@@ -3226,8 +3226,6 @@ namespace {
           // instead of checking if they come from the `std` module.
           if (!d->getDeclName().isIdentifier())
             return false;
-          if (d->getName() == "abs" || d->getName() == "div")
-            return true;
           if (Impl.SwiftContext.LangOpts.Target.isOSDarwin())
             return d->getName() == "strstr" || d->getName() == "sin" ||
                    d->getName() == "cos" || d->getName() == "exit";

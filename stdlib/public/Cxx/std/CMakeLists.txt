@@ -1,3 +1,22 @@
+#
+# API Notes for the C++ Standard Library
+#
+set(output_dir "${SWIFTLIB_DIR}/apinotes")
+add_custom_target(CxxStdlib-apinotes
+    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
+    COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes
+    COMMENT "Copying CxxStdlib API Notes to ${output_dir}")
+
+swift_install_in_component(FILES std.apinotes
+    DESTINATION "lib/swift/apinotes"
+    COMPONENT compiler)
+
+set_property(TARGET CxxStdlib-apinotes PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay CxxStdlib-apinotes)
+add_dependencies(compiler CxxStdlib-apinotes)
+
+
 # Swift compiler currently assumes that the Darwin overlay is a dependency of
 # CxxStdlib, and fails to build CxxStdlib if Darwin.swiftmodule in build dir
 # is built with a different (older) version of the compiler. To workaround this,
@@ -34,4 +53,4 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     TARGET_SDKS ALL_APPLE_PLATFORMS LINUX WINDOWS
     INSTALL_IN_COMPONENT compiler
     INSTALL_WITH_SHARED
-    DEPENDS libstdcxx-modulemap libcxxshim_modulemap)
+    DEPENDS libstdcxx-modulemap libcxxshim_modulemap CxxStdlib-apinotes)
