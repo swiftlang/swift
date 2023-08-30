@@ -428,22 +428,40 @@ static void dumpSubstitutionMapRec(
     SubstitutionMap::DumpStyle style, unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
+static Type defaultGetTypeOfExpr(Expr *E) { return E->getType(); }
+static Type defaultGetTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
+  return E->getComponents()[index].getComponentType();
+}
+
 namespace {
-  class PrintPattern : public PatternVisitor<PrintPattern> {
+  class PrintBase {
   public:
     raw_ostream &OS;
     unsigned Indent;
+    llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
+    llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
+    llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+        GetTypeOfKeyPathComponent;
 
-    explicit PrintPattern(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent) { }
+    explicit PrintBase(raw_ostream &os, unsigned indent = 0,
+                       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
+                       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
+                       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
+      : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
+        GetTypeOfTypeRepr(getTypeOfTypeRepr),
+        GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
 
-    void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-    void printRec(Expr *E) { E->dump(OS, Indent + 2); }
-    void printRec(Stmt *S, const ASTContext &Ctx) { S->dump(OS, &Ctx, Indent + 2); }
+    void printRec(Decl *D);
+    void printRec(Expr *E);
+    void printRec(Stmt *S, const ASTContext *Ctx);
     void printRec(TypeRepr *T);
-    void printRec(const Pattern *P) {
-      PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
-    }
+    void printRec(const Pattern *P);
+  };
+
+  class PrintPattern : public PatternVisitor<PrintPattern>, public PrintBase {
+  public:
+    using PrintBase::PrintBase;
 
     raw_ostream &printCommon(Pattern *P, const char *Name) {
       OS.indent(Indent);
@@ -555,21 +573,11 @@ namespace {
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.
-  class PrintDecl : public DeclVisitor<PrintDecl> {
+  class PrintDecl : public DeclVisitor<PrintDecl>, PrintBase {
   public:
-    raw_ostream &OS;
-    unsigned Indent;
-
-    explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent) { }
+    using PrintBase::PrintBase;
 
   private:
-    void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
-    void printRec(Expr *E) { E->dump(OS, Indent+2); }
-    void printRec(Stmt *S, const ASTContext &Ctx) { S->dump(OS, &Ctx, Indent+2); }
-    void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
-    void printRec(TypeRepr *T);
-
     void printWhereRequirements(
         PointerUnion<const AssociatedTypeDecl *, const GenericContext *> Owner)
         const {
@@ -1151,7 +1159,7 @@ namespace {
 
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
-        printRec(Body, D->getASTContext());
+        printRec(Body, &D->getASTContext());
       }
     }
 
@@ -1200,7 +1208,7 @@ namespace {
       printCommon(TLCD, "top_level_code_decl");
       if (TLCD->getBody()) {
         OS << "\n";
-        printRec(TLCD->getBody(), static_cast<Decl *>(TLCD)->getASTContext());
+        printRec(TLCD->getBody(), &static_cast<Decl *>(TLCD)->getASTContext());
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1214,7 +1222,7 @@ namespace {
         if (auto *SubExpr = Elt.dyn_cast<Expr*>())
           printRec(SubExpr);
         else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          printRec(SubStmt, Ctx);
+          printRec(SubStmt, &Ctx);
         else
           printRec(Elt.get<Decl*>());
       }
@@ -1522,29 +1530,23 @@ void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
 
 namespace {
 /// PrintStmt - Visitor implementation of Stmt::dump.
-class PrintStmt : public StmtVisitor<PrintStmt> {
+class PrintStmt : public StmtVisitor<PrintStmt>, public PrintBase {
 public:
-  raw_ostream &OS;
+  using PrintBase::PrintBase;
   const ASTContext *Ctx;
-  unsigned Indent;
 
-  PrintStmt(raw_ostream &os, const ASTContext *ctx, unsigned indent)
-    : OS(os), Ctx(ctx), Indent(indent) {
-  }
+  PrintStmt(raw_ostream &os, const ASTContext *ctx, unsigned indent = 0,
+            llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
+            llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
+            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
+    : PrintBase(os, indent, getTypeOfExpr, getTypeOfTypeRepr,
+                getTypeOfKeyPathComponent), Ctx(ctx) { }
+
+  using PrintBase::printRec;
 
   void printRec(Stmt *S) {
-    Indent += 2;
-    if (S)
-      visit(S);
-    else
-      OS.indent(Indent) << "(**NULL STATEMENT**)";
-    Indent -= 2;
-  }
-
-  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-  void printRec(Expr *E) { E->dump(OS, Indent + 2); }
-  void printRec(const Pattern *P) {
-    PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
+    PrintBase::printRec(S, Ctx);
   }
 
   void printRec(StmtConditionElement C) {
@@ -1776,26 +1778,22 @@ public:
     if (S->hasUnknownAttr())
       OS << " @unknown";
 
+    Indent += 2;
     if (S->hasCaseBodyVariables()) {
       OS << '\n';
-      OS.indent(Indent + 2);
+      OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_body_variables";
-      OS << '\n';
       for (auto *vd : S->getCaseBodyVariables()) {
-        OS.indent(2);
-        // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
-        // should see if we can factor this dumping so that the caller of
-        // printRec(VarDecl) has more control over the printing.
+        OS << '\n';
         printRec(vd);
       }
-      OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
-      OS.indent(Indent + 2);
+      OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_label_item";
       if (LabelItem.isDefault())
@@ -1806,10 +1804,12 @@ public:
       }
       if (auto *Guard = LabelItem.getGuardExpr()) {
         OS << '\n';
-        Guard->dump(OS, Indent+4);
+        printRec(const_cast<Expr *>(Guard));
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
+    Indent -= 2;
+
     OS << '\n';
     printRec(S->getBody());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -1871,32 +1871,9 @@ void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
 
 namespace {
 /// PrintExpr - Visitor implementation of Expr::dump.
-class PrintExpr : public ExprVisitor<PrintExpr> {
+class PrintExpr : public ExprVisitor<PrintExpr>, public PrintBase {
 public:
-  raw_ostream &OS;
-  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
-  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-      GetTypeOfKeyPathComponent;
-  unsigned Indent;
-
-  PrintExpr(raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-            llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
-            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-                getTypeOfKeyPathComponent,
-            unsigned indent)
-      : OS(os), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeRepr(getTypeOfTypeRepr),
-        GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
-
-  void printRec(Expr *E) {
-    Indent += 2;
-    if (E)
-      visit(E);
-    else
-      OS.indent(Indent) << "(**NULL EXPRESSION**)";
-    Indent -= 2;
-  }
+  using PrintBase::PrintBase;
 
   void printRecLabeled(Expr *E, StringRef label) {
     Indent += 2;
@@ -1911,12 +1888,8 @@ public:
 
   /// FIXME: This should use ExprWalker to print children.
 
-  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-  void printRec(Stmt *S, const ASTContext &Ctx) { S->dump(OS, &Ctx, Indent + 2); }
-  void printRec(const Pattern *P) {
-    PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
-  }
-  void printRec(TypeRepr *T);
+  using PrintBase::printRec;
+
   void printRec(ProtocolConformanceRef conf) {
     conf.dump(OS, Indent + 2);
   }
@@ -2669,7 +2642,7 @@ public:
     }
 
     OS << '\n';
-    printRec(E->getBody(), E->getASTContext());
+    printRec(E->getBody(), &E->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitAutoClosureExpr(AutoClosureExpr *E) {
@@ -3044,7 +3017,7 @@ public:
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E) {
     printCommon(E, "single_value_stmt_expr");
     OS << '\n';
-    printRec(E->getStmt(), E->getDeclContext()->getASTContext());
+    printRec(E->getStmt(), &E->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3064,7 +3037,7 @@ public:
     printRec(E->getSubExpr());
     OS << '\n';
 
-    printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
+    printRec(E->getBody(), &E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3122,18 +3095,14 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent,
-            Indent)
+  PrintExpr(OS, Indent, getTypeOfExpr, getTypeOfTypeRepr,
+            getTypeOfKeyPathComponent)
       .visit(const_cast<Expr *>(this));
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  auto getTypeOfExpr = [](Expr *E) -> Type { return E->getType(); };
-  auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
-    return E->getComponents()[index].getComponentType();
-  };
-  dump(OS, getTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
-       getTypeOfKeyPathComponent, Indent);
+  dump(OS, defaultGetTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
+       defaultGetTypeOfKeyPathComponent, Indent);
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
@@ -3153,8 +3122,8 @@ void ArgumentList::dump(raw_ostream &OS, unsigned Indent) const {
   auto getTypeOfKeyPathComponent = [](KeyPathExpr *E, unsigned index) -> Type {
     return E->getComponents()[index].getComponentType();
   };
-  PrintExpr printer(OS, getTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
-                    getTypeOfKeyPathComponent, Indent);
+  PrintExpr printer(OS, Indent, getTypeOfExpr, /*getTypeOfTypeRepr*/ nullptr,
+                    getTypeOfKeyPathComponent);
   printer.printArgumentList(this, /*indent*/ false);
   llvm::errs() << '\n';
 }
@@ -3164,17 +3133,9 @@ void ArgumentList::dump(raw_ostream &OS, unsigned Indent) const {
 //===----------------------------------------------------------------------===//
 
 namespace {
-class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr> {
+class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr>, public PrintBase {
 public:
-  raw_ostream &OS;
-  unsigned Indent;
-
-  PrintTypeRepr(raw_ostream &os, unsigned indent)
-    : OS(os), Indent(indent) { }
-
-  void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-  void printRec(Expr *E) { E->dump(OS, Indent + 2); }
-  void printRec(TypeRepr *T) { PrintTypeRepr(OS, Indent + 2).visit(T); }
+  using PrintBase::PrintBase;
 
   raw_ostream &printCommon(const char *Name) {
     OS.indent(Indent);
@@ -3431,23 +3392,51 @@ public:
   }
 };
 
+void PrintBase::printRec(Decl *D) {
+  if (!D)
+    OS.indent(Indent + 2) << "(<null decl>)";
+  else
+    PrintDecl(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+              GetTypeOfKeyPathComponent).visit(D);
+}
+void PrintBase::printRec(Expr *E) {
+  if (!E)
+    OS.indent(Indent + 2) << "(<null expr>)";
+  else
+    PrintExpr(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+              GetTypeOfKeyPathComponent).visit(E);
+}
+void PrintBase::printRec(Stmt *S, const ASTContext *Ctx) {
+  if (!S)
+    OS.indent(Indent + 2) << "(<null stmt>)";
+  else
+    PrintStmt(OS, Ctx, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+              GetTypeOfKeyPathComponent).visit(S);
+}
+void PrintBase::printRec(TypeRepr *T) {
+  if (!T)
+    OS.indent(Indent + 2) << "(<null typerepr>)";
+  else
+    PrintTypeRepr(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+                  GetTypeOfKeyPathComponent).visit(T);
+}
+void PrintBase::printRec(const Pattern *P) {
+  if (!P)
+    OS.indent(Indent + 2) << "(<null pattern>)";
+  else
+    PrintPattern(OS, Indent + 2, GetTypeOfExpr, GetTypeOfTypeRepr,
+                 GetTypeOfKeyPathComponent).visit(const_cast<Pattern *>(P));
+}
+
+
 } // end anonymous namespace
 
-void PrintDecl::printRec(TypeRepr *T) {
-  PrintTypeRepr(OS, Indent+2).visit(T);
-}
-
-void PrintExpr::printRec(TypeRepr *T) {
-  PrintTypeRepr(OS, Indent+2).visit(T);
-}
-
-void PrintPattern::printRec(TypeRepr *T) {
-  PrintTypeRepr(OS, Indent+2).visit(T);
-}
-
 void TypeRepr::dump() const {
-  PrintTypeRepr(llvm::errs(), 0).visit(const_cast<TypeRepr*>(this));
+  dump(llvm::errs());
   llvm::errs() << '\n';
+}
+void TypeRepr::dump(raw_ostream &os, unsigned indent) const {
+  PrintTypeRepr(os, indent).visit(const_cast<TypeRepr*>(this));
 }
 
 // Recursive helpers to avoid infinite recursion for recursive protocol
@@ -3750,10 +3739,7 @@ void SubstitutionMap::dump() const {
 //===----------------------------------------------------------------------===//
 
 namespace {
-  class PrintType : public TypeVisitor<PrintType, void, StringRef> {
-    raw_ostream &OS;
-    unsigned Indent;
-
+  class PrintType : public TypeVisitor<PrintType, void, StringRef>, public PrintBase {
     raw_ostream &printCommon(StringRef label, StringRef name) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -3798,7 +3784,7 @@ namespace {
     }
 
   public:
-    PrintType(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) { }
+    PrintType(raw_ostream &os, unsigned indent) : PrintBase(os, indent) { }
 
     void printRec(Type type) {
       printRec("", type);

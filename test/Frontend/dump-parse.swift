@@ -99,8 +99,8 @@ enum MyEnum {
 // CHECK-NEXT:      (sequence_expr type='<null>'
 // CHECK-NEXT:        (discard_assignment_expr type='<null>')
 // CHECK-NEXT:        (assign_expr type='<null>'
-// CHECK-NEXT:          (**NULL EXPRESSION**)
-// CHECK-NEXT:          (**NULL EXPRESSION**))
+// CHECK-NEXT:          (<null expr>)
+// CHECK-NEXT:          (<null expr>))
 // CHECK-NEXT:        (closure_expr type='<null>' discriminator={{[0-9]+}}
 // CHECK-NEXT:          (parameter_list range=[{{.+}}]
 // CHECK-NEXT:            (parameter "v"))
