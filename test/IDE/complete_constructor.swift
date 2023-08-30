@@ -312,8 +312,8 @@ class DependentTypeInClosure<Data: DataType> {
 func testDependentTypeInClosure() {
   let _: DependentTypeInClosure = .#^DEPENDENT_IN_CLOSURE_3^#
 // DEPENDENT_IN_CLOSURE_3: Begin completions, 2 items
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
-// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal: init({#(arg): DataType#}, {#fn: (DataType.Content) -> Void##(DataType.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal: init({#arg: DataType#}, {#fn: () -> DataType.Content##() -> DataType.Content#})[#DependentTypeInClosure<DataType>#];
 
   let _ = DependentTypeInClosure(#^DEPENDENT_IN_CLOSURE_1^#)
 // DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#(arg): DataType#}, {#fn: (_) -> Void##(_) -> Void#}[')'][#DependentTypeInClosure<DataType>#];

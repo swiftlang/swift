@@ -880,9 +880,10 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     }
 
     auto expr = parseExpr(diag::expected_expr_yield);
-    if (expr.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Stmt>();
-    if (expr.isParseErrorOrHasCompletion()) {
+    if (expr.hasCodeCompletion() && expr.isNonNull()) {
+      status |= expr;
+      yields.push_back(expr.get());
+    } else if (expr.isParseErrorOrHasCompletion()) {
       auto endLoc = (Tok.getLoc() == beginLoc ? beginLoc : PreviousLoc);
       yields.push_back(
         new (Context) ErrorExpr(SourceRange(beginLoc, endLoc)));
