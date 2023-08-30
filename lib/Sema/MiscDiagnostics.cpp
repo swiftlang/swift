@@ -3850,7 +3850,20 @@ class SingleValueStmtUsageChecker final : public ASTWalker {
   llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
 
 public:
-  SingleValueStmtUsageChecker(ASTContext &ctx) : Ctx(ctx), Diags(ctx.Diags) {}
+  SingleValueStmtUsageChecker(
+      ASTContext &ctx, ASTNode root,
+      llvm::Optional<ContextualTypePurpose> contextualPurpose)
+      : Ctx(ctx), Diags(ctx.Diags) {
+    assert(!root.is<Expr *>() || contextualPurpose &&
+           "Must provide contextual purpose for expr");
+
+    // If we have a contextual purpose, this is for an expression. Check if it's
+    // an expression in a valid position.
+    if (contextualPurpose) {
+      markAnyValidTopLevelSingleValueStmt(root.get<Expr *>(),
+                                          *contextualPurpose);
+    }
+  }
 
 private:
   /// Mark a given expression as a valid position for a SingleValueStmtExpr.
@@ -3862,8 +3875,23 @@ private:
       ValidSingleValueStmtExprs.insert(SVE);
   }
 
+  /// Mark a valid top-level expression with a given contextual purpose.
+  void markAnyValidTopLevelSingleValueStmt(Expr *E, ContextualTypePurpose ctp) {
+    // Allowed in returns, throws, and bindings.
+    switch (ctp) {
+    case CTP_ReturnStmt:
+    case CTP_ReturnSingleExpr:
+    case CTP_ThrowStmt:
+    case CTP_Initialization:
+      markValidSingleValueStmt(E);
+      break;
+    default:
+      break;
+    }
+  }
+
   MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
+    return MacroWalking::ArgumentsAndExpansion;
   }
 
   AssignExpr *findAssignment(Expr *E) const {
@@ -3989,18 +4017,25 @@ private:
     if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
       for (auto idx : range(PBD->getNumPatternEntries()))
         markValidSingleValueStmt(PBD->getInit(idx));
+
+      return Action::Continue();
     }
-    // Valid as a single expression body of a function. This is needed in
-    // addition to ReturnStmt checking, as we will remove the return if the
-    // expression is inferred to be Never.
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (AFD->hasSingleExpressionBody())
-        markValidSingleValueStmt(AFD->getSingleExpressionBody());
-    }
-    return Action::Continue();
+    // We don't want to walk into any other decl, we will visit them as part of
+    // typeCheckDecl.
+    return Action::SkipChildren();
   }
 };
 } // end anonymous namespace
+
+void swift::diagnoseOutOfPlaceExprs(
+    ASTContext &ctx, ASTNode root,
+    llvm::Optional<ContextualTypePurpose> contextualPurpose) {
+  // TODO: We ought to consider moving this into pre-checking such that we can
+  // still diagnose on invalid code, and don't have to traverse over implicit
+  // exprs. We need to first separate out SequenceExpr folding though.
+  SingleValueStmtUsageChecker sveChecker(ctx, root, contextualPurpose);
+  root.walk(sveChecker);
+}
 
 /// Apply the warnings managed by VarDeclUsageChecker to the top level
 /// code declarations that haven't been checked yet.
@@ -4009,8 +4044,6 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   auto &ctx = TLCD->getDeclContext()->getASTContext();
   VarDeclUsageChecker checker(TLCD, ctx.Diags);
   TLCD->walk(checker);
-  SingleValueStmtUsageChecker sveChecker(ctx);
-  TLCD->walk(sveChecker);
 }
 
 /// Perform diagnostics for func/init/deinit declarations.
@@ -4026,10 +4059,6 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
     auto &ctx = AFD->getDeclContext()->getASTContext();
     VarDeclUsageChecker checker(AFD, ctx.Diags);
     AFD->walk(checker);
-
-    // Do a similar walk to check for out of place SingleValueStmtExprs.
-    SingleValueStmtUsageChecker sveChecker(ctx);
-    AFD->walk(sveChecker);
   }
 
   auto *body = AFD->getBody();
@@ -5864,10 +5893,10 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
 //===----------------------------------------------------------------------===//
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
-void swift::performSyntacticExprDiagnostics(const Expr *E,
-                                            const DeclContext *DC,
-                                            bool isExprStmt,
-                                            bool disableExprAvailabilityChecking) {
+void swift::performSyntacticExprDiagnostics(
+    const Expr *E, const DeclContext *DC,
+    llvm::Optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
+    bool disableExprAvailabilityChecking, bool disableOutOfPlaceExprChecking) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -5886,6 +5915,8 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseConstantArgumentRequirement(E, DC);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
+  if (!disableOutOfPlaceExprChecking)
+    diagnoseOutOfPlaceExprs(ctx, const_cast<Expr *>(E), contextualPurpose);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

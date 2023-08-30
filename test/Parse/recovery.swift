@@ -81,9 +81,7 @@ func missingControllingExprInIf() {
 
   if { // expected-error {{missing condition in 'if' statement}}
   } // expected-error {{expected '{' after 'if' condition}}
-  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
-  // expected-error@-4 {{'if' must have an unconditional 'else' to be used as expression}}
+  // expected-error@-2 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
 
   if // expected-error {{missing condition in 'if' statement}}
   {
@@ -239,7 +237,7 @@ func missingControllingExprInForEach() {
 func missingControllingExprInSwitch() {
   switch
 
-  switch { // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+  switch { // expected-error {{expected expression in 'switch' statement}}
   } // expected-error {{expected '{' after 'switch' subject expression}}
 
   switch // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
