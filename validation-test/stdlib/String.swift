@@ -8,6 +8,10 @@
 // XFAIL: interpret
 // UNSUPPORTED: freestanding
 
+// Only run these tests with a just-built stdlib.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 // With a non-optimized stdlib the test takes very long.
 // REQUIRES: optimized_stdlib
 
