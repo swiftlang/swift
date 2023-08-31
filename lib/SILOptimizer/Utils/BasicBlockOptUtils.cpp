@@ -367,3 +367,12 @@ StaticInitCloner::clone(SingleValueInstruction *initVal) {
   }
   return cast<SingleValueInstruction>(getMappedValue(initVal));
 }
+
+// START: Workaround for C++ interop
+#include <tuple>
+template std::pair<SILInstruction *, SILInstruction *> std::make_pair<>(SILInstruction *&&, SILInstruction *&&);
+template std::pair<SILValue, SILInstruction *> std::make_pair<>(SILValue &&, SILInstruction *&&);
+template std::pair<SILType, SILType> std::make_pair<>(SILType &&, SILType &&);
+template llvm::DomTreeNodeBase<SILBasicBlock> *&std::get<0>(std::tuple<llvm::DomTreeNodeBase<SILBasicBlock> *, std::default_delete<llvm::DomTreeNodeBase<SILBasicBlock>>> &);
+template std::default_delete<llvm::DomTreeNodeBase<SILBasicBlock>> &std::get<1>(std::tuple<llvm::DomTreeNodeBase<SILBasicBlock> *, std::default_delete<llvm::DomTreeNodeBase<SILBasicBlock>>> &);
+// END: Workaround for C++ interop

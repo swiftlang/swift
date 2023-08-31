@@ -37,6 +37,19 @@ function(add_swift_macro_library name)
     return()
   endif()
 
+  # Add rpath to 'lib/{platform}'
+  file(RELATIVE_PATH relpath_to_lib
+    "${SWIFT_HOST_PLUGINS_DEST_DIR}"
+    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+  )
+  _set_pure_swift_link_flags(${name} "${relpath_to_lib}")
+
+  # Add rpath to 'lib/host'
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+    set_property(TARGET ${name}
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/..")
+  endif()
+
   # Install into the plugin directory.
   set_target_properties(${name}
     PROPERTIES
@@ -44,12 +57,14 @@ function(add_swift_macro_library name)
       LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_PLUGINS_DEST_DIR}"
   )
 
+  set(destination_dir "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins")
+
   swift_install_in_component(TARGETS ${name}
     LIBRARY
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
+      DESTINATION "${destination_dir}"
       COMPONENT compiler
     ARCHIVE
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins"
+      DESTINATION "${destination_dir}"
       COMPONENT compiler)
 
   # Export this macro plugin target.

@@ -36,7 +36,7 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
     def should_build(self, host_target):
         # Temporarily disable for non-darwin since this build never works
         # outside of that case currently.
-        if sys.platform != 'darwin':
+        if sys.platform != 'darwin' and sys.platform != 'linux':
             return False
 
         if self.args.build_early_swiftsyntax:
@@ -73,18 +73,10 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         pass
 
     def should_install(self, host_target):
-        """should_install() -> Bool
-
-        Whether or not this product should be installed with the given
-        arguments.
-        """
-        return self.should_build(host_target) and self.args.install_swiftsyntax
+        # The artifacts are copied to build directory of 'swift' and are
+        # installed as a part of 'swift' product.
+        return False
 
     def install(self, host_target):
-        """
-        Perform the install phase for the product.
-
-        This phase might copy the artifacts from the previous phases into a
-        destination directory.
-        """
-        self.install_with_cmake(["install"], self.host_install_destdir(host_target))
+        # No-op.
+        pass
