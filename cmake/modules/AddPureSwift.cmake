@@ -76,7 +76,7 @@ function(_set_pure_swift_link_flags name relpath_to_lib_dir)
       APPEND PROPERTY INSTALL_RPATH
         # At runtime, use swiftCore in the current just-built toolchain.
         # NOTE: This relies on the ABI being the same as the builder.
-        "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
+        "$ORIGIN/${relpath_to_lib_dir}swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
     )
     # NOTE: At this point we don't have any pure swift executables/shared
     # libraries required for building runtime/stdlib. So we don't need to add
@@ -285,7 +285,7 @@ function(add_pure_swift_host_tool name)
   # Create the library.
   add_executable(${name} ${APSHT_SOURCES})
   _add_host_swift_compile_options(${name})
-  _set_pure_swift_link_flags(${name} "../lib")
+  _set_pure_swift_link_flags(${name} "../lib/")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set_property(TARGET ${name}
