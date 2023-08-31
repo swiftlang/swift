@@ -298,15 +298,18 @@ private:
 
 protected:
   /// Not const because may reexpand some scopes.
-  ASTScopeImpl *findInnermostEnclosingScope(SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScope(ModuleDecl *,
+                                            SourceLoc,
                                             NullablePtr<raw_ostream>);
-  ASTScopeImpl *findInnermostEnclosingScopeImpl(SourceLoc,
+  ASTScopeImpl *findInnermostEnclosingScopeImpl(ModuleDecl *,
+                                                SourceLoc,
                                                 NullablePtr<raw_ostream>,
                                                 SourceManager &,
                                                 ScopeCreator &);
 
 private:
-  NullablePtr<ASTScopeImpl> findChildContaining(SourceLoc loc,
+  NullablePtr<ASTScopeImpl> findChildContaining(ModuleDecl *,
+                                                SourceLoc loc,
                                                 SourceManager &sourceMgr) const;
 
 #pragma mark - - lookup- per scope
