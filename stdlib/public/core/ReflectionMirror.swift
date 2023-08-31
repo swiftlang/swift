@@ -36,7 +36,7 @@ internal func _getRecursiveChildCount(_: Any.Type) -> Int
 internal func _getChildMetadata(
   _: Any.Type,
   index: Int,
-  fieldMetadata: UnsafeMutablePointer<_FieldReflectionMetadata>
+  @_forwardedToC fieldMetadata: UnsafeMutablePointer<_FieldReflectionMetadata>
 ) -> Any.Type
 
 @_silgen_name("swift_reflectionMirror_recursiveChildOffset")
@@ -52,8 +52,8 @@ internal func _getChild<T>(
   of: T,
   type: Any.Type,
   index: Int,
-  outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
-  outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
+  @_forwardedToC outName: UnsafeMutablePointer<UnsafePointer<CChar>?>,
+  @_forwardedToC outFreeFunc: UnsafeMutablePointer<NameFreeFunc?>
 ) -> Any
 
 // Returns 'c' (class), 'e' (enum), 's' (struct), 't' (tuple), or '\0' (none)
