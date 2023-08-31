@@ -103,13 +103,13 @@ enum _ClockID: Int32 {
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_time")
 internal func _getTime(
-  seconds: UnsafeMutablePointer<Int64>,
-  nanoseconds: UnsafeMutablePointer<Int64>,
+  @_forwardedToC seconds: UnsafeMutablePointer<Int64>,
+  @_forwardedToC nanoseconds: UnsafeMutablePointer<Int64>,
   clock: CInt)
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_get_clock_res")
 internal func _getClockRes(
-  seconds: UnsafeMutablePointer<Int64>,
-  nanoseconds: UnsafeMutablePointer<Int64>,
+  @_forwardedToC seconds: UnsafeMutablePointer<Int64>,
+  @_forwardedToC nanoseconds: UnsafeMutablePointer<Int64>,
   clock: CInt)
