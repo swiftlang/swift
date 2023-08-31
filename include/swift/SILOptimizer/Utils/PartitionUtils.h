@@ -152,8 +152,9 @@ public:
     return sourceExpr;
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
-    raw_ostream &os = llvm::errs();
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     switch (OpKind) {
     case PartitionOpKind::Assign:
       os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
@@ -221,7 +222,7 @@ private:
 
     auto fail = [&](Element i, int type) {
       llvm::dbgs() << "FAIL(i=" << i << "; type=" << type << "): ";
-      dump();
+      print(llvm::dbgs());
       return false;
     };
 
@@ -367,14 +368,10 @@ public:
         fst_reduced.merge(i, Element(snd_label));
     }
 
-    LLVM_DEBUG(
-        llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
-        fst.dump();
-        llvm::dbgs() << "SND: ";
-        snd.dump();
-        llvm::dbgs() << "RESULT: ";
-        fst_reduced.dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
+               fst.print(llvm::dbgs()); llvm::dbgs() << "SND: ";
+               snd.print(llvm::dbgs()); llvm::dbgs() << "RESULT: ";
+               fst_reduced.print(llvm::dbgs()););
 
     assert(fst_reduced.is_canonical_correct());
 
@@ -516,24 +513,27 @@ public:
     llvm::dbgs() << "}\n";
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     std::map<Region, std::vector<Element>> buckets;
 
     for (auto [i, label] : labels)
       buckets[label].push_back(i);
 
-    llvm::dbgs() << "[";
+    os << "[";
     for (auto [label, indices] : buckets) {
-      llvm::dbgs() << (label.isConsumed() ? "{" : "(");
+      os << (label.isConsumed() ? "{" : "(");
       int j = 0;
       for (Element i : indices) {
-        llvm::dbgs() << (j++ ? " " : "") << i;
+        os << (j++ ? " " : "") << i;
       }
-      llvm::dbgs() << (label.isConsumed() ? "}" : ")");
+      os << (label.isConsumed() ? "}" : ")");
     }
-    llvm::dbgs() << "]\n";
+    os << "]\n";
   }
 };
-}
+
+} // namespace swift
 
 #endif // SWIFT_PARTITIONUTILS_H

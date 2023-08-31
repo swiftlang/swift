@@ -904,8 +904,8 @@ public:
       break;
     }
 
-    LLVM_DEBUG(llvm::errs() << "warning: ";
-               llvm::errs() << "unhandled instruction kind "
+    LLVM_DEBUG(llvm::dbgs() << "warning: ";
+               llvm::dbgs() << "unhandled instruction kind "
                             << getSILInstructionName(inst->getKind()) << "\n";);
 
     return {};
@@ -915,16 +915,11 @@ public:
   // transformations to the non-Sendable partition that it induces.
   // it accomplished this by sequentially calling translateSILInstruction
   std::vector<PartitionOp> translateSILBasicBlock(SILBasicBlock *basicBlock) {
-    LLVM_DEBUG(
-        llvm::dbgs() << SEP_STR
-                     << "Compiling basic block for function "
-                     << basicBlock->getFunction()->getName()
-                     << ": ";
-        basicBlock->dumpID();
-        llvm::dbgs() << SEP_STR;
-        basicBlock->dump();
-        llvm::dbgs() << SEP_STR << "Results:\n";
-    );
+    LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Compiling basic block for function "
+                            << basicBlock->getFunction()->getName() << ": ";
+               basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
+               basicBlock->print(llvm::dbgs());
+               llvm::dbgs() << SEP_STR << "Results:\n";);
 
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
@@ -937,18 +932,14 @@ public:
         LLVM_DEBUG(
             if (translationIndex != lastTranslationIndex) {
               llvm::dbgs() << " ┌─┬─╼";
-              instruction.dump();
+              instruction.print(llvm::dbgs());
               llvm::dbgs() << " │ └─╼  ";
               instruction.getLoc().getSourceLoc().printLineAndColumn(
                   llvm::dbgs(), function->getASTContext().SourceMgr);
               llvm::dbgs() << " │ translation #" << translationIndex;
               llvm::dbgs() << "\n └─────╼ ";
-            } else {
-              llvm::dbgs() << "      └╼ ";
-            }
-            op.dump();
-            lastTranslationIndex = translationIndex;
-        );
+            } else { llvm::dbgs() << "      └╼ "; } op.print(llvm::dbgs());
+            lastTranslationIndex = translationIndex;);
       }
     }
 
@@ -1038,36 +1029,32 @@ public:
     return exitPartition;
   }
 
-  void dump() LLVM_ATTRIBUTE_USED {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     LLVM_DEBUG(
-        llvm::dbgs() << SEP_STR
-                     << "BlockPartitionState[reached="
-                     << reached
-                     << ", needsUpdate="
-                     << needsUpdate
-                     << "]\nid: ";
-        basicBlock->dumpID();
-        llvm::dbgs() << "entry partition: ";
-        entryPartition.dump();
-        llvm::dbgs() << "exit partition: ";
-        exitPartition.dump();
-        llvm::dbgs() << "instructions:\n┌──────────╼\n";
-        for (PartitionOp op : blockPartitionOps) {
-          llvm::dbgs() << "│ ";
-          op.dump();
-        }
-        llvm::dbgs() << "└──────────╼\nSuccs:\n";
-        for (auto succ : basicBlock->getSuccessorBlocks()) {
-          llvm::dbgs() << "→";
-          succ->dumpID();
-        }
-        llvm::dbgs() << "Preds:\n";
-        for (auto pred : basicBlock->getPredecessorBlocks()) {
-          llvm::dbgs() << "←";
-          pred->dumpID();
-        }
-        llvm::dbgs()<< SEP_STR;
-    );
+        os << SEP_STR << "BlockPartitionState[reached=" << reached
+           << ", needsUpdate=" << needsUpdate << "]\nid: ";
+        basicBlock->printID(os); os << "entry partition: ";
+        entryPartition.print(os); os << "exit partition: ";
+        exitPartition.print(os);
+        os << "instructions:\n┌──────────╼\n"; for (PartitionOp op
+                                                    : blockPartitionOps) {
+          os << "│ ";
+          op.print(os);
+        } os << "└──────────╼\nSuccs:\n";
+        for (auto succ
+             : basicBlock->getSuccessorBlocks()) {
+          os << "→";
+          succ->printID(os);
+        } os
+        << "Preds:\n";
+        for (auto pred
+             : basicBlock->getPredecessorBlocks()) {
+          os << "←";
+          pred->printID(os);
+        } os
+        << SEP_STR;);
   }
 };
 
@@ -1223,17 +1210,19 @@ public:
     }
   }
 
-  void dump() const {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     forEachConsumeRequire(
-        [](const PartitionOp& consumeOp, unsigned numProcessed, unsigned numSkipped) {
-          llvm::dbgs() << " ┌──╼ CONSUME: ";
-          consumeOp.dump();
+        [&](const PartitionOp &consumeOp, unsigned numProcessed,
+            unsigned numSkipped) {
+          os << " ┌──╼ CONSUME: ";
+          consumeOp.print(os);
         },
-        [](const PartitionOp& requireOp) {
-          llvm::dbgs() << " ├╼ REQUIRE: ";
-          requireOp.dump();
-        }
-    );
+        [&](const PartitionOp &requireOp) {
+          os << " ├╼ REQUIRE: ";
+          requireOp.print(os);
+        });
   }
 };
 
@@ -1429,25 +1418,22 @@ class RaceTracer {
   }
 
   bool dumpBlockSearch(SILBasicBlock * SILBlock, TrackableValueID consumedVal) {
-    LLVM_DEBUG(
-        unsigned i = 0;
-        const BlockPartitionState &block = blockStates[SILBlock];
-        Partition working = block.getEntryPartition();
-        llvm::dbgs() << "┌──────────╼\n│ ";
-        working.dump();
-        block.forEachPartitionOp([&](const PartitionOp &op) {
-          llvm::dbgs() << "├[" << i++ << "] ";
-          op.dump();
-          working.apply(op);
-          llvm::dbgs() << "│ ";
-          if (working.isConsumed(consumedVal)) {
-            llvm::errs() << "(" << consumedVal << " CONSUMED) ";
-          }
-          working.dump();
-          return true;
-        });
-        llvm::dbgs() << "└──────────╼\n";
-    );
+    LLVM_DEBUG(unsigned i = 0;
+               const BlockPartitionState &block = blockStates[SILBlock];
+               Partition working = block.getEntryPartition();
+               llvm::dbgs() << "┌──────────╼\n│ "; working.print(llvm::dbgs());
+               block.forEachPartitionOp([&](const PartitionOp &op) {
+                 llvm::dbgs() << "├[" << i++ << "] ";
+                 op.print(llvm::dbgs());
+                 working.apply(op);
+                 llvm::dbgs() << "│ ";
+                 if (working.isConsumed(consumedVal)) {
+                   llvm::dbgs() << "(" << consumedVal << " CONSUMED) ";
+                 }
+                 working.print(llvm::dbgs());
+                 return true;
+               });
+               llvm::dbgs() << "└──────────╼\n";);
     return false;
   }
 
@@ -1624,10 +1610,8 @@ class PartitionAnalysis {
           });
     }
 
-    LLVM_DEBUG(
-        llvm::dbgs() << "Accumulator Complete:\n";
-        raceTracer.getAccumulator().dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
+               raceTracer.getAccumulator().print(llvm::dbgs()););
 
     // ask the raceTracer to report diagnostics at the consumption sites
     // for all the racy requirement sites entered into it above
@@ -1692,22 +1676,20 @@ class PartitionAnalysis {
   }
 
 public:
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  void dump() LLVM_ATTRIBUTE_USED {
-    llvm::dbgs() << "\nPartitionAnalysis[fname=" << function->getName() << "]\n";
+  void print(llvm::raw_ostream &os) const {
+    os << "\nPartitionAnalysis[fname=" << function->getName() << "]\n";
 
     for (auto [_, blockState] : blockStates) {
-      blockState.dump();
+      blockState.print(os);
     }
   }
 
   static void performForFunction(SILFunction *function) {
     auto analysis = PartitionAnalysis(function);
     analysis.solve();
-    LLVM_DEBUG(
-        llvm::dbgs() << "SOLVED: ";
-        analysis.dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "SOLVED: "; analysis.print(llvm::dbgs()););
     analysis.diagnose();
   }
 };
