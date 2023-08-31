@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete
+// RUN: %target-swift-frontend -strict-concurrency=complete -emit-sil -o /dev/null %s -verify
+// RUN: %target-swift-frontend -strict-concurrency=complete -enable-experimental-feature SendNonSendable -emit-sil -o /dev/null %s -verify
+
 // REQUIRES: concurrency
 
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}

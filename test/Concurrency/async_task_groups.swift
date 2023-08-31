@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -174,7 +177,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
   func map<T: Sendable>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /
-    _ transform: @Sendable (Element) async throws -> T
+    _ transform: @Sendable (Element) async throws -> T // expected-note {{parameter 'transform' is implicitly non-escaping}}
   ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
     let defaultParallelism = 2
     let parallelism = requestedParallelism ?? defaultParallelism
@@ -192,8 +195,8 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       var submitted = 0
 
       func submitNext() async throws {
-        group.addTask { [submitted,i] in
-          let value = try await transform(self[i])
+        group.addTask { [submitted,i] in // expected-error {{escaping closure captures non-escaping parameter 'transform'}}
+          let value = try await transform(self[i]) // expected-note {{captured here}}
           return SendableTuple2(submitted, value)
         }
         submitted += 1

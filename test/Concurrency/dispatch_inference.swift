@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking %import-libdispatch -warn-concurrency
+// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %import-libdispatch -warn-concurrency %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 

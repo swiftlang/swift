@@ -111,6 +111,8 @@ def verify : Flag<["-"], "verify">,
            "annotations">;
 def verify_additional_file : Separate<["-"], "verify-additional-file">,
   HelpText<"Verify diagnostics in this file in addition to source files">;
+def verify_additional_prefix : Separate<["-"], "verify-additional-prefix">,
+  HelpText<"Check for diagnostics with the prefix expected-<PREFIX> as well as expected-">;
 def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
 def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,

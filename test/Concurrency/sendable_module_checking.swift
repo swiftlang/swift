@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -warn-concurrency %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
+
+// We leave this as just type check since we are checking something that is cross module.
 // RUN: %target-swift-frontend -typecheck -strict-concurrency=targeted -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
 
 // REQUIRES: concurrency

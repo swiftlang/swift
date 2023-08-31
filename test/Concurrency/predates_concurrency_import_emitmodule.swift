@@ -4,6 +4,9 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
 
 // RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies
+// RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=targeted
+// RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-module -I %t -verify -primary-file %s -emit-module-path %t/predates_concurrency_import_swiftmodule.swiftmodule -experimental-skip-all-function-bodies -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

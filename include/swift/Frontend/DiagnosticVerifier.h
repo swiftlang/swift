@@ -94,12 +94,15 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   SmallVector<unsigned, 4> AdditionalBufferIDs;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
+  ArrayRef<std::string> AdditionalExpectedPrefixes;
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              bool AutoApplyFixes, bool IgnoreUnknown)
+                              bool AutoApplyFixes, bool IgnoreUnknown,
+                              ArrayRef<std::string> AdditionalExpectedPrefixes)
       : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
-        IgnoreUnknown(IgnoreUnknown) {}
+        IgnoreUnknown(IgnoreUnknown),
+        AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
 
   void appendAdditionalBufferID(unsigned bufferID) {
     AdditionalBufferIDs.push_back(bufferID);

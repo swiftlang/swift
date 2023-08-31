@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift -enable-infer-public-sendable
+// RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -enable-infer-public-sendable %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 func acceptCV<T: Sendable>(_: T) { }
 
