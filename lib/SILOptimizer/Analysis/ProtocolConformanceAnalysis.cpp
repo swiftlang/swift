@@ -70,7 +70,12 @@ public:
 };
 } // end anonymous namespace
 
-void ProtocolConformanceAnalysis::init() {
+// FIXME: This could be implemented as a request.
+void ProtocolConformanceAnalysis::populateConformanceCacheIfNecessary() {
+  if (ProtocolConformanceCache.has_value())
+    return;
+
+  ProtocolConformanceCache.emplace();
 
   // We only do this in Whole-Module compilation mode.
   if (!M->isWholeModule())
@@ -84,7 +89,7 @@ void ProtocolConformanceAnalysis::init() {
 
   /// This operation is quadratic and should only be performed
   /// in whole module compilation!
-  NominalTypeWalker Walker(ProtocolConformanceCache);
+  NominalTypeWalker Walker(*ProtocolConformanceCache);
   for (auto *D : Decls) {
     D->walk(Walker);
   }
