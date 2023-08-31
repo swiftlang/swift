@@ -3,6 +3,10 @@
 // RUN: %target-codesign %t/voucher_propagation
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
+// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=targeted -verify
+// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=complete -verify -verify-additional-prefix complete-sns-
+// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable -verify -verify-additional-prefix complete-sns-
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
@@ -15,7 +19,7 @@
 // REQUIRES: OS=macosx
 
 import Darwin
-import Dispatch
+import Dispatch // expected-remark {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
 import StdlibUnittest
 
 // These are an attempt to simulate some kind of async work, and the
@@ -159,7 +163,7 @@ func withVouchers(call: @Sendable @escaping (voucher_t?, voucher_t?, voucher_t?)
 
       // Clear any voucher that the call adopted.
       adopt(voucher: nil)
-      group.leave()
+      group.leave() // expected-complete-sns-warning {{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
     }
     group.wait()
 
@@ -348,7 +352,7 @@ if #available(SwiftStdlib 5.1, *) {
            _ = await (g, add)
 
            if await n.get() >= limit {
-             group.leave()
+             group.leave() // expected-warning 2{{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
            } else {
              await n.increment()
              await detachedTask()

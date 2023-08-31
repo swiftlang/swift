@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify -disable-availability-checking %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // expected-error @+1 {{non-async functions cannot inherit an executor}}
 @_unsafeInheritExecutor

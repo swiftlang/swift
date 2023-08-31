@@ -1,10 +1,14 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted
+// RUN: %target-swift-frontend -verify -strict-concurrency=targeted -verify-additional-prefix targeted-and-complete- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix targeted-and-complete- -verify-additional-prefix complete-and-sns- -verify-additional-prefix complete- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix sns- -verify-additional-prefix complete-and-sns- -emit-sil -o /dev/null %s -enable-experimental-feature SendNonSendable 
+
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
 @available(SwiftStdlib 5.1, *)
 struct NS1 { }
-// expected-note@-1 2{{consider making struct 'NS1' conform to the 'Sendable' protocol}}
+// expected-note @-1 {{consider making struct 'NS1' conform to the 'Sendable' protocol}}
+// expected-targeted-and-complete-note @-2 {{consider making struct 'NS1' conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
@@ -12,7 +16,8 @@ extension NS1: Sendable { }
 // expected-note@-1 4{{conformance of 'NS1' to 'Sendable' has been explicitly marked unavailable here}}
 
 @available(SwiftStdlib 5.1, *)
-struct NS2 { // expected-note{{consider making struct 'NS2' conform to the 'Sendable' protocol}}
+struct NS2 { // expected-note {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
+  // expected-complete-and-sns-note @-1 {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
   var ns1: NS1
 }
 
@@ -23,7 +28,8 @@ struct NS3 { }
 extension NS3: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-class NS4 { } // expected-note{{class 'NS4' does not conform to the 'Sendable' protocol}}
+class NS4 { } // expected-note {{class 'NS4' does not conform to the 'Sendable' protocol}}
+// expected-complete-and-sns-note @-1 {{class 'NS4' does not conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 func acceptCV<T: Sendable>(_: T) { }
@@ -34,15 +40,22 @@ func acceptSendableFn(_: @Sendable @escaping () -> Void) { }
 func testCV(
   ns1: NS1, ns1array: [NS1], ns2: NS2, ns3: NS3, ns4: NS4,
   fn: @escaping () -> Void
-  // expected-note@-1{{parameter 'fn' is implicitly non-sendable}}
+  // expected-note @-1 {{parameter 'fn' is implicitly non-sendable}}
 ) {
-  acceptCV(ns1) // expected-warning{{conformance of 'NS1' to 'Sendable' is unavailable}}
-  acceptCV(ns1array) // expected-warning{{conformance of 'NS1' to 'Sendable' is unavailable}}
-  acceptCV(ns2)
-  acceptCV(ns3) // expected-warning{{conformance of 'NS3' to 'Sendable' is only available in macOS 11.0 or newer}}
-  // expected-note@-1{{add 'if #available' version check}}
-  acceptCV(ns4)
-  acceptCV(fn)
+  acceptCV(ns1) // expected-warning {{conformance of 'NS1' to 'Sendable' is unavailable}}
+
+  acceptCV(ns1array) // expected-warning {{conformance of 'NS1' to 'Sendable' is unavailable}}
+
+  acceptCV(ns2) // expected-complete-and-sns-warning {{type 'NS2' does not conform to the 'Sendable' protocol}}
+
+  acceptCV(ns3) // expected-warning {{conformance of 'NS3' to 'Sendable' is only available in macOS 11.0 or newer}}
+  // expected-note @-1 {{add 'if #available' version check}}
+
+  acceptCV(ns4) // expected-complete-and-sns-warning {{type 'NS4' does not conform to the 'Sendable' protocol}}
+
+  acceptCV(fn) // expected-complete-and-sns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-complete-and-sns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+
   acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
 }
 
@@ -81,7 +94,7 @@ public actor MyActor: MyProto {
   public func bar<B>(aBar: B) async where B: Sendable { }
 
   func g(ns1: NS1) async {
-    await nonisolatedAsyncFunc1(ns1) // expected-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
+    await nonisolatedAsyncFunc1(ns1) // expected-targeted-and-complete-warning{{passing argument of non-sendable type 'NS1' outside of actor-isolated context may introduce data races}}
     _ = await nonisolatedAsyncFunc2() // expected-warning{{non-sendable type 'NS1' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
   }
 }
@@ -233,7 +246,9 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 
 @available(SwiftStdlib 5.1, *)
 final class NonSendable {
-  // expected-note@-1 6 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // SendNonSendable emits 3 fewer errors here.
+  // expected-targeted-and-complete-note @-3 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -243,10 +258,10 @@ final class NonSendable {
 
   func call() async {
     await update()
-    // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
 
     await self.update()
-    // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
@@ -263,8 +278,8 @@ final class NonSendable {
 func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
-  // expected-warning@-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
 
   _ = await t.x
-  // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
 }

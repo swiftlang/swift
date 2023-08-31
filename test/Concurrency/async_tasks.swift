@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=targeted -disable-availability-checking
+// RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking %s -o /dev/null -verify -emit-sil
+// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil
+// RUN: %target-swift-frontend -strict-concurrency=strict -disable-availability-checking %s -o /dev/null -verify -emit-sil -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

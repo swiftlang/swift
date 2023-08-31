@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
 
