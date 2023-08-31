@@ -5860,6 +5860,18 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Extern_DECL_ATTR: {
+        bool isImplicit;
+        unsigned moduleNameSize, declNameSize;
+        serialization::decls_block::ExternDeclAttrLayout::readRecord(
+            scratch, isImplicit, moduleNameSize, declNameSize);
+        StringRef moduleName = blobData.substr(0, moduleNameSize);
+        blobData = blobData.substr(moduleNameSize);
+        StringRef declName = blobData.substr(0, declNameSize);
+        Attr = new (ctx) ExternAttr(moduleName, declName, isImplicit);
+        break;
+      }
+
       case decls_block::Documentation_DECL_ATTR: {
         bool isImplicit;
         uint64_t CategoryID;

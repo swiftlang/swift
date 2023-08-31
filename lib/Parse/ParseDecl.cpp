@@ -1431,6 +1431,83 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
       parameters, whereClause));
 }
 
+bool Parser::parseExternAttribute(DeclAttributes &Attributes,
+                                  bool &DiscardAttribute, StringRef AttrName,
+                                  SourceLoc AtLoc, SourceLoc Loc) {
+
+  // Parse @_extern(<language>, ...)
+  if (!consumeIf(tok::l_paren)) {
+    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+             DeclAttribute::isDeclModifier(DAK_Extern));
+    return false;
+  }
+  auto diagnoseExpectLanguage = [&]() {
+    diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
+             "wasm");
+  };
+  if (Tok.isNot(tok::identifier)) {
+    diagnoseExpectLanguage();
+    return false;
+  }
+
+  if (Tok.getText() != "wasm") {
+    diagnoseExpectLanguage();
+    DiscardAttribute = true;
+  }
+  consumeToken(tok::identifier);
+
+  // Parse @_extern(wasm, module: "x", name: "y")
+  auto parseStringLiteralArgument = [&](StringRef fieldName, StringRef &fieldValue) {
+    if (!consumeIf(tok::comma) || Tok.isNot(tok::identifier) || Tok.getText() != fieldName) {
+      diagnose(Loc, diag::attr_extern_expected_label, fieldName);
+      return false;
+    }
+    consumeToken(tok::identifier);
+
+    if (!consumeIf(tok::colon)) {
+      diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, fieldName);
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+    llvm::Optional<StringRef> importModuleName =
+        getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
+    consumeToken(tok::string_literal);
+
+    if (!importModuleName.has_value()) {
+      DiscardAttribute = true;
+      return false;
+    }
+    fieldValue = importModuleName.value();
+    return true;
+  };
+
+  StringRef importModuleName, importName;
+  if (!parseStringLiteralArgument("module", importModuleName))
+    DiscardAttribute = true;
+
+  if (!parseStringLiteralArgument("name", importName))
+    DiscardAttribute = true;
+
+  if (!consumeIf(tok::r_paren)) {
+    diagnose(Loc, diag::attr_expected_rparen, AttrName,
+             DeclAttribute::isDeclModifier(DAK_Extern));
+    return false;
+  }
+
+  auto AttrRange = SourceRange(Loc, Tok.getLoc());
+
+  if (!DiscardAttribute) {
+    Attributes.add(new (Context) ExternAttr(importModuleName, importName, AtLoc,
+                                            AttrRange,
+                                            /*Implicit=*/false));
+  }
+  return false;
+}
+
 // Attribute parsing error helper.
 // For the given parentheses depth, skip until ')' and consume it if possible.
 // If no ')' is found, produce error.
@@ -3165,6 +3242,12 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         llvm_unreachable("out of sync with switch");
     }
 
+    break;
+  }
+
+  case DAK_Extern: {
+    if (!parseExternAttribute(Attributes, DiscardAttribute, AttrName, AtLoc, Loc))
+      return makeParserSuccess();
     break;
   }
 

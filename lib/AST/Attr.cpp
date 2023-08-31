@@ -1138,6 +1138,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
   }
+
+  case DAK_Extern: {
+    auto *Attr = cast<ExternAttr>(this);
+    Printer.printAttrName("@_extern");
+    // For now, it accepts only "wasm" as its kind.
+    Printer << "(wasm, module: \"" << Attr->ModuleName << "\", name: \"" << Attr->Name << "\")";
+    break;
+  }
+
   case DAK_Section:
     Printer.printAttrName("@_section");
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
@@ -1708,6 +1717,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DAK_RawLayout:
     return "_rawLayout";
+  case DAK_Extern:
+    return "_extern";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

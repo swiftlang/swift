@@ -84,6 +84,9 @@ ERROR(require_const_initializer_for_const,none,
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
 
+ERROR(func_decl_no_body_expected,PointsToFirstBadToken,
+      "unexpected body of function declaration", ())
+
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
 

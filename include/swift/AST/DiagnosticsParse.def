@@ -1867,6 +1867,8 @@ ERROR(attr_rawlayout_expected_integer_count,none,
 ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in @_rawLayout attribute", (StringRef, StringRef))
 
+ERROR(attr_extern_expected_label,none,
+      "expected %0 argument to @_extern attribute", (StringRef))
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
