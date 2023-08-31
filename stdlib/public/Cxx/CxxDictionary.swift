@@ -30,7 +30,7 @@ public protocol CxxDictionary<Key, Value> {
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
-  
+
   /// Do not implement this function manually in Swift.
   mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator
 
