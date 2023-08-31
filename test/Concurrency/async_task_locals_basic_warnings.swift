@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
-// RUN: %target-typecheck-verify-swift -I %t  -disable-availability-checking -warn-concurrency -parse-as-library
+
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 
 // REQUIRES: concurrency

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency -parse-as-library
+// RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 
 class GlobalCounter {

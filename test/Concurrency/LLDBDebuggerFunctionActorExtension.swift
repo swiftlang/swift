@@ -1,4 +1,8 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -debugger-support
+// RUN: %target-swift-frontend  -disable-availability-checking -debugger-support %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend  -disable-availability-checking -debugger-support %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend  -disable-availability-checking -debugger-support %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking -debugger-support %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 
 // This test simulates LLDB's expression evaluator making an otherwise illegal

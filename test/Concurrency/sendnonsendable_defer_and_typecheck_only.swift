@@ -1,7 +1,7 @@
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+
 // REQUIRES: concurrency
 // REQUIRES: asserts
-
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 /*
  This file tests the experimental SendNonSendable feature. This feature causes the passing
