@@ -1636,11 +1636,25 @@ public:
   }
 
   [[nodiscard]]
+  bool doIt(ArgumentList *ArgList, unsigned Idx) {
+    auto Arg = ArgList->get(Idx);
+    return traverse(
+        Walker.walkToArgumentPre(Arg),
+        [&]() {
+          auto *E = doIt(Arg.getExpr());
+          if (!E)
+            return true;
+          ArgList->setExpr(Idx, E);
+          return false;
+        },
+        [&]() { return Walker.walkToArgumentPost(Arg); });
+  }
+
+  [[nodiscard]]
   ArgumentList *visit(ArgumentList *ArgList) {
     for (auto Idx : indices(*ArgList)) {
-      auto *E = doIt(ArgList->getExpr(Idx));
-      if (!E) return nullptr;
-      ArgList->setExpr(Idx, E);
+      if (doIt(ArgList, Idx))
+        return nullptr;
     }
     return ArgList;
   }
