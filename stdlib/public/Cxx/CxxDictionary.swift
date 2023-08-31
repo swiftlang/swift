@@ -14,7 +14,7 @@
 ///
 /// C++ standard library types such as `std::map` and `std::unordered_map`
 /// conform to this protocol.
-public protocol CxxDictionary where Key: Hashable {
+public protocol CxxDictionary<Key, Value> {
   associatedtype Key
   associatedtype Value
   associatedtype Element: CxxPair<Key, Value>
