@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
+// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -typecheck -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
 // RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
@@ -31,5 +31,14 @@
 // CHECK:       }
 
 // CHECK:       public struct PublicStruct {
+// CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:         public static func publicStaticMethod()
+// CHECK:       }
+
+// CHECK:       public class PublicClass {
+// CHECK:         public init(x: Swift.Int)
+// CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:         public class func publicClassMethod()
+// CHECK:         deinit
 // CHECK:       }

@@ -61,11 +61,23 @@ protocol InternalProto {
 public struct PublicStruct {
   // FIXME: Test properties
 
+  public init(x: Int) {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+
   public func publicMethod() -> Int {
     return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
   }
 
+  public static func publicStaticMethod() {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+
   func internalMethod() -> DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
+    return 1
+  }
+
+  static func internalStaticMethod() -> DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
     return 1
   }
 }
@@ -76,6 +88,32 @@ struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'Does
   func f(_ x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
 
+public class PublicClass {
+  // FIXME: Test properties
+
+  public init(x: Int) {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+
+  // FIXME: TBDGen causes this constructor to be type checked
+//  init(_ x: DoesNotExist) {}
+
+  public func publicMethod() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+
+  public class func publicClassMethod() {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+
+  // FIXME: TBDGen causes these methods to be type checked
+//  func internalMethod() -> DoesNotExist {}
+//  class func internalClassMethod() -> DoesNotExist {}
+}
+
+class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
+  init(x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
+}
 // FIXME: Test enums
 // FIXME: Test conformances
 // FIXME: Test global vars

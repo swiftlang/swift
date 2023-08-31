@@ -20,6 +20,14 @@ func testGlobalFunctions() {
   }
 }
 
-func testPublicStruct(_ s: PublicStruct) {
+func testPublicStruct() {
+  var s = PublicStruct(x: 1)
   _ = s.publicMethod()
+  PublicStruct.publicStaticMethod()
+}
+
+func testPublicClass() {
+  let c = PublicClass(x: 2)
+  _ = c.publicMethod()
+  PublicClass.publicClassMethod()
 }
