@@ -1865,6 +1865,10 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
 
+def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
+  Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
+  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 

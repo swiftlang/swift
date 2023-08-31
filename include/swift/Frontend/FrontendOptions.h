@@ -148,6 +148,9 @@ public:
   /// CacheKey for input file.
   std::string InputFileKey;
 
+  /// CacheReplay PrefixMap.
+  std::vector<std::string> CacheReplayPrefixMap;
+
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;
