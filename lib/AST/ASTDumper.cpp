@@ -501,11 +501,9 @@ public:
 
       auto label = arg.getLabel();
       if (!label.empty()) {
-        PrintWithColorRAII(OS, ArgumentsColor) << " label=";
-        PrintWithColorRAII(OS, ArgumentsColor) << label.str();
+        printField("label", label.str(), ArgumentsColor);
       }
-      if (arg.isInOut())
-        PrintWithColorRAII(OS, ArgModifierColor) << " inout";
+      printFlag(arg.isInOut(), "inout", ArgModifierColor);
 
       printRec(arg.getExpr());
       printFoot();
@@ -521,16 +519,15 @@ public:
   void visitArgumentList(const ArgumentList *argList, StringRef label = "") {
     printHead("argument_list", ExprColor, label);
 
-    if (argList->isImplicit())
-      PrintWithColorRAII(OS, ArgModifierColor) << " implicit";
+    printFlag(argList->isImplicit(), "implicit", ArgModifierColor);
 
     if (argList->hasAnyArgumentLabels()) {
-      PrintWithColorRAII(OS, ArgumentsColor) << " labels=";
-      for (auto arg : *argList) {
-        auto label = arg.getLabel();
-        PrintWithColorRAII(OS, ArgumentsColor)
-            << (label.empty() ? "_" : label.str()) << ":";
-      }
+      printFieldRaw("labels", [&](raw_ostream &OS) {
+        for (auto arg : *argList) {
+          auto label = arg.getLabel();
+          OS << (label.empty() ? "_" : label.str()) << ":";
+        }
+      }, ArgumentsColor);
     }
 
     for (auto arg : *argList) {
@@ -568,8 +565,8 @@ public:
     printRecRaw([&](StringRef Label) {
       printHead((Clause.Cond ? "#if:" : "#else:"), StmtColor, Label);
 
-      if (Clause.isActive)
-        PrintWithColorRAII(OS, DeclModifierColor) << " active";
+      printFlag(Clause.isActive, "active", DeclModifierColor);
+
       if (Clause.Cond) {
         printRec(Clause.Cond);
       }
@@ -607,6 +604,21 @@ public:
     return OS;
   }
 
+  // Print a single flag.
+  raw_ostream &printFlag(StringRef name, TerminalColor color = FieldLabelColor) {
+    PrintWithColorRAII(OS, color) << " " << name;
+    return OS;
+  }
+
+  // Print a single flag if it is set.
+  raw_ostream &printFlag(bool isSet, StringRef name,
+                         TerminalColor color = FieldLabelColor) {
+    if (isSet)
+      printFlag(name, color);
+
+    return OS;
+  }
+
   void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
                      StringRef label = "location") {
     if (!L.isValid() || !Ctx)
@@ -636,8 +648,7 @@ public:
     raw_ostream &printCommon(Pattern *P, const char *Name, StringRef Label) {
      printHead(Name, PatternColor, Label);
 
-      if (P->isImplicit())
-        PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
+      printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
       if (P->hasType()) {
         printFieldQuoted("type", P->getType(), TypeColor);
@@ -760,18 +771,13 @@ public:
 
     void printCommon(Decl *D, const char *Name, StringRef Label,
                      TerminalColor Color = DeclColor) {
-     printHead(Name, Color, Label);
+      printHead(Name, Color, Label);
 
-      if (D->isImplicit())
-        PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
-
-      if (D->isHoisted())
-        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
-
+      printFlag(D->isImplicit(), "implicit", DeclModifierColor);
+      printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
       printSourceRange(D->getSourceRange(), &D->getASTContext());
-
-      if (D->TrailingSemiLoc.isValid())
-        PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
+      printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
+                DeclModifierColor);
     }
 
     void printInherited(InheritedTypes Inherited) {
@@ -787,9 +793,7 @@ public:
     void visitImportDecl(ImportDecl *ID, StringRef label) {
       printCommon(ID, "import_decl", label);
 
-      if (ID->isExported())
-        OS << " exported";
-
+      printFlag(ID->isExported(), "exported");
       if (ID->getImportKind() != ImportKind::Module)
         printField("kind", getDumpString(ID->getImportKind()));
 
@@ -812,7 +816,9 @@ public:
       printCommonPost(ED);
     }
 
-    void printDeclName(const ValueDecl *D) {
+    void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
+      if (leadingSpace)
+        OS << ' ';
       if (D->getName()) {
         PrintWithColorRAII(OS, IdentifierColor)
           << '\"' << D->getName() << '\"';
@@ -820,6 +826,12 @@ public:
         PrintWithColorRAII(OS, IdentifierColor)
           << "'anonname=" << (const void*)D << '\'';
       }
+    }
+
+    void printDeclNameField(StringRef name, const ValueDecl *D) {
+      printFieldRaw(name, [&](raw_ostream &os) {
+        printDeclName(D, /*leadingSpace=*/false);
+      });
     }
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD, StringRef label) {
@@ -835,8 +847,7 @@ public:
 
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD, StringRef label) {
       printCommon(OTD, "opaque_type", label);
-      OS << " naming_decl=";
-      printDeclName(OTD->getNamingDecl());
+      printDeclNameField("naming_decl", OTD->getNamingDecl());
       printFieldRaw("opaque_interface", [&](raw_ostream &OS) {
         OS << OTD->getDeclaredInterfaceType() << " in "
            << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
@@ -896,7 +907,6 @@ public:
                      TerminalColor Color = DeclColor) {
       printCommon((Decl*)VD, Name, Label, Color);
 
-      OS << ' ';
       printDeclName(VD);
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
         printGenericParameters(OS, AFD->getParsedGenericParams());
@@ -931,12 +941,10 @@ public:
 
       auto VarD = dyn_cast<VarDecl>(VD);
       const auto &attrs = VD->getAttrs();
-      if (attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()))
-        OS << " final";
-      if (attrs.hasAttribute<ObjCAttr>())
-        OS << " @objc";
-      if (attrs.hasAttribute<DynamicAttr>())
-        OS << " dynamic";
+      printFlag(attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()),
+                "final");
+      printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
+      printFlag(attrs.hasAttribute<DynamicAttr>(), "dynamic");
       if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
         OS << " @_dynamicReplacement(for: \"";
         OS << attr->getReplacedFunctionName();
@@ -944,19 +952,15 @@ public:
       }
       auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
       if (!lifetimeString.empty())
-        OS << " " << lifetimeString;
+        printFlag(lifetimeString);
     }
 
     void printCommon(NominalTypeDecl *NTD, const char *Name, StringRef Label,
                      TerminalColor Color = DeclColor) {
       printCommon((ValueDecl *)NTD, Name, Label, Color);
 
-      if (NTD->hasInterfaceType()) {
-        if (NTD->isResilient())
-          OS << " resilient";
-        else
-          OS << " non-resilient";
-      }
+      if (NTD->hasInterfaceType())
+        printFlag(NTD->isResilient() ? "resilient" : "non_resilient");
     }
 
     void printCommonPost(const IterableDeclContext *IDC) {
@@ -1004,31 +1008,29 @@ public:
 
     void visitVarDecl(VarDecl *VD, StringRef label) {
       printCommon(VD, "var_decl", label);
-      if (VD->isDistributed())
-        PrintWithColorRAII(OS, DeclModifierColor) << " distributed";
-      if (VD->isLet())
-        PrintWithColorRAII(OS, DeclModifierColor) << " let";
-      if (VD->getAttrs().hasAttribute<LazyAttr>())
-        PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
+
+      printFlag(VD->isDistributed(), "distributed", DeclModifierColor);
+      printFlag(VD->isLet(), "let", DeclModifierColor);
+      printFlag(VD->getAttrs().hasAttribute<LazyAttr>(), "lazy",
+                DeclModifierColor);
       printStorageImpl(VD);
+      printFlag(VD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
+                "known_to_be_local", DeclModifierColor);
+
       printAccessors(VD);
-      if (VD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        OS << " known-to-be-local";
-      }
+      
       printFoot();
     }
 
     void printStorageImpl(AbstractStorageDecl *D) {
-      if (D->isStatic())
-        PrintWithColorRAII(OS, DeclModifierColor) << " type";
+      printFlag(D->isStatic(), "type", DeclModifierColor);
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
         printField("readImpl", getDumpString(impl.getReadImpl()),
                    DeclModifierColor);
         if (!impl.supportsMutation()) {
-          PrintWithColorRAII(OS, DeclModifierColor)
-            << " immutable";
+          printFlag("immutable", DeclModifierColor);
         } else {
           printField("writeImpl", getDumpString(impl.getWriteImpl()),
                      DeclModifierColor);
@@ -1045,14 +1047,11 @@ public:
     }
 
     void visitParamDecl(ParamDecl *PD, StringRef label) {
-      printHead("parameter", ParameterColor, label) << ' ';
-      if (PD->getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
-        OS << "known-to-be-local ";
-      }
+      printHead("parameter", ParameterColor, label);
+
       printDeclName(PD);
       if (!PD->getArgumentName().empty())
         printField("apiName", PD->getArgumentName(), IdentifierColor);
-
       if (PD->hasInterfaceType()) {
         printFieldQuoted("interface type", PD->getInterfaceType(),
                          InterfaceTypeColor);
@@ -1060,39 +1059,35 @@ public:
 
       if (auto specifier = PD->getCachedSpecifier()) {
         if (*specifier != ParamDecl::Specifier::Default) {
-          OS << ' ' << ParamDecl::getSpecifierSpelling(*specifier);
+          printFlag(ParamDecl::getSpecifierSpelling(*specifier));
         }
       }
 
       if (PD->hasInterfaceType())
-        if (PD->isVariadic())
-          OS << " variadic";
-
-      if (PD->isAutoClosure())
-        OS << " autoclosure";
-
-      if (PD->getAttrs().hasAttribute<NonEphemeralAttr>())
-        OS << " nonEphemeral";
+        printFlag(PD->isVariadic(), "variadic");
+      printFlag(PD->isAutoClosure(), "autoclosure");
+      printFlag(PD->getAttrs().hasAttribute<NonEphemeralAttr>(),"nonEphemeral");
 
       auto lifetimeString =
           getDumpString(PD->getLifetimeAnnotationFromAttributes());
       if (!lifetimeString.empty())
-        OS << " " << lifetimeString;
+        printFlag(lifetimeString);
 
-      if (PD->isNoImplicitCopy())
-        OS << " noImplicitCopy";
+      printFlag(PD->isNoImplicitCopy(), "noImplicitCopy");
 
       if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDumpString(PD->getDefaultArgumentKind()));
       }
-
       if (PD->hasDefaultExpr() &&
           !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
         OS << " ";
         PD->getDefaultArgumentCaptureInfo().print(
           PrintWithColorRAII(OS, CapturesColor).getOS());
       }
+      
+      printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
+                "known_to_be_local", DeclModifierColor);
 
       if (auto init = PD->getStructuralDefaultExpr()) {
         printRec(init, "expression");
@@ -1129,13 +1124,12 @@ public:
 
     void visitClassDecl(ClassDecl *CD, StringRef label) {
       printCommon(CD, "class_decl", label);
-      if (CD->isExplicitActor()) {
-        OS << " actor";
-      } else if (CD->isExplicitDistributedActor()) {
-        OS << " distributed actor";
-      }
-      if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
-        OS << " @_staticInitializeObjCMetadata";
+
+      printFlag(CD->isExplicitDistributedActor(), "distributed");
+      printFlag(CD->isExplicitActor(), "actor");
+      printFlag(CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>(),
+                "@_staticInitializeObjCMetadata");
+
       printCommonPost(CD);
     }
 
@@ -1173,15 +1167,10 @@ public:
         D->getCaptureInfo().print(OS);
       }
 
-      if (D->getAttrs().hasAttribute<NonisolatedAttr>()) {
-        PrintWithColorRAII(OS, ExprModifierColor) << " nonisolated";
-      }
-      if (D->isDistributed()) {
-        PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
-      }
-      if (D->isDistributedThunk()) {
-        PrintWithColorRAII(OS, ExprModifierColor) << " distributed-thunk";
-      }
+      printFlag(D->getAttrs().hasAttribute<NonisolatedAttr>(), "nonisolated",
+                ExprModifierColor);
+      printFlag(D->isDistributed(), "distributed", ExprModifierColor);
+      printFlag(D->isDistributedThunk(), "distributed_thunk",ExprModifierColor);
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
@@ -1251,8 +1240,7 @@ public:
 
     void printCommonFD(FuncDecl *FD, const char *type, StringRef Label) {
       printCommonAFD(FD, type, Label);
-      if (FD->isStatic())
-        OS << " type";
+      printFlag(FD->isStatic(), "type");
     }
 
     void visitFuncDecl(FuncDecl *FD, StringRef label) {
@@ -1263,7 +1251,7 @@ public:
 
     void visitAccessorDecl(AccessorDecl *AD, StringRef label) {
       printCommonFD(AD, "accessor_decl", label);
-      OS << " " << getDumpString(AD->getAccessorKind());
+      printFlag(getDumpString(AD->getAccessorKind()));
       printField("for", AD->getStorage()->getName());
       printAbstractFunctionDecl(AD);
       printFoot();
@@ -1271,10 +1259,8 @@ public:
 
     void visitConstructorDecl(ConstructorDecl *CD, StringRef label) {
       printCommonAFD(CD, "constructor_decl", label);
-      if (CD->isRequired())
-        PrintWithColorRAII(OS, DeclModifierColor) << " required";
-      PrintWithColorRAII(OS, DeclModifierColor) << " "
-        << getDumpString(CD->getInitKind());
+      printFlag(CD->isRequired(), "required", DeclModifierColor);
+      printFlag(getDumpString(CD->getInitKind()), DeclModifierColor);
       if (CD->isFailable())
         printField("failable", (CD->isImplicitlyUnwrappedOptional()
                                 ? "ImplicitlyUnwrappedOptional"
@@ -1355,10 +1341,7 @@ public:
 
     void visitModuleDecl(ModuleDecl *MD, StringRef label) {
       printCommon(MD, "module", label);
-
-      if (MD->isNonSwiftModule())
-        OS << " non_swift";
-      
+      printFlag(MD->isNonSwiftModule(), "non_swift");
       printFoot();
     }
 
@@ -1599,13 +1582,9 @@ public:
   raw_ostream &printCommon(Stmt *S, const char *Name, StringRef Label) {
     printHead(Name, StmtColor, Label);
 
-    if (S->isImplicit())
-      OS << " implicit";
-
+    printFlag(S->isImplicit(), "implicit");
     printSourceRange(S->getSourceRange(), Ctx);
-
-    if (S->TrailingSemiLoc.isValid())
-      OS << " trailing_semi";
+    printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
 
     return OS;
   }
@@ -1729,8 +1708,7 @@ public:
   }
   void visitCaseStmt(CaseStmt *S, StringRef label) {
     printCommon(S, "case_stmt", label);
-    if (S->hasUnknownAttr())
-      OS << " @unknown";
+    printFlag(S->hasUnknownAttr(), "@unknown");
 
     if (S->hasCaseBodyVariables()) {
       printRecRange(S->getCaseBodyVariables(), "case_body_variables");
@@ -1739,14 +1717,15 @@ public:
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       printRecRaw([&](StringRef label) {
         printHead("case_label_item", StmtColor, label);
-        if (LabelItem.isDefault())
-          OS << " default";
+        printFlag(LabelItem.isDefault(), "default");
+        
         if (auto *CasePattern = LabelItem.getPattern()) {
           printRec(CasePattern);
         }
         if (auto *Guard = LabelItem.getGuardExpr()) {
           printRec(const_cast<Expr *>(Guard));
         }
+
         printFoot();
       }, "");
     }
@@ -1828,14 +1807,20 @@ public:
     declRef.dump(PrintWithColorRAII(OS, Color).getOS());
   }
 
+  void printDeclRefField(StringRef label, ConcreteDeclRef declRef,
+                         TerminalColor Color = DeclColor) {
+    printFieldRaw(label, [&](raw_ostream &OS) {
+      printDeclRef(declRef, Color);
+    }, Color);
+  }
+
   raw_ostream &printCommon(Expr *E, const char *C, StringRef label) {
     PrintOptions PO;
     PO.PrintTypesForDebugging = true;
 
     printHead(C, ExprColor, label);
 
-    if (E->isImplicit())
-      PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
+    printFlag(E->isImplicit(), "implicit", ExprModifierColor);
     printFieldQuoted("type", GetTypeOfExpr(E).getString(PO), TypeColor);
 
     // If we have a source range and an ASTContext, print the source range.
@@ -1845,8 +1830,7 @@ public:
       printSourceRange(E->getSourceRange(), &Ctx);
     }
 
-    if (E->TrailingSemiLoc.isValid())
-      OS << " trailing_semi";
+    printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
 
     return OS;
   }
@@ -1887,8 +1871,7 @@ public:
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E, StringRef label) {
     printCommon(E, "integer_literal_expr", label);
     
-    if (E->isNegative())
-      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
+    printFlag(E->isNegative(), "negative", LiteralValueColor);
     Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
       printField("value", E->getDigitsText(), LiteralValueColor);
@@ -1902,8 +1885,7 @@ public:
   void visitFloatLiteralExpr(FloatLiteralExpr *E, StringRef label) {
     printCommon(E, "float_literal_expr", label);
     
-    if (E->isNegative())
-      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
+    printFlag(E->isNegative(), "negative", LiteralValueColor);
     printField("value", E->getDigitsText(), LiteralValueColor);
     printInitializerField("builtin_initializer", E->getBuiltinInitializer());
     printInitializerField("initializer", E->getInitializer());
@@ -1940,12 +1922,7 @@ public:
     // Print the trailing quote location
     if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();
-      auto TQL = E->getTrailingQuoteLoc();
-      if (TQL.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
-        TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
-                  Ctx.SourceMgr);
-      }
+      printSourceLoc(E->getTrailingQuoteLoc(), &Ctx, "trailing_quote_loc");
     }
     printField("literal_capacity", E->getLiteralCapacity(), ExprModifierColor);
     printField("interpolation_count", E->getInterpolationCount(),
@@ -1999,11 +1976,9 @@ public:
   void visitDeclRefExpr(DeclRefExpr *E, StringRef label) {
     printCommon(E, "declref_expr", label);
 
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getDeclRef());
+    printDeclRefField("decl", E->getDeclRef());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getDumpString(E->getAccessSemantics());
+      printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
     printField("function_ref", getDumpString(E->getFunctionRefKind()),
                ExprModifierColor);
 
@@ -2017,7 +1992,6 @@ public:
   void visitTypeExpr(TypeExpr *E, StringRef label) {
     printCommon(E, "type_expr", label);
 
-    PrintWithColorRAII(OS, TypeReprColor) << " typerepr='";
     printFieldRaw("typerepr", [&](raw_ostream &OS) {
       OS << '\'';
       if (E->getTypeRepr())
@@ -2032,8 +2006,8 @@ public:
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E, StringRef label) {
     printCommon(E, "other_constructor_ref_expr", label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getDeclRef());
+    PrintWithColorRAII(OS, DeclColor);
+    printDeclRefField("decl", E->getDeclRef());
     printFoot();
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E, StringRef label) {
@@ -2080,13 +2054,11 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E, StringRef label) {
     printCommon(E, "member_ref_expr", label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMember());
+
+    printDeclRefField("decl", E->getMember());
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getDumpString(E->getAccessSemantics());
-    if (E->isSuper())
-      OS << " super";
+      printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
+    printFlag(E->isSuper(), "super");
 
     printRec(E->getBase());
     printFoot();
@@ -2094,8 +2066,8 @@ public:
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, StringRef label) {
     printCommon(E, "dynamic_member_ref_expr", label);
 
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMember());
+    PrintWithColorRAII(OS, DeclColor);
+    printDeclRefField("decl", E->getMember());
 
     printRec(E->getBase());
 
@@ -2197,13 +2169,10 @@ public:
     printCommon(E, "subscript_expr", label);
 
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getDumpString(E->getAccessSemantics());
-    if (E->isSuper())
-      OS << " super";
+      printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
+    printFlag(E->isSuper(), "super");
     if (E->hasDecl()) {
-      PrintWithColorRAII(OS, DeclColor) << " decl=";
-      printDeclRef(E->getDecl());
+      printDeclRefField("decl", E->getDecl());
     }
 
     printRec(E->getBase());
@@ -2220,8 +2189,7 @@ public:
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E, StringRef label) {
     printCommon(E, "dynamic_subscript_expr", label);
 
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMember());
+    printDeclRefField("decl", E->getMember());
 
     printRec(E->getBase());
     printRec(E->getArgs());
@@ -2301,8 +2269,7 @@ public:
   void visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E, StringRef label) {
     printCommon(E, "conditional_bridge_from_objc_expr", label);
 
-    OS << " conversion=";
-    printDeclRef(E->getConversion());
+    printDeclRefField("conversion", E->getConversion());
 
     printRec(E->getSubExpr());
 
@@ -2535,10 +2502,10 @@ public:
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
     if (auto Ty = GetTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
-        if (!fType->getExtInfo().isNoEscape())
-          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
-        if (fType->getExtInfo().isSendable())
-          PrintWithColorRAII(OS, ClosureModifierColor) << " concurrent";
+        printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
+                  ClosureModifierColor);
+        printFlag(fType->getExtInfo().isSendable(), "sendable",
+                  ClosureModifierColor);
       }
     }
 
@@ -2547,18 +2514,18 @@ public:
 
   void visitClosureExpr(ClosureExpr *E, StringRef label) {
     printClosure(E, "closure_expr", label);
-    if (E->hasSingleExpressionBody())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " single-expression";
-    if (E->allowsImplicitSelfCapture())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " implicit-self";
-    if (E->inheritsActorContext())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " inherits-actor-context";
+    printFlag(E->hasSingleExpressionBody(), "single_expression",
+              ClosureModifierColor);
+    printFlag(E->allowsImplicitSelfCapture(), "implicit_self",
+              ClosureModifierColor);
+    printFlag(E->inheritsActorContext(), "inherits_actor_context",
+              ClosureModifierColor);
 
     if (E->getParameters()) {
       printRec(E->getParameters(), &E->getASTContext());
     }
-
     printRec(E->getBody(), &E->getASTContext());
+
     printFoot();
   }
   void visitAutoClosureExpr(AutoClosureExpr *E, StringRef label) {
@@ -2690,10 +2657,8 @@ public:
   void visitArrowExpr(ArrowExpr *E, StringRef label) {
     printCommon(E, "arrow", label);
 
-    if (E->getAsyncLoc().isValid())
-      OS << " async";
-    if (E->getThrowsLoc().isValid())
-      OS << " throws";
+    printFlag(E->getAsyncLoc().isValid(), "async");
+    printFlag(E->getThrowsLoc().isValid(), "throws");
 
     printRec(E->getArgsExpr());
     printRec(E->getResultExpr());
@@ -2742,10 +2707,12 @@ public:
   }
   void visitForceValueExpr(ForceValueExpr *E, StringRef label) {
     printCommon(E, "force_value_expr", label);
-    if (E->isForceOfImplicitlyUnwrappedOptional())
-      PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
+
+    printFlag(E->isForceOfImplicitlyUnwrappedOptional(), "implicit_iuo_unwrap",
+              ExprModifierColor);
 
     printRec(E->getSubExpr());
+
     printFoot();
   }
   void visitOpenExistentialExpr(OpenExistentialExpr *E, StringRef label) {
@@ -2794,8 +2761,7 @@ public:
     printCommon(E, "objc_selector_expr", label);
 
     printField("kind", getDumpString(E->getSelectorKind()));
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMethod());
+    printDeclRefField("decl", E->getMethod());
 
     printRec(E->getSubExpr());
 
@@ -2804,8 +2770,8 @@ public:
 
   void visitKeyPathExpr(KeyPathExpr *E, StringRef label) {
     printCommon(E, "keypath_expr", label);
-    if (E->isObjC())
-      OS << " objc";
+
+    printFlag(E->isObjC(), "objc");
 
     printRecRaw([&](StringRef label) {
       printHead("components", ExprColor, label);
@@ -2831,21 +2797,18 @@ public:
 
           case KeyPathExpr::Component::Kind::Property:
             printHead("property", ASTNodeColor);
-            PrintWithColorRAII(OS, DeclColor) << " decl=";
-            printDeclRef(component.getDeclRef());
+            printDeclRefField("decl", component.getDeclRef());
             break;
 
           case KeyPathExpr::Component::Kind::Subscript:
             printHead("subscript", ASTNodeColor);
-            PrintWithColorRAII(OS, DeclColor) << " decl='";
-            printDeclRef(component.getDeclRef());
-            PrintWithColorRAII(OS, DeclColor) << "'";
+            printDeclRefField("decl", component.getDeclRef());
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedProperty:
             printHead("unresolved_property", ASTNodeColor);
-            PrintWithColorRAII(OS, IdentifierColor)
-              << " decl_name='" << component.getUnresolvedDeclName() << "'";
+            printFieldQuoted("decl_name", component.getUnresolvedDeclName(),
+                             IdentifierColor);
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedSubscript:
@@ -2856,21 +2819,19 @@ public:
             break;
 
           case KeyPathExpr::Component::Kind::TupleElement:
-            printHead("tuple_element", ASTNodeColor) << ' ';
-            PrintWithColorRAII(OS, DiscriminatorColor)
-              << "#" << component.getTupleIndex();
+            printHead("tuple_element", ASTNodeColor);
+            printField("index", component.getTupleIndex(), DiscriminatorColor);
             break;
           case KeyPathExpr::Component::Kind::DictionaryKey:
             printHead("dict_key", ASTNodeColor);
-            PrintWithColorRAII(OS, IdentifierColor)
-              << " key='" << component.getUnresolvedDeclName() << "'";
+            printFieldQuoted("key", component.getUnresolvedDeclName(),
+                             IdentifierColor);
             break;
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor);
             break;
           }
-          PrintWithColorRAII(OS, TypeColor)
-            << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
+          printFieldQuoted("type", GetTypeOfKeyPathComponent(E, i));
           if (auto *args = component.getSubscriptArgs()) {
             printRec(args);
           }
@@ -2914,8 +2875,7 @@ public:
 
   void visitTapExpr(TapExpr *E, StringRef label) {
     printCommon(E, "tap_expr", label);
-    PrintWithColorRAII(OS, DeclColor) << " var=";
-    printDeclRef(E->getVar());
+    printDeclRefField("var", E->getVar());
     printRec(E->getSubExpr());
     printRec(E->getBody(), &E->getVar()->getDeclContext()->getASTContext());
     printFoot();
@@ -3053,10 +3013,8 @@ public:
   void visitFunctionTypeRepr(FunctionTypeRepr *T, StringRef label) {
     printCommon("type_function", label);
 
-    if (T->isAsync())
-      OS << " async";
-    if (T->isThrowing())
-      OS << " throws";
+    printFlag(T->isAsync(), "async");
+    printFlag(T->isThrowing(), "throws");
 
     printRec(T->getArgsTypeRepr());
     printRec(T->getResultTypeRepr());
@@ -3232,9 +3190,8 @@ public:
     for (auto &Field : T->getFields()) {
       printRecRaw([&](StringRef label) {
         printCommon("sil_box_field", label);
-        if (Field.isMutable()) {
-          OS << " mutable";
-        }
+        printFlag(Field.isMutable(), "mutable");
+
         printRec(Field.getFieldType());
         printFoot();
       }, "");
@@ -3620,20 +3577,6 @@ namespace {
       return printHead(name, TypeColor, label);
     }
 
-    // Print a single flag.
-    raw_ostream &printFlag(StringRef name) {
-      PrintWithColorRAII(OS, FieldLabelColor) << " " << name;
-      return OS;
-    }
-
-    // Print a single flag if it is set.
-    raw_ostream &printFlag(bool isSet, StringRef name) {
-      if (isSet)
-        printFlag(name);
-
-      return OS;
-    }
-
     void dumpParameterFlags(ParameterTypeFlags paramFlags) {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
@@ -3835,7 +3778,7 @@ namespace {
       printCommon(label, "metatype_type");
 
       if (T->hasRepresentation())
-        OS << " " << getDumpString(T->getRepresentation());
+        printFlag(getDumpString(T->getRepresentation()));
 
       printRec(T->getInstanceType());
 
@@ -3847,7 +3790,7 @@ namespace {
       printCommon(label, "existential_metatype_type");
 
       if (T->hasRepresentation())
-        OS << " " << getDumpString(T->getRepresentation());
+        printFlag(getDumpString(T->getRepresentation()));
 
       printRec(T->getInstanceType());
 
@@ -4116,8 +4059,8 @@ namespace {
                                       StringRef label) {
 
       printCommon(label, "protocol_composition_type");
-      if (T->hasExplicitAnyObject())
-        OS << " any_object";
+
+      printFlag(T->hasExplicitAnyObject(), "any_object");
 
       for (auto proto : T->getMembers()) {
         printRec(proto);
