@@ -776,9 +776,10 @@ public:
       // insert a no implicit copy
       if (value->getType().isPureMoveOnly()) {
         value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
-        return SGF.B.createMarkMustCheckInst(
+        return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
-            MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
       }
 
       // Otherwise, if we don't have a no implicit copy trivial type, just
@@ -791,9 +792,10 @@ public:
       value =
           SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
       value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
-      return SGF.B.createMarkMustCheckInst(
+      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
-          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
     }
 
     // Otherwise, we need to perform some additional processing. First, if we
@@ -817,16 +819,17 @@ public:
       return value;
 
     // Check if we have a move only type. In that case, we perform a lexical
-    // move and insert a mark_must_check.
+    // move and insert a mark_unresolved_non_copyable_value.
     //
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
         value->getType().isPureMoveOnly()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
-      return SGF.B.createMarkMustCheckInst(
+      return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
-          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
     }
 
     // Otherwise, if we do not have a no implicit copy variable, just follow
@@ -844,9 +847,9 @@ public:
                                     /*isLexical*/ true);
     value = SGF.B.createCopyValue(PrologueLoc, value);
     value = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(PrologueLoc, value);
-    return SGF.B.createMarkMustCheckInst(
+    return SGF.B.createMarkUnresolvedNonCopyableValueInst(
         PrologueLoc, value,
-        MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
   }
 
   void bindValue(SILValue value, SILGenFunction &SGF, bool wasPlusOne,
@@ -1992,8 +1995,9 @@ std::unique_ptr<TemporaryInitialization>
 SILGenFunction::emitTemporary(SILLocation loc, const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
   if (addr->getType().isMoveOnly())
-    addr = B.createMarkMustCheckInst(
-        loc, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+    addr = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, addr,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
   return useBufferAsTemporary(addr, tempTL);
 }
 
@@ -2002,8 +2006,9 @@ SILGenFunction::emitFormalAccessTemporary(SILLocation loc,
                                           const TypeLowering &tempTL) {
   SILValue addr = emitTemporaryAllocation(loc, tempTL.getLoweredType());
   if (addr->getType().isMoveOnly())
-    addr = B.createMarkMustCheckInst(
-        loc, addr, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+    addr = B.createMarkUnresolvedNonCopyableValueInst(
+        loc, addr,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
   CleanupHandle cleanup =
       enterDormantFormalAccessTemporaryCleanup(addr, loc, tempTL);
   return std::unique_ptr<TemporaryInitialization>(
@@ -2175,7 +2180,8 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
     return;
   }
 
-  if (auto *mvi = dyn_cast<MarkMustCheckInst>(Val.getDefiningInstruction())) {
+  if (auto *mvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+          Val.getDefiningInstruction())) {
     if (mvi->hasMoveCheckerKind()) {
       if (auto *cvi = dyn_cast<CopyValueInst>(mvi->getOperand())) {
         if (auto *bbi = dyn_cast<BeginBorrowInst>(cvi->getOperand())) {

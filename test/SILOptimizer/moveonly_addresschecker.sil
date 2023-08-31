@@ -96,7 +96,7 @@ sil @get_nativeobject : $@convention(thin) () -> @owned Builtin.NativeObject
 sil [ossa] @simpleInitReturn : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   %3 = load [copy] %2 : $*NonTrivialStruct
   destroy_addr %2 : $*NonTrivialStruct
@@ -107,7 +107,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturn2 : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct) -> @owned NonTrivialStructPair {
 bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %arg1 to [init] %2 : $*NonTrivialStruct
   %3 = load [copy] %2 : $*NonTrivialStruct
   destroy_addr %2 : $*NonTrivialStruct
@@ -136,7 +136,7 @@ bb0(%arg1 : @owned $NonTrivialStruct, %arg2 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturnMoveOnlyField : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   %3a = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.k
   %3 = load [copy] %3a : $*Klass
@@ -172,7 +172,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -222,7 +222,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock2 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -275,7 +275,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @simpleInitReturnMoveOnlyFieldMultiBlock3 : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack [lexical] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %2 : $*NonTrivialStruct
   cond_br undef, bb1, bb2
 
@@ -309,7 +309,7 @@ bb3(%5 : @owned $Klass):
 sil [ossa] @useVarKlassNoErrorSimple : $@convention(thin) (@owned Klass) -> () {
 bb0(%arg : @owned $Klass):
   %0 = alloc_stack [lexical] $Klass, var, name "k"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*Klass
   store %arg to [init] %1 : $*Klass
   %12 = begin_access [read] [static] %1 : $*Klass
   %13 = load_borrow %12 : $*Klass
@@ -321,7 +321,7 @@ bb0(%arg : @owned $Klass):
   %19 = load [copy] %18 : $*Klass
   end_access %18 : $*Klass
   %21 = move_value [lexical] %19 : $Klass
-  %22 = mark_must_check [consumable_and_assignable] %21 : $Klass
+  %22 = mark_unresolved_non_copyable_value [consumable_and_assignable] %21 : $Klass
   debug_value %22 : $Klass, let, name "k2"
   %25 = move_value %22 : $Klass
   destroy_value %25 : $Klass
@@ -348,7 +348,7 @@ bb0(%arg : @owned $Klass):
 sil [ossa] @classSimpleNonConsumingUseTest : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %4 = alloc_stack [lexical] $Klass, var, name "x2"
-  %5 = mark_must_check [consumable_and_assignable] %4 : $*Klass
+  %5 = mark_unresolved_non_copyable_value [consumable_and_assignable] %4 : $*Klass
   store %0 to [init] %5 : $*Klass
   %9 = begin_access [modify] [static] %5 : $*Klass
   store %1 to [assign] %9 : $*Klass
@@ -378,7 +378,7 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
 sil [ossa] @myBufferViewSetter : $@convention(method) <T> (UnsafeBufferPointer<T>, @inout MyBufferView<T>) -> () {
 bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
   debug_value %0 : $UnsafeBufferPointer<T>, let, name "value", argno 1, implicit
-  %3 = mark_must_check [consumable_and_assignable] %1 : $*MyBufferView<T>
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MyBufferView<T>
   debug_value %3 : $*MyBufferView<T>, var, name "self", argno 2, implicit, expr op_deref
   %5 = begin_access [modify] [static] %3 : $*MyBufferView<T>
   %6 = struct_element_addr %5 : $*MyBufferView<T>, #MyBufferView.ptr
@@ -388,13 +388,13 @@ bb0(%0 : $UnsafeBufferPointer<T>, %1 : $*MyBufferView<T>):
   return %9 : $()
 }
 
-// No transformation here, just make sure that we treat the mark_must_check as
+// No transformation here, just make sure that we treat the mark_unresolved_non_copyable_value as
 // the def so that we don't crash.
 sil [ossa] @test_ref_element_addr_borrow_use : $@convention(thin) (@guaranteed ClassContainingMoveOnly) -> () {
 bb0(%0 : @guaranteed $ClassContainingMoveOnly):
   %f = function_ref @useNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %1 = ref_element_addr %0 : $ClassContainingMoveOnly, #ClassContainingMoveOnly.value
-  %2 = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   %3 = begin_access [read] [dynamic] %2 : $*NonTrivialStruct
   %4 = load_borrow %3 : $*NonTrivialStruct
   apply %f(%4) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
@@ -404,12 +404,12 @@ bb0(%0 : @guaranteed $ClassContainingMoveOnly):
   return %9999 : $()
 }
 
-// No transformation here, just make sure that we treat the mark_must_check as
+// No transformation here, just make sure that we treat the mark_unresolved_non_copyable_value as
 // the def so that we don't crash.
 sil [ossa] @test_global_addr_borrow_use : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $*NonTrivialStruct
-  %1 = mark_must_check [no_consume_or_assign] %0 : $*NonTrivialStruct
+  %1 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStruct
   %2 = begin_access [read] [dynamic] %1 : $*NonTrivialStruct
   %3 = load_borrow %2 : $*NonTrivialStruct
   %4 = function_ref @useNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
@@ -424,7 +424,7 @@ bb0:
 sil [ossa] @test_global_addr_multiple_borrow_uses : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $*NonTrivialStruct
-  %1 = mark_must_check [no_consume_or_assign] %0 : $*NonTrivialStruct
+  %1 = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NonTrivialStruct
   %2 = begin_access [read] [dynamic] %1 : $*NonTrivialStruct
   %3 = load_borrow %2 : $*NonTrivialStruct
   %4 = function_ref @useNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
@@ -448,9 +448,9 @@ bb0:
 // CHECK-NEXT: debug_value [[ARG]]
 sil [ossa] @classSimpleChainArgTestHoistDebugValue : $@convention(thin) (@inout Klass) -> () {
 bb0(%0 : $*Klass):
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*Klass
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*Klass
   %3 = alloc_stack [lexical] $Klass, var, name "y2"
-  %4 = mark_must_check [consumable_and_assignable] %3 : $*Klass
+  %4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %3 : $*Klass
   %5 = begin_access [read] [static] %1 : $*Klass
   copy_addr %5 to [init] %4 : $*Klass
   end_access %5 : $*Klass
@@ -487,7 +487,7 @@ bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
   %9 = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
   %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
   %11 = begin_access [modify] [dynamic] %4 : $*NonTrivialStruct
-  %12 = mark_must_check [assignable_but_not_consumable] %11 : $*NonTrivialStruct
+  %12 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %11 : $*NonTrivialStruct
   store %10 to [assign] %12 : $*NonTrivialStruct
   end_access %11 : $*NonTrivialStruct
   %24 = tuple ()
@@ -513,7 +513,7 @@ bb0(%0 : @guaranteed $ClassContainingMoveOnly):
   %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
   %5 = ref_element_addr %0 : $ClassContainingMoveOnly, #ClassContainingMoveOnly.value
   %6 = begin_access [modify] [dynamic] %5 : $*NonTrivialStruct
-  %7 = mark_must_check [assignable_but_not_consumable] %6 : $*NonTrivialStruct
+  %7 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %6 : $*NonTrivialStruct
   store %10 to [assign] %7 : $*NonTrivialStruct
   end_access %6 : $*NonTrivialStruct
   %11 = tuple ()
@@ -539,7 +539,7 @@ bb0:
   %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = global_addr @$s23moveonly_addresschecker9varGlobalAA16NonTrivialStructVvp : $*NonTrivialStruct
   %1 = begin_access [modify] [dynamic] %0 : $*NonTrivialStruct
-  %2 = mark_must_check [assignable_but_not_consumable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %1 : $*NonTrivialStruct
   store %10 to [assign] %2 : $*NonTrivialStruct
   end_access %1 : $*NonTrivialStruct
   %8 = tuple ()
@@ -551,7 +551,7 @@ sil [ossa] @test_in_use : $@convention(thin) () -> () {
   %9 = function_ref @getNonTrivialStruct : $@convention(thin) () -> @owned NonTrivialStruct
   %10 = apply %9() : $@convention(thin) () -> @owned NonTrivialStruct
   %0 = alloc_stack [moveable_value_debuginfo] $NonTrivialStruct
-  %2 = mark_must_check [consumable_and_assignable] %0 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*NonTrivialStruct
   store %10 to [init] %2 : $*NonTrivialStruct
   %f2 = function_ref @consumeNonTrivialStructAddr : $@convention(thin) (@in NonTrivialStruct) -> ()
   apply %f2(%2) : $@convention(thin) (@in NonTrivialStruct) -> ()
@@ -573,7 +573,7 @@ sil [ossa] @test_in_use : $@convention(thin) () -> () {
 sil [ossa] @load_take_as_load_borrow : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %1a : $*NonTrivialStruct
   %2 = load [take] %1a : $*NonTrivialStruct
   destroy_value %2 : $NonTrivialStruct
@@ -590,7 +590,7 @@ bb0(%0 : @owned $NonTrivialStruct):
 sil [ossa] @load_take_as_load_take : $@convention(thin) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [consumable_and_assignable] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NonTrivialStruct
   store %0 to [init] %1a : $*NonTrivialStruct
   %2 = load [take] %1a : $*NonTrivialStruct
   %f = function_ref @consumeNonTrivialStruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
@@ -643,7 +643,7 @@ sil @end_addr_see_addr : $@convention(thin) (@in M, @in_guaranteed M) -> ()
 sil [ossa] @rdar110909290 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $M2
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*M2
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*M2
   %3 = function_ref @get_M2 : $@convention(thin) () -> @owned M2
   %4 = apply %3() : $@convention(thin) () -> @owned M2
   store %4 to [init] %1 : $*M2
@@ -670,7 +670,7 @@ bb0:
 sil hidden [ossa] @testNoFieldReinit : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] $SingleTrivialFieldAndDeinit, var
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*SingleTrivialFieldAndDeinit
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*SingleTrivialFieldAndDeinit
   %3 = function_ref @getSingleTrivialFieldAndDeinit : $@convention(thin) () -> @owned SingleTrivialFieldAndDeinit
   %4 = apply %3() : $@convention(thin) () -> @owned SingleTrivialFieldAndDeinit
   store %4 to [init] %1 : $*SingleTrivialFieldAndDeinit
@@ -722,11 +722,11 @@ sil @get_fixedsize_queue : $@convention(thin) () -> @owned FixedSizeQueue
 sil [ossa] @test_return_trivial_type : $@convention(thin) (@owned FixedSizeQueue) -> Builtin.Int32 {
 bb0(%0 : @owned $FixedSizeQueue):
   %1 = alloc_stack [lexical] $FixedSizeQueue, var, name "self", implicit
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*FixedSizeQueue
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*FixedSizeQueue
   store %0 to [init] %2 : $*FixedSizeQueue
   %4 = begin_access [modify] [static] %2 : $*FixedSizeQueue
   %5 = alloc_stack $FixedSizeQueue
-  %6 = mark_must_check [consumable_and_assignable] %5 : $*FixedSizeQueue
+  %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $*FixedSizeQueue
   copy_addr %4 to [init] %6 : $*FixedSizeQueue
   %8 = load [take] %6 : $*FixedSizeQueue
   end_access %4 : $*FixedSizeQueue
@@ -770,7 +770,7 @@ bb1:
 bb2:
   %2 = ref_element_addr %0 : $ClassContainingMoveOnly, #ClassContainingMoveOnly.value
   %3 = begin_access [modify] [dynamic] %2 : $*NonTrivialStruct
-  %4 = mark_must_check [assignable_but_not_consumable] %3 : $*NonTrivialStruct
+  %4 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %3 : $*NonTrivialStruct
   %4a = struct_element_addr %4 : $*NonTrivialStruct, #NonTrivialStruct.nonTrivialStruct2
   store %1 to [assign] %4a : $*NonTrivialStruct2
   end_access %3 : $*NonTrivialStruct
@@ -791,7 +791,7 @@ sil [ossa] @testUseCorrectBits : $@convention(method) (Int, @inout NonCopyableNa
 bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectIntPair):
   debug_value %0 : $Int, let, name "index", argno 1
   debug_value %1a : $*NonCopyableNativeObjectIntPair, var, name "self", argno 2, implicit, expr op_deref
-  %1 = mark_must_check [consumable_and_assignable] %1a : $*NonCopyableNativeObjectIntPair
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1a : $*NonCopyableNativeObjectIntPair
   %4 = function_ref @testUseCorrectBitsClosureCallee : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectIntPair) -> Bool
   %5 = partial_apply [callee_guaranteed] [on_stack] %4(%0, %1) : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectIntPair) -> Bool
   %6 = mark_dependence %5 : $@noescape @callee_guaranteed () -> Bool on %1 : $*NonCopyableNativeObjectIntPair
@@ -826,7 +826,7 @@ sil [ossa] @testUseCorrectBits2 : $@convention(method) (Int, @inout NonCopyableN
 bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectPair):
   debug_value %0 : $Int, let, name "index", argno 1
   debug_value %1a : $*NonCopyableNativeObjectPair, var, name "self", argno 2, implicit, expr op_deref
-  %1 = mark_must_check [consumable_and_assignable] %1a : $*NonCopyableNativeObjectPair
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1a : $*NonCopyableNativeObjectPair
   %4 = function_ref @testUseCorrectBits2ClosureCallee : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectPair) -> Bool
   %5 = partial_apply [callee_guaranteed] [on_stack] %4(%0, %1) : $@convention(thin) (Int, @inout_aliasable NonCopyableNativeObjectPair) -> Bool
   %6 = mark_dependence %5 : $@noescape @callee_guaranteed () -> Bool on %1 : $*NonCopyableNativeObjectPair
@@ -848,7 +848,7 @@ bb0(%0 : $Int, %1a : $*NonCopyableNativeObjectPair):
 sil [ossa] @testSupportStoreBorrow : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 bb0(%0 : @guaranteed $NonTrivialStruct):
   %1 = alloc_stack $NonTrivialStruct
-  %1a = mark_must_check [no_consume_or_assign] %1 : $*NonTrivialStruct
+  %1a = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $*NonTrivialStruct
   %borrow = store_borrow %0 to %1a : $*NonTrivialStruct
   %f = function_ref @useNonTrivialStruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %l = load_borrow %borrow : $*NonTrivialStruct

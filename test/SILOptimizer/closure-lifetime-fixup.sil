@@ -329,7 +329,7 @@ sil @testTrivialBorrowTakeClosure : $@convention(thin) (@guaranteed @noescape @c
 sil [ossa] @testTrivialBorrow : $@convention(thin) (Int) -> Int {
 bb0(%0 : @noImplicitCopy @_eagerMove $Int):
   %1 = alloc_stack $@moveOnly Int, var, name "i"
-  %2 = mark_must_check [consumable_and_assignable] %1 : $*@moveOnly Int
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly Int
   %3 = moveonlywrapper_to_copyable_addr %2 : $*@moveOnly Int
   store %0 to [trivial] %3 : $*Int
   %5 = begin_access [read] [static] %2 : $*@moveOnly Int

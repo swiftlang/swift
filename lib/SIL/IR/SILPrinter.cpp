@@ -2078,8 +2078,9 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
-  void visitMarkMustCheckInst(MarkMustCheckInst *I) {
-    using CheckKind = MarkMustCheckInst::CheckKind;
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *I) {
+    using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
     switch (I->getCheckKind()) {
     case CheckKind::Invalid:
       llvm_unreachable("Invalid?!");

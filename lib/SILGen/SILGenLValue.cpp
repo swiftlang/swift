@@ -820,13 +820,15 @@ namespace {
       // NOTE: We purposely do this on the access itself to ensure that when we
       // hoist destroy_addr, they stay within the access scope.
       if (result->getType().isMoveOnly()) {
-        auto checkKind =
-            MarkMustCheckInst::CheckKind::AssignableButNotConsumable;
+        auto checkKind = MarkUnresolvedNonCopyableValueInst::CheckKind::
+            AssignableButNotConsumable;
         if (isReadAccess(getAccessKind())) {
-          // Add a mark_must_check [no_consume_or_assign].
-          checkKind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+          // Add a mark_unresolved_non_copyable_value [no_consume_or_assign].
+          checkKind =
+              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign;
         }
-        result = SGF.B.createMarkMustCheckInst(loc, result, checkKind);
+        result = SGF.B.createMarkUnresolvedNonCopyableValueInst(loc, result,
+                                                                checkKind);
       }
 
       return ManagedValue::forLValue(result);
@@ -1134,16 +1136,19 @@ namespace {
             addr = enterAccessScope(SGF, loc, base, addr, getTypeData(),
                                     getAccessKind(), *Enforcement,
                                     takeActorIsolation());
-          // Mark all move only as having mark_must_check.
+          // Mark all move only as having mark_unresolved_non_copyable_value.
           //
-          // DISCUSSION: LValue access to let boxes must have a mark_must_check
-          // to allow for DI to properly handle delayed initialization of the
-          // boxes and convert those to initable_but_not_consumable.
-          addr = SGF.B.createMarkMustCheckInst(
+          // DISCUSSION: LValue access to let boxes must have a
+          // mark_unresolved_non_copyable_value to allow for DI to properly
+          // handle delayed initialization of the boxes and convert those to
+          // initable_but_not_consumable.
+          addr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
               loc, addr,
               isReadAccess(getAccessKind())
-                  ? MarkMustCheckInst::CheckKind::NoConsumeOrAssign
-                  : MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+                  ? MarkUnresolvedNonCopyableValueInst::CheckKind::
+                        NoConsumeOrAssign
+                  : MarkUnresolvedNonCopyableValueInst::CheckKind::
+                        AssignableButNotConsumable);
           return ManagedValue::forLValue(addr);
         }
       }
@@ -2182,8 +2187,10 @@ namespace {
             value.getOwnershipKind() == OwnershipKind::Guaranteed) {
           SILValue alloc = SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
           if (alloc->getType().isMoveOnly())
-            alloc = SGF.B.createMarkMustCheckInst(
-                loc, alloc, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+            alloc = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+                loc, alloc,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
           return SGF.B.createFormalAccessStoreBorrow(loc, value, alloc);
         }
       }
@@ -3418,12 +3425,12 @@ RValue SILGenFunction::emitRValueForNonMemberVarDecl(SILLocation loc,
                                                         SILAccessKind::Read);
 
     if (accessAddr->getType().isMoveOnly() &&
-        !isa<MarkMustCheckInst>(accessAddr)) {
+        !isa<MarkUnresolvedNonCopyableValueInst>(accessAddr)) {
       // When loading an rvalue, we should never need to modify the place
       // we're loading from.
-      accessAddr = B.createMarkMustCheckInst(
+      accessAddr = B.createMarkUnresolvedNonCopyableValueInst(
           loc, accessAddr,
-          MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
     }
 
     auto propagateRValuePastAccess = [&](RValue &&rvalue) {

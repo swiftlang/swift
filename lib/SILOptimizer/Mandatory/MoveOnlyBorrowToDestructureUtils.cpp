@@ -189,8 +189,8 @@ struct borrowtodestructure::Implementation {
   /// arguments.
   FieldSensitiveSSAPrunedLiveRange liveness;
 
-  /// The copy_value we insert upon our mark_must_check or switch_enum argument
-  /// so that we have an independent owned value.
+  /// The copy_value we insert upon our mark_unresolved_non_copyable_value or
+  /// switch_enum argument so that we have an independent owned value.
   SILValue initialValue;
 
   using InterestingUser = FieldSensitivePrunedLiveness::InterestingUser;
@@ -240,17 +240,19 @@ struct borrowtodestructure::Implementation {
 
   AvailableValues &computeAvailableValues(SILBasicBlock *block);
 
-  /// Returns mark_must_check if we are processing borrows or the enum argument
-  /// if we are processing switch_enum.
+  /// Returns mark_unresolved_non_copyable_value if we are processing borrows or
+  /// the enum argument if we are processing switch_enum.
   SILValue getRootValue() const { return liveness.getRootValue(); }
 
   DiagnosticEmitter &getDiagnostics() const {
     return interface.diagnosticEmitter;
   }
 
-  /// Always returns the actual root mark_must_check for both switch_enum args
-  /// and normal borrow user checks.
-  MarkMustCheckInst *getMarkedValue() const { return interface.mmci; }
+  /// Always returns the actual root mark_unresolved_non_copyable_value for both
+  /// switch_enum args and normal borrow user checks.
+  MarkUnresolvedNonCopyableValueInst *getMarkedValue() const {
+    return interface.mmci;
+  }
 
   PostOrderFunctionInfo *getPostOrderFunctionInfo() {
     return interface.getPostOrderFunctionInfo();
@@ -1383,8 +1385,8 @@ void Implementation::cleanup() {
 /// that the caller will fail in such a case.
 static bool gatherBorrows(SILValue rootValue,
                           StackList<BeginBorrowInst *> &borrowWorklist) {
-  // If we have a no implicit copy mark_must_check, we do not run the borrow to
-  // destructure transform since:
+  // If we have a no implicit copy mark_unresolved_non_copyable_value, we do not
+  // run the borrow to destructure transform since:
   //
   // 1. If we have a move only type, we should have emitted an earlier error
   //    saying that move only types should not be marked as no implicit copy.
