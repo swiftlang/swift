@@ -22,7 +22,7 @@ func internalFunc() -> DoesNotExist { // expected-error {{cannot find type 'Does
 }
 
 @inlinable func inlinableFunc() -> Int {
-  return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  return 1
 }
 
 private func privateFunc() -> DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
