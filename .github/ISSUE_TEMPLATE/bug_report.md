@@ -23,7 +23,7 @@ etc., please report it to https://feedbackassistant.apple.com instead.
 Explain how to reproduce the problem (in steps if seen fit) and include either
 an inline test case (preferred) or a project that reproduces it. Consider
 reducing the sample to the smallest amount of code possible — a smaller test
-case is easier to reason about and more appealing to сontributors.
+case is easier to reason about and more appealing to contributors.
 -->
 
 **Expected behavior**
