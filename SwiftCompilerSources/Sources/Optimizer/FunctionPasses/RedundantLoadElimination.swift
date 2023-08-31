@@ -307,10 +307,15 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
     case .assign:
       builder.createDestroyAddr(address: availableStore.destination)
       context.erase(instruction: availableStore)
-    case .initialize:
+    case .initialize,
+         // It can be the case that e non-payload case is stored as trivial enum and the enum is loaded as [take], e.g.
+         //   %1 = enum $Optional<Class>, #Optional.none
+         //   store %1 to [trivial] %addr : $*Optional<Class>
+         //   %2 = load [take] %addr : $*Optional<Class>
+         .trivial:
       context.erase(instruction: availableStore)
-    case .trivial, .unqualified:
-      fatalError("store ownership doesn't fit a later load [take]")
+    case .unqualified:
+      fatalError("unqualified store in ossa function?")
     }
     return valueToAdd
   }
