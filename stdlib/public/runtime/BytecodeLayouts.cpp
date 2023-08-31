@@ -662,10 +662,13 @@ static void objcStrongDestroyBranchless(const Metadata *metadata,
                              LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
-  objc_object *object = (objc_object *)((*(uintptr_t *)(addr + addrOffset)) &
-                                        ~_swift_abi_SwiftSpareBitsMask);
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(objc_object*);
-  objc_release(object);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_release((objc_object *)object);
 }
 #endif
 
@@ -896,8 +899,10 @@ static void objcStrongRetainBranchless(const Metadata *metadata,
   uintptr_t _addrOffset = addrOffset;
   uintptr_t object = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
-  object &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(objc_object *);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
   objc_retain((objc_object *)object);
 }
 #endif
@@ -1295,11 +1300,17 @@ static void objcStrongAssignWithCopy(const Metadata *metadata,
   uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
   uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object*));
-  destObject &= ~_swift_abi_SwiftSpareBitsMask;
-  srcObject &= ~_swift_abi_SwiftSpareBitsMask;
   addrOffset = _addrOffset + sizeof(objc_object*);
-  objc_release((objc_object *)destObject);
-  objc_retain((objc_object *)srcObject);
+
+  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    objc_release((objc_object *)destObject);
+  }
+
+  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+    objc_retain((objc_object *)srcObject);
+  }
 }
 #endif
 
