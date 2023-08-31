@@ -638,6 +638,31 @@ public:
     }, RangeColor);
   }
 
+  void printName(DeclName name, bool leadingSpace = true) {
+    if (leadingSpace)
+      OS << ' ';
+    PrintWithColorRAII(OS, IdentifierColor) << '"';
+    ::printName(PrintWithColorRAII(OS, IdentifierColor).getOS(), name);
+    PrintWithColorRAII(OS, IdentifierColor) << '"';
+  }
+
+  void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
+    if (D->getName()) {
+      printName(D->getName(), leadingSpace);
+    } else {
+      if (leadingSpace)
+        OS << ' ';
+      PrintWithColorRAII(OS, IdentifierColor)
+        << "<anonymous @ " << (const void*)D << '>';
+    }
+  }
+
+  void printDeclNameField(StringRef name, const ValueDecl *D) {
+    printFieldRaw(name, [&](raw_ostream &os) {
+      printDeclName(D, /*leadingSpace=*/false);
+    });
+  }
+
   };
 
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef>,
@@ -680,7 +705,7 @@ public:
     }
     void visitNamedPattern(NamedPattern *P, StringRef label) {
       printCommon(P, "pattern_named", label);
-      PrintWithColorRAII(OS, IdentifierColor) << " '" << P->getNameStr() << "'";
+      printDeclName(P->getDecl());
       printFoot();
     }
     void visitAnyPattern(AnyPattern *P, StringRef label) {
@@ -814,24 +839,6 @@ public:
       else
         ED->getExtendedTypeRepr()->print(OS);
       printCommonPost(ED);
-    }
-
-    void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
-      if (leadingSpace)
-        OS << ' ';
-      if (D->getName()) {
-        PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << D->getName() << '\"';
-      } else {
-        PrintWithColorRAII(OS, IdentifierColor)
-          << "'anonname=" << (const void*)D << '\'';
-      }
-    }
-
-    void printDeclNameField(StringRef name, const ValueDecl *D) {
-      printFieldRaw(name, [&](raw_ostream &os) {
-        printDeclName(D, /*leadingSpace=*/false);
-      });
     }
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD, StringRef label) {
@@ -1252,7 +1259,7 @@ public:
     void visitAccessorDecl(AccessorDecl *AD, StringRef label) {
       printCommonFD(AD, "accessor_decl", label);
       printFlag(getDumpString(AD->getAccessorKind()));
-      printField("for", AD->getStorage()->getName());
+      printDeclNameField("for", AD->getStorage());
       printAbstractFunctionDecl(AD);
       printFoot();
     }
@@ -1298,8 +1305,8 @@ public:
     }
 
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, StringRef label) {
-      printCommon(PGD, "precedence_group_decl ", label);
-      printName(OS, PGD->getName());
+      printCommon(PGD, "precedence_group_decl", label);
+      printName(PGD->getName());
       printField("associativity", getDumpString(PGD->getAssociativity()));
       printField("assignment", getDumpString(PGD->isAssignment()));
 
@@ -1320,22 +1327,22 @@ public:
     }
 
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD, StringRef label) {
-      printCommon(IOD, "infix_operator_decl ", label);
-      printName(OS, IOD->getName());
+      printCommon(IOD, "infix_operator_decl", label);
+      printName(IOD->getName());
       if (!IOD->getPrecedenceGroupName().empty())
         printField("precedence_group_name", IOD->getPrecedenceGroupName());
       printFoot();
     }
 
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD, StringRef label) {
-      printCommon(POD, "prefix_operator_decl ", label);
-      printName(OS, POD->getName());
+      printCommon(POD, "prefix_operator_decl", label);
+      printName(POD->getName());
       printFoot();
     }
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD, StringRef label) {
-      printCommon(POD, "postfix_operator_decl ", label);
-      printName(OS, POD->getName());
+      printCommon(POD, "postfix_operator_decl", label);
+      printName(POD->getName());
       printFoot();
     }
 
@@ -1352,8 +1359,7 @@ public:
 
     void visitMissingMemberDecl(MissingMemberDecl *MMD, StringRef label) {
       printCommon(MMD, "missing_member_decl ", label);
-      PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << MMD->getName() << '\"';
+      printName(MMD->getName());
       printFoot();
     }
 
@@ -3799,7 +3805,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, StringRef label) {
       printCommon(label, "module_type");
-      printField("module", T->getModule()->getName());
+      printDeclNameField("module", T->getModule());
       printFoot();
     }
 
