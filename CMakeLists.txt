@@ -794,7 +794,6 @@ include(SwiftConfigureSDK)
 include(SwiftComponents)
 include(SwiftList)
 include(AddPureSwift)
-include(SetRPATH)
 
 # Configure swift include, install, build components.
 swift_configure_components()
