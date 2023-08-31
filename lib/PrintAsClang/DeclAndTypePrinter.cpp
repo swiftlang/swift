@@ -2504,7 +2504,7 @@ private:
   void visitClassType(ClassType *CT,
                       llvm::Optional<OptionalTypeKind> optionalKind) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
-    assert(CD->isObjC());
+    assert(CD->isObjC() || CD->isForeignReferenceType());
     auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
     if (clangDecl) {
       // Hack for <os/object.h> types, which use classes in Swift but
@@ -2512,7 +2512,8 @@ private:
       StringRef osObjectName = maybeGetOSObjectBaseName(clangDecl);
       if (!osObjectName.empty()) {
         os << osObjectName << "_t";
-      } else if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      } else if (isa<clang::ObjCInterfaceDecl>(clangDecl) ||
+                 CD->isForeignReferenceType()) {
         os << clangDecl->getName() << " *";
       } else {
         maybePrintTagKeyword(CD);
