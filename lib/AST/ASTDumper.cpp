@@ -123,16 +123,6 @@ static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
   Params->print(OS);
 }
 
-static void printSourceRange(raw_ostream &OS, const SourceRange R,
-                             const ASTContext &Ctx) {
-  if (!R.isValid())
-    return;
-
-  PrintWithColorRAII(OS, RangeColor) << " range=";
-  R.print(PrintWithColorRAII(OS, RangeColor).getOS(), Ctx.SourceMgr,
-          /*PrintText=*/false);
-}
-
 static StringRef getDumpString(SILFunctionType::Representation value) {
   switch (value) {
   case SILFunctionType::Representation::Thick: return "thick";
@@ -457,8 +447,7 @@ public:
     case StmtConditionElement::CK_HasSymbol:
       printRecRaw([&](StringRef Label) {
         printHead("#_hasSymbol", PatternColor, Label);
-        if (Ctx)
-          printSourceRange(OS, C.getSourceRange(), *Ctx);
+        printSourceRange(C.getSourceRange(), Ctx);
         printRec(C.getHasSymbolInfo()->getSymbolExpr());
         printFoot();
       }, Label);
@@ -558,10 +547,7 @@ public:
 
     if (!ctx && params->size() != 0 && params->get(0))
       ctx = &params->get(0)->getASTContext();
-
-    if (ctx) {
-      printSourceRange(OS, params->getSourceRange(), *ctx);
-    }
+    printSourceRange(params->getSourceRange(), ctx);
 
     for (auto P : *params) {
       printRec(const_cast<ParamDecl *>(P));
@@ -619,6 +605,25 @@ public:
     OS << " ";
     PrintWithColorRAII(OS, color) << name << "='" << value << '\'';
     return OS;
+  }
+
+  void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
+                     StringRef label = "location") {
+    if (!L.isValid() || !Ctx)
+      return;
+
+    printFieldRaw(label, [&](raw_ostream &OS) {
+      L.print(OS, Ctx->SourceMgr);
+    }, LocationColor);
+  }
+
+  void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
+    if (!R.isValid() || !Ctx)
+      return;
+
+    printFieldRaw("range", [&](raw_ostream &OS) {
+      R.print(OS, Ctx->SourceMgr, /*PrintText=*/false);
+    }, RangeColor);
   }
 
   };
@@ -763,7 +768,7 @@ public:
       if (D->isHoisted())
         PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
 
-      printSourceRange(OS, D->getSourceRange(), D->getASTContext());
+      printSourceRange(D->getSourceRange(), &D->getASTContext());
 
       if (D->TrailingSemiLoc.isValid())
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
@@ -1597,8 +1602,7 @@ public:
     if (S->isImplicit())
       OS << " implicit";
 
-    if (Ctx)
-      printSourceRange(OS, S->getSourceRange(), *Ctx);
+    printSourceRange(S->getSourceRange(), Ctx);
 
     if (S->TrailingSemiLoc.isValid())
       OS << " trailing_semi";
@@ -1837,13 +1841,8 @@ public:
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();
-      auto L = E->getLoc();
-      if (L.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " location=";
-        L.print(PrintWithColorRAII(OS, LocationColor).getOS(), Ctx.SourceMgr);
-      }
-
-      printSourceRange(OS, E->getSourceRange(), Ctx);
+      printSourceLoc(E->getLoc(), &Ctx);
+      printSourceRange(E->getSourceRange(), &Ctx);
     }
 
     if (E->TrailingSemiLoc.isValid())
@@ -3206,13 +3205,7 @@ public:
 
     auto Ty = T->getType();
     if (Ty) {
-      auto &srcMgr =  Ty->getASTContext().SourceMgr;
-      if (T->getLoc().isValid()) {
-        OS << " location=@";
-        T->getLoc().print(OS, srcMgr);
-      } else {
-        OS << " location=<invalid>";
-      }
+      printSourceLoc(T->getLoc(), &Ty->getASTContext());
     }
 
     printRec(Ty, "type");
@@ -3225,13 +3218,7 @@ public:
 
     auto Ty = T->getType();
     if (Ty) {
-      auto &srcMgr =  Ty->getASTContext().SourceMgr;
-      if (T->getLoc().isValid()) {
-        OS << " location=@";
-        T->getLoc().print(OS, srcMgr);
-      } else {
-        OS << " location=<invalid>";
-      }
+      printSourceLoc(T->getLoc(), &Ty->getASTContext());
     }
 
     printRec(Ty, "type");
