@@ -100,7 +100,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Actor.cpp
     TaskStatus.cpp)
 
-  add_swift_unittest(SwiftRuntimeTests
+  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST
     Array.cpp
     CompatibilityOverrideRuntime.cpp
     CompatibilityOverrideConcurrency.cpp

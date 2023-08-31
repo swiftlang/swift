@@ -545,11 +545,11 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
-      if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-        set(swift_runtime_rpath "${host_lib_dir}")
-      else()
-        set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-      endif()
+
+      # At runtime, use swiftCore in the current toolchain.
+      # For building stdlib, LD_LIBRARY_PATH will be set to builder's stdlib
+      # FIXME: This assumes the ABI hasn't changed since the builder.
+      set(swift_runtime_rpath "$ORIGIN/${relpath_to_lib_dir}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
 
     elseif(ASRLF_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       # At build time link against the built swift libraries from the
@@ -573,10 +573,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   endif()
 
   if(SWIFT_SWIFT_PARSER)
-    # Make sure we can find the early SwiftSyntax libraries.
-    target_link_directories(${target} PRIVATE "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host")
-
-    # For the "end step" of bootstrapping configurations on Darwin, need to be
+    # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
       if (NOT "${bootstrapping}" STREQUAL "1")
@@ -590,6 +587,13 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
           get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
           get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
           target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
+        else()
+          get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+          get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+          set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+          target_link_directories(${target} PRIVATE ${host_lib_dir})
+
+          set(swift_runtime_rpath "${host_lib_dir}")
         endif()
       endif()
     endif()
@@ -822,8 +826,43 @@ macro(add_swift_lib_subdirectory name)
   add_llvm_subdirectory(SWIFT LIB ${name})
 endmacro()
 
+# Add a new Swift host executable.
+#
+# Usage:
+#   add_swift_host_tool(name
+#     [HAS_SWIFT_MODULES | DOES_NOT_USE_SWIFT]
+#     [THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY]
+#
+#     [BOOTSTRAPPING 0|1]
+#     [SWIFT_COMPONENT component]
+#     [LLVM_LINK_COMPONENTS comp1 ...]
+#     source1 [source2 source3 ...])
+#
+# name
+#   Name of the executable (e.g., swift-frontend).
+#
+# HAS_SWIFT_MODULES
+#   Whether to link with SwiftCompilerSources library
+#
+# DOES_NOT_USE_SWIFT
+#   Do not link with swift runtime
+#
+# THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
+#   Opt-out of LLVM IR optimizations when linking ThinLTO with ld64
+#
+# BOOTSTRAPPING
+#   Bootstrapping stage.
+#
+# SWIFT_COMPONENT
+#   Installation component where this tool belongs to.
+#
+# LLVM_LINK_COMPONENTS
+#   LLVM components this library depends on.
+#
+# source1 ...
+#   Sources to add into this executable.
 function(add_swift_host_tool executable)
-  set(options HAS_SWIFT_MODULES THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
+  set(options HAS_SWIFT_MODULES DOES_NOT_USE_SWIFT THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
   set(single_parameter_options SWIFT_COMPONENT BOOTSTRAPPING)
   set(multiple_parameter_options LLVM_LINK_COMPONENTS)
 
@@ -879,12 +918,12 @@ function(add_swift_host_tool executable)
   endif()
 
   # Once the new Swift parser is linked in, every host tool has Swift modules.
-  if (SWIFT_SWIFT_PARSER)
+  if (SWIFT_SWIFT_PARSER AND NOT ASHT_DOES_NOT_USE_SWIFT)
     set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
   if (ASHT_HAS_SWIFT_MODULES)
-      _add_swift_runtime_link_flags(${executable} "../lib" "${ASHT_BOOTSTRAPPING}")
+    _add_swift_runtime_link_flags(${executable} "../lib" "${ASHT_BOOTSTRAPPING}")
   endif()
 
   llvm_update_compile_flags(${executable})
@@ -926,10 +965,17 @@ function(add_swift_host_tool executable)
       endif()
     endif()
 
-    set_property(
-      TARGET ${executable}
-      APPEND PROPERTY INSTALL_RPATH
-        "@executable_path/../${extra_relative_rpath}lib/swift/host")
+    if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+      set_property(
+        TARGET ${executable}
+        APPEND PROPERTY INSTALL_RPATH
+          "@executable_path/../${extra_relative_rpath}lib/swift/host")
+    else()
+      set_property(
+        TARGET ${executable}
+        APPEND PROPERTY INSTALL_RPATH
+          "$ORIGIN/../${extra_relative_rpath}lib/swift/host")
+    endif()
   endif()
 
   if(ASHT_THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY)
@@ -950,7 +996,8 @@ function(add_swift_host_tool executable)
     swift_install_in_component(TARGETS ${executable}
                                RUNTIME
                                  DESTINATION bin
-                                 COMPONENT ${ASHT_SWIFT_COMPONENT})
+                                 COMPONENT ${ASHT_SWIFT_COMPONENT}
+    )
 
     swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
   endif()

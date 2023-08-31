@@ -1,5 +1,5 @@
 if(TARGET swiftDemangle)
-  add_swift_unittest(SwiftDemangleTests
+  add_swift_unittest(SwiftDemangleTests IS_TARGET_TEST
     DemangleTest.cpp
   )
   set_target_properties(SwiftDemangleTests

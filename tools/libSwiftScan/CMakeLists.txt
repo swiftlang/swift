@@ -30,14 +30,36 @@ set_target_properties(libSwiftScan
     PROPERTIES
     OUTPUT_NAME ${SWIFT_SCAN_LIB_NAME})
 
+if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+  # Runtime INSTALL_RPATH are set by 'add_swift_host_library', but that expects
+  # libSwiftScan be installed in 'lib'. But since it's actually installed in 'lib/swift/host',
+  # we need to have correct runtime path to 'lib/swift/{platform}'.
+  # FIXME: BUILD_RPATH and INSTALL_PATH should be different
+  # FIXME: add_swift_host_library should accept 'DESTINATION' and handle installation
+  # FIXME: Build this library into 'lib/swift/host/' instead of 'lib/'
+  set_property(
+    TARGET libSwiftScan
+    APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"
+  )
+endif()
+
 if(SWIFT_SWIFT_PARSER)
-  # Ensure that we can find the host shared libraries.
-  set_property(
-    TARGET libSwiftScan
-    APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
-  set_property(
-    TARGET libSwiftScan
-    APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    # Ensure that we can find the host shared libraries.
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "@loader_path/swift/host")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "@loader_path/../host")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/swift/host")
+    set_property(
+      TARGET libSwiftScan
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../host")
+  endif()
 endif()
 
 add_llvm_symbol_exports(libSwiftScan ${LLVM_EXPORTED_SYMBOL_FILE})
