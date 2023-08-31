@@ -3077,7 +3077,9 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   auto initRawAvail = IGF.IGM.Context.getInitRawStructMetadataAvailability();
 
   if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
-      !deploymentAvailability.isContainedIn(initRawAvail)) {
+      !deploymentAvailability.isContainedIn(initRawAvail) &&
+      // The standard library always has access to the latest and greatest.
+      !IGF.IGM.getSwiftModule()->isStdlibModule()) {
     emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
     return;
   }

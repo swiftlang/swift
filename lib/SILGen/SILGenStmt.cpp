@@ -784,6 +784,14 @@ void StmtEmitter::visitDiscardStmt(DiscardStmt *S) {
   for (auto *varDecl : nominal->getStoredProperties()) {
     assert(varDecl->hasStorage());
     auto varType = varDecl->getTypeInContext();
+
+    // If the stored property's type is a raw layout type, fine.
+    if (auto nominal = varType->getStructOrBoundGenericStruct()) {
+      if (nominal->getAttrs().hasAttribute<RawLayoutAttr>()) {
+        continue;
+      }
+    }
+
     auto &varTypeLowering = SGF.getTypeLowering(varType);
     if (!varTypeLowering.isTrivial()) {
       diagnose(getASTContext(),

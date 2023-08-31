@@ -990,6 +990,34 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
+      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
+      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+
+      // If we have a raw layout struct who is non-fixed size, it means the
+      // layout of the struct is dependent on the archetype of the thing it's
+      // like.
+      if (rawLayout) {
+        SILType loweredLikeType;
+
+        if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
+          loweredLikeType = IGM.getLoweredType(*likeType);
+        } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
+          loweredLikeType = IGM.getLoweredType(likeArray->first);
+        }
+
+        // The given struct type T that we're building may be in a generic
+        // environment that is different than that which was built our
+        // resolved rawLayout like type. Map our like type into the given
+        // environment.
+        auto subs = T.getASTType()->getContextSubstitutionMap(
+          IGM.getSwiftModule(), decl);
+
+        loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
+
+        return IGM.getTypeInfo(loweredLikeType).buildTypeLayoutEntry(IGM,
+          loweredLikeType, useStructLayouts);
+      }
+
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);

@@ -279,12 +279,26 @@ getTypeRefByFunction(IRGenModule &IGM,
           llvm::Instruction *br = nullptr;
           llvm::BasicBlock *supportedBB = nullptr;
           if (useForwardCompatibility) {
-            auto runtimeSupportsNoncopyableTypesSymbol
-              = IGM.Module.getOrInsertGlobal("swift_runtimeSupportsNoncopyableTypes",
-                                             IGM.Int8Ty);
-            cast<llvm::GlobalVariable>(runtimeSupportsNoncopyableTypesSymbol)
-              ->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
-              
+            llvm::Value *runtimeSupportsNoncopyableTypesSymbol = nullptr;
+
+            // This is weird. When building the stdlib, we don't have access to
+            // the swift_runtimeSupportsNoncopyableTypes symbol in the Swift.o,
+            // so we'll emit an adrp + ldr to resolve the GOT address. However,
+            // this symbol is defined as an abolsute in the runtime object files
+            // to address 0x0 right now and ld doesn't quite understand how to
+            // fixup this GOT address when merging the runtime and stdlib. Just
+            // unconditionally fail the branch.
+            if (IGM.getSwiftModule()->isStdlibModule()) {
+              runtimeSupportsNoncopyableTypesSymbol
+                  = llvm::ConstantInt::get(IGM.Int8Ty, 0);
+            } else {
+              runtimeSupportsNoncopyableTypesSymbol
+                  = IGM.Module.getOrInsertGlobal(
+                      "swift_runtimeSupportsNoncopyableTypes", IGM.Int8Ty);
+              cast<llvm::GlobalVariable>(runtimeSupportsNoncopyableTypesSymbol)
+                  ->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+            }
+
             auto runtimeSupportsNoncopyableTypes
               = IGF.Builder.CreateIsNotNull(runtimeSupportsNoncopyableTypesSymbol,
                                             "supports.noncopyable");

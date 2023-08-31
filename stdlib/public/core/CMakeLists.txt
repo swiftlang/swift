@@ -38,6 +38,7 @@ set(SWIFTLIB_ESSENTIAL
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  Cell.swift
   Character.swift
   CocoaArray.swift
   Codable.swift
@@ -291,6 +292,7 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "RawLayout")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
