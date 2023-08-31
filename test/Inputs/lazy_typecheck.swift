@@ -71,8 +71,7 @@ public struct PublicStruct {
 }
 
 struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
-  // FIXME: TBD emission causes this property to be typechecked
-//  var x: DoesNotExist
+  var x: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 
   func f(_ x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
