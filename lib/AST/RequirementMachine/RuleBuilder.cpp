@@ -367,6 +367,7 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::SameType: {
     auto otherType = CanType(req.getSecondType());
+    auto elementSymbol = Symbol::forPackElement(Context);
 
     if (!otherType->isTypeParameter()) {
       // A concrete same-type requirement T == C<X, Y> becomes a
@@ -379,6 +380,16 @@ void RuleBuilder::addRequirement(const Requirement &req,
                         otherType, *substitutions, result)
                    : Context.getSubstitutionSchemaFromType(
                         otherType, proto, result));
+
+      // If 'T' is a parameter pack, this is a same-element
+      // requirement that becomes the following rewrite rule:
+      //
+      //   [element].T.[concrete: C<X, Y>] => [element].T
+      if (subjectType->isParameterPack()) {
+        llvm::SmallVector<Symbol, 3> subjectSymbols{elementSymbol};
+        subjectSymbols.append(subjectTerm.begin(), subjectTerm.end());
+        subjectTerm = MutableTerm(std::move(subjectSymbols));
+      }
 
       constraintTerm = subjectTerm;
       constraintTerm.add(Symbol::forConcreteType(otherType, result, Context));
@@ -393,7 +404,6 @@ void RuleBuilder::addRequirement(const Requirement &req,
 
     if (subjectType->isParameterPack() != otherType->isParameterPack()) {
       // This is a same-element requirement.
-      auto elementSymbol = Symbol::forPackElement(Context);
       llvm::SmallVector<Symbol, 3> symbols{elementSymbol};
 
       if (subjectType->isParameterPack()) {
