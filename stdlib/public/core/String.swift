@@ -628,7 +628,9 @@ extension String {
         into: { arg.append($0) })
       arg.append(TargetEncoding.CodeUnit(0))
       _internalInvariant(!repaired)
-      return try body(arg)
+      return try arg.withUnsafeBufferPointer {
+        try body($0.baseAddress._unsafelyUnwrappedUnchecked)
+      }
     }
   }
 }

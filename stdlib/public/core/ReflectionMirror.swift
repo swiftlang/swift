@@ -289,7 +289,10 @@ public func _forEachField(
         return false
       }
     } else {
-      if !body("", offset, childType, kind) {
+      let result = withUnsafePointer(to: CChar.zero) {
+        !body($0, offset, childType, kind)
+      }
+      if result {
         return false
       }
     }
@@ -373,7 +376,10 @@ public func _forEachFieldWithKeyPath<Root>(
         return false
       }
     } else {
-      if !body("", partialKeyPath) {
+      let result = withUnsafePointer(to: CChar.zero) {
+        !body($0, partialKeyPath)
+      }
+      if result {
         return false
       }
     }
