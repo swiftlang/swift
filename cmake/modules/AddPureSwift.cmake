@@ -46,20 +46,7 @@ function(_add_host_swift_compile_options name)
     $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
     $<$<COMPILE_LANGUAGE:Swift>:none>)
 
-  # Set the appropriate target triple.
-  # FIXME: This should be set by CMake.
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-  endif()
-
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
-    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
-  endif()
-
-  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-    MACCATALYST_BUILD_FLAVOR ""
-    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-
+  swift_get_host_triple(target)
   target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
   _add_host_variant_swift_sanitizer_flags(${name})
 endfunction()

@@ -112,9 +112,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
   endif()
 endfunction()
 
-# Usage:
-# _add_host_variant_c_compile_link_flags(name)
-function(_add_host_variant_c_compile_link_flags name)
+function(swift_get_host_triple out_var)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
@@ -123,12 +121,21 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
+  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+    MACCATALYST_BUILD_FLAVOR ""
+    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+
+  set(${out_var} "${target}" PARENT_SCOPE)
+endfunction()
+
+# Usage:
+# _add_host_variant_c_compile_link_flags(name)
+function(_add_host_variant_c_compile_link_flags name)
+  swift_get_host_triple(target)
+
   # MSVC and gcc don't understand -target.
   # clang-cl understands --target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
       target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
@@ -139,9 +146,6 @@ function(_add_host_variant_c_compile_link_flags name)
   endif()
 
   if (CMAKE_Swift_COMPILER)
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
 
    _add_host_variant_swift_sanitizer_flags(${name})
