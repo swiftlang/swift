@@ -6423,7 +6423,7 @@ Type constraints::getConcreteReplacementForProtocolSelfType(ValueDecl *member) {
     signature = DC->getGenericSignatureOfContext();
   }
 
-  auto selfTy = DC->getProtocolSelfType();
+  auto selfTy = DC->getSelfInterfaceType();
   return signature->getConcreteType(selfTy);
 }
 

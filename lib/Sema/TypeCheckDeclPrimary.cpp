@@ -3189,10 +3189,7 @@ public:
         TypeChecker::inferDefaultWitnesses(PD);
 
     if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
-      auto sig =
-        GenericSignature::get({PD->getProtocolSelfType()},
-                              reqSig.getRequirements());
-
+      auto sig = PD->getRequirementSignatureAsGenericSignature();
       llvm::errs() << "\n";
       llvm::errs() << "Protocol requirement signature:\n";
       PD->dumpRef(llvm::errs());

@@ -6298,7 +6298,7 @@ getWitnessFunctionType(TypeExpansionContext context, SILGenModule &SGM,
 static std::pair<CanType, ProtocolConformanceRef>
 getSelfTypeAndConformanceForWitness(SILDeclRef witness, SubstitutionMap subs) {
   auto protocol = cast<ProtocolDecl>(witness.getDecl()->getDeclContext());
-  auto selfParam = protocol->getProtocolSelfType()->getCanonicalType();
+  auto selfParam = protocol->getSelfInterfaceType()->getCanonicalType();
   auto type = subs.getReplacementTypes()[0];
   auto conf = subs.lookupConformance(selfParam, protocol);
   return {type->getCanonicalType(), conf};

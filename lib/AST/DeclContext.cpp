@@ -95,24 +95,6 @@ VarDecl *DeclContext::getNonLocalVarDecl() const {
   return nullptr;
 }
 
-GenericTypeParamType *DeclContext::getProtocolSelfType() const {
-  assert(getSelfProtocolDecl() && "not a protocol");
-
-  GenericParamList *genericParams;
-  if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    genericParams = proto->getGenericParams();
-  } else {
-    genericParams = cast<ExtensionDecl>(this)->getGenericParams();
-  }
-
-  if (genericParams == nullptr)
-    return nullptr;
-
-  return genericParams->getParams().front()
-      ->getDeclaredInterfaceType()
-      ->castTo<GenericTypeParamType>();
-}
-
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto declaredType = getDeclaredInterfaceType())
     return mapTypeIntoContext(declaredType);

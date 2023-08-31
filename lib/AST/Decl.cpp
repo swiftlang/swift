@@ -6331,6 +6331,12 @@ RequirementSignature ProtocolDecl::getRequirementSignature() const {
                RequirementSignature());
 }
 
+GenericSignature ProtocolDecl::getRequirementSignatureAsGenericSignature() const {
+  return GenericSignature::get(
+      {getSelfInterfaceType()->castTo<GenericTypeParamType>()},
+      getRequirementSignature().getRequirements());
+}
+
 bool ProtocolDecl::isComputingRequirementSignature() const {
   return getASTContext().evaluator.hasActiveRequest(
                  RequirementSignatureRequest{const_cast<ProtocolDecl*>(this)});
@@ -7852,16 +7858,7 @@ ParamDecl *ParamDecl::createImplicit(ASTContext &Context,
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
-  assert(isTypeContext());
-
-  // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl()) {
-    auto selfType = getProtocolSelfType();
-    if (!selfType)
-      return ErrorType::get(getASTContext());
-    return mapTypeIntoContext(selfType);
-  }
-  return getDeclaredTypeInContext();
+  return mapTypeIntoContext(getSelfInterfaceType());
 }
 
 TupleType *BuiltinTupleDecl::getTupleSelfType() const {
@@ -7895,16 +7892,16 @@ Type DeclContext::getSelfInterfaceType() const {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
       return builtinTupleDecl->getTupleSelfType();
 
-    // For a protocol or extension thereof, the type is 'Self'.
     if (isa<ProtocolDecl>(nominalDecl)) {
-      auto selfType = getProtocolSelfType();
-      if (!selfType)
-        return ErrorType::get(getASTContext());
-      return selfType;
+      auto *genericParams = nominalDecl->getGenericParams();
+      return genericParams->getParams().front()
+          ->getDeclaredInterfaceType();
     }
+
+    return getDeclaredInterfaceType();
   }
 
-  return getDeclaredInterfaceType();
+  return ErrorType::get(getASTContext());
 }
 
 /// Return the full source range of this parameter.
