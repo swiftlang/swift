@@ -1446,3 +1446,19 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %30 = tuple(%3 : $A, %20 : $A)
   return %30 : $(A, A)
 }
+
+// CHECK-LABEL: sil [ossa] @store_trivial_load_non_trivial_enum
+// CHECK:         %0 = enum $Optional<B>, #Optional.none!enumelt
+// CHECK-NOT:     store 
+// CHECK-NOT:     load 
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'store_trivial_load_non_trivial_enum'
+sil [ossa] @store_trivial_load_non_trivial_enum : $@convention(thin) () -> @owned Optional<B> {
+bb0:
+  %0 = enum $Optional<B>, #Optional.none!enumelt
+  %1 = alloc_stack $Optional<B>
+  store %0 to [trivial] %1 : $*Optional<B>
+  %3 = load [take] %1 : $*Optional<B>
+  dealloc_stack %1 : $*Optional<B>
+  return %3 : $Optional<B>
+}
