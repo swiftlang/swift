@@ -479,9 +479,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     MayHaveSideEffects, DoesNotRelease)
   // A canary value inserted by a SIL generating frontend to signal to the move
   // checker to check a specific value.  Valid only in Raw SIL. The relevant
-  // checkers should remove the mark_unresolved_non_copyable_value instruction after successfully
+  // checkers should remove the mark_unresolved_noncopyable instruction after successfully
   // running the relevant diagnostic.
-  SINGLE_VALUE_INST(MarkUnresolvedNonCopyableValueInst, mark_unresolved_non_copyable_value,
+  SINGLE_VALUE_INST(MarkUnresolvedNonCopyableInst, mark_unresolved_noncopyable,
                     SingleValueInstruction, None, DoesNotRelease)
   // A canary value inserted by a SIL generating frontend to signal to the
   // reference binding transform to check/transform a specific value.  Valid

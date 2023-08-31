@@ -89,7 +89,7 @@ func testEnumNoInitWithGenericPayload() {
 
 // This test doesn't actually test anything today... but once the memory
 // lifetime verifier runs on ref_element_addr, this would assert in _Box<T>.init
-// since we were not setting the mark_unresolved_non_copyable_value to initable_but_not_assignable.
+// since we were not setting the mark_unresolved_noncopyable to initable_but_not_assignable.
 fileprivate final class _Box<T> {
   var value: _Node<T>
 

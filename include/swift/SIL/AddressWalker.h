@@ -218,7 +218,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UncheckedAddrCastInst>(user) ||
-        isa<MarkUnresolvedNonCopyableValueInst>(user) ||
+        isa<MarkUnresolvedNonCopyableInst>(user) ||
         isa<MarkUninitializedInst>(user) || isa<DropDeinitInst>(user) ||
         isa<ProjectBlockStorageInst>(user) || isa<UpcastInst>(user) ||
         isa<TuplePackElementAddrInst>(user) ||

@@ -543,31 +543,29 @@ static void replaceAllNonDebugUsesWith(SILValue value,
   }
 }
 
-static void hoistMarkUnresolvedNonCopyableValueInsts(
-    SILValue stackBox,
-    MarkUnresolvedNonCopyableValueInst::CheckKind checkKind) {
+static void hoistMarkUnresolvedNonCopyableInsts(
+    SILValue stackBox, MarkUnresolvedNonCopyableInst::CheckKind checkKind) {
   StackList<Operand *> worklist(stackBox->getFunction());
 
   for (auto *use : stackBox->getUses()) {
     worklist.push_back(use);
   }
 
-  StackList<MarkUnresolvedNonCopyableValueInst *> targets(
-      stackBox->getFunction());
+  StackList<MarkUnresolvedNonCopyableInst *> targets(stackBox->getFunction());
   while (!worklist.empty()) {
     auto *nextUse = worklist.pop_back_val();
     auto *nextUser = nextUse->getUser();
 
     if (isa<BeginBorrowInst>(nextUser) || isa<BeginAccessInst>(nextUser) ||
         isa<CopyValueInst>(nextUser) || isa<MarkUninitializedInst>(nextUser) ||
-        isa<MarkUnresolvedNonCopyableValueInst>(nextUser)) {
+        isa<MarkUnresolvedNonCopyableInst>(nextUser)) {
       for (auto result : nextUser->getResults()) {
         for (auto *use : result->getUses())
           worklist.push_back(use);
       }
     }
 
-    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(nextUser)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableInst>(nextUser)) {
       targets.push_back(mmci);
     }
   }
@@ -590,9 +588,9 @@ static void hoistMarkUnresolvedNonCopyableValueInsts(
   auto *undef = SILUndef::get(stackBox->getType(), *stackBox->getModule());
 
   auto *mmci =
-      builder.createMarkUnresolvedNonCopyableValueInst(loc, undef, checkKind);
+      builder.createMarkUnresolvedNonCopyableInst(loc, undef, checkKind);
   // Leave debug uses on the to-be-promoted box, but hoist all other uses to the
-  // new mark_unresolved_non_copyable_value.
+  // new mark_unresolved_noncopyable.
   replaceAllNonDebugUsesWith(stackBox, mmci);
   mmci->setOperand(stackBox);
 }
@@ -668,13 +666,13 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   // the address of the stack location.
   replaceProjectBoxUsers(HeapBox, StackBox);
 
-  // Then hoist any mark_unresolved_non_copyable_value
+  // Then hoist any mark_unresolved_noncopyable
   // [assignable_but_not_consumable] to the alloc_stack and convert them to
   // [consumable_but_not_assignable]. This is because we are semantically
   // converting from escaping semantics to non-escaping semantics.
-  hoistMarkUnresolvedNonCopyableValueInsts(
+  hoistMarkUnresolvedNonCopyableInsts(
       StackBox,
-      MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
+      MarkUnresolvedNonCopyableInst::CheckKind::ConsumableAndAssignable);
 
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
@@ -686,12 +684,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   for (auto LastRelease : FinalReleases) {
     SILBuilderWithScope Builder(LastRelease);
     if (!isa<DeallocBoxInst>(LastRelease)&& !Lowering.isTrivial()) {
-      // If we have a mark_unresolved_non_copyable_value use of our stack box,
+      // If we have a mark_unresolved_noncopyable use of our stack box,
       // we want to destroy that.
       SILValue valueToDestroy = StackBox;
       if (auto *mmci =
-              StackBox
-                  ->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+              StackBox->getSingleUserOfType<MarkUnresolvedNonCopyableInst>()) {
         valueToDestroy = mmci;
       }
 
@@ -1065,12 +1062,13 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
       if (F->getArgument(index)->getType().isBoxedNonCopyableType(*F)) {
         auto boxType = F->getArgument(index)->getType().castTo<SILBoxType>();
         bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
-        auto checkKind = isMutable ? MarkUnresolvedNonCopyableValueInst::
-                                         CheckKind::ConsumableAndAssignable
-                                   : MarkUnresolvedNonCopyableValueInst::
-                                         CheckKind::NoConsumeOrAssign;
-        hoistMarkUnresolvedNonCopyableValueInsts(ClonedFn->getArgument(index),
-                                                 checkKind);
+        auto checkKind =
+            isMutable
+                ? MarkUnresolvedNonCopyableInst::CheckKind::
+                      ConsumableAndAssignable
+                : MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign;
+        hoistMarkUnresolvedNonCopyableInsts(ClonedFn->getArgument(index),
+                                            checkKind);
       }
     }
   }

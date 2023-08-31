@@ -16,7 +16,7 @@
 namespace swift {
 
 class SILFunction;
-class MarkUnresolvedNonCopyableValueInst;
+class MarkUnresolvedNonCopyableInst;
 class Operand;
 
 namespace siloptimizer {
@@ -31,7 +31,7 @@ void emitCheckerMissedCopyOfNonCopyableTypeErrors(
     SILFunction *fn, DiagnosticEmitter &diagnosticEmitter);
 
 bool eliminateTemporaryAllocationsFromLet(
-    MarkUnresolvedNonCopyableValueInst *markedInst);
+    MarkUnresolvedNonCopyableInst *markedInst);
 
 namespace noncopyable {
 

@@ -80,7 +80,7 @@ public func registerSILClasses() {
   register(UncheckedRefCastInst.self)
   register(UncheckedAddrCastInst.self)
   register(UncheckedTrivialBitCastInst.self)
-  register(MarkUnresolvedNonCopyableValueInst.self)
+  register(MarkUnresolvedNonCopyableInst.self)
   register(ObjectInst.self)
   register(RawPointerToRefInst.self)
   register(AddressToPointerInst.self)

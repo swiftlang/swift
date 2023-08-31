@@ -2402,11 +2402,11 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     // noncopyable type, convert it to be an initable_but_not_consumable so that
     // we do not consume an uninitialized value.
     if (InitKind == IsInitialization) {
-      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableInst>(
               stripAccessMarkers(CA->getDest()))) {
-        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
-                                        CheckKind::AssignableButNotConsumable) {
-          mmci->setCheckKind(MarkUnresolvedNonCopyableValueInst::CheckKind::
+        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableInst::CheckKind::
+                                        AssignableButNotConsumable) {
+          mmci->setCheckKind(MarkUnresolvedNonCopyableInst::CheckKind::
                                  InitableButNotConsumable);
         }
       }
@@ -2444,17 +2444,17 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     }
 
     // Look and see if we are assigning a moveonly type into a
-    // mark_unresolved_non_copyable_value [assignable_but_not_consumable]. If we
+    // mark_unresolved_noncopyable [assignable_but_not_consumable]. If we
     // are, then we need to transition its flag to initable_but_not_assignable.
     //
     // NOTE: We should only ever have to do this for a single level since SILGen
     // always initializes values completely and we enforce that invariant.
     if (InitKind == IsInitialization) {
-      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableInst>(
               stripAccessMarkers(AI->getDest()))) {
-        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
-                                        CheckKind::AssignableButNotConsumable) {
-          mmci->setCheckKind(MarkUnresolvedNonCopyableValueInst::CheckKind::
+        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableInst::CheckKind::
+                                        AssignableButNotConsumable) {
+          mmci->setCheckKind(MarkUnresolvedNonCopyableInst::CheckKind::
                                  InitableButNotConsumable);
         }
       }

@@ -1949,10 +1949,10 @@ void SILCloner<ImplClass>::visitDropDeinitInst(DropDeinitInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitMarkUnresolvedNonCopyableValueInst(
-    MarkUnresolvedNonCopyableValueInst *Inst) {
+void SILCloner<ImplClass>::visitMarkUnresolvedNonCopyableInst(
+    MarkUnresolvedNonCopyableInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  auto *MVI = getBuilder().createMarkUnresolvedNonCopyableValueInst(
+  auto *MVI = getBuilder().createMarkUnresolvedNonCopyableInst(
       getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
       Inst->getCheckKind());
   recordClonedInstruction(Inst, MVI);

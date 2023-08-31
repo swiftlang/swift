@@ -3838,7 +3838,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst: {
     StringRef AttrName;
     if (!parseSILOptional(AttrName, *this)) {
       auto diag = diag::sil_markmustcheck_requires_attribute;
@@ -3846,7 +3846,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+    using CheckKind = MarkUnresolvedNonCopyableInst::CheckKind;
     CheckKind CKind =
         llvm::StringSwitch<CheckKind>(AttrName)
             .Case("consumable_and_assignable",
@@ -3869,7 +3869,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    auto *MVI = B.createMarkUnresolvedNonCopyableValueInst(InstLoc, Val, CKind);
+    auto *MVI = B.createMarkUnresolvedNonCopyableInst(InstLoc, Val, CKind);
     ResultVal = MVI;
     break;
   }

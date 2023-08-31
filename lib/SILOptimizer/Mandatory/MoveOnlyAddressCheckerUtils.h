@@ -25,9 +25,9 @@ class DiagnosticEmitter;
 ///
 /// NOTE: To see if we emitted a diagnostic, use \p
 /// diagnosticEmitter.getDiagnosticCount().
-void searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
+void searchForCandidateAddressMarkUnresolvedNonCopyableInsts(
     SILFunction *fn,
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    SmallSetVector<MarkUnresolvedNonCopyableInst *, 32>
         &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 
@@ -40,7 +40,7 @@ struct MoveOnlyAddressChecker {
 
   /// \returns true if we changed the IR. To see if we emitted a diagnostic, use
   /// \p diagnosticEmitter.getDiagnosticCount().
-  bool check(SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  bool check(SmallSetVector<MarkUnresolvedNonCopyableInst *, 32>
                  &moveIntroducersToProcess);
 };
 

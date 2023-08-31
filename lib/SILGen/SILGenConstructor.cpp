@@ -762,9 +762,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
       if (selfLV.getType().isMoveOnly()) {
-        selfLV = B.createMarkUnresolvedNonCopyableValueInst(
+        selfLV = B.createMarkUnresolvedNonCopyableInst(
             cleanupLoc, selfLV,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
+            MarkUnresolvedNonCopyableInst::CheckKind::
                 AssignableButNotConsumable);
       }
 
@@ -1150,10 +1150,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
       selfArg = B.createMarkUninitialized(selfDecl, selfArg, MUKind);
       if (selfArg.getType().isMoveOnly()) {
         assert(selfArg.getOwnershipKind() == OwnershipKind::Owned);
-        selfArg = B.createMarkUnresolvedNonCopyableValueInst(
+        selfArg = B.createMarkUnresolvedNonCopyableInst(
             selfDecl, selfArg,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                ConsumableAndAssignable);
+            MarkUnresolvedNonCopyableInst::CheckKind::ConsumableAndAssignable);
       }
       VarLocs[selfDecl] = VarLoc::get(selfArg.getValue());
     }

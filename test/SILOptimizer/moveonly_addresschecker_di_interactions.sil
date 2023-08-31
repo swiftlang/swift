@@ -1,7 +1,7 @@
 // RUN: %target-sil-opt -definite-init %s | %FileCheck %s
 
-// Make sure that DI properly converts mark_unresolved_non_copyable_value
-// [assignable_but_not_consumable] -> mark_unresolved_non_copyable_value
+// Make sure that DI properly converts mark_unresolved_noncopyable
+// [assignable_but_not_consumable] -> mark_unresolved_noncopyable
 // [initable_but_not_consumable].
 
 sil_stage raw
@@ -28,14 +28,14 @@ struct ListEntry<T> : ~Copyable {
 // CHECK:   [[BORROW_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_SELF]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
-// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [initable_but_not_consumable] [[ACCESS]]
+// CHECK:   [[MARK:%.*]] = mark_unresolved_noncopyable [initable_but_not_consumable] [[ACCESS]]
 // CHECK:   copy_addr [take] {{%.*}} to [init] [[MARK]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function 'boxInit'
 sil private [ossa] @boxInit : $@convention(method) <T> (@in _Node<T>, @owned _Box<T>) -> @owned _Box<T> {
 bb0(%0 : $*_Node<T>, %1 : @owned $_Box<T>):
   %2 = alloc_stack [lexical] $_Node<T>, var, name "value"
-  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*_Node<T>
+  %3 = mark_unresolved_noncopyable [consumable_and_assignable] %2 : $*_Node<T>
   copy_addr [take] %0 to [init] %3 : $*_Node<T>
   debug_value %1 : $_Box<T>, let, name "self", argno 2, implicit
   %6 = mark_uninitialized [rootself] %1 : $_Box<T>
@@ -46,7 +46,7 @@ bb0(%0 : $*_Node<T>, %1 : @owned $_Box<T>):
   end_access %8 : $*_Node<T>
   %12 = ref_element_addr %7 : $_Box<T>, #_Box.value
   %13 = begin_access [modify] [dynamic] %12 : $*_Node<T>
-  %14 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %13 : $*_Node<T>
+  %14 = mark_unresolved_noncopyable [assignable_but_not_consumable] %13 : $*_Node<T>
   copy_addr [take] %9 to %14 : $*_Node<T>
   end_access %13 : $*_Node<T>
   dealloc_stack %9 : $*_Node<T>
