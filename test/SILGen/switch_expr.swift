@@ -707,3 +707,8 @@ extension Never {
     self = switch value { case let v: v }
   }
 }
+
+func testCaptureList() -> Int {
+  let fn = { [x = switch Bool.random() { case true: 0 case false: 1 }] in x }
+  return fn()
+}

@@ -1970,6 +1970,20 @@ public struct NestedMagicLiteralMacro: ExpressionMacro {
   }
 }
 
+public struct InvalidIfExprMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["""
+      func bar() {
+        let _ = (if .random() { 0 } else { 1 })
+      }
+      """]
+  }
+}
+
 public struct InitWithProjectedValueWrapperMacro: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,

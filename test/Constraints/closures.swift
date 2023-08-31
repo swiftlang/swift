@@ -1152,11 +1152,9 @@ struct R_76250381<Result, Failure: Error> {
 // rdar://77022842 - crash due to a missing argument to a ternary operator
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
   if let a = argA ?? false, if let b = argB ?? {
-    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-    // expected-error@-2 {{initializer for conditional binding must have Optional type, not 'Bool'}}
-    // expected-error@-3 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
-    // expected-error@-4 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
-    // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
+    // expected-error@-2 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
+    // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
   } // expected-error {{expected '{' after 'if' condition}}
 }
 
