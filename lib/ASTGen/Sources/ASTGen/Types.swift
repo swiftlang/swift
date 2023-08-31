@@ -3,6 +3,7 @@ import CASTBridging
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
 import SwiftSyntax
+import SwiftDiagnostics
 
 extension ASTGenVisitor {
   public func visit(_ node: IdentifierTypeSyntax) -> ASTNode {
@@ -179,27 +180,36 @@ extension ASTGenVisitor {
       return .type(ExistentialTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     }
   }
+}
 
+// MARK: - SpecifierTypeRepr/AttrubutedTypeRepr
+
+extension BridgedAttributedTypeSpecifier {
+  fileprivate init?(from tokenKind: TokenKind) {
+    switch tokenKind {
+    case .keyword(.inout): self = .inOut
+    case .keyword(.borrowing): self = .borrowing
+    case .keyword(.consuming): self = .consuming
+    case .keyword(.__shared): self = .legacyShared
+    case .keyword(.__owned): self = .legacyOwned
+    case .keyword(._const): self = .const
+    case .keyword(.isolated): self = .isolated
+    default: return nil
+    }
+  }
+}
+
+extension ASTGenVisitor {
   public func visit(_ node: AttributedTypeSyntax) -> ASTNode {
     var type = visit(node.baseType)
 
     // Handle specifiers.
     if let specifier = node.specifier {
-      let specifierLoc = bridgedSourceLoc(for: specifier)
-
-      let kind: BridgedAttributedTypeSpecifier
-      switch specifier.tokenKind {
-        case .keyword(.inout): kind = .inOut
-        case .keyword(.borrowing): kind = .borrowing
-        case .keyword(.consuming): kind = .consuming
-        case .keyword(.__shared): kind = .legacyShared
-        case .keyword(.__owned): kind = .legacyOwned
-        case .keyword(._const): kind = .const
-        case .keyword(.isolated): kind = .isolated
-        default: fatalError("unhandled specifier \(specifier.debugDescription)")
+      if let kind = BridgedAttributedTypeSpecifier(from: specifier.tokenKind) {
+        type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, bridgedSourceLoc(for: specifier)))
+      } else {
+        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
       }
-
-      type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, specifierLoc))
     }
 
     // Handle type attributes.
@@ -284,6 +294,7 @@ extension ASTGenVisitor {
 @_cdecl("swift_ASTGen_buildTypeRepr")
 @usableFromInline
 func buildTypeRepr(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafeRawPointer,
   typeLocPtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
@@ -309,8 +320,10 @@ func buildTypeRepr(
   endTypeLocPtr.pointee = sourceFile.pointee.buffer.baseAddress!.advanced(by: typeSyntax.endPosition.utf8Offset)
 
   // Convert the type syntax node.
-  let typeReprNode = ASTGenVisitor(ctx: BridgedASTContext(raw: ctx), base: sourceFile.pointee.buffer, declContext: BridgedDeclContext(raw: dc))
-    .visit(typeSyntax)
-
-  return typeReprNode.rawValue
+  return ASTGenVisitor(
+    diagnosticEngine: .init(raw: diagEnginePtr),
+    sourceBuffer: sourceFile.pointee.buffer,
+    declContext: BridgedDeclContext(raw: dc),
+    astContext: BridgedASTContext(raw: ctx)
+  ).visit(typeSyntax).rawValue
 }

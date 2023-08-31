@@ -6,6 +6,7 @@ import CBasicBridging
 // Needed to use BumpPtrAllocator
 @_spi(RawSyntax)
 import SwiftSyntax
+import struct SwiftDiagnostics.Diagnostic
 
 extension UnsafePointer {
   public var raw: UnsafeMutableRawPointer {
@@ -63,12 +64,27 @@ class Boxed<Value> {
 struct ASTGenVisitor: SyntaxTransformVisitor {
   typealias ResultType = ASTNode
 
-  let ctx: BridgedASTContext
+  fileprivate let diagnosticEngine: BridgedDiagnosticEngine
+
   let base: UnsafeBufferPointer<UInt8>
 
   @Boxed var declContext: BridgedDeclContext
 
+  let ctx: BridgedASTContext
+
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(slabSize: 256)
+
+  init(
+    diagnosticEngine: BridgedDiagnosticEngine,
+    sourceBuffer: UnsafeBufferPointer<UInt8>,
+    declContext: BridgedDeclContext,
+    astContext: BridgedASTContext
+  ) {
+    self.diagnosticEngine = diagnosticEngine
+    self.base = sourceBuffer
+    self.declContext = declContext
+    self.ctx = astContext
+  }
 
   // TODO: this some how messes up the witness table when I uncomment it locally :/
   //  public func visit<T>(_ node: T?) -> [UnsafeMutableRawPointer]? {
@@ -104,6 +120,19 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     }
 
     return out
+  }
+}
+
+extension ASTGenVisitor {
+  /// Emits the given diagnostic via the C++ diagnostic engine.
+  @inline(__always)
+  func diagnose(_ diagnostic: Diagnostic) {
+    emitDiagnostic(
+      diagnosticEngine: self.diagnosticEngine,
+      sourceFileBuffer: self.base,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
+    )
   }
 }
 
@@ -218,6 +247,7 @@ extension Optional where Wrapped: LazyCollectionProtocol {
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
   ctx: UnsafeMutableRawPointer,
@@ -225,8 +255,13 @@ public func buildTopLevelASTNodes(
   callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
   sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
-    ASTGenVisitor(ctx: BridgedASTContext(raw: ctx), base: sourceFile.pointee.buffer, declContext: BridgedDeclContext(raw: dc))
-      .visit(sourceFile.pointee.syntax)
-      .forEach { callback($0, outputContext) }
+    ASTGenVisitor(
+      diagnosticEngine: .init(raw: diagEnginePtr),
+      sourceBuffer: sourceFile.pointee.buffer,
+      declContext: BridgedDeclContext(raw: dc),
+      astContext: BridgedASTContext(raw: ctx)
+    )
+    .visit(sourceFile.pointee.syntax)
+    .forEach { callback($0, outputContext) }
   }
 }

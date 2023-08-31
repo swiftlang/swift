@@ -3,7 +3,7 @@ import SwiftDiagnostics
 import SwiftSyntax
 
 fileprivate func emitDiagnosticParts(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   message: String,
   severity: DiagnosticSeverity,
@@ -11,8 +11,6 @@ fileprivate func emitDiagnosticParts(
   highlights: [Syntax] = [],
   fixItChanges: [FixIt.Change] = []
 ) {
-  let bridgedDiagEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
-
   // Map severity
   let bridgedSeverity = severity.bridged
 
@@ -24,7 +22,7 @@ fileprivate func emitDiagnosticParts(
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
     Diagnostic_create(
-      bridgedDiagEngine, bridgedSeverity, bridgedSourceLoc(at: position),
+      diagnosticEngine, bridgedSeverity, bridgedSourceLoc(at: position),
       bridgedMessage
     )
   }
@@ -74,7 +72,7 @@ fileprivate func emitDiagnosticParts(
 
 /// Emit the given diagnostic via the diagnostic engine.
 func emitDiagnostic(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   diagnostic: Diagnostic,
   diagnosticSeverity: DiagnosticSeverity,
@@ -82,7 +80,7 @@ func emitDiagnostic(
 ) {
   // Emit the main diagnostic
   emitDiagnosticParts(
-    diagEnginePtr: diagEnginePtr,
+    diagnosticEngine: diagnosticEngine,
     sourceFileBuffer: sourceFileBuffer,
     message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
     severity: diagnosticSeverity,
@@ -93,19 +91,19 @@ func emitDiagnostic(
   // Emit Fix-Its.
   for fixIt in diagnostic.fixIts {
     emitDiagnosticParts(
-        diagEnginePtr: diagEnginePtr,
-        sourceFileBuffer: sourceFileBuffer,
-        message: fixIt.message.message,
-        severity: .note,
-        position: diagnostic.position,
-        fixItChanges: fixIt.changes
+      diagnosticEngine: diagnosticEngine,
+      sourceFileBuffer: sourceFileBuffer,
+      message: fixIt.message.message,
+      severity: .note,
+      position: diagnostic.position,
+      fixItChanges: fixIt.changes
     )
   }
 
   // Emit any notes as follow-ons.
   for note in diagnostic.notes {
     emitDiagnosticParts(
-      diagEnginePtr: diagEnginePtr,
+      diagnosticEngine: diagnosticEngine,
       sourceFileBuffer: sourceFileBuffer,
       message: note.message,
       severity: .note,

@@ -111,6 +111,8 @@ public func emitParserDiagnostics(
     let diags = ParseDiagnosticsGenerator.diagnostics(
       for: sourceFile.pointee.syntax
     )
+
+    let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
     for diag in diags {
       // Skip over diagnostics within #if, because we don't know whether
       // we are in an active region or not.
@@ -131,7 +133,7 @@ public func emitParserDiagnostics(
       }
 
       emitDiagnostic(
-        diagEnginePtr: diagEnginePtr,
+        diagnosticEngine: diagnosticEngine,
         sourceFileBuffer: sourceFile.pointee.buffer,
         diagnostic: diag,
         diagnosticSeverity: diagnosticSeverity
