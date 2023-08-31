@@ -39,7 +39,7 @@ function(add_swift_macro_library name)
   _set_pure_swift_link_flags(${name} "${relpath_to_lib}")
 
   # Add rpath to 'lib/host'
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
+  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set_property(TARGET ${name}
       APPEND PROPERTY INSTALL_RPATH "$ORIGIN/..")
   endif()
