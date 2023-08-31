@@ -30,6 +30,7 @@ const StringRef Symbol::Kinds[] = {
   "assocty",
   "generic",
   "name",
+  "shape",
   "layout",
   "super",
   "concrete"

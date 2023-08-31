@@ -1201,7 +1201,7 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   if (!interfaceTy->hasTypeParameter())
     return true;
 
-  auto *const selfGP = wmi->getLookupProtocol()->getProtocolSelfType();
+  auto selfGP = wmi->getLookupProtocol()->getSelfInterfaceType();
   auto isSelfRootedTypeParameter = [selfGP](Type T) -> bool {
     if (!T->hasTypeParameter())
       return false;
