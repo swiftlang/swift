@@ -30,6 +30,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -6917,9 +6918,23 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   auto *clangMod = swiftDecl->getClangDecl()->getOwningModule();
   if (clangMod && clangMod->isSubModule())
     clangMod = clangMod->getTopLevelModule();
-  auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
-  ctx.lookupInModule(parentModule, name, results);
+  if (clangMod) {
+    auto parentModule = ctx.getClangModuleLoader()->getWrapperForModule(clangMod);
+    ctx.lookupInModule(parentModule, name, results);
+  } else {
+    // There is no Clang module for this declaration, so perform lookup from
+    // the main module. This will find declarations from the bridging header.
+    namelookup::lookupInModule(
+        ctx.MainModule, ctx.getIdentifier(name), results,
+        NLKind::UnqualifiedLookup, namelookup::ResolutionKind::Overloadable,
+        ctx.MainModule, SourceLoc(), NL_UnqualifiedDefault);
 
+    // Filter out any declarations that didn't come from Clang.
+    auto newEnd = std::remove_if(results.begin(), results.end(), [&](ValueDecl *decl) {
+      return !decl->getClangDecl();
+    });
+    results.erase(newEnd, results.end());
+  }
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};
