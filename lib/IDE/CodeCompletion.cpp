@@ -896,14 +896,19 @@ static void addKeywordsAfterReturn(CodeCompletionResultSink &Sink, DeclContext *
   // using the solver-based implementation. Add the result manually.
   if (auto ctor = dyn_cast_or_null<ConstructorDecl>(DC->getAsDecl())) {
     if (ctor->isFailable()) {
+      Type resultType = ctor->getResultInterfaceType();
+
+      // Note that `TypeContext` must stay alive for the duration of
+      // `~CodeCodeCompletionResultBuilder()`.
+      ExpectedTypeContext TypeContext;
+      TypeContext.setPossibleTypes({resultType});
+
       CodeCompletionResultBuilder Builder(Sink, CodeCompletionResultKind::Literal,
                                           SemanticContextKind::None);
       Builder.setLiteralKind(CodeCompletionLiteralKind::NilLiteral);
       Builder.addKeyword("nil");
-      Builder.addTypeAnnotation(ctor->getResultInterfaceType(), {});
-      Builder.setResultTypes(ctor->getResultInterfaceType());
-      ExpectedTypeContext TypeContext;
-      TypeContext.setPossibleTypes({ctor->getResultInterfaceType()});
+      Builder.addTypeAnnotation(resultType, {});
+      Builder.setResultTypes(resultType);
       Builder.setTypeContext(TypeContext, DC);
     }
   }
