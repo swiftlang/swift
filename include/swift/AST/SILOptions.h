@@ -117,6 +117,9 @@ public:
   /// Controls whether to emit actor data-race checks.
   bool EnableActorDataRaceChecks = false;
 
+  /// Controls whether to run async demotion pass.
+  bool EnableAsyncDemotion = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.

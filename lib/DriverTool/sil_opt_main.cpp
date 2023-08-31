@@ -258,6 +258,10 @@ struct SILOptOptions {
                     llvm::cl::desc("Enable Speculative Devirtualization pass."));
 
   llvm::cl::opt<bool>
+  EnableAsyncDemotion = llvm::cl::opt<bool>("enable-async-demotion",
+                    llvm::cl::desc("Enables an optimization pass to demote async functions."));
+
+  llvm::cl::opt<bool>
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
@@ -711,6 +715,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EmitSortedSIL |= options.EmitSortedSIL;
 
   SILOpts.EnableSpeculativeDevirtualization = options.EnableSpeculativeDevirtualization;
+  SILOpts.EnableAsyncDemotion = options.EnableAsyncDemotion;
   SILOpts.IgnoreAlwaysInline = options.IgnoreAlwaysInline;
   SILOpts.EnableOSSAModules = options.EnableOSSAModules;
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;

@@ -92,6 +92,10 @@ public class Instruction : CustomStringConvertible, Hashable {
   final public var mayWriteToMemory: Bool { memoryEffects.write }
   final public var mayReadOrWriteMemory: Bool { memoryEffects.read || memoryEffects.write }
 
+  public final var maySuspend: Bool {
+    return bridged.maySuspend()
+  }
+
   public final var mayRelease: Bool {
     return bridged.mayRelease()
   }
@@ -337,6 +341,8 @@ final public class CondFailInst : Instruction, UnaryInstruction {
 
   public var message: String { bridged.CondFailInst_getMessage().string }
 }
+
+final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
@@ -744,6 +750,13 @@ final public
 class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {
   public var value: Value { return operand.value }
 }
+
+final public
+class GetAsyncContinuationInst : SingleValueInstruction {}
+
+final public
+class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
+
 
 final public
 class MarkDependenceInst : SingleValueInstruction {
