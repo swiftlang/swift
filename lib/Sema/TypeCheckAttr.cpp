@@ -2026,36 +2026,47 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
-  auto *VD = cast<ValueDecl>(D);
-  // Expose cannot be mixed with '@_cdecl' declarations.
-  if (VD->getAttrs().hasAttribute<CDeclAttr>())
-    diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
-
-  // Nested exposed declarations are expected to be inside
-  // of other exposed declarations.
-  bool hasExpose = true;
-  const ValueDecl *decl = VD;
-  while (const NominalTypeDecl *NMT =
-             dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
-    decl = NMT;
-    hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
+  switch (attr->getExposureKind()) {
+  case ExposureKind::Wasm: {
+    // Only top-level func decls are currently supported.
+    if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext())
+      diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
+    break;
   }
-  if (!hasExpose) {
-    diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl, decl);
+  case ExposureKind::Cxx: {
+    auto *VD = cast<ValueDecl>(D);
+    // Expose cannot be mixed with '@_cdecl' declarations.
+    if (VD->getAttrs().hasAttribute<CDeclAttr>())
+      diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
+
+    // Nested exposed declarations are expected to be inside
+    // of other exposed declarations.
+    bool hasExpose = true;
+    const ValueDecl *decl = VD;
+    while (const NominalTypeDecl *NMT =
+               dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+      decl = NMT;
+      hasExpose = NMT->getAttrs().hasAttribute<ExposeAttr>();
+    }
+    if (!hasExpose) {
+      diagnose(attr->getLocation(), diag::expose_inside_unexposed_decl, decl);
+    }
+
+    // Verify that the declaration is exposable.
+    auto repr = cxx_translation::getDeclRepresentation(VD);
+    if (repr.isUnsupported())
+      diagnose(attr->getLocation(),
+               cxx_translation::diagnoseRepresenationError(*repr.error, VD));
+
+    // Verify that the name mentioned in the expose
+    // attribute matches the supported name pattern.
+    if (!attr->Name.empty()) {
+      if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
+        diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
+                 attr->Name);
+    }
+    break;
   }
-
-  // Verify that the declaration is exposable.
-  auto repr = cxx_translation::getDeclRepresentation(VD);
-  if (repr.isUnsupported())
-    diagnose(attr->getLocation(),
-             cxx_translation::diagnoseRepresenationError(*repr.error, VD));
-
-  // Verify that the name mentioned in the expose
-  // attribute matches the supported name pattern.
-  if (!attr->Name.empty()) {
-    if (isa<ConstructorDecl>(VD) && !attr->Name.startswith("init"))
-      diagnose(attr->getLocation(), diag::expose_invalid_name_pattern_init,
-               attr->Name);
   }
 }
 

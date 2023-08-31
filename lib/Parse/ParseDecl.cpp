@@ -3015,12 +3015,24 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     bool ParseSymbolName = true;
+
+    ExposureKind ExpKind;
     if (DK == DAK_Expose) {
-      if (Tok.isNot(tok::identifier) || Tok.getText() != "Cxx") {
+      auto diagnoseExpectOption = [&]() {
         diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
                  "Cxx");
-        if (Tok.isNot(tok::identifier))
-          return makeParserSuccess();
+        ParseSymbolName = false;
+      };
+      if (Tok.isNot(tok::identifier)) {
+        diagnoseExpectOption();
+        return makeParserSuccess();
+      }
+      if (Tok.getText() == "Cxx") {
+        ExpKind = ExposureKind::Cxx;
+      } else if (Tok.getText() == "wasm") {
+        ExpKind = ExposureKind::Wasm;
+      } else {
+        diagnoseExpectOption();
         DiscardAttribute = true;
       }
       consumeToken(tok::identifier);
@@ -3079,7 +3091,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       else if (DK == DAK_Expose)
         Attributes.add(new (Context) ExposeAttr(
             AsmName ? AsmName.value() : StringRef(""), AtLoc, AttrRange,
-            /*Implicit=*/false));
+            ExpKind, /*Implicit=*/false));
       else
         llvm_unreachable("out of sync with switch");
     }

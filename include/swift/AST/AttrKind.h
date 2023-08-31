@@ -102,6 +102,15 @@ enum class EffectsKind : uint8_t {
 enum : unsigned { NumEffectsKindBits =
   countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind)) };
 
+/// This enum represents the possible values of the @_expose attribute.
+enum class ExposureKind: uint8_t {
+  Cxx,
+  Wasm,
+  Last_ExposureKind = Wasm
+};
+
+enum : unsigned { NumExposureKindBits =
+  countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind)) };
   
 enum DeclAttrKind : unsigned {
 #define DECL_ATTR(_, NAME, ...) DAK_##NAME,

@@ -218,6 +218,24 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  if (auto *EA = Attrs.getAttribute<ExposeAttr>()) {
+    bool shouldExportDecl = true;
+    if (Attrs.hasAttribute<CDeclAttr>()) {
+      // If the function is marked with @cdecl, expose only C compatible
+      // thunk function.
+      shouldExportDecl = constant.isNativeToForeignThunk();
+    }
+    if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
+      // A wasm-level exported function must be retained if it appears in a
+      // compilation unit.
+      F->setMarkedAsUsed(true);
+      if (EA->Name.empty())
+        F->setWasmExportName(F->getName());
+      else
+        F->setWasmExportName(EA->Name);
+    }
+  }
+
   if (Attrs.hasAttribute<UsedAttr>())
     F->setMarkedAsUsed(true);
 

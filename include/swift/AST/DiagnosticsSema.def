@@ -1838,6 +1838,9 @@ ERROR(section_not_at_top_level,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
+ERROR(expose_wasm_not_at_top_level_func,none,
+      "@_expose attribute with 'wasm' can only be applied to global functions", ())
+
 ERROR(expose_only_non_other_attr,none,
       "@_expose attribute cannot be applied to an '%0' declaration", (StringRef))
 ERROR(expose_inside_unexposed_decl,none,
