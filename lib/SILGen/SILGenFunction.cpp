@@ -764,9 +764,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // If we have a mutable binding for a 'let', such as 'self' in an
         // 'init' method, load it.
         if (val->getType().isMoveOnly()) {
-          val = B.createMarkMustCheckInst(
+          val = B.createMarkUnresolvedNonCopyableValueInst(
               loc, val,
-              MarkMustCheckInst::CheckKind::AssignableButNotConsumable);
+              MarkUnresolvedNonCopyableValueInst::CheckKind::
+                  AssignableButNotConsumable);
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }

@@ -1259,7 +1259,8 @@ public:
   void visitDropDeinitInst(DropDeinitInst *i) {
     llvm_unreachable("only valid in ownership SIL");
   }
-  void visitMarkMustCheckInst(MarkMustCheckInst *i) {
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *i) {
     llvm_unreachable("Invalid in Lowered SIL");
   }
   void visitMarkUnresolvedReferenceBindingInst(

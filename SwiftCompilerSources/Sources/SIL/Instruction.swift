@@ -816,7 +816,7 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
 
 final public
-class MarkMustCheckInst : SingleValueInstruction, UnaryInstruction {}
+class MarkUnresolvedNonCopyableValueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjectInst : SingleValueInstruction {
   public var baseOperands: OperandArray {

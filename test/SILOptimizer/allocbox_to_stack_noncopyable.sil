@@ -22,11 +22,11 @@ bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
 // CHECK-LABEL: sil [ossa] @hoist_markmustcheck : $@convention(thin) (@owned NonTrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @owned
 // CHECK-NEXT:   [[STACK1:%.*]] = alloc_stack $NonTrivialStruct
-// CHECK-NEXT:   [[MARKED1:%.*]] = mark_must_check [consumable_and_assignable] [[STACK1]]
+// CHECK-NEXT:   [[MARKED1:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK1]]
 // CHECK-NEXT:   store [[ARG]] to [init] [[MARKED1]]
 // CHECK-NEXT:   [[LOADED_VALUE:%.*]] = load [take] [[MARKED1]]
 // CHECK-NEXT:   [[STACK2:%.*]] = alloc_stack $NonTrivialStruct
-// CHECK-NEXT:   [[MARKED2:%.*]] = mark_must_check [consumable_and_assignable] [[STACK2]]
+// CHECK-NEXT:   [[MARKED2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK2]]
 // CHECK-NEXT:   store [[LOADED_VALUE]] to [init] [[MARKED2]]
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:   [[FUNC:%.*]] = function_ref @$s26host_markmustcheck_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
@@ -46,12 +46,12 @@ bb0(%0 : @owned $NonTrivialStruct):
   store %0 to [init] %2 : $*NonTrivialStruct
 
   %3 = project_box %1 : ${ var NonTrivialStruct }, 0
-  %3a = mark_must_check [assignable_but_not_consumable] %3 : $*NonTrivialStruct
+  %3a = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %3 : $*NonTrivialStruct
   %3b = load [take] %3a : $*NonTrivialStruct
 
   %4 = alloc_box ${ var NonTrivialStruct }
   %4a = project_box %4 : ${ var NonTrivialStruct }, 0
-  %4b = mark_must_check [assignable_but_not_consumable] %4a : $*NonTrivialStruct
+  %4b = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %4a : $*NonTrivialStruct
   store %3b to [init] %4b : $*NonTrivialStruct
 
   %f = function_ref @host_markmustcheck_closure : $@convention(thin) (@guaranteed { var NonTrivialStruct }) -> ()
@@ -71,14 +71,14 @@ bb0(%0 : @owned $NonTrivialStruct):
 // CHECK-LABEL: sil hidden [ossa] @captured_let_allocstack_caller : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[STACK:%.*]] = alloc_stack
-// CHECK:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[STACK]]
+// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
 // CHECK:   partial_apply [callee_guaranteed] {{%.*}}([[MARK]]) : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
 // CHECK: } // end sil function 'captured_let_allocstack_caller'
 
 // CHECK-LABEL: sil private [ossa] @$s31captured_let_allocstack_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> () {
 // CHECK: // [[ARG:.*]]{{ .*}}// user: [[MARK:%[0-9][0-9]*]]
 // CHECK: bb0([[ARG]] : @closureCapture $*NonTrivialStruct):
-// CHECK:   [[MARK]] = mark_must_check [no_consume_or_assign] [[ARG]]
+// CHECK:   [[MARK]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ARG]]
 // CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
 // CHECK:   [[VALUE:%.*]] = move_value [[LOAD]]
 // CHECK:   destroy_value [[VALUE]]
@@ -108,13 +108,13 @@ bb0:
   %11 = begin_borrow [lexical] %10 : $@callee_guaranteed () -> ()
   debug_value %11 : $@callee_guaranteed () -> (), let, name "f"
   %13 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %13a = mark_must_check [assignable_but_not_consumable] %13 : $*NonTrivialStruct
+  %13a = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %13 : $*NonTrivialStruct
   %14 = load_borrow %13a : $*NonTrivialStruct
   %15 = function_ref @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %16 = apply %15(%14) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   end_borrow %14 : $NonTrivialStruct
   %18 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %18a = mark_must_check [assignable_but_not_consumable] %18 : $*NonTrivialStruct
+  %18a = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %18 : $*NonTrivialStruct
   %19 = load [copy] %18a : $*NonTrivialStruct
   %20 = function_ref @consume_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
   %21 = apply %20(%19) : $@convention(thin) (@owned NonTrivialStruct) -> ()
@@ -128,12 +128,12 @@ bb0:
 sil private [ossa] @captured_let_allocstack_closure : $@convention(thin) (@guaranteed { let NonTrivialStruct }) -> () {
 bb0(%0 : @closureCapture @guaranteed ${ let NonTrivialStruct }):
   %1 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %2 = mark_must_check [assignable_but_not_consumable] %1 : $*NonTrivialStruct
+  %2 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %1 : $*NonTrivialStruct
   %3 = load [copy] %2 : $*NonTrivialStruct
   %4 = move_value %3 : $NonTrivialStruct
   destroy_value %4 : $NonTrivialStruct
   %6 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %7 = mark_must_check [assignable_but_not_consumable] %6 : $*NonTrivialStruct
+  %7 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %6 : $*NonTrivialStruct
   %8 = load [copy] %7 : $*NonTrivialStruct
   %9 = move_value %8 : $NonTrivialStruct
   destroy_value %9 : $NonTrivialStruct
@@ -141,12 +141,12 @@ bb0(%0 : @closureCapture @guaranteed ${ let NonTrivialStruct }):
 
 bb1:
   %17 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %18 = mark_must_check [assignable_but_not_consumable] %17 : $*NonTrivialStruct
+  %18 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %17 : $*NonTrivialStruct
   %19 = load [copy] %18 : $*NonTrivialStruct
   %20 = function_ref @consume_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
   %21 = apply %20(%19) : $@convention(thin) (@owned NonTrivialStruct) -> ()
   %22 = project_box %0 : ${ let NonTrivialStruct }, 0
-  %23 = mark_must_check [assignable_but_not_consumable] %22 : $*NonTrivialStruct
+  %23 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %22 : $*NonTrivialStruct
   %24 = load_borrow %23 : $*NonTrivialStruct
   %25 = function_ref @use_nontrivialstruct : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
   %26 = apply %25(%24) : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
@@ -185,7 +185,7 @@ bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
   %1 = project_box %0 : ${ var NonTrivialStruct }, 0
   debug_value %1 : $*NonTrivialStruct, var, name "x", argno 1, expr op_deref
   %3 = begin_access [read] [unknown] %1 : $*NonTrivialStruct
-  %4 = mark_must_check [no_consume_or_assign] %3 : $*NonTrivialStruct
+  %4 = mark_unresolved_non_copyable_value [no_consume_or_assign] %3 : $*NonTrivialStruct
   %5 = load [copy] %4 : $*NonTrivialStruct
   end_access %3 : $*NonTrivialStruct
   %7 = move_value %5 : $NonTrivialStruct

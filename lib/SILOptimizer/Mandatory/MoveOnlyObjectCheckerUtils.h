@@ -147,28 +147,30 @@ struct OSSACanonicalizer {
       llvm::filter_iterator<SILInstruction *const *, DropDeinitFilter>;
   using DropDeinitRange = iterator_range<DropDeinitIter>;
 
-  /// Returns a range of final uses of the mark_must_check that are drop_deinit
+  /// Returns a range of final uses of the mark_unresolved_non_copyable_value
+  /// that are drop_deinit
   DropDeinitRange getDropDeinitUses() const {
     return llvm::make_filter_range(consumingBoundaryUsers, DropDeinitFilter());
   }
 };
 
-/// Search for candidate object mark_must_checks. If we find one that does not
-/// fit a pattern that we understand, emit an error diagnostic telling the
-/// programmer that the move checker did not know how to recognize this code
-/// pattern.
+/// Search for candidate object mark_unresolved_non_copyable_values. If we find
+/// one that does not fit a pattern that we understand, emit an error diagnostic
+/// telling the programmer that the move checker did not know how to recognize
+/// this code pattern.
 ///
-/// \returns true if we deleted a mark_must_check inst that we didn't recognize
-/// after emitting the diagnostic.
+/// \returns true if we deleted a mark_unresolved_non_copyable_value inst that
+/// we didn't recognize after emitting the diagnostic.
 ///
 /// To check if an error was emitted call \p
 /// diagnosticEmitter.getDiagnosticCount().
 ///
 /// NOTE: This is the routine used by the move only object checker to find mark
 /// must checks to process.
-bool searchForCandidateObjectMarkMustChecks(
+bool searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
     SILFunction *fn,
-    SmallSetVector<MarkMustCheckInst *, 32> &moveIntroducersToProcess,
+    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 
 struct MoveOnlyObjectChecker {
@@ -179,7 +181,8 @@ struct MoveOnlyObjectChecker {
 
   /// Returns true if we changed the IR in any way. Check with \p
   /// diagnosticEmitter to see if we emitted any diagnostics.
-  bool check(llvm::SmallSetVector<MarkMustCheckInst *, 32> &instsToCheck);
+  bool check(llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+                 &instsToCheck);
 };
 
 } // namespace siloptimizer
