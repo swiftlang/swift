@@ -29,6 +29,9 @@ public protocol CxxDictionary<Key, Value> {
   func __findUnsafe(_ key: Key) -> RawIterator
 
   /// Do not implement this function manually in Swift.
+  func __beginUnsafe() -> RawIterator
+  
+  /// Do not implement this function manually in Swift.
   mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator
 
   /// Do not implement this function manually in Swift.
