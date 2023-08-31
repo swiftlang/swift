@@ -17,7 +17,30 @@ compatibility-version: 0
 swift-abi-version: 7
 exports:
   - targets:         [ arm64-macos ]
-    symbols:         [ '_$s14lazy_typecheck10publicFuncSiyF', '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTj',
+    symbols:         [ '_$s14lazy_typecheck023PublicClassConformingToC5ProtoC3reqSiyFTj',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoC3reqSiyFTq',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCAA0cG0AAMc',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCAA0cG0AAWP',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCACycfC',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCACycfCTj',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCACycfCTq',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCACycfc',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCMa',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCMm',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCMn',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCMo',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCMu',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCN',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCfD',
+                       '_$s14lazy_typecheck023PublicClassConformingToC5ProtoCfd',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoV3reqSiyF',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVAA0cG0AAMc',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVAA0cG0AAWP',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVACycfC',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVMa',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVMn',
+                       '_$s14lazy_typecheck024PublicStructConformingToC5ProtoVN',
+                       '_$s14lazy_typecheck10publicFuncSiyF', '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTj',
                        '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTq',
                        '_$s14lazy_typecheck11PublicClassC12publicMethodSiyFTj', '_$s14lazy_typecheck11PublicClassC12publicMethodSiyFTq',
                        '_$s14lazy_typecheck11PublicClassC1xACSi_tcfC', '_$s14lazy_typecheck11PublicClassC1xACSi_tcfCTj',
@@ -35,5 +58,7 @@ exports:
                        '_$s14lazy_typecheck13inlinableFuncSiyF', '_$s14lazy_typecheck24publicFuncWithDefaultArgyS2iF',
                        '_$s14lazy_typecheck30publicFuncWithOpaqueReturnTypeQryF',
                        '_$s14lazy_typecheck30publicFuncWithOpaqueReturnTypeQryFQOMQ',
-                       '_$s14lazy_typecheck32constrainedGenericPublicFunctionyyxAA0E5ProtoRzlF' ]
+                       '_$s14lazy_typecheck32constrainedGenericPublicFunctionyyxAA0E5ProtoRzlF',
+                       '_$sSS14lazy_typecheck11PublicProtoAAMc', '_$sSS14lazy_typecheck11PublicProtoAAWP',
+                       '_$sSS14lazy_typecheckE3reqSiyF' ]
 ...

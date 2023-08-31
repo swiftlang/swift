@@ -50,12 +50,12 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
 // MARK: - Nominal types
 
 public protocol PublicProto {
-  func req() -> Int
+  func req() -> Int // expected-note 2 {{protocol requires function 'req()' with type '() -> Int'; add a stub for conformance}}
 }
 
 protocol InternalProto {
-  // FIXME: Serialization causes typechecking of protocols regardless of access level
-//  func req() -> DoesNotExist
+  func goodReq() -> Int // expected-note {{protocol requires function 'goodReq()' with type '() -> Int'; add a stub for conformance}}
+  func badReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
 
 public struct PublicStruct {
@@ -114,6 +114,37 @@ public class PublicClass {
 class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
   init(x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
+
+// MARK: - Conformances
+
+public struct PublicStructConformingToPublicProto: PublicProto {
+  public init() {}
+  public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+public class PublicClassConformingToPublicProto: PublicProto {
+  public init() {}
+  public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+extension String: PublicProto {
+  public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+struct InternalStructConformingToPublicProto: PublicProto { // expected-error {{type 'InternalStructConformingToPublicProto' does not conform to protocol 'PublicProto'}}
+}
+
+extension InternalStruct: PublicProto { // expected-error {{type 'InternalStruct' does not conform to protocol 'PublicProto'}}
+}
+
+struct InternalStructConformingToInternalProto: InternalProto { // expected-error {{type 'InternalStructConformingToInternalProto' does not conform to protocol 'InternalProto'}}
+}
+
 // FIXME: Test enums
-// FIXME: Test conformances
 // FIXME: Test global vars
