@@ -387,7 +387,6 @@ func testReturnMismatch() {
   let _ = if .random() {
     return 1 // expected-error {{unexpected non-void return value in void function}}
     // expected-note@-1 {{did you mean to add a return type?}}
-    // expected-error@-2 {{cannot 'return' in 'if' when used as expression}}
   } else {
     0
   }
@@ -651,9 +650,46 @@ func builderWithBinding() -> Either<String, Int> {
   }
 }
 
+@Builder
+func builderWithInvalidBinding() -> Either<String, Int> {
+  let str = (if .random() { "a" } else { "b" })
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  if .random() {
+    str
+  } else {
+    1
+  }
+}
+
+func takesBuilder(@Builder _ fn: () -> Either<String, Int>) {}
+
+func builderClosureWithBinding() {
+  takesBuilder {
+    // Make sure the binding gets type-checked as an if expression, but the
+    // other if block gets type-checked as a stmt.
+    let str = if .random() { "a" } else { "b" }
+    if .random() {
+      str
+    } else {
+      1
+    }
+  }
+}
+
+func builderClosureWithInvalidBinding()  {
+  takesBuilder {
+    let str = (if .random() { "a" } else { "b" })
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    if .random() {
+      str
+    } else {
+      1
+    }
+  }
+}
+
 func builderInClosure() {
-  func build(@Builder _ fn: () -> Either<String, Int>) {}
-  build {
+  takesBuilder {
     if .random() {
       ""
     } else {
