@@ -372,13 +372,6 @@ class ModelASTWalker : public ASTWalker {
   friend class InactiveClauseRAII;
   bool inInactiveClause = false;
 
-  struct ParentArgsTy {
-    Expr *Parent = nullptr;
-    llvm::DenseMap<Expr *, Argument> Args;
-  };
-  /// A mapping of argument expressions to their full argument info.
-  SmallVector<ParentArgsTy, 4> ParentArgs;
-
 public:
   SyntaxModelWalker &Walker;
   ArrayRef<SyntaxNode> TokenNodes;
@@ -401,10 +394,7 @@ public:
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
-  PreWalkResult<ArgumentList *>
-  walkToArgumentListPre(ArgumentList *ArgList) override;
-  PostWalkResult<ArgumentList *>
-  walkToArgumentListPost(ArgumentList *ArgList) override;
+  PreWalkAction walkToArgumentPre(const Argument &Arg) override;
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override;
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
@@ -544,68 +534,37 @@ static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
              SM.getLineAndColumnInBuffer(Node.Range.getEnd()).first;
 }
 
-ASTWalker::PreWalkResult<ArgumentList *>
-ModelASTWalker::walkToArgumentListPre(ArgumentList *ArgList) {
-  Expr *ParentExpr = Parent.getAsExpr();
-  if (!ParentExpr)
-    return Action::Continue(ArgList);
+ASTWalker::PreWalkAction
+ModelASTWalker::walkToArgumentPre(const Argument &Arg) {
+  if (isVisitedBefore(Arg.getExpr()))
+    return Action::SkipChildren();
 
-  ParentArgsTy Mapping;
-  Mapping.Parent = ParentExpr;
-  for (auto Arg : *ArgList) {
-    auto res = Mapping.Args.try_emplace(Arg.getExpr(), Arg);
-    assert(res.second && "Duplicate arguments?");
-    (void)res;
-  }
-  ParentArgs.push_back(std::move(Mapping));
-  return Action::Continue(ArgList);
-}
+  auto *Elem = Arg.getExpr();
+  if (isa<DefaultArgumentExpr>(Elem))
+    return Action::Continue();
 
-ASTWalker::PostWalkResult<ArgumentList *>
-ModelASTWalker::walkToArgumentListPost(ArgumentList *ArgList) {
-  if (Expr *ParentExpr = Parent.getAsExpr()) {
-    assert(ParentExpr == ParentArgs.back().Parent &&
-           "Unmatched walkToArgumentList(Pre|Post)");
-    ParentArgs.pop_back();
+  auto NL = Arg.getLabelLoc();
+  auto Name = Arg.getLabel();
+
+  SyntaxStructureNode SN;
+  SN.Kind = SyntaxStructureKind::Argument;
+  SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
+  if (NL.isValid() && !Name.empty()) {
+    SN.NameRange = CharSourceRange(NL, Name.getLength());
+    SN.Range = charSourceRangeFromSourceRange(
+        SM, SourceRange(NL, Elem->getEndLoc()));
+    passTokenNodesUntil(NL, ExcludeNodeAtLocation);
+  } else {
+    SN.Range = SN.BodyRange;
   }
-  return Action::Continue(ArgList);
+
+  pushStructureNode(SN, Elem);
+  return Action::Continue();
 }
 
 ASTWalker::PreWalkResult<Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
     return Action::SkipChildren(E);
-
-  auto addCallArgExpr = [&](const Argument &Arg) {
-    auto *Elem = Arg.getExpr();
-    if (isa<DefaultArgumentExpr>(Elem))
-      return;
-
-    auto NL = Arg.getLabelLoc();
-    auto Name = Arg.getLabel();
-
-    SyntaxStructureNode SN;
-    SN.Kind = SyntaxStructureKind::Argument;
-    SN.BodyRange = charSourceRangeFromSourceRange(SM, Elem->getSourceRange());
-    if (NL.isValid() && !Name.empty()) {
-      SN.NameRange = CharSourceRange(NL, Name.getLength());
-      SN.Range = charSourceRangeFromSourceRange(
-          SM, SourceRange(NL, Elem->getEndLoc()));
-      passTokenNodesUntil(NL, ExcludeNodeAtLocation);
-    } else {
-      SN.Range = SN.BodyRange;
-    }
-
-    pushStructureNode(SN, Elem);
-  };
-
-  if (auto *ParentExpr = Parent.getAsExpr()) {
-    if (!ParentArgs.empty() && ParentArgs.back().Parent == ParentExpr) {
-      auto &ArgumentInfo = ParentArgs.back().Args;
-      auto Arg = ArgumentInfo.find(E);
-      if (Arg != ArgumentInfo.end())
-        addCallArgExpr(Arg->second);
-    }
-  }
 
   if (E->isImplicit())
     return Action::Continue(E);
