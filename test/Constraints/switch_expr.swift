@@ -754,7 +754,7 @@ func builderNotPostfix() -> (Either<String, Int>, Bool) {
 
 @Builder
 func builderWithBinding() -> Either<String, Int> {
-  // Make sure the binding gets type-checked as an if expression, but the
+  // Make sure the binding gets type-checked as a switch expression, but the
   // other if block gets type-checked as a stmt.
   let str = switch Bool.random() {
     case true: "a"
@@ -767,9 +767,49 @@ func builderWithBinding() -> Either<String, Int> {
   }
 }
 
+
+@Builder
+func builderWithInvalidBinding() -> Either<String, Int> {
+  let str = (switch Bool.random() { default: "a" })
+  // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+  if .random() {
+    str
+  } else {
+    1
+  }
+}
+
+func takesBuilder(@Builder _ fn: () -> Either<String, Int>) {}
+
+func builderClosureWithBinding() {
+  takesBuilder {
+    // Make sure the binding gets type-checked as a switch expression, but the
+    // other if block gets type-checked as a stmt.
+    let str = switch Bool.random() { case true: "a" case false: "b" }
+    switch Bool.random() {
+    case true:
+      str
+    case false:
+      1
+    }
+  }
+}
+
+func builderClosureWithInvalidBinding()  {
+  takesBuilder {
+    let str = (switch Bool.random() { case true: "a" case false: "b" })
+    // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+    switch Bool.random() {
+    case true:
+      str
+    case false:
+      1
+    }
+  }
+}
+
 func builderInClosure() {
-  func build(@Builder _ fn: () -> Either<String, Int>) {}
-  build {
+  takesBuilder {
     switch Bool.random() {
     case true:
       ""
