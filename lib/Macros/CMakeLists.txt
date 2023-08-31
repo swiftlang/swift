@@ -31,6 +31,12 @@ function(add_swift_macro_library name)
   # Add the library.
   add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
 
+  # If we don't have the Swift swift parser, bail out, because the above
+  # add_pure_swift_host_library did nothing.
+  if (NOT SWIFT_SWIFT_PARSER)
+    return()
+  endif()
+
   # Add rpath to 'lib/{platform}'
   file(RELATIVE_PATH relpath_to_lib
     "${SWIFT_HOST_PLUGINS_DEST_DIR}"
@@ -42,12 +48,6 @@ function(add_swift_macro_library name)
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     set_property(TARGET ${name}
       APPEND PROPERTY INSTALL_RPATH "$ORIGIN/..")
-  endif()
-
-  # If we don't have the Swift swift parser, bail out, because the above
-  # add_pure_swift_host_library did nothing.
-  if (NOT SWIFT_SWIFT_PARSER)
-    return()
   endif()
 
   # Install into the plugin directory.
