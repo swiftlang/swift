@@ -3649,7 +3649,7 @@ void ASTMangler::appendDependentProtocolConformance(
 
     // Inherited conformance.
     bool isInheritedConformance =
-      entry.first->isEqual(currentProtocol->getProtocolSelfType());
+      entry.first->isEqual(currentProtocol->getSelfInterfaceType());
     if (isInheritedConformance) {
       appendProtocolName(entry.second);
       // For now, this is never an unknown index and so must be adjusted by 2.

@@ -392,12 +392,6 @@ public:
   LLVM_READONLY
   VarDecl *getNonLocalVarDecl() const;
 
-  /// Retrieve the generic parameter 'Self' from a protocol or
-  /// protocol extension.
-  ///
-  /// Only valid if \c getSelfProtocolDecl().
-  GenericTypeParamType *getProtocolSelfType() const;
-
   /// Gets the type being declared by this context.
   ///
   /// - Generic types return a bound generic type using archetypes.
