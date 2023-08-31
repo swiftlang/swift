@@ -65,14 +65,14 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN:   destroy_value [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
 // SILGEN:   destroy_value [[DD]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
@@ -88,7 +88,7 @@ var value: Bool { false }
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -138,7 +138,7 @@ public func testIntPairWithoutDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -186,7 +186,7 @@ public func testIntPairWithDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -235,7 +235,7 @@ public func testKlassPairWithoutDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -323,7 +323,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN:   destroy_value [[DD]] : $KlassEnumPairWithDeinit
 // SILGEN-NEXT: tuple ()
@@ -332,7 +332,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN:   destroy_value [[DD]] : $IntEnumPairWithDeinit
 // SILGEN-NEXT: tuple ()
@@ -350,7 +350,7 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -399,7 +399,7 @@ public func testIntEnumPairWithoutDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -445,7 +445,7 @@ public func testIntEnumPairWithDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3
@@ -493,7 +493,7 @@ public func testKlassEnumPairWithoutDeinit() {
 // SILGEN: cond_br {{%.*}}, bb1, bb2
 //
 // SILGEN: bb1:
-// SILGEN:   [[MARKED:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // SILGEN:   [[LOAD:%.*]] = load [copy] [[MARKED]]
 // SILGEN:   apply {{%.*}}([[LOAD]])
 // SILGEN:   br bb3

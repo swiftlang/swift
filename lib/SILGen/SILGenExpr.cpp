@@ -6208,8 +6208,10 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
     if (subType.isMoveOnly()) {
       // We need to move-only-check the moved value.
-      mv = SGF.B.createMarkMustCheckInst(E, mv,
-                         MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+      mv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          E, mv,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
     }
     return RValue(SGF, {mv}, subType.getASTType());
   }

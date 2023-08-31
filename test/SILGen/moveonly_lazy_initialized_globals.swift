@@ -34,10 +34,10 @@ struct Doit {
   // CHECK: [[PTR2:%.*]] = apply [[F2]]()
   // CHECK: [[ADDR2:%.*]] = pointer_to_address [[PTR2]]
   // CHECK: [[ACCESS1:%.*]] = begin_access [modify] [dynamic] [[ADDR1]]
-  // CHECK: [[MARK1:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS1]]
+  // CHECK: [[MARK1:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS1]]
   // CHECK: [[GEP1:%.*]] = struct_element_addr [[MARK1]]
   // CHECK: [[ACCESS2:%.*]] = begin_access [modify] [dynamic] [[ADDR2]]
-  // CHECK: [[MARK2:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS2]]
+  // CHECK: [[MARK2:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS2]]
   // CHECK: [[GEP2:%.*]] = struct_element_addr [[MARK2]]
   // CHECK: apply {{%.*}}([[GEP1]], [[GEP2]])
   //
@@ -48,10 +48,10 @@ struct Doit {
   // CHECK: [[PTR4:%.*]] = apply [[F4]]()
   // CHECK: [[ADDR4:%.*]] = pointer_to_address [[PTR4]]
   // CHECK: [[ACCESS3:%.*]] = begin_access [modify] [dynamic] [[ADDR3]]
-  // CHECK: [[MARK3:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS3]]
+  // CHECK: [[MARK3:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS3]]
   // CHECK: [[GEP3:%.*]] = struct_element_addr [[MARK3]]
   // CHECK: [[ACCESS4:%.*]] = begin_access [modify] [dynamic] [[ADDR4]]
-  // CHECK: [[MARK4:%.*]] = mark_must_check [assignable_but_not_consumable] [[ACCESS4]]
+  // CHECK: [[MARK4:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS4]]
   // CHECK: [[GEP4:%.*]] = struct_element_addr [[MARK4]]
   // CHECK: apply {{%.*}}([[GEP3]], [[GEP4]])
   // CHECK: } // end sil function '$s33moveonly_lazy_initialized_globals4DoitV3runyyFZ'

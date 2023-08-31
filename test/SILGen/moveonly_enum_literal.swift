@@ -21,7 +21,7 @@ var value: Bool { false }
 // CHECK: [[VALUE:%.*]] = enum $MoveOnlyIntPair, #MoveOnlyIntPair.lhs!enumelt,
 // CHECK: store [[VALUE]] to [init] [[PROJECT]]
 //
-// CHECK: [[MARKED_VALUE:%.*]] = mark_must_check [no_consume_or_assign] [[PROJECT]]
+// CHECK: [[MARKED_VALUE:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // CHECK: } // end sil function '$s21moveonly_enum_literal4testyyF'
 func test() {
     let x = MoveOnlyIntPair.lhs(5)

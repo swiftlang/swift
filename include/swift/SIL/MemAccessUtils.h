@@ -1634,7 +1634,7 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
 
   // Simply pass-thru the incoming address.
   case SILInstructionKind::MarkUninitializedInst:
-  case SILInstructionKind::MarkMustCheckInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
   case SILInstructionKind::DropDeinitInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::MarkDependenceInst:

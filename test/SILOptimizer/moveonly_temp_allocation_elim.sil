@@ -54,7 +54,7 @@ sil @sideeffect : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil hidden [ossa] @accessGrandLoadableField : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_stack
-// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ALLOC]]
+// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
 // CHECK: apply {{%.*}}([[MARK]], {{%.*}})
 // CHECK: [[GEP1:%.*]] = struct_element_addr [[MARK]]
 // CHECK: [[GEP2:%.*]] = struct_element_addr [[GEP1]]
@@ -65,7 +65,7 @@ sil @sideeffect : $@convention(thin) () -> ()
 sil hidden [ossa] @accessGrandLoadableField : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] $AddressOnlyType, let, name "x"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*AddressOnlyType
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*AddressOnlyType
   %2 = metatype $@thin AddressOnlyType.Type
   %3 = function_ref @get_addressonly_type : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
   %4 = apply %3(%1, %2) : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
@@ -91,7 +91,7 @@ bb0:
 
 // CHECK-LABEL: sil hidden [ossa] @accessChildLoadableField : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_stack
-// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ALLOC]]
+// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
 // CHECK: apply {{%.*}}([[MARK]], {{%.*}})
 // CHECK: [[GEP1:%.*]] = struct_element_addr [[MARK]]
 // CHECK: [[GEP2:%.*]] = struct_element_addr [[GEP1]]
@@ -101,7 +101,7 @@ bb0:
 sil hidden [ossa] @accessChildLoadableField : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] $AddressOnlyType, let, name "x"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*AddressOnlyType
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*AddressOnlyType
   %2 = metatype $@thin AddressOnlyType.Type
   %3 = function_ref @get_addressonly_type : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
   %4 = apply %3(%1, %2) : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
@@ -121,7 +121,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil hidden [ossa] @accessChildLoadableFieldWithBlockingSideEffect : $@convention(thin) () -> () {
-// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ALLOC]]
+// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
 // CHECK: apply {{%.*}}([[MARK]], {{%.*}})
 // CHECK: [[GEP1:%.*]] = struct_element_addr [[MARK]]
 // CHECK: [[TEMP:%.*]] = alloc_stack $SingleFieldAddressOnly2
@@ -134,7 +134,7 @@ bb0:
 sil hidden [ossa] @accessChildLoadableFieldWithBlockingSideEffect : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] $AddressOnlyType, let, name "x"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*AddressOnlyType
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*AddressOnlyType
   %2 = metatype $@thin AddressOnlyType.Type
   %3 = function_ref @get_addressonly_type : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
   %4 = apply %3(%1, %2) : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
@@ -159,7 +159,7 @@ bb0:
 
 // CHECK-LABEL: sil hidden [ossa] @copyableAddressOnlyTest : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_stack
-// CHECK: [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ALLOC]]
+// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ALLOC]]
 // CHECK: apply {{%.*}}([[MARK]], {{%.*}})
 // CHECK: [[GEP1:%.*]] = struct_element_addr [[MARK]]
 // CHECK: [[GEP2:%.*]] = struct_element_addr [[GEP1]]
@@ -169,7 +169,7 @@ bb0:
 sil hidden [ossa] @copyableAddressOnlyTest : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack [lexical] $AddressOnlyType, let, name "x"
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*AddressOnlyType
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*AddressOnlyType
   %2 = metatype $@thin AddressOnlyType.Type
   %3 = function_ref @get_addressonly_type : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType
   %4 = apply %3(%1, %2) : $@convention(method) (@thin AddressOnlyType.Type) -> @out AddressOnlyType

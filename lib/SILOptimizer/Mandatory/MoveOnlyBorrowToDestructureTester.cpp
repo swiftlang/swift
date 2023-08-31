@@ -46,10 +46,10 @@ using namespace swift::siloptimizer::borrowtodestructure;
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-static bool runTransform(SILFunction *fn,
-                         ArrayRef<MarkMustCheckInst *> moveIntroducersToProcess,
-                         PostOrderAnalysis *poa,
-                         DiagnosticEmitter &diagnosticEmitter) {
+static bool runTransform(
+    SILFunction *fn,
+    ArrayRef<MarkUnresolvedNonCopyableValueInst *> moveIntroducersToProcess,
+    PostOrderAnalysis *poa, DiagnosticEmitter &diagnosticEmitter) {
   IntervalMapAllocator allocator;
   bool madeChange = false;
   while (!moveIntroducersToProcess.empty()) {
@@ -88,12 +88,14 @@ class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
 
     auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
-    SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        moveIntroducersToProcess;
     DiagnosticEmitter diagnosticEmitter(getFunction());
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-    bool madeChange = searchForCandidateObjectMarkMustChecks(
-        getFunction(), moveIntroducersToProcess, diagnosticEmitter);
+    bool madeChange =
+        searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
+            getFunction(), moveIntroducersToProcess, diagnosticEmitter);
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

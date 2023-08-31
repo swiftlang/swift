@@ -47,8 +47,8 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
   selfType = F.mapTypeIntoContext(selfType);
   SILValue selfValue = F.begin()->createFunctionArgument(selfType, selfDecl);
 
-  // If we have a move only type, then mark it with mark_must_check so we can't
-  // escape it.
+  // If we have a move only type, then mark it with
+  // mark_unresolved_non_copyable_value so we can't escape it.
   if (selfType.isMoveOnly()) {
     // For now, we do not handle move only class deinits. This is because we
     // need to do a bit more refactoring to handle the weird way that it deals
@@ -56,9 +56,10 @@ SILValue SILGenFunction::emitSelfDeclForDestructor(VarDecl *selfDecl) {
     // are owned, lets mark them as needing to be no implicit copy checked so
     // they cannot escape.
     if (selfValue->getOwnershipKind() == OwnershipKind::Owned) {
-      selfValue = B.createMarkMustCheckInst(
+      selfValue = B.createMarkUnresolvedNonCopyableValueInst(
           selfDecl, selfValue,
-          MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
     }
   }
 
@@ -286,8 +287,10 @@ public:
       // If we are inout and are move only, insert a note to the move checker to
       // check ownership.
       if (mv.getType().isMoveOnly() && !mv.getType().isMoveOnlyWrapped())
-        mv = SGF.B.createMarkMustCheckInst(
-            loc, mv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        mv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+            loc, mv,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
 
       // If the value needs to be reabstracted, set up a shadow copy with
       // writeback here.
@@ -758,8 +761,9 @@ private:
       // consume the value.
       assert(argrv.getOwnershipKind() == OwnershipKind::Guaranteed);
       argrv = argrv.copy(SGF, loc);
-      argrv = SGF.B.createMarkMustCheckInst(
-          loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, argrv,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
       return completeUpdate(argrv);
     }
 
@@ -771,38 +775,42 @@ private:
 
       // If our argument was owned, we use no implicit copy. Otherwise, we
       // use no copy.
-      MarkMustCheckInst::CheckKind kind;
+      MarkUnresolvedNonCopyableValueInst::CheckKind kind;
       switch (pd->getValueOwnership()) {
       case ValueOwnership::Default:
       case ValueOwnership::Shared:
       case ValueOwnership::InOut:
-        kind = MarkMustCheckInst::CheckKind::NoConsumeOrAssign;
+        kind = MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign;
         break;
 
       case ValueOwnership::Owned:
-        kind = MarkMustCheckInst::CheckKind::ConsumableAndAssignable;
+        kind = MarkUnresolvedNonCopyableValueInst::CheckKind::
+            ConsumableAndAssignable;
         break;
       }
 
-      argrv = SGF.B.createMarkMustCheckInst(loc, argrv, kind);
+      argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(loc, argrv, kind);
       return completeUpdate(argrv);
     }
 
     if (argrv.getOwnershipKind() == OwnershipKind::Guaranteed) {
       argrv = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(loc, argrv);
       argrv = argrv.copy(SGF, loc);
-      argrv = SGF.B.createMarkMustCheckInst(
-          loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, argrv,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
       return completeUpdate(argrv);
     }
 
     if (argrv.getOwnershipKind() == OwnershipKind::Owned) {
-      // If we have an owned value, forward it into the mark_must_check to
-      // avoid an extra destroy_value.
+      // If we have an owned value, forward it into the
+      // mark_unresolved_non_copyable_value to avoid an extra destroy_value.
       argrv = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(loc, argrv);
       argrv = SGF.B.createMoveValue(loc, argrv, true /*is lexical*/);
-      argrv = SGF.B.createMarkMustCheckInst(
-          loc, argrv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+      argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          loc, argrv,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
       return completeUpdate(argrv);
     }
 
@@ -870,11 +878,13 @@ private:
       switch (pd->getValueOwnership()) {
       case ValueOwnership::Default:
         if (pd->isSelfParameter()) {
-          assert(!isa<MarkMustCheckInst>(argrv.getValue()) &&
+          assert(!isa<MarkUnresolvedNonCopyableValueInst>(argrv.getValue()) &&
                  "Should not have inserted mark must check inst in EmitBBArgs");
           if (!pd->isInOut()) {
-            argrv = SGF.B.createMarkMustCheckInst(
-                loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+            argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+                loc, argrv,
+                MarkUnresolvedNonCopyableValueInst::CheckKind::
+                    NoConsumeOrAssign);
           }
         } else {
           if (auto *fArg = dyn_cast<SILFunctionArgument>(argrv.getValue())) {
@@ -891,35 +901,41 @@ private:
             case SILArgumentConvention::Pack_Out:
               llvm_unreachable("Should have been handled elsewhere");
             case SILArgumentConvention::Indirect_In:
-              argrv = SGF.B.createMarkMustCheckInst(
+              argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
                   loc, argrv,
-                  MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+                  MarkUnresolvedNonCopyableValueInst::CheckKind::
+                      ConsumableAndAssignable);
               break;
             case SILArgumentConvention::Indirect_In_Guaranteed:
-              argrv = SGF.B.createMarkMustCheckInst(
-                  loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+              argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+                  loc, argrv,
+                  MarkUnresolvedNonCopyableValueInst::CheckKind::
+                      NoConsumeOrAssign);
             }
           } else {
-            assert(isa<MarkMustCheckInst>(argrv.getValue()) &&
+            assert(isa<MarkUnresolvedNonCopyableValueInst>(argrv.getValue()) &&
                    "Should have inserted mark must check inst in EmitBBArgs");
           }
         }
         break;
       case ValueOwnership::InOut: {
-        assert(isa<MarkMustCheckInst>(argrv.getValue()) &&
+        assert(isa<MarkUnresolvedNonCopyableValueInst>(argrv.getValue()) &&
                "Expected mark must check inst with inout to be handled in "
                "emitBBArgs earlier");
-        auto mark = cast<MarkMustCheckInst>(argrv.getValue());
+        auto mark = cast<MarkUnresolvedNonCopyableValueInst>(argrv.getValue());
         debugOperand = mark->getOperand();
         break;
       }
       case ValueOwnership::Owned:
-        argrv = SGF.B.createMarkMustCheckInst(
-            loc, argrv, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+        argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+            loc, argrv,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::
+                ConsumableAndAssignable);
         break;
       case ValueOwnership::Shared:
-        argrv = SGF.B.createMarkMustCheckInst(
-            loc, argrv, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+        argrv = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+            loc, argrv,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
         break;
       }
     }
@@ -928,7 +944,8 @@ private:
       = SGF.B.createDebugValueAddr(loc, debugOperand, varinfo);
 
     if (argrv.getValue() != debugOperand) {
-      if (auto valueInst = dyn_cast<MarkMustCheckInst>(argrv.getValue())) {
+      if (auto valueInst =
+              dyn_cast<MarkUnresolvedNonCopyableValueInst>(argrv.getValue())) {
         // Move the debug instruction outside of any marker instruction that might
         // have been applied to the value, so that analysis doesn't move the
         // debug_value anywhere it shouldn't be.
@@ -1097,8 +1114,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // with consuming the move only type.
     if (val.getType().isMoveOnly()) {
       val = val.ensurePlusOne(SGF, Loc);
-      val = SGF.B.createMarkMustCheckInst(
-          Loc, val, MarkMustCheckInst::CheckKind::NoConsumeOrAssign);
+      val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, val,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
     }
 
     arg = val.getValue();
@@ -1149,10 +1167,12 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // NOTE: If we have an escaping closure, we are going to emit an error later
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
-    // mark_must_check here.
+    // mark_unresolved_non_copyable_value here.
     if (isInOut && ty.isPureMoveOnly()) {
-      arg = SGF.B.createMarkMustCheckInst(
-          Loc, arg, MarkMustCheckInst::CheckKind::ConsumableAndAssignable);
+      arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+          Loc, arg,
+          MarkUnresolvedNonCopyableValueInst::CheckKind::
+              ConsumableAndAssignable);
     }
     break;
   }
