@@ -1227,3 +1227,23 @@ func closureWithCaseArchetype<T>(_: T.Type) {
     }
   }
 }
+
+// rdar://112426330 - invalid diagnostic when closure argument is omitted
+do {
+  func test<T>(_: T, _: (T) -> Void) {}
+
+  test(42) { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{13-13= _ in}}
+    print("")
+  }
+
+  func context(_: (Int) -> Void) {}
+  func context(_: () -> Void) {}
+
+  context {
+    test(42) { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{15-15= _ in}}
+      print("")
+    }
+  }
+
+
+}
