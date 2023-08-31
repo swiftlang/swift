@@ -239,8 +239,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     for (auto conformance :
          IDC->getLocalConformances(ConformanceLookupKind::NonInherited)) {
       auto protocol = conformance->getProtocol();
-      if (Ctx.getOpts().PublicSymbolsOnly &&
-          getDeclLinkage(protocol) != FormalLinkage::PublicUnique)
+      if (canSkipNominal(protocol))
         continue;
 
       auto needsWTable =
@@ -308,8 +307,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
   }
 
   bool addClassMetadata(ClassDecl *CD) {
-    if (Ctx.getOpts().PublicSymbolsOnly &&
-        getDeclLinkage(CD) != FormalLinkage::PublicUnique)
+    if (canSkipNominal(CD))
       return false;
 
     auto &ctxt = CD->getASTContext();
@@ -363,6 +361,18 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       Visitor.addDispatchThunk(method);
     }
     Visitor.addMethodDescriptor(method);
+  }
+
+  /// Returns `true` if the neither the nominal nor its members have any symbols
+  /// that need to be visited because it has non-public linkage.
+  bool canSkipNominal(const NominalTypeDecl *NTD) {
+    if (!Ctx.getOpts().PublicSymbolsOnly)
+      return false;
+
+    if (NTD->hasClangNode())
+      return false;
+
+    return getDeclLinkage(NTD) != FormalLinkage::PublicUnique;
   }
 
 public:
@@ -585,6 +595,9 @@ public:
   }
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    if (canSkipNominal(NTD))
+      return;
+
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
     if (!NTD->getObjCImplementationDecl()) {
@@ -680,12 +693,16 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    auto nominal = ED->getExtendedNominal();
+    if (canSkipNominal(nominal))
+      return;
+
     if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
       // @_objcImplementation extensions generate the class metadata symbols.
       (void)addClassMetadata(CD);
     }
 
-    if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
+    if (!isa<ProtocolDecl>(nominal)) {
       addConformances(ED);
     }
 
@@ -738,6 +755,9 @@ public:
 #endif
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (canSkipNominal(PD))
+      return;
+
     if (!PD->isObjC() && !PD->isMarkerProtocol()) {
       Visitor.addProtocolDescriptor(PD);
 
