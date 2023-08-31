@@ -28,8 +28,7 @@ func _blackHolePtr<T>(_ x: UnsafePointer<T>) {
 }
 
 public func _blackHole<T>(_ x: T) {
-  var x = x
-  _blackHolePtr(&x)
+  withUnsafePointer(to: x, _blackHolePtr)
 }
 
 @inline(never)
