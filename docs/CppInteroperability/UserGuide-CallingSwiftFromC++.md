@@ -593,7 +593,7 @@ enum value will abort the program.
 ### Resilient Enums
 
 A resilient Swift enumeration value could represent a case that's unknown to the client.
-Swift forces the client to check if the value is `@uknown default` when switching over
+Swift forces the client to check if the value is `@unknown default` when switching over
 the enumeration to account for that. C++ follows a similar principle,
 by exposing an `unknownDefault` case that can then be matched in a switch.
 

@@ -1364,7 +1364,7 @@ public func ParamAttrs5(a : (@escaping () -> ()) -> ()) {
 // PASS_PRINT_AST: public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 
-// The following type only has the internal paramter name inferred from the
+// The following type only has the internal parameter name inferred from the
 // closure on the right-hand side of `=`. Thus, it is only part of the `Type`
 // and not part of the `TypeRepr`.
 // PASS_PRINT_AST_TYPE: public var ParamAttrs7: (_ f: @escaping () -> ()) -> ()

@@ -117,7 +117,7 @@ namespace swift {
 ///    %d_0 -def-> ... -def-> %d_N -use-> %u_0 -use-> ... -use-> %u_M
 ///
 /// a sequence (possibly empty) of def projections followed by a sequence
-/// (possibly emtpy) of use projections [projection_chain_structure].
+/// (possibly empty) of use projections [projection_chain_structure].
 struct ValueStorage {
   enum : uint32_t { InvalidID = uint32_t(~0) };
   enum : uint16_t { InvalidOper = uint16_t(~0) };
