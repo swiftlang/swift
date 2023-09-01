@@ -149,7 +149,7 @@ void *SwiftImportDecl_create(void *ctx, void *dc, void *importLoc, char kind,
       getSourceLocFromPointer(kindLoc), std::move(importPath).get());
 }
 
-void *BridgedSourceLoc_advanced(void *loc, long len) {
+void *BridgedSourceLoc_advanced(void *loc, SwiftInt len) {
   SourceLoc l = getSourceLocFromPointer(loc).getAdvancedLoc(len);
   return const_cast<void *>(l.getOpaquePointerValue());
 }
@@ -586,7 +586,7 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
 
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable eachLoc, long index,
+                                  void *_Nullable eachLoc, SwiftInt index,
                                   bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(
       static_cast<DeclContext *>(declContext),
@@ -699,6 +699,6 @@ bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto size = message.size();
   auto outPtr = malloc(size);
   memcpy(outPtr, message.data(), size);
-  *out = BridgedData{(const char *)outPtr, (unsigned long)size};
+  *out = BridgedData{(const char *)outPtr, (SwiftUInt)size};
   return false;
 }

@@ -39,12 +39,9 @@
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-typedef long SwiftInt;
-typedef unsigned long SwiftUInt;
-
 typedef struct {
   const void *_Nullable data;
-  long numElements;
+  SwiftInt numElements;
 } BridgedArrayRef;
 
 typedef struct {
@@ -65,7 +62,7 @@ typedef struct {
   void *_Nullable TrailingCommaLoc;
 } BridgedTupleTypeElement;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : SwiftInt {
   /// A type bound T : P, where T is a type that depends on a generic
   /// parameter and P is some type that should bound T, either as a concrete
   /// supertype or a protocol to which T must conform.
@@ -92,7 +89,7 @@ typedef struct {
 } BridgedRequirementRepr;
 
 /// Diagnostic severity when reporting diagnostics.
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : SwiftInt {
   BridgedFatalError,
   BridgedError,
   BridgedWarning,
@@ -102,7 +99,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : long {
 
 typedef void* BridgedDiagnostic;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : SwiftInt {
   /// An expanded macro.
   BridgedExpandedMacro = 0,
   /// An external macro, spelled with either the old spelling (Module.Type)
@@ -130,7 +127,7 @@ BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
                                          BridgedDiagnosticSeverity severity,
                                          const void *_Nullable sourceLoc,
                                          const unsigned char *_Nullable text,
-                                         long textLen);
+                                         SwiftInt textLen);
 
 /// Highlight a source range as part of the diagnostic.
 void SwiftDiagnostic_highlight(
@@ -141,14 +138,14 @@ void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diag,
                                   const void *_Nullable replaceStartLoc,
                                   const void *_Nullable replaceEndLoc,
                                   const unsigned char *_Nullable newText,
-                                  long newTextLen);
+                                  SwiftInt newTextLen);
 
 /// Finish the given diagnostic and emit it.
 void SwiftDiagnostic_finish(BridgedDiagnostic diag);
 
 BridgedIdentifier
 SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
-                              long len);
+                              SwiftInt len);
 
 void *SwiftImportDecl_create(void *, void *, void *, char, void *,
                              BridgedArrayRef, BridgedArrayRef);
@@ -173,11 +170,11 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc);
 
 void *SwiftStringLiteralExpr_create(void *ctx,
                                     const unsigned char *_Nullable string,
-                                    long len, void *TokenLoc);
+                                    SwiftInt len, void *TokenLoc);
 
 void *SwiftIntegerLiteralExpr_create(void *ctx,
                                      const unsigned char *_Nullable string,
-                                     long len, void *TokenLoc);
+                                     SwiftInt len, void *TokenLoc);
 
 void *SwiftBooleanLiteralExpr_create(void *ctx, _Bool value, void *TokenLoc);
 
@@ -194,7 +191,7 @@ void *SingleValueStmtExpr_createWithWrappedBranches(void *ctx, void *S,
 void *IfStmt_create(void *ctx, void *ifLoc, void *cond, void *_Nullable then,
                     void *_Nullable elseLoc, void *_Nullable elseStmt);
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : SwiftInt {
   ASTNodeKindExpr,
   ASTNodeKindStmt,
   ASTNodeKindDecl
@@ -208,7 +205,7 @@ struct ASTNodeBridged {
 void *BraceStmt_create(void *ctx, void *lbloc, BridgedArrayRef elements,
                        void *rbloc);
 
-void *BridgedSourceLoc_advanced(void *loc, long len);
+void *BridgedSourceLoc_advanced(void *loc, SwiftInt len);
 
 void *ParamDecl_create(void *ctx, void *loc, void *_Nullable argLoc,
                        void *_Nullable argName, void *_Nullable paramLoc,
@@ -282,7 +279,7 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
                               BridgedArrayRef reqs, void *rAngleLoc);
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable eachLoc, long index,
+                                  void *_Nullable eachLoc, SwiftInt index,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(void *ctx, void *Param, void *ty);
 
