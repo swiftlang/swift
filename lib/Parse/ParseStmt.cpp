@@ -34,7 +34,7 @@ using namespace swift;
 
 /// isStartOfStmt - Return true if the current token starts a statement.
 ///
-bool Parser::isStartOfStmt() {
+bool Parser::isStartOfStmt(bool preferExpr) {
   // This needs to be kept in sync with `Parser::parseStmt()`. If a new token
   // kind is accepted here as start of statement, it should also be handled in
   // `Parser::parseStmt()`.
@@ -84,14 +84,15 @@ bool Parser::isStartOfStmt() {
     }
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::kw_try);
-    return isStartOfStmt();
+    return isStartOfStmt(preferExpr);
   }
       
   case tok::identifier: {
     // "identifier ':' for/while/do/switch" is a label on a loop/switch.
     if (!peekToken().is(tok::colon)) {
-      // "yield" or "discard" in the right context begins a statement.
-      if (isContextualYieldKeyword() || isContextualDiscardKeyword()) {
+      // "yield", "discard", and "then" in the right context begins a statement.
+      if (isContextualYieldKeyword() || isContextualDiscardKeyword() ||
+          isContextualThenKeyword(preferExpr)) {
         return true;
       }
       return false;
@@ -111,7 +112,7 @@ bool Parser::isStartOfStmt() {
     }
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
-    return isStartOfStmt();
+    return isStartOfStmt(preferExpr);
   }
 
   case tok::at_sign: {
@@ -123,7 +124,7 @@ bool Parser::isStartOfStmt() {
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::at_sign);
     consumeToken(tok::identifier);
-    return isStartOfStmt();
+    return isStartOfStmt(preferExpr);
   }
   }
 }
@@ -146,7 +147,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     return makeParserCodeCompletionStatus();
   }
 
-  if (isStartOfStmt()) {
+  if (isStartOfStmt(/*preferExpr*/ false)) {
     ParserResult<Stmt> Res = parseStmt();
     if (Res.isNonNull()) {
       auto *S = Res.get();
@@ -562,6 +563,9 @@ ParserResult<Stmt> Parser::parseStmt() {
     Tok.setKind(tok::kw_discard);
   }
 
+  if (isContextualThenKeyword(/*preferExpr*/ false))
+    Tok.setKind(tok::kw_then);
+
   // This needs to handle everything that `Parser::isStartOfStmt()` accepts as
   // start of statement.
   switch (Tok.getKind()) {
@@ -588,6 +592,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::kw_yield:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtYield(tryLoc);
+  case tok::kw_then:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseStmtThen(tryLoc);
   case tok::kw_throw:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtThrow(tryLoc);
@@ -697,7 +704,7 @@ static ParserStatus parseOptionalControlTransferTarget(Parser &P,
   // "break x+y") but since the expression after the them is dead, we don't feel
   // bad eagerly parsing this.
   if (!P.Tok.isAtStartOfLine()) {
-    if (P.Tok.is(tok::identifier) && !P.isStartOfStmt() &&
+    if (P.Tok.is(tok::identifier) && !P.isStartOfStmt(/*preferExpr*/ true) &&
         !P.isStartOfSwiftDecl()) {
       TargetLoc = P.consumeIdentifier(Target, /*diagnoseDollarPrefix=*/false);
       return makeParserSuccess();
@@ -775,7 +782,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     if (Tok.isAny(tok::kw_if, tok::kw_switch)) {
       return true;
     }
-    if (isStartOfStmt() || isStartOfSwiftDecl())
+    if (isStartOfStmt(/*preferExpr*/ true) || isStartOfSwiftDecl())
       return false;
 
     return true;
@@ -804,7 +811,7 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
     }
 
     if (tryLoc.isValid()) {
-      diagnose(tryLoc, diag::try_on_return_throw_yield, /*return=*/0)
+      diagnose(tryLoc, diag::try_must_come_after_stmt, /*return=*/0)
         .fixItInsert(ExprLoc, "try ")
         .fixItRemoveChars(tryLoc, ReturnLoc);
 
@@ -854,7 +861,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     // yielded values, suggest just removing the try instead of
     // suggesting adding it to every yielded value.
     if (tryLoc.isValid()) {
-      diagnose(tryLoc, diag::try_on_return_throw_yield, /*yield=*/2)
+      diagnose(tryLoc, diag::try_must_come_after_stmt, /*yield=*/2)
         .fixItRemoveChars(tryLoc, yieldLoc);
     }
 
@@ -874,7 +881,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
 
     // There's a single yielded value, so suggest moving 'try' before it.
     if (tryLoc.isValid()) {
-      diagnose(tryLoc, diag::try_on_return_throw_yield, /*yield=*/2)
+      diagnose(tryLoc, diag::try_must_come_after_stmt, /*yield=*/2)
         .fixItInsert(beginLoc, "try ")
         .fixItRemoveChars(tryLoc, yieldLoc);
     }
@@ -896,6 +903,95 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
            status, YieldStmt::create(Context, yieldLoc, lpLoc, yields, rpLoc));
 }
 
+bool Parser::isContextualThenKeyword(bool preferExpr) {
+  if (!Context.LangOpts.hasFeature(Feature::ThenStatements))
+    return false;
+
+  if (!Tok.isContextualKeyword("then"))
+    return false;
+
+  // If we want to prefer an expr, and aren't at the start of a newline, then
+  // don't parse a ThenStmt.
+  if (preferExpr && !Tok.isAtStartOfLine())
+    return false;
+
+  // 'then' immediately followed by '('/'[' is a function/subscript call. If
+  // immediately followed by '.', it's a member access.
+  if (peekToken().isAny(tok::l_paren, tok::l_square, tok::period)) {
+    auto tokEndLoc = Lexer::getLocForEndOfToken(SourceMgr, Tok.getLoc());
+    return peekToken().getLoc() != tokEndLoc;
+  }
+
+  // 'then' followed by '{' is a trailing closure on a function call.
+  if (peekToken().is(tok::l_brace))
+    return false;
+
+  // If we have 'then' followed by an infix or postfix operator, we know this
+  // must be an expression.
+  if (peekToken().isBinaryOperatorLike() || peekToken().isPostfixOperatorLike())
+    return false;
+
+  // These act like binary operators.
+  if (peekToken().isAny(tok::kw_is, tok::kw_as))
+    return false;
+
+  return true;
+}
+
+/// parseStmtThen
+///
+/// stmt-then:
+///   'then' expr
+///
+ParserResult<Stmt> Parser::parseStmtThen(SourceLoc tryLoc) {
+  SourceLoc thenLoc = consumeToken(tok::kw_then);
+
+  if (Tok.is(tok::code_complete)) {
+    auto ccLoc = consumeToken();
+    auto *CCE = new (Context) CodeCompletionExpr(ccLoc);
+    if (CodeCompletionCallbacks)
+      CodeCompletionCallbacks->completeThenStmt(CCE);
+
+    return makeParserCodeCompletionResult(
+        ThenStmt::createParsed(Context, thenLoc, CCE));
+  }
+
+  auto exprLoc = Tok.getLoc();
+
+  // Issue a warning when the expression is on a different line than
+  // the 'then' keyword, but both have the same indentation.
+  if (SourceMgr.getLineAndColumnInBuffer(thenLoc).second ==
+      SourceMgr.getLineAndColumnInBuffer(exprLoc).second) {
+    diagnose(exprLoc, diag::unindented_code_after_then);
+    diagnose(exprLoc, diag::indent_expression_to_silence);
+  }
+
+  ParserResult<Expr> result = parseExpr(diag::expected_expr_after_then);
+  bool hasCodeCompletion = result.hasCodeCompletion();
+
+  // If we couldn't parse an expr, fill it the gap with an ErrorExpr, as
+  // ThenStmt expects an expression node.
+  if (result.isNull())
+    result = makeParserErrorResult(new (Context) ErrorExpr(exprLoc));
+
+  if (tryLoc.isValid()) {
+    diagnose(tryLoc, diag::try_must_come_after_stmt, /*then=*/3)
+        .fixItInsert(exprLoc, "try ")
+        .fixItRemoveChars(tryLoc, thenLoc);
+
+    // Note: We can't use tryLoc here because that's outside the ThenStmt's
+    // source range.
+    if (!isa<ErrorExpr>(result.get()))
+      result = makeParserResult(new (Context) TryExpr(exprLoc, result.get()));
+  }
+
+  if (hasCodeCompletion)
+    result.setHasCodeCompletionAndIsError();
+
+  return makeParserResult(
+      result, ThenStmt::createParsed(Context, thenLoc, result.get()));
+}
+
 /// parseStmtThrow
 ///
 /// stmt-throw
@@ -914,7 +1010,7 @@ ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
     Result = makeParserErrorResult(new (Context) ErrorExpr(throwLoc));
 
   if (tryLoc.isValid() && exprLoc.isValid()) {
-    diagnose(tryLoc, diag::try_on_return_throw_yield, /*throw=*/1)
+    diagnose(tryLoc, diag::try_must_come_after_stmt, /*throw=*/1)
       .fixItInsert(exprLoc, "try ")
       .fixItRemoveChars(tryLoc, throwLoc);
 
@@ -2243,7 +2339,8 @@ static bool isStmtForCStyle(Parser &P) {
   // Skip until we see ';', or something that ends control part.
   while (true) {
     if (P.Tok.isAny(tok::eof, tok::kw_in, tok::l_brace, tok::r_brace,
-                    tok::r_paren) || P.isStartOfStmt())
+                    tok::r_paren) ||
+        P.isStartOfStmt(/*preferExpr*/ false))
       return false;
     // If we saw newline before ';', consider it is a foreach statement.
     if (!HasLParen && P.Tok.isAtStartOfLine())

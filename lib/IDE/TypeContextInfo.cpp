@@ -45,6 +45,7 @@ public:
 
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeThenStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          llvm::Optional<unsigned> yieldIndex) override;
 
@@ -70,6 +71,10 @@ void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
   ParsedExpr = E;
 }
 void ContextInfoCallbacks::completeReturnStmt(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  ParsedExpr = E;
+}
+void ContextInfoCallbacks::completeThenStmt(CodeCompletionExpr *E) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }

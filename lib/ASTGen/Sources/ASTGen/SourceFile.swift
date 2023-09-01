@@ -35,6 +35,7 @@ extension Parser.ExperimentalFeatures {
         insert(feature)
       }
     }
+    mapFeature(.ThenStatements, to: .thenStatements)
   }
 }
 

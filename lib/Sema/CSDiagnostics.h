@@ -3073,6 +3073,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an out-of-place ThenStmt.
+class OutOfPlaceThenStmtFailure final : public FailureDiagnostic {
+public:
+  OutOfPlaceThenStmtFailure(const Solution &solution,
+                            ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose attempts to specialize with invalid number of generic arguments:
 ///
 /// \code

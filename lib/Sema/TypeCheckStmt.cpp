@@ -1179,7 +1179,18 @@ public:
     }
     return YS;
   }
-  
+
+  Stmt *visitThenStmt(ThenStmt *TS) {
+    // These are invalid outside of if/switch expressions, but let's type-check
+    // to get extra diagnostics.
+    getASTContext().Diags.diagnose(TS->getThenLoc(),
+                                   diag::out_of_place_then_stmt);
+    auto *E = TS->getResult();
+    TypeChecker::typeCheckExpression(E, DC);
+    TS->setResult(E);
+    return TS;
+  }
+
   Stmt *visitThrowStmt(ThrowStmt *TS) {
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
@@ -2519,18 +2530,17 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       if (isa<TapExpr>(E))
         return Action::SkipChildren(E);
 
-      // If the location is within a single-expression branch of a
-      // SingleValueStmtExpr, walk it directly rather than as part of the brace.
-      // This ensures we type-check it a part of the whole expression, unless it
-      // has an inner closure or SVE, in which case we can still pick up a
-      // better node to type-check.
+      // If the location is within a result of a SingleValueStmtExpr, walk it
+      // directly rather than as part of the brace. This ensures we type-check
+      // it a part of the whole expression, unless it has an inner closure or
+      // SVE, in which case we can still pick up a better node to type-check.
       if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
         SmallVector<Expr *> scratch;
-        for (auto *branch : SVE->getSingleExprBranches(scratch)) {
-          auto branchCharRange = Lexer::getCharSourceRangeFromSourceRange(
-            SM, branch->getSourceRange());
-          if (branchCharRange.contains(Loc)) {
-            if (!branch->walk(*this))
+        for (auto *result : SVE->getResultExprs(scratch)) {
+          auto resultCharRange = Lexer::getCharSourceRangeFromSourceRange(
+            SM, result->getSourceRange());
+          if (resultCharRange.contains(Loc)) {
+            if (!result->walk(*this))
               return Action::Stop();
 
             return Action::SkipChildren(E);
@@ -2857,20 +2867,6 @@ void TypeChecker::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   performTopLevelDeclDiagnostics(TLCD);
 }
 
-/// Whether the given brace statement ends with a throw.
-static bool doesBraceEndWithThrow(BraceStmt *BS) {
-  auto elts = BS->getElements();
-  if (elts.empty())
-    return false;
-
-  auto lastElt = elts.back();
-  auto *S = lastElt.dyn_cast<Stmt *>();
-  if (!S)
-    return false;
-
-  return isa<ThrowStmt>(S);
-}
-
 namespace {
 /// An ASTWalker that searches for any break/continue/return statements that
 /// jump out of the context the walker starts at.
@@ -2924,6 +2920,38 @@ public:
 };
 } // end anonymous namespace
 
+/// Whether the given brace statement ends with a 'throw'.
+static bool doesBraceEndWithThrow(BraceStmt *BS) {
+  if (BS->empty())
+    return false;
+
+  auto *S = BS->getLastElement().dyn_cast<Stmt *>();
+  if (!S)
+    return false;
+
+  return isa<ThrowStmt>(S);
+}
+
+/// Whether the given brace statement is considered to produce a result for
+/// an if/switch expression.
+static bool doesBraceProduceResult(BraceStmt *BS, Evaluator &eval) {
+  if (BS->empty())
+    return false;
+
+  // We consider the branch as having a result if there is:
+  // - A single active expression or statement that can be turned into an
+  //   expression.
+  // - 'then <expr>' as the last statement.
+  if (BS->getSingleActiveExpression())
+    return true;
+
+  if (auto *S = BS->getSingleActiveStatement()) {
+    if (S->mayProduceSingleValue(eval))
+      return true;
+  }
+  return SingleValueStmtExpr::hasResult(BS);
+}
+
 IsSingleValueStmtResult
 areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
@@ -2932,7 +2960,7 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
 
   // Must have a single expression brace, and non-single-expression branches
   // must end with a throw.
-  bool hadSingleExpr = false;
+  bool hadResult = false;
   for (auto *branch : branches) {
     auto *BS = dyn_cast<BraceStmt>(branch);
     if (!BS)
@@ -2941,19 +2969,13 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
     // Check to see if there are any invalid jumps.
     BS->walk(jumpFinder);
 
-    if (BS->getSingleActiveExpression()) {
-      hadSingleExpr = true;
+    // Check to see if a result is produced from the branch.
+    if (doesBraceProduceResult(BS, eval)) {
+      hadResult = true;
       continue;
     }
 
-    // We also allow single value statement branches, which we can wrap in
-    // a SingleValueStmtExpr.
-    if (auto *S = BS->getSingleActiveStatement()) {
-      if (S->mayProduceSingleValue(eval)) {
-        hadSingleExpr = true;
-        continue;
-      }
-    }
+    // If there was no result, the branch must end in a 'throw'.
     if (!doesBraceEndWithThrow(BS))
       unterminatedBranches.push_back(BS);
   }
@@ -2966,8 +2988,9 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
         std::move(unterminatedBranches));
   }
 
-  if (!hadSingleExpr)
-    return IsSingleValueStmtResult::noExpressionBranches();
+  // No branches produced a result, we can't turn this into an expression.
+  if (!hadResult)
+    return IsSingleValueStmtResult::noResult();
 
   return IsSingleValueStmtResult::valid();
 }

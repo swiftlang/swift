@@ -103,8 +103,14 @@ enum class ConversionRestrictionKind;
 
 /// The kind of SingleValueStmtExpr branch the locator identifies.
 enum class SingleValueStmtBranchKind {
-  Regular,
-  InSingleExprClosure
+  /// Explicitly written 'then <expr>'.
+  Explicit,
+
+  /// Implicitly written '<expr>'.
+  Implicit,
+
+  /// Implicitly written '<expr>' in a single expr closure body.
+  ImplicitInSingleExprClosure
 };
 
 /// Locates a given constraint within the expression being
@@ -938,19 +944,19 @@ public:
   }
 };
 
-/// The branch of a SingleValueStmtExpr. Note the stored index corresponds to
-/// the expression branches, i.e it skips statement branch indices.
-class LocatorPathElt::SingleValueStmtBranch final
+/// A particular result of a ThenStmt at a given index in a SingleValueStmtExpr.
+/// The stored index corresponds to the \c getResultExprs array.
+class LocatorPathElt::SingleValueStmtResult final
     : public StoredIntegerElement<1> {
 public:
-  SingleValueStmtBranch(unsigned exprIdx)
-      : StoredIntegerElement(ConstraintLocator::SingleValueStmtBranch,
+  SingleValueStmtResult(unsigned exprIdx)
+      : StoredIntegerElement(ConstraintLocator::SingleValueStmtResult,
                              exprIdx) {}
 
-  unsigned getExprBranchIndex() const { return getValue(); }
+  unsigned getIndex() const { return getValue(); }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::SingleValueStmtBranch;
+    return elt->getKind() == ConstraintLocator::SingleValueStmtResult;
   }
 };
 

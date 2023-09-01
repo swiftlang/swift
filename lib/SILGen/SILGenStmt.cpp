@@ -419,16 +419,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-      // Check to see if we have an initialization for a SingleValueStmtExpr
-      // active, and if so, use it for this expression branch. If the expression
-      // is uninhabited, we can skip this, and let unreachability checking
-      // handle it.
-      auto init = SGF.getSingleValueStmtInit(E);
-      if (init && !E->getType()->isStructurallyUninhabited()) {
-        SGF.emitExprInto(E, init.get());
-      } else {
-        SGF.emitIgnoredExpr(E);
-      }
+      SGF.emitIgnoredExpr(E);
     } else {
       auto *D = ESD.get<Decl*>();
 
@@ -832,6 +823,17 @@ void StmtEmitter::visitYieldStmt(YieldStmt *S) {
   FullExpr fullExpr(SGF.Cleanups, CleanupLocation(S));
 
   SGF.emitYield(S, sources, origTypes, SGF.CoroutineUnwindDest);
+}
+
+void StmtEmitter::visitThenStmt(ThenStmt *S) {
+  auto *E = S->getResult();
+  auto init = SGF.getSingleValueStmtInit(E);
+
+  if (init && !E->getType()->isStructurallyUninhabited()) {
+    SGF.emitExprInto(E, init.get());
+  } else {
+    SGF.emitIgnoredExpr(E);
+  }
 }
 
 void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *stmt) {

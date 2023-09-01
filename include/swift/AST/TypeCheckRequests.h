@@ -3901,8 +3901,8 @@ public:
     /// The statement is an 'if' statement without an unconditional 'else'.
     NonExhaustiveIf,
 
-    /// There are no single-expression branches.
-    NoExpressionBranches,
+    /// There is no branch that produces a resulting value.
+    NoResult,
 
     /// There is an unhandled statement branch. This should only be the case
     /// for invalid AST.
@@ -3957,8 +3957,8 @@ public:
   static IsSingleValueStmtResult nonExhaustiveIf() {
     return IsSingleValueStmtResult(Kind::NonExhaustiveIf);
   }
-  static IsSingleValueStmtResult noExpressionBranches() {
-    return IsSingleValueStmtResult(Kind::NoExpressionBranches);
+  static IsSingleValueStmtResult noResult() {
+    return IsSingleValueStmtResult(Kind::NoResult);
   }
   static IsSingleValueStmtResult unhandledStmt() {
     return IsSingleValueStmtResult(Kind::UnhandledStmt);

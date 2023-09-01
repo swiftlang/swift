@@ -1624,6 +1624,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitThenStmt(ThenStmt *S) {
+    printCommon(S, "then_stmt");
+    OS << '\n';
+    printRec(S->getResult());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitDeferStmt(DeferStmt *S) {
     printCommon(S, "defer_stmt") << '\n';
     printRec(S->getTempDecl());

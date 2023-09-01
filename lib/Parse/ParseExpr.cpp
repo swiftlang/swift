@@ -3578,10 +3578,11 @@ ParserResult<Expr> Parser::parseExprCollection() {
 
       // If The next token is at the beginning of a new line and can never start
       // an element, break.
-      if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfSwiftDecl() || isStartOfStmt()))
+      if (Tok.isAtStartOfLine() &&
+          (Tok.isAny(tok::r_brace, tok::pound_endif) || isStartOfSwiftDecl() ||
+           isStartOfStmt(/*preferExpr*/ false))) {
         break;
-
+      }
       diagnose(Tok, diag::expected_separator, ",")
           .fixItInsertAfter(PreviousLoc, ",");
       Status.setIsParseError();
