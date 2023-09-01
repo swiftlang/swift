@@ -870,11 +870,16 @@ bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
   auto result = plugin->waitForNextMessage();
   if (!result) {
-    // FIXME: Pass the error message back to the caller.
-    llvm::consumeError(result.takeError());
-//    llvm::handleAllErrors(result.takeError(), [](const llvm::ErrorInfoBase &err) {
-//      llvm::errs() << err.message() << "\n";
-//    });
+    std::string errMsg;
+    llvm::handleAllErrors(
+        result.takeError(),
+        [&](const llvm::ErrorInfoBase &err) { errMsg.append(err.message()); });
+    if (!errMsg.empty()) {
+      auto size = errMsg.size();
+      auto outPtr = malloc(size);
+      memcpy(outPtr, errMsg.data(), size);
+      *out = BridgedData{(const char *)outPtr, (unsigned long)size};
+    }
     return true;
   }
   auto &message = result.get();

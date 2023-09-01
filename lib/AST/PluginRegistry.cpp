@@ -22,7 +22,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Config/config.h"
 
+#include <fcntl.h>
 #include <signal.h>
+#include <sys/select.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -153,9 +155,9 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
     return llvm::errorCodeToError(childInfo.getError());
   }
 
-  Process = std::make_unique<PluginProcess>(childInfo->Pid,
-                                            childInfo->ReadFileDescriptor,
-                                            childInfo->WriteFileDescriptor);
+  Process = std::make_unique<PluginProcess>(
+      childInfo->Pid, childInfo->ReadFileDescriptor,
+      childInfo->WriteFileDescriptor, childInfo->ErrOutFileDescriptor);
 
   // Call "on reconnect" callbacks.
   for (auto *callback : onReconnect) {
@@ -167,9 +169,18 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
 
 LoadedExecutablePlugin::PluginProcess::PluginProcess(llvm::sys::procid_t pid,
                                                      int inputFileDescriptor,
-                                                     int outputFileDescriptor)
+                                                     int outputFileDescriptor,
+                                                     int errorFileDescriptor)
     : pid(pid), inputFileDescriptor(inputFileDescriptor),
-      outputFileDescriptor(outputFileDescriptor) {}
+      outputFileDescriptor(outputFileDescriptor),
+      errorFileDescriptor(errorFileDescriptor) {
+  #if defined(F_SETNOSIGPIPE)
+  // Disable SIGPIPE
+  fcntl(inputFileDescriptor, F_SETNOSIGPIPE, 1);
+  fcntl(outputFileDescriptor, F_SETNOSIGPIPE, 1);
+  fcntl(errorFileDescriptor, F_SETNOSIGPIPE, 1);
+  #endif
+}
 
 LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
   close(inputFileDescriptor);
@@ -182,8 +193,8 @@ LoadedExecutablePlugin::~LoadedExecutablePlugin() {
     this->cleanup();
 }
 
-ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
-                                                    size_t nbyte) const {
+ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf, size_t nbyte,
+                                                    std::string &error) const {
   ssize_t bytesToRead = nbyte;
   void *ptr = buf;
 
@@ -193,16 +204,48 @@ ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
   SWIFT_DEFER { signal(SIGPIPE, old_handler); };
 #endif
 
+  int nfds = std::max(inputFileDescriptor, errorFileDescriptor) + 1;
+  fd_set readfds;
+  fd_set errorfds;
+  FD_ZERO(&readfds);
+  FD_ZERO(&errorfds);
+
   while (bytesToRead > 0) {
-    ssize_t readingSize = std::min(ssize_t(INT32_MAX), bytesToRead);
-    ssize_t readSize = ::read(inputFileDescriptor, ptr, readingSize);
-    if (readSize <= 0) {
-      // 0: EOF (the plugin exited?), -1: error (e.g. broken pipe.)
-      // FIXME: Mark the plugin 'stale' and relaunch later.
+    FD_SET(inputFileDescriptor, &readfds);
+    FD_SET(errorFileDescriptor, &readfds);
+    FD_SET(inputFileDescriptor, &errorfds);
+    FD_SET(errorFileDescriptor, &errorfds);
+
+    // TODO: Timeout?
+    select(nfds, &readfds, nullptr, &errorfds, nullptr);
+
+    // Correct captured error output.
+    if (FD_ISSET(errorFileDescriptor, &readfds)) {
+      char buf[4096];
+      ssize_t readSize = ::read(errorFileDescriptor, buf, 4096);
+
+      // Print captured error output from the plugin to STDERR.
+      llvm::errs() << StringRef(buf, readSize);
+
+      error.append(buf, readSize);
+    }
+
+    // Read the stdout from the plugin.
+    if (FD_ISSET(inputFileDescriptor, &readfds)) {
+      ssize_t readingSize = std::min(ssize_t(INT32_MAX), bytesToRead);
+      ssize_t readSize = ::read(inputFileDescriptor, ptr, readingSize);
+      if (readSize <= 0) {
+        // This is probably unreachable, but just in case.
+        break;
+      }
+      ptr = static_cast<char *>(ptr) + readSize;
+      bytesToRead -= readSize;
+    }
+
+    if (FD_ISSET(errorFileDescriptor, &errorfds) ||
+        FD_ISSET(inputFileDescriptor, &errorfds)) {
       break;
     }
-    ptr = static_cast<char *>(ptr) + readSize;
-    bytesToRead -= readSize;
   }
 
   return nbyte - bytesToRead;
@@ -267,14 +310,15 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
 llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   ssize_t readSize = 0;
 
+  std::string error;
+
   // Read header (message size).
   uint64_t header;
-  readSize = Process->read(&header, sizeof(header));
+  readSize = Process->read(&header, sizeof(header), error);
 
   if (readSize != sizeof(header)) {
     setStale();
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "failed to read plugin message header");
+    return llvm::createStringError(llvm::inconvertibleErrorCode(), error);
   }
 
   size_t size = llvm::support::endian::read<uint64_t>(
@@ -286,11 +330,11 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   auto sizeToRead = size;
   while (sizeToRead > 0) {
     char buffer[4096];
-    readSize = Process->read(buffer, std::min(sizeof(buffer), sizeToRead));
+    readSize =
+        Process->read(buffer, std::min(sizeof(buffer), sizeToRead), error);
     if (readSize == 0) {
       setStale();
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "failed to read plugin message data");
+      return llvm::createStringError(llvm::inconvertibleErrorCode(), error);
     }
     sizeToRead -= readSize;
     message.append(buffer, readSize);

@@ -16,13 +16,31 @@ import SwiftSyntax
 import swiftLLVMJSON
 import SwiftCompilerPluginMessageHandling
 
-enum PluginError: String, Error, CustomStringConvertible {
-  case stalePlugin = "plugin is stale"
-  case failedToSendMessage = "failed to send request to plugin"
-  case failedToReceiveMessage = "failed to receive result from plugin"
-  case invalidReponseKind = "plugin returned invalid result"
+enum PluginError: Error, CustomStringConvertible {
+  case stalePlugin
+  case failedToSendMessage
+  case failedToReceiveMessage(String?)
+  case invalidReponseKind
 
-  var description: String { rawValue }
+  var description: String {
+    switch self {
+    case .stalePlugin:
+      return "plugin is stale"
+    case .failedToSendMessage:
+      return "failed to send request to plugin"
+    case .failedToReceiveMessage(let message):
+      var description = "failed to receive result from plugin"
+      if let message = message {
+        let message = message
+          .dropPrefix(in: ["\n", "\r", "\r\n"])
+          .dropSuffix(in: ["\n", "\r", "\r\n"])
+        description += "; " + message
+      }
+      return description
+    case .invalidReponseKind:
+      return "plugin returned invalid result"
+    }
+  }
 }
 
 @_cdecl("swift_ASTGen_initializePlugin")
@@ -133,7 +151,7 @@ struct CompilerPlugin {
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
     defer { BridgedData_free(result) }
     guard !hadError else {
-      throw PluginError.failedToReceiveMessage
+      throw PluginError.failedToReceiveMessage(String(result))
     }
     let data = UnsafeBufferPointer(start: result.baseAddress, count: Int(result.size))
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
@@ -419,5 +437,34 @@ extension PluginMessage.Syntax {
         column: 0
       )
     )
+  }
+}
+
+extension String {
+  init?(_ data: BridgedData) {
+    if data.baseAddress == nil {
+      return nil
+    }
+    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: Int(data.size))
+    self = buffer.withMemoryRebound(to: UInt8.self) { buffer in
+      String(decoding: buffer, as: UTF8.self)
+    }
+  }
+}
+
+extension StringProtocol where SubSequence == Substring {
+  func dropPrefix(in characters: Set<Character>) -> Substring {
+    var i = startIndex
+    while characters.contains(self[i]) {
+      i = index(after: i)
+    }
+    return self[i...]
+  }
+  func dropSuffix(in characters: Set<Character>) -> Substring {
+    var i = index(before: endIndex)
+    while characters.contains(self[i]) {
+      i = index(before: i)
+    }
+    return self[...i]
   }
 }

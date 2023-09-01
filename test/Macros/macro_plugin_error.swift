@@ -42,7 +42,7 @@ func test() {
   let _: String = #fooMacro(1)
   // expected-error @-1 {{typeMismatch(SwiftCompilerPluginMessageHandling.PluginToHostMessage}}
   let _: String = #fooMacro(2)
-  // expected-error @-1 {{failed to receive result from plugin (from macro 'fooMacro')}}
+  // expected-error @-1 {{failed to receive result from plugin; cound't find matching item for request}}
   let _: String = #fooMacro(3)
   // ^ This should succeed.
 }

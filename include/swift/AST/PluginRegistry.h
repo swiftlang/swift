@@ -53,17 +53,23 @@ class LoadedExecutablePlugin {
   /// Represents the current process of the executable plugin.
   struct PluginProcess {
     const llvm::sys::procid_t pid;
+    // Plugin's STDOUT.
     const int inputFileDescriptor;
+    // Plugin's STDIN.
     const int outputFileDescriptor;
+    // Plugin's STDERR.
+    const int errorFileDescriptor;
     bool isStale = false;
 
     PluginProcess(llvm::sys::procid_t pid, int inputFileDescriptor,
-                  int outputFileDescriptor);
+                  int outputFileDescriptor, int errorFileDescriptor);
 
     ~PluginProcess();
 
+    void readErrorAppendingTo(std::string &errStr) const;
+
     ssize_t write(const void *buf, size_t nbyte) const;
-    ssize_t read(void *buf, size_t nbyte) const;
+    ssize_t read(void *buf, size_t nbyte, std::string &error) const;
   };
 
   /// Launched current process.
