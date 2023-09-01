@@ -287,6 +287,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
                                                Witness witness) {
         auto witnessDecl = witness.getDecl();
+        if (!witnessDecl)
+          return;
+
         if (isa<AbstractFunctionDecl>(valueReq)) {
           addSymbolIfNecessary(valueReq, witnessDecl);
         } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
