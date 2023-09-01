@@ -40,14 +40,12 @@ int ExecuteInPlace(const char *Program, const char **args,
                    const char **env = nullptr);
 
 struct ChildProcessInfo {
-  llvm::sys::procid_t Pid;
-  int WriteFileDescriptor;
-  int ReadFileDescriptor;
+  llvm::sys::ProcessInfo ProcessInfo;
+  int Write;
+  int Read;
 
-  ChildProcessInfo(llvm::sys::procid_t Pid, int WriteFileDescriptor,
-                   int ReadFileDescriptor)
-      : Pid(Pid), WriteFileDescriptor(WriteFileDescriptor),
-        ReadFileDescriptor(ReadFileDescriptor) {}
+  ChildProcessInfo(llvm::sys::ProcessInfo ProcessInfo, int Write, int Read)
+      : ProcessInfo(ProcessInfo), Write(Write), Read(Read) {}
 };
 
 /// This function executes the program using the argument provided.
