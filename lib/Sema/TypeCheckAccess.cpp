@@ -196,62 +196,46 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   ImportAccessLevel problematicImport = llvm::None;
 
   if (type) {
-    auto scopeAndImport =
+    llvm::Optional<AccessScope> typeAccessScope =
         TypeAccessScopeChecker::getAccessScope(type, useDC,
                                                checkUsableFromInline);
 
     // Note: This means that the type itself is invalid for this particular
     // context, because it references declarations from two incompatible scopes.
     // In this case we should have diagnosed the bad reference already.
-    llvm::Optional<AccessScope> typeAccessScope = scopeAndImport.Scope;
     if (!typeAccessScope.has_value())
       return;
 
-    problematicImport = scopeAndImport.Import;
     problematicAccessScope = *typeAccessScope;
   }
 
   auto downgradeToWarning = DowngradeToWarning::No;
 
-  AccessLevel importAccessLevel = AccessLevel::Public;
-  if (problematicImport.has_value())
-    importAccessLevel = problematicImport->accessLevel;
-
   // Check if type can be referenced in this context.
   // - hasEqualDeclContextWith checks for matching scopes (public to public,
-  // internal to the same module, private to same scope, etc.)
+  //   internal to the same module, private to same scope, etc.)
   // - isChildOf checks for use of public in internal, etc.
-  // - Comparison to importAccessLevel ensures the type access scope isn't
-  //   restricted by an access-level on an import.
-  if ((contextAccessScope.hasEqualDeclContextWith(problematicAccessScope) ||
-      contextAccessScope.isChildOf(problematicAccessScope)) &&
-      contextAccessScope.accessLevelForDiagnostics() <= importAccessLevel) {
+  if (contextAccessScope.hasEqualDeclContextWith(problematicAccessScope) ||
+      contextAccessScope.isChildOf(problematicAccessScope)) {
 
     // /Also/ check the TypeRepr, if present. This can be important when we're
     // unable to preserve typealias sugar that's present in the TypeRepr.
     if (!typeRepr)
       return;
 
-    auto typeReprAccessScopeAndImport =
+    auto typeReprAccessScope =
         TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
                                                checkUsableFromInline);
-    auto typeReprAccessScope = typeReprAccessScopeAndImport.Scope;
     if (!typeReprAccessScope.has_value())
       return;
 
-    if (typeReprAccessScopeAndImport.Import.has_value())
-       importAccessLevel = typeReprAccessScopeAndImport.Import->accessLevel;
-
-    if ((contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
-         contextAccessScope.isChildOf(*typeReprAccessScope)) &&
-        contextAccessScope.accessLevelForDiagnostics() <= importAccessLevel) {
+    if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
+        contextAccessScope.isChildOf(*typeReprAccessScope)) {
       // Only if both the Type and the TypeRepr follow the access rules can
       // we exit; otherwise we have to emit a diagnostic.
       return;
     }
     problematicAccessScope = *typeReprAccessScope;
-    if (typeReprAccessScopeAndImport.Import.has_value())
-      problematicImport = typeReprAccessScopeAndImport.Import;
   } else {
     // The type violates the rules of access control (with or without taking the
     // TypeRepr into account).
@@ -268,8 +252,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       // Downgrade the error to a warning in this case for source compatibility.
       llvm::Optional<AccessScope> typeReprAccessScope =
           TypeAccessScopeChecker::getAccessScope(typeRepr, useDC,
-                                                 checkUsableFromInline)
-              .Scope;
+                                                 checkUsableFromInline);
       assert(typeReprAccessScope && "valid Type but not valid TypeRepr?");
       if (contextAccessScope.hasEqualDeclContextWith(*typeReprAccessScope) ||
           contextAccessScope.isChildOf(*typeReprAccessScope)) {
