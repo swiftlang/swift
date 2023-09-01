@@ -667,6 +667,7 @@ private:
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
   void visitYieldStmt(YieldStmt *) {}
+  void visitThenStmt(ThenStmt *) {}
   void visitThrowStmt(ThrowStmt *) {}
   void visitDiscardStmt(DiscardStmt *) {}
   void visitPoundAssertStmt(PoundAssertStmt *) {}

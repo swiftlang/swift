@@ -29,16 +29,26 @@
 // CHECK:       public protocol PublicProto {
 // CHECK:         func req() -> Swift.Int
 // CHECK:       }
-
 // CHECK:       public struct PublicStruct {
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public static func publicStaticMethod()
 // CHECK:       }
-
 // CHECK:       public class PublicClass {
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public class func publicClassMethod()
 // CHECK:         deinit
+// CHECK:       }
+// CHECK:       public struct PublicStructConformingToPublicProto : PublicProto {
+// CHECK:         public init()
+// CHECK:         public func req() -> Swift.Int
+// CHECK:       }
+// CHECK:       public class PublicClassConformingToPublicProto : PublicProto {
+// CHECK:         public init()
+// CHECK:         public func req() -> Swift.Int
+// CHECK:         deinit
+// CHECK:       }
+// CHECK:       extension Swift.String : PublicProto {
+// CHECK:         public func req() -> Swift.Int
 // CHECK:       }

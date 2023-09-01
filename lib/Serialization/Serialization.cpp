@@ -1666,8 +1666,6 @@ void Serializer::writeLocalNormalProtocolConformance(
 
   PrettyStackTraceConformance trace("serializing", conformance);
 
-  // The conformance must be complete, or we can't serialize it.
-  assert(conformance->isComplete() || allowCompilerErrors());
   assert(ConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
@@ -1689,7 +1687,7 @@ void Serializer::writeLocalNormalProtocolConformance(
     data.push_back(addDeclRef(typeDecl, /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
     return false;
-  });
+  }, /*useResolver=*/true);
 
   conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       PrettyStackTraceDecl traceValueWitness(
@@ -1718,7 +1716,7 @@ void Serializer::writeLocalNormalProtocolConformance(
 
       data.push_back(addSubstitutionMapRef(subs));
       data.push_back(witness.getEnterIsolation().has_value() ? 1 : 0);
-  });
+  }, /*useResolver=*/true);
 
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
@@ -3262,8 +3260,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   size_t addConformances(const IterableDeclContext *declContext,
                          ConformanceLookupKind lookupKind,
                          SmallVectorImpl<TypeID> &data) {
+    // We don't expect to be serializing conformances for skipped decls.
+    assert(!S.shouldSkipDecl(declContext->getDecl()));
+
     size_t count = 0;
     for (auto conformance : declContext->getLocalConformances(lookupKind)) {
+      if (S.shouldSkipDecl(conformance->getProtocol()))
+        continue;
+
       data.push_back(S.addConformanceRef(conformance));
       count++;
     }

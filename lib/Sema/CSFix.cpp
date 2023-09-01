@@ -2843,6 +2843,18 @@ AllowConcreteTypeSpecialization::create(ConstraintSystem &cs, Type concreteTy,
       AllowConcreteTypeSpecialization(cs, concreteTy, locator);
 }
 
+bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,
+                                        bool asNote) const {
+  OutOfPlaceThenStmtFailure failure(solution, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreOutOfPlaceThenStmt *
+IgnoreOutOfPlaceThenStmt::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreOutOfPlaceThenStmt(cs, locator);
+}
+
 bool IgnoreGenericSpecializationArityMismatch::diagnose(
     const Solution &solution, bool asNote) const {
   InvalidTypeSpecializationArity failure(solution, D, NumParams, NumArgs,

@@ -163,6 +163,11 @@ protected:
       assert(returnStmt->isImplicit());
       element = returnStmt->getResult();
     }
+    // Unwrap an implicit ThenStmt.
+    if (auto *thenStmt = getAsStmt<ThenStmt>(element)) {
+      if (thenStmt->isImplicit())
+        element = thenStmt->getResult();
+    }
 
     if (auto *decl = element.dyn_cast<Decl *>()) {
       switch (decl->getKind()) {
@@ -756,6 +761,7 @@ protected:
   UNSUPPORTED_STMT(Throw)
   UNSUPPORTED_STMT(Return)
   UNSUPPORTED_STMT(Yield)
+  UNSUPPORTED_STMT(Then)
   UNSUPPORTED_STMT(Discard)
   UNSUPPORTED_STMT(Defer)
   UNSUPPORTED_STMT(Guard)

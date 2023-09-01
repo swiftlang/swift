@@ -3872,10 +3872,10 @@ namespace {
       if (auto *SVE = expr->getSingleValueStmtExpr()) {
         // If we have a SingleValueStmtExpr, form a join of the branch types.
         SmallVector<Expr *, 4> scratch;
-        auto branches = SVE->getSingleExprBranches(scratch);
+        auto branches = SVE->getResultExprs(scratch);
         for (auto idx : indices(branches)) {
           auto *eltLoc = CS.getConstraintLocator(
-              SVE, {LocatorPathElt::SingleValueStmtBranch(idx)});
+              SVE, {LocatorPathElt::SingleValueStmtResult(idx)});
           elements.emplace_back(CS.getType(branches[idx]), eltLoc);
         }
       } else {

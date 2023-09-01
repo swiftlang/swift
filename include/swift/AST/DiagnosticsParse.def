@@ -1244,8 +1244,9 @@ ERROR(case_stmt_without_body,none,
 // 'try' on statements
 ERROR(try_on_stmt,none,
       "'try' cannot be used with '%0'", (StringRef))
-ERROR(try_on_return_throw_yield,none,
-      "'try' must be placed on the %select{returned|thrown|yielded}0 expression",
+ERROR(try_must_come_after_stmt,none,
+      "'try' must be placed on the %select{returned|thrown|yielded|produced}0 "
+      "expression",
       (unsigned))
 ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
@@ -1399,6 +1400,12 @@ ERROR(expected_expr_after_each, none,
       "expected expression after 'each'", ())
 ERROR(expected_expr_after_repeat, none,
       "expected expression after 'repeat'", ())
+ERROR(expected_expr_after_then,none,
+      "expected expression after 'then'", ())
+
+WARNING(unindented_code_after_then,none,
+        "expression following 'then' is treated as an argument of "
+        "the 'then'", ())
 
 WARNING(move_consume_final_spelling, none,
         "'_move' has been renamed to 'consume', and the '_move' spelling will be removed shortly", ())

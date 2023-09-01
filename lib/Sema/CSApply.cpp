@@ -8764,20 +8764,8 @@ namespace {
       auto resultTy = solution.getResolvedType(SVE);
       Rewriter.cs.setType(SVE, resultTy);
 
-      SmallVector<Expr *, 4> scratch;
-      SmallPtrSet<Expr *, 4> exprBranches;
-      for (auto *branch : SVE->getSingleExprBranches(scratch))
-        exprBranches.insert(branch);
-
       return Rewriter.cs.applySolutionToSingleValueStmt(
           solution, SVE, solution.getDC(), [&](SyntacticElementTarget target) {
-            // We need to fixup the conversion type to the full result type,
-            // not the branch result type. This is necessary as there may be
-            // an additional conversion required for the branch.
-            if (auto *E = target.getAsExpr()) {
-              if (exprBranches.contains(E))
-                target.setExprConversionType(resultTy);
-            }
             auto resultTarget = rewriteTarget(target);
             if (!resultTarget)
               return resultTarget;

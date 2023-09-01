@@ -458,6 +458,9 @@ enum class FixKind : uint8_t {
   /// Ignore an attempt to specialize non-generic type.
   AllowConcreteTypeSpecialization,
 
+  /// Ignore an out-of-place \c then statement.
+  IgnoreOutOfPlaceThenStmt,
+
   /// Ignore situations when provided number of generic arguments didn't match
   /// expected number of parameters.
   IgnoreGenericSpecializationArityMismatch,
@@ -3681,6 +3684,29 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowConcreteTypeSpecialization;
+  }
+};
+
+class IgnoreOutOfPlaceThenStmt final : public ConstraintFix {
+  IgnoreOutOfPlaceThenStmt(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreOutOfPlaceThenStmt, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore out-of-place ThenStmt";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static IgnoreOutOfPlaceThenStmt *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreOutOfPlaceThenStmt;
   }
 };
 
