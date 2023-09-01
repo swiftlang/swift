@@ -5,17 +5,16 @@ function(force_target_link_libraries TARGET)
   cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
 
   foreach(DEPENDENCY ${ARGS_PUBLIC})
-    target_link_libraries(${TARGET} PRIVATE
-      ${DEPENDENCY}
-    )
+    target_link_libraries(${TARGET} PRIVATE ${DEPENDENCY})
     add_dependencies(${TARGET} ${DEPENDENCY})
 
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
-      COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+    string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
+      COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       DEPENDS ${DEPENDENCY}
       )
     target_sources(${TARGET} PRIVATE
-      ${CMAKE_CURRENT_BINARY_DIR}/forced-${DEPENDENCY}-dep.swift
+      ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
     )
   endforeach()
 endfunction()
