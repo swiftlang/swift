@@ -734,3 +734,13 @@ do {
     }
   }
 }
+
+// Pack Iteration
+do {
+  func test<each T>(_ t: repeat each T) {
+    func nested() -> (repeat (Int, each T)) {}
+    for (x, y) in repeat each nested() {}
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+    // expected-warning@-2 {{immutable value 'y' was never used; consider replacing with '_' or removing it}}
+  }
+}

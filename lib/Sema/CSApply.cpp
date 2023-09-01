@@ -3843,6 +3843,11 @@ namespace {
       auto *locator = cs.getConstraintLocator(expr);
       auto *environment = cs.getPackElementEnvironment(locator,
           expansionTy->getCountType()->getCanonicalType());
+
+      // Assert that we have an opened element environment, otherwise we'll get
+      // an ASTVerifier crash when pack archetypes or element archetypes appear
+      // inside the pack expansion expression.
+      assert(environment);
       expr->setGenericEnvironment(environment);
 
       return expr;

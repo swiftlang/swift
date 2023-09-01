@@ -3759,6 +3759,11 @@ public:
                                        RememberChoice_t rememberChoice,
                                        ConstraintLocatorBuilder locator,
                                        ConstraintFix *compatFix = nullptr);
+  
+  /// Add a materialize constraint for a pack expansion.
+  TypeVariableType *
+  addMaterializePackExpansionConstraint(Type patternType,
+                                        ConstraintLocatorBuilder locator);
 
   /// Add a disjunction constraint.
   void
