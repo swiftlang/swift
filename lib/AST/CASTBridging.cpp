@@ -27,6 +27,8 @@ static SourceLoc getSourceLocFromPointer(const void *loc) {
 
 namespace {
   struct BridgedDiagnosticImpl {
+    typedef llvm::MallocAllocator Allocator;
+
     InFlightDiagnostic inFlight;
     std::vector<StringRef> textBlobs;
 
@@ -37,8 +39,10 @@ namespace {
 
     ~BridgedDiagnosticImpl() {
       inFlight.flush();
+
+      Allocator allocator;
       for (auto text: textBlobs) {
-        free((void*)text.data());
+        allocator.Deallocate(text.data(), text.size());
       }
     }
   };
@@ -51,8 +55,8 @@ BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
                                          long textLen) {
   StringRef origText{
     reinterpret_cast<const char *>(textPtr), size_t(textLen)};
-  llvm::MallocAllocator mallocAlloc;
-  StringRef text = origText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef text = origText.copy(alloc);
 
   SourceLoc loc = getSourceLocFromPointer(sourceLocPtr);
 
@@ -102,8 +106,8 @@ void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diagPtr,
 
   StringRef origReplaceText{
     reinterpret_cast<const char *>(newTextPtr), size_t(newTextLen)};
-  llvm::MallocAllocator mallocAlloc;
-  StringRef replaceText = origReplaceText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef replaceText = origReplaceText.copy(alloc);
 
   BridgedDiagnosticImpl *impl = static_cast<BridgedDiagnosticImpl *>(diagPtr);
   impl->textBlobs.push_back(replaceText);
