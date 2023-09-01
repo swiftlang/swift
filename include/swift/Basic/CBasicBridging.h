@@ -21,6 +21,64 @@
 // it causes importing the "Darwin"/"Glibc" overlay module. That violates
 // layering. i.e. Darwin overlay is created by Swift compiler.
 
+// NOTE: Partially ported from SwiftShim's SwiftStdint.h. We cannot include
+// that header here because it belongs to the runtime, but we need the same
+// logic for interoperability with Swift code in the compiler itself.
+// stdint.h is provided by Clang, but it dispatches to libc's stdint.h.  As a
+// result, using stdint.h here would pull in Darwin module (which includes
+// libc). This creates a dependency cycle, so we can't use stdint.h in
+// SwiftShims.
+// On Linux, the story is different. We get the error message
+// "/usr/include/x86_64-linux-gnu/sys/types.h:146:10: error: 'stddef.h' file not
+// found"
+// This is a known Clang/Ubuntu bug.
+
+// Clang has been defining __INTxx_TYPE__ macros for a long time.
+// __UINTxx_TYPE__ are defined only since Clang 3.5.
+#if !defined(__APPLE__) && !defined(__linux__) && !defined(__OpenBSD__) && !defined(__wasi__)
+#include <stdint.h>
+typedef int64_t __swiftc_int64_t;
+typedef uint64_t __swiftc_uint64_t;
+typedef int32_t __swiftc_int32_t;
+typedef uint32_t __swiftc_uint32_t;
+typedef intptr_t __swiftc_intptr_t;
+typedef uintptr_t __swiftc_uintptr_t;
+#else
+typedef __INT64_TYPE__ __swiftc_int64_t;
+#ifdef __UINT64_TYPE__
+typedef __UINT64_TYPE__ __swiftc_uint64_t;
+#else
+typedef unsigned __INT64_TYPE__ __swiftc_uint64_t;
+#endif
+
+typedef __INT32_TYPE__ __swiftc_int32_t;
+#ifdef __UINT32_TYPE__
+typedef __UINT32_TYPE__ __swiftc_uint32_t;
+#else
+typedef unsigned __INT32_TYPE__ __swiftc_uint32_t;
+#endif
+
+#define __swiftc_join3(a,b,c) a ## b ## c
+
+#define __swiftc_intn_t(n) __swiftc_join3(__swiftc_int, n, _t)
+#define __swiftc_uintn_t(n) __swiftc_join3(__swiftc_uint, n, _t)
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_WIN32)
+typedef __swiftc_int32_t SwiftInt;
+typedef __swiftc_uint32_t SwiftUInt;
+#elif defined(_WIN64)
+typedef __swiftc_int64_t SwiftInt;
+typedef __swiftc_uint64_t SwiftUInt;
+#else
+#error unknown windows pointer width
+#endif
+#else
+typedef __swiftc_intn_t(__INTPTR_WIDTH__) SwiftInt;
+typedef __swiftc_uintn_t(__INTPTR_WIDTH__) SwiftUInt;
+#endif
+#endif
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
@@ -37,9 +95,6 @@ FeatureName,
 } BridgedFeature;
 
 SWIFT_BEGIN_ASSUME_NONNULL
-
-typedef long SwiftInt;
-typedef unsigned long SwiftUInt;
 
 typedef struct BridgedData {
   const char *_Nullable baseAddress;
