@@ -52,14 +52,13 @@ class LoadedExecutablePlugin {
 
   /// Represents the current process of the executable plugin.
   struct PluginProcess {
-    const llvm::sys::procid_t pid;
-    const int inputFileDescriptor;
-    const int outputFileDescriptor;
+    const llvm::sys::ProcessInfo process;
+    const int input;
+    const int output;
     bool isStale = false;
 
-    PluginProcess(llvm::sys::procid_t pid, int inputFileDescriptor,
-                  int outputFileDescriptor);
-
+    PluginProcess(llvm::sys::ProcessInfo process, int input, int output)
+        : process(process), input(input), output(output) {}
     ~PluginProcess();
 
     ssize_t write(const void *buf, size_t nbyte) const;
@@ -138,7 +137,8 @@ public:
     llvm::erase_value(onReconnect, fn);
   }
 
-  llvm::sys::procid_t getPid() { return Process->pid; }
+  llvm::sys::procid_t getPid() { return Process->process.Pid; }
+  llvm::sys::process_t getProcess() { return Process->process.Process; }
 
   NullTerminatedStringRef getExecutablePath() {
     return {ExecutablePath.c_str(), ExecutablePath.size()};

@@ -75,7 +75,9 @@ void *LoadedLibraryPlugin::getAddressOfSymbol(const char *symbolName) {
   auto &cached = resolvedSymbols[symbolName];
   if (cached)
     return cached;
-#if !defined(_WIN32)
+#if defined(_WIN32)
+  cached = GetProcAddress(static_cast<HMODULE>(handle), symbolName);
+#else
   cached = dlsym(handle, symbolName);
 #endif
   return cached;
@@ -153,9 +155,8 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
     return llvm::errorCodeToError(childInfo.getError());
   }
 
-  Process = std::make_unique<PluginProcess>(childInfo->Pid,
-                                            childInfo->ReadFileDescriptor,
-                                            childInfo->WriteFileDescriptor);
+  Process = std::make_unique<PluginProcess>(childInfo->ProcessInfo,
+                                            childInfo->Read, childInfo->Write);
 
   // Call "on reconnect" callbacks.
   for (auto *callback : onReconnect) {
@@ -165,15 +166,15 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   return llvm::Error::success();
 }
 
-LoadedExecutablePlugin::PluginProcess::PluginProcess(llvm::sys::procid_t pid,
-                                                     int inputFileDescriptor,
-                                                     int outputFileDescriptor)
-    : pid(pid), inputFileDescriptor(inputFileDescriptor),
-      outputFileDescriptor(outputFileDescriptor) {}
-
 LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
-  close(inputFileDescriptor);
-  close(outputFileDescriptor);
+#if defined(_WIN32)
+  _close(input);
+  _close(output);
+  CloseHandle(process.Process);
+#else
+  close(input);
+  close(output);
+#endif
 }
 
 LoadedExecutablePlugin::~LoadedExecutablePlugin() {
@@ -184,6 +185,17 @@ LoadedExecutablePlugin::~LoadedExecutablePlugin() {
 
 ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
                                                     size_t nbyte) const {
+#if defined(_WIN32)
+  size_t nread = 0;
+  while (nread < nbyte) {
+    int n = _read(input, static_cast<char*>(buf) + nread,
+                  std::min(static_cast<size_t>(UINT32_MAX), nbyte - nread));
+    if (n <= 0)
+      break;
+    nread += n;
+  }
+  return nread;
+#else
   ssize_t bytesToRead = nbyte;
   void *ptr = buf;
 
@@ -206,10 +218,22 @@ ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
   }
 
   return nbyte - bytesToRead;
+#endif
 }
 
 ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
                                                      size_t nbyte) const {
+#if defined(_WIN32)
+  size_t nwritten = 0;
+  while (nwritten < nbyte) {
+    int n = _write(output, static_cast<const char *>(buf) + nwritten,
+                   std::min(static_cast<size_t>(UINT32_MAX), nbyte - nwritten));
+    if (n <= 0)
+      break;
+    nwritten += n;
+  }
+  return nwritten;
+#else
   ssize_t bytesToWrite = nbyte;
   const void *ptr = buf;
 
@@ -231,13 +255,14 @@ ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
     bytesToWrite -= writtenSize;
   }
   return nbyte - bytesToWrite;
+#endif
 }
 
 llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   ssize_t writtenSize = 0;
 
   if (dumpMessaging) {
-    llvm::dbgs() << "->(plugin:" << Process->pid << ") " << message << "\n";
+    llvm::dbgs() << "->(plugin:" << Process->process.Pid << ") " << message << '\n';
   }
 
   const char *data = message.data();
@@ -297,7 +322,7 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
   }
 
   if (dumpMessaging) {
-    llvm::dbgs() << "<-(plugin:" << Process->pid << ") " << message << "\n";
+    llvm::dbgs() << "<-(plugin:" << Process->process.Pid << ") " << message << "\n";
   }
 
   return message;
