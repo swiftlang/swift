@@ -2408,7 +2408,6 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
 
     auto *accessor = createMetatypeAccessorFunction(IGM, ty, genericSig);
     B.addFixedEnumRefCount(accessor);
-    B.addSkip(fixedSize(IGM)->getValue());
     return true;
   }
   }

@@ -662,9 +662,13 @@ static void objcStrongDestroyBranchless(const Metadata *metadata,
                              LayoutStringReader1 &reader,
                              uintptr_t &addrOffset,
                              uint8_t *addr) {
-  objc_object *object = (objc_object*)(*(uintptr_t *)(addr + addrOffset));
+  uintptr_t object = *(uintptr_t *)(addr + addrOffset);
   addrOffset += sizeof(objc_object*);
-  objc_release(object);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_release((objc_object *)object);
 }
 #endif
 
@@ -697,7 +701,9 @@ static void resilientDestroyBranchless(const Metadata *metadata,
                                uintptr_t &addrOffset,
                                uint8_t *addr) {
   auto *type = getResilientTypeMetadata(metadata, reader);
-  type->vw_destroy((OpaqueValue *)(addr + addrOffset));
+  auto *object = (OpaqueValue *)(addr + addrOffset);
+  addrOffset += type->vw_size();
+  type->vw_destroy(object);
 }
 
 typedef void (*DestrFnBranchless)(const Metadata *metadata,
@@ -891,10 +897,13 @@ static void objcStrongRetainBranchless(const Metadata *metadata,
                              uint8_t *dest,
                              uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  objc_object *object = (objc_object*)(*(uintptr_t *)(src + _addrOffset));
-  memcpy(dest + _addrOffset, &object, sizeof(objc_object*));
-  addrOffset = _addrOffset + sizeof(objc_object*);
-  objc_retain(object);
+  uintptr_t object = *(uintptr_t *)(src + _addrOffset);
+  memcpy(dest + _addrOffset, &object, sizeof(objc_object *));
+  addrOffset = _addrOffset + sizeof(objc_object *);
+  if (object & _swift_abi_ObjCReservedBitsMask)
+    return;
+  object &= ~_swift_abi_SwiftSpareBitsMask;
+  objc_retain((objc_object *)object);
 }
 #endif
 
@@ -1004,6 +1013,8 @@ swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   uintptr_t addrOffset = 0;
   handleRefCountsInitWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
 
+  assert(addrOffset == metadata->vw_size());
+
   return dest;
 }
 
@@ -1062,8 +1073,10 @@ static void existentialInitWithTake(const Metadata *metadata,
   auto *destObject = (OpaqueValue *)(dest + _addrOffset);
   auto *srcObject = (OpaqueValue *)(src + _addrOffset);
   addrOffset = _addrOffset + (sizeof(uintptr_t) * NumWords_ValueBuffer);
-  if (SWIFT_UNLIKELY(!type->getValueWitnesses()->isBitwiseTakable())) {
+  if (type->getValueWitnesses()->isValueInline()) {
     type->vw_initializeWithTake(destObject, srcObject);
+  } else {
+    memcpy(destObject, srcObject, sizeof(uintptr_t));
   }
 }
 
@@ -1149,6 +1162,8 @@ swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   uintptr_t addrOffset = 0;
 
   handleRefCountsInitWithTake(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+
+  assert(addrOffset == metadata->vw_size());
 
   return dest;
 }
@@ -1282,12 +1297,20 @@ static void objcStrongAssignWithCopy(const Metadata *metadata,
                              uint8_t *dest,
                              uint8_t *src) {
   uintptr_t _addrOffset = addrOffset;
-  objc_object *destObject = (objc_object*)(*(uintptr_t *)(dest + _addrOffset));
-  objc_object *srcObject = (objc_object*)(*(uintptr_t *)(src + _addrOffset));
+  uintptr_t destObject = *(uintptr_t *)(dest + _addrOffset);
+  uintptr_t srcObject = *(uintptr_t *)(src + _addrOffset);
   memcpy(dest + _addrOffset, &srcObject, sizeof(objc_object*));
   addrOffset = _addrOffset + sizeof(objc_object*);
-  objc_release(destObject);
-  objc_retain(srcObject);
+
+  if (!(destObject & _swift_abi_ObjCReservedBitsMask)) {
+    destObject &= ~_swift_abi_SwiftSpareBitsMask;
+    objc_release((objc_object *)destObject);
+  }
+
+  if (!(srcObject & _swift_abi_ObjCReservedBitsMask)) {
+    srcObject &= ~_swift_abi_SwiftSpareBitsMask;
+    objc_retain((objc_object *)srcObject);
+  }
 }
 #endif
 
@@ -1599,7 +1622,7 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (destTag > numPayloads) {
+  } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
@@ -1608,7 +1631,10 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (srcTag > numPayloads) {
+  } else if (destTag < numPayloads) {
+    size_t refCountOffset =
+        nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
@@ -1654,7 +1680,7 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (destTag > numPayloads) {
+  } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
@@ -1663,7 +1689,10 @@ static void multiPayloadEnumFNResolvedAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (srcTag > numPayloads) {
+  } else if (destTag < numPayloads) {
+    size_t refCountOffset =
+        nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
@@ -1711,7 +1740,7 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (destTag > numPayloads) {
+  } else if (srcTag < numPayloads) {
     addrOffset += enumSize;
     size_t refCountOffset = nestedReader.peekBytes<size_t>(srcTag * sizeof(size_t));
     nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
@@ -1720,7 +1749,10 @@ static void multiPayloadEnumGenericAssignWithCopy(const Metadata *metadata,
     if (trailingBytes)
       memcpy(dest + nestedAddrOffset, src + nestedAddrOffset, trailingBytes);
     return;
-  } else if (srcTag > numPayloads) {
+  } else if (destTag < numPayloads) {
+    size_t refCountOffset =
+        nestedReader.peekBytes<size_t>(destTag * sizeof(size_t));
+    nestedReader.skip((numPayloads * sizeof(size_t)) + refCountOffset);
     handleRefCountsDestroy(metadata, nestedReader, nestedAddrOffset, dest);
   }
 
@@ -1784,12 +1816,17 @@ static void handleRefCountsAssignWithCopy(const Metadata *metadata,
 extern "C" swift::OpaqueValue *
 swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {
-  const uint8_t *layoutStr = metadata->getLayoutString();
-  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
-  uintptr_t addrOffset = 0;
-  handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t *)dest, (uint8_t *)src);
+  // const uint8_t *layoutStr = metadata->getLayoutString();
+  // LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  // uintptr_t addrOffset = 0;
+  // handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t
+  // *)dest, (uint8_t *)src);
 
-  return dest;
+  // assert(addrOffset == metadata->vw_size());
+  swift_generic_destroy(dest, metadata);
+  return swift_generic_initWithCopy(dest, src, metadata);
+
+  // return dest;
 }
 
 extern "C" swift::OpaqueValue *
@@ -1864,12 +1901,13 @@ extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
                           uint64_t zeroTagValue, uint8_t xiTagBytesPattern,
                           unsigned xiTagBytesOffset, size_t payloadSize,
                           uint8_t numExtraTagBytes) -> unsigned {
-    auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
-    uint64_t tagBytes =
-        readTagBytes(addr + xiTagBytesOffset, xiTagBytes) -
-        zeroTagValue;
-    if (tagBytes < payloadNumExtraInhabitants) {
-      return tagBytes + 1;
+    if (xiTagBytesPattern) {
+      auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
+      uint64_t tagBytes =
+          readTagBytes(addr + xiTagBytesOffset, xiTagBytes) - zeroTagValue;
+      if (tagBytes < payloadNumExtraInhabitants) {
+        return tagBytes + 1;
+      }
     }
 
     return 0;
@@ -1917,16 +1955,18 @@ extern "C" void swift_enumSimple_destructiveInjectEnumTag(
                                uint64_t zeroTagValue, uint8_t xiTagBytesPattern,
                                unsigned xiTagBytesOffset, size_t payloadSize,
                                uint8_t numExtraTagBytes) -> bool {
-    auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
-    if (tag <= payloadNumExtraInhabitants) {
-      if (numExtraTagBytes != 0)
-        storeEnumElement(addr + payloadSize, 0, numExtraTagBytes);
+    if (xiTagBytesPattern) {
+      auto xiTagBytes = 1 << (xiTagBytesPattern - 1);
+      if (tag <= payloadNumExtraInhabitants) {
+        if (numExtraTagBytes != 0)
+          storeEnumElement(addr + payloadSize, 0, numExtraTagBytes);
 
-      if (tag == 0)
-        return true;
+        if (tag == 0)
+          return true;
 
-      storeEnumElement(addr + xiTagBytesOffset, tag - 1 + zeroTagValue,
-                       xiTagBytes);
+        storeEnumElement(addr + xiTagBytesOffset, tag - 1 + zeroTagValue,
+                         xiTagBytes);
+      }
     }
     return true;
   };
