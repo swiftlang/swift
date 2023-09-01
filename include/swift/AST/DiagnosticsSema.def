@@ -2355,6 +2355,15 @@ ERROR(experimental_tuple_extension,none,
       ())
 ERROR(tuple_extension_wrong_type,none,
       "tuple extension must be written as extension of %0", (Type))
+ERROR(tuple_extension_one_conformance,none,
+      "tuple extension must declare conformance to exactly one protocol", ())
+ERROR(tuple_extension_extra_requirement,none,
+      "tuple extension cannot require that %0 "
+      "%select{conforms to|subclasses|is the same type as|%error|%error}1 %2",
+      (Type, unsigned, Type))
+ERROR(tuple_extension_missing_requirement,none,
+      "tuple extension must require that %0 conforms to %1", (Type, Type))
+
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_placeholder,none,

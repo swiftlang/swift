@@ -3486,25 +3486,81 @@ public:
     checkAccessControl(EED);
   }
 
+  static void checkTupleExtension(ExtensionDecl *ED) {
+    auto *nominal = ED->getExtendedNominal();
+    if (!nominal || !isa<BuiltinTupleDecl>(nominal))
+      return;
+
+    auto &ctx = ED->getASTContext();
+
+    if (!ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+      ED->diagnose(diag::experimental_tuple_extension);
+    }
+
+    auto extType = ED->getExtendedType();
+
+    // The extended type must be '(repeat each Element)'.
+    if (extType->is<TupleType>()) {
+      auto selfType = ED->getSelfInterfaceType();
+      if (!extType->isEqual(selfType)) {
+        ED->diagnose(diag::tuple_extension_wrong_type, selfType);
+      }
+    }
+
+    // Make sure we declare conformance to exactly one protocol.
+    auto protocols = ED->getLocalProtocols();
+    if (protocols.size() != 1) {
+      ED->diagnose(diag::tuple_extension_one_conformance);
+      return;
+    }
+
+    auto *protocol = protocols[0];
+
+    auto genericSig = ED->getGenericSignature();
+
+    // We have a single parameter pack by construction, if we
+    // get this far.
+    auto params = genericSig.getGenericParams();
+    assert(params.size() == 1);
+    assert(params[0]->isParameterPack());
+
+    // Make sure we have a single conditional requirement,
+    // 'repeat each Element: P', where 'Element' is our pack
+    // and 'P' is the protocol above, and nothing else.
+    bool foundRequirement = false;
+    auto reqs = genericSig.getRequirements();
+    for (auto req : reqs) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getFirstType()->isEqual(params[0]) &&
+          req.getProtocolDecl() == protocol) {
+        assert(!foundRequirement);
+        foundRequirement = true;
+      } else {
+        if (req.getKind() == RequirementKind::Layout) {
+          ED->diagnose(diag::tuple_extension_extra_requirement,
+                       req.getFirstType(),
+                       unsigned(RequirementKind::Conformance),
+                       ctx.getAnyObjectType());
+        } else {
+          ED->diagnose(diag::tuple_extension_extra_requirement,
+                       req.getFirstType(),
+                       unsigned(req.getKind()),
+                       req.getSecondType());
+        }
+      }
+    }
+
+    if (!foundRequirement) {
+      ED->diagnose(diag::tuple_extension_missing_requirement,
+                   params[0], protocol->getDeclaredInterfaceType());
+    }
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
-
-    // Diagnose experimental tuple extensions.
-    if (nominal && isa<BuiltinTupleDecl>(nominal)) {
-      if (!getASTContext().LangOpts.hasFeature(Feature::TupleConformances)) {
-        ED->diagnose(diag::experimental_tuple_extension);
-      }
-
-      if (extType->is<TupleType>()) {
-        auto selfType = ED->getSelfInterfaceType();
-        if (!extType->isEqual(selfType)) {
-          ED->diagnose(diag::tuple_extension_wrong_type, selfType);
-        }
-      }
-    }
 
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
@@ -3633,6 +3689,8 @@ public:
       TypeChecker::checkDistributedActor(SF, nominal);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
+
+    checkTupleExtension(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
