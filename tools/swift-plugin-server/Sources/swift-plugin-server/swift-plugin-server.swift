@@ -47,7 +47,7 @@ extension SwiftPluginServer: PluginProvider {
   /// Load a macro implementation from the dynamic link library.
   func loadPluginLibrary(libraryPath: String, moduleName: String) throws {
     var errorMessage: UnsafePointer<CChar>?
-    guard let dlHandle = PluginServer_dlopen(libraryPath, &errorMessage) else {
+    guard let dlHandle = PluginServer_load(libraryPath, &errorMessage) else {
       throw PluginServerError(message: String(cString: errorMessage!))
     }
     loadedLibraryPlugins[moduleName] = dlHandle
