@@ -7,6 +7,7 @@ set(sources
   KeyPath.h
   LibcOverlayShims.h
   LibcShims.h
+  Lock.h
   MetadataSections.h
   Random.h
   RefCount.h

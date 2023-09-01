@@ -6,6 +6,7 @@ module SwiftShims {
   header "HeapObject.h"
   header "KeyPath.h"
   header "LibcShims.h"
+  header "Lock.h"
   header "MetadataSections.h"
   header "Random.h"
   header "RefCount.h"
