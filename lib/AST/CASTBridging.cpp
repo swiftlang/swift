@@ -204,7 +204,7 @@ void *ImportDecl_create(BridgedASTContext cContext,
                             std::move(importPath).get());
 }
 
-BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, long len) {
+BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, size_t len) {
   SourceLoc loc = convertSourceLoc(cLoc).getAdvancedLoc(len);
   return {loc.getOpaquePointerValue()};
 }
@@ -764,7 +764,7 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
                                   BridgedIdentifier name,
                                   BridgedSourceLoc cNameLoc,
-                                  BridgedSourceLoc cEachLoc, long index,
+                                  BridgedSourceLoc cEachLoc, size_t index,
                                   bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(
       convertDeclContext(cDeclContext), convertIdentifier(name),

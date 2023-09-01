@@ -25,17 +25,17 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 SWIFT_BEGIN_ASSUME_NONNULL
 
-typedef long SwiftInt;
-typedef unsigned long SwiftUInt;
+typedef long long SwiftInt;
+typedef unsigned long long SwiftUInt;
 
 typedef struct {
   const unsigned char *_Nullable data;
-  long length;
+  size_t length;
 } BridgedString;
 
 typedef struct {
   const void *_Nullable data;
-  long numElements;
+  size_t numElements;
 } BridgedArrayRef;
 
 typedef struct BridgedASTContext {
@@ -113,7 +113,7 @@ typedef struct BridgedDiagnosticEngine {
   void *raw;
 } BridgedDiagnosticEngine;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : long {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// An expanded macro.
   BridgedExpandedMacro = 0,
   /// An external macro, spelled with either the old spelling (Module.Type)
@@ -307,7 +307,7 @@ void *IfStmt_create(BridgedASTContext cContext, BridgedSourceLoc cIfLoc,
 void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
                        BridgedArrayRef elements, BridgedSourceLoc cRBLoc);
 
-BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, long len);
+BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, size_t len);
 
 void *ParamDecl_create(BridgedASTContext cContext, BridgedSourceLoc cLoc,
                        BridgedSourceLoc cArgLoc, BridgedIdentifier argName,
@@ -357,7 +357,7 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedDeclContext cDeclContext,
                                   BridgedIdentifier name,
                                   BridgedSourceLoc cNameLoc,
-                                  BridgedSourceLoc cEachLoc, long index,
+                                  BridgedSourceLoc cEachLoc, size_t index,
                                   _Bool isParameterPack);
 void GenericTypeParamDecl_setInheritedType(BridgedASTContext cContext,
                                            void *Param, void *ty);
