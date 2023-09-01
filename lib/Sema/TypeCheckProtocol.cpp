@@ -1901,13 +1901,12 @@ void MultiConformanceChecker::checkAllConformances() {
 static void diagnoseConformanceImpliedByConditionalConformance(
     DiagnosticEngine &Diags, NormalProtocolConformance *conformance,
     NormalProtocolConformance *implyingConf, bool issueFixit) {
-  Type T = conformance->getType();
   auto proto = conformance->getProtocol();
   Type protoType = proto->getDeclaredInterfaceType();
   auto implyingProto = implyingConf->getProtocol()->getDeclaredInterfaceType();
   auto loc = implyingConf->getLoc();
   Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
-                 T, implyingProto, protoType);
+                 conformance->getType(), implyingProto, protoType);
 
   if (!issueFixit)
     return;
@@ -1949,11 +1948,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
     llvm::raw_svector_ostream prefixStream(prefix);
     llvm::raw_svector_ostream suffixStream(suffix);
 
-    ValueDecl *decl = T->getAnyNominal();
-    if (!decl)
-      decl = T->getAnyGeneric();
-
-    prefixStream << "extension " << decl->getName() << ": " << protoType << " ";
+    prefixStream << "extension " << ext->getExtendedType() << ": " << protoType << " ";
     suffixStream << " {\n"
                  << indent << extraIndent << "<#witnesses#>\n"
                  << indent << "}\n\n"
