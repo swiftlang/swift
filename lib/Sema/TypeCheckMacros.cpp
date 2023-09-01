@@ -1067,7 +1067,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
         adjustMacroExpansionBufferName(*discriminator));
-    free((void *)evaluatedSourceAddress);
+    /* free((void *)evaluatedSourceAddress); */
     break;
 #else
     ctx.Diags.diagnose(loc, diag::macro_unsupported);
@@ -1345,7 +1345,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
         adjustMacroExpansionBufferName(*discriminator));
-    free((void *)evaluatedSourceAddress);
+    /* free((void *)evaluatedSourceAddress); */
     break;
 #else
     attachedTo->diagnose(diag::macro_unsupported);
