@@ -556,7 +556,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam ||
-                    lhs[index - 1].getKind() == Symbol::Kind::PackElement);
+                    (index == 1 &&
+                     lhs[index - 1].getKind() == Symbol::Kind::PackElement));
       }
 
       if (!rule.isLHSSimplified() &&
@@ -612,7 +613,8 @@ void RewriteSystem::verifyRewriteRules(ValidityPolicy policy) const {
 
       if (index != 0) {
         ASSERT_RULE(symbol.getKind() != Symbol::Kind::GenericParam ||
-                    lhs[index - 1].getKind() == Symbol::Kind::PackElement);
+                    (index == 1 &&
+                     lhs[index - 1].getKind() == Symbol::Kind::PackElement));
       }
 
       if (!rule.isRHSSimplified() &&
