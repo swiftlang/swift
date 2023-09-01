@@ -12,9 +12,11 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/LocalVsImportClient.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 
 //--- PublicLib.swift
 public struct PublicImportType {}

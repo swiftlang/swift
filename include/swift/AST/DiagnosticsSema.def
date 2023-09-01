@@ -1916,6 +1916,10 @@ WARNING(access_control_non_objc_open_member,none,
 ERROR(access_control_requires_package_name, none,
       "%0 has a package access level but no -package-name was specified: %1",
       (Identifier, StringRef))
+ERROR(access_control_requires_package_name_import, none,
+      "package import can only be used from a module with a package name; "
+      "set it with the compiler flag -package-name",
+      ())
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
