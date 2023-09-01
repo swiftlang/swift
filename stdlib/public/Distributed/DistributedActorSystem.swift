@@ -672,7 +672,8 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // DistributedActor
-  _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
+  @_forwardedToC _ targetName: UnsafePointer<UInt8>,
+  _ targetNameLength: UInt,
   argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
