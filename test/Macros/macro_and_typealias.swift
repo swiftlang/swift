@@ -9,13 +9,11 @@
 @freestanding(expression) public macro ConcretePrint(_ value: Any) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 @freestanding(expression) public macro MultiPrint(_ value: Any) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 
-public struct Printer<Value> {
+public struct Printer<Value> { // expected-note {{generic type 'Printer' declared here}}
   init(_: (Value) -> Void) {}
 }
 
-public struct MultiPrinter<T, U> {
-  // expected-note@-1 {{'T' declared as parameter to type 'MultiPrinter'}}
-  // expected-note@-2 {{'U' declared as parameter to type 'MultiPrinter'}}
+public struct MultiPrinter<T, U> { // expected-note {{generic type 'MultiPrinter' declared here}}
 }
 
 typealias Print = Printer
@@ -34,7 +32,7 @@ struct Test {
     }
 
     let _ = Print<Object, Int> {
-      // expected-error@-1 {{generic type 'Print' specialized with too many type parameters (got 2, but expected 1)}}
+      // expected-error@-1 {{generic type 'Printer' specialized with too many type parameters (got 2, but expected 1)}}
     }
 
     let _ = OtherPrint<Object> { // Ok
@@ -42,14 +40,12 @@ struct Test {
     }
 
     let _ = ConcretePrint<Object> { // expected-error {{cannot specialize non-generic type 'ConcretePrint' (aka 'Printer<Any>')}}
-      compute(root: $0, \.prop) // expected-error {{value of type 'Any' has no member 'prop'}}
-      // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+      // expected-error@-1 {{cannot infer type of closure parameter '$0' without a type annotation}}
+      compute(root: $0, \.prop)
     }
 
     let _ = MultiPrint<Int>()
-    // expected-error@-1 {{generic type 'MultiPrint' specialized with too few type parameters (got 1, but expected 2)}}
-    // expected-error@-2 {{generic parameter 'T' could not be inferred}}
-    // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+    // expected-error@-1 {{generic type 'MultiPrinter' specialized with too few type parameters (got 1, but expected 2)}}
   }
 
   func compute<R, V>(root: R, _: KeyPath<R, V>) {}

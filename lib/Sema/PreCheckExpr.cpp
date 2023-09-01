@@ -650,16 +650,12 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
-  // If we have an unambiguous reference to a type decl, form a TypeExpr.
-  if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
-      isa<TypeDecl>(Lookup[0].getValueDecl())) {
-    auto *D = cast<TypeDecl>(Lookup[0].getValueDecl());
+  auto buildTypeExpr = [&](TypeDecl *D) -> Expr * {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(D)) {
-      return new (Context) DeclRefExpr(D, UDRE->getNameLoc(),
-                                       /*Implicit=*/false,
-                                       AccessSemantics::Ordinary,
-                                       D->getInterfaceType());
+      return new (Context) DeclRefExpr(
+          D, UDRE->getNameLoc(),
+          /*Implicit=*/false, AccessSemantics::Ordinary, D->getInterfaceType());
     }
 
     auto *LookupDC = Lookup[0].getDeclContext();
@@ -668,12 +664,19 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           UDRE->getNameLoc(), D, LookupDC,
           // It might happen that LookupDC is null if this is checking
           // synthesized code, in that case, don't map the type into context,
-          // but return as is -- the synthesis should ensure the type is correct.
+          // but return as is -- the synthesis should ensure the type is
+          // correct.
           LookupDC ? LookupDC->mapTypeIntoContext(D->getInterfaceType())
                    : D->getInterfaceType());
     } else {
       return TypeExpr::createForDecl(UDRE->getNameLoc(), D, LookupDC);
     }
+  };
+
+  // If we have an unambiguous reference to a type decl, form a TypeExpr.
+  if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
+      isa<TypeDecl>(Lookup[0].getValueDecl())) {
+    return buildTypeExpr(cast<TypeDecl>(Lookup[0].getValueDecl()));
   }
 
   if (AllDeclRefs) {
@@ -708,6 +711,24 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         unsigned yDepth = yGeneric->getGenericParams().back()->getDepth();
         return xDepth < yDepth;
       });
+    }
+
+    // Filter out macro declarations without `#` if there are valid
+    // non-macro results.
+    if (llvm::any_of(ResultValues,
+                     [](const ValueDecl *D) { return !isa<MacroDecl>(D); })) {
+      ResultValues.erase(
+          llvm::remove_if(ResultValues,
+                          [](const ValueDecl *D) { return isa<MacroDecl>(D); }),
+          ResultValues.end());
+
+      // If there is only one type reference in results, let's handle
+      // this in a special way.
+      if (ResultValues.size() == 1 &&
+          UDRE->getRefKind() == DeclRefKind::Ordinary &&
+          isa<TypeDecl>(ResultValues.front())) {
+        return buildTypeExpr(cast<TypeDecl>(ResultValues.front()));
+      }
     }
 
     return buildRefExpr(ResultValues, DC, UDRE->getNameLoc(),
