@@ -29,18 +29,17 @@ const void *PluginServer_createConnection(const char **errorMessage);
 void PluginServer_destroyConnection(const void *connHandle);
 
 /// Read bytes from the IPC communication handle.
-long PluginServer_read(const void *connHandle, void *data, unsigned long nbyte);
+size_t PluginServer_read(const void *connHandle, void *data, size_t nbyte);
 
 /// Write bytes to the IPC communication handle.
-long PluginServer_write(const void *connHandle, const void *data,
-                        unsigned long nbyte);
+size_t PluginServer_write(const void *connHandle, const void *data, size_t nbyte);
 
 //===----------------------------------------------------------------------===//
 // Dynamic link
 //===----------------------------------------------------------------------===//
 
 /// Load a dynamic link library, and return the handle.
-void *PluginServer_dlopen(const char *filename, const char **errorMessage);
+void *PluginServer_load(const char *filename, const char **errorMessage);
 
 /// Resolve a type metadata by a pair of the module name and the type name.
 /// 'libraryHint' is a
