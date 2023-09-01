@@ -70,6 +70,7 @@ namespace swift {
   class CallExpr;
   class KeyPathExpr;
   class CaptureListExpr;
+  class ThenStmt;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -6125,10 +6126,10 @@ private:
   SingleValueStmtExpr(Stmt *S, DeclContext *DC)
       : Expr(ExprKind::SingleValueStmt, /*isImplicit*/ true), S(S), DC(DC) {}
 
-public:
   /// Creates a new SingleValueStmtExpr wrapping a statement.
   static SingleValueStmtExpr *create(ASTContext &ctx, Stmt *S, DeclContext *DC);
 
+public:
   /// Creates a new SingleValueStmtExpr wrapping a statement, and recursively
   /// attempts to wrap any branches of that statement that can become single
   /// value statement expressions.
@@ -6144,6 +6145,16 @@ public:
   /// SingleValueStmtExpr.
   static SingleValueStmtExpr *tryDigOutSingleValueStmtExpr(Expr *E);
 
+  /// Retrieves a resulting ThenStmt from the given BraceStmt, or \c nullptr if
+  /// the brace does not have a resulting ThenStmt.
+  static ThenStmt *getThenStmtFrom(BraceStmt *BS);
+
+  /// Whether the given BraceStmt has a result to be produced from a parent
+  /// SingleValueStmtExpr.
+  static bool hasResult(BraceStmt *BS) {
+    return getThenStmtFrom(BS);
+  }
+
   /// Retrieve the wrapped statement.
   Stmt *getStmt() const { return S; }
   void setStmt(Stmt *newS) { S = newS; }
@@ -6154,10 +6165,15 @@ public:
   /// Retrieve the complete set of branches for the underlying statement.
   ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
 
-  /// Retrieve the single expression branches of the statement, excluding
-  /// branches that either have multiple expressions, or have statements.
+  /// Retrieve the resulting ThenStmts from each branch of the
+  /// SingleValueStmtExpr.
+  ArrayRef<ThenStmt *>
+  getThenStmts(SmallVectorImpl<ThenStmt *> &scratch) const;
+
+  /// Retrieve the result expressions from each branch of the
+  /// SingleValueStmtExpr.
   ArrayRef<Expr *>
-  getSingleExprBranches(SmallVectorImpl<Expr *> &scratch) const;
+  getResultExprs(SmallVectorImpl<Expr *> &scratch) const;
 
   DeclContext *getDeclContext() const { return DC; }
 

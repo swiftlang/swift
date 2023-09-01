@@ -213,6 +213,7 @@ enum class CompletionKind : uint8_t {
   CallArg,
   LabeledTrailingClosure,
   ReturnStmtExpr,
+  ThenStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
 

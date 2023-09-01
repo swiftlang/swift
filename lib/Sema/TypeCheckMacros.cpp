@@ -49,6 +49,8 @@ using namespace swift;
 extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
+extern "C" void swift_ASTGen_freeString(const char *str);
+
 extern "C" void *swift_ASTGen_resolveExecutableMacro(
     const char *moduleName, ptrdiff_t moduleNameLength,
     const char *typeName, ptrdiff_t typeNameLength,
@@ -64,6 +66,9 @@ extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
     ptrdiff_t **replacementsPtr,
     ptrdiff_t *numReplacements
 );
+extern "C" void swift_ASTGen_freeExpansionReplacements(
+    ptrdiff_t *replacementsPtr,
+    ptrdiff_t numReplacements);
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
@@ -197,8 +202,8 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   // Clean up after the call.
   SWIFT_DEFER {
-    free(externalMacroNamePtr);
-    free(replacements);
+    swift_ASTGen_freeString(externalMacroNamePtr);
+    swift_ASTGen_freeExpansionReplacements(replacements, numReplacements);
   };
 
   if (checkResult < 0 && ctx.CompletionCallback) {
@@ -1065,7 +1070,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
         adjustMacroExpansionBufferName(*discriminator));
-    free((void *)evaluatedSourceAddress);
+    swift_ASTGen_freeString(evaluatedSourceAddress);
     break;
 #else
     ctx.Diags.diagnose(loc, diag::macro_unsupported);
@@ -1343,7 +1348,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
         adjustMacroExpansionBufferName(*discriminator));
-    free((void *)evaluatedSourceAddress);
+    swift_ASTGen_freeString(evaluatedSourceAddress);
     break;
 #else
     attachedTo->diagnose(diag::macro_unsupported);

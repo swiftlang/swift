@@ -602,6 +602,10 @@ public:
             cast<AccessorDecl>(CurDeclContext)->isCoroutine());
   }
 
+  /// Whether the current token is the contextual keyword for a \c then
+  /// statement.
+  bool isContextualThenKeyword(bool preferExpr);
+
   /// `discard self` is the only valid phrase, but we peek ahead for just any
   /// identifier after `discard` to determine if it's the statement. This helps
   /// us avoid interpreting `discard(self)` as the statement and not a call.
@@ -641,7 +645,7 @@ public:
     while (Tok.isNot(K..., tok::eof, tok::r_brace, tok::pound_endif,
                      tok::pound_else, tok::pound_elseif,
                      tok::code_complete) &&
-           !isStartOfStmt() &&
+           !isStartOfStmt(/*preferExpr*/ false) &&
            !isStartOfSwiftDecl(/*allowPoundIfAttributes=*/true)) {
       skipSingle();
     }
@@ -1919,7 +1923,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Statement Parsing
 
-  bool isStartOfStmt();
+  /// Whether we are at the start of a statement.
+  ///
+  /// \param preferExpr If either an expression or statement could be parsed and
+  /// this parameter is \c true, the function returns \c false such that an
+  /// expression can be parsed.
+  bool isStartOfStmt(bool preferExpr);
+
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
   ParserResult<Stmt> parseStmt();
@@ -1928,6 +1938,7 @@ public:
   ParserResult<Stmt> parseStmtContinue();
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtYield(SourceLoc tryLoc);
+  ParserResult<Stmt> parseStmtThen(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDiscard();
   ParserResult<Stmt> parseStmtDefer();

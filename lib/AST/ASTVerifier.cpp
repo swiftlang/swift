@@ -1214,7 +1214,7 @@ public:
     void verifyChecked(SingleValueStmtExpr *E) {
       using Kind = IsSingleValueStmtResult::Kind;
       switch (E->getStmt()->mayProduceSingleValue(Ctx).getKind()) {
-      case Kind::NoExpressionBranches:
+      case Kind::NoResult:
         // These are allowed as long as the type is Void.
         checkSameType(
             E->getType(), Ctx.getVoidType(),

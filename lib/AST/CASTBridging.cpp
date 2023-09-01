@@ -17,6 +17,8 @@ using namespace swift;
 
 namespace {
 struct BridgedDiagnosticImpl {
+  typedef llvm::MallocAllocator Allocator;
+
   InFlightDiagnostic inFlight;
   std::vector<StringRef> textBlobs;
 
@@ -31,8 +33,10 @@ struct BridgedDiagnosticImpl {
 
   ~BridgedDiagnosticImpl() {
     inFlight.flush();
+
+    Allocator allocator;
     for (auto text : textBlobs) {
-      free((void *)text.data());
+      allocator.Deallocate(text.data(), text.size());
     }
   }
 };
@@ -100,8 +104,8 @@ BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
                                     BridgedSourceLoc cLoc,
                                     BridgedString cText) {
   StringRef origText = convertString(cText);
-  llvm::MallocAllocator mallocAlloc;
-  StringRef text = origText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef text = origText.copy(alloc);
 
   SourceLoc loc = convertSourceLoc(cLoc);
 
@@ -148,8 +152,8 @@ void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
   SourceLoc endLoc = convertSourceLoc(cEndLoc);
 
   StringRef origReplaceText = convertString(cReplaceText);
-  llvm::MallocAllocator mallocAlloc;
-  StringRef replaceText = origReplaceText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef replaceText = origReplaceText.copy(alloc);
 
   BridgedDiagnosticImpl *diag = convertDiagnostic(cDiag);
   diag->textBlobs.push_back(replaceText);

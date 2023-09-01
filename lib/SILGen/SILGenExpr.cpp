@@ -2235,7 +2235,7 @@ RValue RValueEmitter::visitSingleValueStmtExpr(SingleValueStmtExpr *E,
   // Collect the target exprs that will be used for initialization.
   SmallVector<Expr *, 4> scratch;
   SILGenFunction::SingleValueStmtInitialization initInfo(resultAddr);
-  for (auto *E : E->getSingleExprBranches(scratch))
+  for (auto *E : E->getResultExprs(scratch))
     initInfo.Exprs.insert(E);
 
   // Push the initialization for branches of the statement to initialize into.

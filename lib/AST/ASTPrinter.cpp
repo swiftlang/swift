@@ -3502,6 +3502,10 @@ static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureThenStatements(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
 }
@@ -5512,6 +5516,16 @@ void PrintAST::visitYieldStmt(YieldStmt *stmt) {
     (void) yield;
   }
   if (parens) Printer << ")";
+}
+
+void PrintAST::visitThenStmt(ThenStmt *stmt) {
+  // For now, don't print implicit 'then' statements, since they can be
+  // present when the feature is disabled.
+  // TODO: Once we enable the feature, we can remove this.
+  if (!stmt->isImplicit())
+    Printer.printKeyword("then", Options, " ");
+
+  visit(stmt->getResult());
 }
 
 void PrintAST::visitThrowStmt(ThrowStmt *stmt) {

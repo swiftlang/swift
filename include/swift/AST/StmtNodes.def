@@ -46,6 +46,7 @@
 
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
+STMT(Then, Stmt)
 STMT(Yield, Stmt)
 STMT(Defer, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)

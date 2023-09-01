@@ -707,8 +707,10 @@ SourceLoc Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
-    if (isStartOfStmt() || isStartOfSwiftDecl() || Tok.is(tok::pound_endif))
+    if (isStartOfStmt(/*preferExpr*/ false) || isStartOfSwiftDecl() ||
+        Tok.is(tok::pound_endif)) {
       return lastLoc;
+    }
     break;
 
     case tok::l_paren:
@@ -1019,8 +1021,8 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
   }
   // If we're in a comma-separated list, the next token is at the
   // beginning of a new line and can never start an element, break.
-  if (Tok.isAtStartOfLine() &&
-      (Tok.is(tok::r_brace) || isStartOfSwiftDecl() || isStartOfStmt())) {
+  if (Tok.isAtStartOfLine() && (Tok.is(tok::r_brace) || isStartOfSwiftDecl() ||
+                                isStartOfStmt(/*preferExpr*/ false))) {
     return ParseListItemResult::Finished;
   }
   // If we found EOF or such, bailout.
