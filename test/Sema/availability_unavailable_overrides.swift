@@ -243,7 +243,7 @@ func testOverrideOfUnavailableDeclFromUnavailableDerivedType() {
 
 func testImplicitSuperInit() {
   // FIXME: The diagnostics for the implicit call to super.init() could be
-  // relaxed since both initialziers are unreachable and the developer cannot
+  // relaxed since both initializers are unreachable and the developer cannot
   // wrap the call to super in a conditional compilation block.
   class Base {
     @available(*, unavailable)

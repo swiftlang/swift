@@ -70,7 +70,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   /// initialized memory to the elements' type.
   ///
   /// When calling the `initializeMemory(as:from:)` method on a buffer slice,
-  /// the memory referenced by the slice must be uninitialized or initialised
+  /// the memory referenced by the slice must be uninitialized or initialized
   /// to a trivial type, and must be properly aligned for accessing `S.Element`.
   /// The buffer must contain sufficient memory to accommodate
   /// `source.underestimatedCount`.

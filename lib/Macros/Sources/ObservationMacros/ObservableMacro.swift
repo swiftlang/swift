@@ -243,7 +243,7 @@ extension ObservableMacro: MemberAttributeMacro {
       return []
     }
 
-    // dont apply to ignored properties or properties that are already flaged as tracked
+    // dont apply to ignored properties or properties that are already flagged as tracked
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
        property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
