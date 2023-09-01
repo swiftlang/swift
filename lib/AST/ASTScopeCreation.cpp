@@ -437,6 +437,12 @@ public:
     return p;
   }
 
+  ASTScopeImpl *visitThenStmt(ThenStmt *ts, ASTScopeImpl *p,
+                              ScopeCreator &scopeCreator) {
+    visitExpr(ts->getResult(), p, scopeCreator);
+    return p;
+  }
+
   ASTScopeImpl *visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p,
                                ScopeCreator &scopeCreator) {
     visitFuncDecl(ds->getTempDecl(), p, scopeCreator);

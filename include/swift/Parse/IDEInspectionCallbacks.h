@@ -235,6 +235,8 @@ public:
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
+  virtual void completeThenStmt(CodeCompletionExpr *E) {};
+
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
   /// an expression or a parenthesized expression list.  A present yield

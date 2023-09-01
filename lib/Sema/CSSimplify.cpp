@@ -6370,7 +6370,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::TernaryBranch:
-  case ConstraintLocator::SingleValueStmtBranch: {
+  case ConstraintLocator::SingleValueStmtResult: {
     recordAnyTypeVarAsPotentialHole(lhs);
     recordAnyTypeVarAsPotentialHole(rhs);
 
@@ -7813,16 +7813,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // value statements.
       //
       // As with the previous checks, we only allow the Void conversion in
-      // an implicit single-expression closure. In the more general case, we
-      // only allow the Never conversion.
+      // an implicit single-expression closure. In the more general case for
+      // implicit branches, we only allow the Never conversion. For explicit
+      // branches, no conversions are allowed.
       auto *loc = getConstraintLocator(locator);
       if (auto branchKind = loc->isForSingleValueStmtBranch()) {
         bool allowConversion = false;
         switch (*branchKind) {
-        case SingleValueStmtBranchKind::Regular:
+        case SingleValueStmtBranchKind::Explicit:
+          allowConversion = false;
+          break;
+        case SingleValueStmtBranchKind::Implicit:
           allowConversion = type1->isUninhabited();
           break;
-        case SingleValueStmtBranchKind::InSingleExprClosure:
+        case SingleValueStmtBranchKind::ImplicitInSingleExprClosure:
           allowConversion = true;
           break;
         }
@@ -15200,12 +15204,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
         impact = 5;
       }
     }
-    using SingleValueStmtBranch = LocatorPathElt::SingleValueStmtBranch;
-    if (auto branchElt = locator->getLastElementAs<SingleValueStmtBranch>()) {
+    using SingleValueStmtResult = LocatorPathElt::SingleValueStmtResult;
+    if (auto branchElt = locator->getLastElementAs<SingleValueStmtResult>()) {
       // Similar to a ternary, except we have N branches. Let's prefer the fix
       // on the first branch, and discount subsequent branches by index.
-      if (branchElt->getExprBranchIndex() > 0)
-        impact = 9 + branchElt->getExprBranchIndex();
+      if (branchElt->getIndex() > 0)
+        impact = 9 + branchElt->getIndex();
     }
     // Increase impact of invalid conversions to `Any` and `AnyHashable`
     // associated with collection elements (i.e. for-in sequence element)

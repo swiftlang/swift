@@ -2575,7 +2575,7 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::ternary_expr_cases_mismatch;
     break;
   }
-  case ConstraintLocator::SingleValueStmtBranch: {
+  case ConstraintLocator::SingleValueStmtResult: {
     diagnostic = diag::single_value_stmt_branches_mismatch;
     break;
   }

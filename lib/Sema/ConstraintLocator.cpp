@@ -103,7 +103,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PackExpansionPattern:
   case ConstraintLocator::PatternBindingElement:
   case ConstraintLocator::NamedPatternDecl:
-  case ConstraintLocator::SingleValueStmtBranch:
+  case ConstraintLocator::SingleValueStmtResult:
   case ConstraintLocator::AnyPatternDecl:
   case ConstraintLocator::GlobalActorType:
   case ConstraintLocator::CoercionOperand:
@@ -393,9 +393,9 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     break;
   }
 
-  case ConstraintLocator::SingleValueStmtBranch: {
-    auto branch = elt.castTo<LocatorPathElt::SingleValueStmtBranch>();
-    out << "expr branch [" << branch.getExprBranchIndex() << "] of "
+  case ConstraintLocator::SingleValueStmtResult: {
+    auto branch = elt.castTo<LocatorPathElt::SingleValueStmtResult>();
+    out << "result [" << branch.getIndex() << "] of "
            "single value stmt";
     break;
   }
@@ -688,24 +688,31 @@ llvm::Optional<SingleValueStmtBranchKind>
 ConstraintLocator::isForSingleValueStmtBranch() const {
   // Ignore a trailing ContextualType path element.
   auto path = getPath();
-  if (auto elt = getLastElementAs<LocatorPathElt::ContextualType>())
+  if (isLastElement<LocatorPathElt::ContextualType>())
     path = path.drop_back();
 
   if (path.empty())
     return llvm::None;
 
-  if (!path.back().is<LocatorPathElt::SingleValueStmtBranch>())
+  auto resultElt = path.back().getAs<LocatorPathElt::SingleValueStmtResult>();
+  if (!resultElt)
     return llvm::None;
 
   auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
   if (!SVE)
     return llvm::None;
 
+  // Check to see if we have an explicit result, i.e 'then <expr>'.
+  SmallVector<ThenStmt *, 4> scratch;
+  auto *TS = SVE->getThenStmts(scratch)[resultElt->getIndex()];
+  if (!TS->isImplicit())
+    return SingleValueStmtBranchKind::Explicit;
+
   if (auto *CE = dyn_cast<ClosureExpr>(SVE->getDeclContext())) {
     if (CE->hasSingleExpressionBody() && !hasExplicitResult(CE))
-      return SingleValueStmtBranchKind::InSingleExprClosure;
+      return SingleValueStmtBranchKind::ImplicitInSingleExprClosure;
   }
-  return SingleValueStmtBranchKind::Regular;
+  return SingleValueStmtBranchKind::Implicit;
 }
 
 NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {

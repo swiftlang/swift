@@ -108,7 +108,38 @@ public:
   bool isBinaryOperator() const {
     return Kind == tok::oper_binary_spaced || Kind == tok::oper_binary_unspaced;
   }
-  
+
+  /// Checks whether the token is either a binary operator, or is a token that
+  /// acts like a binary operator (e.g infix '=', '?', '->').
+  bool isBinaryOperatorLike() const {
+    if (isBinaryOperator())
+      return true;
+
+    switch (Kind) {
+    case tok::equal:
+    case tok::arrow:
+    case tok::question_infix:
+      return true;
+    default:
+      return false;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
+  /// Checks whether the token is either a postfix operator, or is a token that
+  /// acts like a postfix operator (e.g postfix '!' and '?').
+  bool isPostfixOperatorLike() const {
+    switch (Kind) {
+    case tok::oper_postfix:
+    case tok::exclaim_postfix:
+    case tok::question_postfix:
+      return true;
+    default:
+      return false;
+    }
+    llvm_unreachable("Unhandled case in switch!");
+  }
+
   bool isAnyOperator() const {
     return isBinaryOperator() || Kind == tok::oper_postfix ||
            Kind == tok::oper_prefix;

@@ -3846,6 +3846,7 @@ class SingleValueStmtUsageChecker final : public ASTWalker {
   ASTContext &Ctx;
   DiagnosticEngine &Diags;
   llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
+  llvm::DenseSet<ThenStmt *> ValidThenStmts;
 
 public:
   SingleValueStmtUsageChecker(
@@ -3918,10 +3919,10 @@ private:
                        SVE->getStmt()->getKind());
       }
 
-      // Nested SingleValueStmtExprs are allowed.
-      SmallVector<Expr *, 4> scratch;
-      for (auto *branch : SVE->getSingleExprBranches(scratch))
-        markValidSingleValueStmt(branch);
+      // Mark the valid 'then' statements.
+      SmallVector<ThenStmt *, 4> scratch;
+      for (auto *thenStmt : SVE->getThenStmts(scratch))
+        ValidThenStmts.insert(thenStmt);
 
       // Diagnose invalid SingleValueStmtExprs. This should only happen for
       // expressions in positions that we didn't support before
@@ -3942,7 +3943,7 @@ private:
             }
           }
           Diags.diagnose(branch->getEndLoc(),
-                         diag::single_value_stmt_branch_must_end_in_throw,
+                         diag::single_value_stmt_branch_must_end_in_result,
                          S->getKind());
         }
         break;
@@ -3971,7 +3972,7 @@ private:
         }
         break;
       }
-      case IsSingleValueStmtResult::Kind::NoExpressionBranches:
+      case IsSingleValueStmtResult::Kind::NoResult:
         // This is fine, we will have typed the expression as Void (we verify
         // as such in the ASTVerifier).
         break;
@@ -3999,13 +4000,19 @@ private:
   }
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    // Valid in a return/throw.
+    // Valid in a return/throw/then.
     if (auto *RS = dyn_cast<ReturnStmt>(S)) {
       if (RS->hasResult())
         markValidSingleValueStmt(RS->getResult());
     }
     if (auto *TS = dyn_cast<ThrowStmt>(S))
       markValidSingleValueStmt(TS->getSubExpr());
+
+    if (auto *TS = dyn_cast<ThenStmt>(S)) {
+      markValidSingleValueStmt(TS->getResult());
+      if (!ValidThenStmts.contains(TS))
+        Diags.diagnose(TS->getThenLoc(), diag::out_of_place_then_stmt);
+    }
 
     return Action::Continue(S);
   }

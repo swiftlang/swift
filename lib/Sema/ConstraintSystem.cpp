@@ -5859,12 +5859,12 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::SingleValueStmtBranch: {
-      auto branchElt = path[0].castTo<LocatorPathElt::SingleValueStmtBranch>();
-      auto exprIdx = branchElt.getExprBranchIndex();
+    case ConstraintLocator::SingleValueStmtResult: {
+      auto branchElt = path[0].castTo<LocatorPathElt::SingleValueStmtResult>();
+      auto exprIdx = branchElt.getIndex();
       auto *SVE = castToExpr<SingleValueStmtExpr>(anchor);
       SmallVector<Expr *, 4> scratch;
-      anchor = SVE->getSingleExprBranches(scratch)[exprIdx];
+      anchor = SVE->getResultExprs(scratch)[exprIdx];
       path = path.slice(1);
       continue;
     }

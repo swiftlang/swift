@@ -259,8 +259,8 @@ CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
 /// The element of the pattern binding declaration.
 CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
 
-/// A branch of a SingleValueStmtExpr.
-CUSTOM_LOCATOR_PATH_ELT(SingleValueStmtBranch)
+/// A particular result of a ThenStmt at a given index in a SingleValueStmtExpr.
+CUSTOM_LOCATOR_PATH_ELT(SingleValueStmtResult)
 
 /// A declaration introduced by a pattern: name (i.e. `x`) or `_`
 ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)

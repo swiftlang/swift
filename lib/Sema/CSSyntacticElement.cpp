@@ -268,7 +268,7 @@ static bool isViableElement(ASTNode element,
       // code completion token, as it won't contribute to the type of the
       // SingleValueStmtExpr.
       if (isForSingleValueStmtCompletion &&
-          !braceStmt->getSingleActiveExpression() &&
+          !SingleValueStmtExpr::hasResult(braceStmt) &&
           !cs.containsIDEInspectionTarget(braceStmt)) {
         return false;
       }
@@ -456,6 +456,10 @@ struct SyntacticElementContext
 
   NullablePtr<AbstractFunctionDecl> getAsAbstractFunctionDecl() const {
     return this->dyn_cast<AbstractFunctionDecl *>();
+  }
+
+  NullablePtr<SingleValueStmtExpr> getAsSingleValueStmtExpr() const {
+    return this->dyn_cast<SingleValueStmtExpr *>();
   }
 
   llvm::Optional<AnyFunctionRef> getAsAnyFunctionRef() const {
@@ -1141,14 +1145,13 @@ private:
 
     for (auto element : braceStmt->getElements()) {
       if (cs.isForCodeCompletion() &&
-          !cs.containsIDEInspectionTarget(element) &&
-          !(braceStmt->getSingleActiveExpression() &&
-            locator->isForSingleValueStmtConjunctionOrBrace())) {
+          !cs.containsIDEInspectionTarget(element)) {
         // To improve performance, skip type checking elements that can't
-        // influence the code completion token. Note we don't do this for
-        // single expression SingleValueStmtExpr branches, as they're needed to
-        // infer the type.
-        if (element.is<Stmt *>() && !element.isStmt(StmtKind::Guard) && !element.isStmt(StmtKind::Return)) {
+        // influence the code completion token.
+        if (element.is<Stmt *>() &&
+            !element.isStmt(StmtKind::Guard) &&
+            !element.isStmt(StmtKind::Return) &&
+            !element.isStmt(StmtKind::Then)) {
           // Statements can't influence the expresion that contains the code
           // completion token.
           // Guard statements might define variables that are used in the code
@@ -1183,17 +1186,6 @@ private:
       if (element.is<Expr *>() &&
           !ctx.LangOpts.Playground && !ctx.LangOpts.DebuggerSupport) {
         isDiscarded = !contextInfo || contextInfo->purpose == CTP_Unused;
-      }
-
-      // For an if/switch expression, if the contextual type for the branch is
-      // still a type variable, we can drop it. This avoids needlessly
-      // propagating the type of the branch to subsequent branches, instead
-      // we'll let the join handle the conversion.
-      if (contextInfo && isExpr<SingleValueStmtExpr>(locator->getAnchor())) {
-        auto contextualFixedTy = cs.getFixedTypeRecursive(
-            contextInfo->getType(), /*wantRValue*/ true);
-        if (contextualFixedTy->isTypeVariableOrMember())
-          contextInfo = llvm::None;
       }
 
       elements.push_back(makeElement(
@@ -1257,6 +1249,30 @@ private:
 
     cs.setContextualInfo(target.getAsExpr(), contextualResultInfo);
     cs.setTargetFor(returnStmt, target);
+  }
+
+  void visitThenStmt(ThenStmt *thenStmt) {
+    auto *resultExpr = thenStmt->getResult();
+    auto contextInfo = cs.getContextualTypeInfo(resultExpr);
+
+    // For an if/switch expression, if the contextual type for the branch is
+    // still a type variable, we can drop it. This avoids needlessly
+    // propagating the type of the branch to subsequent branches, instead
+    // we'll let the join handle the conversion.
+    if (contextInfo && isExpr<SingleValueStmtExpr>(locator->getAnchor())) {
+      auto contextualFixedTy =
+          cs.getFixedTypeRecursive(contextInfo->getType(), /*wantRValue*/ true);
+      if (contextualFixedTy->isTypeVariableOrMember())
+        contextInfo = llvm::None;
+    }
+
+    // We form a single element conjunction here to ensure the context type var
+    // gets taken out of the active type vars (assuming we dropped it) before we
+    // produce a solution.
+    auto resultElt = makeElement(resultExpr, locator,
+                                 contextInfo.value_or(ContextualTypeInfo()),
+                                 /*isDiscarded=*/false);
+    createConjunction(cs, {resultElt}, locator);
   }
 
   ContextualTypeInfo getContextualResultInfo() const {
@@ -1408,15 +1424,15 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
   Type resultTy = createTypeVariable(loc, /*options*/ 0);
   setType(E, resultTy);
 
-  // Assign contextual types for each of the expression branches.
+  // Assign contextual types for each of the result exprs.
   SmallVector<Expr *, 4> scratch;
-  auto branches = E->getSingleExprBranches(scratch);
+  auto branches = E->getResultExprs(scratch);
   for (auto idx : indices(branches)) {
     auto *branch = branches[idx];
 
     auto ctpElt = LocatorPathElt::ContextualType(CTP_SingleValueStmtBranch);
     auto *loc = getConstraintLocator(
-        E, {LocatorPathElt::SingleValueStmtBranch(idx), ctpElt});
+        E, {LocatorPathElt::SingleValueStmtResult(idx), ctpElt});
 
     ContextualTypeInfo info(resultTy, CTP_SingleValueStmtBranch, loc);
     setContextualInfo(branch, info);
@@ -2159,6 +2175,38 @@ private:
     return returnStmt;
   }
 
+  ASTNode visitThenStmt(ThenStmt *thenStmt) {
+    // Note we're defensive here over whether we're in a SingleValueStmtExpr,
+    // as we don't diagnose out-of-place ThenStmts until MiscDiagnostics. If we
+    // have an out-of-place ThenStmt, just rewrite the expr without a contextual
+    // type.
+    auto SVE = context.getAsSingleValueStmtExpr();
+    auto ty = SVE ? solution.getResolvedType(SVE.get()) : Type();
+
+    // We need to fixup the conversion type to the full result type,
+    // not the branch result type. This is necessary as there may be
+    // an additional conversion required for the branch.
+    auto target = solution.getTargetFor(thenStmt->getResult());
+    if (ty)
+      target->setExprConversionType(ty);
+
+    auto *resultExpr = thenStmt->getResult();
+    if (auto newResultTarget = rewriteTarget(*target))
+      resultExpr = newResultTarget->getAsExpr();
+
+    thenStmt->setResult(resultExpr);
+
+    if (!SVE)
+      return thenStmt;
+
+    // If the expression was typed as Void, its branches are effectively
+    // discarded, so treat them as ignored expressions.
+    if (ty->lookThroughAllOptionalTypes()->isVoid()) {
+      TypeChecker::checkIgnoredExpr(resultExpr);
+    }
+    return thenStmt;
+  }
+
 #define UNSUPPORTED_STMT(STMT) ASTNode visit##STMT##Stmt(STMT##Stmt *) { \
       llvm_unreachable("Unsupported statement kind " #STMT);          \
   }
@@ -2591,16 +2639,6 @@ bool ConstraintSystem::applySolutionToSingleValueStmt(
   auto *stmt = application.apply();
   if (!stmt || application.hadError)
     return true;
-
-  // If the expression was typed as Void, its branches are effectively
-  // discarded, so treat them as ignored expressions. This doesn't happen in
-  // the solution application walker as we consider all the branches to have
-  // contextual types.
-  if (solution.getResolvedType(SVE)->lookThroughAllOptionalTypes()->isVoid()) {
-    SmallVector<Expr *, 4> scratch;
-    for (auto *branch : SVE->getSingleExprBranches(scratch))
-      TypeChecker::checkIgnoredExpr(branch);
-  }
 
   SVE->setStmt(stmt);
   return false;

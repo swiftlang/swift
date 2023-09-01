@@ -304,6 +304,38 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
 };
 
+/// The statement `then <expr>`. This is used within if/switch expressions to
+/// indicate the value being produced by a given branch.
+class ThenStmt : public Stmt {
+  SourceLoc ThenLoc;
+  Expr *Result;
+
+  ThenStmt(SourceLoc thenLoc, Expr *result, bool isImplicit)
+      : Stmt(StmtKind::Then, isImplicit), ThenLoc(thenLoc), Result(result) {
+    assert(Result && "Must have non-null result");
+  }
+
+public:
+  /// Create a new parsed ThenStmt.
+  static ThenStmt *createParsed(ASTContext &ctx, SourceLoc thenLoc,
+                                Expr *result);
+
+  /// Create an implicit ThenStmt.
+  ///
+  /// Note that such statements will be elided during the result builder
+  /// transform.
+  static ThenStmt *createImplicit(ASTContext &ctx, Expr *result);
+
+  SourceLoc getThenLoc() const { return ThenLoc; }
+
+  SourceRange getSourceRange() const;
+
+  Expr *getResult() const { return Result; }
+  void setResult(Expr *e) { Result = e; }
+
+  static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Then; }
+};
+
 /// DeferStmt - A 'defer' statement.  This runs the substatement it contains
 /// when the enclosing scope is exited.
 ///
