@@ -1865,6 +1865,16 @@ bool PullbackCloner::Implementation::run() {
       // become projections into their adjoint base buffer.
       if (Projection::isAddressProjection(v))
         return false;
+
+      // Check that active values are differentiable. Otherwise we may crash
+      // later when tangent space is required, but not available.
+      if (!getTangentSpace(remapType(type).getASTType())) {
+        getContext().emitNondifferentiabilityError(
+            v, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+        errorOccurred = true;
+        return true;
+      }
+
       // Record active value.
       bbActiveValues.push_back(v);
       return false;
