@@ -1816,17 +1816,15 @@ static void handleRefCountsAssignWithCopy(const Metadata *metadata,
 extern "C" swift::OpaqueValue *
 swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {
-  // const uint8_t *layoutStr = metadata->getLayoutString();
-  // LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
-  // uintptr_t addrOffset = 0;
-  // handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t
-  // *)dest, (uint8_t *)src);
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t *)dest,
+                                (uint8_t *)src);
 
-  // assert(addrOffset == metadata->vw_size());
-  swift_generic_destroy(dest, metadata);
-  return swift_generic_initWithCopy(dest, src, metadata);
+  assert(addrOffset == metadata->vw_size());
 
-  // return dest;
+  return dest;
 }
 
 extern "C" swift::OpaqueValue *
