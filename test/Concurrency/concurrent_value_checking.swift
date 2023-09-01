@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 class NotConcurrent { } // expected-note 16{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 // expected-complete-note @-1 11{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}

@@ -4,10 +4,6 @@
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_priority -strict-concurrency=targeted
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_priority -strict-concurrency=complete
-// RUN: %target-build-swift %s -Xfrontend -disable-availability-checking -parse-as-library -o %t/async_task_priority -strict-concurrency=complete -Xfrontend -enable-experimental-feature -Xfrontend SendNonSendable
-
 // REQUIRES: VENDOR=apple
 // REQUIRES: executable_test
 // REQUIRES: concurrency

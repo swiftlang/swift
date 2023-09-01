@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 class GlobalCounter {
   var counter: Int = 0

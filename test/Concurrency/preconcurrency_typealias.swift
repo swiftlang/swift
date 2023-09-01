@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-sns- -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @preconcurrency @MainActor func f() { }
 // expected-note @-1 2{{calls to global function 'f()' from outside of its actor context are implicitly asynchronous}}

@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable  -verify-additional-prefix complete-sns-
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 actor SomeActor { }
 

@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -disable-availability-checking -emit-sil -verify -o /dev/null %s -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @available(SwiftStdlib 5.1, *)
 struct TL {

@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
-
+// REQUIRES: asserts
 
 @Sendable func globalFunc() { }
 

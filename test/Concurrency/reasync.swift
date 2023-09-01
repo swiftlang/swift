@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 //// Basic definitions and parsing
 

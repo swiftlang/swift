@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 actor A1: Comparable {}
 // expected-error@-1 {{type 'A1' does not conform to protocol 'Comparable'}}
