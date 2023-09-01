@@ -3846,7 +3846,6 @@ class SingleValueStmtUsageChecker final : public ASTWalker {
   ASTContext &Ctx;
   DiagnosticEngine &Diags;
   llvm::DenseSet<SingleValueStmtExpr *> ValidSingleValueStmtExprs;
-  llvm::DenseSet<ThenStmt *> ValidThenStmts;
 
 public:
   SingleValueStmtUsageChecker(
@@ -3918,11 +3917,6 @@ private:
         Diags.diagnose(SVE->getLoc(), diag::single_value_stmt_out_of_place,
                        SVE->getStmt()->getKind());
       }
-
-      // Mark the valid 'then' statements.
-      SmallVector<ThenStmt *, 4> scratch;
-      for (auto *thenStmt : SVE->getThenStmts(scratch))
-        ValidThenStmts.insert(thenStmt);
 
       // Diagnose invalid SingleValueStmtExprs. This should only happen for
       // expressions in positions that we didn't support before
@@ -4008,11 +4002,8 @@ private:
     if (auto *TS = dyn_cast<ThrowStmt>(S))
       markValidSingleValueStmt(TS->getSubExpr());
 
-    if (auto *TS = dyn_cast<ThenStmt>(S)) {
+    if (auto *TS = dyn_cast<ThenStmt>(S))
       markValidSingleValueStmt(TS->getResult());
-      if (!ValidThenStmts.contains(TS))
-        Diags.diagnose(TS->getThenLoc(), diag::out_of_place_then_stmt);
-    }
 
     return Action::Continue(S);
   }

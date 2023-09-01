@@ -1255,11 +1255,21 @@ private:
     auto *resultExpr = thenStmt->getResult();
     auto contextInfo = cs.getContextualTypeInfo(resultExpr);
 
+    // First check to make sure the ThenStmt is in a valid position.
+    SmallVector<ThenStmt *, 4> validThenStmts;
+    if (auto SVE = context.getAsSingleValueStmtExpr())
+      (void)SVE.get()->getThenStmts(validThenStmts);
+
+    if (!llvm::is_contained(validThenStmts, thenStmt)) {
+      auto *thenLoc = cs.getConstraintLocator(thenStmt);
+      (void)cs.recordFix(IgnoreOutOfPlaceThenStmt::create(cs, thenLoc));
+    }
+
     // For an if/switch expression, if the contextual type for the branch is
     // still a type variable, we can drop it. This avoids needlessly
     // propagating the type of the branch to subsequent branches, instead
     // we'll let the join handle the conversion.
-    if (contextInfo && isExpr<SingleValueStmtExpr>(locator->getAnchor())) {
+    if (contextInfo) {
       auto contextualFixedTy =
           cs.getFixedTypeRecursive(contextInfo->getType(), /*wantRValue*/ true);
       if (contextualFixedTy->isTypeVariableOrMember())
@@ -2176,28 +2186,21 @@ private:
   }
 
   ASTNode visitThenStmt(ThenStmt *thenStmt) {
-    // Note we're defensive here over whether we're in a SingleValueStmtExpr,
-    // as we don't diagnose out-of-place ThenStmts until MiscDiagnostics. If we
-    // have an out-of-place ThenStmt, just rewrite the expr without a contextual
-    // type.
     auto SVE = context.getAsSingleValueStmtExpr();
-    auto ty = SVE ? solution.getResolvedType(SVE.get()) : Type();
+    assert(SVE && "Should have diagnosed an out-of-place ThenStmt");
+    auto ty = solution.getResolvedType(SVE.get());
 
     // We need to fixup the conversion type to the full result type,
     // not the branch result type. This is necessary as there may be
     // an additional conversion required for the branch.
     auto target = solution.getTargetFor(thenStmt->getResult());
-    if (ty)
-      target->setExprConversionType(ty);
+    target->setExprConversionType(ty);
 
     auto *resultExpr = thenStmt->getResult();
     if (auto newResultTarget = rewriteTarget(*target))
       resultExpr = newResultTarget->getAsExpr();
 
     thenStmt->setResult(resultExpr);
-
-    if (!SVE)
-      return thenStmt;
 
     // If the expression was typed as Void, its branches are effectively
     // discarded, so treat them as ignored expressions.

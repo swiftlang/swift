@@ -9158,6 +9158,11 @@ bool ConcreteTypeSpecialization::diagnoseAsError() {
   return true;
 }
 
+bool OutOfPlaceThenStmtFailure::diagnoseAsError() {
+  emitDiagnostic(diag::out_of_place_then_stmt);
+  return true;
+}
+
 bool InvalidTypeSpecializationArity::diagnoseAsError() {
   emitDiagnostic(diag::type_parameter_count_mismatch, D->getBaseIdentifier(),
                  NumParams, NumArgs, NumArgs < NumParams, HasParameterPack);
