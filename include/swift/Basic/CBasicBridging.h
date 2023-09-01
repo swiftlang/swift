@@ -40,7 +40,7 @@ SWIFT_BEGIN_ASSUME_NONNULL
 
 typedef struct BridgedData {
   const char *_Nullable baseAddress;
-  unsigned long size;
+  size_t size;
 } BridgedData;
 
 void BridgedData_free(BridgedData data);
