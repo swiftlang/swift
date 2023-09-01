@@ -3496,6 +3496,27 @@ public:
     checkAccessControl(EED);
   }
 
+  /// The extended type must be '(repeat each Element)' or a generic
+  /// typealias with that underlying type.
+  static bool isValidExtendedTypeForTupleExtension(ExtensionDecl *ED) {
+    auto extType = ED->getExtendedType();
+    auto selfType = ED->getSelfInterfaceType();
+
+    // The extended type must be '(repeat each Element)'.
+    if (extType->is<UnboundGenericType>()) {
+      auto *extDecl = extType->getAnyGeneric();
+      if (!extDecl->getDeclaredInterfaceType()->isEqual(selfType))
+        return false;
+    } else if (extType->is<TupleType>()) {
+      if (!extType->isEqual(selfType))
+        return false;
+    } else {
+      assert(false && "Huh?");
+    }
+
+    return true;
+  }
+
   static void checkTupleExtension(ExtensionDecl *ED) {
     auto *nominal = ED->getExtendedNominal();
     if (!nominal || !isa<BuiltinTupleDecl>(nominal))
@@ -3507,14 +3528,9 @@ public:
       ED->diagnose(diag::experimental_tuple_extension);
     }
 
-    auto extType = ED->getExtendedType();
-
-    // The extended type must be '(repeat each Element)'.
-    if (extType->is<TupleType>()) {
-      auto selfType = ED->getSelfInterfaceType();
-      if (!extType->isEqual(selfType)) {
-        ED->diagnose(diag::tuple_extension_wrong_type, selfType);
-      }
+    if (!isValidExtendedTypeForTupleExtension(ED)) {
+      ED->diagnose(diag::tuple_extension_wrong_type,
+                   ED->getSelfInterfaceType());
     }
 
     // Make sure we declare conformance to exactly one protocol.
@@ -3526,6 +3542,7 @@ public:
 
     auto *protocol = protocols[0];
 
+    // Validate the generic signature.
     auto genericSig = ED->getGenericSignature();
 
     // We have a single parameter pack by construction, if we

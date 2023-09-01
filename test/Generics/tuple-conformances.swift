@@ -11,6 +11,11 @@ extension () {
   // expected-error@-1 {{type 'Nested' cannot be nested in tuple extension}}
 }
 
+typealias BadTuple<each Horse> = (repeat each Horse, Int)
+extension BadTuple {}
+// expected-error@-1 {{tuple extension must be written as extension of '(repeat each Horse)'}}
+// expected-error@-2 {{tuple extension must declare conformance to exactly one protocol}}
+
 typealias Tuple<each Element> = (repeat each Element)
 
 protocol Q {}
@@ -28,8 +33,8 @@ protocol Base1 {}
 protocol Derived1: Base1 {}
 
 extension Tuple: Derived1 where repeat each Element: Derived1 {}
-// expected-error@-1 {{conditional conformance of type '(repeat each Element)' to protocol 'Derived1' does not imply conformance to inherited protocol 'Base1'}} // FIXME: crappy error
-// expected-note@-2 {{did you mean to explicitly state the conformance like 'extension (repeat each Element): Base1 where ...'?}}
+// expected-error@-1 {{conditional conformance of type '(repeat each Element)' to protocol 'Derived1' does not imply conformance to inherited protocol 'Base1'}}
+// expected-note@-2 {{did you mean to explicitly state the conformance like 'extension Tuple: Base1 where ...'?}}
 // expected-error@-3 {{tuple extension must declare conformance to exactly one protocol}}
 
 protocol Base2 {}
@@ -37,6 +42,22 @@ protocol Derived2: Base2 {}
 
 extension Tuple: Derived2 {}
 // expected-error@-1 {{tuple extension must declare conformance to exactly one protocol}} // FIXME: crappy error
+
+////
+
+protocol P2 {}
+
+typealias FancyTuple1<each Cat: P2> = (repeat each Cat)
+extension FancyTuple1: P2 {}
+
+protocol P3 {}
+
+typealias FancyTuple2<each Cat: C> = (repeat each Cat)
+extension FancyTuple2: P3 {}
+// expected-error@-1 {{tuple extension cannot require that 'each Cat' subclasses 'C'}}
+// expected-error@-2 {{tuple extension must require that 'each Cat' conforms to 'P3'}}
+
+////
 
 protocol P {
   associatedtype A

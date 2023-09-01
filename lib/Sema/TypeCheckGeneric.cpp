@@ -571,7 +571,6 @@ static void collectAdditionalExtensionRequirements(
   if (type->is<ErrorType>())
     return;
 
-  // Tuple extensions cannot introduce requirements via this mechanism.
   if (type->is<TupleType>())
     return;
 
@@ -605,6 +604,8 @@ static void collectAdditionalExtensionRequirements(
   if (!nominal) {
     type = typealias->getUnderlyingType();
     nominal = type->getNominalOrBoundGenericNominal();
+    if (!nominal && type->is<TupleType>())
+      nominal = type->getASTContext().getBuiltinTupleDecl();
   }
 
   // If we have a bound generic type, add same-type requirements for each of
@@ -773,17 +774,23 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
-    parentSig = ext->getExtendedNominal()->getGenericSignatureOfContext();
-    genericParams = nullptr;
-
     collectAdditionalExtensionRequirements(ext->getExtendedType(), sameTypeReqs);
+
+    auto *extendedNominal = ext->getExtendedNominal();
+
+    if (isa<BuiltinTupleDecl>(extendedNominal)) {
+      genericParams = ext->getGenericParams();
+    } else {
+      parentSig = extendedNominal->getGenericSignatureOfContext();
+      genericParams = nullptr;
+    }
 
     // Re-use the signature of the type being extended by default.
     // For tuple extensions, always build a new signature to get
     // the right sugared types, since we don't want to expose the
     // name of the generic parameter of BuiltinTupleDecl itself.
     if (sameTypeReqs.empty() && !ext->getTrailingWhereClause() &&
-        !isa<BuiltinTupleDecl>(ext->getExtendedNominal())) {
+        !isa<BuiltinTupleDecl>(extendedNominal)) {
       return parentSig;
     }
 

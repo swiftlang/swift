@@ -2938,6 +2938,12 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
+  if (isa<BuiltinTupleDecl>(nominal) &&
+      typealias->getUnderlyingType()->isEqual(
+        nominal->getSelfInterfaceType())) {
+    return true;
+  }
+
   auto boundGenericType = typealias->getUnderlyingType()
       ->getAs<BoundGenericType>();
   if (!boundGenericType) return false;
@@ -2995,8 +3001,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
                    : extendedNominal->getDeclaredType();
       }
 
-      if (underlyingType->is<TupleType>())
-        extendedType = underlyingType;
+      if (underlyingType->is<TupleType>()) {
+        return extendedType;
+      }
     }
   }
 

@@ -7865,7 +7865,13 @@ TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const 
   auto &ctx = getASTContext();
 
   // Get the generic parameter type 'each T'.
-  auto *genericParams = owner->getGenericParams();
+  GenericParamList *genericParams;
+  if (owner != nullptr) {
+    genericParams = owner->getGenericParams();
+  } else {
+    genericParams = getGenericParams();
+  }
+
   assert(genericParams != nullptr);
   assert(genericParams->getParams().size() == 1);
   assert(genericParams->getOuterParameters() == nullptr);
@@ -7887,7 +7893,7 @@ Type DeclContext::getSelfInterfaceType() const {
 
   if (auto *nominalDecl = getSelfNominalTypeDecl()) {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
-      return builtinTupleDecl->getTupleSelfType(cast<ExtensionDecl>(this));
+      return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
       auto *genericParams = nominalDecl->getGenericParams();
