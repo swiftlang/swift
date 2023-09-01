@@ -46,7 +46,7 @@ sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
 sil [ossa] @rdar110676577 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $M4
-  %1 = mark_must_check [consumable_and_assignable] %0 : $*M4
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*M4
   %3 = function_ref @get_M4 : $@convention(thin) () -> @owned M4
   %4 = apply %3() : $@convention(thin) () -> @owned M4
   store %4 to [init] %1 : $*M4
@@ -93,7 +93,7 @@ bb0:
 sil [ossa] @rdar111356251 : $@convention(thin) () -> () {
 bb0:
   %stack_addr = alloc_stack $M4
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*M4
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*M4
   %get_M4 = function_ref @get_M4 : $@convention(thin) () -> @owned M4
   %instance = apply %get_M4() : $@convention(thin) () -> @owned M4
   store %instance to [init] %stack : $*M4
@@ -131,7 +131,7 @@ sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
   %get_out_2 = function_ref @get_out_2 : $@convention(thin) () -> (@out M, @out M)
   %end_2 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
   %stack_addr = alloc_stack $M4
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*M4
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*M4
   %s2_addr = struct_element_addr %stack : $*M4, #M4.s2
   %s4_addr = struct_element_addr %stack : $*M4, #M4.s4
   apply %get_out_2(%s2_addr, %s4_addr) : $@convention(thin) () -> (@out M, @out M)

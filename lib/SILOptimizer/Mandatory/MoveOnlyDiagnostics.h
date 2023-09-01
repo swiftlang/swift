@@ -39,7 +39,7 @@ class DiagnosticEmitter {
 
   /// Any mark must check inst that we have emitted diagnostics for are placed
   /// here.
-  SmallPtrSet<MarkMustCheckInst *, 4> valuesWithDiagnostics;
+  SmallPtrSet<MarkUnresolvedNonCopyableValueInst *, 4> valuesWithDiagnostics;
 
   /// Track any violating uses we have emitted a diagnostic for so we don't emit
   /// multiple diagnostics for the same use.
@@ -53,20 +53,20 @@ class DiagnosticEmitter {
   bool emittedCheckerDoesntUnderstandDiagnostic = false;
 
   /// This is incremented every time that the checker determines that an earlier
-  /// pass emitted a diagnostic while processing a mark_must_check. In such a
-  /// case, we want to suppress:
+  /// pass emitted a diagnostic while processing a
+  /// mark_unresolved_non_copyable_value. In such a case, we want to suppress:
   ///
   /// 1. Emitting the compiler doesn't understand how to check error for the
-  ///    specific mark_must_check.
+  ///    specific mark_unresolved_non_copyable_value.
   ///
   /// 2. The "copy of noncopyable type" error over the entire function since us
   ///    stopping processing at some point may have left copies.
   ///
   /// We use a counter rather than a boolean here so that a caller that is
-  /// processing an individual mark_must_check can determine if the checker
-  /// identified such an earlier pass diagnostic for the specific allocation so
-  /// that we can still emit "compiler doesn't understand" errors for other
-  /// allocations.
+  /// processing an individual mark_unresolved_non_copyable_value can determine
+  /// if the checker identified such an earlier pass diagnostic for the specific
+  /// allocation so that we can still emit "compiler doesn't understand" errors
+  /// for other allocations.
   unsigned diagnosticEmittedByEarlierPassCount = 0;
 
 public:
@@ -77,7 +77,7 @@ public:
   }
 
   /// Clear our cache of uses that we have diagnosed for a specific
-  /// mark_must_check.
+  /// mark_unresolved_non_copyable_value.
   void clearUsesWithDiagnostic() { useWithDiagnostic.clear(); }
 
   const OSSACanonicalizer &getCanonicalizer() const {
@@ -110,7 +110,8 @@ public:
     return diagnosticEmittedByEarlierPassCount;
   }
 
-  void emitEarlierPassEmittedDiagnostic(MarkMustCheckInst *mmci) {
+  void
+  emitEarlierPassEmittedDiagnostic(MarkUnresolvedNonCopyableValueInst *mmci) {
     ++diagnosticEmittedByEarlierPassCount;
     registerDiagnosticEmitted(mmci);
   }
@@ -130,64 +131,71 @@ public:
   void emitMissingConsumeInDiscardingContext(SILInstruction *leftoverDestroy,
                                              SILInstruction *dropDeinit);
 
-  void emitCheckerDoesntUnderstandDiagnostic(MarkMustCheckInst *markedValue);
-  void emitObjectGuaranteedDiagnostic(MarkMustCheckInst *markedValue);
-  void emitObjectOwnedDiagnostic(MarkMustCheckInst *markedValue);
+  void emitCheckerDoesntUnderstandDiagnostic(
+      MarkUnresolvedNonCopyableValueInst *markedValue);
+  void emitObjectGuaranteedDiagnostic(
+      MarkUnresolvedNonCopyableValueInst *markedValue);
+  void
+  emitObjectOwnedDiagnostic(MarkUnresolvedNonCopyableValueInst *markedValue);
 
-  bool emittedDiagnosticForValue(MarkMustCheckInst *markedValue) const {
+  bool emittedDiagnosticForValue(
+      MarkUnresolvedNonCopyableValueInst *markedValue) const {
     return valuesWithDiagnostics.count(markedValue);
   }
 
-  void emitAddressDiagnostic(MarkMustCheckInst *markedValue,
+  void emitAddressDiagnostic(MarkUnresolvedNonCopyableValueInst *markedValue,
                              SILInstruction *lastLiveUse,
                              SILInstruction *violatingUse, bool isUseConsuming,
                              bool isInOutEndOfFunction = false);
-  void emitInOutEndOfFunctionDiagnostic(MarkMustCheckInst *markedValue,
-                                        SILInstruction *violatingUse);
-  void emitAddressDiagnosticNoCopy(MarkMustCheckInst *markedValue,
-                                   SILInstruction *consumingUse);
-  void emitAddressExclusivityHazardDiagnostic(MarkMustCheckInst *markedValue,
-                                              SILInstruction *consumingUse);
+  void emitInOutEndOfFunctionDiagnostic(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      SILInstruction *violatingUse);
+  void
+  emitAddressDiagnosticNoCopy(MarkUnresolvedNonCopyableValueInst *markedValue,
+                              SILInstruction *consumingUse);
+  void emitAddressExclusivityHazardDiagnostic(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      SILInstruction *consumingUse);
   void emitObjectDestructureNeededWithinBorrowBoundary(
-      MarkMustCheckInst *markedValue, SILInstruction *destructureNeedingUse,
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      SILInstruction *destructureNeedingUse,
       TypeTreeLeafTypeRange destructureNeededBits,
       FieldSensitivePrunedLivenessBoundary &boundary);
 
-  void emitObjectInstConsumesValueTwice(MarkMustCheckInst *markedValue,
-                                        Operand *firstConsumingUse,
-                                        Operand *secondConsumingUse);
-  void emitObjectInstConsumesAndUsesValue(MarkMustCheckInst *markedValue,
-                                          Operand *consumingUse,
-                                          Operand *nonConsumingUse);
+  void emitObjectInstConsumesValueTwice(
+      MarkUnresolvedNonCopyableValueInst *markedValue,
+      Operand *firstConsumingUse, Operand *secondConsumingUse);
+  void emitObjectInstConsumesAndUsesValue(
+      MarkUnresolvedNonCopyableValueInst *markedValue, Operand *consumingUse,
+      Operand *nonConsumingUse);
 
   /// Emit a diagnostic for a case where we have one of the following cases:
   ///
   /// 1. A partial_apply formed from a borrowed address only value.
   /// 2. A use of a captured value in a closure callee.
   void emitAddressEscapingClosureCaptureLoadedAndConsumed(
-      MarkMustCheckInst *markedValue);
+      MarkUnresolvedNonCopyableValueInst *markedValue);
 
   /// Try to emit a diagnostic for a load/consume from an
   /// assignable_but_not_consumable access to a global or a class field. Returns
   /// false if we did not find something we pattern matched as being either of
   /// those cases. Returns true if we emitted a diagnostic.
-  bool emitGlobalOrClassFieldLoadedAndConsumed(MarkMustCheckInst *markedValue);
+  bool emitGlobalOrClassFieldLoadedAndConsumed(
+      MarkUnresolvedNonCopyableValueInst *markedValue);
 
-  void emitPromotedBoxArgumentError(MarkMustCheckInst *markedValue,
-                                    SILFunctionArgument *arg);
+  void
+  emitPromotedBoxArgumentError(MarkUnresolvedNonCopyableValueInst *markedValue,
+                               SILFunctionArgument *arg);
 
-  void emitCannotPartiallyConsumeError(MarkMustCheckInst *markedValue,
-                                       StringRef pathString,
-                                       NominalTypeDecl *nominal,
-                                       SILInstruction *consumingUser,
-                                       bool dueToDeinit);
+  void emitCannotPartiallyConsumeError(
+      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
+      NominalTypeDecl *nominal, SILInstruction *consumingUser,
+      bool dueToDeinit);
 
-  void emitCannotPartiallyReinitError(MarkMustCheckInst *markedValue,
-                                      StringRef pathString,
-                                      NominalTypeDecl *nominal,
-                                      SILInstruction *initUser,
-                                      SILInstruction *consumingUser,
-                                      bool dueToDeinit);
+  void emitCannotPartiallyReinitError(
+      MarkUnresolvedNonCopyableValueInst *markedValue, StringRef pathString,
+      NominalTypeDecl *nominal, SILInstruction *initUser,
+      SILInstruction *consumingUser, bool dueToDeinit);
 
 private:
   /// Emit diagnostics for the final consuming uses and consuming uses needing
@@ -198,7 +206,7 @@ private:
   emitObjectDiagnosticsForGuaranteedUses(bool ignorePartialApply = false) const;
   void emitObjectDiagnosticsForPartialApplyUses(StringRef capturedVarName) const;
 
-  void registerDiagnosticEmitted(MarkMustCheckInst *value) {
+  void registerDiagnosticEmitted(MarkUnresolvedNonCopyableValueInst *value) {
     ++diagnosticCount;
     valuesWithDiagnostics.insert(value);
   }

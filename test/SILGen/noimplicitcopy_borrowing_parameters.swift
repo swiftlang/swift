@@ -53,7 +53,7 @@ func borrowValBorrowing<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {}
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[COPY2:%.*]] = copy_value [[BORROW]]
 // CHECK:   [[MOVE:%.*]] = move_value [[COPY2]]
@@ -78,7 +78,7 @@ func testConsume(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   end_borrow [[BORROW]]
 // CHECK:   destroy_value [[CHECK]]
@@ -91,7 +91,7 @@ func testUse(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROW]]
 // CHECK:   apply {{%.*}}([[UNWRAP]])
@@ -106,7 +106,7 @@ func testCallBorrowValDefault(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 func testCallBorrowValBorrowing(_ x: borrowing NonTrivialStruct) {
     borrowValBorrowing(x)
@@ -116,7 +116,7 @@ func testCallBorrowValBorrowing(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROW]]
 // CHECK:   apply {{%.*}}([[UNWRAP]])
@@ -130,7 +130,7 @@ func testCallMethodSelfDefault(_ x: borrowing NonTrivialStruct) {
 // CHECK-LABEL: sil hidden [ossa] @$s35noimplicitcopy_borrowing_parameters27testCallMethodSelfBorrowingyyAA16NonTrivialStructVF : $@convention(thin) (@guaranteed NonTrivialStruct) -> () {
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [guaranteed] [[BORROW]]
 // TODO: This should be passed directly without a conversion.
@@ -144,7 +144,7 @@ func testCallMethodSelfBorrowing(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[COPY2:%.*]] = copy_value [[CHECK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [owned] [[COPY2]]
 // CHECK:   partial_apply [callee_guaranteed] {{%.*}}([[UNWRAP]])
@@ -161,7 +161,7 @@ func testEscapingClosure(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy @guaranteed $NonTrivialStruct):
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[COPY2:%.*]] = copy_value [[CHECK]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [owned] [[COPY2]]
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[UNWRAP]])
@@ -177,7 +177,7 @@ func testNonEscapingClosure(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[COPY2:%.*]] = copy_value [[BORROW]]
 // CHECK:   [[MOVE:%.*]] = move_value [allows_diagnostics] [[COPY2]]
@@ -193,7 +193,7 @@ func testLoadableBorrowingConsumeOperator(_ x: borrowing NonTrivialStruct) {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper [guaranteed]
 // CHECK:   [[COPY:%.*]] = copy_value [[WRAP]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[COPY]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
 // CHECK:   [[BORROW:%.*]] = begin_borrow [[CHECK]]
 // CHECK:   [[COPY2:%.*]] = copy_value [[BORROW]]
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable [owned] [[COPY2]]
@@ -216,7 +216,7 @@ func testLoadableBorrowingEnum(_ x: borrowing LoadableEnum) {
 // CHECK-LABEL: sil hidden [ossa] @$s35noimplicitcopy_borrowing_parameters31testAddressOnlyBorrowingConsumeyyAA23GenericNonTrivialStructVyxGAA1PRzlF : $@convention(thin) <T where T : P> (@in_guaranteed GenericNonTrivialStruct<T>) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy
 // CHECK:   [[WRAP:%.*]] = copyable_to_moveonlywrapper_addr [[ARG]]
-// CHECK:   [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[WRAP]]
+// CHECK:   [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAP]]
 // CHECK:   [[STACK:%.*]] = alloc_stack
 // CHECK:   [[UNWRAP:%.*]] = moveonlywrapper_to_copyable_addr [[CHECK]]
 // CHECK:   copy_addr [[UNWRAP]] to [init] [[STACK]]

@@ -49,11 +49,12 @@ struct MoveOnlyTempAllocationFromLetTester : SILFunctionTransform {
                << "===> MoveOnlyTempAllocationFromLetTester. Visiting: "
                << fn->getName() << '\n');
 
-    llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        moveIntroducersToProcess;
     DiagnosticEmitter diagnosticEmitter(getFunction());
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-    searchForCandidateAddressMarkMustChecks(
+    searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
         getFunction(), moveIntroducersToProcess, diagnosticEmitter);
 
     // Return early if we emitted a diagnostic.

@@ -5808,9 +5808,6 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::FunctionArgument: {
-    auto *argLoc = getConstraintLocator(
-        locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
-
     // Let's drop the last element which points to a single argument
     // and see if this is a contextual mismatch.
     path.pop_back();
@@ -5819,38 +5816,41 @@ bool ConstraintSystem::repairFailures(
           path.back().getKind() == ConstraintLocator::ContextualType))
       return false;
 
-    auto arg = llvm::find_if(getTypeVariables(),
-                             [&argLoc](const TypeVariableType *typeVar) {
-                               return typeVar->getImpl().getLocator() == argLoc;
-                             });
+    if (auto argToParamElt =
+            path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto loc = getConstraintLocator(anchor, path);
 
-    // What we have here is a form or tuple splat with no arguments
-    // demonstrated by following example:
-    //
-    // func foo<T: P>(_: T, _: (T.Element) -> Int) {}
-    // foo { 42 }
-    //
-    // In cases like this `T.Element` might be resolved to `Void`
-    // which means that we have to try a single empty tuple argument
-    // as a narrow exception to SE-0110, see `matchFunctionTypes`.
-    //
-    // But if `T.Element` didn't get resolved to `Void` we'd like
-    // to diagnose this as a missing argument which can't be ignored or
-    // a tuple is trying to be inferred as a tuple for destructuring but
-    // contextual argument does not match(in this case we remove the extra
-    // closure arguments).
-    if (arg != getTypeVariables().end()) {
-      if (auto argToParamElt =
-              path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
-        auto loc = getConstraintLocator(anchor, path);
-        auto closureAnchor =
-            getAsExpr<ClosureExpr>(simplifyLocatorToAnchor(loc));
-        if (rhs->is<TupleType>() && closureAnchor &&
-            closureAnchor->getParameters()->size() > 1) {
+      if (auto closure = getAsExpr<ClosureExpr>(simplifyLocatorToAnchor(loc))) {
+        auto closureTy = getClosureType(closure);
+        // What we have here is a form or tuple splat with no arguments
+        // demonstrated by following example:
+        //
+        // func foo<T: P>(_: T, _: (T.Element) -> Int) {}
+        // foo { 42 }
+        //
+        // In cases like this `T.Element` might be resolved to `Void`
+        // which means that we have to try a single empty tuple argument
+        // as a narrow exception to SE-0110, see `matchFunctionTypes`.
+        //
+        // But if `T.Element` didn't get resolved to `Void` we'd like
+        // to diagnose this as a missing argument which can't be ignored or
+        // a tuple is trying to be inferred as a tuple for destructuring but
+        // contextual argument does not match(in this case we remove the extra
+        // closure arguments).
+        if (closureTy->getNumParams() == 0) {
+          conversionsOrFixes.push_back(AddMissingArguments::create(
+              *this, {SynthesizedArg{0, AnyFunctionType::Param(lhs)}}, loc));
+          break;
+        }
+
+        // Since this is a problem with `FunctionArgument` we know that the
+        // contextual type only has one parameter, if closure has more than
+        // that the fix is to remove extraneous ones.
+        if (closureTy->getNumParams() > 1) {
           auto callee = getCalleeLocator(loc);
           if (auto overload = findSelectedOverloadFor(callee)) {
-            auto fnType =
-                simplifyType(overload->adjustedOpenedType)->castTo<FunctionType>();
+            auto fnType = simplifyType(overload->adjustedOpenedType)
+                              ->castTo<FunctionType>();
             auto paramIdx = argToParamElt->getParamIdx();
             auto paramType = fnType->getParams()[paramIdx].getParameterType();
             if (auto paramFnType = paramType->getAs<FunctionType>()) {
@@ -5861,11 +5861,6 @@ bool ConstraintSystem::repairFailures(
           }
         }
       }
-
-      conversionsOrFixes.push_back(AddMissingArguments::create(
-          *this, {SynthesizedArg{0, AnyFunctionType::Param(*arg)}},
-          getConstraintLocator(anchor, path)));
-      break;
     }
 
     auto *parentLoc = getConstraintLocator(anchor, path);

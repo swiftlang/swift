@@ -14,7 +14,7 @@ public func consumeVal(_ s: __owned FD) {}
 
 // CHECK: sil hidden [ossa] @$s22moveonly_deinit_access0B17AccessConsumeTestyyAA2FDVzF : $@convention(thin) (@inout FD) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[MARK:%.*]] = mark_must_check [consumable_and_assignable] [[ARG]]
+// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [deinit] [unknown] [[MARK]]
 // CHECK:   [[TAKE:%.*]] = load [take] [[ACCESS]]
 // CHECK:   apply {{%.*}}([[TAKE]]) : $@convention(thin) (@owned FD) -> ()

@@ -97,9 +97,11 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
     borrowtodestructure::IntervalMapAllocator allocator;
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-    llvm::SmallSetVector<MarkMustCheckInst *, 32> moveIntroducersToProcess;
-    bool madeChange = searchForCandidateObjectMarkMustChecks(
-        fn, moveIntroducersToProcess, diagnosticEmitter);
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        moveIntroducersToProcess;
+    bool madeChange =
+        searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
+            fn, moveIntroducersToProcess, diagnosticEmitter);
 
     LLVM_DEBUG(llvm::dbgs()
                << "Emitting diagnostic when checking for mark must check inst: "

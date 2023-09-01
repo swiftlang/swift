@@ -681,7 +681,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexAddrInst:
       case SILInstructionKind::TailAddrInst:
       case SILInstructionKind::IndexRawPointerInst:
-      case SILInstructionKind::MarkMustCheckInst:
+      case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
       case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
       case SILInstructionKind::PackElementGetInst:
         // Add these to our worklist.
@@ -2610,7 +2610,7 @@ public:
             "Must store to an address dest");
     // Note: This is the current implementation and the design is not final.
     auto isLegal = [](SILValue value) {
-      if (auto *mmci = dyn_cast<MarkMustCheckInst>(value))
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value))
         value = mmci->getOperand();
       return isa<AllocStackInst>(value);
     };
@@ -6125,7 +6125,8 @@ public:
     checkDropDeinitUses(ddi);
   }
 
-  void checkMarkMustCheckInst(MarkMustCheckInst *i) {
+  void checkMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *i) {
     require(i->getModule().getStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");

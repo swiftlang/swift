@@ -21,7 +21,7 @@ public struct M {
 }
 
 // CHECK-LABEL: sil [ossa] @${{.*}}4test3mut
-// CHECK: [[CHECK:%.*]] = mark_must_check [consumable_and_assignable] %0
+// CHECK: [[CHECK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[CHECK]]
 // CHECK: [[RESULT:%.*]] = apply {{.*}}([[ACCESS]])
 // CHECK; end_access [[ACCESS]]
@@ -31,7 +31,7 @@ public func test(mut: inout M) -> CInt {
 }
 
 // CHECK-LABEL: sil [ossa] @${{.*}}4test6borrow
-// CHECK: [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] %0
+// CHECK: [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] %0
 // CHECK: [[RESULT:%.*]] = apply {{.*}}([[CHECK]])
 // CHECK: return [[RESULT]]
 public func test(borrow: borrowing M) -> CInt {
@@ -41,7 +41,7 @@ public func test(borrow: borrowing M) -> CInt {
 // CHECK-LABEL: sil [ossa] @${{.*}}4test7consume
 // CHECK: [[BOX:%.*]] = project_box
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] [[BOX]]
-// CHECK: [[CHECK:%.*]] = mark_must_check [no_consume_or_assign] [[ACCESS]]
+// CHECK: [[CHECK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
 // CHECK: [[RESULT:%.*]] = apply {{.*}}([[CHECK]])
 // CHECK; end_access [[ACCESS]]
 // CHECK: return [[RESULT]]
@@ -50,7 +50,7 @@ public func test(consume: consuming M) -> CInt {
 }
 
 // CHECK-LABEL: sil [ossa] @${{.*}}4test3own
-// CHECK: [[CHECK:%.*]] = mark_must_check [consumable_and_assignable] %0
+// CHECK: [[CHECK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
 // CHECK: [[RESULT:%.*]] = apply {{.*}}([[CHECK]])
 // CHECK: return [[RESULT]]
 public func test(own: __owned M) -> CInt {

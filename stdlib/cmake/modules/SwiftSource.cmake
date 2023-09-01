@@ -801,6 +801,7 @@ function(_compile_swift_files
     set(swift_compiler_tool "${SWIFT_SOURCE_DIR}/utils/check-incremental" "${swift_compiler_tool}")
   endif()
 
+  set(custom_env "PYTHONIOENCODING=UTF8")
   if(SWIFTFILE_IS_STDLIB OR
      # Linux "hosttools" build require builder's runtime before building the runtime.
      (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
@@ -811,13 +812,13 @@ function(_compile_swift_files
       # to pick up the stdlib from the previous bootstrapping stage, because the
       # stdlib in the current stage is not built yet.
       if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-        set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "DYLD_LIBRARY_PATH=${bs_lib_dir}")
+        list(APPEND custom_env "DYLD_LIBRARY_PATH=${bs_lib_dir}")
       elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
-        set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "LD_LIBRARY_PATH=${bs_lib_dir}")
+        list(APPEND custom_env "LD_LIBRARY_PATH=${bs_lib_dir}")
       endif()
     endif()
-
   endif()
+  set(set_environment_args "${CMAKE_COMMAND}" "-E" "env" "${custom_env}")
 
   if (SWIFT_REPORT_STATISTICS)
     list(GET dirs_to_create 0 first_obj_dir)

@@ -157,7 +157,7 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
   while (true) {
     // Look through mark must check.
-    if (auto *mmci = dyn_cast<MarkMustCheckInst>(value)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value)) {
       value = mmci->getOperand();
     // Look through copies.
     } else if (auto *ci = dyn_cast<CopyValueInst>(value)) {
@@ -300,7 +300,7 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
       continue;
 
     // Look through mark must check inst.
-    if (auto *mmci = dyn_cast<MarkMustCheckInst>(user)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user)) {
       for (auto *use : mmci->getUses())
         uselistInsert(use);
       continue;

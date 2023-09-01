@@ -61,7 +61,7 @@ bb0:
   %end = function_ref @end : $@convention(thin) (@owned S) -> ()
 
   %stack_addr = alloc_stack $S
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
   %instance = apply %get_value() : $@convention(thin) () -> @owned S
   store %instance to [init] %stack : $*S
   %access = begin_access [deinit] [static] %stack : $*S
@@ -103,7 +103,7 @@ bb0:
   %end = function_ref @end : $@convention(thin) (@owned S) -> ()
 
   %stack_addr = alloc_stack $S
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
   %instance = apply %get_value() : $@convention(thin) () -> @owned S
   store %instance to [init] %stack : $*S
   %access = begin_access [deinit] [static] %stack : $*S
@@ -150,7 +150,7 @@ bb0:
 sil [ossa] @diamond__consume_r__use_l__destroy_b : $@convention(thin) () -> () {
 top:
     %stack_addr = alloc_stack $S
-    %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+    %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
     %get = function_ref @get : $@convention(thin) () -> @out S
     %other = function_ref @other : $@convention(thin) () -> ()
     %see = function_ref @see : $@convention(thin) (@guaranteed S) -> ()
@@ -202,7 +202,7 @@ bottom:
 sil [ossa] @diamond_2r__consume_r1r2__use_l__destroy_b : $@convention(thin) () -> () {
 top:
     %stack_addr = alloc_stack $S
-    %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+    %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
     %get = function_ref @get : $@convention(thin) () -> @out S
     %other = function_ref @other : $@convention(thin) () -> ()
     %see = function_ref @see : $@convention(thin) (@guaranteed S) -> ()
@@ -283,7 +283,7 @@ bottom:
 sil [ossa] @diamond__consume_r__reinit_l__use_l__destroy_b : $@convention(thin) () -> () {
 top:
     %stack_addr = alloc_stack $S
-    %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+    %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
     %get = function_ref @get : $@convention(thin) () -> @out S
     %other = function_ref @other : $@convention(thin) () -> ()
     %see = function_ref @see : $@convention(thin) (@guaranteed S) -> ()
@@ -343,7 +343,7 @@ bottom:
 sil [ossa] @diamond__consume_r__reinit_l__use_l__destroy_b2 : $@convention(thin) () -> () {
 top:
     %stack_addr = alloc_stack $S
-    %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+    %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
     %get = function_ref @get : $@convention(thin) () -> @out S
     %get_value = function_ref @get_value : $@convention(thin) () -> @owned S
     %other = function_ref @other : $@convention(thin) () -> ()
@@ -434,7 +434,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   apply %other() : $@convention(thin) () -> ()
@@ -481,7 +481,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -511,7 +511,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -553,7 +553,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -602,7 +602,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -649,7 +649,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %s1_addr = struct_element_addr %stack : $*S2, #S2.s1
@@ -694,7 +694,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S
   %instance_1 = apply %get_value() : $@convention(thin) () -> @owned S
   store %instance_1 to [init] %stack : $*S
   %s = load_borrow %stack : $*S
@@ -733,7 +733,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -800,7 +800,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %s1_addr = struct_element_addr %stack : $*S2, #S2.s1
@@ -855,7 +855,7 @@ entry:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -928,7 +928,7 @@ entry:
   %end = function_ref @end : $@convention(thin) (@owned S) -> ()
 
   %stack_addr = alloc_stack $S2
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S2
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S2
   %instance_1 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
   store %instance_1 to [init] %stack : $*S2
   %instance_2 = apply %get_value_S2() : $@convention(thin) () -> @owned S2
@@ -1004,7 +1004,7 @@ bb0:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S3
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S3
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S3
   %instance_1 = apply %get_value_S3() : $@convention(thin) () -> @owned S3
   store %instance_1 to [init] %stack : $*S3
   %instance_2 = apply %get_value_S3() : $@convention(thin) () -> @owned S3
@@ -1072,7 +1072,7 @@ entry:
   %other = function_ref @other : $@convention(thin) () -> ()
 
   %stack_addr = alloc_stack $S3
-  %stack = mark_must_check [consumable_and_assignable] %stack_addr : $*S3
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*S3
   %instance_1 = apply %get_value_S3() : $@convention(thin) () -> @owned S3
   store %instance_1 to [init] %stack : $*S3
   %instance_2 = apply %get_value_S3() : $@convention(thin) () -> @owned S3
