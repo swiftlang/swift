@@ -28,9 +28,9 @@
 // CHECK:         [[BRIDGE_STORAGE:%[^,]+]] = struct $_BridgeStorage<__ContiguousArrayStorageBase> ([[BRIDGE_OBJECT]] :
 // CHECK:         [[ARRAY_BUFFER:%[^,]+]] = struct $_ArrayBuffer<(String, String)> ([[BRIDGE_STORAGE]] :
 // CHECK:         [[ARRAY:%[^,]+]] = struct $Array<(String, String)> ([[ARRAY_BUFFER]] :
-// CHECK:         [[DICTIONARY_INIT:%[^,]+]] = function_ref @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SSTg5
+// CHECK:         [[DICTIONARY_INIT:%[^,]+]] = function_ref @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SSTg{{m?}}5
 // CHECK-NEXT:    strong_retain [[REF]] : $__EmptyArrayStorage
-// CHECK-NEXT:    apply [[DICTIONARY_INIT]]([[ARRAY]], {{.*}})
+// CHECK-NEXT:    apply [[DICTIONARY_INIT]]([[ARRAY]]
 // CHECK-LABEL: } // end sil function '$s4main1CCACycfc'
 
 class C {
