@@ -552,6 +552,8 @@ public:
     assert((sourceKind == ConformanceEntryKind::Implied) ==
                (bool)implyingConformance &&
            "an implied conformance needs something that implies it");
+    assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
+           "cannot create conformance pre-macro-expansion");
     SourceKindAndImplyingConformance = {implyingConformance, sourceKind};
   }
 

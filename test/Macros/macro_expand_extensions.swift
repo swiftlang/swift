@@ -10,6 +10,9 @@
 // RUN: not %target-swift-frontend -enable-experimental-feature ExtensionMacros -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics
 // RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
 
+// Ensure that we can serialize this file as a module.
+// RUN: %target-swift-frontend -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -I %t -disable-availability-checking -emit-module -o %t/MyModule.swiftmodule -enable-testing
+
 // RUN: %target-build-swift -enable-experimental-feature ExtensionMacros -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5 -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
@@ -165,3 +168,37 @@ macro AvailableEquatable() = #externalMacro(module: "MacroDefinition", type: "Co
 struct TestAvailability {
   static let x : any Equatable.Type = TestAvailability.self
 }
+
+@attached(extension, conformances: Equatable, names: named(==))
+macro Equatable() = #externalMacro(module: "MacroDefinition", type: "EquatableViaMembersMacro")
+
+@propertyWrapper
+struct NotEquatable<T> {
+  var wrappedValue: T
+}
+
+@Equatable
+struct HasPropertyWrappers {
+  @NotEquatable
+  var value: Int = 0
+}
+
+func requiresEquatable<T: Equatable>(_: T) { }
+func testHasPropertyWrappers(hpw: HasPropertyWrappers) {
+  requiresEquatable(hpw)
+}
+
+// Check that conformances implied by a macro-defined conformance are serialized
+// without issue.
+public protocol ImpliesHashable: Hashable { }
+
+@attached(extension, conformances: ImpliesHashable)
+macro ImpliesHashable() = #externalMacro(module: "MacroDefinition", type: "ImpliesHashableMacro")
+
+func requiresHashable<T: Hashable>(_: T) { }
+func testMakeMeHashable(mmh: MakeMeHashable, dict: [MakeMeHashable: Int]) {
+  requiresHashable(mmh)
+}
+
+@ImpliesHashable
+public struct MakeMeHashable { }

@@ -1593,15 +1593,7 @@ llvm::Optional<unsigned> swift::expandExtensions(CustomAttr *attr,
   for (auto protocol : potentialConformances) {
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
-
-    bool hasExistingConformance = llvm::any_of(
-        existingConformances,
-        [&](ProtocolConformance *conformance) {
-          return conformance->getSourceKind() !=
-              ConformanceEntryKind::PreMacroExpansion;
-        });
-
-    if (!hasExistingConformance) {
+    if (existingConformances.empty()) {
       introducedConformances.push_back(protocol);
     }
   }
