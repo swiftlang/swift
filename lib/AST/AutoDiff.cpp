@@ -101,6 +101,10 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   llvm_unreachable("invalid derivative kind");
 }
 
+void AutoDiffConfig::dump() const {
+  print(llvm::errs());
+}
+
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);

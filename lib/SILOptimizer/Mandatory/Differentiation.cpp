@@ -156,6 +156,12 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         isa<CheckedCastBranchInst>(term) ||
         isa<CheckedCastAddrBranchInst>(term) || isa<TryApplyInst>(term))
       continue;
+    
+    if (isa<YieldInst>(term)) {
+      // FIXME: diagnose proper yields
+      continue;
+    }
+    
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
       context.emitNondifferentiabilityError(
@@ -541,10 +547,17 @@ emitDerivativeFunctionReference(
         }
       }
       // Check and diagnose non-differentiable results.
+      unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
+      unsigned firstYieldResultIndex = originalFnTy->getNumResults() +
+        originalFnTy->getNumAutoDiffSemanticResultsParameters();
       for (auto resultIndex : desiredResultIndices->getIndices()) {
         SILType resultType;
-        if (resultIndex >= originalFnTy->getNumResults()) {
-          auto semanticResultParamIdx = resultIndex - originalFnTy->getNumResults();
+        if (resultIndex >= firstYieldResultIndex) {
+          auto yieldResultIndex = resultIndex - firstYieldResultIndex;
+          resultType = originalFnTy->getYields()[yieldResultIndex]
+                           .getSILStorageInterfaceType();
+        } else if (resultIndex >= firstSemanticParamResultIdx) {
+          auto semanticResultParamIdx = resultIndex - firstSemanticParamResultIdx;
           auto semanticResultParam =
               *std::next(originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
                          semanticResultParamIdx);
