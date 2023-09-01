@@ -55,6 +55,7 @@ typedef __UINT64_TYPE__ __swiftc_uint64_t;
 #else
 typedef unsigned __INT64_TYPE__ __swiftc_uint64_t;
 #endif
+#endif
 
 typedef __INT32_TYPE__ __swiftc_int32_t;
 #ifdef __UINT32_TYPE__
@@ -81,7 +82,6 @@ typedef __swiftc_uint32_t SwiftUInt;
 #else
 typedef __swiftc_intn_t(__INTPTR_WIDTH__) SwiftInt;
 typedef __swiftc_uintn_t(__INTPTR_WIDTH__) SwiftUInt;
-#endif
 #endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
