@@ -68,7 +68,7 @@ func _deallocateUninitializedArray<Element>(
 #if !INTERNAL_CHECKS_ENABLED
 @_alwaysEmitIntoClient
 @_semantics("array.finalize_intrinsic")
-@_effects(readnone)
+@_effects(readnone) @_effects(releasenone)
 @_effects(escaping array.value** => return.value**)
 @_effects(escaping array.value**.class*.value** => return.value**.class*.value**)
 public // COMPILER_INTRINSIC
