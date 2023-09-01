@@ -6,6 +6,9 @@
 extension () {
   // expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}
   // expected-error@-2 {{tuple extension must declare conformance to exactly one protocol}}
+
+  struct Nested {}
+  // expected-error@-1 {{type 'Nested' cannot be nested in tuple extension}}
 }
 
 typealias Tuple<each Element> = (repeat each Element)

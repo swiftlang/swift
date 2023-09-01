@@ -2363,7 +2363,8 @@ ERROR(tuple_extension_extra_requirement,none,
       (Type, unsigned, Type))
 ERROR(tuple_extension_missing_requirement,none,
       "tuple extension must require that %0 conforms to %1", (Type, Type))
-
+ERROR(tuple_extension_nested_type,none,
+      "type %0 cannot be nested in tuple extension", (const NominalTypeDecl *))
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_placeholder,none,

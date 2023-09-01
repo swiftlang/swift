@@ -2655,27 +2655,37 @@ public:
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
     auto *DC = NTD->getDeclContext();
+
+    // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     kind.getSelector());
     }
 
-    // We don't support protocols outside the top level of a file.
-    if (isa<ProtocolDecl>(NTD) &&
-        !NTD->getParent()->isModuleScopeContext()) {
-      NTD->diagnose(diag::unsupported_nested_protocol, NTD);
-      NTD->setInvalid();
-      return;
-    }
+    if (auto *parentDecl = DC->getSelfNominalTypeDecl()) {
+      // We don't allow types to be nested within a tuple extension.
+      if (isa<BuiltinTupleDecl>(parentDecl)) {
+        NTD->diagnose(diag::tuple_extension_nested_type, NTD);
+        return;
+      }
 
-    // We don't support nested types in protocols.
-    if (auto proto = DC->getSelfProtocolDecl()) {
-      if (DC->getExtendedProtocolDecl()) {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
-                      proto);
-      } else {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
+      // We don't support protocols outside the top level of a file.
+      if (isa<ProtocolDecl>(NTD) &&
+          !DC->isModuleScopeContext()) {
+        NTD->diagnose(diag::unsupported_nested_protocol, NTD);
+        NTD->setInvalid();
+        return;
+      }
+
+      // We don't support nested types in protocols.
+      if (auto proto = dyn_cast<ProtocolDecl>(parentDecl)) {
+        if (DC->getExtendedProtocolDecl()) {
+          NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
+                        proto);
+        } else {
+          NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
+        }
       }
     }
 
