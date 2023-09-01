@@ -6,5 +6,6 @@
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
 // UNSUPPORTED: swift_in_compiler
+// UNSUPPORTED: swift_swift_parser
 
 // CHECK: {{^}}clang

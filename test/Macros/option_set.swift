@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift(-Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins -emit-tbd -emit-tbd-path %t.tbd)
+// RUN: %target-run-simple-swift(-Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir -emit-tbd -emit-tbd-path %t.tbd)
 
 import Swift
 

@@ -18,8 +18,7 @@
 // RUN:   -emit-library -o %t/lib/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-library
 // RUN: %host-build-swift \
@@ -27,8 +26,7 @@
 // RUN:   -emit-library -o %t/lib/tmp/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D LOAD_PLUGIN_LIBRARY \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -external-plugin-path
 // RUN: %host-build-swift \
@@ -36,16 +34,14 @@
 // RUN:   -emit-library -o %t/external/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D EXTERNAL_PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-executable
 // RUN: %clang \
 // RUN:  -isysroot %host_sdk \
 // RUN:  -I %swift_src_root/include \
 // RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/libexec/MacroDefinitionPlugin \
+// RUN:  -o %t/libexec/MacroDefinitionPlugin.exe \
 // RUN:  %t/src/MacroDefinition.c
 
 //#-- Expect -load-plugin-library
@@ -54,7 +50,7 @@
 // RUN:   -load-plugin-library %t/lib/tmp/%target-library-name(MacroDefinition) \
 // RUN:   -plugin-path %t/lib/plugins \
 // RUN:   -external-plugin-path %t/external#%swift-plugin-server \
-// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin#MacroDefinition \
+// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin.exe#MacroDefinition \
 // RUN:   -o %t/main1
 // RUN: %target-codesign %t/main1
 // RUN: %target-run %t/main1 | %FileCheck --check-prefix=CHECK_LOAD_PLUGIN_LIBRARY %s
@@ -62,7 +58,7 @@
 //#-- Expect -load-plugin-executable
 // RUN: %target-build-swift %t/src/test.swift \
 // RUN:   -module-name test \
-// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin#MacroDefinition \
+// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin.exe#MacroDefinition \
 // RUN:   -plugin-path %t/lib/plugins \
 // RUN:   -external-plugin-path %t/external#%swift-plugin-server \
 // RUN:   -o %t/main2
@@ -84,7 +80,7 @@
 // RUN:   -module-name test \
 // RUN:   -external-plugin-path %t/external#%swift-plugin-server \
 // RUN:   -plugin-path %t/lib/plugins \
-// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin#MacroDefinition \
+// RUN:   -load-plugin-executable  %t/libexec/MacroDefinitionPlugin.exe#MacroDefinition \
 // RUN:   -o %t/main4
 // RUN: %target-codesign %t/main4
 // RUN: %target-run %t/main4 | %FileCheck --check-prefix=CHECK_EXTERNAL_PLUGIN_PATH %s
