@@ -196,10 +196,12 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       &externalMacroNameLength, &replacements, &numReplacements);
 
   // Clean up after the call.
+  /*
   SWIFT_DEFER {
     free(externalMacroNamePtr);
     free(replacements);
   };
+  */
 
   if (checkResult < 0 && ctx.CompletionCallback) {
     // If the macro failed to check and we are in code completion mode, pretend

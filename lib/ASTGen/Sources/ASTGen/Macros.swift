@@ -155,9 +155,7 @@ func allocateUTF8String(
   var string = string
   return string.withUTF8 { utf8 in
     let capacity = utf8.count + (nullTerminated ? 1 : 0)
-    let ptr = UnsafeMutablePointer<UInt8>.allocate(
-      capacity: capacity
-    )
+    let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: capacity)
     if let baseAddress = utf8.baseAddress {
       ptr.initialize(from: baseAddress, count: utf8.count)
     }
