@@ -167,6 +167,11 @@ func allocateUTF8String(
   }
 }
 
+@_cdecl("swift_ASTGen_freeString")
+public func freeString(pointer: UnsafePointer<UInt8>?) {
+  pointer?.deallocate()
+}
+
 /// Diagnostics produced here.
 enum ASTGenMacroDiagnostic: DiagnosticMessage, FixItMessage {
   case thrownError(Error)
@@ -408,6 +413,14 @@ func checkMacroDefinition(
     )
     return -1
   }
+}
+
+@_cdecl("swift_ASTGen_freeExpansionReplacements")
+public func freeExpansionReplacements(
+  pointer: UnsafeMutablePointer<Int>?,
+  numReplacements: Int
+) {
+  UnsafeMutableBufferPointer(start: pointer, count: numReplacements).deallocate()
 }
 
 // Make an expansion result for '@_cdecl' function caller.
