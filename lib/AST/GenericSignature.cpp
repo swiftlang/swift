@@ -105,8 +105,16 @@ void GenericSignatureImpl::forEachParam(
 
   for (auto req : getRequirements()) {
     GenericTypeParamType *gp;
+    bool isCanonical = false;
     switch (req.getKind()) {
     case RequirementKind::SameType: {
+      if (req.getSecondType()->isParameterPack() != 
+          req.getFirstType()->isParameterPack()) {
+        // This is a same-element requirement, which does not make
+        // type parameters non-canonical.
+        isCanonical = true;
+      }
+
       if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
         // If two generic parameters are same-typed, then the right-hand one
         // is non-canonical.
@@ -136,7 +144,7 @@ void GenericSignatureImpl::forEachParam(
     }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreCanonical[index] = false;
+    genericParamsAreCanonical[index] = isCanonical;
   }
 
   // Call the callback with each parameter and the result of the above analysis.

@@ -13584,6 +13584,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
     return SolutionKind::Solved;
   }
 
+  if (isSingleUnlabeledPackExpansionTuple(packTy)) {
+    auto *packVar =
+        createTypeVariable(getConstraintLocator(locator), TVO_CanBindToPack);
+    addConstraint(ConstraintKind::MaterializePackExpansion, packTy,
+                  packVar,
+                  getConstraintLocator(locator, {ConstraintLocator::Member}));
+    addConstraint(ConstraintKind::ShapeOf, shapeTy, packVar, locator);
+    return SolutionKind::Solved;
+  }
+
   // Map element archetypes to the pack context to check for equality.
   if (packTy->hasElementArchetype()) {
     auto *packEnv = DC->getGenericEnvironmentOfContext();

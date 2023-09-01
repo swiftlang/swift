@@ -3125,18 +3125,9 @@ namespace {
         auto expansionType =
             CS.getType(packEnvironment)->castTo<PackExpansionType>();
         CS.addConstraint(ConstraintKind::ShapeOf, expansionType->getCountType(),
-                         elementType,
+                         packType,
                          CS.getConstraintLocator(packEnvironment,
                                                  ConstraintLocator::PackShape));
-        auto *elementShape = CS.createTypeVariable(
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape),
-            TVO_CanBindToPack);
-        CS.addConstraint(
-            ConstraintKind::ShapeOf, elementShape, elementType,
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
-        CS.addConstraint(
-            ConstraintKind::Equal, elementShape, expansionType->getCountType(),
-            CS.getConstraintLocator(expr, ConstraintLocator::PackShape));
       } else {
         CS.recordFix(AllowInvalidPackReference::create(
             CS, packType, CS.getConstraintLocator(expr->getPackRefExpr())));
