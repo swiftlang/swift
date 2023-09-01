@@ -251,7 +251,8 @@ void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
   auto sr = AFD->getOriginalBodySourceRange();
   if (sr.isInvalid())
     return;
-  ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
+  ASTScopeImpl *bodyScope =
+      findInnermostEnclosingScope(AFD->getParentModule(), sr.Start, nullptr);
   if (!bodyScope->getWasExpanded())
     bodyScope->expandAndBeCurrent(*scopeCreator);
 }
