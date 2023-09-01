@@ -51,7 +51,7 @@ struct Broken {
 var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' inferred to have type '()'}} \
                                   // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
 
-// rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
+// rdar://15263687 - Diagnose variables inferred to 'AnyObject'
 var ao1 : AnyObject
 var ao2 = ao1
 

@@ -1161,7 +1161,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     fArg->setClosureCapture(true);
     arg = SILValue(fArg);
 
-    // If we have an inout noncopyable paramter, insert a consumable and
+    // If we have an inout noncopyable parameter, insert a consumable and
     // assignable.
     //
     // NOTE: If we have an escaping closure, we are going to emit an error later

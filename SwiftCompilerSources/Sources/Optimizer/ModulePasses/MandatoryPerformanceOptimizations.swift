@@ -95,7 +95,7 @@ private func inlineAndDevirtualize(apply: FullApplySite, alreadyInlinedFunctions
   }
 
   if !context.loadFunction(function: callee, loadCalleesRecursively: true) {
-    // We don't have the funcion body of the callee.
+    // We don't have the function body of the callee.
     return
   }
 

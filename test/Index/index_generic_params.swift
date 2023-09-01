@@ -9,7 +9,7 @@ protocol P1 {
 // CHECK: [[@LINE+1]]:10 | protocol/Swift | P2 | s:14swift_ide_test2P2P | Def |
 protocol P2 {}
 
-// MARK: - Test extening a simple generic type
+// MARK: - Test extending a simple generic type
 
 // CHECK: [[@LINE+4]]:7 | class/Swift | Foo | s:14swift_ide_test3FooC | Def |
 // CHECK: [[@LINE+3]]:11 | type-alias/generic-type-param/Swift | OtherParam | s:14swift_ide_test3FooC10OtherParamxmfp | Def,RelChild |
@@ -63,7 +63,7 @@ extension Wrapper.Wrapped where WrapperParam: P2 {
   func bar(x: Bar.Assoc) {}
 }
 
-// MARK: - Test extening a non-generic type in a generic context
+// MARK: - Test extending a non-generic type in a generic context
 
 // CHECK: [[@LINE+1]]:16 | type-alias/generic-type-param/Swift | Wrapper2Param | s:14swift_ide_test8Wrapper2C0D5Paramxmfp | Def,RelChild |
 class Wrapper2<Wrapper2Param> {
