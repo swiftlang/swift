@@ -38,9 +38,12 @@ FeatureName,
 
 SWIFT_BEGIN_ASSUME_NONNULL
 
+typedef long SwiftInt;
+typedef unsigned long SwiftUInt;
+
 typedef struct BridgedData {
   const char *_Nullable baseAddress;
-  unsigned long size;
+  SwiftUInt size;
 } BridgedData;
 
 void BridgedData_free(BridgedData data);
