@@ -244,9 +244,13 @@
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
-    "Cell.swift",
+    "Result.swift",
+    "Cell.swift"
   ],
-  "Result": [
-    "Result.swift"
+  "Synchronization": [
+    "Atomic.swift",
+    "AtomicMemoryOrderings.swift",
+    "AtomicValue.swift",
+    "Lock.swift"
   ]
 }

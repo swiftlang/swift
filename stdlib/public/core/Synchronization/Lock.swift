@@ -74,7 +74,7 @@ public struct Lock<T>: ~Copyable {
   @available(SwiftStdlib 5.10, *)
   @inlinable
   public borrowing func whileLocked<U>(
-    _ body: (borrowing LockedValue<T>) throws -> U
+    _ body: (inout T) throws -> U
   ) rethrows -> U {
     lock.lock()
 
@@ -82,7 +82,7 @@ public struct Lock<T>: ~Copyable {
       lock.unlock()
     }
 
-    return try body(LockedValue<T>(value.address))
+    return try body(&value.address.pointee)
   }
 }
 

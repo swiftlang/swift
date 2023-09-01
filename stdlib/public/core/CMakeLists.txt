@@ -175,6 +175,12 @@ set(SWIFTLIB_ESSENTIAL
   StringWordBreaking.swift
   Substring.swift
   SwiftNativeNSArray.swift
+
+  Synchronization/Atomic.swift
+  Synchronization/AtomicMemoryOrderings.swift
+  Synchronization/AtomicValue.swift
+  Synchronization/Lock.swift
+
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
@@ -203,7 +209,7 @@ set(SWIFTLIB_ESSENTIAL
   MigrationSupport.swift)
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
-  AtomicInt.swift.gyb
+  Synchronization/AtomicInt.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
