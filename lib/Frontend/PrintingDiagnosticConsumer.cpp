@@ -1107,11 +1107,13 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
     // Use the swift-syntax formatter.
     auto bufferStack = getSourceBufferStack(SM, Info.Loc);
     if (!bufferStack.empty()) {
-      // If there are no enqueued diagnostics, or they are from a different
-      // outermost buffer, flush any enqueued diagnostics and start fresh.
+      // If there are no enqueued diagnostics, they are from a different
+      // outermost buffer, or we have hit a non-note diagnostic, flush any
+      // enqueued diagnostics and start fresh.
       unsigned outermostBufferID = bufferStack.back();
       if (!queuedDiagnostics ||
-          outermostBufferID != queuedDiagnosticsOutermostBufferID) {
+          outermostBufferID != queuedDiagnosticsOutermostBufferID ||
+          Info.Kind != DiagnosticKind::Note) {
         flush(/*includeTrailingBreak*/ true);
 
         queuedDiagnosticsOutermostBufferID = outermostBufferID;
