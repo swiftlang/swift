@@ -3381,7 +3381,7 @@ private:
                             loweredSubstParamType, origParamType, paramSlice))
         return;
 
-      // If we have a guaranteed paramter, see if we have a move only type and
+      // If we have a guaranteed parameter, see if we have a move only type and
       // can emit it borrow.
       //
       // We check for move only in tryEmitBorrowedMoveOnly.

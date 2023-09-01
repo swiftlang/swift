@@ -56,7 +56,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   // global effects to the argument, because we don't know to which "global" side-effect
   // instruction the argument might have escaped.
   for argument in function.arguments {
-    collectedEffects.addEffectsForEcapingArgument(argument: argument)
+    collectedEffects.addEffectsForEscapingArgument(argument: argument)
   }
 
   // Don't modify the effects if they didn't change. This avoids sending a change notification
@@ -214,7 +214,7 @@ private struct CollectedEffects {
     }
   }
   
-  mutating func addEffectsForEcapingArgument(argument: FunctionArgument) {
+  mutating func addEffectsForEscapingArgument(argument: FunctionArgument) {
     var escapeWalker = ArgumentEscapingWalker()
 
     if escapeWalker.hasUnknownUses(argument: argument) {

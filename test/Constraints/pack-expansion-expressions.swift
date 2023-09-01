@@ -443,7 +443,7 @@ func test_no_unused_result_warning(arr: inout [Any]) {
   }
 }
 
-func test_partually_flattened_expansions() {
+func test_partially_flattened_expansions() {
   struct S<each T> {
     init() {}
 

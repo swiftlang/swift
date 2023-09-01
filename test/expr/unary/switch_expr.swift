@@ -530,7 +530,7 @@ do {
   }, 0) // expected-error {{expected '{' after 'switch' subject expression}}
 }
 
-// These are syntatically okay because the #if starts on a newline. This seems
+// These are syntactically okay because the #if starts on a newline. This seems
 // like the common case.
 _ = (switch Bool.random() {
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}

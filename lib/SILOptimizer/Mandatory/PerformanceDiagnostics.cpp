@@ -267,7 +267,7 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       return false;
     } else {
       PrettyStackTracePerformanceDiagnostics stackTrace(
-          "validating closure (function ref, callee) - unkown callee", callInst);
+          "validating closure (function ref, callee) - unknown callee", callInst);
 
       diagnose(LocWithParent(callInst->getLoc().getSourceLoc(), parentLoc), diag::performance_unknown_callees);
       return true;
@@ -410,7 +410,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       }
       // The default error message.
       PrettyStackTracePerformanceDiagnostics stackTrace(
-          "default error (fallthrough, unkown inst)", inst);
+          "default error (fallthrough, unknown inst)", inst);
       diagnose(loc, diag::performance_metadata, "this code pattern");
       break;
     }
