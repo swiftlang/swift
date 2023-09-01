@@ -31,9 +31,10 @@ struct BridgedDiagnosticImpl {
 
   ~BridgedDiagnosticImpl() {
     inFlight.flush();
-    for (auto text : textBlobs) {
-      free((void *)text.data());
-    }
+    /*
+    for (auto &text : textBlobs)
+      BridgedDiagnosticImpl::Allocator.Deallocate(&text);
+    */
   }
 };
 } // namespace
