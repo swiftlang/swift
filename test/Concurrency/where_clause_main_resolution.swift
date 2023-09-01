@@ -16,9 +16,9 @@ protocol App {
 
 // Load in the source file name and grab line numbers for default main funcs
 // CHECK: (source_file "[[SOURCE_FILE:[^"]+]]"
-// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
-// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
-// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} App where
+// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "App" where
+// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "App" where
+// CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "App" where
 // CHECK: (extension_decl range={{\[}}[[SOURCE_FILE]]:{{[0-9]+}}:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}}
 // CHECK-NOT: where
 // CHECK-NEXT: (func_decl range={{\[}}[[SOURCE_FILE]]:[[DEFAULT_ASYNCHRONOUS_MAIN_LINE:[0-9]+]]:{{[0-9]+}} - line:{{[0-9]+}}:{{[0-9]+}}{{\]}} "main()"
