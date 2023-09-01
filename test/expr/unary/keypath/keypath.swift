@@ -692,8 +692,7 @@ func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
 
 func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i)
-  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<any PP, Int>'}}
-  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'any PP') are expected to be equal}}
+  // expected-error@-1 {{value of type 'any PP' has no member 'i'}}
 }
 
 // rdar://problem/32057712
