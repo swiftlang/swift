@@ -565,9 +565,9 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
 /// Generic types
 ///
 
-/// Collect additional requirements into \p sameTypeReqs.
+/// Collect additional requirements into \p extraReqs.
 static void collectAdditionalExtensionRequirements(
-    Type type, SmallVectorImpl<Requirement> &sameTypeReqs) {
+    Type type, SmallVectorImpl<Requirement> &extraReqs) {
   if (type->is<ErrorType>())
     return;
 
@@ -587,7 +587,7 @@ static void collectAdditionalExtensionRequirements(
 
     paramProtoTy->getRequirements(
         protoTy->getDecl()->getSelfInterfaceType(),
-        sameTypeReqs);
+        extraReqs);
   }
 
   Type parentType = type->getNominalParent();
@@ -595,7 +595,7 @@ static void collectAdditionalExtensionRequirements(
 
   // Visit the parent type, if there is one.
   if (parentType) {
-    collectAdditionalExtensionRequirements(parentType, sameTypeReqs);
+    collectAdditionalExtensionRequirements(parentType, extraReqs);
   }
 
   // Find the nominal type.
@@ -616,8 +616,8 @@ static void collectAdditionalExtensionRequirements(
       auto *gp = genericParams->getParams()[gpIndex];
       auto gpType = gp->getDeclaredInterfaceType();
 
-      sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
-                                currentBoundType->getGenericArgs()[gpIndex]);
+      extraReqs.emplace_back(RequirementKind::SameType, gpType,
+                             currentBoundType->getGenericArgs()[gpIndex]);
     }
   }
 
@@ -625,7 +625,7 @@ static void collectAdditionalExtensionRequirements(
   // generic signature.
   if (typealias && TypeChecker::isPassThroughTypealias(typealias, nominal)) {
     for (auto req : typealias->getGenericSignature().getRequirements())
-      sameTypeReqs.push_back(req);
+      extraReqs.push_back(req);
   }
 }
 
@@ -700,7 +700,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
   GenericSignature parentSig;
   SmallVector<TypeLoc, 2> inferenceSources;
-  SmallVector<Requirement, 2> sameTypeReqs;
+  SmallVector<Requirement, 2> extraReqs;
   if (auto VD = dyn_cast<ValueDecl>(GC->getAsDecl())) {
     parentSig = GC->getParentForLookup()->getGenericSignatureOfContext();
 
@@ -774,7 +774,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
-    collectAdditionalExtensionRequirements(ext->getExtendedType(), sameTypeReqs);
+    collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();
 
@@ -789,7 +789,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     // For tuple extensions, always build a new signature to get
     // the right sugared types, since we don't want to expose the
     // name of the generic parameter of BuiltinTupleDecl itself.
-    if (sameTypeReqs.empty() && !ext->getTrailingWhereClause() &&
+    if (extraReqs.empty() && !ext->getTrailingWhereClause() &&
         !isa<BuiltinTupleDecl>(extendedNominal)) {
       return parentSig;
     }
@@ -803,7 +803,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   auto request = InferredGenericSignatureRequest{
       parentSig.getPointer(),
       genericParams, WhereClauseOwner(GC),
-      sameTypeReqs, inferenceSources,
+      extraReqs, inferenceSources,
       allowConcreteGenericParams};
   auto sig = evaluateOrDefault(ctx.evaluator, request,
                                GenericSignatureWithError()).getPointer();
