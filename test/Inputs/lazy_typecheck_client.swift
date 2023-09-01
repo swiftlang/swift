@@ -31,3 +31,11 @@ func testPublicClass() {
   _ = c.publicMethod()
   PublicClass.publicClassMethod()
 }
+
+func testConformances() {
+  let _: [any PublicProto] = [
+    PublicStructConformingToPublicProto(),
+    PublicClassConformingToPublicProto(),
+    "string",
+  ]
+}
