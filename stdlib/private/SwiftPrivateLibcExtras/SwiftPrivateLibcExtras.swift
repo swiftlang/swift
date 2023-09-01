@@ -89,8 +89,10 @@ public struct _stdlib_fd_set {
 }
 
 public func _stdlib_select(
-  _ readfds: inout _stdlib_fd_set, _ writefds: inout _stdlib_fd_set,
-  _ errorfds: inout _stdlib_fd_set, _ timeout: UnsafeMutablePointer<timeval>?
+  _ readfds: inout _stdlib_fd_set,
+  _ writefds: inout _stdlib_fd_set,
+  _ errorfds: inout _stdlib_fd_set,
+  @_forwardedToC _ timeout: UnsafeMutablePointer<timeval>?
 ) -> CInt {
   return readfds._data.withUnsafeMutableBufferPointer {
     (readfds) in
