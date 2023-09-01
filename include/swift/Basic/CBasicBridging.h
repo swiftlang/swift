@@ -34,7 +34,12 @@
 
 // Clang has been defining __INTxx_TYPE__ macros for a long time.
 // __UINTxx_TYPE__ are defined only since Clang 3.5.
-#if !defined(__APPLE__) && !defined(__linux__) && !defined(__OpenBSD__) && !defined(__wasi__)
+#if defined(_MSC_VER) && !defined(__clang__)
+typedef __int64 __swiftc_int64_t;
+typedef unsigned __int64 __swiftc_uint64_t;
+typedef int __swiftc_int32_t;
+typedef unsigned int __swiftc_uint32_t;
+#elif !defined(__APPLE__) && !defined(__linux__) && !defined(__OpenBSD__) && !defined(__wasi__)
 #include <stdint.h>
 typedef int64_t __swiftc_int64_t;
 typedef uint64_t __swiftc_uint64_t;
