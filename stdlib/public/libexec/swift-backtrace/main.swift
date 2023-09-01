@@ -587,7 +587,9 @@ Generate a backtrace for the parent process.
   static func backtraceFormatter() -> BacktraceFormatter {
     var terminalSize = winsize(ws_row: 24, ws_col: 80,
                                ws_xpixel: 1024, ws_ypixel: 768)
-    _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), &terminalSize)
+    withUnsafeMutablePointer(to: &terminalSize) {
+      _ = ioctl(0, CUnsignedLong(TIOCGWINSZ), $0)
+    }
 
     return BacktraceFormatter(formattingOptions
                               .theme(theme)
