@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 
 // Needed to use SyntaxTransformVisitor's visit method.
@@ -65,7 +66,7 @@ extension BridgedSourceLoc {
   ) {
     if let start = buffer.baseAddress,
       position.utf8Offset >= 0 && position.utf8Offset < buffer.count {
-      self = SourceLoc_advanced(BridgedSourceLoc(raw: start), position.utf8Offset)
+      self = SourceLoc_advanced(BridgedSourceLoc(raw: start), SwiftInt(position.utf8Offset))
     } else {
       self = nil
     }
@@ -75,7 +76,7 @@ extension BridgedSourceLoc {
 extension String {
   mutating func withBridgedString<R>(_ body: (BridgedString) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
-      try body(BridgedString(data: buffer.baseAddress, length: buffer.count))
+      try body(BridgedString(data: buffer.baseAddress, length: SwiftInt(buffer.count)))
     }
   }
 }

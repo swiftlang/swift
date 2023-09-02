@@ -121,7 +121,7 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: UInt(data.count)))
+      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: SwiftUInt(data.count)))
     }
     if hadError {
       throw PluginError.failedToSendMessage
@@ -339,7 +339,7 @@ class PluginDiagnosticsEngine {
     guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
-    return SourceLoc_advanced(BridgedSourceLoc(raw: bufferBaseAddress), offset)
+    return SourceLoc_advanced(BridgedSourceLoc(raw: bufferBaseAddress), SwiftInt(offset))
   }
 
   /// C++ source location from a position value from a plugin.
