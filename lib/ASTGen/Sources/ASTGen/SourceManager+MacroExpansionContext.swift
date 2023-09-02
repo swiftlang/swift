@@ -43,7 +43,7 @@ extension String {
   /// Retrieve the base name of a string that represents a path, removing the
   /// directory.
   var basename: String {
-    guard let lastSlash = lastIndex(of: "/") else {
+    guard let lastSlash = lastIndex(where: { ["/", "\\"].contains($0) }) else {
       return self
     }
 
