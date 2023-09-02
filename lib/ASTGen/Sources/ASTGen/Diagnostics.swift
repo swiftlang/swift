@@ -14,12 +14,7 @@ fileprivate func emitDiagnosticParts(
   let bridgedDiagEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
 
   // Map severity
-  let bridgedSeverity: BridgedDiagnosticSeverity
-  switch severity {
-    case .error: bridgedSeverity = .error
-    case .note: bridgedSeverity = .note
-    case .warning: bridgedSeverity = .warning
-  }
+  let bridgedSeverity = severity.bridged
 
   func bridgedSourceLoc(at position: AbsolutePosition) -> BridgedSourceLoc {
     return BridgedSourceLoc(at: position, in: sourceFileBuffer)
@@ -119,6 +114,18 @@ func emitDiagnostic(
   }
 }
 
+extension DiagnosticSeverity {
+  var bridged: BridgedDiagnosticSeverity {
+    switch self {
+      case .error: return .error
+      case .note: return .note
+      case .warning: return .warning
+      case .remark: return .remark
+      @unknown default: return .error
+    }
+  }
+}
+
 extension SourceManager {
   private func diagnoseSingle<Node: SyntaxProtocol>(
     message: String,
@@ -129,12 +136,7 @@ extension SourceManager {
     fixItChanges: [FixIt.Change] = []
   ) {
     // Map severity
-    let bridgedSeverity: BridgedDiagnosticSeverity
-    switch severity {
-      case .error: bridgedSeverity = .error
-      case .note: bridgedSeverity = .note
-      case .warning: bridgedSeverity = .warning
-    }
+    let bridgedSeverity = severity.bridged
 
     // Emit the diagnostic
     var mutableMessage = message
@@ -292,7 +294,7 @@ extension BridgedDiagnosticSeverity {
     case .fatalError: return .error
     case .error: return .error
     case .warning: return .warning
-    case .remark: return .warning // FIXME
+    case .remark: return .remark
     case .note: return .note
     @unknown default: return .error
     }
