@@ -371,9 +371,9 @@ static Type defaultGetTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
 
 namespace {
 class PrintBase {
-public:
   raw_ostream &OS;
   unsigned Indent;
+public:
   llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
   llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
@@ -387,6 +387,10 @@ public:
   : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
   GetTypeOfTypeRepr(getTypeOfTypeRepr),
   GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
+
+  bool hasNonStandardOutput() {
+    return &OS != &llvm::errs() && &OS != &llvm::dbgs();
+  }
 
   template <typename Fn>
   void printRecRaw(Fn Body, StringRef label = "") {
@@ -869,7 +873,7 @@ public:
     void visitExtensionDecl(ExtensionDecl *ED, StringRef label) {
       printCommon(ED, "extension_decl", label, ExtensionColor);
       printFlag(!ED->hasBeenBound(), "unbound");
-      printNameRaw([&](raw_ostream &os) {
+      printNameRaw([&](raw_ostream &OS) {
         if (ED->hasBeenBound())
           ED->getExtendedType().print(OS);
         else
@@ -2031,7 +2035,6 @@ public:
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E, StringRef label) {
     printCommon(E, "other_constructor_ref_expr", label);
-    PrintWithColorRAII(OS, DeclColor);
     printDeclRefField("decl", E->getDeclRef());
     printFoot();
   }
@@ -2496,7 +2499,7 @@ public:
 
     // If we aren't printing to standard error or the debugger output stream,
     // this client expects to see the computed discriminator. Compute it now.
-    if (&OS != &llvm::errs() && &OS != &llvm::dbgs())
+    if (hasNonStandardOutput())
       (void)E->getDiscriminator();
 
     printField("discriminator", E->getRawDiscriminator(), DiscriminatorColor);
@@ -2518,7 +2521,6 @@ public:
     }
 
     if (!E->getCaptureInfo().isTrivial()) {
-      OS << " ";
       printFieldRaw("", [&](raw_ostream &OS) {
         E->getCaptureInfo().print(OS);
       }, CapturesColor);
