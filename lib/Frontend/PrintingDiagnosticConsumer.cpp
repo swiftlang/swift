@@ -37,12 +37,12 @@ extern "C" void *swift_ASTGen_createQueuedDiagnostics();
 extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
 extern "C" void swift_ASTGen_addQueuedSourceFile(
       void *queuedDiagnostics,
-      int bufferID,
+      SwiftInt bufferID,
       void *sourceFile,
       const uint8_t *displayNamePtr,
       intptr_t displayNameLength,
-      int parentID,
-      int positionInParent);
+      SwiftInt parentID,
+      SwiftInt positionInParent);
 extern "C" void swift_ASTGen_addQueuedDiagnostic(
     void *queued,
     const char* text, ptrdiff_t textLength,
@@ -52,8 +52,8 @@ extern "C" void swift_ASTGen_addQueuedDiagnostic(
     ptrdiff_t numHighlightRanges
 );
 extern "C" void swift_ASTGen_renderQueuedDiagnostics(
-    void *queued, ptrdiff_t contextSize, ptrdiff_t colorize,
-    char **outBuffer, ptrdiff_t *outBufferLength);
+    void *queued, SwiftInt contextSize, SwiftInt colorize,
+    char **outBuffer, SwiftInt *outBufferLength);
 extern "C" void swift_ASTGen_freeString(const char *str);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
