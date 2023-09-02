@@ -283,7 +283,7 @@ func checkMacroDefinition(
       if module == "Builtin" {
         switch type {
         case "ExternalMacro":
-          return BridgedMacroDefinitionKind.builtinExternalMacro.rawValue
+          return Int(BridgedMacroDefinitionKind.builtinExternalMacro.rawValue)
 
         default:
           // Warn about the unknown builtin.
@@ -328,7 +328,7 @@ func checkMacroDefinition(
           ]
         )
       )
-      return BridgedMacroDefinitionKind.externalMacro.rawValue
+      return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
     case let .expansion(expansionSyntax, replacements: _)
         where expansionSyntax.macro.text == "externalMacro":
@@ -367,7 +367,7 @@ func checkMacroDefinition(
       // Form the "ModuleName.TypeName" result string.
       (externalMacroPointer.pointee, externalMacroLength.pointee) =
         allocateUTF8String("\(module).\(type)", nullTerminated: true)
-      return BridgedMacroDefinitionKind.externalMacro.rawValue
+      return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
     case let .expansion(expansionSyntax, replacements: replacements):
       // Provide the expansion syntax.
@@ -378,7 +378,7 @@ func checkMacroDefinition(
 
       // If there are no replacements, we're done.
       if replacements.isEmpty {
-        return BridgedMacroDefinitionKind.expandedMacro.rawValue
+        return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
       }
 
       // The replacements are triples: (startOffset, endOffset, parameter index).
@@ -393,7 +393,7 @@ func checkMacroDefinition(
 
       replacementsPtr.pointee = replacementBuffer.baseAddress
       numReplacementsPtr.pointee = replacements.count
-      return BridgedMacroDefinitionKind.expandedMacro.rawValue
+      return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
     }
   } catch let errDiags as DiagnosticsError {
     let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)

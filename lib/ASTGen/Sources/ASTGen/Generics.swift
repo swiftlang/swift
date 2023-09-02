@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -36,7 +37,7 @@ extension ASTGenVisitor {
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, eachLoc, genericParameterIndex,
+        self.ctx, self.declContext, name, nameLoc, eachLoc, SwiftInt(genericParameterIndex),
         eachLoc != nil))
   }
 }
