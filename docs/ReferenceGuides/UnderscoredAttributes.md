@@ -909,7 +909,7 @@ will exactly match the size and stride of the original type `T`, allowing for
 other values to be stored in the tail padding when the raw layout type appears
 in a larger aggregate.
 
-```
+```swift
 // struct Weird has size 5, stride 8, alignment 4
 struct Weird {
     var x: Int32
