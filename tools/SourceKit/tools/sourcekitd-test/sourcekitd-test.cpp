@@ -427,7 +427,7 @@ static bool setSyntacticMacroExpansions(sourcekitd_object_t req,
   SmallVector<sourcekitd_object_t, 4> expansions;
   for (std::string &opt : opts.RequestOptions) {
     SmallVector<StringRef, 3> args;
-    StringRef(opt).split(args, ":");
+    StringRef(opt).split(args, ":", /*maxSplits=*/2);
     unsigned line, column;
 
     if (args.size() != 3 || args[0].getAsInteger(10, line) ||
