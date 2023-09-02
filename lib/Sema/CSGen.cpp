@@ -1601,40 +1601,22 @@ namespace {
                                       TVO_CanBindToLValue | TVO_CanBindToNoEscape);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
-      bool anyMacros = false;
-      auto addChoices = [&](bool skipMacros) {
-        for (unsigned i = 0, n = decls.size(); i != n; ++i) {
-          // If the result is invalid, skip it.
-          // FIXME: Note this as invalid, in case we don't find a solution,
-          // so we don't let errors cascade further.
-          if (decls[i]->isInvalid())
-            continue;
 
-          // If the result is a macro, skip it if we're supposed to.
-          if (skipMacros && isa<MacroDecl>(decls[i])) {
-            anyMacros = true;
-            continue;
-          }
+      for (unsigned i = 0, n = decls.size(); i != n; ++i) {
+        // If the result is invalid, skip it.
+        // FIXME: Note this as invalid, in case we don't find a solution,
+        // so we don't let errors cascade further.
+        if (decls[i]->isInvalid())
+          continue;
 
-          OverloadChoice choice =
-              OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
-          choices.push_back(choice);
-        }
-      };
-
-      addChoices(/*skipMacros=*/true);
+        OverloadChoice choice =
+            OverloadChoice(Type(), decls[i], expr->getFunctionRefKind());
+        choices.push_back(choice);
+      }
 
       if (choices.empty()) {
-        // If there are no valid overloads, but we ignored some macros, add
-        // the macros. This improves recovery when the user forgot the leading
-        // '#'.
-        if (anyMacros) {
-          addChoices(/*skipMacros=*/false);
-          assert(!choices.empty());
-        } else {
-          // There are no suitable overloads. Just fail.
-          return nullptr;
-        }
+        // There are no suitable overloads. Just fail.
+        return nullptr;
       }
 
       // Record this overload set.
