@@ -367,6 +367,9 @@ private:
     /// Whether this module was built with -experimental-hermetic-seal-at-link.
     unsigned HasHermeticSealAtLink : 1;
 
+    /// Whether this module was built with embedded Swift.
+    unsigned IsEmbeddedSwiftModule : 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 

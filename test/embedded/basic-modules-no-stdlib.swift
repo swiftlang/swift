@@ -1,0 +1,46 @@
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/split_file.py -o %t %s
+
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded
+// RUN: %target-swift-frontend -swift-version 5 -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded | %FileCheck %s
+
+// TODO: investigate why windows is generating more metadata.
+// XFAIL: OS=windows-msvc
+
+// BEGIN MyModule.swift
+
+public struct Bool {}
+
+public protocol Player {
+  func play()
+  var canPlay: Bool { get }
+}
+
+public struct Concrete : Player {
+  public init() { }
+  public func play() { }
+  public var canPlay: Bool { Bool() }
+}
+
+public func start(p: some Player) {
+  p.play()
+}
+
+public func moduleMain() {
+  start(p: Concrete())
+}
+
+// BEGIN Main.swift
+
+import MyModule
+
+public func main() {
+  moduleMain()
+}
+
+// CHECK: define {{.*}}@main{{.*}} {
+// CHECK: define {{.*}}void @"$s4Main4mainyyF"{{.*}} {
+// CHECK: define {{.*}}void @"$s8MyModule10moduleMainyyF"{{.*}} {
+// CHECK: define {{.*}}void @"$s8MyModule8ConcreteVACycfC"{{.*}} {
+// CHECK: define {{.*}}void @"$s8MyModule5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"{{.*}} {
+// CHECK: define {{.*}}void @"$s8MyModule8ConcreteV4playyyF"{{.*}} {

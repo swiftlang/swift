@@ -442,7 +442,9 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   if (function->hasSemanticsAttr("optimize.no.crossmodule"))
     return false;
 
-  if (SerializeEverything)
+  // In embedded Swift we serialize everything.
+  if (SerializeEverything ||
+      function->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return true;
 
   if (!conservative) {
@@ -652,15 +654,18 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
       
     bool conservative = false;
-    switch (M.getOptions().CMOMode) {
-      case swift::CrossModuleOptimizationMode::Off:
-        return;
-      case swift::CrossModuleOptimizationMode::Default:
-        conservative = true;
-        break;
-      case swift::CrossModuleOptimizationMode::Aggressive:
-        conservative = false;
-        break;
+    // In embedded Swift we serialize everything.
+    if (!M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      switch (M.getOptions().CMOMode) {
+        case swift::CrossModuleOptimizationMode::Off:
+          return;
+        case swift::CrossModuleOptimizationMode::Default:
+          conservative = true;
+          break;
+        case swift::CrossModuleOptimizationMode::Aggressive:
+          conservative = false;
+          break;
+      }
     }
 
     CrossModuleOptimization CMO(M, conservative);

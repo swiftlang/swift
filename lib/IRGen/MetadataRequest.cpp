@@ -3303,7 +3303,11 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  assert(!type->getASTContext().LangOpts.hasFeature(Feature::Embedded));
+  if (type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    llvm::errs() << "Metadata pointer requested in embedded Swift for type "
+                 << type << "\n";
+    assert(0 && "metadata used in embedded mode");
+  }
 
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
