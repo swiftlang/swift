@@ -41,7 +41,7 @@ public struct LLVMJSON {
 
   /// Decode a JSON data to a Swift value.
   public static func decode<T: Decodable>(_ type: T.Type, from json: UnsafeBufferPointer<Int8>) throws -> T {
-    let data = BridgedData(baseAddress: json.baseAddress, size: UInt(json.count))
+    let data = BridgedData(baseAddress: json.baseAddress, size: SwiftUInt(json.count))
     let valuePtr = JSON_deserializedValue(data)
     defer { JSON_value_delete(valuePtr) }
 
