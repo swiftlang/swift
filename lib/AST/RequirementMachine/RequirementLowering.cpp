@@ -218,6 +218,18 @@ static void desugarSameTypeRequirement(Requirement req, SourceLoc loc,
         break;
       }
 
+      auto &ctx = firstType->getASTContext();
+      if (!ctx.LangOpts.hasFeature(Feature::SameElementRequirements)) {
+        // If one side is a parameter pack, this is a same-element requirement, which
+        // is not yet supported.
+        if (firstType->isParameterPack() != secondType->isParameterPack()) {
+          errors.push_back(RequirementError::forSameElement(
+              {kind, sugaredFirstType, secondType}, loc));
+          recordedErrors = true;
+          return true;
+        }
+      }
+
       if (firstType->isTypeParameter() && secondType->isTypeParameter()) {
         result.emplace_back(kind, sugaredFirstType, secondType);
         return true;
