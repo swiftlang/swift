@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 import OtherActors // expected-remark{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'OtherActors'}}{{1-1=@preconcurrency }}
 

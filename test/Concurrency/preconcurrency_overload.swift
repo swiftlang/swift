@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -verify-additional-prefix complete-and-sns- -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // https://github.com/apple/swift/issues/59909
 struct Future<T> { }

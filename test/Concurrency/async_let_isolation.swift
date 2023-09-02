@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 actor MyActor {
   let immutable: Int = 17

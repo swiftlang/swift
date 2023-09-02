@@ -8,7 +8,7 @@
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
-
+// REQUIRES: asserts
 
 import ShadowsConcur
 

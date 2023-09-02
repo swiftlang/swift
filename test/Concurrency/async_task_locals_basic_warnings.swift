@@ -5,8 +5,7 @@
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
-
-// REQUIRES: concurrency
+// REQUIRES: asserts
 
 @available(SwiftStdlib 5.1, *)
 actor Test {

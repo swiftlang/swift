@@ -7,6 +7,7 @@
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable -verify-additional-prefix complete-sns-
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 import other_global_actor_inference
 

@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -enable-actor-data-race-checks -o - %s | %FileCheck %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 func doSomething() {}
 

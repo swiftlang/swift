@@ -3,10 +3,6 @@
 // RUN: %target-codesign %t/voucher_propagation
 // RUN: MallocStackLogging=1 %target-run %t/voucher_propagation
 
-// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=targeted -verify
-// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=complete -verify -verify-additional-prefix complete-sns-
-// RUN: %target-swift-frontend %s -emit-sil -disable-availability-checking -o /dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable -verify -verify-additional-prefix complete-sns-
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 

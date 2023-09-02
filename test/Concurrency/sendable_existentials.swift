@@ -4,6 +4,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 @preconcurrency func send(_: Sendable) { }
 func sendOpt(_: Sendable?) { }

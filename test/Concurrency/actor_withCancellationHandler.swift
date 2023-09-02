@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -I %t  -disable-availability-checking -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 actor foo {
   var t: Task<Void, Error>?

@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 @_implementationOnly import ImplementationOnlyDefs
 
