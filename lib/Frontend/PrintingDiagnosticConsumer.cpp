@@ -54,6 +54,7 @@ extern "C" void swift_ASTGen_addQueuedDiagnostic(
 extern "C" void swift_ASTGen_renderQueuedDiagnostics(
     void *queued, ptrdiff_t contextSize, ptrdiff_t colorize,
     char **outBuffer, ptrdiff_t *outBufferLength);
+extern "C" void swift_ASTGen_freeString(const char *str);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
 // file from here. Fix this egregious oversight!
@@ -1201,6 +1202,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
         &renderedString, &renderedStringLen);
     if (renderedString) {
       Stream.write(renderedString, renderedStringLen);
+      swift_ASTGen_freeString(renderedString);
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
     queuedDiagnostics = nullptr;

@@ -445,7 +445,7 @@ public func addQueuedDiagnostic(
 
 /// Render the queued diagnostics into a UTF-8 string.
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
-public func renterQueuedDiagnostics(
+public func renderQueuedDiagnostics(
   queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>,
   contextSize: Int,
   colorize: Int,
