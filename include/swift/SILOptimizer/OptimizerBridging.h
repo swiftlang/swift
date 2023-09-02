@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
+#include "swift/AST/ASTBridging.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -220,6 +221,14 @@ struct BridgedPassContext {
   BridgedNominalTypeDecl getSwiftArrayDecl() const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
     return {mod->getASTContext().getArrayDecl()};
+  }
+
+  // AST
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedDiagnosticEngine getDiagnosticEngine() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return {&mod->getASTContext().Diags};
   }
 
   // SIL modifications

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 import OptimizerBridging
 
@@ -37,6 +38,12 @@ extension Context {
       case .Lowered:   return .lowered
       default:         fatalError("unhandled SILStage case")
     }
+  }
+}
+
+extension Context {
+  var diagnosticEngine: DiagnosticEngine {
+    return DiagnosticEngine(bridged: _bridged.getDiagnosticEngine())
   }
 }
 
