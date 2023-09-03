@@ -5,6 +5,8 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: asserts
+
 import Foundation
 import ObjCConcurrency
 

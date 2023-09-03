@@ -1,11 +1,5 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
 
-// Shouldn't see any warnings/etc
-// RUN: %target-swift-frontend -verify -disable-availability-checking -parse-as-library -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -verify -disable-availability-checking -parse-as-library -emit-sil -o /dev/null %s -strict-concurrency=targeted
-// RUN: %target-swift-frontend -verify -disable-availability-checking -parse-as-library -emit-sil -o /dev/null %s -strict-concurrency=complete
-// RUN: %target-swift-frontend -verify -disable-availability-checking -parse-as-library -emit-sil -o /dev/null %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: freestanding

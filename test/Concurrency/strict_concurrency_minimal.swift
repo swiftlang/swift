@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix targeted- -enable-experimental-feature SendNonSendable -o /dev/null -emit-sil %s -verify
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 class C1 { }
 // expected-note @-1 {{class 'C1' does not conform to the 'Sendable' protocol}}

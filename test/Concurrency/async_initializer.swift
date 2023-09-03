@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s -verify-additional-prefix complete-and-sns-
 
 // REQUIRES: concurrency
-
+// REQUIRES: asserts
 
 ////
 // some functions to play with

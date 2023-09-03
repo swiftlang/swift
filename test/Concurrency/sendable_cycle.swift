@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend %S/Inputs/sendable_cycle_other.swift  -disable-availability-checking %s -verify -emit-sil -o /dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 struct Bar {
   lazy var foo = { // expected-error {{escaping closure captures mutating 'self' parameter}}

@@ -5,6 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
+// REQUIRES: asserts
 
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding

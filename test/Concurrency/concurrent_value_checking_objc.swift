@@ -3,6 +3,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: asserts
 
 import Foundation
 

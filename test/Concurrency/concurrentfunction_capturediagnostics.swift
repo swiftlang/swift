@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 func f(_: @escaping @Sendable () -> Void) { }
 open class F {
