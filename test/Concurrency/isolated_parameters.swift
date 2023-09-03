@@ -333,3 +333,18 @@ func execute<ActorType: Actor>(
     task(isolatedActor)
   }
 }
+
+actor ProtectsDictionary {
+  var dictionary: [String: String] = ["A": "B"]
+}
+
+func getValues(
+  forKeys keys: [String],
+  from actor: isolated ProtectsDictionary
+) -> [String?] {
+  // A non-escaping, synchronous closure cannot cross isolation
+  // boundaries; it should be isolated to 'actor'.
+  keys.map { key in
+    actor.dictionary[key]
+  }
+}
