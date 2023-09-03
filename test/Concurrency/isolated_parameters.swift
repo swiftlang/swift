@@ -319,3 +319,17 @@ func isolatedClosures() {
     a.f()
   }
 }
+
+// Test case for https://github.com/apple/swift/issues/62568
+func execute<ActorType: Actor>(
+  on isolatedActor: isolated ActorType,
+  task: @escaping @Sendable (isolated ActorType) -> Void)
+{
+  // Compiler correctly allows this task to execute synchronously.
+  task(isolatedActor)
+  // Start a task that inherits the current execution context (i.e. that of the isolatedActor)
+  Task {
+    // 'await' is not not necessary because 'task' is synchronous.
+    task(isolatedActor)
+  }
+}
