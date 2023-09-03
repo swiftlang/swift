@@ -207,7 +207,7 @@ ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
 
   while (bytesToRead > 0) {
     ssize_t readingSize = std::min(ssize_t(INT32_MAX), bytesToRead);
-    ssize_t readSize = ::read(inputFileDescriptor, ptr, readingSize);
+    ssize_t readSize = ::read(input, ptr, readingSize);
     if (readSize <= 0) {
       // 0: EOF (the plugin exited?), -1: error (e.g. broken pipe.)
       // FIXME: Mark the plugin 'stale' and relaunch later.
@@ -245,7 +245,7 @@ ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
 
   while (bytesToWrite > 0) {
     ssize_t writingSize = std::min(ssize_t(INT32_MAX), bytesToWrite);
-    ssize_t writtenSize = ::write(outputFileDescriptor, ptr, writingSize);
+    ssize_t writtenSize = ::write(output, ptr, writingSize);
     if (writtenSize <= 0) {
       // -1: error (e.g. broken pipe,)
       // FIXME: Mark the plugin 'stale' and relaunch later.
