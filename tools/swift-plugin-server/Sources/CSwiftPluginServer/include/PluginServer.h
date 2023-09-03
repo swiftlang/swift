@@ -13,6 +13,8 @@
 #ifndef SWIFT_PLUGINSERVER_PLUGINSERVER_H
 #define SWIFT_PLUGINSERVER_PLUGINSERVER_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
