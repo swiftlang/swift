@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 class Box { // expected-note 3{{class 'Box' does not conform to the 'Sendable' protocol}}
     let size : Int = 0

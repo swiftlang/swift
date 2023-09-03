@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -enable-library-evolution -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 class C1 { } // expected-note {{class 'C1' does not conform to the 'Sendable' protocol}}
 final class C2: Sendable { }

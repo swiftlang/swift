@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 public protocol P {
   associatedtype T

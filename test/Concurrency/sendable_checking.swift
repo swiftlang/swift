@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -verify -strict-concurrency=complete -verify-additional-prefix sns- -verify-additional-prefix complete-and-sns- -emit-sil -o /dev/null %s -enable-experimental-feature SendNonSendable 
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 // REQUIRES: OS=macosx
 
 @available(SwiftStdlib 5.1, *)

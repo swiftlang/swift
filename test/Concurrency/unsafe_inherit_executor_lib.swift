@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete
 // RUN: %target-swift-frontend -emit-sil -verify -o /dev/null -disable-availability-checking %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
+// REQUIRES: asserts
+
 actor A {
   func g() { }
   func h() throws { }

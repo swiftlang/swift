@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 import UnavailableFunction
 

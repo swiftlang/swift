@@ -5,6 +5,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// REQUIRES: asserts
 
 import Dispatch
 

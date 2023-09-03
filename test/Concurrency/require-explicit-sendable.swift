@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -require-explicit-sendable -warn-concurrency %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
 
+// REQUIRES: asserts
+
 public protocol P { }
 
 // expected-note@+2{{consider making struct 'S1' conform to the 'Sendable' protocol}}{{18-18=: Sendable}}

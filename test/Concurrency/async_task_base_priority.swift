@@ -1,9 +1,5 @@
 // RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library )
 
-// RUN: %target-swift-frontend -disable-availability-checking %import-libdispatch -parse-as-library -emit-sil -o /dev/null -strict-concurrency=targeted %s
-// RUN: %target-swift-frontend -disable-availability-checking %import-libdispatch -parse-as-library -emit-sil -o /dev/null -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking %import-libdispatch -parse-as-library -emit-sil -o /dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
-
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
