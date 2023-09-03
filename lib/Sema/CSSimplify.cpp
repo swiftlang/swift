@@ -3425,18 +3425,36 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (!anchor)
         return getTypeMatchFailure(argumentLocator);
 
-      // If there are missing arguments, let's add them
-      // using parameter as a template.
-      if (diff < 0) {
-        if (fixMissingArguments(*this, anchor, func1Params, func2Params,
-                                abs(diff), loc))
+      // The param diff is in a function type coercion context
+      //
+      // func fn(_: Int) {}
+      // let i: Int = 0
+      // (fn as (Int, Int) -> Void)(i, i)
+      //
+      // Since we are not in a function argument application, so simply record
+      // a function type mismatch instead of an argument fix.
+      // Except for when a closure is a subexpr because missing and extraneous
+      // arg fix can properly handle closure diagnostic.
+      if (loc->isForCoercion() && !isExpr<ClosureExpr>(anchor)) {
+        auto *fix = ContextualMismatch::create(*this, func1, func2, loc);
+        if (recordFix(fix))
           return getTypeMatchFailure(argumentLocator);
       } else {
-        // If there are extraneous arguments, let's remove
-        // them from the list.
-        if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
-          return getTypeMatchFailure(argumentLocator);
+        // If there are missing arguments, let's add them
+        // using parameter as a template.
+        if (diff < 0) {
+          if (fixMissingArguments(*this, anchor, func1Params, func2Params,
+                                  abs(diff), loc))
+            return getTypeMatchFailure(argumentLocator);
+        } else {
+          // If there are extraneous arguments, let's remove
+          // them from the list.
+          if (fixExtraneousArguments(*this, func2, func1Params, diff, loc))
+            return getTypeMatchFailure(argumentLocator);
+        }
+      }
 
+      if (diff > 0) {
         // Drop all of the extraneous arguments.
         auto numParams = func2Params.size();
         func1Params.erase(func1Params.begin() + numParams, func1Params.end());

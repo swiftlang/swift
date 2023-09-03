@@ -2761,6 +2761,17 @@ bool ContextualFailure::diagnoseAsNote() {
     }
   }
 
+  // Note that mentions candidate type number of parameters diff.
+  auto fromFnType = getFromType()->getAs<FunctionType>();
+  auto toFnType = getToType()->getAs<FunctionType>();
+  if (fromFnType && toFnType &&
+      fromFnType->getNumParams() > toFnType->getNumParams()) {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args, fromFnType,
+                     fromFnType->getNumParams(), toFnType,
+                     toFnType->getNumParams());
+    return true;
+  }
+
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
