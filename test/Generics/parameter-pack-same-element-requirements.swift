@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -enable-experimental-feature SameElementRequirements -disable-availability-checking 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures -enable-experimental-feature SameElementRequirements -disable-availability-checking 2>&1 | %FileCheck %s -dump-input=fail
 
 // REQUIRES: asserts
 
