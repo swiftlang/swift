@@ -4,6 +4,11 @@ import re
 import subprocess
 import sys
 
+# Fine-grained swiftdeps files use multiple lines for each graph node.
+# Compress such a file so that each entry is one line of the form:
+# <kind> <aspect> <context> <name> <isProvides>
+# Also sort for consistency, since the node order can vary.
+
 output = subprocess.run([
         sys.argv[1],
         "--to-yaml",
