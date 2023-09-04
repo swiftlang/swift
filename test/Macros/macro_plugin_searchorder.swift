@@ -18,8 +18,7 @@
 // RUN:   -emit-library -o %t/lib/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-library
 // RUN: %host-build-swift \
@@ -27,8 +26,7 @@
 // RUN:   -emit-library -o %t/lib/tmp/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D LOAD_PLUGIN_LIBRARY \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -external-plugin-path
 // RUN: %host-build-swift \
@@ -36,8 +34,7 @@
 // RUN:   -emit-library -o %t/external/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D EXTERNAL_PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-executable
 // RUN: %clang \
