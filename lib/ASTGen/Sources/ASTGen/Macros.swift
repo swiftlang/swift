@@ -183,7 +183,11 @@ enum ASTGenMacroDiagnostic: DiagnosticMessage, FixItMessage {
   var message: String {
     switch self {
     case .thrownError(let error):
-      return String(describing: error)
+      if let err = error as? PluginError {
+        return err.description
+      } else {
+        return String(describing: error)
+      }
 
     case .oldStyleExternalMacro:
       return "external macro definitions are now written using #externalMacro"
