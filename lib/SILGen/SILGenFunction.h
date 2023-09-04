@@ -2724,26 +2724,24 @@ public:
   ///
   ///   This function will be called within a cleanups scope and with
   ///   InnermostPackExpansion set up properly for the context.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           SILValue startingAfterIndexWithinComponent,
-                           SILValue limitWithinComponent,
-                           GenericEnvironment *openedElementEnv,
-                           bool reverse,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      SILValue startingAfterIndexWithinComponent, SILValue limitWithinComponent,
+      GenericEnvironment *openedElementEnv, bool reverse,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// A convenience version of dynamic pack loop that visits an entire
   /// pack expansion component in forward order.
-  void emitDynamicPackLoop(SILLocation loc,
-                           CanPackType formalPackType,
-                           unsigned componentIndex,
-                           GenericEnvironment *openedElementEnv,
-                        llvm::function_ref<void(SILValue indexWithinComponent,
-                                                SILValue packExpansionIndex,
-                                                SILValue packIndex)> emitBody);
+  void emitDynamicPackLoop(
+      SILLocation loc, CanPackType formalPackType, unsigned componentIndex,
+      GenericEnvironment *openedElementEnv,
+      llvm::function_ref<void(SILValue indexWithinComponent,
+                              SILValue packExpansionIndex, SILValue packIndex)>
+          emitBody,
+      SILBasicBlock *loopLatch = nullptr);
 
   /// Emit a transform on each element of a pack-expansion component
   /// of a pack, write the result into a pack-expansion component of

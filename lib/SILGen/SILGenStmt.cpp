@@ -1255,9 +1255,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         PackType::get(SGF.getASTContext(), expansion->getType())
             ->getCanonicalType());
 
-    // Create a new basic block and jump into it.
     JumpDest loopDest = createJumpDest(S->getBody());
-    SGF.B.emitBlock(loopDest.getBlock(), S);
 
     SGF.emitDynamicPackLoop(
         SILLocation(expansion), formalPackType, 0,
@@ -1271,7 +1269,8 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
           visit(S->getBody());
           return;
-        });
+        },
+        loopDest.getBlock());
 
     return;
   }
