@@ -319,3 +319,32 @@ func isolatedClosures() {
     a.f()
   }
 }
+
+// Test case for https://github.com/apple/swift/issues/62568
+func execute<ActorType: Actor>(
+  on isolatedActor: isolated ActorType,
+  task: @escaping @Sendable (isolated ActorType) -> Void)
+{
+  // Compiler correctly allows this task to execute synchronously.
+  task(isolatedActor)
+  // Start a task that inherits the current execution context (i.e. that of the isolatedActor)
+  Task {
+    // 'await' is not not necessary because 'task' is synchronous.
+    task(isolatedActor)
+  }
+}
+
+actor ProtectsDictionary {
+  var dictionary: [String: String] = ["A": "B"]
+}
+
+func getValues(
+  forKeys keys: [String],
+  from actor: isolated ProtectsDictionary
+) -> [String?] {
+  // A non-escaping, synchronous closure cannot cross isolation
+  // boundaries; it should be isolated to 'actor'.
+  keys.map { key in
+    actor.dictionary[key]
+  }
+}
