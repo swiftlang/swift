@@ -11,7 +11,7 @@
 // RUN:  -o %t/mock-plugin \
 // RUN:  %t/plugin.c
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
