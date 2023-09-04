@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-host-lib-dir/plugins) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir) | %FileCheck %s
 
 // REQUIRES: observation
 // REQUIRES: concurrency
