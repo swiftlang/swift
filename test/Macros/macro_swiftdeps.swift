@@ -12,8 +12,7 @@
 // RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugin/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
-// RUN:   %S/Inputs/syntax_macro_definitions.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %S/Inputs/syntax_macro_definitions.swift
 
 //#-- Prepare the macro executable plugin.
 // RUN: %clang \
