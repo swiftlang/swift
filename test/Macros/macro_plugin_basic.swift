@@ -17,7 +17,7 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   > %t/macro-expansions.txt 2>&1
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
@@ -28,7 +28,7 @@
 // RUN:   -Rmacro-loading \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-loading.txt
+// RUN:   > %t/macro-loading.txt 2>&1
 
 // RUN: %FileCheck -check-prefix=DIAGS %s < %t/macro-loading.txt
 
