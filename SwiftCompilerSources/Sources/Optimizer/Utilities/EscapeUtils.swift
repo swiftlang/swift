@@ -99,8 +99,10 @@ extension ProjectedValue {
   /// it returns the `result` of the `visitor`, if the projected value does not escape.
   /// Returns nil, if the projected value escapes.
   ///
-  func visit<V: EscapeVisitorWithResult>(using visitor: V, _ context: some Context) -> V.Result? {
-    var walker = EscapeWalker(visitor: visitor, context)
+  func visit<V: EscapeVisitorWithResult>(using visitor: V,
+                                         complexityBudget: Int = Int.max,
+                                         _ context: some Context) -> V.Result? {
+    var walker = EscapeWalker(visitor: visitor, complexityBudget: complexityBudget, context)
     if walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk {
       return nil
     }

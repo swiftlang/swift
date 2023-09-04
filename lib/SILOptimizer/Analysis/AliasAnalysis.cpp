@@ -723,7 +723,8 @@ MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
 
 bool AliasAnalysis::isObjectReleasedByInst(SILValue obj, SILInstruction *inst) {
   if (isObjReleasedFunction) {
-    return isObjReleasedFunction({PM->getSwiftPassInvocation()}, {obj}, {inst->asSILNode()}) != 0;
+    return isObjReleasedFunction({PM->getSwiftPassInvocation()}, {obj}, {inst->asSILNode()},
+                                 getComplexityBudget(obj)) != 0;
   }
   return true;
 }

@@ -34,7 +34,7 @@ struct BridgedAliasAnalysis {
   typedef swift::MemoryBehavior (* _Nonnull GetMemEffectFn)(
         BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
   typedef bool (* _Nonnull Escaping2InstFn)(
-        BridgedPassContext context, BridgedValue, BridgedInstruction);
+        BridgedPassContext context, BridgedValue, BridgedInstruction, SwiftInt);
   typedef bool (* _Nonnull Escaping2ValFn)(
         BridgedPassContext context, BridgedValue, BridgedValue);
   typedef bool (* _Nonnull Escaping2ValIntFn)(
