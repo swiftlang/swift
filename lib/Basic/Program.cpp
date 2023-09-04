@@ -18,7 +18,11 @@
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Program.h"
+#if defined(_WIN32)
+#include "llvm/Support/Windows/WindowsSupport.h"
+#endif
 
+#include <memory>
 #include <system_error>
 
 #if HAVE_POSIX_SPAWN
@@ -27,6 +31,12 @@
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <io.h>
 #endif
 
 using namespace swift;
@@ -175,7 +185,100 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 #endif
   close(p1.read);
   close(p2.write);
-  return ChildProcessInfo(pid, p1.write, p2.read);
+  llvm::sys::ProcessInfo proc;
+  proc.Pid = pid;
+  return ChildProcessInfo(proc, p1.write, p2.read);
+}
+
+#elif defined(_WIN32)
+
+llvm::ErrorOr<swift::ChildProcessInfo>
+swift::ExecuteWithPipe(llvm::StringRef program,
+                       llvm::ArrayRef<llvm::StringRef> args,
+                       llvm::Optional<llvm::ArrayRef<llvm::StringRef>> env) {
+  using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
+  enum { PI_READ, PI_WRITE };
+
+  unique_handle input[2] = {
+    {INVALID_HANDLE_VALUE, CloseHandle},
+    {INVALID_HANDLE_VALUE, CloseHandle},
+  };
+  unique_handle output[2] = {
+    {INVALID_HANDLE_VALUE, CloseHandle},
+    {INVALID_HANDLE_VALUE, CloseHandle},
+  };
+  unique_handle error{INVALID_HANDLE_VALUE, CloseHandle};
+  HANDLE hRead = INVALID_HANDLE_VALUE, hWrite = INVALID_HANDLE_VALUE;
+  SECURITY_ATTRIBUTES saAttrs{sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
+
+  if (!CreatePipe(&hRead, &hWrite, &saAttrs, 0))
+    return std::error_code(GetLastError(), std::system_category());
+  output[PI_READ].reset(hRead);
+  output[PI_WRITE].reset(hWrite);
+
+  if (!SetHandleInformation(output[PI_READ].get(), HANDLE_FLAG_INHERIT, FALSE))
+    return std::error_code(GetLastError(), std::system_category());
+
+  if (!CreatePipe(&hRead, &hWrite, &saAttrs, 0))
+    return std::error_code(GetLastError(), std::system_category());
+  input[PI_READ].reset(hRead);
+  input[PI_WRITE].reset(hWrite);
+
+  if (!SetHandleInformation(input[PI_WRITE].get(), HANDLE_FLAG_INHERIT, FALSE))
+    return std::error_code(GetLastError(), std::system_category());
+
+  if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(STD_ERROR_HANDLE),
+                       GetCurrentProcess(), &hWrite, DUPLICATE_SAME_ACCESS,
+                       TRUE, DUPLICATE_SAME_ACCESS))
+    return std::error_code(GetLastError(), std::system_category());
+  error.reset(hWrite);
+
+  STARTUPINFO si = {0};
+  si.cb = sizeof(si);
+  si.hStdInput = input[PI_READ].get();
+  si.hStdOutput = output[PI_WRITE].get();
+  si.hStdError = error.get();
+  si.dwFlags = STARTF_USESTDHANDLES;
+
+  llvm::SmallVector<wchar_t, MAX_PATH> executable;
+  if (std::error_code ec = llvm::sys::windows::widenPath(program, executable))
+    return ec;
+
+  std::vector<StringRef> components;
+  components.push_back(program);
+  components.assign(args.begin(), args.end());
+  llvm::ErrorOr<std::wstring> commandline =
+      llvm::sys::flattenWindowsCommandLine(components);
+  if (!commandline)
+    return commandline.getError();
+
+  std::vector<wchar_t> command(commandline->size() + 1, 0);
+  std::copy(commandline->begin(), commandline->end(), command.begin());
+
+  PROCESS_INFORMATION pi = {0};
+  if (!CreateProcessW(executable.data(),
+                      command.data(), nullptr, nullptr, TRUE, 0, nullptr,
+                      nullptr, &si, &pi))
+    return std::error_code(GetLastError(), std::system_category());
+
+  unique_handle hThread{pi.hThread, CloseHandle};
+  unique_handle hProcess{pi.hProcess, CloseHandle};
+
+  int ifd = _open_osfhandle(reinterpret_cast<intptr_t>(input[PI_WRITE].get()), 0);
+  if (ifd < 0)
+    return std::error_code(errno, std::system_category());
+  input[PI_WRITE].release();
+
+  int ofd = _open_osfhandle(reinterpret_cast<intptr_t>(output[PI_READ].get()), 0);
+  if (ofd < 0) {
+    _close(ifd);
+    return std::error_code(errno, std::system_category());
+  }
+  output[PI_READ].release();
+
+  llvm::sys::ProcessInfo proc;
+  proc.Process = pi.hProcess;
+  return ChildProcessInfo(proc, ifd, ofd);
 }
 
 #else // HAVE_UNISTD_H

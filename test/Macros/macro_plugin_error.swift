@@ -11,13 +11,13 @@
 // RUN:  -o %t/mock-plugin \
 // RUN:  %t/plugin.c
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   > %t/macro-expansions.txt 2>&1
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 

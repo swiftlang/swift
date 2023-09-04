@@ -47,7 +47,7 @@ extension SwiftPluginServer: PluginProvider {
   /// Load a macro implementation from the dynamic link library.
   func loadPluginLibrary(libraryPath: String, moduleName: String) throws {
     var errorMessage: UnsafePointer<CChar>?
-    guard let dlHandle = PluginServer_dlopen(libraryPath, &errorMessage) else {
+    guard let dlHandle = PluginServer_load(libraryPath, &errorMessage) else {
       throw PluginServerError(message: String(cString: errorMessage!))
     }
     loadedLibraryPlugins[moduleName] = dlHandle
@@ -172,7 +172,7 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while (bytesToWrite > 0) {
-      let writtenSize = PluginServer_write(handle, ptr, UInt(bytesToWrite))
+      let writtenSize = PluginServer_write(handle, ptr, Int(bytesToWrite))
       if (writtenSize <= 0) {
         // error e.g. broken pipe.
         break
@@ -193,7 +193,7 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while bytesToRead > 0 {
-      let readSize = PluginServer_read(handle, ptr, UInt(bytesToRead))
+      let readSize = PluginServer_read(handle, ptr, Int(bytesToRead))
       if (readSize <= 0) {
         // 0: EOF (the host closed), -1: Broken pipe (the host crashed?)
         break;
