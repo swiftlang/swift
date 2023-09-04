@@ -185,7 +185,9 @@ swift::ExecuteWithPipe(llvm::StringRef program,
 #endif
   close(p1.read);
   close(p2.write);
-  return ChildProcessInfo(pid, p1.write, p2.read);
+  llvm::sys::ProcessInfo proc;
+  proc.Pid = pid;
+  return ChildProcessInfo(proc, p1.write, p2.read);
 }
 
 #elif defined(_WIN32)
