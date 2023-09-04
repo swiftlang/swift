@@ -58,7 +58,7 @@ This contains the IDE integration tools (e.g. SourceKit-LSP).
 
 - `sdk` (Platform SDK)
 
-There are multiple SDKs which are built and available. The Windows toolkit includes the SDKs for the Windows platorm for the currently supported architectures (x86, x64, ARM64).  It also contains the MSMs to allow the redistribution of the runtime library as part of a software distribution.
+There are multiple SDKs which are built and available. The Windows toolkit includes the SDKs for the Windows platform for the currently supported architectures (x86, x64, ARM64).  It also contains the MSMs to allow the redistribution of the runtime library as part of a software distribution.
 
 - `rtl` (Platform Runtime Library)
 
