@@ -1619,16 +1619,18 @@ public:
   void visitInjectEnumAddrInst(InjectEnumAddrInst *inject) {
     SILBasicBlock *bb = inject->getParent();
     SILValue origEnum = inject->getOperand();
-    bool unsupported = false;
 
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
-    //
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
     if (origEnum->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
       LLVM_DEBUG(getADDebugStream()
                  << "Unsupported enum type in PullbackCloner: " << *inject);
-      unsupported = true;
+      getContext().emitNondifferentiabilityError(
+          inject, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
     }
 
     InitEnumDataAddrInst *origData = nullptr;
@@ -1637,25 +1639,19 @@ public:
         // We need a more complicated analysis when init_enum_data_addr and
         // inject_enum_addr are in different blocks, or there is more than one
         // such instruction. Bail out for now.
-        //
         if (origData || init->getParent() != bb) {
           LLVM_DEBUG(getADDebugStream()
                      << "Could not find a matching init_enum_data_addr for: "
                      << *inject);
-          unsupported = true;
-          break;
+          getContext().emitNondifferentiabilityError(
+              inject, getInvoker(),
+              diag::autodiff_expression_not_differentiable_note);
+          errorOccurred = true;
+          return;
         }
 
         origData = init;
       }
-    }
-
-    if (unsupported) {
-      getContext().emitNondifferentiabilityError(
-          inject, getInvoker(),
-          diag::autodiff_expression_not_differentiable_note);
-      errorOccurred = true;
-      return;
     }
 
     auto adjEnum = getAdjointBuffer(bb, origEnum);
