@@ -15,13 +15,7 @@
 // RUN:   %S/Inputs/syntax_macro_definitions.swift
 
 //#-- Prepare the macro executable plugin.
-// RUN: %clang \
-// RUN:  -isysroot %host_sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/mock-plugin \
-// RUN:  %t/src/plugin.c
+// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/src/plugin.c
 
 //#-- Prepare the macro library.
 // RUN: %target-swift-frontend \
