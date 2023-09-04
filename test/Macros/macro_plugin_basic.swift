@@ -11,13 +11,13 @@
 // RUN:  -o %t/mock-plugin \
 // RUN:  %t/plugin.c
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   > %t/macro-expansions.txt 2>&1
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
@@ -28,7 +28,7 @@
 // RUN:   -Rmacro-loading \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-loading.txt
+// RUN:   > %t/macro-loading.txt 2>&1
 
 // RUN: %FileCheck -check-prefix=DIAGS %s < %t/macro-loading.txt
 
