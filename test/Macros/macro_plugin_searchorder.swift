@@ -37,13 +37,7 @@
 // RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-executable
-// RUN: %clang \
-// RUN:  -isysroot %host_sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/libexec/MacroDefinitionPlugin \
-// RUN:  %t/src/MacroDefinition.c
+// RUN: %swift-build-cxx-plugin -o %t/libexec/MacroDefinitionPlugin %t/src/MacroDefinition.c
 
 //#-- Expect -load-plugin-library
 // RUN: %target-build-swift %t/src/test.swift \
