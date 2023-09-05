@@ -1090,3 +1090,23 @@ void swift::ide::getReceiverType(Expr *Base,
     Types.push_back(TyD);
   }
 }
+
+ParamDecl *
+swift::ide::resolveArgName(ValueDecl *D, Identifier Name, CharSourceRange Range,
+                           std::function<bool(ParamDecl *)> Predicate) {
+  if (auto *parameterList = getParameterList(D)) {
+    for (auto *paramDecl : *parameterList) {
+      if (Predicate(paramDecl)) {
+        return paramDecl;
+      }
+    }
+  }
+  if (auto overriddenDecl = D->getOverriddenDecl()) {
+    return resolveArgName(overriddenDecl, Name, Range, Predicate);
+  }
+  return nullptr;
+}
+
+bool swift::ide::isParamFromOverriddenConstructor(const ParamDecl *ParamDecl) {
+  return ParamDecl->isImplicit() && ParamDecl->getNameLoc().isInvalid();
+}

@@ -375,7 +375,25 @@ bool CursorInfoResolver::visitCallArgName(Identifier Name,
   if (isa<ModuleDecl>(D))
     return true;
 
-  bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
+  if (swift::ide::resolveArgName(
+          D, Name, Range, [this, Name, Range](ParamDecl *param) {
+            bool isExtArgName = param->getArgumentNameLoc().isValid();
+            bool Found = param->getArgumentName() == Name &&
+                         !swift::ide::isParamFromOverriddenConstructor(param) &&
+                         tryResolve(param, NULL, NULL, Range.getStart(), true);
+            if (Found) {
+              cast<ResolvedValueRefCursorInfo>(CursorInfo)
+                  ->setIsKeywordArgument(true);
+              cast<ResolvedValueRefCursorInfo>(CursorInfo)
+                  ->setIsExtArgName(isExtArgName);
+            }
+            return Found;
+          })) {
+    return false;
+  }
+
+  bool Found =
+      tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found) {
     cast<ResolvedValueRefCursorInfo>(CursorInfo)->setIsKeywordArgument(true);
   }

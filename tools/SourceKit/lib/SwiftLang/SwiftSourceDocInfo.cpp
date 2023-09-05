@@ -877,14 +877,20 @@ static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
   return SM.getByteDistance(TokenRange.Start, CharEndLoc);
 }
 
-static void setLocationInfo(const ValueDecl *VD,
-                            LocationInfo &Location) {
+static void setLocationInfo(const ValueDecl *VD, LocationInfo &Location,
+                            bool ForExtArgName) {
   ASTContext &Ctx = VD->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
 
   auto ClangNode = VD->getClangNode();
 
-  auto Loc = VD->getLoc(/*SerializedOK=*/true);
+  SourceLoc Loc;
+  if (ForExtArgName) {
+    Loc = cast<ParamDecl>(VD)->getArgumentNameLoc();
+  } else {
+    Loc = VD->getLoc(/*SerializedOK=*/true);
+  }
+
   if (Loc.isValid()) {
     auto getSignatureRange =
         [&](const ValueDecl *VD) -> llvm::Optional<unsigned> {
@@ -940,7 +946,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                SourceLoc CursorLoc, bool AddSymbolGraph, SwiftLangSupport &Lang,
                const CompilerInvocation &Invoc,
                ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
-               llvm::BumpPtrAllocator &Allocator) {
+               llvm::BumpPtrAllocator &Allocator, bool IsExtArgName = false) {
   SmallString<256> Buffer;
   SmallVector<StringRef, 4> Strings;
   llvm::raw_svector_ostream OS(Buffer);
@@ -948,7 +954,12 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
   Symbol.DeclarationLang = SwiftLangSupport::getUIDForDeclLanguage(DInfo.VD);
   Symbol.Kind = SwiftLangSupport::getUIDForDecl(DInfo.VD, DInfo.IsRef);
 
-  SwiftLangSupport::printDisplayName(DInfo.VD, OS);
+  if (IsExtArgName) {
+    if (auto pDecl = dyn_cast<ParamDecl>(DInfo.VD))
+      OS << pDecl->getArgumentName();
+  } else {
+    SwiftLangSupport::printDisplayName(DInfo.VD, OS);
+  }
   Symbol.Name = copyAndClearString(Allocator, Buffer);
 
   SwiftLangSupport::printUSR(DInfo.OriginalProperty, OS);
@@ -1076,7 +1087,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
-  setLocationInfo(DInfo.OriginalProperty, Symbol.Location);
+  setLocationInfo(DInfo.OriginalProperty, Symbol.Location, IsExtArgName);
   if (!Symbol.Location.Filename.empty()) {
     mapLocToLatestSnapshot(Lang, Symbol.Location, PreviousSnaps);
     if (Symbol.Location.Filename.empty()) {
@@ -1231,9 +1242,9 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   // The primary result for constructor calls, eg. `MyType()` should be
   // the type itself, rather than the constructor. The constructor will be
   // added as a secondary result.
-  if (auto Err =
-          fillSymbolInfo(MainSymbol, MainInfo, Info->getLoc(), AddSymbolGraph,
-                         Lang, Invoc, PreviousSnaps, Data.Allocator)) {
+  if (auto Err = fillSymbolInfo(MainSymbol, MainInfo, Info->getLoc(),
+                                AddSymbolGraph, Lang, Invoc, PreviousSnaps,
+                                Data.Allocator, Info->isExtArgName())) {
     llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
       Diagnostic = E.message();
     });

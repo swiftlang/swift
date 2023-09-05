@@ -176,6 +176,11 @@ private:
       llvm::None;
 
   bool IsKeywordArgument = false;
+  /// Indicates that this cursor info is resolved for an argument name
+  /// and not the parameter name. \c ValueD always points to the surrounding
+  /// param declaration because the argument name is not a standalone
+  /// declaration.
+  bool IsExtArgName = false;
   /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
   bool IsDynamic = false;
   /// If this is a dynamic ref, the types of the base (multiple in the case of
@@ -223,6 +228,9 @@ public:
   void setIsKeywordArgument(bool IsKeywordArgument) {
     this->IsKeywordArgument = IsKeywordArgument;
   }
+
+  bool isExtArgName() const { return IsExtArgName; }
+  void setIsExtArgName(bool IsExtArgName) { this->IsExtArgName = IsExtArgName; }
 
   bool isDynamic() const { return this->IsDynamic; }
 
@@ -340,6 +348,7 @@ class NameMatcher: public ASTWalker {
   std::vector<UnresolvedLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
+  bool ForExtArgName;
 
   /// The \c ArgumentList of a parent \c CustomAttr (if one exists) and
   /// the \c SourceLoc of the type name it applies to.
@@ -390,7 +399,8 @@ class NameMatcher: public ASTWalker {
   bool shouldWalkAccessorsTheOldWay() override { return true; }
 
 public:
-  explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
+  explicit NameMatcher(SourceFile &SrcFile, bool ForExtArgName = false)
+      : SrcFile(SrcFile), ForExtArgName(ForExtArgName) {}
   std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
   ResolvedLoc resolve(UnresolvedLoc Loc);
 };
@@ -735,6 +745,14 @@ bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> get
 /// Adds the resolved nominal types of \p Base to \p Types.
 void getReceiverType(Expr *Base,
                      SmallVectorImpl<NominalTypeDecl *> &Types);
+
+/// Finds the `ParamDecl` that matches the `Predicate`. Returns `nullptr` if no
+/// match was found.
+ParamDecl *resolveArgName(ValueDecl *D, Identifier Name, CharSourceRange Range,
+                          std::function<bool(ParamDecl *)> Predicate);
+
+/// Checks for synthesized parameters from a base constructor
+bool isParamFromOverriddenConstructor(const ParamDecl *ParamDecl);
 
 } // namespace ide
 } // namespace swift
