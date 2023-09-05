@@ -281,11 +281,10 @@ static bool isViableElement(ASTNode element,
 using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
                                /*isDiscarded=*/bool, ConstraintLocator *>;
 
-static void createConjunction(ConstraintSystem &cs,
+static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
-                              ConstraintLocator *locator,
-                              bool isIsolated = false,
-                              ArrayRef<TypeVariableType *> extraTypeVars = {}) {
+                              ConstraintLocator *locator, bool isIsolated,
+                              ArrayRef<TypeVariableType *> extraTypeVars) {
   SmallVector<Constraint *, 4> constraints;
   SmallVector<TypeVariableType *, 2> referencedVars;
   referencedVars.append(extraTypeVars.begin(), extraTypeVars.end());
@@ -335,7 +334,7 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
-  TypeVarRefCollector paramCollector(cs);
+  TypeVarRefCollector paramCollector(cs, dc, locator);
 
   // Whether we're doing completion, and the conjunction is for a
   // SingleValueStmtExpr, or one of its braces.
@@ -520,7 +519,8 @@ public:
   void createConjunction(ArrayRef<ElementInfo> elements,
                          ConstraintLocator *locator, bool isIsolated = false,
                          ArrayRef<TypeVariableType *> extraTypeVars = {}) {
-    ::createConjunction(cs, elements, locator, isIsolated, extraTypeVars);
+    ::createConjunction(cs, context.getAsDeclContext(), elements, locator,
+                        isIsolated, extraTypeVars);
   }
 
   void visitExprPattern(ExprPattern *EP) {
@@ -1520,6 +1520,9 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
 
 void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
                                            ConstraintLocatorBuilder locator) {
+  assert(!exprPatterns.empty());
+  auto *DC = exprPatterns.front()->getDeclContext();
+
   // Form a conjunction of ExprPattern elements, isolated from the rest of the
   // pattern.
   SmallVector<ElementInfo> elements;
@@ -1532,7 +1535,7 @@ void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
     elements.push_back(makeElement(EP, getConstraintLocator(EP), context));
   }
   auto *loc = getConstraintLocator(locator);
-  createConjunction(*this, elements, loc, /*isIsolated*/ true,
+  createConjunction(*this, DC, elements, loc, /*isIsolated*/ true,
                     referencedTypeVars);
 }
 
