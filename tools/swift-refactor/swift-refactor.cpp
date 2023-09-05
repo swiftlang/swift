@@ -248,8 +248,9 @@ std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
   std::vector<RenameLoc> Renames;
   llvm::transform(Locs, std::back_inserter(Renames),
                   [&](const RefactorLoc &Loc) -> RenameLoc {
-                    return {Loc.Line, Loc.Column,     Loc.Usage,        OldName,
-                            NewName,  IsFunctionLike, IsNonProtocolType};
+                    return {Loc.Line,          Loc.Column, Loc.Usage,
+                            OldName,           NewName,    IsFunctionLike,
+                            IsNonProtocolType, llvm::None};
                   });
   return Renames;
 }

@@ -907,6 +907,25 @@ private:
     return finishSourceEntity(Info.symInfo, Info.roles);
   }
 
+  bool visitCallArgName(Identifier Name, CharSourceRange Range,
+                        ValueDecl *D) override {
+    swift::ide::resolveArgName(
+        D, Name, Range, [this, Name, &Range](ParamDecl *param) {
+          if ((param->getArgumentName() == Name ||
+               param->getParameterName() == Name) &&
+              !swift::ide::isParamFromOverriddenConstructor(param)) {
+            IndexSymbol Info;
+            initIndexSymbol(param, Range.getStart(), true, Info);
+            if (startEntity(param, Info, true)) {
+              finishCurrentEntity();
+            }
+            return true;
+          }
+          return false; // Continue iterating over parameters
+        });
+    return true;
+  }
+
   bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
                                     ReferenceMetaData Data) override {
     // Index implicit callAsFunction reference.

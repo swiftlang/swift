@@ -646,6 +646,13 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                              LabelRangeType RangeType,
                              ArrayRef<CharSourceRange> LabelRanges,
                              llvm::Optional<unsigned> FirstTrailingLabel) {
+  if (ForExtArgName) {
+    if (auto decl = Node.getAsDecl()) {
+      if (auto param = dyn_cast<ParamDecl>(decl)) {
+        NameLoc = param->getArgumentNameLoc();
+      }
+    }
+  }
   skipLocsBefore(NameLoc);
   if (isDone())
     return false;

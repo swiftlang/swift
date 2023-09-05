@@ -56,6 +56,7 @@ struct RenameLoc {
   StringRef NewName; // May be empty.
   const bool IsFunctionLike;
   const bool IsNonProtocolType;
+  llvm::Optional<SourceLoc> argumentNameLoc;
 };
 
 struct RefactoringOptions {

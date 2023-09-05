@@ -1541,10 +1541,11 @@ static std::vector<RenameLoc>
 getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
   std::vector<RenameLoc> RenameLocs;
   for(const auto &Locations: RenameLocations) {
-    for(const auto &Location: Locations.LineColumnLocs) {
+    for (const auto &Location : Locations.LineColumnLocs) {
       RenameLocs.push_back({Location.Line, Location.Column,
-        getNameUsage(Location.Type), Locations.OldName, Locations.NewName,
-        Locations.IsFunctionLike, Locations.IsNonProtocolType});
+                            getNameUsage(Location.Type), Locations.OldName,
+                            Locations.NewName, Locations.IsFunctionLike,
+                            Locations.IsNonProtocolType, llvm::None});
     }
   }
   return RenameLocs;

@@ -636,6 +636,7 @@ struct RenameRefInfo {
 struct RenameInfo {
   ValueDecl *VD;
   RefactorAvailabilityInfo Availability;
+  bool isExtArgName;
 };
 
 static llvm::Optional<RefactorAvailabilityInfo>
@@ -708,11 +709,6 @@ renameAvailabilityInfo(const ValueDecl *VD,
     }
   }
 
-  // Always return local rename for parameters.
-  // FIXME: if the cursor is on the argument, we should return global rename.
-  if (isa<ParamDecl>(VD))
-    return RefactorAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
-
   // If the indexer considers VD a global symbol, then we apply global rename.
   if (index::isLocalSymbol(VD))
     return RefactorAvailabilityInfo{RefactoringKind::LocalRename, AvailKind};
@@ -746,16 +742,17 @@ getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
   if (!info)
     return llvm::None;
 
-  return RenameInfo{VD, *info};
+  return RenameInfo{VD, *info, valueCursor->isExtArgName()};
 }
 
 class RenameRangeCollector : public IndexDataConsumer {
 public:
   RenameRangeCollector(StringRef USR, StringRef newName)
-      : USR(USR), newName(newName) {}
+      : USR(USR), newName(newName), forExtArgName(false) {}
 
-  RenameRangeCollector(const ValueDecl *D, StringRef newName)
-      : newName(newName) {
+  RenameRangeCollector(const ValueDecl *D, StringRef newName,
+                       bool forExtArgName)
+      : newName(newName), forExtArgName(forExtArgName) {
     SmallString<64> SS;
     llvm::raw_svector_ostream OS(SS);
     printValueDeclUSR(D, OS);
@@ -807,6 +804,9 @@ private:
 private:
   StringRef USR;
   StringRef newName;
+  bool forExtArgName;
+
+private:
   StringScratchSpace stringStorage;
   std::vector<RenameLoc> locations;
 };
@@ -850,9 +850,21 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
   default:
     break;
   }
+
   StringRef oldName = stringStorage.copyString(symbol.name);
-  return RenameLoc{symbol.line,    symbol.column,    usage, oldName, newName,
-                   isFunctionLike, isNonProtocolType};
+  llvm::Optional<SourceLoc> argNameLoc = llvm::None;
+  if (forExtArgName) {
+    const ParamDecl *pDecl = dyn_cast<ParamDecl>(symbol.decl);
+    if (pDecl) {
+      oldName = pDecl->getArgumentName().str();
+      argNameLoc = pDecl->getArgumentNameLoc();
+    }
+  }
+
+  return RenameLoc{
+      symbol.line,    symbol.column,     usage,      oldName, newName,
+      isFunctionLike, isNonProtocolType, argNameLoc,
+  };
 }
 
 /// Get the source file that corresponds to the given buffer.
@@ -970,6 +982,9 @@ bool RefactoringActionLocalRename::isApplicable(
 static void analyzeRenameScope(ValueDecl *VD,
                                SmallVectorImpl<DeclContext *> &Scopes) {
   auto *Scope = VD->getDeclContext();
+  if (isa<ParamDecl>(VD)) {
+  Scope = Scope->getParent();
+  }
   // There may be sibling decls that the renamed symbol is visible from.
   switch (Scope->getContextKind()) {
   case DeclContextKind::GenericTypeDecl:
@@ -1035,7 +1050,8 @@ localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
   if (scopes.empty())
     return llvm::None;
 
-  RenameRangeCollector rangeCollector(info->VD, preferredName);
+  RenameRangeCollector rangeCollector(info->VD, preferredName,
+                                      info->isExtArgName);
   for (DeclContext *DC : scopes)
     indexDeclContext(DC, rangeCollector);
 
@@ -1362,11 +1378,10 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
       Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
-  RenameLoc RenameConfig = {
-    LineAndCol.first, LineAndCol.second,
-    NameUsage::Definition, /*OldName=*/Name, /*NewName=*/"",
-    IsFunctionLike, IsNonProtocolType
-  };
+  RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,
+                            NameUsage::Definition, /*OldName=*/Name,
+                            /*NewName=*/"",        IsFunctionLike,
+                            IsNonProtocolType,     llvm::None};
   RenameRangeDetailCollector Renamer(SM, Name);
   Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
   auto Ranges = Renamer.Ranges;
@@ -9014,10 +9029,19 @@ resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
   unsigned BufferID = SF.getBufferID().value();
 
   std::vector<UnresolvedLoc> UnresolvedLocs;
+  bool forExtArgName = false;
   for (const RenameLoc &RenameLoc : RenameLocs) {
     DeclNameViewer OldName(RenameLoc.OldName);
-    SourceLoc Location = SM.getLocForLineCol(BufferID, RenameLoc.Line,
-                                             RenameLoc.Column);
+    SourceLoc Location;
+    if (!forExtArgName) {
+      forExtArgName = RenameLoc.argumentNameLoc.has_value();
+    }
+    if (forExtArgName && RenameLoc.Usage == swift::ide::NameUsage::Definition) {
+      Location = RenameLoc.argumentNameLoc.value();
+    } else {
+      Location =
+          SM.getLocForLineCol(BufferID, RenameLoc.Line, RenameLoc.Column);
+    }
 
     if (!OldName.isValid()) {
       Diags.diagnose(Location, diag::invalid_name, RenameLoc.OldName);
@@ -9059,7 +9083,7 @@ resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
     });
   }
 
-  NameMatcher Resolver(SF);
+  NameMatcher Resolver(SF, forExtArgName);
   return Resolver.resolve(UnresolvedLocs, SF.getAllTokens());
 }
 
