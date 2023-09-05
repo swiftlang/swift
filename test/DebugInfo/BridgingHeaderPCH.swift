@@ -1,3 +1,5 @@
+// REQUIRES: rdar114728459
+
 // RUN: %target-swift-frontend \
 // RUN:   -emit-pch %S/Inputs/InlineBridgingHeader.h -o %t.pch 
 // RUN: %target-swift-frontend \
