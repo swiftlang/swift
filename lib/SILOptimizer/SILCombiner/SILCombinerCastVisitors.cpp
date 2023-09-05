@@ -1110,39 +1110,42 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   // %vjp' = convert_escape_to_noescape %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
   if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getOperand())) {
-    auto createConvertEscapeToNoEscape = [&](NormalDifferentiableFunctionTypeComponent extractee) {
-      if (!DFI->hasExtractee(extractee))
-        return SILValue();
+    if (DFI->hasOneUse()) {
+      auto createConvertEscapeToNoEscape =
+        [&](NormalDifferentiableFunctionTypeComponent extractee) {
+          if (!DFI->hasExtractee(extractee))
+            return SILValue();
         
-      auto operand = DFI->getExtractee(extractee);
-      auto fnType = operand->getType().castTo<SILFunctionType>();
-      auto noEscapeFnType =
-        fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
-      auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
-      return Builder.createConvertEscapeToNoEscape(
-        operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
-    };
+          auto operand = DFI->getExtractee(extractee);
+          auto fnType = operand->getType().castTo<SILFunctionType>();
+          auto noEscapeFnType =
+            fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
+          auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
+          return Builder.createConvertEscapeToNoEscape(
+            operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
+        };
     
-    SILValue originalNoEscape =
-      createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
-    SILValue convertedJVP = createConvertEscapeToNoEscape(
-      NormalDifferentiableFunctionTypeComponent::JVP);
-    SILValue convertedVJP = createConvertEscapeToNoEscape(
-      NormalDifferentiableFunctionTypeComponent::VJP);
+      SILValue originalNoEscape =
+        createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
+      SILValue convertedJVP = createConvertEscapeToNoEscape(
+        NormalDifferentiableFunctionTypeComponent::JVP);
+      SILValue convertedVJP = createConvertEscapeToNoEscape(
+        NormalDifferentiableFunctionTypeComponent::VJP);
 
-    llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
-    if (convertedJVP && convertedVJP)
-      derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
+      llvm::Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      if (convertedJVP && convertedVJP)
+        derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
 
-    auto *newDFI = Builder.createDifferentiableFunction(
-      DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
-      originalNoEscape, derivativeFunctions);
-    assert(newDFI->getType() == Cvt->getType() &&
-           "New `@differentiable` function instruction should have same type "
-           "as the old `convert_escape_to_no_escape` instruction");
-    return newDFI;
+      auto *newDFI = Builder.createDifferentiableFunction(
+        DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+        originalNoEscape, derivativeFunctions);
+      assert(newDFI->getType() == Cvt->getType() &&
+             "New `@differentiable` function instruction should have same type "
+             "as the old `convert_escape_to_no_escape` instruction");
+      return newDFI;
+    }
   }
-
+  
   return nullptr;
 }
 
