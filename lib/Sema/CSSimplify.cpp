@@ -3431,10 +3431,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // let i: Int = 0
       // (fn as (Int, Int) -> Void)(i, i)
       //
-      // Since we are not in a function argument application, so simply record
+      // Since we are not in a function argument application, simply record
       // a function type mismatch instead of an argument fix.
-      // Except for when a closure is a subexpr because missing and extraneous
-      // arg fix can properly handle closure diagnostic.
+      // Except for when a closure is a subexpr because closure expr parameters
+      // syntax can be added or removed by missing/extraneous arguments fix.
       if (loc->isForCoercion() && !isExpr<ClosureExpr>(anchor)) {
         auto *fix = ContextualMismatch::create(*this, func1, func2, loc);
         if (recordFix(fix))
