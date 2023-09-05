@@ -3543,6 +3543,18 @@ static bool isNSObjectProtocol(ProtocolDecl *proto) {
   return proto->hasClangNode();
 }
 
+static Type getTupleConformanceTypeWitness(DeclContext *dc,
+                                           AssociatedTypeDecl *assocType) {
+  auto genericSig = dc->getGenericSignatureOfContext();
+  assert(genericSig.getGenericParams().size() == 1);
+
+  auto paramTy = genericSig.getGenericParams()[0];
+  auto elementTy = DependentMemberType::get(paramTy, assocType);
+  auto expansionTy = PackExpansionType::get(elementTy, paramTy);
+
+  return TupleType::get(TupleTypeElt(expansionTy), dc->getASTContext());
+}
+
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
@@ -3583,7 +3595,15 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "typealias " << MissingTypeWitness->getName() << " = ";
+
+    if (isa<BuiltinTupleDecl>(Adopter->getSelfNominalTypeDecl())) {
+      auto expectedTy = getTupleConformanceTypeWitness(Adopter, MissingTypeWitness);
+      Printer << expectedTy.getString();
+    } else {
+      Printer << "<#type#>";
+    }
+
     Printer << "\n";
   } else {
     if (isa<ConstructorDecl>(Requirement)) {
@@ -3894,17 +3914,25 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
 
       // Issue diagnostics for witness types.
       if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
+        llvm::Optional<InFlightDiagnostic> diag;
+        if (isa<BuiltinTupleDecl>(DC->getSelfNominalTypeDecl())) {
+          auto expectedTy = getTupleConformanceTypeWitness(DC, MissingTypeWitness);
+          diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
+                                      MissingTypeWitness, expectedTy));
+        } else {
+          diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                                      MissingTypeWitness));
+        }
         if (SameFile) {
           // If the protocol member decl is in the same file of the stub,
           // we can directly associate the fixit with the note issued to the
           // requirement.
-          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-            MissingTypeWitness).fixItInsertAfter(FixitLocation, FixIt);
+          diag->fixItInsertAfter(FixitLocation, FixIt);
         } else {
+          diag.value().flush();
+
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
-          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                         MissingTypeWitness);
           if (EditorMode) {
             Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
               .fixItInsertAfter(FixitLocation, FixIt);
@@ -4687,8 +4715,19 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   }
 
   if (sig->requiresClass(depTy) &&
-      !contextType->satisfiesClassConstraint())
-    return CheckTypeWitnessResult::forLayout(module->getASTContext().getAnyObjectType());
+      !contextType->satisfiesClassConstraint()) {
+    return CheckTypeWitnessResult::forLayout(
+        module->getASTContext().getAnyObjectType());
+  }
+
+  // Tuple conformances can only witness associated types by projecting them
+  // element-wise.
+  if (isa<BuiltinTupleDecl>(dc->getSelfNominalTypeDecl())) {
+    auto expectedTy = getTupleConformanceTypeWitness(dc, assocType);
+    if (!expectedTy->isEqual(type)) {
+      return CheckTypeWitnessResult::forTuple(expectedTy);
+    }
+  }
 
   // Success!
   return CheckTypeWitnessResult::forSuccess();
@@ -4881,12 +4920,36 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
             candidate.second.getKind() == CheckTypeWitnessResult::Error)
           continue;
 
-        diags.diagnose(
-           candidate.first,
-           diag::protocol_witness_nonconform_type,
-           candidate.first->getDeclaredInterfaceType(),
-           candidate.second.getRequirement(),
-           candidate.second.getKind() != CheckTypeWitnessResult::Superclass);
+        switch (candidate.second.getKind()) {
+        case CheckTypeWitnessResult::Success:
+        case CheckTypeWitnessResult::Error:
+          llvm_unreachable("Should not end up here");
+
+        case CheckTypeWitnessResult::Conformance:
+        case CheckTypeWitnessResult::Layout:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_unsatisfied_conformance,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Superclass:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_unsatisfied_superclass,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Tuple:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_tuple,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+        }
       }
     });
 

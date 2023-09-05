@@ -68,7 +68,7 @@ protocol P {
 
 extension Tuple: P where repeat each Element: P {
   typealias A = (repeat (each Element).A)
-  typealias B = Float
+  typealias B = (repeat (each Element).B)
   func f() {}
 }
 
@@ -85,7 +85,7 @@ func same<T>(_: T, _: T) {}
 
 func useConformance() {
   same(returnsPA((1, 2, 3)), (Int, Int, Int).self)
-  same(returnsPB((1, 2, 3)), Float.self)
+  same(returnsPB((1, 2, 3)), (String, String, String).self)
 
   (1, 2, 3).f()
 }

@@ -2733,10 +2733,23 @@ NOTE(ambiguous_witnesses_wrong_name,none,
 NOTE(no_witnesses_type,none,
      "protocol requires nested type %0; add nested type %0 for conformance",
      (const AssociatedTypeDecl *))
-NOTE(default_associated_type_req_fail,none,
+NOTE(no_witnesses_type_tuple,none,
+     "protocol requires nested type %0; add type alias %0 with underlying type %1 "
+     "for conformance",
+     (const AssociatedTypeDecl *, Type))
+NOTE(default_associated_type_unsatisfied_conformance,none,
      "default type %0 for associated type %1 (from protocol %2) "
-     "does not %select{inherit from|conform to}4 %3",
-     (Type, const AssociatedTypeDecl *, Type, Type, bool))
+     "does not conform to %3",
+     (Type, const AssociatedTypeDecl *, Type, Type))
+NOTE(default_associated_type_unsatisfied_superclass,none,
+     "default type %0 for associated type %1 (from protocol %2) "
+     "does not inherit from %3",
+     (Type, const AssociatedTypeDecl *, Type, Type))
+NOTE(default_associated_type_tuple,none,
+     "default type %0 for associated type %1 (from protocol %2) "
+     "is unsuitable for tuple conformance; the associated type requirement "
+     "must be fulfilled by a type alias with underlying type %3",
+     (Type, const AssociatedTypeDecl *, Type, Type))
 ERROR(associated_type_access,none,
       "associated type in "
       "%select{a private|a fileprivate|an internal|a package|a public|%error}0 protocol "
@@ -2764,10 +2777,19 @@ WARNING(associated_type_not_usable_from_inline_warn,none,
 NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
      (const AssociatedTypeDecl *, const ProtocolDecl *))
-NOTE(associated_type_deduction_witness_failed,none,
+NOTE(associated_type_deduction_unsatisfied_conformance,none,
      "candidate would match and infer %0 = %1 if %1 "
-     "%select{inherited from|conformed to}3 %2",
-     (const AssociatedTypeDecl *, Type, Type, bool))
+     "conformed to %2",
+     (const AssociatedTypeDecl *, Type, Type))
+NOTE(associated_type_deduction_unsatisfied_superclass,none,
+     "candidate would match and infer %0 = %1 if %1 "
+     "inherited from %2",
+     (const AssociatedTypeDecl *, Type, Type))
+NOTE(associated_type_deduction_tuple,none,
+     "cannot infer %0 = %1 in tuple conformance because "
+     "the associated type requirement must be fulfilled by a type alias with "
+     "underlying type %2",
+     (const AssociatedTypeDecl *, Type, Type))
 NOTE(associated_type_witness_conform_impossible,none,
      "candidate can not infer %0 = %1 because %1 "
      "is not a nominal type and so can't conform to %2",
@@ -2858,9 +2880,17 @@ NOTE(protocol_witness_enum_case_payload, none,
 
 NOTE(protocol_witness_type,none,
      "possibly intended match", ())
-NOTE(protocol_witness_nonconform_type,none,
+NOTE(protocol_type_witness_unsatisfied_conformance,none,
      "possibly intended match %0 does not "
-     "%select{inherit from|conform to}2 %1", (Type, Type, bool))
+     "conform to %1", (Type, Type))
+NOTE(protocol_type_witness_unsatisfied_superclass,none,
+     "possibly intended match %0 does not "
+     "inherit from %1", (Type, Type))
+NOTE(protocol_type_witness_tuple,none,
+     "possibly intended match %0 is unsuitable for tuple conformance; "
+     "the associated type requirement must be fulfilled by a type alias "
+     "with underlying type %1",
+     (Type, Type))
 
 NOTE(protocol_witness_circularity,none,
      "candidate references itself", ())

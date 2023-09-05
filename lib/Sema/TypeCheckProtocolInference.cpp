@@ -1936,13 +1936,43 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
        failedDefaultedResult](NormalProtocolConformance *conformance) {
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
-        diags.diagnose(failedDefaultedAssocType,
-                       diag::default_associated_type_req_fail,
-                       failedDefaultedWitness,
-                       failedDefaultedAssocType,
-                       proto->getDeclaredInterfaceType(),
-                       failedDefaultedResult.getRequirement(),
-                       failedDefaultedResult.getKind() != CheckTypeWitnessResult::Superclass);
+
+        switch (failedDefaultedResult.getKind()) {
+        case CheckTypeWitnessResult::Success:
+        case CheckTypeWitnessResult::Error:
+          llvm_unreachable("Should not end up here");
+
+        case CheckTypeWitnessResult::Conformance:
+        case CheckTypeWitnessResult::Layout:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_unsatisfied_conformance,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Superclass:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_unsatisfied_superclass,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Tuple:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_tuple,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+        }
       });
 
     return true;
@@ -2026,11 +2056,36 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             continue;
           }
 
-          diags.diagnose(failed.Witness,
-                         diag::associated_type_deduction_witness_failed,
-                         assocType, failed.TypeWitness,
-                         failed.Result.getRequirement(),
-                         failed.Result.getKind() != CheckTypeWitnessResult::Superclass);
+          switch (failed.Result.getKind()) {
+          case CheckTypeWitnessResult::Success:
+          case CheckTypeWitnessResult::Error:
+            llvm_unreachable("Should not end up here");
+
+          case CheckTypeWitnessResult::Conformance:
+          case CheckTypeWitnessResult::Layout:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_unsatisfied_conformance,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+
+          case CheckTypeWitnessResult::Superclass:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_unsatisfied_superclass,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+
+          case CheckTypeWitnessResult::Tuple:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_tuple,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+          }
         }
       });
 

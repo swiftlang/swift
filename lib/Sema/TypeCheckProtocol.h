@@ -89,7 +89,11 @@ public:
 
     /// Type witness does not satisfy a layout requirement on
     /// the associated type.
-    Layout
+    Layout,
+
+    /// Type witness of a tuple conformance does not have the form
+    /// (repeat (each Element).A).
+    Tuple
   } kind;
 
 private:
@@ -121,6 +125,10 @@ public:
 
   static CheckTypeWitnessResult forLayout(Type reqt) {
     return CheckTypeWitnessResult(Layout, reqt);
+  }
+
+  static CheckTypeWitnessResult forTuple(Type reqt) {
+    return CheckTypeWitnessResult(Tuple, reqt);
   }
 
   Kind getKind() const { return kind; }
