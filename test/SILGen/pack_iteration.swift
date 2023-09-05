@@ -10,6 +10,15 @@ func loopBodyEnd() -> ()
 @_silgen_name("funcEnd")
 func funcEnd() -> ()
 
+@_silgen_name("condition")
+func condition() -> Bool
+
+@_silgen_name("loopContinueEnd")
+func loopContinueEnd() -> ()
+
+@_silgen_name("loopBreakEnd")
+func loopBreakEnd() -> ()
+
 enum E<T> {
   case one(T)
   case two
@@ -37,7 +46,7 @@ enum E<T> {
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
 // CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] $@pack_element("[[UUID]]") each Element, let, name "element"
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] $@pack_element("[[UUID]]") each Element, let, name "el"
 // CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
 // CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
@@ -48,8 +57,8 @@ enum E<T> {
 // CHECK: br [[LOOP_DEST]]([[IDX4]] : $Builtin.Word)
 //
 // CHECK: } // end sil function '$s14pack_iteration14iterateTrivial4overyxxQp_tRvzlF'
-func iterateTrivial<each Element>(over elements: repeat each Element) {
-  for element in repeat each elements {
+func iterateTrivial<each Element>(over element: repeat each Element) {
+  for el in repeat each element {
     loopBodyEnd()
   }
   funcEnd()
@@ -140,4 +149,80 @@ func iteratePatternMatch<each Element>(over element: repeat E<each Element>) {
   funcEnd()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration20iterateContinueBreak4overyxxQp_tRvzlF : $@convention(thin) <each Element> (@pack_guaranteed Pack{repeat each Element}) -> () {
+// CHECK: bb0([[PACK:%.*]] : $*Pack{repeat each Element}):
+// CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [[IDX2:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [[PACK_LENGTH:%.*]] = pack_length $Pack{repeat each Element}
+// CHECK: br [[LOOP_DEST:bb[0-9]+]]([[IDX1]] : $Builtin.Word)
+//
+// CHECK: [[LOOP_DEST]]([[IDX3:%.*]] : $Builtin.Word):
+// CHECK: [[COND:%.*]] = builtin "cmp_eq_Word"([[IDX3]] : $Builtin.Word, [[PACK_LENGTH]] : $Builtin.Word) : $Builtin.Int1
+// CHECK: cond_br [[COND]], [[NONE_BB:bb[0-9]+]], [[SOME_BB:bb[0-9]+]]
+//
+// CHECK: [[SOME_BB]]:
+// CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] $@pack_element("[[UUID]]") each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: [[COND_FUNC:%.*]] = function_ref @condition : $@convention(thin) () -> Bool
+// CHECK: [[BOOL:%.*]] = apply [[COND_FUNC]]() : $@convention(thin) () -> Bool
+// CHECK: [[IF:%.*]] = struct_extract [[BOOL]] : $Bool, #Bool._value
+// CHECK: cond_br [[IF]], [[LOOP_BREAK:bb[0-9]+]], [[LOOP_CONDITION:bb[0-9]+]]
+//
+// CHECK: [[LOOP_BREAK]]:
+// CHECK: [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
+// CHECK: apply [[LOOP_BREAK_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// br [[FUNC_END:bb[0-9]+]]
+//
+// CHECK: [[LOOP_CONDITION]]:
+// CHECK: [[LOOP_CONDITION_FUNC:%.*]] = function_ref @condition : $@convention(thin) () -> Bool
+// CHECK: [[BOOL:%.*]] = apply [[LOOP_CONDITION_FUNC]]() : $@convention(thin) () -> Bool
+// CHECK: [[IF:%.*]] = struct_extract [[BOOL]] : $Bool, #Bool._value
+// CHECK: cond_br [[IF]], [[LOOP_CONTINUE:bb[0-9]+]], [[LOOP_BODY_END:bb[0-9]+]]
+//
+// CHECK: [[LOOP_CONTINUE]]:
+// CHECK: [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
+// CHECK: apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: br [[LATCH:bb[0-9]+]]
+//
+// CHECK: [[LOOP_BODY_END]]:
+// CHECK: [[LOOP_BODY_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
+// CHECK: apply [[LOOP_BODY_END_FUNC]]() : $@convention(thin) () -> ()
+// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: br [[LATCH]]
+//
+// CHECK: [[NONE_BB]]:
+// CHECK: br [[FUNC_END_BB:bb[0-9]+]]
+//
+// CHECK: [[FUNC_END_BB]]
+// CHECK: [[FUNC_END_FUNC:%.*]] = function_ref @funcEnd : $@convention(thin) () -> ()
+// CHECK: apply [[FUNC_END_FUNC]]() : $@convention(thin) () -> ()
+//
+// CHECK: [[LATCH]]:
+// CHECK: [[ADD_WORD:%.*]] = builtin "add_Word"([[IDX3]] : $Builtin.Word, [[IDX2]] : $Builtin.Word) : $Builtin.Word
+// CHECK: br [[LOOP_DEST]]([[ADD_WORD]] : $Builtin.Word)
+// CHECK: } // end sil function '$s14pack_iteration20iterateContinueBreak4overyxxQp_tRvzlF'
+func iterateContinueBreak<each Element>(over element: repeat each Element) {
+  for el in repeat each element {
+    if (condition()) {
+      loopBreakEnd()
+      break
+    }
+
+    if (condition()) {
+      loopContinueEnd()
+      continue
+    }
+    loopBodyEnd()
+  }
+
+  funcEnd()
+}
 

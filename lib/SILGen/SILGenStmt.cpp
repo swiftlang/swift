@@ -1257,6 +1257,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
     JumpDest loopDest = createJumpDest(S->getBody());
 
+    // Set the destinations for 'break' and 'continue'.
+    JumpDest endDest = createJumpDest(S->getBody());
+
     SGF.emitDynamicPackLoop(
         SILLocation(expansion), formalPackType, 0,
         expansion->getGenericEnvironment(),
@@ -1267,10 +1270,16 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
               SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
 
           SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
+
+          SGF.BreakContinueDestStack.push_back({S, endDest, loopDest});
           visit(S->getBody());
+          SGF.BreakContinueDestStack.pop_back();
+
           return;
         },
         loopDest.getBlock());
+
+    emitOrDeleteBlock(SGF, endDest, S);
 
     return;
   }
