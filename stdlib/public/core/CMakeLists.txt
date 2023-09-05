@@ -177,7 +177,9 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
 
   Synchronization/Atomic.swift
+  Synchronization/AtomicBool.swift
   Synchronization/AtomicMemoryOrderings.swift
+  Synchronization/AtomicRawRepresentable.swift
   Synchronization/AtomicValue.swift
   Synchronization/Lock.swift
 
@@ -209,10 +211,14 @@ set(SWIFTLIB_ESSENTIAL
   MigrationSupport.swift)
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
-  Synchronization/AtomicInt.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
+
+  Synchronization/AtomicImpl.swift.gyb
+  Synchronization/AtomicInt.swift.gyb
+  Synchronization/AtomicIntegers.swift.gyb
+
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )

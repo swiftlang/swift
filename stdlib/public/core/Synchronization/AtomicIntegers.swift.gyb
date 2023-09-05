@@ -1,0 +1,382 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift Atomics open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  from SwiftAtomics import *
+
+  integerTypes = [
+    # Swift        Storage64        Storage32
+    ("Int8",       "Int8",          "Int8"),
+    ("Int16",      "Int16",         "Int16"),
+    ("Int32",      "Int32",         "Int32"),
+    ("Int64",      "Int64",         "Int64"),
+    ("UInt8",      "UInt8",         "UInt8"),
+    ("UInt16",     "UInt16",        "UInt16"),
+    ("UInt32",     "UInt32",        "UInt32"),
+    ("UInt64",     "UInt64",        "UInt64"),
+    ("Int",        "Int",           "Int"),
+    ("UInt",       "UInt",          "UInt"),
+  ]
+}%
+
+% for (SwiftType, storage64, storage32) in integerTypes:
+%   for (variant, StorageType) in bitwidth_variants(storage64, storage32):
+
+%{
+   def decode(name):
+     if swiftType == storageType:
+       return name
+     if swiftType == "U" + storageType:
+       return swiftType + "(bitPattern: " + name + ")"
+     if swiftType == "Int" or swiftType == "UInt":
+       return swiftType + "(" + name + "._value)"
+     return "unsafeBitCast(" + name + ", to: " + swiftType + ".self)"
+
+   def encode(name):
+     if swiftType == storageType:
+       return name
+     if swiftType == "U" + storageType:
+       return storageType + "(bitPattern: " + name + ")"
+     if swiftType == "Int" or swiftType == "UInt":
+       return storageType + "(" + name + "._value)"
+     return "unsafeBitCast(" + name + ", to: " + storageType + ".self)"
+}%
+
+${archConditionStart(variant)}
+
+@available(SwiftStdlib 5.10, *)
+extension ${SwiftType}: AtomicValue {
+  public typealias AtomicStorage = ${SwiftType}
+
+  @available(SwiftStdlib 5.10, *)
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  public consuming func _encodeAtomicStorage() -> ${SwiftType} {
+    self
+  }
+
+  /// Prepare this atomic storage value for deinitialization, extracting the
+  /// logical value it represents. This invalidates this atomic storage; you
+  /// must not perform any operations on it after this call (except for
+  /// deinitialization).
+  ///
+  /// This call prevents resource leaks when destroying the storage
+  /// representation of certain `AtomicValue` types. (In particular, ones that
+  /// model strong references.)
+  ///
+  /// Note: This is not an atomic operation. Logically, it implements a custom
+  /// destructor for the underlying non-copiable value.
+  @available(SwiftStdlib 5.10, *)
+  @inline(__always)
+  @_alwaysEmitIntoClient
+  public static func _decodeAtomicStorage(
+    _ storage: consuming ${SwiftType}
+  ) -> ${SwiftType} {
+    storage
+  }
+
+  /// Atomically loads and returns the value referenced by the given pointer,
+  /// applying the specified memory ordering.
+  ///
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `prepareAtomicRepresentation(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The current value referenced by `pointer`.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public static func _atomicLoad(
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    ordering: AtomicLoadOrdering
+  ) -> ${SwiftType} {
+    address._atomicLoad(ordering: ordering)
+  }
+
+  /// Atomically sets the value referenced by `pointer` to `desired`,
+  /// applying the specified memory ordering.
+  ///
+  /// - Parameter desired: The desired new value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `prepareAtomicRepresentation(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public static func _atomicStore(
+    _ desired: consuming ${SwiftType},
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    ordering: AtomicStoreOrdering
+  ) {
+    address._atomicStore(desired, ordering: ordering)
+  }
+
+  /// Atomically sets the value referenced by `pointer` to `desired` and returns
+  /// the original value, applying the specified memory ordering.
+  ///
+  /// - Parameter desired: The desired new value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `prepareAtomicRepresentation(for:)`.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public static func _atomicExchange(
+    _ desired: consuming ${SwiftType},
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    address._atomicExchange(desired, ordering: ordering)
+  }
+
+  /// Perform an atomic compare and exchange operation on the value referenced
+  /// by `pointer`, applying the specified success/failure memory orderings.
+  ///
+  /// This operation performs the following algorithm as a single atomic
+  /// transaction:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// The `successOrdering` argument specifies the memory ordering to use when
+  /// the operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// This method implements a "strong" compare and exchange operation
+  /// that does not permit spurious failures.
+  ///
+  /// - Parameter expected: The expected current value.
+  /// - Parameter desired: The desired new value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `prepareSelf(for:)`.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation if it does not perform the exchange.
+  /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
+  ///   the exchange was successful, and `original` is the original value.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public static func _atomicCompareExchange(
+    expected: ${SwiftType},
+    desired: consuming ${SwiftType},
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    successOrdering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: ${SwiftType}) {
+    address._atomicCompareExchange(
+      expected: expected,
+      desired: desired,
+      successOrdering: successOrdering,
+      failureOrdering: failureOrdering
+    )
+  }
+
+  /// Perform an atomic weak compare and exchange operation on the value
+  /// referenced by `pointer`, applying the specified success/failure memory
+  /// orderings. This compare-exchange variant is allowed to spuriously fail; it
+  /// is designed to be called in a loop until it indicates a successful
+  /// exchange has happened.
+  ///
+  /// This operation performs the following algorithm as a single atomic
+  /// transaction:
+  ///
+  /// ```
+  /// atomic(self) { currentValue in
+  ///   let original = currentValue
+  ///   guard original == expected else { return (false, original) }
+  ///   currentValue = desired
+  ///   return (true, original)
+  /// }
+  /// ```
+  ///
+  /// (In this weak form, transient conditions may cause the `original ==
+  /// expected` check to sometimes return false when the two values are in fact
+  /// the same.)
+  ///
+  /// The `successOrdering` argument specifies the memory ordering to use when the
+  /// operation manages to update the current value, while `failureOrdering`
+  /// will be used when the operation leaves the value intact.
+  ///
+  /// - Parameter expected: The expected current value.
+  /// - Parameter desired: The desired new value.
+  /// - Parameter pointer: A memory location previously initialized with a value
+  ///   returned by `prepareAtomicRepresentation(for:)`.
+  /// - Parameter successOrdering: The memory ordering to apply if this
+  ///    operation performs the exchange.
+  /// - Parameter failureOrdering: The memory ordering to apply on this
+  ///    operation if it does not perform the exchange.
+  /// - Returns: A tuple `(exchanged, original)`, where `exchanged` is true if
+  ///   the exchange was successful, and `original` is the original value.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public static func _atomicWeakCompareExchange(
+    expected: ${SwiftType},
+    desired: consuming ${SwiftType},
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    successOrdering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: ${SwiftType}) {
+    address._atomicWeakCompareExchange(
+      expected: expected,
+      desired: desired,
+      successOrdering: successOrdering,
+      failureOrdering: failureOrdering
+    )
+  }
+}
+
+extension ${SwiftType} {
+% for (name, cname, op, label, doc) in integerOperations:
+% defaultValue = " = 1" if label != "" else ""
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  @discardableResult
+  public static func _atomicLoadThen${name}(
+    ${label} operand: ${SwiftType}${defaultValue},
+    at address: UnsafeMutablePointer<${SwiftType}>,
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    address._atomicLoadThen${name}(
+      ${argLabel(label)}operand,
+      ordering: ordering
+    )
+  }
+% end
+}
+
+@available(SwiftStdlib 5.10, *)
+extension Atomic where Value == ${SwiftType} {
+% for (name, _, op, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the original value, applying
+  /// the specified memory ordering.
+  ///
+% if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `${SwiftType}` values.
+  ///
+% end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public func loadThen${name}(
+    ${label} operand: ${SwiftType}${" = 1" if "crement" in name else ""},
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    ${SwiftType}._atomicLoadThen${name}(
+      ${argLabel(label)}operand,
+      at: value.address,
+      ordering: ordering
+    )
+  }
+% end
+
+% for (name, _, op, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the new value, applying
+  /// the specified memory ordering.
+  ///
+% if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `${SwiftType}` values.
+  ///
+% end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The new value after the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public func ${lowerFirst(name)}ThenLoad(
+    ${label} operand: Value${" = 1" if "crement" in name else ""},
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    let original = ${SwiftType}._atomicLoadThen${name}(
+      ${argLabel(label)}operand,
+      at: value.address,
+      ordering: ordering
+    )
+
+    return original ${op} operand
+  }
+% end
+
+  /// Perform an atomic wrapping increment operation applying the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&+=` operator does on `${SwiftType}` values.
+  ///
+  /// - Parameter operand: The value to add to the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public func wrappingIncrement(
+    by operand: Value = 1,
+    ordering: AtomicUpdateOrdering
+  ) {
+    _ = ${SwiftType}._atomicLoadThenWrappingIncrement(
+      by: operand,
+      at: value.address,
+      ordering: ordering
+    )
+  }
+
+  /// Perform an atomic wrapping decrement operation applying the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&-=` operator does on `${SwiftType}` values.
+  ///
+  /// - Parameter operand: The value to subtract from the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  public func wrappingDecrement(
+    by operand: Value = 1,
+    ordering: AtomicUpdateOrdering
+  ) {
+    _ = ${SwiftType}._atomicLoadThenWrappingDecrement(
+      by: operand,
+      at: value.address,
+      ordering: ordering
+    )
+  }
+}
+
+${archConditionEnd(variant)}
+
+%   end
+% end

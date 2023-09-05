@@ -249,7 +249,11 @@
   ],
   "Synchronization": [
     "Atomic.swift",
+    "AtomicBool.swift",
+    "AtomicImpl.swift",
+    "AtomicIntegers.swift",
     "AtomicMemoryOrderings.swift",
+    "AtomicRawRepresentable.swift",
     "AtomicValue.swift",
     "Lock.swift"
   ]

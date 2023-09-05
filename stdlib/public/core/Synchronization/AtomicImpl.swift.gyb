@@ -1,0 +1,205 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift Atomics open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% from SwiftAtomics import *
+
+% for (SwiftType, builtin64, builtin32) in atomicTypes:
+%   for (variant, builtinType) in bitwidth_variants(builtin64, builtin32):
+
+${archConditionStart(variant)}
+
+extension UnsafeMutablePointer where Pointee == ${SwiftType} {
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  func _atomicLoad(ordering: AtomicLoadOrdering) -> ${SwiftType} {
+    switch ordering {
+% for (enumOrder, apiOrder, _, llvmOrder) in loadOrderings:
+    case .${enumOrder}:
+      return ${SwiftType}(Builtin.atomicload_${llvmOrder}_${builtinType}(_rawValue))
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  func _atomicStore(
+    _ desired: ${SwiftType},
+    ordering: AtomicStoreOrdering
+  ) {
+    switch ordering {
+% for (enumOrder, apiOrder, _, llvmOrder) in storeOrderings:
+    case .${enumOrder}:
+      Builtin.atomicstore_${llvmOrder}_${builtinType}(_rawValue, desired._value)
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  func _atomicExchange(
+    _ desired: ${SwiftType},
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    switch ordering {
+% for (enumOrder, _, _, llvmOrder, _) in updateOrderings:
+    case .${enumOrder}:
+      let oldValue = Builtin.atomicrmw_xchg_${llvmOrder}_${builtinType}(
+        _rawValue,
+        desired._value
+      )
+
+      return ${SwiftType}(oldValue)
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_transparent
+  @_alwaysEmitIntoClient
+  func _atomicCompareExchange(
+    expected: ${SwiftType},
+    desired: ${SwiftType},
+    ordering: AtomicUpdateOrdering
+  ) -> (expected: Bool, original: ${SwiftType}) {
+    switch ordering {
+% for (enumOrder, _, _, llvmOrder, failureOrder) in updateOrderings:
+    case .${enumOrder}:
+      let (oldValue, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_${builtinType}(
+        _rawValue,
+        expected._value,
+        desired._value
+      )
+
+      return (expected: Bool(won), original: ${SwiftType}(oldValue))
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_alwaysEmitIntoClient
+  @_transparent
+  func _atomicCompareExchange(
+    expected: ${SwiftType},
+    desired: ${SwiftType},
+    successOrdering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: ${SwiftType}) {
+    // FIXME: LLVM doesn't support arbitrary ordering combinations
+    // yet, so upgrade the success ordering when necessary so that it
+    // is at least as "strong" as the failure case.
+    switch (successOrdering, failureOrdering) {
+% for (swiftSuccess, apiSuccess, _, llvmOrder, _) in updateOrderings:
+%   for (swiftFailure, apiFailure, _, llvmFailOrder) in loadOrderings:
+    case (.${swiftSuccess}, .${swiftFailure}):
+      let (oldValue, won) = Builtin.cmpxchg_${actualOrders(llvmOrder, llvmFailOrder)}_${builtinType}(
+        _rawValue,
+        expected._value,
+        desired._value
+      )
+
+      return (exchanged: Bool(won), original: ${SwiftType}(oldValue))
+%   end
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_alwaysEmitIntoClient
+  @_transparent
+  func _atomicWeakCompareExchange(
+    expected: ${SwiftType},
+    desired: ${SwiftType},
+    successOrdering: AtomicUpdateOrdering,
+    failureOrdering: AtomicLoadOrdering
+  ) -> (exchanged: Bool, original: ${SwiftType}) {
+    // FIXME: LLVM doesn't support arbitrary ordering combinations
+    // yet, so upgrade the success ordering when necessary so that it
+    // is at least as "strong" as the failure case.
+    switch (successOrdering, failureOrdering) {
+% for (swiftSuccess, apiSuccess, _, llvmOrder, _) in updateOrderings:
+%   for (swiftFailure, apiFailure, _, llvmFailOrder) in loadOrderings:
+    case (.${swiftSuccess}, .${swiftFailure}):
+      let (oldValue, won) = Builtin.cmpxchg_${actualOrders(llvmOrder, llvmFailOrder)}_weak_${builtinType}(
+        _rawValue,
+        expected._value,
+        desired._value
+      )
+
+      return (exchanged: Bool(won), original: ${SwiftType}(oldValue))
+%   end
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+}
+
+extension UnsafeMutablePointer where Pointee == ${SwiftType} {
+% for (swiftName, builtinName, operator, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the new value,
+  /// with the specified memory ordering.
+  ///
+  % if "Wrapping" in swiftName:
+  /// - Note: This operation silently wraps around on overflow, like the
+  /// `${operator}` operator does on `UInt` values.
+  ///
+  % end
+  /// - Returns: The original value before the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_semantics("atomics.requires_constant_orderings")
+  @_alwaysEmitIntoClient
+  @_transparent
+  @usableFromInline
+  func _atomicLoadThen${swiftName}(
+    ${label} operand: ${SwiftType},
+    ordering: AtomicUpdateOrdering
+  ) -> ${SwiftType} {
+    switch ordering {
+% for (enumOrder, apiOrder, _, llvmOrder, failureOrder) in updateOrderings:
+    case .${enumOrder}:
+      let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_${builtinType}(
+        _rawValue,
+        operand._value
+      )
+
+      return ${SwiftType}(value)
+% end
+    default:
+      fatalError("Unsupported ordering")
+    }
+  }
+% end
+}
+
+${archConditionEnd(variant)}
+
+%   end
+% end
