@@ -505,7 +505,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 #if SWIFT_SWIFT_PARSER
   if (queuedDiagnostics) {
     char *renderedString = nullptr;
-    ptrdiff_t renderedStringLen = 0;
+    SwiftInt renderedStringLen = 0;
     swift_ASTGen_renderQueuedDiagnostics(
         queuedDiagnostics, /*contextSize=*/2, ForceColors ? 1 : 0,
         &renderedString, &renderedStringLen);
