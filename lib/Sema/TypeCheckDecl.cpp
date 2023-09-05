@@ -2938,28 +2938,12 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
-  if (isa<BuiltinTupleDecl>(nominal) &&
-      typealias->getUnderlyingType()->isEqual(
+  if (typealias->getUnderlyingType()->isEqual(
         nominal->getSelfInterfaceType())) {
     return true;
   }
 
-  auto boundGenericType = typealias->getUnderlyingType()
-      ->getAs<BoundGenericType>();
-  if (!boundGenericType) return false;
-
-  // If our arguments line up with our innermost generic parameters, it's
-  // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
-  auto boundArgs = boundGenericType->getGenericArgs();
-  if (boundArgs.size() != innermostGenericParams.size())
-    return false;
-
-  return std::equal(boundArgs.begin(), boundArgs.end(),
-                    innermostGenericParams.begin(),
-                    [](Type arg, GenericTypeParamType *gp) {
-                      return arg->isEqual(gp);
-                    });
+  return false;
 }
 
 Type
