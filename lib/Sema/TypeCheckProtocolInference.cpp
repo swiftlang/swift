@@ -1407,10 +1407,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       // witness failure and we haven't seen one already, write it down.
       auto *defaultedAssocType = witness.getDefaultedAssocType();
       if (defaultedAssocType && !failedDefaultedAssocType &&
-          !failed.isError()) {
+          failed.getKind() != CheckTypeWitnessResult::Error) {
         failedDefaultedAssocType = defaultedAssocType;
         failedDefaultedWitness = type;
-        failedDefaultedResult = std::move(failed);
+        failedDefaultedResult = failed;
       }
 
       return assocType;
@@ -1942,7 +1942,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                        failedDefaultedAssocType,
                        proto->getDeclaredInterfaceType(),
                        failedDefaultedResult.getRequirement(),
-                       failedDefaultedResult.isConformanceRequirement());
+                       failedDefaultedResult.getKind() != CheckTypeWitnessResult::Superclass);
       });
 
     return true;
@@ -1977,12 +1977,12 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         diags.diagnose(assocType, diag::bad_associated_type_deduction,
                        assocType, proto);
         for (const auto &failed : failedSet) {
-          if (failed.Result.isError())
+          if (failed.Result.getKind() == CheckTypeWitnessResult::Error)
             continue;
 
           if ((!failed.TypeWitness->getAnyNominal() ||
                failed.TypeWitness->isExistentialType()) &&
-              failed.Result.isConformanceRequirement()) {
+              failed.Result.getKind() != CheckTypeWitnessResult::Superclass) {
             Type resultType;
             SourceRange typeRange;
             if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
@@ -2018,7 +2018,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             continue;
           }
           if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
-              failed.Result.isSuperclassRequirement()) {
+              failed.Result.getKind() == CheckTypeWitnessResult::Superclass) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_inherit_impossible,
                            assocType, failed.TypeWitness,
@@ -2030,7 +2030,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                          diag::associated_type_deduction_witness_failed,
                          assocType, failed.TypeWitness,
                          failed.Result.getRequirement(),
-                         failed.Result.isConformanceRequirement());
+                         failed.Result.getKind() != CheckTypeWitnessResult::Superclass);
         }
       });
 

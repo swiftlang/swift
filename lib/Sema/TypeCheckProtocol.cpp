@@ -4613,7 +4613,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   auto &ctx = assocType->getASTContext();
 
   if (type->hasError())
-    return ErrorType::get(ctx);
+    return CheckTypeWitnessResult::forError();
 
   const auto proto = Conf->getProtocol();
   const auto dc = Conf->getDeclContext();
@@ -4624,14 +4624,14 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
       ctx.isRecursivelyConstructingRequirementMachine(proto) ||
       proto->isComputingRequirementSignature())
-    return ErrorType::get(ctx);
+    return CheckTypeWitnessResult::forError();
 
   // No move-only type can witness an associatedtype requirement.
   if (type->isPureMoveOnly()) {
     // describe the failure reason as it not conforming to Copyable
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
     assert(copyable && "missing _Copyable protocol!");
-    return CheckTypeWitnessResult(copyable->getDeclaredInterfaceType());
+    return CheckTypeWitnessResult::forConformance(copyable);
   }
 
   const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
@@ -4656,7 +4656,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
         superclass = dc->mapTypeIntoContext(superclass);
     }
     if (!superclass->isExactSuperclassOf(contextType))
-      return superclass;
+      return CheckTypeWitnessResult::forSuperclass(superclass);
   }
 
   auto *module = dc->getParentModule();
@@ -4668,7 +4668,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
             /*allowMissing=*/reqProto->isSpecificProtocol(
                 KnownProtocolKind::Sendable))
             .isInvalid())
-      return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
+      return CheckTypeWitnessResult::forConformance(reqProto);
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
     // build unless we fail here while inferring an associated type
@@ -4681,17 +4681,17 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
           decl->getGenericEnvironmentOfContext());
       for (auto replacement : subMap.getReplacementTypes()) {
         if (replacement->hasError())
-          return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
+          return CheckTypeWitnessResult::forConformance(reqProto);
       }
     }
   }
 
   if (sig->requiresClass(depTy) &&
       !contextType->satisfiesClassConstraint())
-    return CheckTypeWitnessResult(module->getASTContext().getAnyObjectType());
+    return CheckTypeWitnessResult::forLayout(module->getASTContext().getAnyObjectType());
 
   // Success!
-  return CheckTypeWitnessResult();
+  return CheckTypeWitnessResult::forSuccess();
 }
 
 ResolveWitnessResult
@@ -4878,7 +4878,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
         if (candidate.first->getDeclaredInterfaceType()->hasError() ||
-            candidate.second.isError())
+            candidate.second.getKind() == CheckTypeWitnessResult::Error)
           continue;
 
         diags.diagnose(
@@ -4886,7 +4886,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
            diag::protocol_witness_nonconform_type,
            candidate.first->getDeclaredInterfaceType(),
            candidate.second.getRequirement(),
-           candidate.second.isConformanceRequirement());
+           candidate.second.getKind() != CheckTypeWitnessResult::Superclass);
       }
     });
 
