@@ -1227,3 +1227,69 @@ entry(%instance : @owned $AnyObject):
   %82 = tuple ()
   return %82 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_borrow_none :
+// CHECK:       alloc_stack
+// CHECK-NOT:   alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_borrow_none'
+sil [ossa] @test_enum_store_borrow_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %2 = store_borrow %none to %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %2 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  end_borrow %2 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_store_none :
+// CHECK:       alloc_stack
+// CHECK-NOT:   alloc_stack
+// CHECK:       dealloc_stack
+// CHECK-LABEL: } // end sil function 'test_enum_store_none'
+sil [ossa] @test_enum_store_none : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack [lexical] $FakeOptional<Klass>
+  %none = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %none to [init] %1 : $*FakeOptional<Klass>
+  %3 = alloc_stack $FakeOptional<Klass>
+  %4 = load [copy] %1 : $*FakeOptional<Klass>
+  store %4 to [init] %3 : $*FakeOptional<Klass>
+  switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1:
+  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %8 = load [take] %7 : $*Klass
+  destroy_value %8 : $Klass
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*FakeOptional<Klass>
+  dealloc_stack %1 : $*FakeOptional<Klass>
+  %t = tuple ()
+  return %t : $()
+}
