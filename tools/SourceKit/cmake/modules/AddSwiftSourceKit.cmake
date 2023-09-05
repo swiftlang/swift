@@ -115,12 +115,6 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
                    LINK_FLAGS " -lobjc ")
 
     endif() # HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE
-
-    if(SWIFT_SWIFT_PARSER)
-      # Add rpath to the host Swift libraries.
-      file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
-      list(APPEND RPATH_LIST "@loader_path/${relative_hostlib_path}")
-    endif()
   elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
     if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
@@ -156,15 +150,19 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
     else()
       message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
     endif()
+  endif()
 
-    if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_SWIFT_PARSER)
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # Add rpath to the host Swift libraries.
+      file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
+      list(APPEND RPATH_LIST "@loader_path/${relative_hostlib_path}")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD")
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")
     endif()
-  endif()
 
-  if(SWIFT_SWIFT_PARSER)
     # For the "end step" of bootstrapping configurations on Darwin, need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -436,7 +434,6 @@ macro(add_sourcekit_framework name)
     file(RELATIVE_PATH relative_lib_path
       "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
     list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
-    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}/swift/host")
 
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
@@ -472,7 +469,6 @@ macro(add_sourcekit_framework name)
     file(RELATIVE_PATH relative_lib_path
       "${framework_location}" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
     list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
-    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}/swift/host")
 
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
@@ -564,7 +560,6 @@ macro(add_sourcekit_xpc_service name framework_target)
 
   file(RELATIVE_PATH relative_lib_path "${xpc_bin_dir}" "${lib_dir}")
   list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
-  list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}/swift/host")
 
   # Add rpath for sourcekitdInProc
   # lib/${framework_target}.framework/Versions/A/XPCServices/${name}.xpc/Contents/MacOS/${name}
