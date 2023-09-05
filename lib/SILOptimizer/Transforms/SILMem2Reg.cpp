@@ -203,13 +203,6 @@ public:
     return LiveValues::forOwned({stored, move});
   }
 
-  static LiveValues forValues(SILValue stored, SILValue lexical) {
-    if (stored->getOwnershipKind() == OwnershipKind::Guaranteed) {
-      return LiveValues::forGuaranteed({stored, lexical});
-    }
-    return LiveValues::forOwned({stored, lexical});
-  }
-
   static LiveValues toReplace(AllocStackInst *asi, SILValue replacement) {
     if (replacement->getOwnershipKind() == OwnershipKind::Guaranteed) {
       return LiveValues::forGuaranteed(Guaranteed::toReplace(asi, replacement));
@@ -1290,7 +1283,9 @@ StackAllocationPromoter::getLiveOutValues(BasicBlockSetVector &phiBlocks,
       auto *inst = it->second;
       auto stored = inst->getOperand(CopyLikeInstruction::Src);
       auto lexical = getLexicalValueForStore(inst, asi);
-      return LiveValues::forValues(stored, lexical);
+      return isa<StoreBorrowInst>(inst)
+                 ? LiveValues::forGuaranteed(stored, lexical)
+                 : LiveValues::forOwned(stored, lexical);
     }
 
     // If there is a Phi definition in this block:
