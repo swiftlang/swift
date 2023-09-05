@@ -17,6 +17,9 @@
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -diagnostic-style=swift -load-plugin-library %t/%target-library-name(MacroDefinition)  -module-name MacroUser -DTEST_DIAGNOSTICS %s > %t/pretty-macro-diagnostics.txt 2>&1
+// RUN: %FileCheck %s --check-prefix PRETTY-DIAGS < %t/pretty-macro-diagnostics.txt
+
 // Debug info SIL testing
 // RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
@@ -239,6 +242,13 @@ func testNested() {
 // CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
 // CHECK-DIAGS: @__swiftmacro_9MacroUser10testNestedyyF9stringifyfMf_9assertAnyfMf_.swift:1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
 // CHECK-DIAGS-NOT: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+
+  // PRETTY-DIAGS: 1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+  // PRETTY-DIAGS: macro_expand.swift:{{.*}}:39: note: expanded code originates here
+  // PRETTY-DIAGS: ─── macro expansion #stringify
+  // PRETTY-DIAGS: ─── macro expansion #assertAny
+  // PRETTY-DIAGS-NEXT: 1 │ assert(Nested())
+  // PRETTY-DIAGS-NEXT:   │        ╰─ error: cannot convert value
 }
 #endif
 
