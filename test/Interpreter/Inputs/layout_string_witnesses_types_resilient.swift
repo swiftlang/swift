@@ -25,6 +25,11 @@ public enum ResilientSinglePayloadEnumGeneric<T> {
     case nonEmpty(T)
 }
 
+public enum ResilientSinglePayloadEnumIndirect {
+    case empty
+    indirect case nonEmpty(AnyObject)
+}
+
 public enum ResilientMultiPayloadEnumGeneric<T> {
     case empty0
     case empty1
@@ -53,6 +58,14 @@ public enum ResilientSinglePayloadEnumSimple {
 
 public enum ResilientSingletonEnum {
     case nonEmpty(AnyObject)
+}
+
+public func getResilientSinglePayloadEnumIndirectEmpty() -> ResilientSinglePayloadEnumIndirect {
+    return .empty
+}
+
+public func getResilientSinglePayloadEnumIndirectNonEmpty(_ x: AnyObject) -> ResilientSinglePayloadEnumIndirect {
+    return .nonEmpty(x)
 }
 
 public func getResilientSinglePayloadEnumGenericEmpty0<T>(_ t: T.Type) -> ResilientSinglePayloadEnumGeneric<T> {
