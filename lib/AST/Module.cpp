@@ -3155,6 +3155,7 @@ bool SourceFile::hasTestableOrPrivateImport(
   case AccessLevel::Internal:
   case AccessLevel::Package:
   case AccessLevel::Public:
+  case AccessLevel::Open:
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
@@ -3173,8 +3174,6 @@ bool SourceFile::hasTestableOrPrivateImport(
                    desc.options.contains(ImportFlags::PrivateImport);
           }
         });
-  case AccessLevel::Open:
-    return true;
   case AccessLevel::FilePrivate:
   case AccessLevel::Private:
     // Fallthrough.
