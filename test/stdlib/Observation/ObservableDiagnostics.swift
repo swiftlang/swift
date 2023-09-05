@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -plugin-path %swift-host-lib-dir/plugins
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -enable-experimental-feature ExtensionMacros -plugin-path %swift-plugin-dir
 
 // REQUIRES: observation
 // REQUIRES: concurrency
