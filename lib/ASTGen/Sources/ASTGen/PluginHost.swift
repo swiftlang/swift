@@ -269,6 +269,8 @@ class PluginDiagnosticsEngine {
     case .error: bridgedSeverity = .error
     case .note: bridgedSeverity = .note
     case .warning: bridgedSeverity = .warning
+    case .remark: bridgedSeverity = .remark
+    @unknown default: bridgedSeverity = .error
     }
 
     // Emit the diagnostic
