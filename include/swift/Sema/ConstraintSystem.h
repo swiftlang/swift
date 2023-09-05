@@ -6238,18 +6238,22 @@ public:
   }
 };
 
-/// Find any references to not yet resolved outer VarDecls (including closure
-/// parameters) used in the body of a conjunction element (e.g closures, taps,
-/// if/switch expressions). This is required because isolated conjunctions, just
-/// like single-expression closures, have to be connected to type variables they
-/// are going to use, otherwise they'll get placed in a separate solver
-/// component and would never produce a solution.
-class VarRefCollector : public ASTWalker {
+/// Find any references to external type variables used in the body of a
+/// conjunction element (e.g closures, taps, if/switch expressions).
+///
+/// This includes:
+/// - Not yet resolved outer VarDecls (including closure parameters)
+///
+/// This is required because isolated conjunctions, just like single-expression
+/// closures, have to be connected to type variables they are going to use,
+/// otherwise they'll get placed in a separate solver component and would never
+/// produce a solution.
+class TypeVarRefCollector : public ASTWalker {
   ConstraintSystem &CS;
   llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
 
 public:
-  VarRefCollector(ConstraintSystem &cs) : CS(cs) {}
+  TypeVarRefCollector(ConstraintSystem &cs) : CS(cs) {}
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);

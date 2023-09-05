@@ -866,7 +866,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void VarRefCollector::inferTypeVars(Decl *D) {
+void TypeVarRefCollector::inferTypeVars(Decl *D) {
   // We're only interested in VarDecls.
   if (!isa_and_nonnull<VarDecl>(D))
     return;
@@ -881,7 +881,7 @@ void VarRefCollector::inferTypeVars(Decl *D) {
 }
 
 ASTWalker::PreWalkResult<Expr *>
-VarRefCollector::walkToExprPre(Expr *expr) {
+TypeVarRefCollector::walkToExprPre(Expr *expr) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
     inferTypeVars(DRE->getDecl());
 
@@ -1304,7 +1304,7 @@ namespace {
           // in the tap body, otherwise tap expression is going
           // to get disconnected from the context.
           if (auto *body = tap->getBody()) {
-            VarRefCollector refCollector(CS);
+            TypeVarRefCollector refCollector(CS);
 
             body->walk(refCollector);
 
@@ -2938,7 +2938,7 @@ namespace {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      VarRefCollector refCollector(CS);
+      TypeVarRefCollector refCollector(CS);
       // Walk the capture list if this closure has one,  because it could
       // reference declarations from the outer closure.
       if (auto *captureList =

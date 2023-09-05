@@ -335,7 +335,7 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
-  VarRefCollector paramCollector(cs);
+  TypeVarRefCollector paramCollector(cs);
 
   // Whether we're doing completion, and the conjunction is for a
   // SingleValueStmtExpr, or one of its braces.
