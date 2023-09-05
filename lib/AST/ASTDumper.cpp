@@ -506,7 +506,7 @@ public:
 
       auto label = arg.getLabel();
       if (!label.empty()) {
-        printField("label", label.str(), ArgumentsColor);
+        printField(label.str(), "label", ArgumentsColor);
       }
       printFlag(arg.isInOut(), "inout", ArgModifierColor);
 
@@ -527,12 +527,12 @@ public:
     printFlag(argList->isImplicit(), "implicit", ArgModifierColor);
 
     if (argList->hasAnyArgumentLabels()) {
-      printFieldRaw("labels", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         for (auto arg : *argList) {
           auto label = arg.getLabel();
           OS << (label.empty() ? "_" : label.str()) << ":";
         }
-      }, ArgumentsColor);
+      }, "labels", ArgumentsColor);
     }
 
     for (auto arg : *argList) {
@@ -597,8 +597,8 @@ public:
 
   // Print a field with a value.
   template<typename Fn>
-  void printFieldRaw(StringRef name, Fn body,
-                             TerminalColor color = FieldLabelColor) {
+  void printFieldRaw(Fn body, StringRef name,
+                      TerminalColor color = FieldLabelColor) {
     OS << " ";
     if (!name.empty())
       PrintWithColorRAII(OS, color) << name << "=";
@@ -607,25 +607,22 @@ public:
 
   // Print a field with a value.
   template<typename T>
-  void printField(StringRef name, const T &value,
+  void printField(const T &value, StringRef name,
                           TerminalColor color = FieldLabelColor) {
-    printFieldRaw(name, [&](raw_ostream &OS) {
-      OS << value;
-    }, color);
+    printFieldRaw([&](raw_ostream &OS) { OS << value; }, name, color);
   }
 
   // Print a field with a value.
   template<typename T>
-  void printFieldQuoted(StringRef name, const T &value,
+  void printFieldQuoted(const T &value, StringRef name,
                                 TerminalColor color = FieldLabelColor) {
-    printFieldRaw(name, [&](raw_ostream &OS) {
-      OS << '\'' << value << '\'';;
-    }, color);
+    printFieldRaw([&](raw_ostream &OS) { OS << '\'' << value << '\''; }, name,
+                   color);
   }
 
   // Print a single flag.
   void printFlag(StringRef name, TerminalColor color = FieldLabelColor) {
-    printField("", name, color);
+    printField(name, "", color);
   }
 
   // Print a single flag if it is set.
@@ -640,18 +637,18 @@ public:
     if (!L.isValid() || !Ctx)
       return;
 
-    printFieldRaw(label, [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       L.print(OS, Ctx->SourceMgr);
-    }, LocationColor);
+    }, label, LocationColor);
   }
 
   void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
     if (!R.isValid() || !Ctx)
       return;
 
-    printFieldRaw("range", [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       R.print(OS, Ctx->SourceMgr, /*PrintText=*/false);
-    }, RangeColor);
+    }, "range", RangeColor);
   }
 
   template <typename Fn>
@@ -680,17 +677,15 @@ public:
     }
   }
 
-  void printDeclNameField(StringRef name, const ValueDecl *D) {
-    printFieldRaw(name, [&](raw_ostream &os) {
+  void printDeclNameField(const ValueDecl *D, StringRef name) {
+    printFieldRaw([&](raw_ostream &os) {
       printDeclName(D, /*leadingSpace=*/false);
-    });
+    }, name);
   }
 
-  void printDeclRefField(StringRef label, ConcreteDeclRef declRef,
+  void printDeclRefField(ConcreteDeclRef declRef, StringRef label,
                          TerminalColor Color = DeclColor) {
-    printFieldRaw(label, [&](raw_ostream &OS) {
-      declRef.dump(OS);
-    }, Color);
+    printFieldRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label, Color);
   }
 
   };
@@ -706,7 +701,7 @@ public:
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
       if (P->hasType()) {
-        printFieldQuoted("type", P->getType(), TypeColor);
+        printFieldQuoted(P->getType(), "type", TypeColor);
       }
     }
 
@@ -718,13 +713,13 @@ public:
     void visitTuplePattern(TuplePattern *P, StringRef label) {
       printCommon(P, "pattern_tuple", label);
 
-      printFieldRaw("names", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         interleave(P->getElements(), OS,
                    [&](const TuplePatternElt &elt) {
                      auto name = elt.getLabel();
                      OS << (name.empty() ? "''" : name.str());
                    }, ",");
-      });
+      }, "names");
 
       for (auto &elt : P->getElements()) {
         printRec(elt.getPattern());
@@ -754,8 +749,8 @@ public:
 
     void visitIsPattern(IsPattern *P, StringRef label) {
       printCommon(P, "pattern_is", label);
-      printField("cast_kind", getDumpString(P->getCastKind()));
-      printField("cast_to", P->getCastType(), TypeColor);
+      printField(getDumpString(P->getCastKind()), "cast_kind");
+      printField(P->getCastType(), "cast_to", TypeColor);
       if (auto sub = P->getSubPattern()) {
         printRec(sub);
       }
@@ -777,11 +772,12 @@ public:
     void visitEnumElementPattern(EnumElementPattern *P, StringRef label) {
       printCommon(P, "pattern_enum_element", label);
 
-      printFieldRaw("element", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         OS << '.';
         PrintWithColorRAII(OS, IdentifierColor) << P->getName();
-      });
+      }, "element");
+
       if (P->hasSubPattern()) {
         printRec(P->getSubPattern());
       }
@@ -812,11 +808,11 @@ public:
                                 ) {
       const auto printWhere = [&](const TrailingWhereClause *Where) {
         if (Where) {
-          printFieldRaw("where_requirements", [&](raw_ostream &OS) {
+          printFieldRaw([&](raw_ostream &OS) {
             OS << '\'';
             Where->print(OS, /*printWhereKeyword*/ false);
             OS << '\'';
-          });
+          }, "where_requirements");
         }
       };
 
@@ -842,11 +838,11 @@ public:
     void printInherited(InheritedTypes Inherited) {
       if (Inherited.empty())
         return;
-      printFieldRaw("inherits", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         interleave(Inherited.getEntries(), OS,
                    [&](InheritedEntry Super) { Super.getType().print(OS); },
                    ", ");
-      });
+      }, "inherits");
     }
 
   public:
@@ -855,9 +851,9 @@ public:
 
       printFlag(ID->isExported(), "exported");
       if (ID->getImportKind() != ImportKind::Module)
-        printField("kind", getDumpString(ID->getImportKind()));
+        printField(getDumpString(ID->getImportKind()), "kind");
 
-      printFieldRaw("module", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         OS << '\'';
         // Check if module aliasing was used for the given imported module; for
         // example, if '-module-alias Foo=Bar' was passed and this module has
@@ -865,7 +861,7 @@ public:
         ImportPath::Builder scratch;
         ID->getRealImportPath(scratch).print(OS);
         OS << '\'';
-      }, IdentifierColor);
+      }, "module", IdentifierColor);
 
       printFoot();
     }
@@ -888,45 +884,48 @@ public:
       if (auto underlying = TAD->getCachedUnderlyingType()) {
         typeStr = underlying.getString();
       }
-      printField("type", typeStr, TypeColor);
+      printField(typeStr, "type", TypeColor);
       printWhereRequirements(TAD);
       printFoot();
     }
 
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD, StringRef label) {
       printCommon(OTD, "opaque_type", label);
-      printDeclNameField("naming_decl", OTD->getNamingDecl());
-      printFieldRaw("opaque_interface", [&](raw_ostream &OS) {
+
+      printDeclNameField(OTD->getNamingDecl(), "naming_decl");
+      printFieldRaw([&](raw_ostream &OS) {
         OS << OTD->getDeclaredInterfaceType() << " in "
            << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
 
-      }, TypeColor);
+      }, "opaque_interface", TypeColor);
+
       if (auto underlyingSubs = OTD->getUniqueUnderlyingTypeSubstitutions()) {
         printRec(*underlyingSubs);
       }
+
       printFoot();
     }
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl, StringRef label) {
       printCommon(decl, "generic_type_param", label);
-      printField("depth", decl->getDepth());
-      printField("index", decl->getIndex());
+      printField(decl->getDepth(), "depth");
+      printField(decl->getIndex(), "index");
       printFoot();
     }
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl, StringRef label) {
       printCommon(decl, "associated_type_decl", label);
       if (auto defaultDef = decl->getDefaultDefinitionType()) {
-        printField("default", defaultDef);
+        printField(defaultDef, "default");
       }
       printWhereRequirements(decl);
       if (decl->overriddenDeclsComputed()) {
-        printFieldRaw("overridden", [&](raw_ostream &OS) {
+        printFieldRaw([&](raw_ostream &OS) {
           interleave(decl->getOverriddenDecls(), OS,
                      [&](AssociatedTypeDecl *overridden) {
                        OS << overridden->getProtocol()->getName();
                      }, ", ");
-        });
+        }, "overridden");
       }
 
       printFoot();
@@ -940,7 +939,8 @@ public:
         auto requirements = PD->getRequirementSignatureAsGenericSignature();
         reqSigStr = requirements->getAsString();
       }
-      printField("requirement signature", reqSigStr);
+      printField(reqSigStr, "requirement signature");
+
       printCommonPost(PD);
     }
 
@@ -948,9 +948,9 @@ public:
       if (!Params)
         return;
 
-      printFieldRaw("", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         Params->print(OS);
-      }, TypeColor);
+      }, "", TypeColor);
     }
 
     void printCommon(ValueDecl *VD, const char *Name, StringRef Label,
@@ -966,24 +966,24 @@ public:
         printGenericParameters(MD->getParsedGenericParams());
 
       if (VD->hasInterfaceType()) {
-        printFieldQuoted("interface type", VD->getInterfaceType(),
+        printFieldQuoted(VD->getInterfaceType(), "interface type",
                          InterfaceTypeColor);
       }
 
       if (VD->hasAccess()) {
-        printField("access", getDumpString(VD->getFormalAccess()),
+        printField(getDumpString(VD->getFormalAccess()), "access",
                    AccessLevelColor);
       }
 
       if (VD->overriddenDeclsComputed()) {
         auto overridden = VD->getOverriddenDecls();
         if (!overridden.empty()) {
-          printFieldRaw("override", [&](raw_ostream &OS) {
+          printFieldRaw([&](raw_ostream &OS) {
             interleave(overridden, OS,
                        [&](ValueDecl *overridden) {
                          overridden->dumpRef(OS);
                        }, ", ");
-          }, OverrideColor);
+          }, "override", OverrideColor);
         }
       }
 
@@ -994,11 +994,11 @@ public:
       printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
       printFlag(attrs.hasAttribute<DynamicAttr>(), "dynamic");
       if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
-        printFieldRaw("", [&](raw_ostream &OS) {
+        printFieldRaw([&](raw_ostream &OS) {
           OS << "@_dynamicReplacement(for: \"";
           OS << attr->getReplacedFunctionName();
           OS << "\")";
-        });
+        }, "");
       }
       auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
       if (!lifetimeString.empty())
@@ -1079,14 +1079,14 @@ public:
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
-        printField("readImpl", getDumpString(impl.getReadImpl()),
+        printField(getDumpString(impl.getReadImpl()), "readImpl",
                    DeclModifierColor);
         if (!impl.supportsMutation()) {
           printFlag("immutable", DeclModifierColor);
         } else {
-          printField("writeImpl", getDumpString(impl.getWriteImpl()),
+          printField(getDumpString(impl.getWriteImpl()), "writeImpl",
                      DeclModifierColor);
-          printField("readWriteImpl", getDumpString(impl.getReadWriteImpl()),
+          printField(getDumpString(impl.getReadWriteImpl()), "readWriteImpl",
                      DeclModifierColor);
         }
       }
@@ -1103,9 +1103,9 @@ public:
 
       printDeclName(PD);
       if (!PD->getArgumentName().empty())
-        printField("apiName", PD->getArgumentName(), IdentifierColor);
+        printField(PD->getArgumentName(), "apiName", IdentifierColor);
       if (PD->hasInterfaceType()) {
-        printFieldQuoted("interface type", PD->getInterfaceType(),
+        printFieldQuoted(PD->getInterfaceType(), "interface type",
                          InterfaceTypeColor);
       }
 
@@ -1128,14 +1128,13 @@ public:
       printFlag(PD->isNoImplicitCopy(), "noImplicitCopy");
 
       if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None) {
-        printField("default_arg",
-                   getDumpString(PD->getDefaultArgumentKind()));
+        printField(getDumpString(PD->getDefaultArgumentKind()), "default_arg");
       }
       if (PD->hasDefaultExpr() &&
           !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
-        printFieldRaw("", [&](raw_ostream &OS) {
+        printFieldRaw([&](raw_ostream &OS) {
           PD->getDefaultArgumentCaptureInfo().print(OS);
-        }, CapturesColor);
+        }, "", CapturesColor);
       }
       
       printFlag(PD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
@@ -1215,9 +1214,9 @@ public:
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
       if (!D->getCaptureInfo().isTrivial()) {
-        printFieldRaw("", [&](raw_ostream &OS) {
+        printFieldRaw([&](raw_ostream &OS) {
           D->getCaptureInfo().print(OS);
-        });
+        }, "");
       }
 
       printFlag(D->getAttrs().hasAttribute<NonisolatedAttr>(), "nonisolated",
@@ -1245,11 +1244,11 @@ public:
         printRecRaw([&](StringRef label) {
           printHead("foreign_async_convention", ASTNodeColor, label);
           if (auto type = fac->completionHandlerType())
-            printField("completion_handler_type", type, TypeColor);
-          printField("completion_handler_param",
-                     fac->completionHandlerParamIndex());
+            printField(type, "completion_handler_type", TypeColor);
+          printField(fac->completionHandlerParamIndex(),
+                     "completion_handler_param");
           if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
-            printField("error_param", *errorParamIndex);
+            printField(*errorParamIndex, "error_param");
           printFoot();
         }, "");
       }
@@ -1257,7 +1256,7 @@ public:
       if (auto fec = D->getForeignErrorConvention()) {
         printRecRaw([&](StringRef label) {
           printHead("foreign_error_convention", ASTNodeColor, label);
-          printField("kind", getDumpString(fec->getKind()));
+          printField(getDumpString(fec->getKind()), "kind");
 
           bool wantResultType = (
             fec->getKind() == ForeignErrorConvention::ZeroResult ||
@@ -1265,10 +1264,10 @@ public:
 
           printFlag(getDumpString(fec->isErrorOwned()));
 
-          printField("param", fec->getErrorParameterIndex());
-          printField("paramtype", fec->getErrorParameterType());
+          printField(fec->getErrorParameterIndex(), "param");
+          printField(fec->getErrorParameterType(), "paramtype");
           if (wantResultType)
-            printField("resulttype", fec->getResultType());
+            printField(fec->getResultType(), "resulttype");
           printFoot();
         }, "");
       }
@@ -1303,7 +1302,7 @@ public:
     void visitAccessorDecl(AccessorDecl *AD, StringRef label) {
       printCommonFD(AD, "accessor_decl", label);
       printFlag(getDumpString(AD->getAccessorKind()));
-      printDeclNameField("for", AD->getStorage());
+      printDeclNameField(AD->getStorage(), "for");
       printAbstractFunctionDecl(AD);
       printFoot();
     }
@@ -1313,9 +1312,9 @@ public:
       printFlag(CD->isRequired(), "required", DeclModifierColor);
       printFlag(getDumpString(CD->getInitKind()), DeclModifierColor);
       if (CD->isFailable())
-        printField("failable", (CD->isImplicitlyUnwrappedOptional()
-                                ? "ImplicitlyUnwrappedOptional"
-                                : "Optional"), DeclModifierColor);
+        printField((CD->isImplicitlyUnwrappedOptional()
+                         ? "ImplicitlyUnwrappedOptional"
+                         : "Optional"), "failable", DeclModifierColor);
       printAbstractFunctionDecl(CD);
       printFoot();
     }
@@ -1342,8 +1341,7 @@ public:
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, StringRef label) {
       printCommon(PDD, "pound_diagnostic_decl", label);
-      auto kind = PDD->isError() ? "error" : "warning";
-      printField("kind", kind);
+      printField(PDD->isError() ? "error" : "warning", "kind");
       printRec(PDD->getMessage());
       printFoot();
     }
@@ -1351,11 +1349,11 @@ public:
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, StringRef label) {
       printCommon(PGD, "precedence_group_decl", label);
       printName(PGD->getName());
-      printField("associativity", getDumpString(PGD->getAssociativity()));
-      printField("assignment", getDumpString(PGD->isAssignment()));
+      printField(getDumpString(PGD->getAssociativity()), "associativity");
+      printField(getDumpString(PGD->isAssignment()), "assignment");
 
-      auto printRelations =
-          [&](StringRef name, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
+      auto printRelationsRec =
+          [&](ArrayRef<PrecedenceGroupDecl::Relation> rels, StringRef name) {
         if (rels.empty()) return;
         printRecRaw([&](StringRef label) {
           printHead(name, FieldLabelColor, label);
@@ -1364,8 +1362,8 @@ public:
           printFoot();
         }, "");
       };
-      printRelations("higherThan", PGD->getHigherThan());
-      printRelations("lowerThan", PGD->getLowerThan());
+      printRelationsRec(PGD->getHigherThan(), "higherThan");
+      printRelationsRec(PGD->getLowerThan(), "lowerThan");
 
       printFoot();
     }
@@ -1374,7 +1372,7 @@ public:
       printCommon(IOD, "infix_operator_decl", label);
       printName(IOD->getName());
       if (!IOD->getPrecedenceGroupName().empty())
-        printField("precedence_group_name", IOD->getPrecedenceGroupName());
+        printField(IOD->getPrecedenceGroupName(), "precedence_group_name");
       printFoot();
     }
 
@@ -1800,7 +1798,7 @@ public:
 
   void visitPoundAssertStmt(PoundAssertStmt *S, StringRef label) {
     printCommon(S, "pound_assert", label);
-    printField("message", QuotedString(S->getMessage()));
+    printField(QuotedString(S->getMessage()), "message");
     printRec(S->getCondition());
     printFoot();
   }
@@ -1851,7 +1849,7 @@ public:
     printHead(C, ExprColor, label);
 
     printFlag(E->isImplicit(), "implicit", ExprModifierColor);
-    printFieldQuoted("type", GetTypeOfExpr(E).getString(PO), TypeColor);
+    printFieldQuoted(GetTypeOfExpr(E).getString(PO), "type", TypeColor);
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -1884,15 +1882,14 @@ public:
     printFoot();
   }
 
-  void printInitializerField(StringRef label, ConcreteDeclRef declRef) {
-    printFieldRaw(label, [&](raw_ostream &OS) {
-      declRef.dump(OS);
-    }, ExprModifierColor);
+  void printInitializerField(ConcreteDeclRef declRef, StringRef label) {
+    printFieldRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
+                  ExprModifierColor);
   }
 
   void visitNilLiteralExpr(NilLiteralExpr *E, StringRef label) {
     printCommon(E, "nil_literal_expr", label);
-    printInitializerField("initializer", E->getInitializer());
+    printInitializerField(E->getInitializer(), "initializer");
     printFoot();
   }
 
@@ -1902,23 +1899,23 @@ public:
     printFlag(E->isNegative(), "negative", LiteralValueColor);
     Type T = GetTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
-      printField("value", E->getDigitsText(), LiteralValueColor);
+      printField(E->getDigitsText(), "value", LiteralValueColor);
     else
-      printField("value", E->getValue(), LiteralValueColor);
-    printInitializerField("builtin_initializer", E->getBuiltinInitializer());
-    printInitializerField("initializer", E->getInitializer());
-    
+      printField(E->getValue(), "value", LiteralValueColor);
+    printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
+    printInitializerField(E->getInitializer(), "initializer");
+
     printFoot();
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E, StringRef label) {
     printCommon(E, "float_literal_expr", label);
     
     printFlag(E->isNegative(), "negative", LiteralValueColor);
-    printField("value", E->getDigitsText(), LiteralValueColor);
-    printInitializerField("builtin_initializer", E->getBuiltinInitializer());
-    printInitializerField("initializer", E->getInitializer());
+    printField(E->getDigitsText(), "value", LiteralValueColor);
+    printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
+    printInitializerField(E->getInitializer(), "initializer");
     if (!E->getBuiltinType().isNull()) {
-      printField("builtin_type", E->getBuiltinType(), ExprModifierColor);
+      printField(E->getBuiltinType(), "builtin_type", ExprModifierColor);
     }
     
     printFoot();
@@ -1927,21 +1924,21 @@ public:
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, StringRef label) {
     printCommon(E, "boolean_literal_expr", label);
     
-    printField("value", getDumpString(E->getValue()), LiteralValueColor);
-    printInitializerField("builtin_initializer", E->getBuiltinInitializer());
-    printInitializerField("initializer", E->getInitializer());
-    
+    printField(getDumpString(E->getValue()), "value", LiteralValueColor);
+    printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
+    printInitializerField(E->getInitializer(), "initializer");
+
     printFoot();
   }
 
   void visitStringLiteralExpr(StringLiteralExpr *E, StringRef label) {
     printCommon(E, "string_literal_expr", label);
     
-    printField("encoding", getDumpString(E->getEncoding()), ExprModifierColor);
-    printField("value", QuotedString(E->getValue()), LiteralValueColor);
-    printInitializerField("builtin_initializer", E->getBuiltinInitializer());
-    printInitializerField("initializer", E->getInitializer());
-    
+    printField(getDumpString(E->getEncoding()), "encoding", ExprModifierColor);
+    printField(QuotedString(E->getValue()), "value", LiteralValueColor);
+    printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
+    printInitializerField(E->getInitializer(), "initializer");
+
     printFoot();
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef label) {
@@ -1952,11 +1949,11 @@ public:
       auto &Ctx = Ty->getASTContext();
       printSourceLoc(E->getTrailingQuoteLoc(), &Ctx, "trailing_quote_loc");
     }
-    printField("literal_capacity", E->getLiteralCapacity(), ExprModifierColor);
-    printField("interpolation_count", E->getInterpolationCount(),
+    printField(E->getLiteralCapacity(), "literal_capacity", ExprModifierColor);
+    printField(E->getInterpolationCount(), "interpolation_count",
                ExprModifierColor);
-    printInitializerField("builder_init", E->getBuilderInit());
-    printInitializerField("result_init", E->getInitializer());
+    printInitializerField(E->getBuilderInit(), "builder_init");
+    printInitializerField(E->getInitializer(), "result_init");
 
     printRec(E->getAppendingExpr());
 
@@ -1965,31 +1962,31 @@ public:
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, StringRef label) {
     printCommon(E, "magic_identifier_literal_expr", label);
     
-    printField("kind", getDumpString(E->getKind()), ExprModifierColor);
+    printField(getDumpString(E->getKind()), "kind", ExprModifierColor);
 
     if (E->isString()) {
-      printField("encoding", getDumpString(E->getStringEncoding()),
+      printField(getDumpString(E->getStringEncoding()), "encoding",
                  ExprModifierColor);
     }
-    printInitializerField("builtin_initializer", E->getBuiltinInitializer());
-    printInitializerField("initializer", E->getInitializer());
-    
+    printInitializerField(E->getBuiltinInitializer(), "builtin_initializer");
+    printInitializerField(E->getInitializer(), "initializer");
+
     printFoot();
   }
   void visitRegexLiteralExpr(RegexLiteralExpr *E, StringRef label) {
     printCommon(E, "regex_literal_expr", label);
     
-    printField("text", QuotedString(E->getRegexText()), LiteralValueColor);
-    printInitializerField("initializer", E->getInitializer());
-    
+    printField(QuotedString(E->getRegexText()), "text", LiteralValueColor);
+    printInitializerField(E->getInitializer(), "initializer");
+
     printFoot();
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E, StringRef label) {
     printCommon(E, "object_literal", label);
 
-    printField("kind", getDumpString(E->getLiteralKind()));
-    printInitializerField("initializer", E->getInitializer());
+    printField(getDumpString(E->getLiteralKind()), "kind");
+    printInitializerField(E->getInitializer(), "initializer");
 
     printRec(E->getArgs());
     
@@ -2004,10 +2001,10 @@ public:
   void visitDeclRefExpr(DeclRefExpr *E, StringRef label) {
     printCommon(E, "declref_expr", label);
 
-    printDeclRefField("decl", E->getDeclRef());
+    printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
-    printField("function_ref", getDumpString(E->getFunctionRefKind()),
+    printField(getDumpString(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
 
     printFoot();
@@ -2020,7 +2017,7 @@ public:
   void visitTypeExpr(TypeExpr *E, StringRef label) {
     printCommon(E, "type_expr", label);
 
-    printFieldRaw("typerepr", [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       if (E->getTypeRepr()) {
         OS << '\'';
         E->getTypeRepr()->print(OS);
@@ -2028,31 +2025,29 @@ public:
       }
       else
         OS << "<null>";
-    }, TypeReprColor);
+    }, "typerepr", TypeReprColor);
 
     printFoot();
   }
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E, StringRef label) {
     printCommon(E, "other_constructor_ref_expr", label);
-    printDeclRefField("decl", E->getDeclRef());
+    printDeclRefField(E->getDeclRef(), "decl");
     printFoot();
   }
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E, StringRef label) {
     printCommon(E, "overloaded_decl_ref_expr", label);
 
-    printField("name", E->getDecls()[0]->getBaseName(), IdentifierColor);
-    printField("number_of_decls", E->getDecls().size(), ExprModifierColor);
-    printField("function_ref", getDumpString(E->getFunctionRefKind()),
+    printField(E->getDecls()[0]->getBaseName(), "name", IdentifierColor);
+    printField(E->getDecls().size(), "number_of_decls", ExprModifierColor);
+    printField(getDumpString(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
 
     if (!E->isForOperator()) {
       for (auto D : E->getDecls()) {
         printRecRaw([&](StringRef label) {
           printHead("candidate_decl", DeclModifierColor, label);
-          printNameRaw([&](raw_ostream &OS) {
-            D->dumpRef(OS);
-          });
+          printNameRaw([&](raw_ostream &OS) { D->dumpRef(OS); });
           printFoot();
         }, "");
       }
@@ -2063,8 +2058,8 @@ public:
   void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E, StringRef label) {
     printCommon(E, "unresolved_decl_ref_expr", label);
 
-    printField("name", E->getName(), IdentifierColor);
-    printField("function_ref", getDumpString(E->getFunctionRefKind()),
+    printField(E->getName(), "name", IdentifierColor);
+    printField(getDumpString(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
 
     printFoot();
@@ -2083,7 +2078,7 @@ public:
   void visitMemberRefExpr(MemberRefExpr *E, StringRef label) {
     printCommon(E, "member_ref_expr", label);
 
-    printDeclRefField("decl", E->getMember());
+    printDeclRefField(E->getMember(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
     printFlag(E->isSuper(), "super");
@@ -2094,7 +2089,7 @@ public:
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, StringRef label) {
     printCommon(E, "dynamic_member_ref_expr", label);
 
-    printDeclRefField("decl", E->getMember());
+    printDeclRefField(E->getMember(), "decl");
 
     printRec(E->getBase());
 
@@ -2103,8 +2098,8 @@ public:
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E, StringRef label) {
     printCommon(E, "unresolved_member_expr", label);
 
-    printField("name", E->getName(), ExprModifierColor);
-    printField("function_ref", getDumpString(E->getFunctionRefKind()),
+    printField(E->getName(), "name", ExprModifierColor);
+    printField(getDumpString(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
     printFoot();
   }
@@ -2147,13 +2142,13 @@ public:
     printCommon(E, "tuple_expr", label);
 
     if (E->hasElementNames()) {
-      printFieldRaw("names", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         interleave(E->getElementNames(), OS,
                    [&](Identifier name) {
                      OS << (name.empty()?"''":name.str());
                    },
                    ",");
-      }, IdentifierColor);
+      }, "names", IdentifierColor);
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
@@ -2172,7 +2167,7 @@ public:
   void visitArrayExpr(ArrayExpr *E, StringRef label) {
     printCommon(E, "array_expr", label);
 
-    printInitializerField("initializer", E->getInitializer());
+    printInitializerField(E->getInitializer(), "initializer");
 
     for (auto elt : E->getElements()) {
       printRec(elt);
@@ -2183,7 +2178,7 @@ public:
   void visitDictionaryExpr(DictionaryExpr *E, StringRef label) {
     printCommon(E, "dictionary_expr", label);
 
-    printInitializerField("initializer", E->getInitializer());
+    printInitializerField(E->getInitializer(), "initializer");
 
     for (auto elt : E->getElements()) {
       printRec(elt);
@@ -2198,7 +2193,7 @@ public:
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
     printFlag(E->isSuper(), "super");
     if (E->hasDecl()) {
-      printDeclRefField("decl", E->getDecl());
+      printDeclRefField(E->getDecl(), "decl");
     }
 
     printRec(E->getBase());
@@ -2215,7 +2210,7 @@ public:
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E, StringRef label) {
     printCommon(E, "dynamic_subscript_expr", label);
 
-    printDeclRefField("decl", E->getMember());
+    printDeclRefField(E->getMember(), "decl");
 
     printRec(E->getBase());
     printRec(E->getArgs());
@@ -2225,8 +2220,8 @@ public:
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E, StringRef label) {
     printCommon(E, "unresolved_dot_expr", label);
 
-    printField("field", E->getName());
-    printField("function_ref", getDumpString(E->getFunctionRefKind()),
+    printField(E->getName(), "field");
+    printField(getDumpString(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
 
     if (E->getBase()) {
@@ -2238,7 +2233,7 @@ public:
   void visitTupleElementExpr(TupleElementExpr *E, StringRef label) {
     printCommon(E, "tuple_element_expr", label);
 
-    printField("field #", E->getFieldNumber());
+    printField(E->getFieldNumber(), "field #");
 
     printRec(E->getBase());
 
@@ -2295,7 +2290,7 @@ public:
   void visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E, StringRef label) {
     printCommon(E, "conditional_bridge_from_objc_expr", label);
 
-    printDeclRefField("conversion", E->getConversion());
+    printDeclRefField(E->getConversion(), "conversion");
 
     printRec(E->getSubExpr());
 
@@ -2502,28 +2497,28 @@ public:
     if (hasNonStandardOutput())
       (void)E->getDiscriminator();
 
-    printField("discriminator", E->getRawDiscriminator(), DiscriminatorColor);
+    printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
 
     switch (auto isolation = E->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
       break;
 
     case ClosureActorIsolation::ActorInstance:
-      printField("actor_isolated", isolation.getActorInstance()->printRef(),
+      printField(isolation.getActorInstance()->printRef(), "actor_isolated",
                  CapturesColor);
       break;
 
     case ClosureActorIsolation::GlobalActor:
-      printField("global_actor_isolated",
-                 isolation.getGlobalActor().getString(),
+      printField(isolation.getGlobalActor().getString(),
+                "global_actor_isolated",
                  CapturesColor);
       break;
     }
 
     if (!E->getCaptureInfo().isTrivial()) {
-      printFieldRaw("", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         E->getCaptureInfo().print(OS);
-      }, CapturesColor);
+      }, "", CapturesColor);
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
@@ -2594,19 +2589,19 @@ public:
 
   void visitDefaultArgumentExpr(DefaultArgumentExpr *E, StringRef label) {
     printCommon(E, "default_argument_expr", label);
-    printFieldRaw("default_args_owner", [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       E->getDefaultArgsOwner().dump(OS);
-    });
-    printField("param", E->getParamIndex());
+    }, "default_args_owner");
+    printField(E->getParamIndex(), "param");
     printFoot();
   }
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName, StringRef label) {
     printCommon(E, NodeName, label);
     if (E->isThrowsSet()) {
-      printFlag(E->throws() ? " throws" : " nothrow", ExprModifierColor);
+      printFlag(E->throws() ? "throws" : "nothrow", ExprModifierColor);
     }
-    printFieldRaw("isolation_crossing", [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       auto isolationCrossing = E->getIsolationCrossing();
       if (isolationCrossing.has_value()) {
         OS << "{caller='";
@@ -2617,7 +2612,7 @@ public:
       } else {
         OS << "none";
       }
-    }, ExprModifierColor);
+    }, "isolation_crossing", ExprModifierColor);
 
     printRec(E->getFn());
     printRec(E->getArgs());
@@ -2655,14 +2650,14 @@ public:
 
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
       printFlag(getDumpString(checkedCast->getCastKind()));
-    printFieldRaw("written_type", [&](raw_ostream &OS) {
+    printFieldRaw([&](raw_ostream &OS) {
       OS << "'";
       if (GetTypeOfTypeRepr)
         GetTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
       else
         E->getCastType().print(OS);
       OS << "'";
-    }, TypeReprColor);
+    }, "written_type", TypeReprColor);
 
     printRec(E->getSubExpr());
     printFoot();
@@ -2721,7 +2716,7 @@ public:
   }
   void visitBindOptionalExpr(BindOptionalExpr *E, StringRef label) {
     printCommon(E, "bind_optional_expr", label);
-    printField("depth", E->getDepth());
+    printField(E->getDepth(), "depth");
     printRec(E->getSubExpr());
     printFoot();
   }
@@ -2781,8 +2776,8 @@ public:
   void visitObjCSelectorExpr(ObjCSelectorExpr *E, StringRef label) {
     printCommon(E, "objc_selector_expr", label);
 
-    printField("kind", getDumpString(E->getSelectorKind()));
-    printDeclRefField("decl", E->getMethod());
+    printField(getDumpString(E->getSelectorKind()), "kind");
+    printDeclRefField(E->getMethod(), "decl");
 
     printRec(E->getSubExpr());
 
@@ -2818,17 +2813,17 @@ public:
 
           case KeyPathExpr::Component::Kind::Property:
             printHead("property", ASTNodeColor);
-            printDeclRefField("decl", component.getDeclRef());
+            printDeclRefField(component.getDeclRef(), "decl");
             break;
 
           case KeyPathExpr::Component::Kind::Subscript:
             printHead("subscript", ASTNodeColor);
-            printDeclRefField("decl", component.getDeclRef());
+            printDeclRefField(component.getDeclRef(), "decl");
             break;
 
           case KeyPathExpr::Component::Kind::UnresolvedProperty:
             printHead("unresolved_property", ASTNodeColor);
-            printFieldQuoted("decl_name", component.getUnresolvedDeclName(),
+            printFieldQuoted(component.getUnresolvedDeclName(), "decl_name",
                              IdentifierColor);
             break;
 
@@ -2841,18 +2836,18 @@ public:
 
           case KeyPathExpr::Component::Kind::TupleElement:
             printHead("tuple_element", ASTNodeColor);
-            printField("index", component.getTupleIndex(), DiscriminatorColor);
+            printField(component.getTupleIndex(), "index", DiscriminatorColor);
             break;
           case KeyPathExpr::Component::Kind::DictionaryKey:
             printHead("dict_key", ASTNodeColor);
-            printFieldQuoted("key", component.getUnresolvedDeclName(),
+            printFieldQuoted(component.getUnresolvedDeclName(), "key",
                              IdentifierColor);
             break;
           case KeyPathExpr::Component::Kind::CodeCompletion:
             printHead("completion", ASTNodeColor);
             break;
           }
-          printFieldQuoted("type", GetTypeOfKeyPathComponent(E, i));
+          printFieldQuoted(GetTypeOfKeyPathComponent(E, i), "type");
           if (auto *args = component.getSubscriptArgs()) {
             printRec(args);
           }
@@ -2896,7 +2891,7 @@ public:
 
   void visitTapExpr(TapExpr *E, StringRef label) {
     printCommon(E, "tap_expr", label);
-    printDeclRefField("var", E->getVar());
+    printDeclRefField(E->getVar(), "var");
     printRec(E->getSubExpr());
     printRec(E->getBody(), &E->getVar()->getDeclContext()->getASTContext());
     printFoot();
@@ -2923,8 +2918,8 @@ public:
   void visitMacroExpansionExpr(MacroExpansionExpr *E, StringRef label) {
     printCommon(E, "macro_expansion_expr", label);
 
-    printField("name", E->getMacroName(), IdentifierColor);
-    printField("discriminator", E->getRawDiscriminator(), DiscriminatorColor);
+    printField(E->getMacroName(), "name", IdentifierColor);
+    printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
 
     if (E->getArgs()) {
       printRec(E->getArgs());
@@ -2996,20 +2991,18 @@ public:
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, StringRef label) {
     printCommon("type_attributed", label);
-    printFieldRaw("attrs", [&](raw_ostream &OS) {
-      T->printAttrs(OS);
-    });
+    printFieldRaw([&](raw_ostream &OS) { T->printAttrs(OS); }, "attrs");
     printRec(T->getTypeRepr());
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T, StringRef label) {
     printCommon("type_ident", label);
 
-    printFieldQuoted("id", T->getNameRef(), IdentifierColor);
+    printFieldQuoted(T->getNameRef(), "id", IdentifierColor);
     std::string bindStr = "<none>";
     if (T->isBound())
       bindStr = T->getBoundDecl()->printRef();
-    printField("bind", bindStr);
+    printField(bindStr, "bind");
 
     if (auto *GenIdT = dyn_cast<GenericIdentTypeRepr>(T)) {
       for (auto genArg : GenIdT->getGenericArgs()) {
@@ -3085,7 +3078,7 @@ public:
     printCommon("type_tuple", label);
 
     if (T->hasElementNames()) {
-      printFieldRaw("names", [&](raw_ostream &OS) {
+      printFieldRaw([&](raw_ostream &OS) {
         llvm::interleave(T->getElements(), OS,
                          [&](const TupleTypeReprElement &Elt) {
           auto name = Elt.Name;
@@ -3094,7 +3087,7 @@ public:
           else
             OS << (name.empty() ? "''" : name.str());
         }, ",");
-      });
+      }, "names");
     }
 
     for (auto elem : T->getElements()) {
@@ -3594,7 +3587,7 @@ void SubstitutionMap::dump() const {
 namespace {
   class PrintType : public TypeVisitor<PrintType, void, StringRef>,
                     public PrintBase {
-    void printCommon(StringRef label, StringRef name) {
+    void printCommon(StringRef name, StringRef label) {
       printHead(name, TypeColor, label);
     }
 
@@ -3611,11 +3604,11 @@ namespace {
 
 #define TRIVIAL_TYPE_PRINTER(Class,Name)                        \
     void visit##Class##Type(Class##Type *T, StringRef label) {  \
-      printCommon(label, #Name "_type"); printFoot();           \
+      printCommon(#Name "_type", label); printFoot();           \
     }
 
     void visitErrorType(ErrorType *T, StringRef label) {
-      printCommon(label, "error_type");
+      printCommon("error_type", label);
       if (auto originalType = T->getOriginalType())
         printRec(originalType, "original_type");
       printFoot();
@@ -3624,14 +3617,12 @@ namespace {
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitPlaceholderType(PlaceholderType *T, StringRef label) {
-      printCommon(label, "placeholder_type");
+      printCommon("placeholder_type", label);
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         printRec(typeVar, "type_variable");
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
-        printFieldRaw("", [&](raw_ostream &OS) {
-          VD->dumpRef(OS);
-        }, DeclColor);
+        printFieldRaw([&](raw_ostream &OS) { VD->dumpRef(OS); }, "", DeclColor);
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
@@ -3645,17 +3636,17 @@ namespace {
     }
 
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
-      printCommon(label, "builtin_integer_type");
+      printCommon("builtin_integer_type", label);
       if (T->isFixedWidth())
-        printField("bit_width", T->getFixedWidth());
+        printField(T->getFixedWidth(), "bit_width");
       else
         printFlag("word_sized");
       printFoot();
     }
 
     void visitBuiltinFloatType(BuiltinFloatType *T, StringRef label) {
-      printCommon(label, "builtin_float_type");
-      printField("bit_width", T->getBitWidth());
+      printCommon("builtin_float_type", label);
+      printField(T->getBitWidth(), "bit_width");
       printFoot();
     }
 
@@ -3673,21 +3664,21 @@ namespace {
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, StringRef label) {
-      printCommon(label, "builtin_vector_type");
-      printField("num_elements", T->getNumElements());
+      printCommon("builtin_vector_type", label);
+      printField(T->getNumElements(), "num_elements");
       printRec(T->getElementType());
       printFoot();
     }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
-      printCommon(label, "type_alias_type");
+      printCommon("type_alias_type", label);
 
-      printField("decl", T->getDecl()->printRef());
+      printField(T->getDecl()->printRef(), "decl");
       std::string underlyingStr = "<unresolved>";
       if (auto underlying = T->getSinglyDesugaredType()) {
         underlyingStr = underlying->getString();
       }
-      printField("underlying", underlyingStr, TypeColor);
+      printField(underlyingStr, "underlying", TypeColor);
 
       if (T->getParent())
         printRec(T->getParent(), "parent");
@@ -3697,9 +3688,9 @@ namespace {
     }
 
     void visitPackType(PackType *T, StringRef label) {
-      printCommon(label, "pack_type");
+      printCommon("pack_type", label);
 
-      printField("num_elements", T->getNumElements());
+      printField(T->getNumElements(), "num_elements");
 
       for (Type elt : T->getElementTypes()) {
         printRec(elt);
@@ -3709,10 +3700,10 @@ namespace {
     }
 
     void visitSILPackType(SILPackType *T, StringRef label) {
-      printCommon(label, "sil_pack_type");
+      printCommon("sil_pack_type", label);
 
-      printField("element_is_address", T->isElementAddress());
-      printField("num_elements", T->getNumElements());
+      printField(T->isElementAddress(), "element_is_address");
+      printField(T->getNumElements(), "num_elements");
 
       for (Type elt : T->getElementTypes()) {
         printRec(elt);
@@ -3722,16 +3713,16 @@ namespace {
     }
 
     void visitPackExpansionType(PackExpansionType *T, StringRef label) {
-      printCommon(label, "pack_expansion_type");
+      printCommon("pack_expansion_type", label);
       printRec(T->getPatternType(), "pattern");
       printRec(T->getCountType(), "count");
       printFoot();
     }
 
     void visitPackElementType(PackElementType *T, StringRef label) {
-      printCommon(label, "element_type");
+      printCommon("element_type", label);
 
-      printField("level", T->getLevel());
+      printField(T->getLevel(), "level");
 
       printRec(T->getPackType(), "pack");
 
@@ -3739,7 +3730,7 @@ namespace {
     }
 
     void visitParenType(ParenType *T, StringRef label) {
-      printCommon(label, "paren_type");
+      printCommon("paren_type", label);
 
       printRec(T->getUnderlyingType());
 
@@ -3747,15 +3738,15 @@ namespace {
     }
 
     void visitTupleType(TupleType *T, StringRef label) {
-      printCommon(label, "tuple_type");
+      printCommon("tuple_type", label);
 
-      printField("num_elements", T->getNumElements());
+      printField(T->getNumElements(), "num_elements");
 
       for (const auto &elt : T->getElements()) {
         printRecRaw([&](StringRef label) {
           printHead("tuple_type_elt", FieldLabelColor, label);
           if (elt.hasName())
-            printField("name", elt.getName().str());
+            printField(elt.getName().str(), "name");
           printRec(elt.getType());
           printFoot();
         }, "");
@@ -3766,17 +3757,17 @@ namespace {
 
 #define REF_STORAGE(Name, name, ...) \
     void visit##Name##StorageType(Name##StorageType *T, StringRef label) { \
-      printCommon(label, #name "_storage_type"); \
+      printCommon(#name "_storage_type", label); \
       printRec(T->getReferentType()); \
       printFoot(); \
     }
 #include "swift/AST/ReferenceStorage.def"
 
-#define VISIT_NOMINAL_TYPE(TypeClass, Name)              \
+#define VISIT_NOMINAL_TYPE(TypeClass, Name)                \
     void visit##TypeClass(TypeClass *T, StringRef label) { \
-      printCommon(label, #Name);                            \
+      printCommon(#Name, label);                           \
                                                            \
-      printField("decl", T->getDecl()->printRef());        \
+      printField(T->getDecl()->printRef(), "decl");        \
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), "parent");                \
@@ -3792,13 +3783,13 @@ namespace {
 #undef VISIT_NOMINAL_TYPE
 
     void visitBuiltinTupleType(BuiltinTupleType *T, StringRef label) {
-      printCommon(label, "builtin_tuple_type");
-      printField("decl", T->getDecl()->printRef());
+      printCommon("builtin_tuple_type", label);
+      printField(T->getDecl()->printRef(), "decl");
       printFoot();
     }
 
     void visitMetatypeType(MetatypeType *T, StringRef label) {
-      printCommon(label, "metatype_type");
+      printCommon("metatype_type", label);
 
       if (T->hasRepresentation())
         printFlag(getDumpString(T->getRepresentation()));
@@ -3810,7 +3801,7 @@ namespace {
 
     void visitExistentialMetatypeType(ExistentialMetatypeType *T,
                                       StringRef label) {
-      printCommon(label, "existential_metatype_type");
+      printCommon("existential_metatype_type", label);
 
       if (T->hasRepresentation())
         printFlag(getDumpString(T->getRepresentation()));
@@ -3821,13 +3812,13 @@ namespace {
     }
 
     void visitModuleType(ModuleType *T, StringRef label) {
-      printCommon(label, "module_type");
-      printDeclNameField("module", T->getModule());
+      printCommon("module_type", label);
+      printDeclNameField(T->getModule(), "module");
       printFoot();
     }
 
     void visitDynamicSelfType(DynamicSelfType *T, StringRef label) {
-      printCommon(label, "dynamic_self_type");
+      printCommon("dynamic_self_type", label);
       printRec(T->getSelfType());
       printFoot();
     }
@@ -3835,17 +3826,17 @@ namespace {
     void printArchetypeCommon(ArchetypeType *T,
                               StringRef className,
                               StringRef label) {
-      printCommon(label, className);
+      printCommon(className, label);
 
-      printField("address", static_cast<void *>(T));
+      printField(static_cast<void *>(T), "address");
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
-        printFieldRaw("layout", [&](raw_ostream &OS) {
+        printFieldRaw([&](raw_ostream &OS) {
           layout->print(OS);
-        });
+        }, "layout");
       }
       for (auto proto : T->getConformsTo())
-        printField("conforms_to", proto->printRef());
+        printField(proto->printRef(), "conforms_to");
     }
 
     void printArchetypeCommonRec(ArchetypeType *T) {
@@ -3857,7 +3848,7 @@ namespace {
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
 
-      printField("name", T->getFullName());
+      printField(T->getFullName(), "name");
 
       printArchetypeCommonRec(T);
 
@@ -3866,7 +3857,7 @@ namespace {
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
 
-      printField("opened_existential_id", T->getOpenedExistentialID());
+      printField(T->getOpenedExistentialID(), "opened_existential_id");
 
       printArchetypeCommonRec(T);
       printRec(T->getGenericEnvironment()->getOpenedExistentialType(), "opened_existential");
@@ -3877,7 +3868,7 @@ namespace {
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
 
-      printField("decl", T->getDecl()->getNamingDecl()->printRef());
+      printField(T->getDecl()->getNamingDecl()->printRef(), "decl");
 
       printArchetypeCommonRec(T);
       if (!T->getSubstitutions().empty()) {
@@ -3888,33 +3879,33 @@ namespace {
     }
     void visitPackArchetypeType(PackArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "pack_archetype_type", label);
-      printField("name", T->getFullName());
+      printField(T->getFullName(), "name");
       printArchetypeCommonRec(T);
       printFoot();
     }
     void visitElementArchetypeType(ElementArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "element_archetype_type", label);
-      printField("opened_element_id", T->getOpenedElementID());
+      printField(T->getOpenedElementID(), "opened_element_id");
       printFoot();
     }
 
     void visitGenericTypeParamType(GenericTypeParamType *T, StringRef label) {
-      printCommon(label, "generic_type_param_type");
-      printField("depth", T->getDepth());
-      printField("index", T->getIndex());
+      printCommon("generic_type_param_type", label);
+      printField(T->getDepth(), "depth");
+      printField(T->getIndex(), "index");
       if (auto decl = T->getDecl())
-        printField("decl", decl->printRef());
+        printField(decl->printRef(), "decl");
       printFlag(T->isParameterPack(), "pack");
       printFoot();
     }
 
     void visitDependentMemberType(DependentMemberType *T, StringRef label) {
-      printCommon(label, "dependent_member_type");
+      printCommon("dependent_member_type", label);
 
       if (auto assocType = T->getAssocType()) {
-        printField("assoc_type", assocType->printRef());
+        printField(assocType->printRef(), "assoc_type");
       } else {
-        printField("name", T->getName());
+        printField(T->getName(), "name");
       }
 
       printRec(T->getBase(), "base");
@@ -3925,17 +3916,21 @@ namespace {
     void printAnyFunctionParamsRec(ArrayRef<AnyFunctionType::Param> params,
                                    StringRef label) {
       printRecRaw([&](StringRef label) {
-        printCommon(label, "function_params");
-        printField("num_params", params.size());
+        printCommon("function_params", label);
+
+        printField(params.size(), "num_params");
         for (const auto &param : params) {
           printRecRaw([&](StringRef label) {
-            printHead("param", FieldLabelColor);
+            printHead("param", FieldLabelColor, label);
+
             if (param.hasLabel())
-              printField("name", param.getLabel().str());
+              printField(param.getLabel().str(), "name");
             if (param.hasInternalLabel())
-              printField("internal_name", param.getInternalLabel().str());
+              printField(param.getInternalLabel().str(), "internal_name");
             dumpParameterFlags(param.getParameterFlags());
+
             printRec(param.getPlainType());
+
             printFoot();
           }, "");
         }
@@ -3959,14 +3954,14 @@ namespace {
 
     void printAnyFunctionTypeCommonRec(AnyFunctionType *T, StringRef label,
                                     StringRef name) {
-      printCommon(label, name);
+      printCommon(name, label);
 
       if (T->hasExtInfo()) {
         SILFunctionType::Representation representation =
             T->getExtInfo().getSILRepresentation();
 
         if (representation != SILFunctionType::Representation::Thick) {
-          printField("representation", getDumpString(representation));
+          printField(getDumpString(representation), "representation");
         }
         printFlag(!T->isNoEscape(), "escaping");
         printFlag(T->isSendable(), "Sendable");
@@ -3974,11 +3969,10 @@ namespace {
         printFlag(T->isThrowing(), "throws");
       }
       if (Type globalActor = T->getGlobalActor()) {
-        printField("global_actor", globalActor.getString());
+        printField(globalActor.getString(), "global_actor");
       }
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext());
-
       printAnyFunctionParamsRec(T->getParams(), "input");
       printRec(T->getResult(), "output");
     }
@@ -3992,16 +3986,16 @@ namespace {
       printAnyFunctionTypeCommonRec(T, label, "generic_function_type");
       // FIXME: generic signature dumping needs improvement
       printRecRaw([&](StringRef label) {
-        printHead("generic_sig", TypeColor);
-        printField("", QuotedString(T->getGenericSignature()->getAsString()));
+        printHead("generic_sig", TypeColor, label);
+        printField(QuotedString(T->getGenericSignature()->getAsString()), "");
         printFoot();
       });
       printFoot();
     }
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
-      printCommon(label, "sil_function_type");
-      printFieldQuoted("type", T->getString());
+      printCommon("sil_function_type", label);
+      printFieldQuoted(T->getString(), "type");
 
       for (auto param : T->getParameters()) {
         printRec(param.getInterfaceType(), "input");
@@ -4023,46 +4017,46 @@ namespace {
     }
 
     void visitSILBlockStorageType(SILBlockStorageType *T, StringRef label) {
-      printCommon(label, "sil_block_storage_type");
+      printCommon("sil_block_storage_type", label);
       printRec(T->getCaptureType());
       printFoot();
     }
 
     void visitSILMoveOnlyWrappedType(SILMoveOnlyWrappedType *T,
                                      StringRef label) {
-      printCommon(label, "sil_move_only_type");
+      printCommon("sil_move_only_type", label);
       printRec(T->getInnerType());
       printFoot();
     }
 
     void visitSILBoxType(SILBoxType *T, StringRef label) {
-      printCommon(label, "sil_box_type");
+      printCommon("sil_box_type", label);
       // FIXME: Print the structure of the type.
-      printField("type", T->getString());
+      printField(T->getString(), "type");
       printFoot();
     }
 
     void visitArraySliceType(ArraySliceType *T, StringRef label) {
-      printCommon(label, "array_slice_type");
+      printCommon("array_slice_type", label);
       printRec(T->getBaseType());
       printFoot();
     }
 
     void visitOptionalType(OptionalType *T, StringRef label) {
-      printCommon(label, "optional_type");
+      printCommon("optional_type", label);
       printRec(T->getBaseType());
       printFoot();
     }
 
     void visitDictionaryType(DictionaryType *T, StringRef label) {
-      printCommon(label, "dictionary_type");
+      printCommon("dictionary_type", label);
       printRec(T->getKeyType(), "key");
       printRec(T->getValueType(), "value");
       printFoot();
     }
 
     void visitVariadicSequenceType(VariadicSequenceType *T, StringRef label) {
-      printCommon(label, "variadic_sequence_type");
+      printCommon("variadic_sequence_type", label);
       printRec(T->getBaseType());
       printFoot();
     }
@@ -4070,7 +4064,7 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
 
-      printCommon(label, "protocol_composition_type");
+      printCommon("protocol_composition_type", label);
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
 
@@ -4083,7 +4077,7 @@ namespace {
 
     void visitParameterizedProtocolType(ParameterizedProtocolType *T,
                                         StringRef label) {
-      printCommon(label, "parameterized_protocol_type");
+      printCommon("parameterized_protocol_type", label);
       printRec(T->getBaseType(), "base");
       for (auto arg : T->getArgs()) {
         printRec(arg);
@@ -4093,34 +4087,34 @@ namespace {
 
     void visitExistentialType(ExistentialType *T,
                               StringRef label) {
-      printCommon(label, "existential_type");
+      printCommon("existential_type", label);
       printRec(T->getConstraintType());
       printFoot();
     }
 
     void visitLValueType(LValueType *T, StringRef label) {
-      printCommon(label, "lvalue_type");
+      printCommon("lvalue_type", label);
       printRec(T->getObjectType());
       printFoot();
     }
 
     void visitInOutType(InOutType *T, StringRef label) {
-      printCommon(label, "inout_type");
+      printCommon("inout_type", label);
       printRec(T->getObjectType());
       printFoot();
     }
 
     void visitUnboundGenericType(UnboundGenericType *T, StringRef label) {
-      printCommon(label, "unbound_generic_type");
-      printField("decl", T->getDecl()->printRef());
+      printCommon("unbound_generic_type", label);
+      printField(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printFoot();
     }
 
     void visitBoundGenericClassType(BoundGenericClassType *T, StringRef label) {
-      printCommon(label, "bound_generic_class_type");
-      printField("decl", T->getDecl()->printRef());
+      printCommon("bound_generic_class_type", label);
+      printField(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4130,8 +4124,8 @@ namespace {
 
     void visitBoundGenericStructType(BoundGenericStructType *T,
                                      StringRef label) {
-      printCommon(label, "bound_generic_struct_type");
-      printField("decl", T->getDecl()->printRef());
+      printCommon("bound_generic_struct_type", label);
+      printField(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4140,8 +4134,8 @@ namespace {
     }
 
     void visitBoundGenericEnumType(BoundGenericEnumType *T, StringRef label) {
-      printCommon(label, "bound_generic_enum_type");
-      printField("decl", T->getDecl()->printRef());
+      printCommon("bound_generic_enum_type", label);
+      printField(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4150,8 +4144,8 @@ namespace {
     }
 
     void visitTypeVariableType(TypeVariableType *T, StringRef label) {
-      printCommon(label, "type_variable_type");
-      printField("id", T->getID());
+      printCommon("type_variable_type", label);
+      printField(T->getID(), "id");
       printFoot();
     }
 
