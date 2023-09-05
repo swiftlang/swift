@@ -1500,6 +1500,13 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     }
   }
 
+  // (apply (differentiable_function f)) to (apply f)
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(AI->getCallee())) {
+    return cloneFullApplySiteReplacingCallee(AI, DFI->getOperand(0),
+                                             Builder.getBuilderContext())
+      .getInstruction();
+  }
+
   // (apply (thin_to_thick_function f)) to (apply f)
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
     // We currently don't remove any possible retain associated with the thick
