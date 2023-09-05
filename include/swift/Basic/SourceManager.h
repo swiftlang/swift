@@ -410,8 +410,6 @@ public:
                                SourceLoc();
   }
 
-  std::string getLineString(unsigned BufferID, unsigned LineNumber);
-
   /// Retrieve the buffer ID for \p Path, loading if necessary.
   unsigned getExternalSourceBufferID(StringRef Path);
 
