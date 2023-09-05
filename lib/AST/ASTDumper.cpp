@@ -512,7 +512,7 @@ public:
 
       printRec(arg.getExpr());
       printFoot();
-    }, "");
+    });
   }
 
   void printRec(const ArgumentList *argList, StringRef label = "") {
@@ -586,7 +586,7 @@ public:
       SmallPtrSet<const ProtocolConformance *, 4> Dumped;
       dumpSubstitutionMapRec(map, OS, SubstitutionMap::DumpStyle::Full,
                              Indent, Dumped);
-    }, "");
+    });
   }
 
   void printRec(ProtocolConformanceRef conf, StringRef label = "") {
@@ -618,6 +618,13 @@ public:
                                 TerminalColor color = FieldLabelColor) {
     printFieldRaw([&](raw_ostream &OS) { OS << '\'' << value << '\''; }, name,
                    color);
+  }
+
+
+  // Print a field with a value.
+  template<typename Fn>
+  void printFlagRaw(Fn body, TerminalColor color = FieldLabelColor) {
+    printFieldRaw(body, "", color);
   }
 
   // Print a single flag.
@@ -994,11 +1001,11 @@ public:
       printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
       printFlag(attrs.hasAttribute<DynamicAttr>(), "dynamic");
       if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
-        printFieldRaw([&](raw_ostream &OS) {
+        printFlagRaw([&](raw_ostream &OS) {
           OS << "@_dynamicReplacement(for: \"";
           OS << attr->getReplacedFunctionName();
           OS << "\")";
-        }, "");
+        });
       }
       auto lifetimeString = getDumpString(VD->getLifetimeAnnotation());
       if (!lifetimeString.empty())
@@ -1214,9 +1221,9 @@ public:
     void printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
       printCommon(D, Type, Label, FuncColor);
       if (!D->getCaptureInfo().isTrivial()) {
-        printFieldRaw([&](raw_ostream &OS) {
+        printFlagRaw([&](raw_ostream &OS) {
           D->getCaptureInfo().print(OS);
-        }, "");
+        });
       }
 
       printFlag(D->getAttrs().hasAttribute<NonisolatedAttr>(), "nonisolated",
@@ -1250,7 +1257,7 @@ public:
           if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
             printField(*errorParamIndex, "error_param");
           printFoot();
-        }, "");
+        });
       }
 
       if (auto fec = D->getForeignErrorConvention()) {
@@ -1269,7 +1276,7 @@ public:
           if (wantResultType)
             printField(fec->getResultType(), "resulttype");
           printFoot();
-        }, "");
+        });
       }
 
       if (D->hasSingleExpressionBody()) {
@@ -1335,7 +1342,7 @@ public:
 
     void visitIfConfigDecl(IfConfigDecl *ICD, StringRef label) {
       printCommon(ICD, "if_config_decl", label);
-      printRecRange(ICD->getClauses(), &ICD->getASTContext(), "");
+      printRecRange(ICD->getClauses(), &ICD->getASTContext(), "clauses");
       printFoot();
     }
 
@@ -1360,7 +1367,7 @@ public:
           for (auto &rel : rels)
             printFlag(rel.Name.str());
           printFoot();
-        }, "");
+        });
       };
       printRelationsRec(PGD->getHigherThan(), "higherThan");
       printRelationsRec(PGD->getLowerThan(), "lowerThan");
@@ -1773,7 +1780,7 @@ public:
         }
 
         printFoot();
-      }, "");
+      });
     }
 
     printRec(S->getBody());
@@ -1805,16 +1812,9 @@ public:
 
   void visitDoCatchStmt(DoCatchStmt *S, StringRef label) {
     printCommon(S, "do_catch_stmt", label);
-    printRec(S->getBody());
-    visitCatches(S->getCatches());
+    printRec(S->getBody(), "body");
+    printRecRange(S->getCatches(), Ctx, "catch_stmts");
     printFoot();
-  }
-  void visitCatches(ArrayRef<CaseStmt *> clauses) {
-    for (auto clause : clauses) {
-      printRecRaw([&](StringRef label) {
-        visitCaseStmt(clause, label);
-      }, "");
-    }
   }
 };
 
@@ -2049,7 +2049,7 @@ public:
           printHead("candidate_decl", DeclModifierColor, label);
           printNameRaw([&](raw_ostream &OS) { D->dumpRef(OS); });
           printFoot();
-        }, "");
+        });
       }
     }
 
@@ -2158,7 +2158,7 @@ public:
         printRecRaw([&](StringRef label) {
           printHead("<tuple element default value>", ExprColor);
           printFoot();
-        }, "");
+        });
       }
     }
 
@@ -2852,11 +2852,11 @@ public:
             printRec(args);
           }
           printFoot();
-        }, "");
+        });
       }
 
       printFoot();
-    }, "");
+    });
 
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
       printRec(stringLiteral, "objc_string_literal");
@@ -3208,7 +3208,7 @@ public:
 
         printRec(Field.getFieldType());
         printFoot();
-      }, "");
+      });
     }
 
     printRecRange(T->getGenericArguments(), "generic_arguments");
@@ -3749,7 +3749,7 @@ namespace {
             printField(elt.getName().str(), "name");
           printRec(elt.getType());
           printFoot();
-        }, "");
+        });
       }
 
       printFoot();
@@ -3932,7 +3932,7 @@ namespace {
             printRec(param.getPlainType());
 
             printFoot();
-          }, "");
+          });
         }
         printFoot();
       }, label);
@@ -3948,7 +3948,7 @@ namespace {
             info.dump(OS, clangCtx);
           });
           printFoot();
-        }, "");
+        });
       }
     }
 
