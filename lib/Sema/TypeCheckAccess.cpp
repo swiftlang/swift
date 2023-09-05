@@ -330,11 +330,11 @@ static void noteLimitingImport(ASTContext &ctx,
                        diag::decl_import_via_here,
                        VD,
                        limitImport->accessLevel,
-                       limitImport->module.importedModule->getName());
+                       limitImport->module.importedModule);
   } else {
-   ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
-                      limitImport->module.importedModule->getName(),
-                      limitImport->accessLevel);
+    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
+                       limitImport->module.importedModule,
+                       limitImport->accessLevel);
   }
 }
 
