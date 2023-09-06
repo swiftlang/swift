@@ -14,12 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Option/Options.h"
 #include <swift/Frontend/CompileJobCacheKey.h>
 #include <swift/Basic/Version.h>
 #include <llvm/ADT/SmallString.h>
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Option/OptTable.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -28,52 +31,37 @@ using namespace swift;
 // TODO: Rewrite this into CASNodeSchema.
 llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
     llvm::cas::ObjectStore &CAS, ArrayRef<const char *> Args) {
-  SmallString<256> CommandLine;
-
-  // TODO: Improve this list.
-  static const std::vector<std::string> removeArgAndNext = {
-      "-o",
-      "-output-filelist",
-      "-supplementary-output-file-map",
-      "-index-unit-output-path",
-      "-index-unit-output-path-filelist",
-      "-serialize-diagnostics-path",
-      "-num-threads",
-      "-cas-path"};
-
   // Don't count the `-frontend` in the first location since only frontend
   // invocation can have a cache key.
   if (Args.size() > 1 && StringRef(Args.front()) == "-frontend")
     Args = Args.drop_front();
 
-  for (unsigned I = 0, IE =Args.size(); I < IE; ++I) {
-    StringRef Arg = Args[I];
-    if (llvm::is_contained(removeArgAndNext, Arg)) {
-      ++I;
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+  llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
+      Args, MissingIndex, MissingCount, options::FrontendOption);
+
+  SmallString<256> CommandLine;
+  for (auto *Arg : ParsedArgs) {
+    const auto &Opt = Arg->getOption();
+
+    // Skip the options that doesn't affect caching.
+    if (Opt.hasFlag(options::CacheInvariant))
       continue;
-    }
-    // FIXME: Use a heuristic to remove all the flags that affect output paths.
-    // Those should not affect compile cache key.
-    if (Arg.startswith("-emit-")) {
-      if (Arg.endswith("-path"))
-        ++I;
-      continue;
-    }
-    // Handle -file-list option. Need to drop the option but adds the file
-    // content instead.
-    // FIXME: will be nice if the same list of files gets the same key no matter
-    // going through command-line or filelist.
-    if (Arg == "-filelist" || Arg == "-primary-filelist") {
-      auto FileList = llvm::MemoryBuffer::getFile(Args[++I]);
+
+    if (Opt.hasFlag(options::ArgumentIsFileList)) {
+      auto FileList = llvm::MemoryBuffer::getFile(Arg->getValue());
       if (!FileList)
         return llvm::errorCodeToError(FileList.getError());
-      CommandLine.append(Arg);
+      CommandLine.append(Opt.getRenderName());
       CommandLine.push_back(0);
       CommandLine.append((*FileList)->getBuffer());
       CommandLine.push_back(0);
       continue;
     }
-    CommandLine.append(Arg);
+
+    CommandLine.append(Arg->getAsString(ParsedArgs));
     CommandLine.push_back(0);
   }
 
