@@ -118,7 +118,7 @@ void PluginServer_destroyConnection(const void *server) {
   delete static_cast<const ConnectionHandle *>(server);
 }
 
-size_t PluginServer_read(const void *server, void *data, size_t nbyte) {
+SwiftInt PluginServer_read(const void *server, void *data, SwiftUInt nbyte) {
   const auto *connection = static_cast<const ConnectionHandle *>(server);
 #if defined(_WIN32)
   return _read(connection->inputFD, data, nbyte);
@@ -127,7 +127,7 @@ size_t PluginServer_read(const void *server, void *data, size_t nbyte) {
 #endif
 }
 
-size_t PluginServer_write(const void *server, const void *data, size_t nbyte) {
+SwiftInt PluginServer_write(const void *server, const void *data, SwiftUInt nbyte) {
   const auto *connection = static_cast<const ConnectionHandle *>(server);
 #if defined(_WIN32)
   return _write(connection->outputFD, data, nbyte);
