@@ -2059,12 +2059,11 @@ private:
   }
 
   llvm::Optional<IndentContext>
-  getIndentContextFromInherits(ArrayRef<InheritedEntry> Inherits,
-                               SourceLoc ContextLoc) {
+  getIndentContextFromInherits(InheritedTypes Inherits, SourceLoc ContextLoc) {
     if (Inherits.empty())
       return llvm::None;
 
-    SourceLoc StartLoc = Inherits.front().getSourceRange().Start;
+    SourceLoc StartLoc = Inherits.getStartLoc();
     if (StartLoc.isInvalid())
       return llvm::None;
 
@@ -2074,7 +2073,7 @@ private:
     assert(ColonLoc.has_value() && "inherits list without leading colon?");
 
     ListAligner Aligner(SM, TargetLocation, ContextLoc, ColonLoc->getLoc());
-    for (auto TL: Inherits)
+    for (auto TL : Inherits.getEntries())
       Aligner.updateAlignment(TL.getSourceRange(), TL.getTypeRepr());
     return Aligner.getContextAndSetAlignment(CtxOverride);
   }

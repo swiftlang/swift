@@ -3045,7 +3045,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
@@ -3112,7 +3112,7 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
         return classDecl;
   }
 
-  for (unsigned i : indices(subject->getInherited())) {
+  for (unsigned i : subject->getInherited().getIndices()) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
       InheritedDeclsReferencedRequest{subject, i}, {});
@@ -3592,8 +3592,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
   SourceLoc uncheckedLoc;
-  if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
-                                    : extDecl->getInherited()[i].getTypeRepr()){
+  auto inheritedTypes = InheritedTypes(decl);
+  if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findUncheckedAttrLoc();
   }
@@ -3608,17 +3608,15 @@ SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject) {
-  auto typeDecl = decl.dyn_cast<const TypeDecl *>();
-  auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
+  auto inheritedTypes = InheritedTypes(decl);
 
   // Gather results from all of the inherited types.
-  unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
-                                   : extDecl->getInherited().size();
   SmallVector<InheritedNominalEntry, 4> result;
-  for (unsigned i : range(numInherited)) {
+  for (unsigned i : inheritedTypes.getIndices()) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
 
+  auto *typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
   if (protoDecl == nullptr)
     return result;

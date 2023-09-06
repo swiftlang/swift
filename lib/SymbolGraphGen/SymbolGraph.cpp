@@ -389,7 +389,7 @@ void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
   const auto VD = S.getLocalSymbolDecl();
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
-    for (const auto &InheritanceLoc : NTD->getInherited()) {
+    for (const auto &InheritanceLoc : NTD->getInherited().getEntries()) {
       auto Ty = InheritanceLoc.getType();
       if (!Ty) {
         continue;

@@ -40,9 +40,8 @@ namespace swift {
 
 SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
-  return typeLoc.getLoc();
+  auto inheritedTypes = InheritedTypes(std::get<0>(storage));
+  return inheritedTypes.getEntry(std::get<1>(storage)).getLoc();
 }
 
 //----------------------------------------------------------------------------//

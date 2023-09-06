@@ -71,7 +71,7 @@ Type InheritedTypeRequest::evaluate(
     break;
   }
 
-  const TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
+  const TypeLoc &typeLoc = InheritedTypes(decl).getEntry(index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
@@ -103,7 +103,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       return Type();
   }
 
-  for (unsigned int idx : indices(nominalDecl->getInherited())) {
+  for (unsigned int idx : nominalDecl->getInherited().getIndices()) {
     auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
 
     if (auto err = result.takeError()) {
@@ -140,7 +140,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
 
 Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
                                   EnumDecl *enumDecl) const {
-  for (unsigned int idx : indices(enumDecl->getInherited())) {
+  for (unsigned int idx : enumDecl->getInherited().getIndices()) {
     auto inheritedTypeResult = evaluator(
         InheritedTypeRequest{enumDecl, idx, TypeResolutionStage::Interface});
 
