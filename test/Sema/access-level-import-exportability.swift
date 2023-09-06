@@ -319,7 +319,8 @@ public struct PublicSubscriptUsesPublic {
     }
 }
 public struct PublicSubscriptUsesPackage {
-    public subscript(index: PackageImportType) -> PackageImportType { // expected-error {{subscript cannot be declared public because its index uses a package type}}
+    public subscript(index: PackageImportType) -> PackageImportType { // expected-error {{subscript cannot be declared public because its element type uses a package type}}
+    // This error should be on the `index` like the other ones.
         fatalError()
     }
 }
