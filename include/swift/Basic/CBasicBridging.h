@@ -83,6 +83,23 @@ typedef __swiftc_intn_t(__INTPTR_WIDTH__) SwiftInt;
 typedef __swiftc_uintn_t(__INTPTR_WIDTH__) SwiftUInt;
 #endif
 
+#if __clang__
+// Provide macros to temporarily suppress warning about the use of
+// _Nullable and _Nonnull.
+#define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS                                    \
+  _Pragma("clang diagnostic push")                                             \
+      _Pragma("clang diagnostic ignored \"-Wnullability-extension\"")          \
+          _Pragma("clang assume_nonnull begin")
+
+#define SWIFT_END_NULLABILITY_ANNOTATIONS                                      \
+  _Pragma("clang diagnostic pop") _Pragma("clang assume_nonnull end")
+#else
+#define SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+#define SWIFT_END_NULLABILITY_ANNOTATIONS
+#define _Nullable
+#define _Nonnull
+#endif
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 #ifdef __cplusplus
