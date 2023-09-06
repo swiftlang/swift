@@ -1300,50 +1300,27 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     // %1 = metatype $A.Type
     // checked_cast_br %1, ....
     if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
-      auto *ASRI = dyn_cast<AllocRefInst>(FoundIERI->getOperand());
-      if (!ASRI)
+      SILValue op = FoundIERI->getOperand();
+      if (!isa<AllocRefInst>(op))
         return nullptr;
-      // Should be in the same BB.
-      if (ASRI->getParent() != EMI->getParent())
-        return nullptr;
-      // Check if this alloc_stack is only initialized once by means of
-      // a single init_existential_ref.
-      bool isLegal = true;
-      for (auto Use : getNonDebugUses(ASRI)) {
-        auto *User = Use->getUser();
-        if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
-          continue;
-        if (auto *IERI = dyn_cast<InitExistentialRefInst>(User)) {
-          if (IERI == FoundIERI) {
-            continue;
-          }
-        }
-        isLegal = false;
-        break;
-      }
 
-      if (isLegal && FoundIERI) {
-        // Should be in the same BB.
-        if (FoundIERI->getParent() != EMI->getParent())
-          return nullptr;
-        // Get the type used to initialize the existential.
-        auto ConcreteTy = FoundIERI->getFormalConcreteType();
-        // We don't know enough at compile time about existential
-        // and generic type parameters.
-        if (ConcreteTy.isAnyExistentialType() ||
-            ConcreteTy->is<ArchetypeType>())
-          return nullptr;
-        // Get the SIL metatype of this type.
-        auto EMT = EMI->getType().castTo<AnyMetatypeType>();
-        auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
-        auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
-        auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
-        SILBuilderWithScope B(Inst, builderContext);
-        auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
-        auto *NewI = replaceCastHelper(B, dynamicCast, MI);
-        eraseInstAction(Inst);
-        return NewI;
-      }
+      // Get the type used to initialize the existential.
+      auto ConcreteTy = FoundIERI->getFormalConcreteType();
+      // We don't know enough at compile time about existential
+      // and generic type parameters.
+      if (ConcreteTy.isAnyExistentialType() ||
+          ConcreteTy->is<ArchetypeType>())
+        return nullptr;
+      // Get the SIL metatype of this type.
+      auto EMT = EMI->getType().castTo<AnyMetatypeType>();
+      auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
+      auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
+      auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
+      SILBuilderWithScope B(Inst, builderContext);
+      auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
+      auto *NewI = replaceCastHelper(B, dynamicCast, MI);
+      eraseInstAction(Inst);
+      return NewI;
     }
   }
 
