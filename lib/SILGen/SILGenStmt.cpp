@@ -881,15 +881,20 @@ namespace {
 namespace {
   class DeferCleanup : public Cleanup {
     SourceLoc deferLoc;
-    Expr *call;
+    llvm::PointerIntPair<Expr *, 1, bool> callAndIsErrorOnly;
   public:
-    DeferCleanup(SourceLoc deferLoc, Expr *call)
-      : deferLoc(deferLoc), call(call) {}
+    Expr *getCall() const { return callAndIsErrorOnly.getPointer(); }
+    bool isErrorOnly() const { return callAndIsErrorOnly.getInt(); }
+    
+    DeferCleanup(SourceLoc deferLoc, Expr *call, bool isErrorOnly)
+      : deferLoc(deferLoc), callAndIsErrorOnly(call, isErrorOnly) {}
     void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
-      SGF.emitIgnoredExpr(call);
+      if (!isErrorOnly() || forUnwind == IsForUnwind) {
+        SGF.emitIgnoredExpr(getCall());
+      }
       
       if (SGF.B.hasValidInsertionPoint())
         SGF.Cleanups.setCleanupState(TheCleanup, CleanupState::Dead);
@@ -917,7 +922,8 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   SGF.visitFuncDecl(deferDecl);
 
   // Register a cleanup to invoke the closure on any exit paths.
-  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
+  SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr(),
+                                         S->isErrorOnly());
 }
 
 void StmtEmitter::visitIfStmt(IfStmt *S) {

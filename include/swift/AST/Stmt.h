@@ -359,16 +359,19 @@ class DeferStmt : public Stmt {
   /// This is the bound temp function.
   FuncDecl *tempDecl;
 
-  /// This is the invocation of the closure, which is to be emitted on any error
+  /// CallExpr is the invocation of the closure, which is to be emitted on any unwind
   /// paths.
-  Expr *callExpr;
+  ///
+  /// IsErrorOnly is true if the defer should only be invoked on error unwind paths.
+  llvm::PointerIntPair<Expr *, 1, bool> callExprAndIsErrorOnly;
   
 public:
   DeferStmt(SourceLoc DeferLoc,
-            FuncDecl *tempDecl, Expr *callExpr)
+            FuncDecl *tempDecl, Expr *callExpr,
+            bool isErrorOnly)
     : Stmt(StmtKind::Defer, /*implicit*/false),
       DeferLoc(DeferLoc), tempDecl(tempDecl),
-      callExpr(callExpr) {}
+      callExprAndIsErrorOnly(callExpr, isErrorOnly) {}
   
   SourceLoc getDeferLoc() const { return DeferLoc; }
   
@@ -376,8 +379,10 @@ public:
   SourceLoc getEndLoc() const;
 
   FuncDecl *getTempDecl() const { return tempDecl; }
-  Expr *getCallExpr() const { return callExpr; }
-  void setCallExpr(Expr *E) { callExpr = E; }
+  Expr *getCallExpr() const { return callExprAndIsErrorOnly.getPointer(); }
+  void setCallExpr(Expr *E) { callExprAndIsErrorOnly.setPointer(E); }
+  
+  bool isErrorOnly() const { return callExprAndIsErrorOnly.getInt(); }
 
   /// Dig the original user's body of the defer out for AST fidelity.
   BraceStmt *getBodyAsWritten() const;
