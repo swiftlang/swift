@@ -52,7 +52,7 @@ BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
                                          BridgedDiagnosticSeverity severity,
                                          const void *sourceLocPtr,
                                          const unsigned char *textPtr,
-                                         long textLen) {
+                                         SwiftInt textLen) {
   StringRef origText{
     reinterpret_cast<const char *>(textPtr), size_t(textLen)};
   BridgedDiagnosticImpl::Allocator alloc;
@@ -99,7 +99,7 @@ void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diagPtr,
                                   const void *replaceStartLocPtr,
                                   const void *replaceEndLocPtr,
                                   const unsigned char *newTextPtr,
-                                  long newTextLen) {
+                                  SwiftInt newTextLen) {
 
   SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(replaceEndLocPtr);
@@ -122,7 +122,7 @@ void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
 
 BridgedIdentifier
 SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
-                              long len) {
+                              SwiftInt len) {
   return const_cast<void *>(
       static_cast<ASTContext *>(ctx)
           ->getIdentifier(
@@ -220,7 +220,7 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
 
 void *SwiftStringLiteralExpr_create(void *ctx,
                                     const unsigned char *_Nullable string,
-                                    long len, void *TokenLoc) {
+                                    SwiftInt len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)});
@@ -230,7 +230,7 @@ void *SwiftStringLiteralExpr_create(void *ctx,
 
 void *SwiftIntegerLiteralExpr_create(void *ctx,
                                      const unsigned char *_Nullable string,
-                                     long len, void *TokenLoc) {
+                                     SwiftInt len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)});
