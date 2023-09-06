@@ -88,10 +88,9 @@ void UnresolvedMemberTypeCheckCompletionCallback::sawSolutionImpl(
   }
 }
 
-void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
+void UnresolvedMemberTypeCheckCompletionCallback::collectResults(
     DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -125,6 +124,11 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
     Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
   }
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
+
   // Offer completions when interpreting the pattern match as an
   // EnumElementPattern.
   for (auto &Result : EnumPatternTypes) {
@@ -141,7 +145,11 @@ void UnresolvedMemberTypeCheckCompletionCallback::deliverResults(
     }
 
     Lookup.getEnumElementPatternCompletions(Ty);
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }

@@ -225,12 +225,8 @@ func testInfix17(x: Void) {
   x#^INFIX_17?check=VOID_OPERATORS^#
 }
 
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#()#}[#Bool#]; name=!=
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#()#}[#Bool#]; name===
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  <= {#()#}[#Bool#]; name=<=
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  >= {#()#}[#Bool#]; name=>=
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  < {#()#}[#Bool#]; name=<
-// VOID_OPERATORS-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  > {#()#}[#Bool#]; name=>
+// VOID_OPERATORS: Begin completions, 1 item
+// VOID_OPERATORS-DAG: Keyword[self]/CurrNominal:          .self[#Void#]; name=self
 
 func testInfix18(x: (S2, S2) {
   x#^INFIX_18?check=NO_OPERATORS^#

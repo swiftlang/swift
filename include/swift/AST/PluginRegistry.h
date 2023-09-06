@@ -40,7 +40,7 @@ public:
   void *getAddressOfSymbol(const char *symbolName);
 };
 
-/// Represent a "resolved" exectuable plugin.
+/// Represent a "resolved" executable plugin.
 ///
 /// Plugin clients usually deal with this object to communicate with the actual
 /// plugin implementation.

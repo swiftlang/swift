@@ -74,6 +74,23 @@ public:
     }
   }
 
+  /// Form a union of this expected type context with \p Other.
+  ///
+  /// Any possible type from either type context will be considered a possible
+  /// type in the merged type context.
+  void merge(const ExpectedTypeContext &Other) {
+    PossibleTypes.append(Other.PossibleTypes);
+
+    // We can't merge ideal types. If they are different, setting to a null type
+    // is the best thing we can do.
+    if (!IdealType || !Other.IdealType || !IdealType->isEqual(Other.IdealType)) {
+      IdealType = Type();
+    }
+    IsImplicitSingleExpressionReturn |= Other.IsImplicitSingleExpressionReturn;
+    PreferNonVoid &= Other.PreferNonVoid;
+    ExpectedCustomAttributeKinds |= Other.ExpectedCustomAttributeKinds;
+  }
+
   Type getIdealType() const { return IdealType; }
 
   void setIdealType(Type IdealType) { this->IdealType = IdealType; }

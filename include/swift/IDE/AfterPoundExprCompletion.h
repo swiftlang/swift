@@ -47,8 +47,7 @@ public:
       : CompletionExpr(CompletionExpr), DC(DC), ParentStmtKind(ParentStmtKind) {
   }
 
-  void deliverResults(ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

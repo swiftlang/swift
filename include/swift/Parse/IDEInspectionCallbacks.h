@@ -230,10 +230,7 @@ public:
     return false;
   }
 
-  virtual void completeLabeledTrailingClosure(CodeCompletionExpr *E,
-                                              bool isAtStartOfLine) {};
-
-  virtual void completeReturnStmt(CodeCompletionExpr *E) {};
+  virtual void completeReturnStmt(CodeCompletionExpr *E){};
 
   virtual void completeThenStmt(CodeCompletionExpr *E) {};
 
