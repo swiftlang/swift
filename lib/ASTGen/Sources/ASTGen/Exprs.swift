@@ -79,7 +79,7 @@ extension ASTGenVisitor {
         return nil
       }
       return name.withUTF8 { buf in
-        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
     }
     let labelLocs: [UnsafeMutableRawPointer] = node.map {
