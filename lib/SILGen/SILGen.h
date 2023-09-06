@@ -32,6 +32,7 @@ namespace swift {
 namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
+  class CalleeTypeInfo;
 
 /// An enum to indicate whether a protocol method requirement is satisfied by
 /// a free function, as for an operator requirement.
@@ -182,10 +183,9 @@ public:
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
-      CanSILFunctionType blockType, CanType continuationTy,
+      CanSILFunctionType blockType, CanType blockStorageType,
       AbstractionPattern origFormalType, CanGenericSignature sig,
-      ForeignAsyncConvention convention,
-      llvm::Optional<ForeignErrorConvention> foreignError);
+      CalleeTypeInfo &calleeInfo);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
