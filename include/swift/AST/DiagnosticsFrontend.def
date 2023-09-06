@@ -556,6 +556,8 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
+ERROR(wmo_with_embedded,none,
+      "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
