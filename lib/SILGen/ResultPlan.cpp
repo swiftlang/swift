@@ -767,9 +767,9 @@ public:
                            {continuation});
 
     // Stash it in a buffer for a block object.
-    auto blockStorageTy = SILType::getPrimitiveAddressType(
-        SILBlockStorageType::get(continuationTy));
-    auto blockStorage = SGF.emitTemporaryAllocation(loc, blockStorageTy);
+    auto blockStorageTy = SILBlockStorageType::get(continuationTy);
+    auto blockStorage = SGF.emitTemporaryAllocation(
+        loc, SILType::getPrimitiveAddressType(blockStorageTy));
     auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
     SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
                       StoreOwnershipQualifier::Trivial);
@@ -796,11 +796,10 @@ public:
         SGF.SGM.getOrCreateForeignAsyncCompletionHandlerImplFunction(
             cast<SILFunctionType>(
                 impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
-            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
-            origFormalType, sig, *calleeTypeInfo.foreign.async,
-            calleeTypeInfo.foreign.error);
+            blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
+            origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
-    
+
     // Initialize the block object for the completion handler.
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
                           impRef, SILType::getPrimitiveObjectType(impFnTy),

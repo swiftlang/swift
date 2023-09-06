@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Callee.h"
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
@@ -198,12 +199,12 @@ static const clang::Type *prependParameterType(
 }
 
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
-    CanSILFunctionType blockType, CanType continuationTy,
+    CanSILFunctionType blockType, CanType blockStorageType,
     AbstractionPattern origFormalType, CanGenericSignature sig,
-    ForeignAsyncConvention convention,
-    llvm::Optional<ForeignErrorConvention> foreignError) {
-  // Extract the result and error types from the continuation type.
-  auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
+    CalleeTypeInfo &calleeInfo) {
+  auto convention = *calleeInfo.foreign.async;
+  auto resumeType =
+      calleeInfo.substResultType->mapTypeOutOfContext()->getReducedType(sig);
 
   CanAnyFunctionType completionHandlerOrigTy = [&]() {
     auto completionHandlerOrigTy =
@@ -236,10 +237,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   // block buffer. The block storage holds the continuation we feed the
   // result values into.
   SmallVector<SILParameterInfo, 4> implArgs;
-  auto blockStorageTy = SILBlockStorageType::get(continuationTy);
-  implArgs.push_back(SILParameterInfo(blockStorageTy,
-                                ParameterConvention::Indirect_InoutAliasable));
-  
+  implArgs.push_back(SILParameterInfo(
+      blockStorageType, ParameterConvention::Indirect_InoutAliasable));
+
   std::copy(blockType->getParameters().begin(),
             blockType->getParameters().end(),
             std::back_inserter(implArgs));
@@ -247,7 +247,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   auto newClangTy = prependParameterType(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
-      getASTContext().getClangTypeForIRGen(blockStorageTy));
+      getASTContext().getClangTypeForIRGen(blockStorageType));
 
   auto implTy = SILFunctionType::get(
       sig,
@@ -384,7 +384,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         errorScope.pop();
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
-      } else if (foreignError) {
+      } else if (auto foreignError = calleeInfo.foreign.error) {
         resumeIntrinsic = getResumeUnsafeThrowingContinuation();
       } else {
         resumeIntrinsic = getResumeUnsafeContinuation();
