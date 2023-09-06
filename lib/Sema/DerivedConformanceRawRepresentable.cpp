@@ -460,7 +460,7 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
 
   rawType = DC->mapTypeIntoContext(rawType);
 
-  auto inherited = enumDecl->getInherited();
+  auto inherited = enumDecl->getInherited().getEntries();
   if (!inherited.empty() && inherited.front().wasValidated() &&
       inherited.front().isError())
     return false;

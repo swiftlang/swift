@@ -734,7 +734,7 @@ void swift::rewriting::realizeInheritedRequirements(
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
 
-  for (unsigned index : indices(inheritedTypes)) {
+  for (unsigned index : inheritedTypes.getIndices()) {
     Type inheritedType
       = evaluateOrDefault(ctx.evaluator,
                           InheritedTypeRequest{decl, index,
@@ -750,7 +750,7 @@ void swift::rewriting::realizeInheritedRequirements(
         continue;
     }
 
-    auto *typeRepr = inheritedTypes[index].getTypeRepr();
+    auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
     if (shouldInferRequirements) {
       inferRequirements(inheritedType, loc, moduleForInference,
@@ -970,15 +970,16 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
     {
       llvm::raw_string_ostream out(result);
       out << start;
-      interleave(assocType->getInherited(), [&](TypeLoc inheritedType) {
-        out << assocType->getName() << ": ";
-        if (auto inheritedTypeRepr = inheritedType.getTypeRepr())
-          inheritedTypeRepr->print(out);
-        else
-          inheritedType.getType().print(out);
-      }, [&] {
-        out << ", ";
-      });
+      llvm::interleave(
+          assocType->getInherited().getEntries(),
+          [&](TypeLoc inheritedType) {
+            out << assocType->getName() << ": ";
+            if (auto inheritedTypeRepr = inheritedType.getTypeRepr())
+              inheritedTypeRepr->print(out);
+            else
+              inheritedType.getType().print(out);
+          },
+          [&] { out << ", "; });
 
       if (const auto whereClause = assocType->getTrailingWhereClause()) {
         if (!assocType->getInherited().empty())

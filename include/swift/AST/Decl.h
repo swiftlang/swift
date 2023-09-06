@@ -1547,6 +1547,53 @@ struct InheritedEntry : public TypeLoc {
     : TypeLoc(typeLoc), isUnchecked(isUnchecked) { }
 };
 
+/// A wrapper for the collection of inherited types for either a `TypeDecl` or
+/// an `ExtensionDecl`.
+class InheritedTypes {
+  llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> Decl;
+  ArrayRef<InheritedEntry> Entries;
+
+public:
+  InheritedTypes(
+      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
+  InheritedTypes(const class Decl *decl);
+  InheritedTypes(const TypeDecl *typeDecl);
+  InheritedTypes(const ExtensionDecl *extensionDecl);
+
+  bool empty() const { return Entries.empty(); }
+  size_t size() const { return Entries.size(); }
+  IntRange<size_t> const getIndices() { return indices(Entries); }
+
+  // FIXME: Remove these in favor of more targeted conveniences
+  const InheritedEntry &front() const { return Entries.front(); }
+  const InheritedEntry &back() const { return Entries.back(); }
+
+  /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
+  /// given index.
+  TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
+
+  /// Returns the array of inherited type entries.
+  /// Returns the underlying array of inherited type entries.
+  ///
+  /// NOTE: The `Type` associated with an entry may not be resolved yet.
+  ArrayRef<InheritedEntry> getEntries() const { return Entries; }
+
+  /// Returns the entry of the inheritance clause at the given index.
+  ///
+  /// NOTE: The `Type` associated with the entry may not be resolved yet.
+  const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
+
+  /// Returns the source location of the beginning of the inheritance clause.
+  SourceLoc getSourceRangeStart() const {
+    return getEntries().front().getSourceRange().Start;
+  }
+
+  /// Returns the source location of the end of the inheritance clause.
+  SourceLoc getSourceRangeEnd() const {
+    return getEntries().back().getSourceRange().End;
+  }
+};
+
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
@@ -1582,6 +1629,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class MemberLookupTable;
   friend class ConformanceLookupTable;
   friend class IterableDeclContext;
+  friend class InheritedTypes;
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
                 ArrayRef<InheritedEntry> inherited,
@@ -1662,7 +1710,7 @@ public:
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
+  InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
@@ -2994,6 +3042,8 @@ protected:
            ArrayRef<InheritedEntry> inherited) :
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
+  friend class InheritedTypes;
+
 public:
   Identifier getName() const { return getBaseIdentifier(); }
 
@@ -3009,7 +3059,7 @@ public:
 
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
+  InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 

@@ -92,14 +92,12 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 /// file.
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  ArrayRef<InheritedEntry> inheritedClause;
+  auto inheritedClause = InheritedTypes(declUnion).getEntries();
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
-
-    inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
@@ -114,7 +112,6 @@ static void checkInheritanceClause(
   } else {
     typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
-    inheritedClause = typeDecl->getInherited();
   }
 
   // Can this declaration's inheritance clause contain a class or
@@ -2968,7 +2965,7 @@ public:
           return;
 
         // go over the all types directly conformed-to by the extension
-        for (auto entry : extension->getInherited()) {
+        for (auto entry : extension->getInherited().getEntries()) {
           diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
                                                entry.getType());
         }

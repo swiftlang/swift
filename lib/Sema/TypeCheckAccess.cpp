@@ -411,13 +411,13 @@ void AccessControlCheckerBase::checkGenericParamAccess(
 
   if (auto params = ownerCtx->getGenericParams()) {
     for (auto param : *params) {
-      if (param->getInherited().empty())
+      auto inheritedEntries = param->getInherited().getEntries();
+      if (inheritedEntries.empty())
         continue;
-      assert(param->getInherited().size() == 1);
-      checkTypeAccessImpl(param->getInherited().front().getType(),
-                          param->getInherited().front().getTypeRepr(),
-                          accessScope, DC, /*mayBeInferred*/false,
-                          callback);
+      assert(inheritedEntries.size() == 1);
+      checkTypeAccessImpl(inheritedEntries.front().getType(),
+                          inheritedEntries.front().getTypeRepr(), accessScope,
+                          DC, /*mayBeInferred*/ false, callback);
     }
   }
 
@@ -725,9 +725,7 @@ public:
     auto minDiagAccessLevel = AccessLevel::Public;
     ImportAccessLevel minImportLimit = llvm::None;
 
-    std::for_each(assocType->getInherited().begin(),
-                  assocType->getInherited().end(),
-                  [&](TypeLoc requirement) {
+    for (TypeLoc requirement : assocType->getInherited().getEntries()) {
       checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
@@ -745,7 +743,7 @@ public:
           minImportLimit = importLimit;
         }
       });
-    });
+    }
     checkTypeAccess(assocType->getDefaultDefinitionType(),
                     assocType->getDefaultDefinitionTypeRepr(), assocType,
                     /*mayBeInferred*/false,
@@ -809,14 +807,15 @@ public:
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
-      auto rawTypeLocIter = std::find_if(ED->getInherited().begin(),
-                                         ED->getInherited().end(),
+      auto inheritedEntries = ED->getInherited().getEntries();
+      auto rawTypeLocIter = std::find_if(inheritedEntries.begin(),
+                                         inheritedEntries.end(),
                                          [&](TypeLoc inherited) {
         if (!inherited.wasValidated())
           return false;
         return inherited.getType().getPointer() == rawType.getPointer();
       });
-      if (rawTypeLocIter == ED->getInherited().end())
+      if (rawTypeLocIter == inheritedEntries.end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
                       /*mayBeInferred*/false,
@@ -851,8 +850,9 @@ public:
     if (const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl()) {
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
-      auto superclassLocIter = std::find_if(CD->getInherited().begin(),
-                                            CD->getInherited().end(),
+      auto inheritedEntries = CD->getInherited().getEntries();
+      auto superclassLocIter = std::find_if(inheritedEntries.begin(),
+                                            inheritedEntries.end(),
                                             [&](TypeLoc inherited) {
         if (!inherited.wasValidated())
           return false;
@@ -865,7 +865,7 @@ public:
       // Sanity check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
-      if (superclassLocIter == CD->getInherited().end())
+      if (superclassLocIter == inheritedEntries.end())
         return;
 
       auto outerDowngradeToWarning = DowngradeToWarning::No;
@@ -919,7 +919,7 @@ public:
 
     // FIXME: Hack to ensure that we've computed the types involved here.
     ASTContext &ctx = proto->getASTContext();
-    for (unsigned i : indices(proto->getInherited())) {
+    for (unsigned i : proto->getInherited().getIndices()) {
       (void)evaluateOrDefault(ctx.evaluator,
                               InheritedTypeRequest{
                                 proto, i, TypeResolutionStage::Interface},
@@ -940,9 +940,7 @@ public:
         return DescriptiveDeclKind::Type;
     };
 
-    std::for_each(proto->getInherited().begin(),
-                  proto->getInherited().end(),
-                  [&](TypeLoc requirement) {
+    for (TypeLoc requirement : proto->getInherited().getEntries()) {
       checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
@@ -961,7 +959,7 @@ public:
           declKind = declKindForType(requirement.getType());
         }
       });
-    });
+    }
 
     forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
       checkTypeAccess(
@@ -1488,9 +1486,7 @@ public:
       ACEK_Requirement
     };
 
-    std::for_each(assocType->getInherited().begin(),
-                  assocType->getInherited().end(),
-                  [&](TypeLoc requirement) {
+    for (TypeLoc requirement : assocType->getInherited().getEntries()) {
       checkTypeAccess(requirement, assocType, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
             const TypeRepr *complainRepr,
@@ -1504,7 +1500,7 @@ public:
         noteLimitingImport(assocType->getASTContext(), importLimit,
                            complainRepr);
       });
-    });
+    }
     checkTypeAccess(assocType->getDefaultDefinitionType(),
                     assocType->getDefaultDefinitionTypeRepr(), assocType,
                      /*mayBeInferred*/false,
@@ -1549,14 +1545,15 @@ public:
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
-      auto rawTypeLocIter = std::find_if(ED->getInherited().begin(),
-                                         ED->getInherited().end(),
+      auto inheritedEntries = ED->getInherited().getEntries();
+      auto rawTypeLocIter = std::find_if(inheritedEntries.begin(),
+                                         inheritedEntries.end(),
                                          [&](TypeLoc inherited) {
         if (!inherited.wasValidated())
           return false;
         return inherited.getType().getPointer() == rawType.getPointer();
       });
-      if (rawTypeLocIter == ED->getInherited().end())
+      if (rawTypeLocIter == inheritedEntries.end())
         return;
       checkTypeAccess(rawType, rawTypeLocIter->getTypeRepr(), ED,
                        /*mayBeInferred*/false,
@@ -1584,10 +1581,11 @@ public:
 
     if (CD->hasSuperclass()) {
       const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl();
+      auto inheritedEntries = CD->getInherited().getEntries();
       // Be slightly defensive here in the presence of badly-ordered
       // inheritance clauses.
-      auto superclassLocIter = std::find_if(CD->getInherited().begin(),
-                                            CD->getInherited().end(),
+      auto superclassLocIter = std::find_if(inheritedEntries.begin(),
+                                            inheritedEntries.end(),
                                             [&](TypeLoc inherited) {
         if (!inherited.wasValidated())
           return false;
@@ -1600,7 +1598,7 @@ public:
       // Sanity check: we couldn't find the superclass for whatever reason
       // (possibly because it's synthetic or something), so don't bother
       // checking it.
-      if (superclassLocIter == CD->getInherited().end())
+      if (superclassLocIter == inheritedEntries.end())
         return;
 
       checkTypeAccess(CD->getSuperclass(), superclassLocIter->getTypeRepr(), CD,
@@ -1628,9 +1626,7 @@ public:
       PCEK_Requirement
     };
 
-    std::for_each(proto->getInherited().begin(),
-                  proto->getInherited().end(),
-                  [&](TypeLoc requirement) {
+    for (TypeLoc requirement : proto->getInherited().getEntries()) {
       checkTypeAccess(requirement, proto, /*mayBeInferred*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
@@ -1644,7 +1640,7 @@ public:
         highlightOffendingType(diag, complainRepr);
         noteLimitingImport(proto->getASTContext(), importLimit, complainRepr);
       });
-    });
+    }
 
     if (proto->getTrailingWhereClause()) {
       auto accessScope = proto->getFormalAccessScope(nullptr,
@@ -2008,10 +2004,11 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
 
     if (auto params = ownerCtx->getGenericParams()) {
       for (auto param : *params) {
-        if (param->getInherited().empty())
+        auto inheritedEntries = param->getInherited().getEntries();
+        if (inheritedEntries.empty())
           continue;
-        assert(param->getInherited().size() == 1);
-        auto inherited = param->getInherited().front();
+        assert(inheritedEntries.size() == 1);
+        auto inherited = inheritedEntries.front();
         checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
       }
     }
@@ -2158,11 +2155,10 @@ public:
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
-    llvm::for_each(assocType->getInherited(),
-                   [&](TypeLoc requirement) {
+    for (TypeLoc requirement : assocType->getInherited().getEntries()) {
       checkType(requirement.getType(), requirement.getTypeRepr(),
                 assocType);
-    });
+    }
     checkType(assocType->getDefaultDefinitionType(),
               assocType->getDefaultDefinitionTypeRepr(), assocType);
 
@@ -2192,17 +2188,17 @@ public:
       flags |= DeclAvailabilityFlag::
           AllowPotentiallyUnavailableAtOrBelowDeploymentTarget;
 
-    llvm::for_each(nominal->getInherited(), [&](TypeLoc inherited) {
+    for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
                 ExportabilityReason::General, flags);
-    });
+    }
   }
 
   void visitProtocolDecl(ProtocolDecl *proto) {
-    llvm::for_each(proto->getInherited(), [&](TypeLoc requirement) {
+    for (TypeLoc requirement : proto->getInherited().getEntries()) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
                 ExportabilityReason::General);
-    });
+    }
 
     if (proto->getTrailingWhereClause()) {
       forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
@@ -2290,11 +2286,11 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
-    llvm::for_each(ED->getInherited(), [&](TypeLoc inherited) {
+    for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
                 ExportabilityReason::General,
                 DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
-    });
+    }
 
     auto wasWhere = Where;
 

@@ -1527,6 +1527,38 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
 }
 
+InheritedTypes::InheritedTypes(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl)
+    : Decl(decl) {
+  if (auto *typeDecl = decl.dyn_cast<const TypeDecl *>()) {
+    Entries = typeDecl->Inherited;
+  } else {
+    Entries = decl.get<const ExtensionDecl *>()->Inherited;
+  }
+}
+
+InheritedTypes::InheritedTypes(const class Decl *decl) {
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    Decl = typeDecl;
+    Entries = typeDecl->Inherited;
+  } else if (auto extensionDecl = dyn_cast<ExtensionDecl>(decl)) {
+    Decl = extensionDecl;
+    Entries = extensionDecl->Inherited;
+  } else {
+    Decl = nullptr;
+    Entries = ArrayRef<InheritedEntry>();
+  }
+}
+
+InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
+  Entries = typeDecl->Inherited;
+}
+
+InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
+    : Decl(extensionDecl) {
+  Entries = extensionDecl->Inherited;
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              ArrayRef<InheritedEntry> inherited,

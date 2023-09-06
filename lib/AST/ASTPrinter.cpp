@@ -2954,8 +2954,8 @@ static bool usesFeatureRethrowsProtocol(
     return false;
 
   // Check an inheritance clause for a marker protocol.
-  auto checkInherited = [&](ArrayRef<InheritedEntry> inherited) -> bool {
-    for (const auto &inheritedEntry : inherited) {
+  auto checkInherited = [&](InheritedTypes inherited) -> bool {
+    for (const auto &inheritedEntry : inherited.getEntries()) {
       if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
@@ -7681,15 +7681,10 @@ void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
     llvm::SmallVectorImpl<InheritedEntry> &Results) {
-  ArrayRef<InheritedEntry> inherited;
-  if (auto td = dyn_cast<TypeDecl>(decl)) {
-    inherited = td->getInherited();
-  } else if (auto ed = dyn_cast<ExtensionDecl>(decl)) {
-    inherited = ed->getInherited();
-  }
+  InheritedTypes inherited = InheritedTypes(decl);
 
   // Collect explicit inherited types.
-  for (auto entry: inherited) {
+  for (auto entry : inherited.getEntries()) {
     if (auto ty = entry.getType()) {
       bool foundUnprintable = ty.findIf([&](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
@@ -7831,7 +7826,7 @@ void GenericParamList::print(ASTPrinter &Printer,
         if (!P->getInherited().empty()) {
           Printer << " : ";
 
-          auto loc = P->getInherited()[0];
+          auto loc = P->getInherited().getEntry(0);
           if (willUseTypeReprPrinting(loc, nullptr, PO)) {
             loc.getTypeRepr()->print(Printer, PO);
           } else {

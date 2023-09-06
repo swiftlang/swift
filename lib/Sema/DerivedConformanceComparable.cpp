@@ -336,7 +336,7 @@ void DerivedConformance::tryDiagnoseFailedComparableDerivation(
   if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
     if (enumDecl->hasRawType() && !enumDecl->getRawType()->is<ErrorType>()) {
       auto rawType = enumDecl->getRawType();
-      auto rawTypeLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+      auto rawTypeLoc = enumDecl->getInherited().front().getSourceRange().Start;
       ctx.Diags.diagnose(rawTypeLoc,
                          diag::comparable_synthesis_raw_value_not_allowed,
                          rawType, nominal->getDeclaredInterfaceType(),

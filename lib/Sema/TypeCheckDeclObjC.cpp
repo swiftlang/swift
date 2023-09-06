@@ -2892,7 +2892,7 @@ public:
 
     // Conformances are declared exclusively in the interface, so diagnose any
     // in the implementation right away.
-    for (auto &inherited : ext->getInherited()) {
+    for (auto &inherited : ext->getInherited().getEntries()) {
       bool isImportedProtocol = false;
       if (auto protoNominal = inherited.getType()->getAnyNominal())
         isImportedProtocol = protoNominal->hasClangNode();
