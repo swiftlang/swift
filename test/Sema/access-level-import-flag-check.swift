@@ -9,9 +9,11 @@
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t
 
 /// Check flag requirement, without and with the flag.
-// RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t -verify \
+// RUN:   -package-name package
 // RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -package-name package
 // REQUIRES: asserts
 
 //--- PublicLib.swift

@@ -21,7 +21,8 @@
 public struct LibType {}
 
 // RUN: %target-swift-frontend -typecheck %t/OneFile_AllExplicit.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name package
 //--- OneFile_AllExplicit.swift
 public import Lib
 package import Lib
@@ -30,7 +31,8 @@ fileprivate import Lib
 private import Lib
 
 // RUN: %target-swift-frontend -typecheck %t/ManyFiles_AllExplicit_File?.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name package
 //--- ManyFiles_AllExplicit_FileA.swift
 public import Lib
 //--- ManyFiles_AllExplicit_FileB.swift
