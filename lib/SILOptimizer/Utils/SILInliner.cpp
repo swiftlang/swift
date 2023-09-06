@@ -943,6 +943,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RefToRawPointerInst:
 
   case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::EndInitLetRefInst:
 
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ConvertFunctionInst:

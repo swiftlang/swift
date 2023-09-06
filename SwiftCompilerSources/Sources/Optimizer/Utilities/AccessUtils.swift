@@ -545,6 +545,7 @@ extension Value {
     while true {
       switch value {
       case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
+           is EndInitLetRefInst,
            is BeginDeallocRefInst,
            is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst:
         value = (value as! Instruction).operands[0].value

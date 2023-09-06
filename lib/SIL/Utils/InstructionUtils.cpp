@@ -83,6 +83,8 @@ SILValue swift::getUnderlyingObject(SILValue v) {
     v2 = lookThroughOwnershipInsts(v2);
     if (auto *ecm = dyn_cast<EndCOWMutationInst>(v2)) {
       v2 = ecm->getOperand();
+    } else if (auto *eir = dyn_cast<EndInitLetRefInst>(v2)) {
+      v2 = eir->getOperand();
     } else if (auto *mvr = dyn_cast<MultipleValueInstructionResult>(v2)) {
       if (auto *bci = dyn_cast<BeginCOWMutationInst>(mvr->getParent()))
         v2 = bci->getOperand();
@@ -146,7 +148,7 @@ SILValue swift::stripCastsWithoutMarkDependence(SILValue v) {
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
       if (isIdentityPreservingRefCast(svi) ||
           isa<UncheckedTrivialBitCastInst>(v) || isa<BeginAccessInst>(v) ||
-          isa<EndCOWMutationInst>(v)) {
+          isa<EndInitLetRefInst>(v) || isa<EndCOWMutationInst>(v)) {
         v = svi->getOperand(0);
         continue;
       }
@@ -835,6 +837,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
   case SILInstructionKind::BeginDeallocRefInst:
+  case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::CopyBlockInst:

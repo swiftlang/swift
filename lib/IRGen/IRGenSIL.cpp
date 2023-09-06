@@ -1296,6 +1296,7 @@ public:
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitBeginDeallocRefInst(BeginDeallocRefInst *i);
+  void visitEndInitLetRefInst(EndInitLetRefInst *i);
   void visitObjectInst(ObjectInst *i)  {
     llvm_unreachable("object instruction cannot appear in a function");
   }
@@ -4857,6 +4858,11 @@ void IRGenSILFunction::visitBeginDeallocRefInst(BeginDeallocRefInst *i) {
     }
   }
   emitNativeSetDeallocating(ref);
+}
+
+void IRGenSILFunction::visitEndInitLetRefInst(EndInitLetRefInst *i) {
+  Explosion v = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(i, v);
 }
 
 void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {

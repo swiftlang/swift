@@ -5131,6 +5131,21 @@ implications and it's purpose is purly to enforce that the object allocation
 is present in the same function and trivially visible from the
 ``begin_dealloc_ref`` instruction.
 
+end_init_let_ref
+````````````````
+::
+
+  %1 = end_init_let_ref %0 : $T
+  // $T must be a reference type.
+
+Marks the point where all let-fields of a class are initialized.
+
+Returns the reference operand. Technically, the returned reference is the same
+as the operand. But it's important that optimizations see the result as a
+different SSA value than the operand. This is important to ensure the
+correctness of ``ref_element_addr [immutable]`` for let-fields, because in the
+initializer of a class, its let-fields are not immutable, yet.
+
 strong_copy_unowned_value
 `````````````````````````
 ::
@@ -6574,6 +6589,10 @@ is null.
 The ``immutable`` attribute specifies that all loads of the same instance
 variable from the same class reference operand are guaranteed to yield the
 same value.
+The ``immutable`` attribute is used to reference COW buffer elements after an
+``end_cow_mutation`` and before a ``begin_cow_mutation``.
+The attribute is also used for let-fields of a class after an
+``end_init_let_ref`` and before a ``begin_dealloc_ref``.
 
 ref_tail_addr
 `````````````

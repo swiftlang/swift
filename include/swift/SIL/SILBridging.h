@@ -1143,6 +1143,11 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createEndInitLetRef(BridgedValue op) const {
+    return {builder().createEndInitLetRef(regularLoc(), op.getSILValue())};
+  }
+
+  SWIFT_IMPORT_UNSAFE
   BridgedInstruction createStrongRetain(BridgedValue op) const {
     auto b = builder();
     return {b.createStrongRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};

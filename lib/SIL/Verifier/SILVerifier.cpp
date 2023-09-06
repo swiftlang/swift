@@ -3069,6 +3069,15 @@ public:
                     "result of begin_dealloc_ref should be same type as operand");
   }
   
+  void checkEndInitLetRefInst(EndInitLetRefInst *I) {
+    require(I->getOperand()->getType().isObject(),
+            "Source value should be an object value");
+    require(I->getOperand()->getType().hasRetainablePointerRepresentation(),
+            "Source value must be a reference type");
+    requireSameType(I->getOperand()->getType(), I->getType(),
+                    "result of end_init_let_ref should be same type as operand");
+  }
+
   void checkCopyBlockInst(CopyBlockInst *I) {
     require(I->getOperand()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");

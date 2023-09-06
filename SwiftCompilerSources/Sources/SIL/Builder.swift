@@ -123,6 +123,11 @@ public struct Builder {
     return notifyNew(beginDealloc.getAs(BeginDeallocRefInst.self))
   }
 
+  public func createEndInitLetRef(operand: Value) -> EndInitLetRefInst {
+    let endInit = bridged.createEndInitLetRef(operand.bridged)
+    return notifyNew(endInit.getAs(EndInitLetRefInst.self))
+  }
+
   @discardableResult
   public func createStrongRetain(operand: Value) -> StrongRetainInst {
     let retain = bridged.createStrongRetain(operand.bridged)

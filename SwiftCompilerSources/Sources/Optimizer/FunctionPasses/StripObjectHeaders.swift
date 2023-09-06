@@ -55,6 +55,7 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
          is BranchInst, is CondBranchInst, is SwitchEnumInst,
          is UpcastInst, is UncheckedRefCastInst,
          is BeginDeallocRefInst,
+         is EndInitLetRefInst,
          is EndCOWMutationInst:
       return walkDownDefault(value: operand, path: path)
     default:

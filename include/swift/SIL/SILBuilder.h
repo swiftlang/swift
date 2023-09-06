@@ -1599,6 +1599,12 @@ public:
         getSILDebugLocation(Loc), reference, allocation));
   }
 
+  EndInitLetRefInst *createEndInitLetRef(SILLocation Loc,
+                                             SILValue operand) {
+    return insert(new (getModule()) EndInitLetRefInst(
+        getSILDebugLocation(Loc), operand));
+  }
+
   ObjectInst *createObject(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements,
                            unsigned NumBaseElements) {

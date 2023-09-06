@@ -2497,6 +2497,9 @@ public:
       *this << "[keep_unique] ";
     *this << getIDAndType(ECMI->getOperand());
   }
+  void visitEndInitLetRefInst(EndInitLetRefInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
   void visitBeginDeallocRefInst(BeginDeallocRefInst *I) {
     *this << getIDAndType(I->getReference()) << " of "
           << getIDAndType(I->getOperand(1));

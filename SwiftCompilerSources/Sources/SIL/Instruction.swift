@@ -309,6 +309,8 @@ final public class BeginDeallocRefInst : SingleValueInstruction {
   public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
 }
 
+final public class EndInitLetRefInst : SingleValueInstruction, UnaryInstruction {}
+
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
 }

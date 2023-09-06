@@ -2132,6 +2132,15 @@ SILCloner<ImplClass>::visitBeginDeallocRefInst(BeginDeallocRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitEndInitLetRefInst(EndInitLetRefInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndInitLetRef(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getAllElements());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

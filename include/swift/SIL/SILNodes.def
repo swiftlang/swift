@@ -700,6 +700,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(BeginDeallocRefInst, begin_dealloc_ref,
                     SingleValueInstruction, None, DoesNotRelease)
 
+  SINGLE_VALUE_INST(EndInitLetRefInst, end_init_let_ref,
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // BindMemory and RebindMemory have no physical side effect. Semantically they
   // access their affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.
