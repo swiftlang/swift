@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -8,7 +9,7 @@ extension ASTGenVisitor {
 
     var text = node.name.text
     let id = text.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     guard let generics = node.genericArgumentClause else {
@@ -38,7 +39,7 @@ extension ASTGenVisitor {
 
       var nameText = nameToken.text
       let name = nameText.withUTF8 { buf in
-        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
       let nameLoc = self.base.advanced(by: nameToken.position.utf8Offset).raw
 
@@ -175,12 +176,12 @@ extension ASTGenVisitor {
     for element in elementList {
       var nameText = element.name?.text
       let name = nameText?.withUTF8 { buf in
-        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
       let nameLoc = element.name.map { self.base.advanced(by: $0.position.utf8Offset).raw }
       var secondNameText = element.secondName?.text
       let secondName = secondNameText?.withUTF8 { buf in
-        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
       let secondNameLoc = element.secondName.map {
         self.base.advanced(by: $0.position.utf8Offset).raw
