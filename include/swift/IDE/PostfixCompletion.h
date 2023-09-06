@@ -103,10 +103,9 @@ public:
   ///                         \p DotLoc is invalid
   /// \param HasLeadingSpace Whether there is a space separating the exiting
   ///                        expression and the code completion token.
-  void deliverResults(SourceLoc DotLoc, bool IsInSelector,
+  void collectResults(SourceLoc DotLoc, bool IsInSelector,
                       bool IncludeOperators, bool HasLeadingSpace,
-                      CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+                      CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

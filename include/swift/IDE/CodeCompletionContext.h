@@ -20,6 +20,7 @@ namespace swift {
 namespace ide {
 
 class CodeCompletionCache;
+struct RequestedCachedModule;
 
 class CodeCompletionContext {
   friend class CodeCompletionResultBuilder;
@@ -103,6 +104,13 @@ public:
   sortCompletionResults(ArrayRef<CodeCompletionResult *> Results);
 
   CodeCompletionResultSink &getResultSink() { return CurrentResults; }
+
+  /// Add code completion results from the given requested modules to this
+  /// context.
+  void addResultsFromModules(ArrayRef<RequestedCachedModule> RequestedModules,
+                             const ExpectedTypeContext &TypeContext,
+                             const DeclContext *DC,
+                             bool CanCurrDeclContextHandleAsync);
 };
 
 } // end namespace ide

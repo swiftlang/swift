@@ -73,10 +73,9 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
   Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
 }
 
-void KeyPathTypeCheckCompletionCallback::deliverResults(
+void KeyPathTypeCheckCompletionCallback::collectResults(
     DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -91,5 +90,6 @@ void KeyPathTypeCheckCompletionCallback::deliverResults(
     Lookup.getValueExprCompletions(Result.BaseType);
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, ExpectedTypeContext(),
+                           /*CanCurrDeclContextHandleAsync=*/false);
 }
