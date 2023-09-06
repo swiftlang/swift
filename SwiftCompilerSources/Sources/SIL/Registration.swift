@@ -41,6 +41,7 @@ public func registerSILClasses() {
   register(StoreInst.self)
   register(StoreWeakInst.self)
   register(StoreUnownedInst.self)
+  register(AssignInst.self)
   register(CopyAddrInst.self)
   register(EndAccessInst.self)
   register(EndBorrowInst.self)

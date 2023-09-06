@@ -4931,6 +4931,8 @@ class MarkUninitializedInst
 
 public:
   /// This enum captures what the mark_uninitialized instruction is designating.
+  ///
+  /// Warning: this enum must be in sync with the swift `MarkUninitializedInst.Kind`
   enum Kind {
     /// Var designates the start of a normal variable live range.
     Var,

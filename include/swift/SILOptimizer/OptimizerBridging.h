@@ -190,6 +190,14 @@ struct BridgedPassContext {
     return {invocation->getPassManager()->getAnalysis<swift::BasicCalleeAnalysis>()};
   }
 
+  bool hadError() const {
+    return invocation->getPassManager()->getModule()->getASTContext().hadError();
+  }
+
+  swift::SILStage getSILStage() const {
+    return invocation->getPassManager()->getModule()->getStage();
+  }
+
   SWIFT_IMPORT_UNSAFE
   BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const {
     auto *dba = invocation->getPassManager()->getAnalysis<swift::DeadEndBlocksAnalysis>();

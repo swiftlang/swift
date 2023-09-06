@@ -260,6 +260,13 @@ struct BridgedFunction {
     return getFunction()->isGlobalInitOnceFunction();
   }
 
+  bool isDestructor() const {
+    if (auto *declCtxt = getFunction()->getDeclContext()) {
+      return llvm::isa<swift::DestructorDecl>(declCtxt);
+    }
+    return false;
+  }
+
   bool isGenericFunction() const {
     return !getFunction()->getGenericSignature().isNull();
   }
@@ -655,6 +662,14 @@ struct BridgedInstruction {
     return getAs<swift::RefElementAddrInst>()->getField()->isLet();
   }
 
+  bool RefElementAddrInst_isImmutable() const {
+    return getAs<swift::RefElementAddrInst>()->isImmutable();
+  }
+
+  void RefElementAddrInst_setImmutable(bool isImmutable) const {
+    getAs<swift::RefElementAddrInst>()->setImmutable(isImmutable);
+  }
+
   SwiftInt PartialApplyInst_numArguments() const {
     return getAs<swift::PartialApplyInst>()->getNumArguments();
   }
@@ -739,6 +754,10 @@ struct BridgedInstruction {
     return (SwiftInt)getAs<swift::StoreInst>()->getOwnershipQualifier();
   }
 
+  SwiftInt AssignInst_getAssignOwnership() const {
+    return (SwiftInt)getAs<swift::AssignInst>()->getOwnershipQualifier();
+  }
+
   swift::SILAccessKind BeginAccessInst_getAccessKind() const {
     return getAs<swift::BeginAccessInst>()->getAccessKind();
   }
@@ -753,6 +772,10 @@ struct BridgedInstruction {
 
   bool CopyAddrInst_isInitializationOfDest() const {
     return getAs<swift::CopyAddrInst>()->isInitializationOfDest();
+  }
+
+  SwiftInt MarkUninitializedInst_getKind() const {
+    return (SwiftInt)getAs<swift::MarkUninitializedInst>()->getMarkUninitializedKind();
   }
 
   void RefCountingInst_setIsAtomic(bool isAtomic) const {
