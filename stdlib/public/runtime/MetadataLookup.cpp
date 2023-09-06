@@ -2830,6 +2830,61 @@ swift_getOpaqueTypeConformance(const void * const *arguments,
       arguments, static_cast<const OpaqueTypeDescriptor *>(descriptor), index);
 }
 
+SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_CC(swift)
+const Metadata *swift::_swift_checkedCreateType(const TypeContextDescriptor *context,
+                                                const void * const *genericArgs,
+                                                size_t genericArgsSize,
+                                                const int32_t *packCounts,
+                                                size_t packCountsSize) {
+  context = swift_auth_data_non_address(
+      context, SpecialPointerAuthDiscriminators::ContextDescriptor);
+
+  if (!context->isGeneric()) {
+    return nullptr;
+  }
+
+  if (packCounts && genericArgsSize != packCountsSize) {
+    return nullptr;
+  }
+
+  llvm::SmallVector<MetadataOrPack, 8> fixedGenericArgs;
+
+  // Heap allocate all of the potential stack allocated pack pointers
+  for (size_t i = 0; i != genericArgsSize; i += 1) {
+    // Use -1 to indicate that this is not a pack pointer and instead just
+    // metadata. If we were not passed a packCount array, treat all elements as
+    // if they were just metadata.
+    if ((packCounts && packCounts[i] == -1) || !packCounts) {
+      fixedGenericArgs.push_back(MetadataOrPack(genericArgs[i]));
+      continue;
+    }
+
+    auto packPointer = swift_allocateMetadataPack(
+      reinterpret_cast<const Metadata *const *>(genericArgs[i]), packCounts[i]);
+    fixedGenericArgs.push_back(MetadataOrPack(packPointer));
+  }
+
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  llvm::SmallVector<unsigned, 8> genericParamCounts;
+  llvm::SmallVector<const void *, 8> allGenericArgs;
+
+  auto result = _gatherGenericParameters(context, fixedGenericArgs,
+                                         /* parent */ nullptr,
+                                         genericParamCounts, allGenericArgs,
+                                         demangler);
+
+  // _gatherGenericParameters returns llvm::None on success.
+  if (result.hasValue()) {
+    return nullptr;
+  }
+
+  auto accessFunction = context->getAccessFunction();
+
+  return accessFunction(MetadataState::Complete, allGenericArgs).Value;
+}
+
 #if SWIFT_OBJC_INTEROP
 
 // Return the ObjC class for the given type name.

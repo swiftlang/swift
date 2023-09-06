@@ -1046,6 +1046,16 @@ void swift_initRawStructMetadata(StructMetadata *self,
                                  const TypeLayout *likeType,
                                  int32_t count);
 
+/// Check if the given generic arguments are valid inputs for the generic type
+/// context and if so call the access function to return 
+SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_CC(swift)
+const Metadata *_swift_checkedCreateType(const TypeContextDescriptor *context,
+                                         const void * const *genericArgs,
+                                         size_t genericArgsSize,
+                                         const int32_t *packCounts,
+                                         size_t packCountsSize);
+
 #pragma clang diagnostic pop
 
 } // end namespace swift
