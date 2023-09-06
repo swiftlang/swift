@@ -163,3 +163,28 @@ let _: Int = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
 // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{18-20=as!}}
 let _: Int? = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
 // expected-note@-1 {{did you mean to use 'as?' to conditionally downcast?}} {{19-21=as?}}
+
+// https://github.com/apple/swift/issues/63926
+
+do {
+  func fn(_: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
+  // expected-note@-1 {{candidate '(Int) -> ()' has 1 parameter, but context '() -> Void' has 0}}
+  func fn(_: Bool) {} // expected-note {{found candidate with type '(Bool) -> ()'}}
+  // expected-note@-1 {{candidate '(Bool) -> ()' has 1 parameter, but context '() -> Void' has 0}}
+
+  func fn_1(_: Bool) {} 
+
+  let i = 0
+  // Missing parameters.
+  (fn as (Int, Int) -> Void)(i, i) // expected-error {{cannot convert value of type '(Int) -> ()' to type '(Int, Int) -> Void' in coercion}}
+  (fn as (Bool, Bool) -> Void)(i, i) // expected-error {{cannot convert value of type '(Bool) -> ()' to type '(Bool, Bool) -> Void' in coercion}}
+  // expected-error@-1 2{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  (fn as (Int, Bool) -> Void)(i, i) // expected-error {{cannot convert value of type '(Int) -> ()' to type '(Int, Bool) -> Void' in coercion}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  (fn as (String) -> Void)(i) // expected-error {{no exact matches in reference to local function 'fn'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  // Extraneous parameters.
+  (fn as () -> Void)() // expected-error {{no exact matches in reference to local function 'fn'}}
+  (fn_1 as () -> Void)() // expected-error {{cannot convert value of type '(Bool) -> ()' to type '() -> Void' in coercion}}
+}
