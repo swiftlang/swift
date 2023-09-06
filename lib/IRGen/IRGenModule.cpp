@@ -2041,7 +2041,7 @@ const llvm::StringRef IRGenerator::getClangDataLayoutString() {
 }
 
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
-  return TypeExpansionContext::maximal(getSwiftModule(),
+  return TypeExpansionContext::maximal(getSILModule().getAssociatedContext(),
                                        getSILModule().isWholeModule());
 }
 
