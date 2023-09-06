@@ -100,8 +100,6 @@ typedef __swiftc_uintn_t(__INTPTR_WIDTH__) SwiftUInt;
 #define _Nonnull
 #endif
 
-SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
-
 #ifdef __cplusplus
 extern "C" {
 
@@ -115,6 +113,7 @@ FeatureName,
 #include "swift/Basic/Features.def"
 } BridgedFeature;
 
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 SWIFT_BEGIN_ASSUME_NONNULL
 
 typedef struct BridgedData {
