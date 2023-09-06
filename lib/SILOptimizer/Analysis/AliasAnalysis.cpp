@@ -715,30 +715,24 @@ MemoryBehavior AliasAnalysis::getMemoryBehaviorOfInst(
             SILValue addr, SILInstruction *toInst) {
   if (getMemEffectsFunction) {
     return (MemoryBehavior)getMemEffectsFunction({PM->getSwiftPassInvocation()}, {addr},
-                                                 {toInst->asSILNode()});
+                                                 {toInst->asSILNode()},
+                                                 getComplexityBudget(addr));
   }
   return MemoryBehavior::MayHaveSideEffects;
 }
 
 bool AliasAnalysis::isObjectReleasedByInst(SILValue obj, SILInstruction *inst) {
   if (isObjReleasedFunction) {
-    return isObjReleasedFunction({PM->getSwiftPassInvocation()}, {obj}, {inst->asSILNode()}) != 0;
+    return isObjReleasedFunction({PM->getSwiftPassInvocation()}, {obj}, {inst->asSILNode()},
+                                 getComplexityBudget(obj)) != 0;
   }
   return true;
 }
 
 bool AliasAnalysis::isAddrVisibleFromObject(SILValue addr, SILValue obj) {
   if (isAddrVisibleFromObjFunction) {
-    // This function is called a lot from ARCSequenceOpt and ReleaseHoisting.
-    // To avoid quadratic complexity for large functions, we limit the amount
-    // of work what the EscapeUtils are allowed to to.
-    // This keeps the complexity linear.
-    //
-    // This arbitrary limit is good enough for almost all functions. It lets
-    // the EscapeUtils do several hundred up/down walks which is much more than
-    // needed in most cases.
-    SwiftInt complexityLimit = 1000000 / getEstimatedFunctionSize(addr);
-    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()}, {addr}, {obj}, complexityLimit) != 0;
+    return isAddrVisibleFromObjFunction({PM->getSwiftPassInvocation()}, {addr}, {obj},
+                                        getComplexityBudget(addr)) != 0;
   }
   return true;
 }
@@ -750,7 +744,14 @@ bool AliasAnalysis::canReferenceSameField(SILValue lhs, SILValue rhs) {
   return true;
 }
 
-int AliasAnalysis::getEstimatedFunctionSize(SILValue valueInFunction) {
+// To avoid quadratic complexity for large functions, we limit the amount
+// of work what the EscapeUtils are allowed to to.
+// This keeps the complexity linear.
+//
+// This arbitrary limit is good enough for almost all functions. It lets
+// the EscapeUtils do several hundred up/down walks which is much more than
+// needed in most cases.
+int AliasAnalysis::getComplexityBudget(SILValue valueInFunction) {
   if (estimatedFunctionSize < 0) {
     int numInsts = 0;
     SILFunction *f = valueInFunction->getFunction();
@@ -759,5 +760,5 @@ int AliasAnalysis::getEstimatedFunctionSize(SILValue valueInFunction) {
     }
     estimatedFunctionSize = numInsts;
   }
-  return estimatedFunctionSize;
+  return 1000000 / estimatedFunctionSize;
 }

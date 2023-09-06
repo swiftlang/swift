@@ -63,7 +63,7 @@ struct AliasAnalysis {
   static func register() {
     BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction) -> swift.MemoryBehavior in
+      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> swift.MemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
@@ -77,23 +77,28 @@ struct AliasAnalysis {
             case (true, true):   return .MayReadWrite
           }
         }
-        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true), context) {
+        if val.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: true),
+                                   complexityBudget: complexityBudget, context) {
           return .MayReadWrite
         }
         return .None
       },
 
       // isObjReleasedFn
-      { (bridgedCtxt: BridgedPassContext, bridgedObj: BridgedValue, bridgedInst: BridgedInstruction) -> Bool in
+      { (bridgedCtxt: BridgedPassContext, bridgedObj: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let obj = bridgedObj.value
         let path = SmallProjectionPath(.anyValueFields)
         if let apply = inst as? ApplySite {
-          let effect = getOwnershipEffect(of: apply, for: obj, path: path, context)
+          // Workaround for quadratic complexity in ARCSequenceOpts.
+          // We need to use an ever lower budget to not get into noticable compile time troubles.
+          let budget = complexityBudget / 10
+          let effect = getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget, context)
           return effect.destroy
         }
-        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false), context)
+        return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false),
+                                       complexityBudget: complexityBudget, context)
       },
 
       // isAddrVisibleFromObj
@@ -144,9 +149,10 @@ private func getMemoryEffect(of apply: ApplySite, for address: Value, path: Smal
   return memoryEffects
 }
 
-private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath, _ context: FunctionPassContext) -> SideEffects.Ownership {
+private func getOwnershipEffect(of apply: ApplySite, for value: Value, path: SmallProjectionPath,
+                                complexityBudget: Int, _ context: FunctionPassContext) -> SideEffects.Ownership {
   let visitor = SideEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
-  if let result = value.at(path).visit(using: visitor, context) {
+  if let result = value.at(path).visit(using: visitor, complexityBudget: complexityBudget, context) {
     // The resulting effects are the argument effects to which `value` escapes to.
     return result.ownership
   } else {
