@@ -368,5 +368,8 @@ NODE(HasSymbolQuery)
 NODE(OpaqueReturnTypeIndex)
 NODE(OpaqueReturnTypeParent)
 
+// Added in Swift 5.9 + 1
+NODE(AsyncRemoved)
+
 #undef CONTEXT_NODE
 #undef NODE

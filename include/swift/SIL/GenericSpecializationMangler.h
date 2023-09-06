@@ -14,6 +14,7 @@
 #define SWIFT_SIL_UTILS_GENERICSPECIALIZATIONMANGLER_H
 
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Effects.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILFunction.h"
@@ -44,6 +45,9 @@ protected:
 
   llvm::SmallVector<char, 32> ArgOpStorage;
   llvm::raw_svector_ostream ArgOpBuffer;
+
+  // Effects that are removed from the original function in this specialization.
+  PossibleEffects RemovedEffects;
 
 protected:
   SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
