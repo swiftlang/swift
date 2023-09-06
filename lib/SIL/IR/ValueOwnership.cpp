@@ -81,6 +81,7 @@ CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, ExplicitCopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MoveValue)
 CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
+CONSTANT_OWNERSHIP_INST(Owned, BeginDeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?

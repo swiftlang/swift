@@ -834,7 +834,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::ExplicitCopyValueInst:
-  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::CopyBlockInst:

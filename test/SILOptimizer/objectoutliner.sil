@@ -81,6 +81,30 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @remove_dealloc_instructions :
+// CHECK:         [[G:%.*]] = global_value
+// CHECK-NEXT:    strong_retain [[G]] : $Obj
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[C:%.*]] = unchecked_ref_cast [[G]]
+// CHECK-NEXT:    strong_release [[C]]
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_dealloc_instructions'
+sil @remove_dealloc_instructions : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation %7 : $Obj
+  %11 = unchecked_ref_cast %10 : $Obj to $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  dealloc_ref %12 : $Base
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @outline_global_with_upcast
 // CHECK: [[G:%[0-9]+]] = global_value @outline_global_with_upcastTv_ : $Obj
 // CHECK: strong_retain [[G]] : $Obj
@@ -149,8 +173,8 @@ bb0:
   %6 = ref_element_addr %5 : $Obj, #Obj.value
   store %4 to %6 : $*Int64
   %10 = end_cow_mutation %5 : $Obj
-  set_deallocating %10 : $Obj
-  dealloc_ref %10 : $Obj
+  %11 = begin_dealloc_ref %10 : $Obj of %5 : $Obj
+  dealloc_ref %11 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -308,6 +332,29 @@ bb0:
   store %6 to %20 : $*Int64
   %21 = end_cow_mutation %7 : $Obj
   strong_release %21 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @unknown_use : $@convention(thin) (@guaranteed Base) -> ()
+
+// CHECK-LABEL: sil @dont_outline_with_invalid_use_of_begin_dealloc :
+// CHECK:         alloc_ref
+// CHECK:       } // end sil function 'dont_outline_with_invalid_use_of_begin_dealloc'
+sil @dont_outline_with_invalid_use_of_begin_dealloc : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation %7 : $Obj
+  %11 = unchecked_ref_cast %10 : $Obj to $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  %13 = function_ref @unknown_use : $@convention(thin) (@guaranteed Base) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@guaranteed Base) -> ()
+  dealloc_ref %12 : $Base
   %r = tuple ()
   return %r : $()
 }

@@ -697,6 +697,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(KeyPathInst, keypath,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
+  SINGLE_VALUE_INST(BeginDeallocRefInst, begin_dealloc_ref,
+                    SingleValueInstruction, None, DoesNotRelease)
+
   // BindMemory and RebindMemory have no physical side effect. Semantically they
   // access their affected memory region because any reads or writes accessing
   // that memory must be dependent on the bind operation.
@@ -790,9 +793,6 @@ ABSTRACT_INST(RefCountingInst, SILInstruction)
                  RefCountingInst, MayHaveSideEffects, MayRelease)
   NON_VALUE_INST(ReleaseValueAddrInst, release_value_addr,
                  RefCountingInst, MayHaveSideEffects, MayRelease)
-  NON_VALUE_INST(SetDeallocatingInst, set_deallocating,
-                 RefCountingInst, MayHaveSideEffects,
-       DoesNotRelease)
   NON_VALUE_INST(AutoreleaseValueInst, autorelease_value,
                  RefCountingInst, MayHaveSideEffects,
        DoesNotRelease)

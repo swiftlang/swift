@@ -263,7 +263,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
       isa<MoveValueInst>(Inst)) {
     return true;
   }
-  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst) ||
+  if (isa<BeginDeallocRefInst>(Inst) || isa<FixLifetimeInst>(Inst) ||
       isa<EndBorrowInst>(Inst))
     return true;
 

@@ -304,7 +304,10 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
 final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
-final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
+final public class BeginDeallocRefInst : SingleValueInstruction {
+  public var reference: Value { operands[0].value }
+  public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
+}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }

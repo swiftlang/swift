@@ -54,6 +54,7 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
          is BeginBorrowInst, is MarkDependenceInst,
          is BranchInst, is CondBranchInst, is SwitchEnumInst,
          is UpcastInst, is UncheckedRefCastInst,
+         is BeginDeallocRefInst,
          is EndCOWMutationInst:
       return walkDownDefault(value: operand, path: path)
     default:
@@ -65,7 +66,7 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
     switch operand.instruction {
     // White-list all instructions which don't use the object header.
     case is RefElementAddrInst, is RefTailAddrInst,
-         is DeallocRefInst, is DeallocStackRefInst, is SetDeallocatingInst,
+         is DeallocRefInst, is DeallocStackRefInst,
          is DebugValueInst, is FixLifetimeInst:
       return .continueWalk
     default:

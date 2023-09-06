@@ -4,6 +4,9 @@
 
 // Do not inline C.factory into main. Doing so would lose the ability
 // to materialize local Self metadata.
+
+// REQUIRES: swift_in_compiler
+
 class C {
   required init() {}
 }

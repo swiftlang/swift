@@ -625,13 +625,15 @@ bb0:
 
   (%2,%3) = begin_cow_mutation %0 : $Derived
   %4 = end_cow_mutation %3 : $Derived
-  %5 = upcast %4 : $Derived to $X
+  %4b = begin_dealloc_ref %4 : $Derived of %0 : $Derived
+  %5 = upcast %4b : $Derived to $X
   %6 = init_existential_ref %5 : $X : $X, $ClassP
   %7 = open_existential_ref %6 : $ClassP to $@opened("53729A20-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
 
   (%8,%9) = begin_cow_mutation %1 : $Derived
   %10 = end_cow_mutation %9 : $Derived
-  %11 = upcast %10 : $Derived to $X
+  %10b = begin_dealloc_ref %10 : $Derived of %1 : $Derived
+  %11 = upcast %10b : $Derived to $X
   %12 = init_existential_ref %11 : $X : $X, $ClassP
   %13 = open_existential_ref %12 : $ClassP to $@opened("12345678-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
 
@@ -651,7 +653,8 @@ bb0(%0 : $DerivedZ):
   %3 = alloc_ref $DerivedZ
   (%4,%5) = begin_cow_mutation %3 : $DerivedZ
   %6 = end_cow_mutation %5 : $DerivedZ
-  %7 = upcast %6 : $DerivedZ to $Z
+  %6b = begin_dealloc_ref %6 : $DerivedZ of %3 : $DerivedZ
+  %7 = upcast %6b : $DerivedZ to $Z
   %8 = ref_element_addr %7 : $Z, #Z.y
   store %1 to %8 : $*Y
 

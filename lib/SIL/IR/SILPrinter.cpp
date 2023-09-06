@@ -2497,6 +2497,10 @@ public:
       *this << "[keep_unique] ";
     *this << getIDAndType(ECMI->getOperand());
   }
+  void visitBeginDeallocRefInst(BeginDeallocRefInst *I) {
+    *this << getIDAndType(I->getReference()) << " of "
+          << getIDAndType(I->getOperand(1));
+  }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
     if (CUI->getVerificationType())
       *this << "[objc] ";

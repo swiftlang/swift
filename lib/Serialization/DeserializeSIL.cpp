@@ -1951,6 +1951,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
     break;
   }
+  case SILInstructionKind::BeginDeallocRefInst: {
+    auto Ty = MF->getType(TyID);
+    auto Ty2 = MF->getType(TyID2);
+    ResultInst = Builder.createBeginDeallocRef(
+        Loc,
+        getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
+        getLocalValue(ValID2, getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
   case SILInstructionKind::CopyBlockWithoutEscapingInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
@@ -2116,7 +2125,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
   REFCOUNTING_INSTRUCTION(AutoreleaseValue)
   REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)
-  REFCOUNTING_INSTRUCTION(SetDeallocating)
   UNARY_INSTRUCTION(DeinitExistentialAddr)
   UNARY_INSTRUCTION(DeinitExistentialValue)
   UNARY_INSTRUCTION(EndBorrow)

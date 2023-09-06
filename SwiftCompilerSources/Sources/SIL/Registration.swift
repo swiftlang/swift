@@ -50,7 +50,7 @@ public func registerSILClasses() {
   register(DebugValueInst.self)
   register(DebugStepInst.self)
   register(UnconditionalCheckedCastAddrInst.self)
-  register(SetDeallocatingInst.self)
+  register(BeginDeallocRefInst.self)
   register(EndApplyInst.self)
   register(AbortApplyInst.self)
   register(StrongRetainInst.self)

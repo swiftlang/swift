@@ -1138,11 +1138,8 @@ struct BridgedBuilder{
   }
 
   SWIFT_IMPORT_UNSAFE
-  BridgedInstruction createSetDeallocating(BridgedValue op, bool isAtomic) const {
-    return {builder().createSetDeallocating(regularLoc(),
-                                            op.getSILValue(),
-                                            isAtomic ? swift::RefCountingInst::Atomicity::Atomic
-                                            : swift::RefCountingInst::Atomicity::NonAtomic)};
+  BridgedInstruction createBeginDeallocRef(BridgedValue reference, BridgedValue allocation) const {
+    return {builder().createBeginDeallocRef(regularLoc(), reference.getSILValue(), allocation.getSILValue())};
   }
 
   SWIFT_IMPORT_UNSAFE

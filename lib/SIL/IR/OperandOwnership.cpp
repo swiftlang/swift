@@ -219,7 +219,6 @@ OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
-OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 #define REF_STORAGE(Name, ...)                                                 \
@@ -659,6 +658,14 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous
   // to a borrow scope).
   return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitBeginDeallocRefInst(BeginDeallocRefInst *bdr) {
+  if (getOperandIndex() == 0) {
+    return OperandOwnership::DestroyingConsume;
+  }
+  return OperandOwnership::NonUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitKeyPathInst(KeyPathInst *I) {

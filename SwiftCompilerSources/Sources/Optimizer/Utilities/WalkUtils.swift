@@ -352,6 +352,11 @@ extension ValueDefUseWalker {
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
       is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
+    case let beginDealloc as BeginDeallocRefInst:
+      if operand.index == 0 {
+        return walkDownUses(ofValue: beginDealloc, path: path)
+      }
+      return .continueWalk
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
         return walkDownUses(ofValue: mdi, path: path)
@@ -656,6 +661,7 @@ extension ValueUseDefWalker {
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
       is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
+      is BeginDeallocRefInst,
       is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let arg as BlockArgument:

@@ -1125,13 +1125,14 @@ bb0(%0 : $X):
 // CHECK-NEXT: return [[T0]] : $X
 }
 
-// CHECK-LABEL: sil @test_set_deallocating
-sil @test_set_deallocating : $(X) -> X {
-bb0(%0 : $X):
-  set_deallocating %0 : $X
-  return %0 : $X
-// CHECK:      set_deallocating [[T0]] : $X
-// CHECK-NEXT: return [[T0]] : $X
+// CHECK-LABEL: sil @test_begin_dealloc_ref
+sil @test_begin_dealloc_ref : $() -> X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = begin_dealloc_ref %0 : $X of %0 : $X
+  return %1 : $X
+// CHECK:      %1 = begin_dealloc_ref %0 : $X of %0 : $X
+// CHECK-NEXT: return %1 : $X
 }
 
 struct GenericStruct<T> {

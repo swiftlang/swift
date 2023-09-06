@@ -1592,11 +1592,11 @@ public:
                       getSILDebugLocation(Loc), operand, atomicity));
   }
 
-  SetDeallocatingInst *createSetDeallocating(SILLocation Loc,
-                                            SILValue operand,
-                                            Atomicity atomicity) {
-    return insert(new (getModule()) SetDeallocatingInst(
-        getSILDebugLocation(Loc), operand, atomicity));
+  BeginDeallocRefInst *createBeginDeallocRef(SILLocation Loc,
+                                             SILValue reference,
+                                             SILValue allocation) {
+    return insert(new (getModule()) BeginDeallocRefInst(
+        getSILDebugLocation(Loc), reference, allocation));
   }
 
   ObjectInst *createObject(SILLocation Loc, SILType Ty,
