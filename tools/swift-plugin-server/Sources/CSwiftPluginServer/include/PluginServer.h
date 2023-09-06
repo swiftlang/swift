@@ -92,10 +92,10 @@ const void *PluginServer_createConnection(const char **errorMessage);
 void PluginServer_destroyConnection(const void *connHandle);
 
 /// Read bytes from the IPC communication handle.
-size_t PluginServer_read(const void *connHandle, void *data, size_t nbyte);
+SwiftUInt PluginServer_read(const void *connHandle, void *data, SwiftUInt nbyte);
 
 /// Write bytes to the IPC communication handle.
-size_t PluginServer_write(const void *connHandle, const void *data, size_t nbyte);
+SwiftUInt PluginServer_write(const void *connHandle, const void *data, SwiftUInt nbyte);
 
 //===----------------------------------------------------------------------===//
 // Dynamic link
