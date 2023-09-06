@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
+#include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
 #include "llvm/ADT/STLExtras.h"
@@ -422,51 +423,4 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
   return CASFS;
 }
 
-namespace cas {
-
-CachingTool::CachingTool(StringRef Path) {
-  auto DB = llvm::cas::createOnDiskUnifiedCASDatabases(Path);
-  if (!DB) {
-    llvm::errs() << "Failed to create CAS at " << Path << ": "
-                 << toString(DB.takeError()) << "\n";
-    return;
-  }
-
-  CAS = std::move(DB->first);
-  Cache = std::move(DB->second);
-}
-
-std::string CachingTool::computeCacheKey(ArrayRef<const char *> Args,
-                                         StringRef InputPath,
-                                         file_types::ID OutputKind) {
-  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
-  if (!BaseKey) {
-    llvm::errs() << "Failed to create cache key: "
-                 << toString(BaseKey.takeError()) << "\n";
-    return "";
-  }
-
-  auto Key =
-      createCompileJobCacheKeyForOutput(*CAS, *BaseKey, InputPath, OutputKind);
-  if (!Key) {
-    llvm::errs() << "Failed to create cache key: " << toString(Key.takeError())
-                 << "\n";
-    return "";
-  }
-
-  return CAS->getID(*Key).toString();
-}
-
-std::string CachingTool::storeContent(StringRef Content) {
-  auto Result = CAS->storeFromString({}, Content);
-  if (!Result) {
-    llvm::errs() << "Failed to store to CAS: " << toString(Result.takeError())
-                 << "\n";
-    return "";
-  }
-
-  return CAS->getID(*Result).toString();
-}
-
-} // namespace cas
 } // namespace swift
