@@ -277,7 +277,7 @@ class PluginDiagnosticsEngine {
       SwiftDiagnostic_create(
         cxxDiagnosticEngine, bridgedSeverity,
         cxxSourceLocation(at: position),
-        messageBuffer.baseAddress, messageBuffer.count)
+        messageBuffer.baseAddress, SwiftInt(messageBuffer.count))
     }
 
     // Emit highlights
@@ -296,7 +296,7 @@ class PluginDiagnosticsEngine {
       var newText = change.newText
       newText.withUTF8 { textBuffer in
         SwiftDiagnostic_fixItReplace(
-          diag, startLoc, endLoc, textBuffer.baseAddress, textBuffer.count)
+          diag, startLoc, endLoc, textBuffer.baseAddress, SwiftInt(textBuffer.count))
       }
     }
 
@@ -343,7 +343,7 @@ class PluginDiagnosticsEngine {
     else {
       return nil
     }
-    return bufferBaseAddress.advanced(by: SwiftInt(offset))
+    return bufferBaseAddress.advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.
