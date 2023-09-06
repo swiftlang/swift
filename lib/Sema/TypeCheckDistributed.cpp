@@ -155,10 +155,8 @@ void swift::diagnoseDistributedFunctionInNonDistributedActorProtocol(
   } else {
     // Similar to how Sendable FitIts do this, we insert at the end of
     // the inherited types.
-    ASTContext &ctx = proto->getASTContext();
-    SourceLoc fixItLoc = proto->getInherited().back().getSourceRange().End;
-    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
-    diag.fixItInsert(fixItLoc, ", DistributedActor");
+    SourceLoc fixItLoc = proto->getInherited().getEndLoc();
+    diag.fixItInsertAfter(fixItLoc, ", DistributedActor");
   }
 }
 
@@ -173,10 +171,8 @@ void swift::addCodableFixIt(
     SourceLoc fixItLoc = nominal->getBraces().Start;
     diag.fixItInsert(fixItLoc, ": Codable");
   } else {
-    ASTContext &ctx = nominal->getASTContext();
-    SourceLoc fixItLoc = nominal->getInherited().back().getSourceRange().End;
-    fixItLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr, fixItLoc);
-    diag.fixItInsert(fixItLoc, ", Codable");
+    SourceLoc fixItLoc = nominal->getInherited().getEndLoc();
+    diag.fixItInsertAfter(fixItLoc, ", Codable");
   }
 }
 

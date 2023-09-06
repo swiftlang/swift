@@ -96,6 +96,8 @@ private:
            llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
            unsigned index, TypeResolutionStage stage) const;
 
+  const TypeLoc &getTypeLoc() const;
+
 public:
   // Source location
   SourceLoc getNearestLoc() const;

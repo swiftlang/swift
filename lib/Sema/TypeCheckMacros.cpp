@@ -1678,7 +1678,8 @@ swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
 
     // Extension macros can only add conformances that are documented by
     // the `@attached(extension)` attribute.
-    for (auto inherited : extension->getInherited()) {
+    auto inheritedTypes = extension->getInherited();
+    for (auto i : inheritedTypes.getIndices()) {
       auto constraint =
           TypeResolution::forInterface(
               extension->getDeclContext(),
@@ -1686,7 +1687,7 @@ swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr)
-          .resolveType(inherited.getTypeRepr());
+          .resolveType(inheritedTypes.getTypeRepr(i));
 
       // Already diagnosed or will be diagnosed later.
       if (constraint->is<ErrorType>() || !constraint->isConstraintType())
