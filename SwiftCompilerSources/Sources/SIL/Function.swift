@@ -137,6 +137,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// It's called from a `[global_init]` function via a `builtin "once"`.
   public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
 
+  public var isGenericFunction: Bool { bridged.isGenericFunction() }
+
   /// Kinds of effect attributes which can be defined for a Swift function.
   public enum EffectAttribute {
     /// No effect attribute is specified.
