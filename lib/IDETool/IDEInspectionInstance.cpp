@@ -594,8 +594,7 @@ void swift::ide::IDEInspectionInstance::codeComplete(
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   using ResultType = CancellableResult<CodeCompleteResult>;
 
-  struct ConsumerToCallbackAdapter
-      : public SimpleCachingCodeCompletionConsumer {
+  struct ConsumerToCallbackAdapter : public CodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
     ImportDepth ImportDep;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;

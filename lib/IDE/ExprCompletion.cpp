@@ -96,13 +96,17 @@ void ExprTypeCheckCompletionCallback::sawSolutionImpl(
   }
 }
 
-void ExprTypeCheckCompletionCallback::deliverResults(
-    SourceLoc CCLoc, ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+void ExprTypeCheckCompletionCallback::collectResults(
+    SourceLoc CCLoc, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
+
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
 
   for (auto &Result : Results) {
     WithSolutionSpecificVarTypesRAII VarTypes(Result.SolutionSpecificVarTypes);
@@ -117,7 +121,11 @@ void ExprTypeCheckCompletionCallback::deliverResults(
     if (Result.UnresolvedMemberBaseType) {
       Lookup.getUnresolvedMemberCompletions(Result.UnresolvedMemberBaseType);
     }
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }

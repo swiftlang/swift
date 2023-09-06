@@ -59,9 +59,8 @@ public:
       CodeCompletionExpr *CompletionExpr, DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
-                      ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

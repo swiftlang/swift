@@ -37,9 +37,8 @@ class KeyPathTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 public:
   KeyPathTypeCheckCompletionCallback(KeyPathExpr *KeyPath) : KeyPath(KeyPath) {}
 
-  void deliverResults(DeclContext *DC, SourceLoc DotLoc,
-                      ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(DeclContext *DC, SourceLoc DotLoc,
+                      ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

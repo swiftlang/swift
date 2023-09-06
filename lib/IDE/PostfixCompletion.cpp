@@ -394,10 +394,9 @@ static void addOperatorResults(Type LHSType, ArrayRef<OperatorDecl *> Operators,
   }
 }
 
-void PostfixCompletionCallback::deliverResults(
+void PostfixCompletionCallback::collectResults(
     SourceLoc DotLoc, bool IsInSelector, bool IncludeOperators,
-    bool HasLeadingSpace, CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    bool HasLeadingSpace, CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -427,12 +426,25 @@ void PostfixCompletionCallback::deliverResults(
     Lookup.collectOperators(Operators);
   }
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
+
+  // The base types of the result for which we already returned results.
+  // Used so we only return keyword and operator completions once for each base
+  // type.
+  llvm::SmallPtrSet<Type, 2> ProcessedBaseTypes;
+
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
+
   for (auto &Result : Results) {
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
     Lookup.setClosureActorIsolations(Result.ClosureActorIsolations);
     Lookup.setIsStaticMetatype(Result.BaseIsStaticMetaType);
-    Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
+    if (!ProcessedBaseTypes.contains(Result.BaseTy)) {
+      Lookup.getPostfixKeywordCompletions(Result.BaseTy, BaseExpr);
+    }
     Lookup.setExpectedTypes(Result.ExpectedTypes,
                             Result.IsImplicitSingleExpressionReturn,
                             Result.ExpectsNonVoid);
@@ -441,10 +453,21 @@ void PostfixCompletionCallback::deliverResults(
     Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl,
                                    Result.IsBaseDeclUnapplied);
 
-    if (IncludeOperators && !Result.BaseIsStaticMetaType) {
+    // `==`, `<=` etc can be used on `Void` because `Void` is just an empty
+    // tuple. But that doesn’t really make sense so we shouldn't be suggesting
+    // any operators based on `Void`.
+    if (IncludeOperators && !Result.BaseIsStaticMetaType &&
+        !Result.BaseTy->isVoid() &&
+        !ProcessedBaseTypes.contains(Result.BaseTy)) {
       addOperatorResults(Result.BaseTy, Operators, DC, Lookup);
     }
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
+
+    ProcessedBaseTypes.insert(Result.BaseTy);
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }
