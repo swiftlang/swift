@@ -30,12 +30,21 @@ func testPublicClass() {
   let c = PublicClass(x: 2)
   _ = c.publicMethod()
   PublicClass.publicClassMethod()
+
+  let d = PublicDerivedClass(x: 3)
+  _ = d.publicMethod()
+  PublicDerivedClass.publicClassMethod()
 }
 
 func testConformances() {
-  let _: [any PublicProto] = [
+  let array: [any PublicProto] = [
     PublicStructConformingToPublicProto(),
     PublicClassConformingToPublicProto(),
     "string",
+    PublicClassInheritingConformanceToPublicProto(),
   ]
+
+  for x in array {
+    _ = x.req()
+  }
 }

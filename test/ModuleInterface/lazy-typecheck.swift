@@ -45,6 +45,10 @@
 // CHECK:         public class func publicClassMethod()
 // CHECK:         deinit
 // CHECK:       }
+// CHECK:       @_inheritsConvenienceInitializers public class PublicDerivedClass : lazy_typecheck.PublicClass {
+// CHECK:         override public init(x: Swift.Int)
+// CHECK:         deinit
+// CHECK:       }
 // CHECK:       public struct PublicStructConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
@@ -52,6 +56,10 @@
 // CHECK:       public class PublicClassConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
+// CHECK:         deinit
+// CHECK:       }
+// CHECK:       @_inheritsConvenienceInitializers public class PublicClassInheritingConformanceToPublicProto : lazy_typecheck.PublicClassConformingToPublicProto {
+// CHECK:         override public init()
 // CHECK:         deinit
 // CHECK:       }
 // CHECK:       extension Swift.String : lazy_typecheck.PublicProto {

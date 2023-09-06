@@ -115,6 +115,8 @@ public class PublicClass {
 //  class func internalClassMethod() -> DoesNotExist {}
 }
 
+public class PublicDerivedClass: PublicClass {}
+
 class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
   init(x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
@@ -134,6 +136,8 @@ public class PublicClassConformingToPublicProto: PublicProto {
     return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
   }
 }
+
+public class PublicClassInheritingConformanceToPublicProto: PublicClassConformingToPublicProto {}
 
 extension String: PublicProto {
   public func req() -> Int {
