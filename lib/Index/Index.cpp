@@ -974,8 +974,7 @@ private:
   /// \param Loc The location of the reference, otherwise the location of the TypeLoc is used.
   bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related,
                             bool isImplicit=false, SourceLoc Loc={});
-  bool reportInheritedTypeRefs(
-      ArrayRef<InheritedEntry> Inherited, Decl *Inheritee);
+  bool reportInheritedTypeRefs(InheritedTypes Inherited, Decl *Inheritee);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
     return reportPseudoAccessor(D, AccessorKind::Get, /*IsRef=*/false,
@@ -1073,7 +1072,7 @@ private:
         if (shouldIndex(VD, /*IsRef=*/false))
           return true;
 
-    for (auto Inherit : D->getInherited())
+    for (auto Inherit : D->getInherited().getEntries())
       if (auto T = Inherit.getType())
         if (T->getAnyNominal() &&
             shouldIndex(T->getAnyNominal(), /*IsRef=*/false))
@@ -1384,8 +1383,9 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
   return !Cancelled;
 }
 
-bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<InheritedEntry> Inherited, Decl *Inheritee) {
-  for (auto Base : Inherited) {
+bool IndexSwiftASTWalker::reportInheritedTypeRefs(InheritedTypes Inherited,
+                                                  Decl *Inheritee) {
+  for (auto Base : Inherited.getEntries()) {
     if (!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
   }

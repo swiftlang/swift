@@ -3399,11 +3399,9 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   auto conformanceDiag =
       emitDiagnostic(diag::assign_protocol_conformance_fix_it, constraint,
                      nominal->getDescriptiveKind(), fromType);
-  if (nominal->getInherited().size() > 0) {
-    auto lastInherited = nominal->getInherited().back().getLoc();
-    auto lastInheritedEndLoc =
-        Lexer::getLocForEndOfToken(getASTContext().SourceMgr, lastInherited);
-    conformanceDiag.fixItInsert(lastInheritedEndLoc, ", " + protoString);
+  if (!nominal->getInherited().empty()) {
+    auto lastInheritedEndLoc = nominal->getInherited().getEndLoc();
+    conformanceDiag.fixItInsertAfter(lastInheritedEndLoc, ", " + protoString);
   } else {
     auto nameEndLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                                  nominal->getNameLoc());

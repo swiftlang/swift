@@ -629,7 +629,7 @@ static void addSendableFixIt(
     diag.fixItInsert(fixItLoc,
                      unchecked ? ": @unchecked Sendable" : ": Sendable");
   } else {
-    auto fixItLoc = nominal->getInherited().back().getLoc();
+    auto fixItLoc = nominal->getInherited().getEndLoc();
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ", @unchecked Sendable" : ", Sendable");
   }
@@ -644,7 +644,7 @@ static void addSendableFixIt(const GenericTypeParamDecl *genericArgument,
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ": @unchecked Sendable" : ": Sendable");
   } else {
-    auto fixItLoc = genericArgument->getInherited().back().getLoc();
+    auto fixItLoc = genericArgument->getInherited().getEndLoc();
     diag.fixItInsertAfter(fixItLoc,
                           unchecked ? ", @unchecked Sendable" : ", Sendable");
   }

@@ -164,8 +164,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (auto *typeRepr = ED->getExtendedTypeRepr())
       if (doIt(typeRepr))
         return true;
-    for (auto &Inherit : ED->getInherited()) {
-      if (auto *const TyR = Inherit.getTypeRepr())
+    auto inheritedTypes = ED->getInherited();
+    for (auto i : inheritedTypes.getIndices()) {
+      if (auto *const TyR = inheritedTypes.getTypeRepr(i))
         if (doIt(TyR))
           return true;
     }
@@ -276,7 +277,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitGenericTypeParamDecl(GenericTypeParamDecl *GTPD) {
-    for (const auto &Inherit: GTPD->getInherited()) {
+    for (const auto &Inherit : GTPD->getInherited().getEntries()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
@@ -285,7 +286,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
-    for (const auto &Inherit: ATD->getInherited()) {
+    for (const auto &Inherit : ATD->getInherited().getEntries()) {
       if (auto *const TyR = Inherit.getTypeRepr())
         if (doIt(TyR))
           return true;
@@ -310,9 +311,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
     bool WalkGenerics = visitGenericParamListIfNeeded(NTD);
 
-    for (const auto &Inherit : NTD->getInherited()) {
-      if (auto *const TyR = Inherit.getTypeRepr())
-        if (doIt(Inherit.getTypeRepr()))
+    auto inheritedTypes = NTD->getInherited();
+    for (auto i : inheritedTypes.getIndices()) {
+      if (auto *const TyR = inheritedTypes.getTypeRepr(i))
+        if (doIt(TyR))
           return true;
     }
 

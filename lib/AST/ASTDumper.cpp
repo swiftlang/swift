@@ -569,11 +569,11 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
     }
 
-    void printInherited(ArrayRef<InheritedEntry> Inherited) {
+    void printInherited(InheritedTypes Inherited) {
       if (Inherited.empty())
         return;
       OS << " inherits: ";
-      interleave(Inherited,
+      interleave(Inherited.getEntries(),
                  [&](InheritedEntry Super) { Super.getType().print(OS); },
                  [&] { OS << ", "; });
     }

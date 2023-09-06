@@ -623,7 +623,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
         passExtends(TD, Consumer);
     }
 
-    passInherits(ED->getInherited(), Consumer);
+    passInherits(ED->getInherited().getEntries(), Consumer);
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
@@ -631,7 +631,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
       if (auto NM = Ty->getAnyNominal()) {
-        passInherits(NM->getInherited(), Consumer);
+        passInherits(NM->getInherited().getEntries(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);
         return;

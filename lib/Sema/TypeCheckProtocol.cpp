@@ -5562,15 +5562,15 @@ void swift::diagnoseConformanceFailure(Type T,
 
       auto rawType = enumDecl->getRawType();
 
-      diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
-                     diag::enum_raw_type_nonconforming_and_nonsynthable,
-                     T, rawType);
+      diags.diagnose(enumDecl->getInherited().getStartLoc(),
+                     diag::enum_raw_type_nonconforming_and_nonsynthable, T,
+                     rawType);
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
-        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
+        SourceLoc loc = enumDecl->getInherited().getStartLoc();
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
       }
@@ -5592,13 +5592,9 @@ void swift::diagnoseConformanceFailure(Type T,
       if (!classDecl)
         return;
 
-      auto inheritedClause = classDecl->getInherited();
-      for (unsigned i : indices(inheritedClause)) {
-        auto &inherited = inheritedClause[i];
-
-        // Find the inherited type.
-        InheritedTypeRequest request{classDecl, i, TypeResolutionStage::Interface};
-        Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+      auto inheritedTypes = classDecl->getInherited();
+      for (auto i : inheritedTypes.getIndices()) {
+        Type inheritedTy = inheritedTypes.getResolvedType(i);
 
         // If it's a class, we cannot suggest a different class to inherit
         // from.
@@ -5608,7 +5604,8 @@ void swift::diagnoseConformanceFailure(Type T,
         // Is it the NSObject protocol?
         if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
           if (isNSObjectProtocol(protoTy->getDecl())) {
-            diag.fixItReplace(inherited.getSourceRange(), "NSObject");
+            diag.fixItReplace(inheritedTypes.getEntry(i).getSourceRange(),
+                              "NSObject");
             return;
           }
         }
@@ -6638,8 +6635,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           DerivedConformance::derivesProtocolConformance(dc, enumDecl,
                                                          diag.Protocol) &&
           enumDecl->hasRawType() &&
-          enumDecl->getInherited()[0].getSourceRange().isValid()) {
-        auto inheritedLoc = enumDecl->getInherited()[0].getSourceRange().Start;
+          enumDecl->getInherited().getStartLoc().isValid()) {
+        auto inheritedLoc = enumDecl->getInherited().getStartLoc();
         Context.Diags.diagnose(
             inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
             dc->getDeclaredInterfaceType(), enumDecl->getRawType());

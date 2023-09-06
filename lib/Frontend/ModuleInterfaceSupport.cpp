@@ -479,11 +479,11 @@ class InheritedProtocolCollector {
   /// If \p skipExtra is true then avoid recording any extra protocols to
   /// print, such as synthesized conformances or conformances to non-public
   /// protocols.
-  void recordProtocols(ArrayRef<InheritedEntry> directlyInherited,
-                       const Decl *D, bool skipExtra = false) {
+  void recordProtocols(InheritedTypes directlyInherited, const Decl *D,
+                       bool skipExtra = false) {
     llvm::Optional<AvailableAttrList> availableAttrs;
 
-    for (InheritedEntry inherited : directlyInherited) {
+    for (InheritedEntry inherited : directlyInherited.getEntries()) {
       Type inheritedTy = inherited.getType();
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
@@ -526,7 +526,7 @@ class InheritedProtocolCollector {
   /// For each type directly inherited by \p extension, record any protocols
   /// that we would have printed in ConditionalConformanceProtocols.
   void recordConditionalConformances(const ExtensionDecl *extension) {
-    for (TypeLoc inherited : extension->getInherited()) {
+    for (TypeLoc inherited : extension->getInherited().getEntries()) {
       Type inheritedTy = inherited.getType();
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
@@ -551,7 +551,7 @@ public:
   ///
   /// \sa recordProtocols
   static void collectProtocols(PerTypeMap &map, const Decl *D) {
-    ArrayRef<InheritedEntry> directlyInherited;
+    InheritedTypes directlyInherited = InheritedTypes(D);
     const NominalTypeDecl *nominal;
     const IterableDeclContext *memberContext;
 
@@ -565,7 +565,6 @@ public:
       return true;
     };
     if ((nominal = dyn_cast<NominalTypeDecl>(D))) {
-      directlyInherited = nominal->getInherited();
       memberContext = nominal;
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
@@ -573,7 +572,6 @@ public:
         return;
       }
       nominal = extension->getExtendedNominal();
-      directlyInherited = extension->getInherited();
       memberContext = extension;
     } else {
       return;
