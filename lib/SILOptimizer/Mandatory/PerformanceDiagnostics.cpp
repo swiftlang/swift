@@ -354,17 +354,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
-  if (isa<WitnessMethodInst>(inst) ||
-      isa<InitExistentialAddrInst>(inst) ||
-      isa<InitExistentialValueInst>(inst) ||
-      isa<InitExistentialRefInst>(inst) ||
-      isa<OpenExistentialValueInst>(inst) ||
-      isa<OpenExistentialRefInst>(inst) ||
-      isa<OpenExistentialAddrInst>(inst) ||
-      isa<OpenExistentialBoxInst>(inst) ||
-      isa<OpenExistentialBoxValueInst>(inst) ||
-      isa<InitExistentialMetatypeInst>(inst) ||
-      isa<OpenExistentialMetatypeInst>(inst)) {
+  if (module.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      impact & RuntimeEffect::Existential) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     diagnose(loc, diag::performance_metadata, "existential");
     return true;
