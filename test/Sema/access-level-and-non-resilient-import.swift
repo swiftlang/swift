@@ -17,18 +17,22 @@
 /// A resilient client will error on public imports.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -enable-library-evolution -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
 // RUN:   -enable-library-evolution -swift-version 6 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 
 /// A non-resilient client doesn't complain.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
 // RUN:   -swift-version 6 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -enable-experimental-feature AccessLevelOnImport \
+// RUN:   -package-name pkg
 
 //--- DefaultLib.swift
 //--- PublicLib.swift
