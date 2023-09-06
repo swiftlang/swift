@@ -918,12 +918,9 @@ public:
     DescriptiveDeclKind declKind = DescriptiveDeclKind::Protocol;
 
     // FIXME: Hack to ensure that we've computed the types involved here.
-    ASTContext &ctx = proto->getASTContext();
-    for (unsigned i : proto->getInherited().getIndices()) {
-      (void)evaluateOrDefault(ctx.evaluator,
-                              InheritedTypeRequest{
-                                proto, i, TypeResolutionStage::Interface},
-                              Type());
+    auto inheritedTypes = proto->getInherited();
+    for (auto i : inheritedTypes.getIndices()) {
+      (void)inheritedTypes.getResolvedType(i);
     }
 
     auto declKindForType = [](Type type) -> DescriptiveDeclKind {

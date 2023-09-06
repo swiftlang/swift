@@ -5592,13 +5592,9 @@ void swift::diagnoseConformanceFailure(Type T,
       if (!classDecl)
         return;
 
-      auto inheritedClause = classDecl->getInherited().getEntries();
-      for (unsigned i : indices(inheritedClause)) {
-        auto &inherited = inheritedClause[i];
-
-        // Find the inherited type.
-        InheritedTypeRequest request{classDecl, i, TypeResolutionStage::Interface};
-        Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+      auto inheritedTypes = classDecl->getInherited();
+      for (auto i : inheritedTypes.getIndices()) {
+        Type inheritedTy = inheritedTypes.getResolvedType(i);
 
         // If it's a class, we cannot suggest a different class to inherit
         // from.
@@ -5608,7 +5604,8 @@ void swift::diagnoseConformanceFailure(Type T,
         // Is it the NSObject protocol?
         if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
           if (isNSObjectProtocol(protoTy->getDecl())) {
-            diag.fixItReplace(inherited.getSourceRange(), "NSObject");
+            diag.fixItReplace(inheritedTypes.getEntry(i).getSourceRange(),
+                              "NSObject");
             return;
           }
         }

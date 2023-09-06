@@ -35,6 +35,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -1572,7 +1573,11 @@ public:
   /// given index.
   TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
 
-  /// Returns the array of inherited type entries.
+  /// Returns the `Type` for the entry of the inheritance clause at the given
+  /// index, resolved at the given stage, or `Type()` if resolution fails.
+  Type getResolvedType(unsigned i, TypeResolutionStage stage =
+                                       TypeResolutionStage::Interface) const;
+
   /// Returns the underlying array of inherited type entries.
   ///
   /// NOTE: The `Type` associated with an entry may not be resolved yet.

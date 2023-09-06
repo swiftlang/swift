@@ -729,17 +729,14 @@ void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors) {
-  auto &ctx = decl->getASTContext();
   auto inheritedTypes = decl->getInherited();
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
 
-  for (unsigned index : inheritedTypes.getIndices()) {
-    Type inheritedType
-      = evaluateOrDefault(ctx.evaluator,
-                          InheritedTypeRequest{decl, index,
-                          TypeResolutionStage::Structural},
-                          Type());
+  for (auto index : inheritedTypes.getIndices()) {
+    Type inheritedType =
+        inheritedTypes.getResolvedType(index, TypeResolutionStage::Structural);
+
     if (!inheritedType) continue;
 
     // Ignore trivially circular protocol refinement (protocol P : P)

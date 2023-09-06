@@ -1559,6 +1559,15 @@ InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
   Entries = extensionDecl->Inherited;
 }
 
+Type InheritedTypes::getResolvedType(unsigned i,
+                                     TypeResolutionStage stage) const {
+  ASTContext &ctx = Decl.is<const ExtensionDecl *>()
+                        ? Decl.get<const ExtensionDecl *>()->getASTContext()
+                        : Decl.get<const TypeDecl *>()->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
+                           Type());
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              ArrayRef<InheritedEntry> inherited,
