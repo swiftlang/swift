@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -34,7 +35,7 @@ extension ASTGenVisitor {
 
     var text = node.identifier.text
     let id = text.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     return .expr(SwiftIdentifierExpr_create(ctx, id, loc))
@@ -45,7 +46,7 @@ extension ASTGenVisitor {
 
     var text = node.identifier.text
     let id = text.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     return .expr(SwiftIdentifierExpr_create(ctx, id, loc))
@@ -56,7 +57,7 @@ extension ASTGenVisitor {
     let base = visit(node.base!).rawValue
     var nameText = node.name.text
     let name = nameText.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     return .expr(UnresolvedDotExpr_create(ctx, base, loc, name, loc))
