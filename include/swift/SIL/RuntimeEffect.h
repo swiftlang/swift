@@ -52,7 +52,7 @@ enum class RuntimeEffect : unsigned {
   /// The runtime function calls ObjectiveC methods.
   ObjectiveC          = 0x40,
   
-  /// Witness methods, boxing, unboxing, itializting, etc.
+  /// Witness methods, boxing, unboxing, initializing, etc.
   Existential         = 0x80,
   
   /// Not modelled currently.

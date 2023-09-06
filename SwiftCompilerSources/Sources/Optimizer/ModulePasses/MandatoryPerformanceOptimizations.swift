@@ -30,12 +30,13 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   (moduleContext: ModulePassContext) in
 
   var worklist = FunctionWorklist()
-  worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
-  worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
     worklist.addAllNonGenericFunctions(of: moduleContext)
+  } else {
+    worklist.addAllPerformanceAnnotatedFunctions(of: moduleContext)
+    worklist.addAllAnnotatedGlobalInitOnceFunctions(of: moduleContext)
   }
 
   optimizeFunctionsTopDown(using: &worklist, moduleContext)
