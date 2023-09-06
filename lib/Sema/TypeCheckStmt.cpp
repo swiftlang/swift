@@ -2605,11 +2605,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
       if (func->getBody()) {
-        auto optBody = TypeChecker::applyResultBuilderBodyTransform(
-            func, builderType,
-            /*ClosuresInResultBuilderDontParticipateInInference=*/
-            ctx.CompletionCallback == nullptr &&
-                ctx.SolutionCallback == nullptr);
+        auto optBody =
+            TypeChecker::applyResultBuilderBodyTransform(func, builderType);
         if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) ||
             (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
           // We already informed the completion callback of solutions found by

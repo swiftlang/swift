@@ -912,9 +912,8 @@ private:
 
 } // end anonymous namespace
 
-llvm::Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
-    FuncDecl *func, Type builderType,
-    bool ClosuresInResultBuilderDontParticipateInInference) {
+llvm::Optional<BraceStmt *>
+TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   //
@@ -970,10 +969,6 @@ llvm::Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
 
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
-  if (ClosuresInResultBuilderDontParticipateInInference) {
-    options |= ConstraintSystemFlags::
-        ClosuresInResultBuildersDontParticipateInInference;
-  }
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 

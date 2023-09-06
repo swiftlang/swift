@@ -7320,15 +7320,7 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (closure->hasEmptyBody())
     return false;
 
-  // If body is nested in a parent that has a function builder applied,
-  // let's prevent inference until result builders.
-  if (Options.contains(
-          ConstraintSystemFlags::
-              ClosuresInResultBuildersDontParticipateInInference)) {
-    return !isInResultBuilderContext(closure);
-  } else {
-    return true;
-  }
+  return true;
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
