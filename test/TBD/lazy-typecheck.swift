@@ -55,10 +55,13 @@ exports:
                        '_$s14lazy_typecheck12PublicStructV18publicStaticMethodyyFZ',
                        '_$s14lazy_typecheck12PublicStructV1xACSi_tcfC', '_$s14lazy_typecheck12PublicStructVMa',
                        '_$s14lazy_typecheck12PublicStructVMn', '_$s14lazy_typecheck12PublicStructVN',
-                       '_$s14lazy_typecheck13inlinableFuncSiyF', '_$s14lazy_typecheck24publicFuncWithDefaultArgyS2iF',
+                       '_$s14lazy_typecheck13inlinableFuncSiyF', '_$s14lazy_typecheck19PublicRethrowsProtoMp',
+                       '_$s14lazy_typecheck19PublicRethrowsProtoP3reqSiyKFTj', '_$s14lazy_typecheck19PublicRethrowsProtoP3reqSiyKFTq',
+                       '_$s14lazy_typecheck19PublicRethrowsProtoTL', '_$s14lazy_typecheck24publicFuncWithDefaultArgyS2iF',
                        '_$s14lazy_typecheck30publicFuncWithOpaqueReturnTypeQryF',
                        '_$s14lazy_typecheck30publicFuncWithOpaqueReturnTypeQryFQOMQ',
                        '_$s14lazy_typecheck32constrainedGenericPublicFunctionyyxAA0E5ProtoRzlF',
                        '_$sSS14lazy_typecheck11PublicProtoAAMc', '_$sSS14lazy_typecheck11PublicProtoAAWP',
-                       '_$sSS14lazy_typecheckE3reqSiyF' ]
+                       '_$sSS14lazy_typecheckE3reqSiyF', '_$sSi14lazy_typecheck19PublicRethrowsProtoAAMc',
+                       '_$sSi14lazy_typecheck19PublicRethrowsProtoAAWP', '_$sSi14lazy_typecheckE3reqSiyKF' ]
 ...

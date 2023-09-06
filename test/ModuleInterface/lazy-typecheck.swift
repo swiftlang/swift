@@ -29,6 +29,11 @@
 // CHECK:       public protocol PublicProto {
 // CHECK:         func req() -> Swift.Int
 // CHECK:       }
+// CHECK:       #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK:       @rethrows public protocol PublicRethrowsProto {
+// CHECK:         func req() throws -> Swift.Int
+// CHECK:       }
+// CHECK:       #endif
 // CHECK:       public struct PublicStruct {
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
@@ -52,3 +57,8 @@
 // CHECK:       extension Swift.String : lazy_typecheck.PublicProto {
 // CHECK:         public func req() -> Swift.Int
 // CHECK:       }
+// CHECK:       #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK:       extension Swift.Int : lazy_typecheck.PublicRethrowsProto {
+// CHECK:         public func req() throws -> Swift.Int
+// CHECK:       }
+// CHECK:       #endif

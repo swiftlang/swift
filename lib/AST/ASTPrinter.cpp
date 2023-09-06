@@ -2955,8 +2955,8 @@ static bool usesFeatureRethrowsProtocol(
 
   // Check an inheritance clause for a marker protocol.
   auto checkInherited = [&](InheritedTypes inherited) -> bool {
-    for (const auto &inheritedEntry : inherited.getEntries()) {
-      if (auto inheritedType = inheritedEntry.getType()) {
+    for (unsigned i : inherited.getIndices()) {
+      if (auto inheritedType = inherited.getResolvedType(i)) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
           for (ProtocolDecl *proto : layout.getProtocols()) {

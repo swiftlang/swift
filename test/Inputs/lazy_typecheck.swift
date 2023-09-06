@@ -53,6 +53,10 @@ public protocol PublicProto {
   func req() -> Int // expected-note 2 {{protocol requires function 'req()' with type '() -> Int'; add a stub for conformance}}
 }
 
+@rethrows public protocol PublicRethrowsProto {
+  func req() throws -> Int
+}
+
 protocol InternalProto {
   func goodReq() -> Int // expected-note 2 {{protocol requires function 'goodReq()' with type '() -> Int'; add a stub for conformance}}
   func badReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
@@ -138,6 +142,12 @@ extension String: PublicProto {
 }
 
 extension String: InternalProto {} // expected-error {{type 'String' does not conform to protocol 'InternalProto'}}
+
+extension Int: PublicRethrowsProto {
+  public func req() throws -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
 
 struct InternalStructConformingToPublicProto: PublicProto { // expected-error {{type 'InternalStructConformingToPublicProto' does not conform to protocol 'PublicProto'}}
 }
