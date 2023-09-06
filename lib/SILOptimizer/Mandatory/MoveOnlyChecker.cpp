@@ -30,6 +30,7 @@
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
@@ -86,6 +87,7 @@ struct MoveOnlyChecker {
   }
 
   void checkObjects();
+  void completeObjectLifetimes(ArrayRef<MarkMustCheckInst *>);
   void checkAddresses();
 };
 
@@ -109,8 +111,73 @@ void MoveOnlyChecker::checkObjects() {
     return;
   }
 
+  completeObjectLifetimes(moveIntroducersToProcess.getArrayRef());
+
   MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, poa, allocator};
   madeChange |= checker.check(moveIntroducersToProcess);
+}
+
+void MoveOnlyChecker::completeObjectLifetimes(
+    ArrayRef<MarkMustCheckInst *> insts) {
+  // TODO: Delete once OSSALifetimeCompletion is run as part of SILGenCleanup.
+  OSSALifetimeCompletion completion(fn, domTree);
+
+  // Collect all values derived from each mark_unresolved_non_copyable_value
+  // instruction via ownership instructions and phis.
+  ValueWorklist transitiveValues(fn);
+  for (auto *inst : insts) {
+    transitiveValues.push(inst);
+  }
+  while (auto value = transitiveValues.pop()) {
+    for (auto *use : value->getUses()) {
+      auto *user = use->getUser();
+      switch (user->getKind()) {
+      case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::MoveValueInst:
+        transitiveValues.pushIfNotVisited(cast<SingleValueInstruction>(user));
+        break;
+      case SILInstructionKind::BranchInst: {
+        PhiOperand po(use);
+        transitiveValues.pushIfNotVisited(po.getValue());
+        break;
+      }
+      default: {
+        auto *forward = OwnershipForwardingMixin::get(user);
+        if (!forward)
+          continue;
+        OwnershipForwardingMixin::visitForwardedValues(
+            user, [&transitiveValues](auto forwarded) {
+              transitiveValues.pushIfNotVisited(forwarded);
+              return true;
+            });
+        break;
+      }
+      }
+    }
+  }
+  // Complete the lifetime of each collected value.  This is a subset of the
+  // work that SILGenCleanup will do.
+  for (auto *block : poa->get(fn)->getPostOrder()) {
+    for (SILInstruction &inst : reverse(*block)) {
+      for (auto result : inst.getResults()) {
+        if (!transitiveValues.isVisited(result))
+          continue;
+        if (completion.completeOSSALifetime(result) ==
+            LifetimeCompletion::WasCompleted) {
+          madeChange = true;
+        }
+      }
+    }
+    for (SILArgument *arg : block->getArguments()) {
+      if (!transitiveValues.isVisited(arg))
+        continue;
+      if (completion.completeOSSALifetime(arg) ==
+          LifetimeCompletion::WasCompleted) {
+        madeChange = true;
+      }
+    }
+  }
 }
 
 void MoveOnlyChecker::checkAddresses() {
