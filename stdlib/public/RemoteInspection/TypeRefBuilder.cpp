@@ -93,6 +93,14 @@ valid_type_ref:
 /// Load and normalize a mangled name so it can be matched with string equality.
 llvm::Optional<std::string>
 TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
+  const auto reflectionNameRemoteAddress = reflectionName.getAddressData();
+
+  if (const auto found =
+          NormalizedReflectionNameCache.find(reflectionNameRemoteAddress);
+      found != NormalizedReflectionNameCache.end()) {
+    return found->second;
+  }
+
   ScopedNodeFactoryCheckpoint checkpoint(this);
   // Remangle the reflection name to resolve symbolic references.
   if (auto node = demangleTypeRef(reflectionName,
@@ -102,18 +110,27 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
     case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
       // Symbolic references cannot be mangled, return a failure.
+      NormalizedReflectionNameCache.insert(std::make_pair(
+          reflectionNameRemoteAddress, llvm::Optional<std::string>()));
       return {};
     default:
       auto mangling = mangleNode(node);
       if (!mangling.isSuccess()) {
+        NormalizedReflectionNameCache.insert(std::make_pair(
+            reflectionNameRemoteAddress, llvm::Optional<std::string>()));
         return {};
       }
+      NormalizedReflectionNameCache.insert(
+          std::make_pair(reflectionNameRemoteAddress, mangling.result()));
       return std::move(mangling.result());
     }
   }
 
   // Fall back to the raw string.
-  return getTypeRefString(reflectionName).str();
+  const auto manglingResult = getTypeRefString(reflectionName).str();
+  NormalizedReflectionNameCache.insert(
+      std::make_pair(reflectionNameRemoteAddress, manglingResult));
+  return std::move(manglingResult);
 }
 
 /// Determine whether the given reflection protocol name matches.
@@ -398,8 +415,12 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   else
     return nullptr;
 
-  for (auto Info : ReflectionInfos) {
-    for (auto BuiltinTypeDescriptor : Info.Builtin) {
+  for (; NormalizedReflectionNameCacheLastReflectionInfoCache <
+         ReflectionInfos.size();
+       NormalizedReflectionNameCacheLastReflectionInfoCache++) {
+    for (auto BuiltinTypeDescriptor :
+         ReflectionInfos[NormalizedReflectionNameCacheLastReflectionInfoCache]
+             .Builtin) {
       if (BuiltinTypeDescriptor->Stride <= 0)
         continue;
       if (!BuiltinTypeDescriptor->hasMangledTypeName())
@@ -413,11 +434,19 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
         continue;
 
       auto CandidateMangledName =
-        readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
-      if (!reflectionNameMatches(CandidateMangledName, MangledName))
-        continue;
-      return BuiltinTypeDescriptor;
+          readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
+      auto CandidateNormalizedName =
+          normalizeReflectionName(CandidateMangledName);
+      if (CandidateNormalizedName) {
+        BuiltInTypeDescriptorCache.insert(
+            std::make_pair(*CandidateNormalizedName, BuiltinTypeDescriptor));
+      }
     }
+  }
+
+  if (const auto found = BuiltInTypeDescriptorCache.find(MangledName);
+      found != BuiltInTypeDescriptorCache.end()) {
+    return found->second;
   }
 
   return nullptr;

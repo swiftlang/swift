@@ -424,6 +424,18 @@ private:
   /// Cache for field info lookups.
   std::unordered_map<std::string, RemoteRef<FieldDescriptor>> FieldTypeInfoCache;
 
+  /// Cache for normalized reflection name lookups.
+  std::unordered_map<uint64_t /* remote address */, llvm::Optional<std::string>>
+      NormalizedReflectionNameCache;
+
+  /// Cache for built-in type descriptor lookups.
+  std::unordered_map<std::string /* normalized name */,
+                     RemoteRef<BuiltinTypeDescriptor>>
+      BuiltInTypeDescriptorCache;
+
+  /// The index of the last ReflectionInfo cached by BuiltInTypeDescriptorCache.
+  uint32_t NormalizedReflectionNameCacheLastReflectionInfoCache = 0;
+
   std::vector<std::unique_ptr<const GenericSignatureRef>> SignatureRefPool;
 
   TypeConverter TC;
