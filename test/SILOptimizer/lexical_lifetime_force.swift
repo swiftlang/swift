@@ -12,11 +12,12 @@ func barrier()
 
 // CHECK-LABEL: sil {{.*}} [lexical_lifetimes] @funky : {{.*}} {
 // CHECK:         [[INSTANCE:%[^,]+]] = alloc_ref $C                               
+// CHECK:         [[EI:%.*]] = end_init_let_ref [[INSTANCE]]
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrow
-// CHECK:         apply [[BORROW]]([[INSTANCE]])
+// CHECK:         apply [[BORROW]]([[EI]])
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
 // CHECK:         apply [[BARRIER]]()
-// CHECK:         strong_release [[INSTANCE]]
+// CHECK:         strong_release [[EI]]
 // CHECK-LABEL: } // end sil function 'funky'
 @_silgen_name("funky")
 @_lexicalLifetimes

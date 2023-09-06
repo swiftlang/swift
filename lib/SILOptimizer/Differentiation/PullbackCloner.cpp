@@ -1644,6 +1644,8 @@ public:
   ///    Adjoint: adj[x] += adj[y]
   void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
 
+  void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
+
   /// Handle `begin_access` instruction.
   ///   Original: y = begin_access x
   ///    Adjoint: nothing

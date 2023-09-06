@@ -1301,6 +1301,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     // checked_cast_br %1, ....
     if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
       SILValue op = FoundIERI->getOperand();
+      if (auto *eir = dyn_cast<EndInitLetRefInst>(op))
+        op = eir->getOperand();
       if (!isa<AllocRefInst>(op))
         return nullptr;
 

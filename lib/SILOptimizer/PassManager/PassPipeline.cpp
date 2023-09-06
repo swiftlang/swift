@@ -103,6 +103,7 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
   P.addDefiniteInitialization();
+  P.addLetPropertyLowering();
   P.addRawSILInstLowering();
 }
 

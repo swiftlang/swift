@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   ComputeSideEffects.swift
   DeadStoreElimination.swift
   InitializeStaticGlobals.swift
+  LetPropertyLowering.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MergeCondFails.swift

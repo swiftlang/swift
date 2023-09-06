@@ -28,18 +28,19 @@ public class Test {
 
   // CHECK-LABEL: sil [ossa] @$s14init_accessors4TestCACycfc : $@convention(method) (@owned Test) -> @owned Test
   //
+  // CHECK: [[MU:%.*]] = mark_uninitialized [rootself] %0 : $Test
   // CHECK: [[DEFAULT_VALUE_INIT:%.*]] = function_ref @$s14init_accessors4TestC5stateAC5StateOvpfi : $@convention(thin) () -> @out Test.State
   // CHECK-NEXT: [[DEFAULT_VALUE_SLOT:%.*]] = alloc_stack $Test.State
   // CHECK-NEXT: {{.*}} = apply [[DEFAULT_VALUE_INIT]]([[DEFAULT_VALUE_SLOT]]) : $@convention(thin) () -> @out Test.State
   // CHECK-NEXT: [[DEFAULT_VALUE:%.*]] = load [take] [[DEFAULT_VALUE_SLOT]] : $*Test.State
   // CHECK: [[NEW_VALUE:%.*]] = alloc_stack $Test.State
   // CHECK-NEXT: store [[DEFAULT_VALUE]] to [init] [[NEW_VALUE]] : $*Test.State
-  // CHECK: assign_or_init [init] #Test.state, self %0 : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@callee_guaranteed (@in Test.State) -> ()
+  // CHECK: assign_or_init [init] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@callee_guaranteed (@in Test.State) -> ()
   //
   // CHECK: [[START_STATE:%.*]] = enum $Test.State, #Test.State.start!enumelt
   // CHECK-NEXT: [[NEW_VALUE:%.*]] = alloc_stack $Test.State
   // CHECK-NEXT: store [[START_STATE]] to [trivial] [[NEW_VALUE]] : $*Test.State
-  // CHECK: assign_or_init [set] #Test.state, self %0 : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@callee_guaranteed (@in Test.State) -> ()
+  // CHECK: assign_or_init [set] #Test.state, self [[MU]] : $Test, value [[NEW_VALUE]] : $*Test.State, init {{.*}} : $@convention(thin) (@in Test.State) -> @out Test.State, set {{.*}} : $@callee_guaranteed (@in Test.State) -> ()
   public init() {
     state = .start
   }

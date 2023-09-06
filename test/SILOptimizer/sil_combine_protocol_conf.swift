@@ -119,7 +119,7 @@ public class Other {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
-// CHECK: [[R1:%.*]] = ref_element_addr %0 : $Other, #Other.z
+// CHECK: [[R1:%.*]] = ref_element_addr [immutable] %0 : $Other, #Other.z
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*any DerivedProtocol to $*@opened("{{.*}}", any DerivedProtocol) Self
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}", any DerivedProtocol) Self, #DerivedProtocol.foo : <Self where Self : DerivedProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}", any DerivedProtocol) Self : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}", any DerivedProtocol) Self>([[O1]]) : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
@@ -129,7 +129,7 @@ public class Other {
 // CHECK: tuple_extract 
 // CHECK: tuple_extract 
 // CHECK: cond_fail
-// CHECK: [[R2:%.*]] = ref_element_addr %0 : $Other, #Other.p
+// CHECK: [[R2:%.*]] = ref_element_addr [immutable] %0 : $Other, #Other.p
 // CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[R2]] : $*any PublicProtocol to $*@opened("{{.*}}", any PublicProtocol) Self
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}", any PublicProtocol) Self, #PublicProtocol.foo : <Self where Self : PublicProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}", any PublicProtocol) Self : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W2]]<@opened("{{.*}}", any PublicProtocol) Self>([[O2]]) : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> Int
@@ -143,7 +143,7 @@ public class Other {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
-// CHECK: [[R3:%.*]] = ref_element_addr %0 : $Other, #Other.r
+// CHECK: [[R3:%.*]] = ref_element_addr [immutable] %0 : $Other, #Other.r
 // CHECK: [[O3:%.*]] = open_existential_addr immutable_access [[R3]] : $*any GenericProtocol to $*@opened("{{.*}}", any GenericProtocol) Self
 // CHECK: [[W3:%.*]] = witness_method $@opened("{{.*}}", any GenericProtocol) Self, #GenericProtocol.foo : <Self where Self : GenericProtocol> (Self) -> () -> Int, [[O3]] : $*@opened("{{.*}}", any GenericProtocol) Self : $@convention(witness_method: GenericProtocol) <τ_0_0 where τ_0_0 : GenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W3]]<@opened("{{.*}}", any GenericProtocol) Self>([[O3]]) : $@convention(witness_method: GenericProtocol) <τ_0_0 where τ_0_0 : GenericProtocol> (@in_guaranteed τ_0_0) -> Int
@@ -152,7 +152,7 @@ public class Other {
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
-// CHECK: [[R4:%.*]] = ref_element_addr %0 : $Other, #Other.s
+// CHECK: [[R4:%.*]] = ref_element_addr [immutable] %0 : $Other, #Other.s
 // CHECK: [[O4:%.*]] = open_existential_addr immutable_access %36 : $*any MultipleConformanceProtocol to $*@opened("{{.*}}", any MultipleConformanceProtocol) Self
 // CHECK: [[W4:%.*]] = witness_method $@opened("{{.*}}", any MultipleConformanceProtocol) Self, #MultipleConformanceProtocol.foo : <Self where Self : MultipleConformanceProtocol> (Self) -> () -> Int, %37 : $*@opened("{{.*}}", any MultipleConformanceProtocol) Self : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W4]]<@opened("{{.*}}", any MultipleConformanceProtocol) Self>(%37) : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
