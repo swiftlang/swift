@@ -483,8 +483,8 @@ class InheritedProtocolCollector {
                        bool skipExtra = false) {
     llvm::Optional<AvailableAttrList> availableAttrs;
 
-    for (InheritedEntry inherited : directlyInherited.getEntries()) {
-      Type inheritedTy = inherited.getType();
+    for (int i : directlyInherited.getIndices()) {
+      Type inheritedTy = directlyInherited.getResolvedType(i);
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
 
@@ -492,6 +492,7 @@ class InheritedProtocolCollector {
       if (!canPrintNormally && skipExtra)
         continue;
 
+      auto inherited = directlyInherited.getEntry(i);
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolDecl *protoDecl : layout.getProtocols()) {
         if (canPrintNormally)

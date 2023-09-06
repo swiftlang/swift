@@ -53,6 +53,10 @@
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
 // CHECK:       }
+// CHECK:       public struct PublicStructIndirectlyConformingToPublicProto {
+// CHECK:         public init()
+// CHECK:         public func req() -> Swift.Int
+// CHECK:       }
 // CHECK:       public class PublicClassConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
@@ -70,3 +74,4 @@
 // CHECK:         public func req() throws -> Swift.Int
 // CHECK:       }
 // CHECK:       #endif
+// CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}

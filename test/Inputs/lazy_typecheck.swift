@@ -62,6 +62,10 @@ protocol InternalProto {
   func badReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
 
+protocol InternalProtoConformingToPublicProto: PublicProto {
+  func internalReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+}
+
 public struct PublicStruct {
   // FIXME: Test properties
 
@@ -124,6 +128,13 @@ class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNo
 // MARK: - Conformances
 
 public struct PublicStructConformingToPublicProto: PublicProto {
+  public init() {}
+  public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+public struct PublicStructIndirectlyConformingToPublicProto: InternalProtoConformingToPublicProto {
   public init() {}
   public func req() -> Int {
     return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}

@@ -39,6 +39,7 @@ func testPublicClass() {
 func testConformances() {
   let array: [any PublicProto] = [
     PublicStructConformingToPublicProto(),
+    PublicStructIndirectlyConformingToPublicProto(),
     PublicClassConformingToPublicProto(),
     "string",
     PublicClassInheritingConformanceToPublicProto(),
@@ -46,5 +47,6 @@ func testConformances() {
 
   for x in array {
     _ = x.req()
+    constrainedGenericPublicFunction(x)
   }
 }
