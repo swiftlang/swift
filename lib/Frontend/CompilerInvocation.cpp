@@ -1340,6 +1340,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  // Is this the correct way to query for WMO?
+  bool isWMO =
+    Args.hasArg(OPT_wmo) ||
+    Args.hasArg(OPT_whole_module_optimization);
+  if (!isWMO && Opts.hasFeature(Feature::Embedded)) {
+    Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
+    HadError = true;
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

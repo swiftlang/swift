@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo 2>&1 | %FileCheck %s
 
 public protocol Player {}
 struct Concrete: Player {}
