@@ -57,51 +57,6 @@
 using namespace swift;
 using namespace constraints;
 
-/// Find the declaration directly referenced by this expression.
-static std::pair<ValueDecl *, FunctionRefKind>
-findReferencedDecl(Expr *expr, DeclNameLoc &loc) {
-  do {
-    expr = expr->getSemanticsProvidingExpr();
-
-    if (auto ice = dyn_cast<ImplicitConversionExpr>(expr)) {
-      expr = ice->getSubExpr();
-      continue;
-    }
-
-    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      loc = dre->getNameLoc();
-      return { dre->getDecl(), dre->getFunctionRefKind() };
-    }
-
-    return { nullptr, FunctionRefKind::Unapplied };
-  } while (true);
-}
-
-// Check if \p E is a call expression to curried thunk of "KeyPath as function".
-// i.e. '{ `$kp$` in { $0[keyPath: $kp$] } }(keypath)'
-static bool isKeyPathCurriedThunkCallExpr(Expr *E) {
-  auto CE = dyn_cast<CallExpr>(E);
-  if (!CE)
-    return false;
-  auto thunk = dyn_cast<AutoClosureExpr>(CE->getFn());
-  if (!thunk)
-    return false;
-  if (thunk->getParameters()->size() != 1 ||
-      thunk->getParameters()->get(0)->getParameterName().str() != "$kp$")
-    return false;
-
-  auto *unaryArg = CE->getArgs()->getUnlabeledUnaryExpr();
-  if (!unaryArg)
-    return false;
-  return isa<KeyPathExpr>(unaryArg);
-}
-
-// Extract the keypath expression from the curried thunk expression.
-static Expr *extractKeyPathFromCurryThunkCall(Expr *E) {
-  assert(isKeyPathCurriedThunkCallExpr(E));
-  return cast<CallExpr>(E)->getArgs()->getUnlabeledUnaryExpr();
-}
-
 static Type
 getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
