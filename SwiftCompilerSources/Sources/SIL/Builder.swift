@@ -309,9 +309,14 @@ public struct Builder {
                                                            useConformancesOf.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
-  
+
   public func createMetatype(of type: Type, representation: swift.MetatypeRepresentation) -> MetatypeInst {
     let metatype = bridged.createMetatype(type.bridged, representation)
     return notifyNew(metatype.getAs(MetatypeInst.self))
+  }
+
+  public func createEndCOWMutation(instance: Value, keepUnique: Bool = false) -> EndCOWMutationInst {
+    let endMutation = bridged.createEndCOWMutation(instance.bridged, keepUnique)
+    return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 }

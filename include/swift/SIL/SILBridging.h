@@ -1364,6 +1364,11 @@ struct BridgedBuilder{
     swift::SILType t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
     return {builder().createMetatype(regularLoc(), t)};
   }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
+    return {builder().createEndCOWMutation(regularLoc(), instance.getSILValue(), keepUnique)};
+  }
 };
 
 // AST bridging
