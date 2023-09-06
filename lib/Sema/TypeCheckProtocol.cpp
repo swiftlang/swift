@@ -5562,15 +5562,15 @@ void swift::diagnoseConformanceFailure(Type T,
 
       auto rawType = enumDecl->getRawType();
 
-      diags.diagnose(enumDecl->getInherited().front().getSourceRange().Start,
-                     diag::enum_raw_type_nonconforming_and_nonsynthable,
-                     T, rawType);
+      diags.diagnose(enumDecl->getInherited().getStartLoc(),
+                     diag::enum_raw_type_nonconforming_and_nonsynthable, T,
+                     rawType);
 
       // If the reason is that the raw type does not conform to
       // Equatable, say so.
       if (!TypeChecker::conformsToKnownProtocol(
               rawType, KnownProtocolKind::Equatable, DC->getParentModule())) {
-        SourceLoc loc = enumDecl->getInherited().front().getSourceRange().Start;
+        SourceLoc loc = enumDecl->getInherited().getStartLoc();
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
       }
@@ -6635,9 +6635,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
           DerivedConformance::derivesProtocolConformance(dc, enumDecl,
                                                          diag.Protocol) &&
           enumDecl->hasRawType() &&
-          enumDecl->getInherited().front().getSourceRange().isValid()) {
-        auto inheritedLoc =
-            enumDecl->getInherited().front().getSourceRange().Start;
+          enumDecl->getInherited().getStartLoc().isValid()) {
+        auto inheritedLoc = enumDecl->getInherited().getStartLoc();
         Context.Diags.diagnose(
             inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
             dc->getDeclaredInterfaceType(), enumDecl->getRawType());

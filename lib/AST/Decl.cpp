@@ -5223,7 +5223,7 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
     startLoc = eachLoc;
 
   if (!getInherited().empty())
-    endLoc = getInherited().back().getSourceRange().End;
+    endLoc = getInherited().getEndLoc();
 
   return {startLoc, endLoc};
 }
@@ -5261,7 +5261,7 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   } else if (auto defaultDefinition = getDefaultDefinitionTypeRepr()) {
     endLoc = defaultDefinition->getEndLoc();
   } else if (!getInherited().empty()) {
-    endLoc = getInherited().back().getSourceRange().End;
+    endLoc = getInherited().getEndLoc();
   } else {
     endLoc = getNameLoc();
   }

@@ -1565,10 +1565,6 @@ public:
   size_t size() const { return Entries.size(); }
   IntRange<size_t> const getIndices() { return indices(Entries); }
 
-  // FIXME: Remove these in favor of more targeted conveniences
-  const InheritedEntry &front() const { return Entries.front(); }
-  const InheritedEntry &back() const { return Entries.back(); }
-
   /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
   /// given index.
   TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
@@ -1589,12 +1585,12 @@ public:
   const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
 
   /// Returns the source location of the beginning of the inheritance clause.
-  SourceLoc getSourceRangeStart() const {
+  SourceLoc getStartLoc() const {
     return getEntries().front().getSourceRange().Start;
   }
 
   /// Returns the source location of the end of the inheritance clause.
-  SourceLoc getSourceRangeEnd() const {
+  SourceLoc getEndLoc() const {
     return getEntries().back().getSourceRange().End;
   }
 };

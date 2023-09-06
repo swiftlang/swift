@@ -2063,7 +2063,7 @@ private:
     if (Inherits.empty())
       return llvm::None;
 
-    SourceLoc StartLoc = Inherits.front().getSourceRange().Start;
+    SourceLoc StartLoc = Inherits.getStartLoc();
     if (StartLoc.isInvalid())
       return llvm::None;
 

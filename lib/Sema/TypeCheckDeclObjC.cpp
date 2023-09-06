@@ -1319,8 +1319,9 @@ static llvm::Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
              .limitBehavior(behavior);
          } else if (CD->getSuperclass().isNull()) {
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ")
-             .limitBehavior(behavior);
+               .fixItInsert(CD->getInherited().getEntry(0).getLoc(),
+                            "NSObject, ")
+               .limitBehavior(behavior);
          }
       }
 
@@ -1594,7 +1595,7 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   if (!isCIntegerType(rawType)) {
     SourceRange errorRange;
     if (!enumDecl->getInherited().empty())
-      errorRange = enumDecl->getInherited().front().getSourceRange();
+      errorRange = enumDecl->getInherited().getEntry(0).getSourceRange();
     enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, rawType)
       .highlight(errorRange);
     return false;

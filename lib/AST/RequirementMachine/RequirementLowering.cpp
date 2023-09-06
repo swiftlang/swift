@@ -956,7 +956,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
       return { ", ", trailing->getRequirements().back().getSourceRange().End };
 
     // Inheritance clause.
-    return { " where ", proto->getInherited().back().getSourceRange().End };
+    return { " where ", proto->getInherited().getEndLoc() };
   };
 
   // Retrieve the set of requirements that a given associated type declaration
