@@ -13,13 +13,17 @@ struct Variadic<each T> {
   struct Nested<U, each V: Equatable> {}
 }
 
-@_silgen_name("_swift_checkedCreateType")
-func _checkedCreateType(
+@_silgen_name("swift_allocateMetadataPack")
+func allocateMetadataPack(
+  _ packPointer: UnsafeRawPointer,
+  _ packCount: UInt
+) -> UnsafeRawPointer
+
+@_silgen_name("_swift_instantiateCheckedGenericMetadata")
+func _instantiateCheckedGenericMetadata(
   _ descriptor: UnsafeRawPointer,
   _ genericArgs: UnsafeRawPointer,
-  _ genericArgsSize: UInt,
-  _ packCounts: UnsafeRawPointer?,
-  _ packCountsSize: UInt
+  _ genericArgsSize: UInt
 ) -> Any.Type?
 
 func metaPointer(_ x: Any.Type) -> UnsafeRawPointer {
@@ -39,12 +43,10 @@ testSuite.test("_swift_checkedCreateType non-variadic") {
   let dictGenericArgs: [Any.Type] = [String.self, Double.self]
 
   dictGenericArgs.withUnsafeBufferPointer {
-    let newDict = _checkedCreateType(
+    let newDict = _instantiateCheckedGenericMetadata(
       dictDesc,
       UnsafeRawPointer($0.baseAddress!),
-      UInt($0.count),
-      nil,
-      0
+      UInt($0.count)
     )
 
     expectTrue(newDict == [String: Double].self)
@@ -62,23 +64,22 @@ testSuite.test("_swift_checkedCreateType variadic") {
   )
 
   let variPack: [Any.Type] = [Int.self, Int8.self, UInt8.self]
-  let variPackCounts: [Int32] = [3]
 
   variPack.withUnsafeBufferPointer { pack in
-    let genericArgs = [UnsafeRawPointer(pack.baseAddress!)]
+    let packPointer = allocateMetadataPack(
+      UnsafeRawPointer(pack.baseAddress!),
+      UInt(pack.count)
+    )
+    let genericArgs = [packPointer]
 
     genericArgs.withUnsafeBufferPointer { genericArgs in
-      variPackCounts.withUnsafeBufferPointer { packCounts in
-        let newVari = _checkedCreateType(
-          variDesc,
-          UnsafeRawPointer(genericArgs.baseAddress!),
-          UInt(genericArgs.count),
-          UnsafeRawPointer(packCounts.baseAddress!),
-          UInt(packCounts.count)
-        )
+      let newVari = _instantiateCheckedGenericMetadata(
+        variDesc,
+        UnsafeRawPointer(genericArgs.baseAddress!),
+        UInt(genericArgs.count)
+      )
 
-        expectTrue(newVari == Variadic<Int, Int8, UInt8>.self)
-      }
+      expectTrue(newVari == Variadic<Int, Int8, UInt8>.self)
     }
   }
 }
@@ -100,26 +101,26 @@ testSuite.test("_swift_checkedCreateType variadic nested with requirements") {
   nestedPack.withUnsafeBufferPointer { nestedPack in
     variPack.withUnsafeBufferPointer { variPack in
       let nestedGenericArgs = [
-        UnsafeRawPointer(variPack.baseAddress!),
+        allocateMetadataPack(
+          UnsafeRawPointer(variPack.baseAddress!),
+          UInt(variPack.count)
+        ),
         metaPointer(Int16.self),
-        UnsafeRawPointer(nestedPack.baseAddress!)
+        allocateMetadataPack(
+          UnsafeRawPointer(nestedPack.baseAddress!),
+          UInt(nestedPack.count)
+        )
       ]
 
       nestedGenericArgs.withUnsafeBufferPointer { nestedGenericArgs in
-        // 3 for each T, -1 for U, and 3 for each V
-        let nestedPackCounts: [Int32] = [3, -1, 3]
 
-        nestedPackCounts.withUnsafeBufferPointer { nestedPackCounts in
-          let newNested = _checkedCreateType(
-            nestedDesc,
-            UnsafeRawPointer(nestedGenericArgs.baseAddress!),
-            UInt(nestedGenericArgs.count),
-            UnsafeRawPointer(nestedPackCounts.baseAddress!),
-            UInt(nestedPackCounts.count)
-          )
+        let newNested = _instantiateCheckedGenericMetadata(
+          nestedDesc,
+          UnsafeRawPointer(nestedGenericArgs.baseAddress!),
+          UInt(nestedGenericArgs.count)
+        )
 
-          expectTrue(newNested == Variadic<String, [Int], UInt64>.Nested<Int16, Int, Substring, Bool>.self)
-        }
+        expectTrue(newNested == Variadic<String, [Int], UInt64>.Nested<Int16, Int, Substring, Bool>.self)
       }
     }
   }
