@@ -593,8 +593,10 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(adoptee->getAnyNominal(), defaultName,
-                      adoptee->getAnyNominal()->getStartLoc(),
+  dc->lookupQualified(dc->getSelfNominalTypeDecl(), defaultName,
+                      isa<ExtensionDecl>(dc)
+                      ? cast<ExtensionDecl>(dc)->getStartLoc()
+                      : cast<NominalTypeDecl>(dc)->getStartLoc(),
                       subOptions, lookupResults);
 
   InferredAssociatedTypesByWitnesses result;
@@ -819,7 +821,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 
   // Look at all of the inherited protocols to determine whether they
   // require a fixed type for this associated type.
-  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
+  for (auto conformedProto : dc->getSelfNominalTypeDecl()->getAllProtocols()) {
     if (conformedProto != assocType->getProtocol() &&
         !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
@@ -888,7 +890,7 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
+  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
   if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
     return std::make_pair(Type(), nullptr);
@@ -942,7 +944,7 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
   // First, look at all the protocols the adoptee conforms to and feed the
   // same-type constraints in their requirement signatures to the system.
   for (auto *const conformedProto :
-       adoptee->getAnyNominal()->getAllProtocols(/*sorted=*/true)) {
+       dc->getSelfNominalTypeDecl()->getAllProtocols(/*sorted=*/true)) {
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
     if (ctx.isRecursivelyConstructingRequirementMachine(
