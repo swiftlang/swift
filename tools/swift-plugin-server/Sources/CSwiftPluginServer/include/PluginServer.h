@@ -56,6 +56,26 @@ typedef unsigned __INT32_TYPE__ __swiftc_uint32_t;
 #endif
 #endif
 
+#define __swiftc_join3(a,b,c) a ## b ## c
+
+#define __swiftc_intn_t(n) __swiftc_join3(__swiftc_int, n, _t)
+#define __swiftc_uintn_t(n) __swiftc_join3(__swiftc_uint, n, _t)
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_WIN64)
+typedef __swiftc_int64_t SwiftInt;
+typedef __swiftc_uint64_t SwiftUInt;
+#elif defined(_WIN32)
+typedef __swiftc_int32_t SwiftInt;
+typedef __swiftc_uint32_t SwiftUInt;
+#else
+#error unknown windows pointer width
+#endif
+#else
+typedef __swiftc_intn_t(__INTPTR_WIDTH__) SwiftInt;
+typedef __swiftc_uintn_t(__INTPTR_WIDTH__) SwiftUInt;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
