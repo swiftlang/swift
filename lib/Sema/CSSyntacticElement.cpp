@@ -281,11 +281,10 @@ static bool isViableElement(ASTNode element,
 using ElementInfo = std::tuple<ASTNode, ContextualTypeInfo,
                                /*isDiscarded=*/bool, ConstraintLocator *>;
 
-static void createConjunction(ConstraintSystem &cs,
+static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ArrayRef<ElementInfo> elements,
-                              ConstraintLocator *locator,
-                              bool isIsolated = false,
-                              ArrayRef<TypeVariableType *> extraTypeVars = {}) {
+                              ConstraintLocator *locator, bool isIsolated,
+                              ArrayRef<TypeVariableType *> extraTypeVars) {
   SmallVector<Constraint *, 4> constraints;
   SmallVector<TypeVariableType *, 2> referencedVars;
   referencedVars.append(extraTypeVars.begin(), extraTypeVars.end());
@@ -335,7 +334,7 @@ static void createConjunction(ConstraintSystem &cs,
     isIsolated = true;
   }
 
-  VarRefCollector paramCollector(cs);
+  TypeVarRefCollector paramCollector(cs, dc, locator);
 
   // Whether we're doing completion, and the conjunction is for a
   // SingleValueStmtExpr, or one of its braces.
@@ -516,6 +515,13 @@ public:
                                       SyntacticElementContext context,
                                       ConstraintLocator *locator)
       : cs(cs), context(context), locator(locator) {}
+
+  void createConjunction(ArrayRef<ElementInfo> elements,
+                         ConstraintLocator *locator, bool isIsolated = false,
+                         ArrayRef<TypeVariableType *> extraTypeVars = {}) {
+    ::createConjunction(cs, context.getAsDeclContext(), elements, locator,
+                        isIsolated, extraTypeVars);
+  }
 
   void visitExprPattern(ExprPattern *EP) {
     auto target = SyntacticElementTarget::forExprPattern(EP);
@@ -859,7 +865,7 @@ private:
     if (auto *join = context.ElementJoin.getPtrOrNull())
       elements.push_back(makeJoinElement(cs, join, locator));
 
-    createConjunction(cs, elements, locator);
+    createConjunction(elements, locator);
   }
 
   void visitGuardStmt(GuardStmt *guardStmt) {
@@ -868,7 +874,7 @@ private:
     visitStmtCondition(guardStmt, elements, locator);
     elements.push_back(makeElement(guardStmt->getBody(), locator));
 
-    createConjunction(cs, elements, locator);
+    createConjunction(elements, locator);
   }
 
   void visitWhileStmt(WhileStmt *whileStmt) {
@@ -877,7 +883,7 @@ private:
     visitStmtCondition(whileStmt, elements, locator);
     elements.push_back(makeElement(whileStmt->getBody(), locator));
 
-    createConjunction(cs, elements, locator);
+    createConjunction(elements, locator);
   }
 
   void visitDoStmt(DoStmt *doStmt) {
@@ -885,8 +891,7 @@ private:
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *repeatWhileStmt) {
-    createConjunction(cs,
-                      {makeElement(repeatWhileStmt->getCond(),
+    createConjunction({makeElement(repeatWhileStmt->getCond(),
                                    cs.getConstraintLocator(
                                        locator, ConstraintLocator::Condition),
                                    getContextForCondition()),
@@ -895,8 +900,7 @@ private:
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *poundAssertStmt) {
-    createConjunction(cs,
-                      {makeElement(poundAssertStmt->getCondition(),
+    createConjunction({makeElement(poundAssertStmt->getCondition(),
                                    cs.getConstraintLocator(
                                        locator, ConstraintLocator::Condition),
                                    getContextForCondition())},
@@ -913,12 +917,10 @@ private:
     auto *errorExpr = throwStmt->getSubExpr();
 
     createConjunction(
-        cs,
-        {makeElement(
-            errorExpr,
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::SyntacticElement(errorExpr)),
-            {errType, CTP_ThrowStmt})},
+        {makeElement(errorExpr,
+                     cs.getConstraintLocator(
+                         locator, LocatorPathElt::SyntacticElement(errorExpr)),
+                     {errType, CTP_ThrowStmt})},
         locator);
   }
 
@@ -939,12 +941,10 @@ private:
     auto *selfExpr = discardStmt->getSubExpr();
 
     createConjunction(
-        cs,
-        {makeElement(
-            selfExpr,
-            cs.getConstraintLocator(
-                locator, LocatorPathElt::SyntacticElement(selfExpr)),
-            {nominalType, CTP_DiscardStmt})},
+        {makeElement(selfExpr,
+                     cs.getConstraintLocator(
+                         locator, LocatorPathElt::SyntacticElement(selfExpr)),
+                     {nominalType, CTP_DiscardStmt})},
         locator);
   }
 
@@ -962,7 +962,7 @@ private:
     // Body of the `for-in` loop.
     elements.push_back(makeElement(forEachStmt->getBody(), stmtLoc));
 
-    createConjunction(cs, elements, locator);
+    createConjunction(elements, locator);
   }
 
   void visitSwitchStmt(SwitchStmt *switchStmt) {
@@ -990,7 +990,7 @@ private:
     if (auto *join = context.ElementJoin.getPtrOrNull())
       elements.push_back(makeJoinElement(cs, join, switchLoc));
 
-    createConjunction(cs, elements, switchLoc);
+    createConjunction(elements, switchLoc);
   }
 
   void visitDoCatchStmt(DoCatchStmt *doStmt) {
@@ -1007,7 +1007,7 @@ private:
     for (auto *catchStmt : doStmt->getCatches())
       elements.push_back(makeElement(catchStmt, doLoc));
 
-    createConjunction(cs, elements, doLoc);
+    createConjunction(elements, doLoc);
   }
 
   void visitCaseStmt(CaseStmt *caseStmt) {
@@ -1040,7 +1040,7 @@ private:
 
     elements.push_back(makeElement(caseStmt->getBody(), caseLoc));
 
-    createConjunction(cs, elements, caseLoc);
+    createConjunction(elements, caseLoc);
   }
 
   void visitBraceStmt(BraceStmt *braceStmt) {
@@ -1127,7 +1127,7 @@ private:
         // want to type-check captures to make sure that the context
         // is valid.
         if (captureList)
-          createConjunction(cs, elements, locator);
+          createConjunction(elements, locator);
 
         return;
       }
@@ -1195,7 +1195,7 @@ private:
           contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
     }
 
-    createConjunction(cs, elements, locator);
+    createConjunction(elements, locator);
   }
 
   void visitReturnStmt(ReturnStmt *returnStmt) {
@@ -1282,7 +1282,7 @@ private:
     auto resultElt = makeElement(resultExpr, locator,
                                  contextInfo.value_or(ContextualTypeInfo()),
                                  /*isDiscarded=*/false);
-    createConjunction(cs, {resultElt}, locator);
+    createConjunction({resultElt}, locator);
   }
 
   ContextualTypeInfo getContextualResultInfo() const {
@@ -1520,6 +1520,9 @@ bool ConstraintSystem::generateConstraints(SingleValueStmtExpr *E) {
 
 void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
                                            ConstraintLocatorBuilder locator) {
+  assert(!exprPatterns.empty());
+  auto *DC = exprPatterns.front()->getDeclContext();
+
   // Form a conjunction of ExprPattern elements, isolated from the rest of the
   // pattern.
   SmallVector<ElementInfo> elements;
@@ -1532,7 +1535,7 @@ void ConstraintSystem::generateConstraints(ArrayRef<ExprPattern *> exprPatterns,
     elements.push_back(makeElement(EP, getConstraintLocator(EP), context));
   }
   auto *loc = getConstraintLocator(locator);
-  createConjunction(*this, elements, loc, /*isIsolated*/ true,
+  createConjunction(*this, DC, elements, loc, /*isIsolated*/ true,
                     referencedTypeVars);
 }
 

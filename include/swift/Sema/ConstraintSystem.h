@@ -6238,18 +6238,29 @@ public:
   }
 };
 
-/// Find any references to not yet resolved outer VarDecls (including closure
-/// parameters) used in the body of a conjunction element (e.g closures, taps,
-/// if/switch expressions). This is required because isolated conjunctions, just
-/// like single-expression closures, have to be connected to type variables they
-/// are going to use, otherwise they'll get placed in a separate solver
-/// component and would never produce a solution.
-class VarRefCollector : public ASTWalker {
+/// Find any references to external type variables used in the body of a
+/// conjunction element (e.g closures, taps, if/switch expressions).
+///
+/// This includes:
+/// - Not yet resolved outer VarDecls (including closure parameters)
+/// - Return statements with a contextual type that has not yet been resolved
+///
+/// This is required because isolated conjunctions, just like single-expression
+/// closures, have to be connected to type variables they are going to use,
+/// otherwise they'll get placed in a separate solver component and would never
+/// produce a solution.
+class TypeVarRefCollector : public ASTWalker {
   ConstraintSystem &CS;
+  DeclContext *DC;
+  ConstraintLocator *Locator;
+
   llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  unsigned DCDepth = 0;
 
 public:
-  VarRefCollector(ConstraintSystem &cs) : CS(cs) {}
+  TypeVarRefCollector(ConstraintSystem &cs, DeclContext *dc,
+                      ConstraintLocator *locator)
+      : CS(cs), DC(dc), Locator(locator) {}
 
   /// Infer the referenced type variables from a given decl.
   void inferTypeVars(Decl *D);
@@ -6259,6 +6270,8 @@ public:
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override;
+  PostWalkResult<Expr *> walkToExprPost(Expr *expr) override;
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *stmt) override;
 
   PreWalkAction walkToDeclPre(Decl *D) override {
     // We only need to walk into PatternBindingDecls, other kinds of decls

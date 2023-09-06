@@ -866,7 +866,7 @@ namespace {
   };
 } // end anonymous namespace
 
-void VarRefCollector::inferTypeVars(Decl *D) {
+void TypeVarRefCollector::inferTypeVars(Decl *D) {
   // We're only interested in VarDecls.
   if (!isa_and_nonnull<VarDecl>(D))
     return;
@@ -881,7 +881,10 @@ void VarRefCollector::inferTypeVars(Decl *D) {
 }
 
 ASTWalker::PreWalkResult<Expr *>
-VarRefCollector::walkToExprPre(Expr *expr) {
+TypeVarRefCollector::walkToExprPre(Expr *expr) {
+  if (isa<ClosureExpr>(expr))
+    DCDepth += 1;
+
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
     inferTypeVars(DRE->getDecl());
 
@@ -899,6 +902,34 @@ VarRefCollector::walkToExprPre(Expr *expr) {
     }
   }
   return Action::Continue(expr);
+}
+
+ASTWalker::PostWalkResult<Expr *>
+TypeVarRefCollector::walkToExprPost(Expr *expr) {
+  if (isa<ClosureExpr>(expr))
+    DCDepth -= 1;
+
+  return Action::Continue(expr);
+}
+
+ASTWalker::PreWalkResult<Stmt *>
+TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
+  // If we have a return without any intermediate DeclContexts in a ClosureExpr,
+  // we need to include any type variables in the closure's result type, since
+  // the conjunction will generate constraints using that type. We don't need to
+  // connect to returns in e.g nested closures since we'll connect those when we
+  // generate constraints for those closures. We also don't need to bother if
+  // we're generating constraints for the closure itself, since we'll connect
+  // the conjunction to the closure type variable itself.
+  if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
+    if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
+        !Locator->directlyAt<ClosureExpr>()) {
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
+      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
+      TypeVars.insert(typeVars.begin(), typeVars.end());
+    }
+  }
+  return Action::Continue(stmt);
 }
 
 namespace {
@@ -1304,7 +1335,8 @@ namespace {
           // in the tap body, otherwise tap expression is going
           // to get disconnected from the context.
           if (auto *body = tap->getBody()) {
-            VarRefCollector refCollector(CS);
+            TypeVarRefCollector refCollector(
+                CS, tap->getVar()->getDeclContext(), locator);
 
             body->walk(refCollector);
 
@@ -2938,7 +2970,7 @@ namespace {
       auto *locator = CS.getConstraintLocator(closure);
       auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-      VarRefCollector refCollector(CS);
+      TypeVarRefCollector refCollector(CS, /*DC*/ closure, locator);
       // Walk the capture list if this closure has one,  because it could
       // reference declarations from the outer closure.
       if (auto *captureList =
