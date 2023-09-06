@@ -7,3 +7,8 @@ public actor OtherModuleActor {
   public let c: SomeClass = SomeClass()
   public let d: SomeSendableClass = SomeSendableClass()
 }
+
+@MainActor
+public class OtherModuleGAIT {
+  public static let A: Int = 1
+}
