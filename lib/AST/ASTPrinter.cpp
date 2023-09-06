@@ -7688,8 +7688,8 @@ swift::getInheritedForPrinting(
   InheritedTypes inherited = InheritedTypes(decl);
 
   // Collect explicit inherited types.
-  for (auto entry : inherited.getEntries()) {
-    if (auto ty = entry.getType()) {
+  for (auto i : inherited.getIndices()) {
+    if (auto ty = inherited.getResolvedType(i)) {
       bool foundUnprintable = ty.findIf([&](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !options.shouldPrint(aliasTy->getDecl());
@@ -7703,7 +7703,7 @@ swift::getInheritedForPrinting(
         continue;
     }
 
-    Results.push_back(entry);
+    Results.push_back(inherited.getEntry(i));
   }
 
   // Collect synthesized conformances.

@@ -40,15 +40,15 @@
 // CHECK:         public class func publicClassMethod()
 // CHECK:         deinit
 // CHECK:       }
-// CHECK:       public struct PublicStructConformingToPublicProto : PublicProto {
+// CHECK:       public struct PublicStructConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
 // CHECK:       }
-// CHECK:       public class PublicClassConformingToPublicProto : PublicProto {
+// CHECK:       public class PublicClassConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
 // CHECK:         deinit
 // CHECK:       }
-// CHECK:       extension Swift.String : PublicProto {
+// CHECK:       extension Swift.String : lazy_typecheck.PublicProto {
 // CHECK:         public func req() -> Swift.Int
 // CHECK:       }
