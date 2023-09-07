@@ -22,6 +22,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "swift/shims/LibcShims.h"
 
