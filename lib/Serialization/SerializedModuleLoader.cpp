@@ -826,6 +826,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
     M.setHasHermeticSealAtLink(loadedModuleFile->hasHermeticSealAtLink());
+    M.setIsEmbeddedSwiftModule(loadedModuleFile->isEmbeddedSwiftModule());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -914,6 +915,18 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
   if (M.hasHermeticSealAtLink() && !Ctx.LangOpts.HermeticSealAtLink) {
     Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
                        diag::need_hermetic_seal_to_import_module, M.getName());
+  }
+
+  if (M.isEmbeddedSwiftModule() &&
+      !Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
+                       diag::cannot_import_embedded_module, M.getName());
+  }
+
+  if (!M.isEmbeddedSwiftModule() &&
+      Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    Ctx.Diags.diagnose(diagLoc.value_or(SourceLoc()),
+                       diag::cannot_import_non_embedded_module, M.getName());
   }
 
   // Non-resilient modules built with C++ interoperability enabled

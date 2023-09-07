@@ -1004,6 +1004,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // inlinable functions from imported ones.
   P.addOnonePrespecializations();
 
+  // For embedded Swift: CMO is used to serialize libraries.
+  P.addCrossModuleOptimization();
+
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();

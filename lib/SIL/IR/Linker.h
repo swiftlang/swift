@@ -142,7 +142,10 @@ private:
 
   /// Is the current mode link all? Link all implies we should try and link
   /// everything, not just transparent/shared functions.
-  bool isLinkAll() const { return Mode == LinkingMode::LinkAll; }
+  bool isLinkAll() const {
+    return Mode == LinkingMode::LinkAll ||
+           Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  }
 
   void linkInVTable(ClassDecl *D);
 

@@ -1557,6 +1557,11 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
       return false;
     }
 
+    // Embedded Swift does not support TBD.
+    if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
+      return false;
+    }
+
     // Cross-module optimization does not support TBD.
     if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive) {
       return false;
