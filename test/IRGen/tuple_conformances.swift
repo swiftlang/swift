@@ -1,9 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir -parse-stdlib -primary-file %s -enable-experimental-feature TupleConformances -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature TupleConformances -parse-as-library | %FileCheck %s
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
-
-import Swift
 
 protocol P {
   func defaultRequirement()
@@ -14,7 +12,9 @@ extension P {
   func defaultRequirement() {}
 }
 
-extension Builtin.TheTupleType: P where repeat each Elements: P {
+typealias Tuple<each Element> = (repeat each Element)
+
+extension Tuple: P where repeat each Element: P {
   static func staticRequirement() {}
 }
 

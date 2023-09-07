@@ -2938,22 +2938,12 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   // If neither is generic at this level, we have a pass-through typealias.
   if (!typealias->isGeneric()) return true;
 
-  auto boundGenericType = typealias->getUnderlyingType()
-      ->getAs<BoundGenericType>();
-  if (!boundGenericType) return false;
+  if (typealias->getUnderlyingType()->isEqual(
+        nominal->getSelfInterfaceType())) {
+    return true;
+  }
 
-  // If our arguments line up with our innermost generic parameters, it's
-  // a passthrough typealias.
-  auto innermostGenericParams = typealiasSig.getInnermostGenericParams();
-  auto boundArgs = boundGenericType->getGenericArgs();
-  if (boundArgs.size() != innermostGenericParams.size())
-    return false;
-
-  return std::equal(boundArgs.begin(), boundArgs.end(),
-                    innermostGenericParams.begin(),
-                    [](Type arg, GenericTypeParamType *gp) {
-                      return arg->isEqual(gp);
-                    });
+  return false;
 }
 
 Type
@@ -2979,7 +2969,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       PlaceholderType::get,
       /*packElementOpener*/ nullptr);
 
-  const auto extendedType = resolution.resolveType(extendedRepr);
+  auto extendedType = resolution.resolveType(extendedRepr);
 
   if (extendedType->hasError())
     return error();
@@ -2987,13 +2977,17 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal =
-          aliasDecl->getUnderlyingType()->getAnyNominal();
-      if (extendedNominal)
+      auto underlyingType = aliasDecl->getUnderlyingType();
+      if (auto extendedNominal = underlyingType->getAnyNominal()) {
         return TypeChecker::isPassThroughTypealias(
                    aliasDecl, extendedNominal)
                    ? extendedType
                    : extendedNominal->getDeclaredType();
+      }
+
+      if (underlyingType->is<TupleType>()) {
+        return extendedType;
+      }
     }
   }
 
@@ -3006,8 +3000,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
-  // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal() &&
+  // Cannot extend function types, metatypes, existentials, etc.
+  if (!extendedType->is<TupleType>() &&
+      !extendedType->getAnyNominal() &&
       !extendedType->is<ParameterizedProtocolType>()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
          .highlight(extendedRepr->getSourceRange());
