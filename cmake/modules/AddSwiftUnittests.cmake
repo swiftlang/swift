@@ -111,10 +111,31 @@ function(add_swift_unittest test_dirname)
     endif()
   endif()
 
+  file(RELATIVE_PATH relative_lib_path "${CMAKE_CURRENT_BINARY_DIR}" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
+
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set_property(
+      TARGET ${test_dirname}
+      APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}")
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+    set_property(
+      TARGET ${test_dirname}
+      APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}")
+  endif()
+
   if (SWIFT_SWIFT_PARSER AND NOT ASU_IS_TARGET_TEST)
     # Link to stdlib the compiler uses.
-    _add_swift_runtime_link_flags(${test_dirname} "../../lib" "")
-    set_property(TARGET ${test_dirname} PROPERTY BUILD_WITH_INSTALL_RPATH OFF)
+    _add_swift_runtime_link_flags(${test_dirname} "${relative_lib_path}" "")
+
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      set_property(
+        TARGET ${test_dirname}
+        APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}/swift/host")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+      set_property(
+        TARGET ${test_dirname}
+        APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}/swift/host")
+    endif()
   endif()
 endfunction()
 
