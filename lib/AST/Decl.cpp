@@ -10889,15 +10889,16 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
 
 void MacroDecl::getIntroducedConformances(
     NominalTypeDecl *attachedTo,
+    MacroRole role,
     SmallVectorImpl<ProtocolDecl *> &conformances) const {
-  auto *attr = getMacroRoleAttr(MacroRole::Extension);
+  auto *attr = getMacroRoleAttr(role);
   if (!attr)
     return;
 
   auto &ctx = getASTContext();
   auto constraintTypes = evaluateOrDefault(
       ctx.evaluator,
-      ResolveExtensionMacroConformances{attr, this},
+      ResolveMacroConformances{attr, this},
       {});
 
   for (auto constraint : constraintTypes) {
