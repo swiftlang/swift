@@ -2416,18 +2416,6 @@ void CompletionLookup::addPostfixOperatorCompletion(OperatorDecl *op,
   addTypeAnnotation(builder, resultType);
 }
 
-void CompletionLookup::tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
-  ConcreteDeclRef referencedDecl;
-  FunctionType *funcTy = getTypeOfCompletionOperator(
-      const_cast<DeclContext *>(CurrDeclContext), expr, op->getName(),
-      DeclRefKind::PostfixOperator, referencedDecl);
-  if (!funcTy)
-    return;
-
-  // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
-  addPostfixOperatorCompletion(op, funcTy->getResult());
-}
-
 void CompletionLookup::addAssignmentOperator(Type RHSType) {
   CodeCompletionResultBuilder builder = makeResultBuilder(
       CodeCompletionResultKind::BuiltinOperator, SemanticContextKind::None);
@@ -2470,104 +2458,6 @@ void CompletionLookup::addInfixOperatorCompletion(OperatorDecl *op,
   }
   if (resultType)
     addTypeAnnotation(builder, resultType);
-}
-
-void CompletionLookup::tryInfixOperatorCompletion(Expr *foldedExpr,
-                                                  InfixOperatorDecl *op) {
-  ConcreteDeclRef referencedDecl;
-  FunctionType *funcTy = getTypeOfCompletionOperator(
-      const_cast<DeclContext *>(CurrDeclContext), foldedExpr, op->getName(),
-      DeclRefKind::BinaryOperator, referencedDecl);
-  if (!funcTy)
-    return;
-
-  Type lhsTy = funcTy->getParams()[0].getPlainType();
-  Type rhsTy = funcTy->getParams()[1].getPlainType();
-  Type resultTy = funcTy->getResult();
-
-  // Don't complete optional operators on non-optional types.
-  if (!lhsTy->getRValueType()->getOptionalObjectType()) {
-    // 'T ?? T'
-    if (op->getName().str() == "??")
-      return;
-    // 'T == nil'
-    if (auto NT = rhsTy->getNominalOrBoundGenericNominal())
-      if (NT->getName() ==
-          CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
-        return;
-  }
-
-  // If the right-hand side and result type are both type parameters, we're
-  // not providing a useful completion.
-  if (resultTy->isTypeParameter() && rhsTy->isTypeParameter())
-    return;
-
-  // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
-  addInfixOperatorCompletion(op, funcTy->getResult(),
-                             funcTy->getParams()[1].getPlainType());
-}
-
-Expr *
-CompletionLookup::typeCheckLeadingSequence(Expr *LHS,
-                                           ArrayRef<Expr *> leadingSequence) {
-  if (leadingSequence.empty())
-    return LHS;
-
-  SourceRange sequenceRange(leadingSequence.front()->getStartLoc(),
-                            LHS->getEndLoc());
-  auto *expr = findParsedExpr(CurrDeclContext, sequenceRange);
-  if (!expr)
-    return LHS;
-
-  if (expr->getType() && !expr->getType()->hasError())
-    return expr;
-
-  if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext), expr))
-    return expr;
-  return LHS;
-}
-
-void CompletionLookup::getOperatorCompletions(
-    Expr *LHS, ArrayRef<Expr *> leadingSequence) {
-  if (IsSuperRefExpr)
-    return;
-
-  Expr *foldedExpr = typeCheckLeadingSequence(LHS, leadingSequence);
-
-  SmallVector<OperatorDecl *, 16> operators;
-  collectOperators(operators);
-  // FIXME: this always chooses the first operator with the given name.
-  llvm::DenseSet<Identifier> seenPostfixOperators;
-  llvm::DenseSet<Identifier> seenInfixOperators;
-
-  for (auto op : operators) {
-    switch (op->getKind()) {
-    case DeclKind::PrefixOperator:
-      // Don't insert prefix operators in postfix position.
-      // FIXME: where should these get completed?
-      break;
-    case DeclKind::PostfixOperator:
-      if (seenPostfixOperators.insert(op->getName()).second)
-        tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
-      break;
-    case DeclKind::InfixOperator:
-      if (seenInfixOperators.insert(op->getName()).second)
-        tryInfixOperatorCompletion(foldedExpr, cast<InfixOperatorDecl>(op));
-      break;
-    default:
-      llvm_unreachable("unexpected operator kind");
-    }
-  }
-
-  if (leadingSequence.empty() && LHS->getType() &&
-      LHS->getType()->hasLValueType()) {
-    addAssignmentOperator(LHS->getType()->getRValueType());
-  }
-
-  // FIXME: unify this with the ?.member completions.
-  if (auto T = LHS->getType())
-    if (auto ValueT = T->getRValueType()->getOptionalObjectType())
-      addPostfixBang(ValueT);
 }
 
 void CompletionLookup::addTypeRelationFromProtocol(

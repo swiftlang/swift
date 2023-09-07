@@ -622,13 +622,6 @@ llvm::Optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
                 TypeCheckExprOptions options = TypeCheckExprOptions());
 
-/// Return the type of operator function for specified LHS, or a null
-/// \c Type on error.
-FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                          Identifier opName,
-                                          DeclRefKind refKind,
-                                          ConcreteDeclRef &refdDecl);
-
 /// Remove any solutions from the provided vector that require more fixes than
 /// the best score or don't contain a type for the code completion token.
 void filterSolutionsForCodeCompletion(

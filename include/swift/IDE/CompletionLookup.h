@@ -534,18 +534,10 @@ public:
 
   void addPostfixOperatorCompletion(OperatorDecl *op, Type resultType);
 
-  void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op);
-
   void addAssignmentOperator(Type RHSType);
 
   void addInfixOperatorCompletion(OperatorDecl *op, Type resultType,
                                   Type RHSType);
-
-  void tryInfixOperatorCompletion(Expr *foldedExpr, InfixOperatorDecl *op);
-
-  Expr *typeCheckLeadingSequence(Expr *LHS, ArrayRef<Expr *> leadingSequence);
-
-  void getOperatorCompletions(Expr *LHS, ArrayRef<Expr *> leadingSequence);
 
   void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
                                    CodeCompletionLiteralKind kind);
