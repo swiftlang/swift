@@ -161,6 +161,9 @@ function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
       # Add rpath to the host Swift libraries.
       file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")
+    else()
+      target_link_directories(${target} PRIVATE
+        ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
     endif()
 
     # For the "end step" of bootstrapping configurations on Darwin, need to be
