@@ -1387,7 +1387,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     // Print conformances, if present.
     auto conformances = evaluateOrDefault(
         D->getASTContext().evaluator,
-        ResolveExtensionMacroConformances{Attr, D},
+        ResolveMacroConformances{Attr, D},
         {});
     if (!conformances.empty()) {
       Printer << ", conformances: ";

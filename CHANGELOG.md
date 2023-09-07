@@ -2,6 +2,18 @@
 
 _**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
+## Swift 5.9.2
+
+* [SE-0407][]:
+
+  Member macros can specify a list of protocols via the `conformances` argument to the macro role. The macro implementation will be provided with those protocols that are listed but have not already been implemented by the type to which the member macro is attached, in the same manner as extension macros.
+
+   ```swift
+   @attached(member, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
+@attached(extension, conformances: Decodable, Encodable, names: named(init(from:), encode(to:)))
+macro Codable() = #externalMacro(module: "MyMacros", type: "CodableMacro")
+   ```
+
 ## Swift 5.9
 
 * [SE-0382][], [SE-0389][], [SE-0394][], [SE-0397][]:
@@ -9830,6 +9842,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0389]: https://github.com/apple/swift-evolution/blob/main/proposals/0389-attached-macros.md
 [SE-0394]: https://github.com/apple/swift-evolution/blob/main/proposals/0394-swiftpm-expression-macros.md
 [SE-0397]: https://github.com/apple/swift-evolution/blob/main/proposals/0397-freestanding-declaration-macros.md
+[SE-0407]: https://github.com/apple/swift-evolution/blob/main/proposals/0407-member-macro-conformances.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

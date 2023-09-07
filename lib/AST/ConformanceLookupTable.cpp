@@ -503,7 +503,8 @@ void ConformanceLookupTable::addMacroGeneratedProtocols(
       MacroRole::Extension,
       [&](CustomAttr *attr, MacroDecl *macro) {
         SmallVector<ProtocolDecl *, 2> conformances;
-        macro->getIntroducedConformances(nominal, conformances);
+        macro->getIntroducedConformances(
+            nominal, MacroRole::Extension, conformances);
 
         for (auto *protocol : conformances) {
           addProtocol(protocol, attr->getLocation(), source);
