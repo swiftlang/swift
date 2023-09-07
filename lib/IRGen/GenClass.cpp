@@ -1075,8 +1075,10 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   assert(!IRGen.hasLazyMetadata(D));
 
   // Emit the class metadata.
-  emitClassMetadata(*this, D, fragileLayout, resilientLayout);
-  emitFieldDescriptor(D);
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    emitClassMetadata(*this, D, fragileLayout, resilientLayout);
+    emitFieldDescriptor(D);
+  }
 
   IRGen.addClassForEagerInitialization(D);
   IRGen.addBackDeployedObjCActorInitialization(D);

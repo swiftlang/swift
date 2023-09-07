@@ -494,6 +494,11 @@ struct BridgedPassContext {
     return mod->getOptions().EnableStackProtection;
   }
 
+  bool enableEmbeddedSwift() const {
+    swift::SILModule *mod = invocation->getPassManager()->getModule();
+    return mod->getASTContext().LangOpts.hasFeature(swift::Feature::Embedded);
+  }
+
   bool enableMoveInoutStackProtection() const {
     swift::SILModule *mod = invocation->getPassManager()->getModule();
     return mod->getOptions().EnableMoveInoutStackProtection;

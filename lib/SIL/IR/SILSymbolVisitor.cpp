@@ -601,6 +601,9 @@ public:
     if (canSkipNominal(NTD))
       return;
 
+    if (NTD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return;
+
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
     if (!NTD->getObjCImplementationDecl()) {

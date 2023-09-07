@@ -3148,6 +3148,10 @@ static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureEmbedded(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinUnprotectedStackAlloc(Decl *decl) {
   return false;
 }
