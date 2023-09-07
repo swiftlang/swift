@@ -9,7 +9,7 @@ add_pure_swift_host_library(swiftASTGen STATIC
   Sources/ASTGen/ASTGen.swift
   Sources/ASTGen/Bridge.swift
   Sources/ASTGen/Decls.swift
-  Sources/ASTGen/Diagnostics.swift
+  Sources/ASTGen/DiagnosticsBridge.swift
   Sources/ASTGen/Exprs.swift
   Sources/ASTGen/Generics.swift
   Sources/ASTGen/Literals.swift
