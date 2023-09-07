@@ -18,7 +18,7 @@ import SwiftShims
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension SerialExecutor {
   /// Unconditionally if the current task is executing on the expected serial executor,
   /// and if not crash the program offering information about the executor mismatch.
@@ -35,7 +35,8 @@ extension SerialExecutor {
   /// * In `-Ounchecked` builds, the optimizer may assume that this function is
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -54,7 +55,7 @@ extension SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
   /// Unconditionally if the current task is executing on the serial executor of the passed in `actor`,
   /// and if not crash the program offering information about the executor mismatch.
@@ -71,7 +72,8 @@ extension Actor {
   /// * In `-Ounchecked` builds, the optimizer may assume that this function is
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -90,7 +92,7 @@ extension Actor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension GlobalActor {
   /// Unconditionally if the current task is executing on the serial executor of the passed in `actor`,
   /// and if not crash the program offering information about the executor mismatch.
@@ -107,7 +109,8 @@ extension GlobalActor {
   /// * In `-Ounchecked` builds, the optimizer may assume that this function is
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public static func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -119,7 +122,7 @@ extension GlobalActor {
 // ==== -----------------------------------------------------------------------
 // MARK: Assert executors
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension SerialExecutor {
   /// Performs an executor check in debug builds.
   ///
@@ -133,7 +136,8 @@ extension SerialExecutor {
   /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -152,7 +156,7 @@ extension SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
   /// Performs an executor check in debug builds.
   ///
@@ -166,7 +170,8 @@ extension Actor {
   /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public nonisolated func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -186,7 +191,7 @@ extension Actor {
   }
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension GlobalActor {
   /// Performs an executor check in debug builds.
   ///
@@ -200,7 +205,8 @@ extension GlobalActor {
   /// * In `-Ounchecked` builds, `condition` is not evaluated, but the optimizer
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   public static func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -212,7 +218,7 @@ extension GlobalActor {
 // ==== -----------------------------------------------------------------------
 // MARK: Assume Executor
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 5.1, *)
 extension Actor {
   /// A safe way to synchronously assume that the current execution context belongs to the passed in actor.
   ///
@@ -227,7 +233,8 @@ extension Actor {
   /// if another actor uses the same serial executor--by using that actor's ``Actor/unownedExecutor``
   /// as its own ``Actor/unownedExecutor``--this check will succeed, as from a concurrency safety
   /// perspective, the serial executor guarantees mutual exclusion of those two actors.
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 5.1, *)
+  @backDeployed(before: SwiftStdlib 5.9)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
   public nonisolated func assumeIsolated<T>(
       _ operation: (isolated Self) throws -> T,
