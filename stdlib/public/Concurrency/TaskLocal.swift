@@ -227,7 +227,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     storage storageKeyPath: ReferenceWritableKeyPath<Never, TaskLocal<Value>>
   ) -> Value {
     get {
-      fatalError("Will never be executed, since enclosing instance is Never")
     }
   }
 
