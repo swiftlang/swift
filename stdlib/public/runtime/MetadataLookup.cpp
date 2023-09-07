@@ -2825,6 +2825,41 @@ swift_getOpaqueTypeConformance(const void * const *arguments,
       arguments, static_cast<const OpaqueTypeDescriptor *>(descriptor), index);
 }
 
+SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_CC(swift)
+const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
+    const TypeContextDescriptor *context,
+    const void * const *genericArgs,
+    size_t genericArgsSize) {
+  context = swift_auth_data_non_address(
+      context, SpecialPointerAuthDiscriminators::ContextDescriptor);
+
+  if (!context->isGeneric()) {
+    return nullptr;
+  }
+
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+
+  llvm::ArrayRef<MetadataOrPack> genericArgsRef(
+      reinterpret_cast<const MetadataOrPack *>(genericArgs), genericArgsSize);
+  llvm::SmallVector<unsigned, 8> genericParamCounts;
+  llvm::SmallVector<const void *, 8> allGenericArgs;
+
+  auto result = _gatherGenericParameters(context, genericArgsRef,
+                                         /* parent */ nullptr,
+                                         genericParamCounts, allGenericArgs,
+                                         demangler);
+
+  // _gatherGenericParameters returns llvm::None on success.
+  if (result.hasValue()) {
+    return nullptr;
+  }
+
+  auto accessFunction = context->getAccessFunction();
+
+  return accessFunction(MetadataState::Complete, allGenericArgs).Value;
+}
+
 #if SWIFT_OBJC_INTEROP
 
 // Return the ObjC class for the given type name.
