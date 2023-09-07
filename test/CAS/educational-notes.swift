@@ -13,10 +13,11 @@ let x = 1 +
 // NO-COLOR-NOT: {{-+$}}
 
 // A diagnostic with an educational note using supported markdown features
-extension (Int, Int) {}
-// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mnon-nominal type '(Int, Int)' cannot be extended
-// CHECK-NEXT:[0mextension (Int, Int) {}
-// CHECK-NEXT:[0;1;32m^         ~~~~~~~~~~
+typealias Crap = () -> ()
+extension Crap {}
+// CHECK:{{.*}}[0m[0;1;31merror: [0m[1mnon-nominal type 'Crap' (aka '() -> ()') cannot be extended
+// CHECK-NEXT:[0mextension Crap {}
+// CHECK-NEXT:[0;1;32m^         ~~~~
 // CHECK-NEXT:[0m[0m[1mNominal Types[0m
 // CHECK-NEXT:--------------
 // CHECK-EMPTY:
@@ -42,9 +43,9 @@ extension (Int, Int) {}
 // CHECK-NEXT:[0m[1mHeader 1[0m
 // CHECK-NEXT:[0m[1mHeader 3[0m
 
-// NO-COLOR:{{.*}}error: non-nominal type '(Int, Int)' cannot be extended
-// NO-COLOR-NEXT:extension (Int, Int) {}
-// NO-COLOR-NEXT:^         ~~~~~~~~~~
+// NO-COLOR:{{.*}}error: non-nominal type 'Crap' (aka '() -> ()') cannot be extended
+// NO-COLOR-NEXT:extension Crap {}
+// NO-COLOR-NEXT:^         ~~~~
 // NO-COLOR-NEXT:Nominal Types
 // NO-COLOR-NEXT:--------------
 // NO-COLOR-EMPTY:
@@ -72,15 +73,15 @@ extension (Int, Int) {}
 
 // CHECK-DESCRIPTIVE: educational-notes.swift
 // CHECK-DESCRIPTIVE-NEXT:  | // A diagnostic with an educational note
-// CHECK-DESCRIPTIVE-NEXT:  | extension (Int, Int) {}
+// CHECK-DESCRIPTIVE-NEXT:  | extension Crap {}
 // CHECK-DESCRIPTIVE-NEXT:  | ^ error: expected expression after operator
 // CHECK-DESCRIPTIVE-NEXT:  |
 
 // CHECK-DESCRIPTIVE: educational-notes.swift
 // CHECK-DESCRIPTIVE-NEXT:  | // A diagnostic with an educational note
-// CHECK-DESCRIPTIVE-NEXT:  | extension (Int, Int) {}
-// CHECK-DESCRIPTIVE-NEXT:  |           ~~~~~~~~~~
-// CHECK-DESCRIPTIVE-NEXT:  | ^ error: non-nominal type '(Int, Int)' cannot be extended
+// CHECK-DESCRIPTIVE-NEXT:  | extension Crap {}
+// CHECK-DESCRIPTIVE-NEXT:  |           ~~~~
+// CHECK-DESCRIPTIVE-NEXT:  | ^ error: non-nominal type 'Crap' (aka '() -> ()') cannot be extended
 // CHECK-DESCRIPTIVE-NEXT:  |
 // CHECK-DESCRIPTIVE-NEXT: Nominal Types
 // CHECK-DESCRIPTIVE-NEXT: -------------

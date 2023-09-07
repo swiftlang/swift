@@ -7902,27 +7902,30 @@ Type DeclContext::getSelfTypeInContext() const {
   return mapTypeIntoContext(getSelfInterfaceType());
 }
 
-TupleType *BuiltinTupleDecl::getTupleSelfType() const {
-  if (TupleSelfType)
-    return TupleSelfType;
-
+TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const {
   auto &ctx = getASTContext();
 
-  // Get the generic parameter type 'Elements'.
-  auto paramType = getGenericParams()->getParams()[0]
-      ->getDeclaredInterfaceType();
+  // Get the generic parameter type 'each T'.
+  GenericParamList *genericParams;
+  if (owner != nullptr) {
+    genericParams = owner->getGenericParams();
+  } else {
+    genericParams = getGenericParams();
+  }
 
-  // Build the pack expansion type 'Elements...'.
+  assert(genericParams != nullptr);
+  assert(genericParams->getParams().size() == 1);
+  assert(genericParams->getOuterParameters() == nullptr);
+  auto paramType = genericParams->getParams()[0]->getDeclaredInterfaceType();
+
+  // Build the pack expansion type 'repeat each T'.
   Type packExpansionType = PackExpansionType::get(paramType, paramType);
 
-  // Build the one-element tuple type '(Elements...)'.
+  // Build the one-element tuple type '(repeat each T)'.
   SmallVector<TupleTypeElt, 1> elts;
   elts.push_back(packExpansionType);
 
-  const_cast<BuiltinTupleDecl *>(this)->TupleSelfType =
-      TupleType::get(elts, ctx);
-
-  return TupleSelfType;
+  return TupleType::get(elts, ctx);
 }
 
 /// Retrieve the interface type of 'self' for the given context.
@@ -7931,7 +7934,7 @@ Type DeclContext::getSelfInterfaceType() const {
 
   if (auto *nominalDecl = getSelfNominalTypeDecl()) {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
-      return builtinTupleDecl->getTupleSelfType();
+      return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
       auto *genericParams = nominalDecl->getGenericParams();
