@@ -902,12 +902,8 @@ SILValue swift::findOwnershipReferenceAggregate(SILValue ref) {
 
     if (auto *inst = root->getDefiningInstruction()) {
       if (auto fwdOp = ForwardingOperation(inst)) {
-        if (fwdOp.canForwardFirstOperandOnly()) {
-          // The `enum` instruction can have no operand.
-          if (inst->getNumOperands() == 0)
-            return root;
-
-          root = inst->getOperand(0);
+        if (auto *singleForwardingOp = fwdOp.getSingleForwardingOperand()) {
+          root = singleForwardingOp->get();
           continue;
         }
       }
