@@ -252,44 +252,34 @@ public:
   ValueOwnershipKind getForwardingOwnershipKind();
   bool preservesOwnership();
 
-  // FIXME: Find a better name. Even unary instructions like struct_extract
-  // forward "all" operands.
-  bool canForwardAllOperands() const {
+  Operand *getSingleForwardingOperand() const {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::LinearFunctionInst:
     case SILInstructionKind::DifferentiableFunctionInst:
-      return true;
+      return nullptr;
     default:
-      return false;
+      if (forwardingInst->getNumRealOperands() == 0) {
+        // This can happen with enum instructions that have no payload.
+        return nullptr;
+      }
+      return &forwardingInst->getOperandRef(0);
     }
-  }
-
-  // FIXME: Find a better name. Even instructions that forward all operands can
-  // forward the first operand.
-  bool canForwardFirstOperandOnly() const {
-    return !canForwardAllOperands() && forwardingInst->getNumRealOperands() > 0;
   }
 
   ArrayRef<Operand> getForwardedOperands() const {
-    if (canForwardAllOperands()) {
-      return forwardingInst->getAllOperands();
+    if (auto *singleForwardingOp = getSingleForwardingOperand()) {
+      return *singleForwardingOp;
     }
-    if (canForwardFirstOperandOnly()) {
-      return forwardingInst->getOperandRef(0);
-    }
-    return {};
+    return forwardingInst->getAllOperands();
   }
 
   MutableArrayRef<Operand> getForwardedOperands() {
-    if (canForwardAllOperands()) {
-      return forwardingInst->getAllOperands();
+    if (auto *singleForwardingOp = getSingleForwardingOperand()) {
+      return *singleForwardingOp;
     }
-    if (canForwardFirstOperandOnly()) {
-      return forwardingInst->getOperandRef(0);
-    }
-    return {};
+    return forwardingInst->getAllOperands();
   }
 
   bool canForwardOwnedCompatibleValuesOnly() {
