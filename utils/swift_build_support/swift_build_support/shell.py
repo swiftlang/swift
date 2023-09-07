@@ -242,7 +242,7 @@ def run(*args, **kwargs):
         _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
         if output:
             for line in output.splitlines():
-                print("{0}{1}".format(prefix, line))
+                print("{0}{1}".format(prefix, line.decode('utf-8')))
         sys.stdout.flush()
         sys.stderr.flush()
     if lock:
