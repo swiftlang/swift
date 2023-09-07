@@ -321,6 +321,10 @@ public:
   /// Return true if the forwarded value is address-only either before or after
   /// forwarding.
   bool isAddressOnly() const;
+
+  // Call \p visitor on all forwarded results of the current forwarding
+  // operation.
+  bool visitForwardedValues(function_ref<bool(SILValue)> visitor);
 };
 } // end namespace swift
 
