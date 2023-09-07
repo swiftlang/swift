@@ -49,6 +49,8 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
 
 // MARK: - Nominal types
 
+public protocol EmptyPublicProto {}
+
 public protocol PublicProto {
   func req() -> Int // expected-note 2 {{protocol requires function 'req()' with type '() -> Int'; add a stub for conformance}}
 }
@@ -87,6 +89,12 @@ public struct PublicStruct {
 
   static func internalStaticMethod() -> DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
     return 1
+  }
+}
+
+public struct PublicGenericStruct<T> {
+  public func publicMethod() -> T {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'T'}}
   }
 }
 
@@ -172,6 +180,12 @@ extension InternalStruct: PublicProto { // expected-error {{type 'InternalStruct
 
 struct InternalStructConformingToInternalProto: InternalProto { // expected-error {{type 'InternalStructConformingToInternalProto' does not conform to protocol 'InternalProto'}}
 }
+
+struct InternalStructForConstraint {}
+
+extension PublicGenericStruct where T == InternalStructForConstraint {}
+
+extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
 
 // FIXME: Test enums
 // FIXME: Test global vars

@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
-// RUN: %target-swift-frontend -package-name Package -typecheck %S/../Inputs/lazy_typecheck_client.swift -I %t
+// RUN: %target-swift-frontend -package-name Package -typecheck -verify %S/../Inputs/lazy_typecheck_client.swift -I %t
 
 // CHECK: import Swift
 
@@ -26,6 +26,8 @@
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
 
+// CHECK:       public protocol EmptyPublicProto {
+// CHECK:       }
 // CHECK:       public protocol PublicProto {
 // CHECK:         func req() -> Swift.Int
 // CHECK:       }
@@ -38,6 +40,9 @@
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public static func publicStaticMethod()
+// CHECK:       }
+// CHECK:       public struct PublicGenericStruct<T> {
+// CHECK:         public func publicMethod() -> T
 // CHECK:       }
 // CHECK:       public class PublicClass {
 // CHECK:         public init(x: Swift.Int)
@@ -74,4 +79,9 @@
 // CHECK:         public func req() throws -> Swift.Int
 // CHECK:       }
 // CHECK:       #endif
+// CHECK:       @available(*, unavailable)
+// CHECK-NEXT:  extension lazy_typecheck.PublicGenericStruct : lazy_typecheck.EmptyPublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 // CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}
+
+// CHECK:       @usableFromInline
+// CHECK:       internal protocol _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
