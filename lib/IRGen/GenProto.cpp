@@ -2394,6 +2394,10 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
+
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
@@ -3353,6 +3357,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         llvm::Value **srcMetadataCache,
                                         ProtocolConformanceRef conformance) {
+  assert(!srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded));
+
   auto proto = conformance.getRequirement();
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");

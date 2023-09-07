@@ -1597,7 +1597,8 @@ const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.hasLazyMetadata(st)) {
+  if (!IRGen.hasLazyMetadata(st) &&
+      !st->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitStructMetadata(*this, st);
     emitFieldDescriptor(st);
   }

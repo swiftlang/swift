@@ -2568,6 +2568,10 @@ static void eraseExistingTypeContextDescriptor(IRGenModule &IGM,
 void irgen::emitLazyTypeContextDescriptor(IRGenModule &IGM,
                                           NominalTypeDecl *type,
                                           RequireMetadata_t requireMetadata) {
+  if (type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
+
   eraseExistingTypeContextDescriptor(IGM, type);
 
   bool hasLayoutString = false;
@@ -6465,6 +6469,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
 /// that the ObjC runtime uses for uniquing.
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", protocol);
+
+  if (protocol->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
 
   // Marker protocols are never emitted.
   if (protocol->isMarkerProtocol())

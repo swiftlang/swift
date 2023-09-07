@@ -554,5 +554,8 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
       "-enable-layout-string-value-witnesses-instantiation can not be enabled "
       "without -enable-layout-string-value-witnesses.", ())
 
+ERROR(evolution_with_embedded,none,
+      "Library evolution cannot be enabled with embedded Swift.", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

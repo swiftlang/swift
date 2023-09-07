@@ -353,7 +353,17 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
-  
+
+  if (module.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      impact & RuntimeEffect::Existential) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+    diagnose(loc, diag::performance_metadata, "existential");
+    return true;
+  }
+
+  if (perfConstr == PerformanceConstraints::None)
+    return false;
+
   if (impact & RuntimeEffect::Casting) {
     // TODO: be more specific on casting.
     // E.g. distinguish locking and allocating dynamic casts, etc.
@@ -497,6 +507,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
+      if (function->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        auto loc = LocWithParent(inst.getLoc().getSourceLoc(), nullptr);
+        visitInst(&inst, PerformanceConstraints::None, &loc);
+      }
+
       auto as = FullApplySite::isa(&inst);
       if (!as)
         continue;
@@ -592,12 +607,18 @@ private:
       }
     }
 
-    if (!annotatedFunctionsFound)
+    if (!annotatedFunctionsFound &&
+        !getModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
       return;
 
     for (SILFunction &function : *module) {
       // Don't rerun diagnostics on deserialized functions.
       if (function.wasDeserializedCanonical())
+        continue;
+
+      // Don't check generic functions, they're about to be removed anyway.
+      if (getModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          function.getLoweredFunctionType()->getSubstGenericSignature())
         continue;
 
       if (function.getPerfConstraints() == PerformanceConstraints::None) {
