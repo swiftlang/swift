@@ -1483,7 +1483,7 @@ SILInstruction *AddressLoweringState::getLatestOpeningInst(SILType ty) const {
 
     if (auto openedTy = getLocalArchetypeOf(archetype)) {
       auto openingVal =
-          getModule()->getRootLocalArchetypeDef(openedTy, function);
+          getModule()->getRootLocalArchetypeDef(openedTy.getRoot(), function);
 
       assert(openingVal && "all opened archetypes should be resolved");
       auto *openingInst = openingVal->getDefiningInstruction();

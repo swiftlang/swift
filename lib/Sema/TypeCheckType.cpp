@@ -2670,7 +2670,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
                constraintType);
 
     if (auto *dmt = interfaceType->getAs<DependentMemberType>()) {
-      auto base = dmt->getBase();
+      auto base = dmt->getRootGenericParam();
       auto baseArchetype =
           OpenedArchetypeType::get(constraintType->getCanonicalType(), base,
                                    GenericSignature(), attrs.getOpenedID());

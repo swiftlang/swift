@@ -18,6 +18,12 @@ protocol P {
   func foo()
 }
 
+protocol PA {
+  associatedtype A : PA
+
+  func foo() -> A
+}
+
 struct S : P {
   func foo()
 }
@@ -1161,6 +1167,22 @@ right:
 exit:
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f166_testOpenedArchetypeAssociatedtype : {{.*}} {
+// CHECK:       bb0([[OUT_ADDR:%[^,]+]] : $*any PA, [[IN_ADDR:%[^,]+]] :
+// CHECK:         [[IN_OPEN_ADDR:%[^,]+]] = open_existential_addr immutable_access [[IN_ADDR]] : $*any PA to $*@opened("00000000-0000-0000-0000-000000000004", any PA) Self
+// CHECK:         [[FOO:%[^,]+]] = witness_method $@opened("00000000-0000-0000-0000-000000000004", any PA) Self, #PA.foo
+// CHECK:         [[OUT_OPEN_ADDR:%[^,]+]] = init_existential_addr [[OUT_ADDR]] : $*any PA, $@opened("00000000-0000-0000-0000-000000000004", any PA) Self.A
+// CHECK:         apply [[FOO]]<@opened("00000000-0000-0000-0000-000000000004", any PA) Self>([[OUT_OPEN_ADDR]], [[IN_OPEN_ADDR]])
+// CHECK-LABEL: } // end sil function 'f166_testOpenedArchetypeAssociatedtype'
+sil [ossa] @f166_testOpenedArchetypeAssociatedtype : $@convention(thin) (@in_guaranteed any PA) -> @out any PA {
+bb0(%0 : @guaranteed $any PA):
+  %2 = open_existential_value %0 : $any PA to $@opened("00000000-0000-0000-0000-000000000004", any PA) Self
+  %3 = witness_method $@opened("00000000-0000-0000-0000-000000000004", any PA) Self, #PA.foo : <Self where Self : PA> (Self) -> () -> Self.A, %2 : $@opened("00000000-0000-0000-0000-000000000004", any PA) Self : $@convention(witness_method: PA) <τ_0_0 where τ_0_0 : PA> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
+  %4 = apply %3<@opened("00000000-0000-0000-0000-000000000004", any PA) Self>(%2) : $@convention(witness_method: PA) <τ_0_0 where τ_0_0 : PA> (@in_guaranteed τ_0_0) -> @out τ_0_0.A
+  %5 = init_existential_value %4 : $(@opened("00000000-0000-0000-0000-000000000004", any PA) Self).A, $(@opened("00000000-0000-0000-0000-000000000004", any PA) Self).A, $any PA
+  return %5 : $any PA
 }
 
 // CHECK-LABEL: sil [ossa] @f170_compare : $@convention(thin) <T where T : Comparable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
