@@ -536,7 +536,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // libraries. This may however cause the library to get pulled in in
   // situations where it isn't useful, such as for dylibs, though this is
   // harmless aside from code size.
-  if (!IRGen.Opts.UseJIT) {
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 StringRef libraryName, bool forceLoad) {
       llvm::Optional<llvm::VersionTuple> compatibilityVersion;
@@ -1416,7 +1416,6 @@ void IRGenerator::emitLazyDefinitions() {
     LazySpecializedTypeMetadataRecords.clear();
     LazyTypeContextDescriptors.clear();
     LazyOpaqueTypeDescriptors.clear();
-    LazyFunctionDefinitions.clear();
     LazyCanonicalSpecializedMetadataAccessors.clear();
     LazyMetadataAccessors.clear();
     LazyWitnessTables.clear();

@@ -898,6 +898,10 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   if (prespecializedFunctionDeclsImported)
     return;
 
+  // No prespecitalizations in embedded Swift
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   SmallVector<ModuleDecl *, 8> importedModules;
   // Add the Swift module.
   if (!isStdlibModule()) {
