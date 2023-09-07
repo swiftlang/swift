@@ -1038,6 +1038,11 @@ void Serializer::writeHeader() {
         HasHermeticSealAtLink.emit(ScratchRecord);
       }
 
+      if (Options.EmbeddedSwiftModule) {
+        options_block::IsEmbeddedSwiftModuleLayout IsEmbeddedSwiftModule(Out);
+        IsEmbeddedSwiftModule.emit(ScratchRecord);
+      }
+
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);

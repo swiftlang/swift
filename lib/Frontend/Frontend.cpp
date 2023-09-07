@@ -223,6 +223,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.HermeticSealAtLink = opts.HermeticSealAtLink;
 
+  serializationOpts.EmbeddedSwiftModule =
+      LangOpts.hasFeature(Feature::Embedded);
+
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
   serializationOpts.SerializeExternalDeclsOnly =

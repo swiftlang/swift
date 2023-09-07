@@ -120,7 +120,8 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
     return;
   }
 
-  // In the performance pipeline, we deserialize all reachable functions.
+  // In the performance pipeline or embedded mode, we deserialize all reachable
+  // functions.
   if (isLinkAll())
     return deserializeAndPushToWorklist(F);
 
@@ -433,6 +434,11 @@ void SILLinkerVisitor::process() {
       // Remove The Serialized state (if any)
       //  This allows for more optimizations
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
+    }
+
+    // TODO: This should probably be done as a separate SIL pass ("internalize")
+    if (Fn->getModule().getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      Fn->setLinkage(stripExternalFromLinkage(Fn->getLinkage()));
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "

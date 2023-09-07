@@ -656,6 +656,14 @@ public:
     Bits.ModuleDecl.HasHermeticSealAtLink = enabled;
   }
 
+  /// Returns true if this module was built with embedded Swift
+  bool isEmbeddedSwiftModule() const {
+    return Bits.ModuleDecl.IsEmbeddedSwiftModule;
+  }
+  void setIsEmbeddedSwiftModule(bool enabled = true) {
+    Bits.ModuleDecl.IsEmbeddedSwiftModule = enabled;
+  }
+
   /// Returns true if this module was built with C++ interoperability enabled.
   bool hasCxxInteroperability() const {
     return Bits.ModuleDecl.HasCxxInteroperability;

@@ -128,6 +128,7 @@ class ExtendedValidationInfo {
     unsigned IsSIB : 1;
     unsigned IsStaticLibrary : 1;
     unsigned HasHermeticSealAtLink : 1;
+    unsigned IsEmbeddedSwiftModule : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
@@ -180,6 +181,10 @@ public:
   bool hasHermeticSealAtLink() const { return Bits.HasHermeticSealAtLink; }
   void setHasHermeticSealAtLink(bool val) {
     Bits.HasHermeticSealAtLink = val;
+  }
+  bool isEmbeddedSwiftModule() const { return Bits.IsEmbeddedSwiftModule; }
+  void setIsEmbeddedSwiftModule(bool val) {
+    Bits.IsEmbeddedSwiftModule = val;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {
