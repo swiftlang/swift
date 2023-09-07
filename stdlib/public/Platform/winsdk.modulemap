@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-module WinSDK [system] {
+module WinSDK [system] [extern_c] {
   module WinSock2 {
     header "WinSock2.h"
     header "WS2tcpip.h"
@@ -166,74 +166,6 @@ module WinSDK [system] {
 
       link "ComDlg32.Lib"
     }
-  }
-
-  explicit module DirectX {
-    module Direct3D11 {
-      header "d3d11.h"
-      header "d3d11_1.h"
-      header "d3d11_2.h"
-      header "d3d11_3.h"
-      header "d3d11_4.h"
-      export *
-
-      link "d3d11.lib"
-      link "dxgi.lib"
-    }
-
-    module Direct3D12 {
-      header "d3d12.h"
-      export *
-
-      link "d3d12.lib"
-      link "dxgi.lib"
-    }
-
-    // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
-    // should split it out, but because it is part of the D3D11 interfaces, this
-    // separate module is meant to augment the uncovered portions only.
-    module _DXGI {
-      header "../shared/dxgi1_6.h"
-      header "dxgidebug.h"
-      export *
-
-      link "dxgi.lib"
-    }
-
-    module D3DCompiler {
-      header "d3dcompiler.h"
-      export *
-
-      link "d3dcompiler.lib"
-    }
-
-    module XAudio29 {
-      header "xaudio2.h"
-      header "xaudio2fx.h"
-      export *
-
-      link "xaudio2.lib"
-
-      requires cplusplus
-    }
-
-    // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
-    // part of Vista.
-    module XInput14 {
-      header "Xinput.h"
-      export *
-
-      link "xinput.lib"
-    }
-    
-    module DirectInput8 {
-      header "dinput.h"
-      export *
-
-      link "dinput.lib"
-    }
-
-    link "dxguid.lib"
   }
 
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
@@ -495,6 +427,7 @@ module WinSDK [system] {
   }
 
   module WinNT {
+    requires core.path
     header "winnt.h"
     export *
   }
@@ -527,11 +460,11 @@ module WinSDK [system] {
 
     link "AdvAPI32.Lib"
   }
-  
+
   module WinUSB {
     header "winusb.h"
     export *
-    
+
     link "winusb.lib"
   }
 
@@ -546,3 +479,70 @@ module WinSDK [system] {
   }
 }
 
+module DirectX [system] {
+  module Direct3D11 {
+    header "d3d11.h"
+    header "d3d11_1.h"
+    header "d3d11_2.h"
+    header "d3d11_3.h"
+    header "d3d11_4.h"
+    export *
+
+    link "d3d11.lib"
+    link "dxgi.lib"
+  }
+
+  module Direct3D12 {
+    header "d3d12.h"
+    export *
+
+    link "d3d12.lib"
+    link "dxgi.lib"
+  }
+
+  // FIXME(compnerd) DXGI is part of the Direct3D interfaces currently; we
+  // should split it out, but because it is part of the D3D11 interfaces, this
+  // separate module is meant to augment the uncovered portions only.
+  module _DXGI {
+    header "../shared/dxgi1_6.h"
+    header "dxgidebug.h"
+    export *
+
+    link "dxgi.lib"
+  }
+
+  module D3DCompiler {
+    header "d3dcompiler.h"
+    export *
+
+    link "d3dcompiler.lib"
+  }
+
+  module XAudio29 {
+    header "xaudio2.h"
+    header "xaudio2fx.h"
+    export *
+
+    link "xaudio2.lib"
+
+    requires cplusplus
+  }
+
+  // XInput 1.4 (Windows 10, XBox) is newer than the XInput 9.1.0 which was
+  // part of Vista.
+  module XInput14 {
+    header "Xinput.h"
+    export *
+
+    link "xinput.lib"
+  }
+
+  module DirectInput8 {
+    header "dinput.h"
+    export *
+
+    link "dinput.lib"
+  }
+
+  link "dxguid.lib"
+}

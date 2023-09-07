@@ -84,7 +84,7 @@ module _visualc_intrinsics [system] [extern_c] {
   }
 }
 
-module SAL [system] {
+module SAL [system] [extern_c] {
   header "sal.h"
   export *
 
@@ -94,7 +94,7 @@ module SAL [system] {
   }
 }
 
-module vcruntime [system] {
+module vcruntime [system] [extern_c] {
   use SAL
   export SAL
 
@@ -111,7 +111,7 @@ module vcruntime [system] {
   }
 }
 
-module std_config [system] {
+module std_config [system] [extern_c] {
   header "crtdefs.h"
   header "crtversion.h"
   export *

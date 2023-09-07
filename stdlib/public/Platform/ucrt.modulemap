@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-module ucrt [system] {
+module ucrt [system] [extern_c] {
   module C {
     module complex {
       /* disallow the header in C++ mode as it forwards to `ccomplex`.  */
@@ -161,7 +161,7 @@ module ucrt [system] {
   }
 }
 
-module corecrt [system] {
+module corecrt [system] [extern_c] {
   use vcruntime
 
   header "corecrt.h"
