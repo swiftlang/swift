@@ -1901,13 +1901,12 @@ void MultiConformanceChecker::checkAllConformances() {
 static void diagnoseConformanceImpliedByConditionalConformance(
     DiagnosticEngine &Diags, NormalProtocolConformance *conformance,
     NormalProtocolConformance *implyingConf, bool issueFixit) {
-  Type T = conformance->getType();
   auto proto = conformance->getProtocol();
   Type protoType = proto->getDeclaredInterfaceType();
   auto implyingProto = implyingConf->getProtocol()->getDeclaredInterfaceType();
   auto loc = implyingConf->getLoc();
   Diags.diagnose(loc, diag::conditional_conformances_cannot_imply_conformances,
-                 T, implyingProto, protoType);
+                 conformance->getType(), implyingProto, protoType);
 
   if (!issueFixit)
     return;
@@ -1949,11 +1948,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
     llvm::raw_svector_ostream prefixStream(prefix);
     llvm::raw_svector_ostream suffixStream(suffix);
 
-    ValueDecl *decl = T->getAnyNominal();
-    if (!decl)
-      decl = T->getAnyGeneric();
-
-    prefixStream << "extension " << decl->getName() << ": " << protoType << " ";
+    prefixStream << "extension " << ext->getExtendedType() << ": " << protoType << " ";
     suffixStream << " {\n"
                  << indent << extraIndent << "<#witnesses#>\n"
                  << indent << "}\n\n"
@@ -3548,6 +3543,18 @@ static bool isNSObjectProtocol(ProtocolDecl *proto) {
   return proto->hasClangNode();
 }
 
+static Type getTupleConformanceTypeWitness(DeclContext *dc,
+                                           AssociatedTypeDecl *assocType) {
+  auto genericSig = dc->getGenericSignatureOfContext();
+  assert(genericSig.getGenericParams().size() == 1);
+
+  auto paramTy = genericSig.getGenericParams()[0];
+  auto elementTy = DependentMemberType::get(paramTy, assocType);
+  auto expansionTy = PackExpansionType::get(elementTy, paramTy);
+
+  return TupleType::get(TupleTypeElt(expansionTy), dc->getASTContext());
+}
+
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
@@ -3588,7 +3595,15 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Printer << "public ";
 
   if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
-    Printer << "typealias " << MissingTypeWitness->getName() << " = <#type#>";
+    Printer << "typealias " << MissingTypeWitness->getName() << " = ";
+
+    if (isa<BuiltinTupleDecl>(Adopter->getSelfNominalTypeDecl())) {
+      auto expectedTy = getTupleConformanceTypeWitness(Adopter, MissingTypeWitness);
+      Printer << expectedTy.getString();
+    } else {
+      Printer << "<#type#>";
+    }
+
     Printer << "\n";
   } else {
     if (isa<ConstructorDecl>(Requirement)) {
@@ -3899,17 +3914,25 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
 
       // Issue diagnostics for witness types.
       if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
+        llvm::Optional<InFlightDiagnostic> diag;
+        if (isa<BuiltinTupleDecl>(DC->getSelfNominalTypeDecl())) {
+          auto expectedTy = getTupleConformanceTypeWitness(DC, MissingTypeWitness);
+          diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type_tuple,
+                                      MissingTypeWitness, expectedTy));
+        } else {
+          diag.emplace(Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                                      MissingTypeWitness));
+        }
         if (SameFile) {
           // If the protocol member decl is in the same file of the stub,
           // we can directly associate the fixit with the note issued to the
           // requirement.
-          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-            MissingTypeWitness).fixItInsertAfter(FixitLocation, FixIt);
+          diag->fixItInsertAfter(FixitLocation, FixIt);
         } else {
+          diag.value().flush();
+
           // Otherwise, we have to issue another note to carry the fixit,
           // because editor may assume the fixit is in the same file with the note.
-          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                         MissingTypeWitness);
           if (EditorMode) {
             Diags.diagnose(ComplainLoc, diag::missing_witnesses_general)
               .fixItInsertAfter(FixitLocation, FixIt);
@@ -4618,7 +4641,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   auto &ctx = assocType->getASTContext();
 
   if (type->hasError())
-    return ErrorType::get(ctx);
+    return CheckTypeWitnessResult::forError();
 
   const auto proto = Conf->getProtocol();
   const auto dc = Conf->getDeclContext();
@@ -4629,14 +4652,14 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
   if (ctx.isRecursivelyConstructingRequirementMachine(sig.getCanonicalSignature()) ||
       ctx.isRecursivelyConstructingRequirementMachine(proto) ||
       proto->isComputingRequirementSignature())
-    return ErrorType::get(ctx);
+    return CheckTypeWitnessResult::forError();
 
   // No move-only type can witness an associatedtype requirement.
   if (type->isPureMoveOnly()) {
     // describe the failure reason as it not conforming to Copyable
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
     assert(copyable && "missing _Copyable protocol!");
-    return CheckTypeWitnessResult(copyable->getDeclaredInterfaceType());
+    return CheckTypeWitnessResult::forConformance(copyable);
   }
 
   const auto depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
@@ -4661,7 +4684,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
         superclass = dc->mapTypeIntoContext(superclass);
     }
     if (!superclass->isExactSuperclassOf(contextType))
-      return superclass;
+      return CheckTypeWitnessResult::forSuperclass(superclass);
   }
 
   auto *module = dc->getParentModule();
@@ -4673,7 +4696,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
             /*allowMissing=*/reqProto->isSpecificProtocol(
                 KnownProtocolKind::Sendable))
             .isInvalid())
-      return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
+      return CheckTypeWitnessResult::forConformance(reqProto);
 
     // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
     // build unless we fail here while inferring an associated type
@@ -4686,17 +4709,28 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
           decl->getGenericEnvironmentOfContext());
       for (auto replacement : subMap.getReplacementTypes()) {
         if (replacement->hasError())
-          return CheckTypeWitnessResult(reqProto->getDeclaredInterfaceType());
+          return CheckTypeWitnessResult::forConformance(reqProto);
       }
     }
   }
 
   if (sig->requiresClass(depTy) &&
-      !contextType->satisfiesClassConstraint())
-    return CheckTypeWitnessResult(module->getASTContext().getAnyObjectType());
+      !contextType->satisfiesClassConstraint()) {
+    return CheckTypeWitnessResult::forLayout(
+        module->getASTContext().getAnyObjectType());
+  }
+
+  // Tuple conformances can only witness associated types by projecting them
+  // element-wise.
+  if (isa<BuiltinTupleDecl>(dc->getSelfNominalTypeDecl())) {
+    auto expectedTy = getTupleConformanceTypeWitness(dc, assocType);
+    if (!expectedTy->isEqual(type)) {
+      return CheckTypeWitnessResult::forTuple(expectedTy);
+    }
+  }
 
   // Success!
-  return CheckTypeWitnessResult();
+  return CheckTypeWitnessResult::forSuccess();
 }
 
 ResolveWitnessResult
@@ -4883,15 +4917,39 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
       auto &diags = conformance->getDeclContext()->getASTContext().Diags;
       for (auto candidate : nonViable) {
         if (candidate.first->getDeclaredInterfaceType()->hasError() ||
-            candidate.second.isError())
+            candidate.second.getKind() == CheckTypeWitnessResult::Error)
           continue;
 
-        diags.diagnose(
-           candidate.first,
-           diag::protocol_witness_nonconform_type,
-           candidate.first->getDeclaredInterfaceType(),
-           candidate.second.getRequirement(),
-           candidate.second.isConformanceRequirement());
+        switch (candidate.second.getKind()) {
+        case CheckTypeWitnessResult::Success:
+        case CheckTypeWitnessResult::Error:
+          llvm_unreachable("Should not end up here");
+
+        case CheckTypeWitnessResult::Conformance:
+        case CheckTypeWitnessResult::Layout:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_unsatisfied_conformance,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Superclass:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_unsatisfied_superclass,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Tuple:
+          diags.diagnose(
+             candidate.first,
+             diag::protocol_type_witness_tuple,
+             candidate.first->getDeclaredInterfaceType(),
+             candidate.second.getRequirement());
+          break;
+        }
       }
     });
 

@@ -72,23 +72,69 @@ struct TypeWitnessConflict {
 ///
 /// This class evaluates true if an error occurred.
 class CheckTypeWitnessResult {
-  Type Requirement;
+public:
+  enum Kind {
+    Success,
+
+    /// Type witness contains an error type.
+    Error,
+
+    /// Type witness does not satisfy a conformance requirement on
+    /// the associated type.
+    Conformance,
+
+    /// Type witness does not satisfy a superclass requirement on
+    /// the associated type.
+    Superclass,
+
+    /// Type witness does not satisfy a layout requirement on
+    /// the associated type.
+    Layout,
+
+    /// Type witness of a tuple conformance does not have the form
+    /// (repeat (each Element).A).
+    Tuple
+  } kind;
+
+private:
+  Type reqt;
+
+  CheckTypeWitnessResult() : kind(Success) {}
+
+  CheckTypeWitnessResult(Kind kind, Type reqt)
+    : kind(kind), reqt(reqt) {}
 
 public:
-  CheckTypeWitnessResult() { }
-  CheckTypeWitnessResult(Type reqt) : Requirement(reqt) {}
+  static CheckTypeWitnessResult forSuccess() {
+    return CheckTypeWitnessResult(Success, Type());
+  }
 
-  Type getRequirement() const { return Requirement; }
-  bool isConformanceRequirement() const {
-    return Requirement->isExistentialType();
+  static CheckTypeWitnessResult forError() {
+    return CheckTypeWitnessResult(Error, Type());
   }
-  bool isSuperclassRequirement() const {
-    return !isConformanceRequirement();
+
+  static CheckTypeWitnessResult forConformance(ProtocolDecl *proto) {
+    auto reqt = proto->getDeclaredInterfaceType();
+    return CheckTypeWitnessResult(Conformance, reqt);
   }
-  bool isError() const {
-    return Requirement->is<ErrorType>();
+
+  static CheckTypeWitnessResult forSuperclass(Type reqt) {
+    assert(reqt->getClassOrBoundGenericClass());
+    return CheckTypeWitnessResult(Superclass, reqt);
   }
-  explicit operator bool() const { return !Requirement.isNull(); }
+
+  static CheckTypeWitnessResult forLayout(Type reqt) {
+    return CheckTypeWitnessResult(Layout, reqt);
+  }
+
+  static CheckTypeWitnessResult forTuple(Type reqt) {
+    return CheckTypeWitnessResult(Tuple, reqt);
+  }
+
+  Kind getKind() const { return kind; }
+  Type getRequirement() const { return reqt; }
+
+  explicit operator bool() const { return kind != Success; }
 };
 
 /// Check whether the given type witness can be used for the given
@@ -1057,7 +1103,7 @@ class AssociatedTypeInference {
   /// Information about a failed, defaulted associated type.
   const AssociatedTypeDecl *failedDefaultedAssocType = nullptr;
   Type failedDefaultedWitness;
-  CheckTypeWitnessResult failedDefaultedResult;
+  CheckTypeWitnessResult failedDefaultedResult = CheckTypeWitnessResult::forSuccess();
 
   /// Information about a failed, derived associated type.
   AssociatedTypeDecl *failedDerivedAssocType = nullptr;
