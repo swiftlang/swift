@@ -6948,7 +6948,7 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
 
   (void)evaluateOrDefault(
       Ctx.evaluator,
-      ResolveExtensionMacroConformances{attr, D},
+      ResolveMacroConformances{attr, D},
       {});
 }
 
