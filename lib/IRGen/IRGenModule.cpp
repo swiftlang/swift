@@ -775,17 +775,9 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
-  bool
-  isDeploymentAvailabilityContainedIn(ASTContext &Context,
-                                      AvailabilityContext featureAvailability) {
-    auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
-    return deploymentAvailability.isContainedIn(featureAvailability);
-  }
-
   RuntimeAvailability OpaqueTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getOpaqueTypeAvailability();
-    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -795,7 +787,7 @@ namespace RuntimeConstants {
   GetTypesInAbstractMetadataStateAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getTypesInAbstractMetadataStateAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -803,7 +795,7 @@ namespace RuntimeConstants {
 
   RuntimeAvailability DynamicReplacementAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getSwift51Availability();
-    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::AvailableByCompatibilityLibrary;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -813,7 +805,7 @@ namespace RuntimeConstants {
   CompareTypeContextDescriptorsAvailability(ASTContext &Context) {
     auto featureAvailability =
         Context.getCompareTypeContextDescriptorsAvailability();
-    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -823,7 +815,7 @@ namespace RuntimeConstants {
   CompareProtocolConformanceDescriptorsAvailability(ASTContext &Context) {
     auto featureAvailability =
         Context.getCompareProtocolConformanceDescriptorsAvailability();
-    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -833,7 +825,7 @@ namespace RuntimeConstants {
   GetCanonicalSpecializedMetadataAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getIntermodulePrespecializedGenericMetadataAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -843,7 +835,7 @@ namespace RuntimeConstants {
   GetCanonicalPrespecializedGenericMetadataAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getPrespecializedGenericMetadataAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -851,7 +843,7 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ConcurrencyAvailability(ASTContext &context) {
     auto featureAvailability = context.getConcurrencyAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -860,7 +852,7 @@ namespace RuntimeConstants {
   RuntimeAvailability ConcurrencyDiscardingTaskGroupAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getConcurrencyDiscardingTaskGroupAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -868,7 +860,7 @@ namespace RuntimeConstants {
 
   RuntimeAvailability DifferentiationAvailability(ASTContext &context) {
     auto featureAvailability = context.getDifferentiationAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -877,7 +869,7 @@ namespace RuntimeConstants {
   RuntimeAvailability
   MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
     auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -887,7 +879,7 @@ namespace RuntimeConstants {
   ObjCIsUniquelyReferencedAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getObjCIsUniquelyReferencedAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -896,7 +888,7 @@ namespace RuntimeConstants {
   RuntimeAvailability SignedConformsToProtocolAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getSignedConformsToProtocolAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -905,7 +897,7 @@ namespace RuntimeConstants {
   RuntimeAvailability SignedDescriptorAvailability(ASTContext &context) {
     auto featureAvailability =
         context.getSignedDescriptorAvailability();
-    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+    if (!Context.isAvailabilityAvailable(featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -1324,8 +1316,7 @@ void IRGenerator::addBackDeployedObjCActorInitialization(ClassDecl *ClassDecl) {
 
   // If we are not back-deploying concurrency, there's nothing to do.
   ASTContext &ctx = ClassDecl->getASTContext();
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
-  if (deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability()))
+  if (ctx.isAvailabilityAvailable(ctx.getConcurrencyAvailability()))
     return;
 
   ObjCActorsNeedingSuperclassSwizzle.push_back(ClassDecl);
@@ -1920,10 +1911,8 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
     return IRGen.Opts.PrespecializeGenericMetadata;
   }
   auto &context = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata &&
-         deploymentAvailability.isContainedIn(
+         context.isAvailabilityAvailable(
              context.getPrespecializedGenericMetadataAvailability()) &&
          canPrespecializeTarget;
 }
@@ -1944,7 +1933,7 @@ bool IRGenModule::canMakeStaticObjectsReadOnly() {
   if (!Triple.isOSDarwin())
     return false;
 
-  return getAvailabilityContext().isContainedIn(
+  return Context.isAvailabilityAvailable(
           Context.getImmortalRefCountSymbolsAvailability());
 #endif
 }
@@ -2061,9 +2050,7 @@ void IRGenModule::emitSwiftAsyncExtendedFrameInfoWeakRef() {
 
 bool IRGenModule::isConcurrencyAvailable() {
   auto &ctx = getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-    AvailabilityContext::forDeploymentTarget(ctx);
-  return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+  return ctx.isAvailabilityAvailable(ctx.getConcurrencyAvailability());
 }
 
 /// Pretend the other files that drivers/build systems expect exist by

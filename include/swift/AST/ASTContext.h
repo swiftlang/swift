@@ -990,6 +990,13 @@ public:
   /// target triple.
   bool supportsVersionedAvailability() const;
 
+  /// Check's if our current availability context is contained within the given
+  /// feature's availability context. Prefer using this over the isContainedIn
+  /// function on availability context because this also checks if 1. we're
+  /// compiling the standard library (who has access to everything) and 2. if
+  /// we've disabled availability checking.
+  bool isAvailabilityAvailable(AvailabilityContext featureAvailability) const;
+
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//

@@ -787,6 +787,22 @@ bool ASTContext::supportsVersionedAvailability() const {
   return minimumAvailableOSVersionForTriple(LangOpts.Target).has_value();
 }
 
+bool ASTContext::isAvailabilityAvailable(
+                                AvailabilityContext featureAvailability) const {
+  // Any of the modules that are part of the Swift toolchain always have access
+  // to the latest and greatest.
+  if (MainModule->isSomeStdlibModule()) {
+    return true;
+  }
+
+  if (LangOpts.DisableAvailabilityChecking) {
+    return true;
+  }
+
+  return AvailabilityContext::forDeploymentTarget(*const_cast<ASTContext *>(this))
+      .isContainedIn(featureAvailability);
+}
+
 // FIXME: Rename abstractSyntaxDeclForAvailableAttribute since it's useful
 // for more attributes than `@available`.
 const Decl *

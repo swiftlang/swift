@@ -236,9 +236,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   // space, so that we don't run into that bug. We leave a note on the
   // declaration so that coroutine splitting can pad out the final context
   // size after splitting.
-  auto deploymentAvailability
-    = AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
-  if (!deploymentAvailability.isContainedIn(
+  if (!IGF.IGM.Context.isAvailabilityAvailable(
                                    IGF.IGM.Context.getSwift57Availability()))
   {
     auto taskAsyncFunctionPointer

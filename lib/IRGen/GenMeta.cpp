@@ -3072,12 +3072,9 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
   // If our deployment target doesn't contain the new swift_initRawStructMetadata,
   // emit a call to the swift_initStructMetadata tricking it into thinking
   // we have a single field.
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
   auto initRawAvail = IGF.IGM.Context.getInitRawStructMetadataAvailability();
 
-  if (!IGF.IGM.Context.LangOpts.DisableAvailabilityChecking &&
-      !deploymentAvailability.isContainedIn(initRawAvail)) {
+  if (!IGF.IGM.Context.isAvailabilityAvailable(initRawAvail)) {
     emitInitializeRawLayoutOld(IGF, likeType, count, T, metadata, collector);
     return;
   }

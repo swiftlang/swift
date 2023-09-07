@@ -32,6 +32,12 @@ constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProcessing";
 /// The name of the Backtracing module, which supports that extension.
 constexpr static const StringLiteral SWIFT_BACKTRACING_NAME = "_Backtracing";
+/// The name of the _RegexParser module.
+constexpr static const StringLiteral SWIFT_REGEX_PARSER_NAME = "_RegexParser";
+/// The name of the RegexBuilder module.
+constexpr static const StringLiteral SWIFT_REGEX_BUILDER_NAME = "RegexBuilder";
+/// The name of the Observation module.
+constexpr static const StringLiteral SWIFT_OBSERVATION_NAME = "Observation";
 /// The name of the SwiftShims module, which contains private stdlib decls.
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the CxxShim module, which contains a cxx casting utility.

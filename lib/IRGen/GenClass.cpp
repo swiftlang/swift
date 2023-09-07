@@ -2745,9 +2745,7 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
   // The linker on older deployment targets does not gracefully handle the
   // situation when both an objective c object and a swift object define the
   // protocol under the same symbol name.
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGM.Context);
-  bool canUseClangEmission = deploymentAvailability.isContainedIn(
+  bool canUseClangEmission = IGM.Context.isAvailabilityAvailable(
     IGM.Context.getSwift58Availability());
 
   if (llvm::Triple(IGM.Module.getTargetTriple()).isOSDarwin() &&
@@ -2930,9 +2928,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
-    if (deploymentAvailability.isContainedIn(
+    if (Context.isAvailabilityAvailable(
           Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
 

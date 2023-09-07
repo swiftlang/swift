@@ -2425,6 +2425,19 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::isSomeStdlibModule() const {
+  return !getParent && (
+    getName() == getASTContext().StdlibModuleName ||
+    getName() == getASTContext().Id_Concurrency ||
+    getName().str() == SWIFT_ONONE_SUPPORT ||
+    getName().str() == SWIFT_DISTRIBUTED_NAME ||
+    getName().str() == SWIFT_REGEX_PARSER_NAME ||
+    getName().str() == SWIFT_STRING_PROCESSING_NAME ||
+    getName().str() == SWIFT_REGEX_BUILDER_NAME ||
+    getName().str() == SWIFT_BACKTRACING_NAME ||
+    getName().str() == SWIFT_OBSERVATION_NAME);
+}
+
 bool ModuleDecl::hasStandardSubstitutions() const {
   return !getParent() &&
       (getName() == getASTContext().StdlibModuleName ||

@@ -189,10 +189,9 @@ bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
   // Use of a back deployment thunk is unnecessary if the deployment target is
   // high enough that the ABI implementation of the back deployed declaration is
   // guaranteed to be available.
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(ctx);
   auto declAvailability =
       AvailabilityContext(VersionRange::allGTE(*backDeployBeforeVersion));
-  if (deploymentAvailability.isContainedIn(declAvailability))
+  if (ctx.isAvailabilityAvailable(declAvailability))
     return false;
 
   return true;

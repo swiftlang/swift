@@ -3022,9 +3022,7 @@ static bool canIssueIncompleteMetadataRequests(IRGenModule &IGM) {
   // We can only answer blocking complete metadata requests with the <=5.1
   // runtime ABI entry points.
   auto &context = IGM.getSwiftModule()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
-  return deploymentAvailability.isContainedIn(
+  return context.isAvailabilityAvailable(
       context.getTypesInAbstractMetadataStateAvailability());
 }
 
@@ -3176,7 +3174,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
 
     llvm::CallInst *call;
-    bool signedDescriptor = IGM.getAvailabilityContext().isContainedIn(
+    bool signedDescriptor = IGM.Context.isAvailabilityAvailable(
       IGM.Context.getSignedDescriptorAvailability());
     if (request.isStaticallyAbstract()) {
       call = signedDescriptor ?

@@ -2596,8 +2596,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   }
 
   if (!mainFunction) {
-    const bool hasAsyncSupport =
-        AvailabilityContext::forDeploymentTarget(context).isContainedIn(
+    const bool hasAsyncSupport = context.isAvailabilityAvailable(
             context.getBackDeployedConcurrencyAvailability());
     context.Diags.diagnose(attr->getLocation(),
                            diag::attr_MainType_without_main,

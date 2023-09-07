@@ -1031,6 +1031,11 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// Returns true if this module is any of the standard modules part of the
+  /// Swift toolchain. This includes "Swift", "_Concurrency",
+  /// "_StringProcessing", etc.
+  bool isSomeStdlibModule() const;
+
   /// \returns true if this module has standard substitutions for mangling.
   bool hasStandardSubstitutions() const;
 

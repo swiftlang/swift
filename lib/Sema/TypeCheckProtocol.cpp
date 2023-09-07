@@ -6264,10 +6264,7 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // If the class does not have a custom @objc name and the deployment target
   // supports the objc_getClass() hook, the workaround is unnecessary.
   ASTContext &ctx = classDecl->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(ctx);
-  if (deploymentAvailability.isContainedIn(
-        ctx.getObjCGetClassHookAvailability()) &&
+  if (ctx.isAvailabilityAvailable(ctx.getObjCGetClassHookAvailability()) &&
       !hasExplicitObjCName(classDecl))
     return;
 
