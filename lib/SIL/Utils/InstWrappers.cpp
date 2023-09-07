@@ -70,3 +70,28 @@ bool ForwardingOperation::isAddressOnly() const {
   // If any of the operands are address-only, then the aggregate must be.
   return aggregate->getType().isAddressOnly(*forwardingInst->getFunction());
 }
+
+bool ForwardingOperation::visitForwardedValues(
+    function_ref<bool(SILValue)> visitor) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(forwardingInst)) {
+    return visitor(svi);
+  }
+  if (auto *mvri = dyn_cast<MultipleValueInstruction>(forwardingInst)) {
+    return llvm::all_of(mvri->getResults(), [&](SILValue value) {
+      if (value->getOwnershipKind() == OwnershipKind::None)
+        return true;
+      return visitor(value);
+    });
+  }
+  auto *ti = cast<TermInst>(forwardingInst);
+  assert(ti->mayHaveTerminatorResult());
+  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+    // If we do not have any arguments, then continue.
+    if (succBlock->args_empty())
+      return true;
+
+    auto args = succBlock->getSILPhiArguments();
+    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
+    return visitor(args[0]);
+  });
+}
