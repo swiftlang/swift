@@ -1938,7 +1938,6 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
             isolationCrossing.value().getDiagnoseIsolation()))
       return true;
   }
-
   auto fnType = fnExprType->getAs<FunctionType>();
   if (!fnType)
     return false;
@@ -2468,11 +2467,6 @@ namespace {
         auto valueRef = declRef->getDeclRef();
         auto value = valueRef.getDecl();
         auto loc = declRef->getLoc();
-
-//        for (auto arg : *declRef->getArgs()) {
-////          if (swift::isSendableType(getDeclContext()->getParentModule(), arg))
-//          value->getAttrs().add(new (ctx) SendableAttr(true));
-//        }
         
         //FIXME: Should this be subsumed in reference checking?
         if (value->isLocalCapture())
@@ -2494,12 +2488,6 @@ namespace {
                 partialApply->base, memberRef->first, memberRef->second,
                 partialApply);
 
-            if (diagnosePartialApplySendability(partialApply->fn, partialApply->base, getDeclContext())){
-              if(auto funcdecl = dyn_cast<FuncDecl>(memberRef->first.getDecl())){
-                // Mark with @Sendable attribute implicitly if type is Sendable
-                    funcdecl->getAttrs().add(new (ctx) SendableAttr(true));
-              }
-            }
             partialApply->base->walk(*this);
 
             return Action::SkipChildren(expr);

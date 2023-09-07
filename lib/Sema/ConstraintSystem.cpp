@@ -1712,10 +1712,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-
-    //check the base ... let's check
     //funcType = funcType->withExtInfo(functy->getExtInfo().withConcurrent())->castTo<AnyFunctionType>();
-    
+
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
@@ -2633,8 +2631,15 @@ ConstraintSystem::getTypeOfMemberReference(
     // FIXME: Handle conditional conformances
     auto baseSendable = TypeChecker::conformsToProtocol( baseOpenedTy, sendableProtocol, useDC->getParentModule());
     
-    if (!baseSendable.isInvalid()) {
+    if (isSendableType(useDC->getParentModule(), baseOpenedTy)) {
+      if (baseSendable.getConditionalRequirements().empty())
+        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+
+      for (auto req : baseSendable.getConditionalRequirements()){
+        if(!TypeChecker::conformsToProtocol( req.getFirstType(), sendableProtocol, useDC->getParentModule()).isInvalid()){
           functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+        }
+      }
     }
     
     // FIXME: Verify ExtInfo state is correct, not working by accident.

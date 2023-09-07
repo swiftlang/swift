@@ -9501,9 +9501,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     instanceTy = baseObjMeta->getInstanceType();
   }
 
+  MemberLookupResult result;
+
   if (instanceTy->isTypeVariableOrMember() ||
       instanceTy->is<UnresolvedType>()) {
-    MemberLookupResult result;
     result.OverallResult = MemberLookupResult::Unsolved;
     return result;
   }
@@ -9513,14 +9514,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (isSingleUnlabeledPackExpansionTuple(instanceTy)) {
     auto elementTy = instanceTy->castTo<TupleType>()->getElementType(0);
     if (elementTy->is<TypeVariableType>()) {
-      MemberLookupResult result;
+      result.OverallResult = MemberLookupResult::Unsolved;
+      return result;
+    }
+  }
+
+  // Delay solving member constraint for unapplied methods
+  // where the base type has a conditional Sendable conformance
+  if (functionRefKind == FunctionRefKind::Unapplied){
+    auto sendableProtocol = DC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+    auto baseSendable = swift::TypeChecker::conformsToProtocol(instanceTy, sendableProtocol, DC->getParentModule());
+
+    if (!baseSendable.isInvalid() && !baseSendable.getConditionalRequirements().empty() && instanceTy->hasTypeVariable()) {
       result.OverallResult = MemberLookupResult::Unsolved;
       return result;
     }
   }
 
   // Okay, start building up the result list.
-  MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
   // Add key path result.
@@ -10520,8 +10531,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *memberRef = Constraint::createMemberOrOuterDisjunction(
-          *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
-          outerAlternatives, locator);
+      *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
+       outerAlternatives, locator);
 
       addUnsolvedConstraint(memberRef);
 
@@ -10576,7 +10587,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // It could either be a hole associated directly with the base
         // or a hole which came from result type of the chain.
         if (originatorLoc->isLastElement<
-                LocatorPathElt::UnresolvedMemberChainResult>()) {
+            LocatorPathElt::UnresolvedMemberChainResult>()) {
           auto *UMCR = castToExpr<UnresolvedMemberChainResultExpr>(
               originatorLoc->getAnchor());
           return UMCR->getChainBase() == getAsExpr(locator->getAnchor());
