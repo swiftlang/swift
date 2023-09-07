@@ -518,10 +518,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
-  case SILInstructionKind::OpenExistentialMetatypeInst:
-  case SILInstructionKind::OpenExistentialBoxInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
@@ -569,6 +565,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::PackLengthInst:
   case SILInstructionKind::DebugStepInst:
     return RuntimeEffect::NoEffect;
+      
+  case SILInstructionKind::OpenExistentialMetatypeInst:
+  case SILInstructionKind::OpenExistentialBoxInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+    return RuntimeEffect::Existential;
 
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
@@ -636,10 +638,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::InitExistentialValueInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
-           RuntimeEffect::MetaData;
+           RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData;
@@ -655,18 +659,18 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::OpenExistentialAddrInst:
     if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
         OpenedExistentialAccess::Mutable)
-      return RuntimeEffect::Allocating;
-    return RuntimeEffect::NoEffect;
+      return RuntimeEffect::Allocating | RuntimeEffect::Existential;
+    return RuntimeEffect::Existential;
 
   case SILInstructionKind::OpenExistentialRefInst: {
     SILType opType = cast<OpenExistentialRefInst>(inst)->getOperand()->getType();
     impactType = opType;
     if (opType.getASTType()->isObjCExistentialType()) {
-      return RuntimeEffect::MetaData;
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     }
-    return RuntimeEffect::MetaData;
-    // TODO: should be NoEffect
-    //return RuntimeEffect::NoEffect;
+    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+    // TODO: should be Existential
+    //return RuntimeEffect::Existential;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -712,8 +716,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::Allocating;
   }
-  case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocExistentialBoxInst:
+    impactType = cast<SingleValueInstruction>(inst)->getType();
+    return RuntimeEffect::Allocating | RuntimeEffect::MetaData |
+           RuntimeEffect::Releasing | RuntimeEffect::Existential;
+  case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
     impactType = cast<SingleValueInstruction>(inst)->getType();
@@ -890,7 +897,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
-      rt |= RuntimeEffect::MetaData;
+      rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:

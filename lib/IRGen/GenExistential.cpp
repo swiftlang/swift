@@ -1780,6 +1780,11 @@ static void forEachProtocolWitnessTable(
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
 
+  // Don't emit witness tables in embedded Swift.
+  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
+
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
     assert(protocols[i] == witnessConformances[i].getRequirement());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,

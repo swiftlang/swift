@@ -28,6 +28,10 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
+  var enableEmbeddedSwift: Bool {
+    _bridged.enableEmbeddedSwift()
+  }
+
   enum AssertConfiguration {
     case enabled
     case disabled
