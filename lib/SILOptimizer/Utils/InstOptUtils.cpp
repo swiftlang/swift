@@ -1806,7 +1806,11 @@ SILValue swift::makeValueAvailable(SILValue value, SILBasicBlock *inBlock) {
 bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
   auto fwdOp = ForwardingOperation(forwardingInst);
-  if (!fwdOp || !fwdOp.canForwardFirstOperandOnly()) {
+  if (!fwdOp) {
+    return false;
+  }
+  auto *singleFwdOp = fwdOp.getSingleForwardingOperand();
+  if (!singleFwdOp) {
     return false;
   }
 
@@ -1831,7 +1835,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
 
   // Now that we know we can perform our transform, set all uses of
   // forwardingInst to be used of its operand and then delete \p forwardingInst.
-  auto newValue = forwardingInst->getOperand(0);
+  auto newValue = singleFwdOp->get();
   while (!forwardingInst->use_empty()) {
     auto *use = *(forwardingInst->use_begin());
     use->set(newValue);
