@@ -573,6 +573,9 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     else()
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
+  else()
+    target_link_directories(${target} PRIVATE
+      ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
   endif()
 
   if(SWIFT_SWIFT_PARSER)
