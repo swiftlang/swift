@@ -124,6 +124,7 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
       }
     }
     for (SILArgument *arg : block->getArguments()) {
+      assert(!arg->isReborrow() && "reborrows not legal at this SIL stage");
       if (completion.completeOSSALifetime(arg) ==
           LifetimeCompletion::WasCompleted) {
         changed = true;
