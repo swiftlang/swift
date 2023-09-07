@@ -2052,7 +2052,7 @@ bool TypeVarBindingProducer::computeNext() {
     }
   }
 
-  if (NumTries == 0) {
+  if (newBindings.empty()) {
     // Add defaultable constraints (if any).
     for (auto *constraint : DelayedDefaults) {
       if (constraint->getKind() == ConstraintKind::FallbackType) {
@@ -2065,6 +2065,9 @@ bool TypeVarBindingProducer::computeNext() {
 
       addNewBinding(getDefaultBinding(constraint));
     }
+
+    // Drop all of the default since we have converted them into bindings.
+    DelayedDefaults.clear();
   }
 
   if (newBindings.empty())
