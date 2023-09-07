@@ -418,15 +418,12 @@ static void printName(raw_ostream &os, DeclName name) {
     os << name;
 }
 
-static void dumpSubstitutionMapRec(
-    SubstitutionMap map, llvm::raw_ostream &out,
-    SubstitutionMap::DumpStyle style, unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
-
 static Type defaultGetTypeOfExpr(Expr *E) { return E->getType(); }
 static Type defaultGetTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
   return E->getComponents()[index].getComponentType();
 }
+
+using VisitedConformances = llvm::SmallPtrSetImpl<const ProtocolConformance *>;
 
 namespace {
 class PrintBase {
@@ -436,7 +433,8 @@ public:
   llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
   llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-  GetTypeOfKeyPathComponent;
+      GetTypeOfKeyPathComponent;
+  char quote = '"';
 
   explicit PrintBase(raw_ostream &os, unsigned indent = 0,
                      llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
@@ -641,17 +639,23 @@ public:
   }
 
   void printRec(SubstitutionMap map) {
-    printRecRaw([&](StringRef label) {
-      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-      dumpSubstitutionMapRec(map, OS, SubstitutionMap::DumpStyle::Full,
-                             Indent, Dumped);
-    });
+    SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+    printRec(map, Dumped);
   }
+
+  void printRec(SubstitutionMap map, VisitedConformances &visited);
 
   void printRec(ProtocolConformanceRef conf, StringRef label = "") {
     printRecRaw([&](StringRef label) {
       conf.dump(OS, Indent);
     }, label);
+  }
+
+  void printRec(const Requirement &requirement, StringRef label = "") {
+    printRecRaw([&](StringRef label) {
+      OS.indent(Indent);
+      requirement.dump(OS);
+    });
   }
 
   // Print a field with a value.
@@ -677,9 +681,9 @@ public:
   void printFieldQuotedRaw(Fn body, StringRef name,
                                 TerminalColor color = FieldLabelColor) {
     printFieldRaw([&](raw_ostream &OS) {
-      OS << '"';
+      OS << quote;
       { escaping_ostream escOS(OS); body(escOS); }
-      OS << '"';
+      OS << quote;
     }, name, color);
   }
 
@@ -732,12 +736,12 @@ public:
     if (leadingSpace)
       OS << ' ';
     PrintWithColorRAII colored(OS, IdentifierColor);
-    OS << '"';
+    OS << quote;
     {
       escaping_ostream escaping_os(OS);
       body(escaping_os);
     }
-    OS << '"';
+    OS << quote;
   }
 
   void printName(DeclName name, bool leadingSpace = true) {
@@ -3342,254 +3346,258 @@ void TypeRepr::dump(raw_ostream &os, unsigned indent) const {
   PrintTypeRepr(os, indent).visit(const_cast<TypeRepr*>(this), "");
 }
 
-// Recursive helpers to avoid infinite recursion for recursive protocol
-// conformances.
-static void dumpProtocolConformanceRec(
-    const ProtocolConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
+namespace {
 
-static void dumpPackConformanceRec(
-    const PackConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
+class PrintConformance : public PrintBase {
+public:
+  using PrintBase::PrintBase;
 
-static void dumpProtocolConformanceRefRec(
-    const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
-    unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  if (conformance.isInvalid()) {
-    out.indent(indent) << "(invalid_conformance)";
-  } else if (conformance.isConcrete()) {
-    dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, visited);
-  } else if (conformance.isPack()) {
-    dumpPackConformanceRec(conformance.getPack(), out, indent, visited);
-  } else {
-    assert(conformance.isAbstract());
+  using PrintBase::printRec;
 
-    out.indent(indent) << "(abstract_conformance protocol="
-                       << conformance.getAbstract()->getName();
-    PrintWithColorRAII(out, ParenthesisColor) << ')';
+  void printRec(const ProtocolConformanceRef &conf,
+                VisitedConformances &visited, StringRef label = "") {
+    printRecRaw([&](StringRef label) {
+      visitProtocolConformanceRef(conf, visited);
+    }, label);
   }
-}
 
-static void dumpProtocolConformanceRec(
-    const ProtocolConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  // A recursive conformance shouldn't have its contents printed, or there's
-  // infinite recursion. (This also avoids printing things that occur multiple
-  // times in a conformance hierarchy.)
-  auto shouldPrintDetails = visited.insert(conformance).second;
+  void printRec(const ProtocolConformance *conformance,
+                VisitedConformances &visited, StringRef label = "") {
+    printRecRaw([&](StringRef label) {
+      visitProtocolConformance(conformance, visited);
+    }, label);
+  }
 
-  auto printCommon = [&](StringRef kind) {
-    out.indent(indent);
-    PrintWithColorRAII(out, ParenthesisColor) << '(';
-    out << kind << "_conformance type=" << conformance->getType()
-        << " protocol=" << conformance->getProtocol()->getName();
-
-    if (!shouldPrintDetails)
-      out << " (details printed above)";
-  };
-
-  switch (conformance->getKind()) {
-  case ProtocolConformanceKind::Normal: {
-    auto normal = cast<NormalProtocolConformance>(conformance);
-
-    printCommon("normal");
-    if (!shouldPrintDetails)
-      break;
-
-    // Maybe print information about the conforming context?
-    if (normal->isLazilyLoaded()) {
-      out << " lazy";
+  void visitProtocolConformanceRef(const ProtocolConformanceRef conformance,
+                                   VisitedConformances &visited) {
+    if (conformance.isInvalid()) {
+      printHead("invalid_conformance", ASTNodeColor);
+      printFoot();
+    } else if (conformance.isConcrete()) {
+      visitProtocolConformance(conformance.getConcrete(), visited);
+    } else if (conformance.isPack()) {
+      visitPackConformance(conformance.getPack(), visited);
     } else {
-      normal->forEachTypeWitness(
-          [&](const AssociatedTypeDecl *req, Type ty,
-              const TypeDecl *) -> bool {
-            out << '\n';
-            out.indent(indent + 2);
-            PrintWithColorRAII(out, ParenthesisColor) << '(';
-            out << "assoc_type req=" << req->getName() << " type=";
-            PrintWithColorRAII(out, TypeColor) << Type(ty->getDesugaredType());
-            PrintWithColorRAII(out, ParenthesisColor) << ')';
+      assert(conformance.isAbstract());
+
+      printHead("abstract_conformance", ASTNodeColor);
+      printFieldQuoted(conformance.getAbstract()->getName(), "protocol");
+      printFoot();
+    }
+  }
+
+  void visitProtocolConformance(const ProtocolConformance *conformance,
+                                VisitedConformances &visited) {
+    // A recursive conformance shouldn't have its contents printed, or there's
+    // infinite recursion. (This also avoids printing things that occur multiple
+    // times in a conformance hierarchy.)
+    auto shouldPrintDetails = visited.insert(conformance).second;
+
+    auto printCommon = [&](StringRef kind) {
+      printHead(kind, ASTNodeColor);
+      printFieldQuoted(conformance->getType(), "type");
+      printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
+      printFlag(!shouldPrintDetails, "<details printed above>");
+    };
+
+    switch (conformance->getKind()) {
+      case ProtocolConformanceKind::Normal: {
+        auto normal = cast<NormalProtocolConformance>(conformance);
+
+        printCommon("normal_conformance");
+        if (!shouldPrintDetails)
+          break;
+
+        // Maybe print information about the conforming context?
+        if (normal->isLazilyLoaded()) {
+          printFlag("lazy");
+        } else {
+          normal->forEachTypeWitness([&](const AssociatedTypeDecl *req, Type ty,
+                                         const TypeDecl *) -> bool {
+            printRecRaw([&](StringRef label) {
+              printHead("assoc_type", ASTNodeColor, label);
+              printFieldQuoted(req->getName(), "req");
+              printFieldQuoted(Type(ty->getDesugaredType()), "type", TypeColor);
+              printFoot();
+            });
             return false;
           });
-      normal->forEachValueWitness([&](const ValueDecl *req,
-                                      Witness witness) {
-        out << '\n';
-        out.indent(indent + 2);
-        PrintWithColorRAII(out, ParenthesisColor) << '(';
-        out << "value req=" << req->getName() << " witness=";
-        if (!witness) {
-          out << "(none)";
-        } else if (witness.getDecl() == req) {
-          out << "(dynamic)";
-        } else {
-          witness.getDecl()->dumpRef(out);
+          normal->forEachValueWitness([&](const ValueDecl *req,
+                                          Witness witness) {
+            printRecRaw([&](StringRef label) {
+              printHead("value", ASTNodeColor, label);
+              printFieldQuoted(req->getName(), "req");
+              if (!witness)
+                printFlag("no_witness");
+              else if (witness.getDecl() == req)
+                printFlag("dynamic_witness");
+              else
+                printFieldQuotedRaw([&](raw_ostream &out) {
+                  witness.getDecl()->dumpRef(out);
+                }, "witness");
+              printFoot();
+            });
+          });
+
+          for (auto sigConf : normal->getSignatureConformances()) {
+            printRec(sigConf, visited);
+          }
         }
-        PrintWithColorRAII(out, ParenthesisColor) << ')';
+
+        if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
+          for (auto requirement : *condReqs) {
+            printRec(requirement);
+          }
+        } else {
+          printRecRaw([&](StringRef label) {
+            printHead("<conditional requirements unable to be computed>",
+                      ASTNodeColor);
+            printFoot();
+          });
+        }
+        break;
+      }
+
+      case ProtocolConformanceKind::Self: {
+        printCommon("self_conformance");
+        break;
+      }
+
+      case ProtocolConformanceKind::Inherited: {
+        auto conf = cast<InheritedProtocolConformance>(conformance);
+        printCommon("inherited_conformance");
+        if (!shouldPrintDetails)
+          break;
+
+        printRec(conf->getInheritedConformance(), visited);
+        break;
+      }
+
+      case ProtocolConformanceKind::Specialized: {
+        auto conf = cast<SpecializedProtocolConformance>(conformance);
+        printCommon("specialized_conformance");
+        if (!shouldPrintDetails)
+          break;
+
+        printRec(conf->getSubstitutionMap(), visited);
+        if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
+          for (auto subReq : *condReqs) {
+            printRec(subReq);
+          }
+        } else {
+          printRecRaw([&](StringRef label) {
+            printHead("<conditional requirements unable to be computed>",
+                      ASTNodeColor);
+            printFoot();
+          });
+        }
+        printRec(conf->getGenericConformance(), visited);
+        break;
+      }
+
+      case ProtocolConformanceKind::Builtin: {
+        printCommon("builtin_conformance");
+      }
+    }
+
+    printFoot();
+  }
+
+  void visitPackConformance(const PackConformance *conformance,
+                            VisitedConformances &visited) {
+    printHead("pack_conformance", ASTNodeColor);
+
+    printFieldQuoted(Type(conformance->getType()), "type");
+    printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
+
+    for (auto conformanceRef : conformance->getPatternConformances()) {
+      printRec(conformanceRef, visited);
+    }
+
+    printFoot();
+  }
+
+  void visitSubstitutionMap(SubstitutionMap map,
+                            SubstitutionMap::DumpStyle style,
+                            VisitedConformances &visited) {
+    // In Minimal style, use single quote so this dump can appear in
+    // double-quoted fields without escaping.
+    std::optional<llvm::SaveAndRestore<char>> restoreQuote;
+    if (style == SubstitutionMap::DumpStyle::Minimal)
+      restoreQuote.emplace(quote, '\'');
+
+    auto genericSig = map.getGenericSignature();
+    printHead("substitution_map", ASTNodeColor);
+    SWIFT_DEFER { printFoot(); };
+
+    if (genericSig.isNull()) {
+      printFlag("null_generic_signature");
+      return;
+    }
+
+    printFieldQuotedRaw([&](raw_ostream &out) { genericSig->print(out); },
+                        "generic_signature");
+
+    auto printSubstitution = [&](GenericTypeParamType * genericParam,
+                                 Type replacementType) {
+      printFieldQuotedRaw([&](raw_ostream &out) {
+        genericParam->print(out);
+        out << " -> ";
+        if (replacementType) {
+          PrintOptions opts;
+          opts.PrintForSIL = true;
+          opts.PrintTypesForDebugging = true;
+          replacementType->print(out, opts);
+        }
+        else
+          out << "<unresolved concrete type>";
+      }, "");
+    };
+
+    auto genericParams = genericSig.getGenericParams();
+    auto replacementTypes =
+    static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
+    for (unsigned i : indices(genericParams)) {
+      if (style == SubstitutionMap::DumpStyle::Minimal) {
+        printSubstitution(genericParams[i], replacementTypes[i]);
+      } else {
+        printRecRaw([&](StringRef label) {
+          printHead("substitution", ASTNodeColor, label);
+          printSubstitution(genericParams[i], replacementTypes[i]);
+          printFoot();
+        });
+      }
+    }
+
+    // A minimal dump doesn't need the details about the conformances, a lot of
+    // that info can be inferred from the signature.
+    if (style == SubstitutionMap::DumpStyle::Minimal)
+      return;
+
+    auto conformances = map.getConformances();
+    for (const auto &req : genericSig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      printRecRaw([&](StringRef label) {
+        printHead("conformance", ASTNodeColor, label);
+        printFieldQuoted(req.getFirstType(), "type");
+        printRec(conformances.front(), visited);
+        printFoot();
       });
-
-      for (auto sigConf : normal->getSignatureConformances()) {
-        out << '\n';
-        dumpProtocolConformanceRefRec(sigConf, out, indent + 2, visited);
-      }
+      conformances = conformances.slice(1);
     }
-
-    if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
-      for (auto requirement : *condReqs) {
-        out << '\n';
-        out.indent(indent + 2);
-        requirement.dump(out);
-      }
-    } else {
-      out << '\n';
-      out.indent(indent + 2);
-      out << "(conditional requirements unable to be computed)";
-    }
-    break;
   }
+};
 
-  case ProtocolConformanceKind::Self: {
-    printCommon("self");
-    break;
-  }
-
-  case ProtocolConformanceKind::Inherited: {
-    auto conf = cast<InheritedProtocolConformance>(conformance);
-    printCommon("inherited");
-    if (!shouldPrintDetails)
-      break;
-
-    out << '\n';
-    dumpProtocolConformanceRec(conf->getInheritedConformance(), out, indent + 2,
-                               visited);
-    break;
-  }
-
-  case ProtocolConformanceKind::Specialized: {
-    auto conf = cast<SpecializedProtocolConformance>(conformance);
-    printCommon("specialized");
-    if (!shouldPrintDetails)
-      break;
-
-    out << '\n';
-    dumpSubstitutionMapRec(conf->getSubstitutionMap(), out,
-                           SubstitutionMap::DumpStyle::Full, indent + 2,
-                           visited);
-    out << '\n';
-    if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(
-            /*computeIfPossible=*/false)) {
-      for (auto subReq : *condReqs) {
-        out.indent(indent + 2);
-        subReq.dump(out);
-        out << '\n';
-      }
-    } else {
-      out.indent(indent + 2);
-      out << "(conditional requirements unable to be computed)\n";
-    }
-    dumpProtocolConformanceRec(conf->getGenericConformance(), out, indent + 2,
-                               visited);
-    break;
-  }
-
-  case ProtocolConformanceKind::Builtin: {
-    printCommon("builtin");
-  }
-  }
-
-  PrintWithColorRAII(out, ParenthesisColor) << ')';
+void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited) {
+  printRecRaw([&](StringRef label) {
+    PrintConformance(OS, Indent)
+        .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited);
+  });
 }
 
-static void dumpPackConformanceRec(
-    const PackConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  out.indent(indent);
-  PrintWithColorRAII(out, ParenthesisColor) << '(';
-  out << "pack_conformance type=" << Type(conformance->getType())
-      << " protocol=" << conformance->getProtocol()->getName();
-
-  auto conformances = conformance->getPatternConformances();
-  if (!conformances.empty()) {
-    out << "\n";
-
-    for (auto conformanceRef : conformances) {
-      dumpProtocolConformanceRefRec(conformanceRef, out, indent, visited);
-    }
-  }
-
-  PrintWithColorRAII(out, ParenthesisColor) << ')';
-}
-
-static void dumpSubstitutionMapRec(
-    SubstitutionMap map, llvm::raw_ostream &out,
-    SubstitutionMap::DumpStyle style, unsigned indent,
-    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  auto genericSig = map.getGenericSignature();
-  out.indent(indent);
-
-  auto printParen = [&](char p) {
-    PrintWithColorRAII(out, ParenthesisColor) << p;
-  };
-  printParen('(');
-  SWIFT_DEFER { printParen(')'); };
-  out << "substitution_map generic_signature=";
-  if (genericSig.isNull()) {
-    out << "<nullptr>";
-    return;
-  }
-
-  genericSig->print(out);
-  auto genericParams = genericSig.getGenericParams();
-  auto replacementTypes =
-      static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
-  for (unsigned i : indices(genericParams)) {
-    if (style == SubstitutionMap::DumpStyle::Minimal) {
-      out << " ";
-    } else {
-      out << "\n";
-      out.indent(indent + 2);
-    }
-    printParen('(');
-    out << "substitution ";
-    genericParams[i]->print(out);
-    out << " -> ";
-    if (replacementTypes[i]) {
-      PrintOptions opts;
-      opts.PrintForSIL = true;
-      opts.PrintTypesForDebugging = true;
-      replacementTypes[i]->print(out, opts);
-    }
-    else
-      out << "<<unresolved concrete type>>";
-    printParen(')');
-  }
-  // A minimal dump doesn't need the details about the conformances, a lot of
-  // that info can be inferred from the signature.
-  if (style == SubstitutionMap::DumpStyle::Minimal)
-    return;
-
-  auto conformances = map.getConformances();
-  for (const auto &req : genericSig.getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    out << "\n";
-    out.indent(indent + 2);
-    printParen('(');
-    out << "conformance type=";
-    req.getFirstType()->print(out);
-    out << "\n";
-    dumpProtocolConformanceRefRec(conformances.front(), out, indent + 4,
-                                  visited);
-
-    printParen(')');
-    conformances = conformances.slice(1);
-  }
-}
+} // end anonymous namespace
 
 void ProtocolConformanceRef::dump() const {
   dump(llvm::errs());
@@ -3602,12 +3610,12 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
   if (!details && isConcrete())
     visited.insert(getConcrete());
 
-  dumpProtocolConformanceRefRec(*this, out, indent, visited);
+  PrintConformance(out, indent).visitProtocolConformanceRef(*this, visited);
 }
 
 void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpProtocolConformanceRefRec(*this, out, 0, visited);
+  PrintConformance(out, 0).visitProtocolConformanceRef(*this, visited);
 }
 
 void ProtocolConformance::dump() const {
@@ -3618,18 +3626,18 @@ void ProtocolConformance::dump() const {
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpProtocolConformanceRec(this, out, indent, visited);
+  PrintConformance(out, indent).visitProtocolConformance(this, visited);
 }
 
 void PackConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpPackConformanceRec(this, out, indent, visited);
+  PrintConformance(out, indent).visitPackConformance(this, visited);
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
                            unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpSubstitutionMapRec(*this, out, style, indent, visited);
+  PrintConformance(out, indent).visitSubstitutionMap(*this, style, visited);
 }
 
 void SubstitutionMap::dump() const {

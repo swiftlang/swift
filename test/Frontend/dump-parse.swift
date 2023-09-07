@@ -58,7 +58,7 @@ enum TrailingSemi {
 // CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
-// CHECK-AST:         (processed_init=declref_expr type="(Int) -> ()" location={{.*}} range={{.*}} decl="main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))]" function_ref=unapplied))
+// CHECK-AST:         (processed_init=declref_expr type="(Int) -> ()" location={{.*}} range={{.*}} decl="main.(file).generic@{{.*}} [with (substitution_map generic_signature='<T where T : Hashable>' 'T -> Int')]" function_ref=unapplied))
 let _: (Int) -> () = generic
 
 // Closures should be marked as escaping or not.
