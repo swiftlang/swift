@@ -270,7 +270,8 @@ function(add_pure_swift_host_tool name)
 
   # Option handling
   set(options)
-  set(single_parameter_options)
+  set(single_parameter_options
+    SWIFT_COMPONENT)
   set(multiple_parameter_options
         DEPENDENCIES
         SWIFT_DEPENDENCIES)
@@ -324,6 +325,17 @@ function(add_pure_swift_host_tool name)
   target_include_directories(${name} PUBLIC
     ${SWIFT_HOST_LIBRARIES_DEST_DIR})
 
-  # Export this target.
-  set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
+    add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})
+    swift_install_in_component(TARGETS ${name}
+      COMPONENT ${APSHT_SWIFT_COMPONENT}
+      RUNTIME DESTINATION bin)
+    swift_is_installing_component(${APSHT_SWIFT_COMPONENT} is_installing)
+  endif()
+
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
 endfunction()
