@@ -3276,6 +3276,31 @@ bool OwnershipForwardingMixin::isAddressOnly(SILInstruction *inst) {
   return inst->getOperand(0)->getType().isAddressOnly(*inst->getFunction());
 }
 
+bool OwnershipForwardingMixin::visitForwardedValues(
+    SILInstruction *inst, function_ref<bool(SILValue)> visitor) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
+    return visitor(svi);
+  }
+  if (auto *mvri = dyn_cast<MultipleValueInstruction>(inst)) {
+    return llvm::all_of(mvri->getResults(), [&](SILValue value) {
+      if (value->getOwnershipKind() == OwnershipKind::None)
+        return true;
+      return visitor(value);
+    });
+  }
+  auto *ti = cast<TermInst>(inst);
+  assert(ti->mayHaveTerminatorResult());
+  return llvm::all_of(ti->getSuccessorBlocks(), [&](SILBasicBlock *succBlock) {
+    // If we do not have any arguments, then continue.
+    if (succBlock->args_empty())
+      return true;
+
+    auto args = succBlock->getSILPhiArguments();
+    assert(args.size() == 1 && "Transforming terminator with multiple args?!");
+    return visitor(args[0]);
+  });
+}
+
 // This may be called in an invalid SIL state. SILCombine creates new
 // terminators in non-terminator position and defers deleting the original
 // terminator until after all modification.
