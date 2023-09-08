@@ -226,16 +226,18 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     if (superclassLoc.isValid())
       return superclassLoc;
 
-    for (const auto &inherited : classDecl->getInherited().getEntries()) {
-      if (auto inheritedType = inherited.getType()) {
+    auto inheritedTypes = classDecl->getInherited();
+    for (unsigned i : inheritedTypes.getIndices()) {
+      if (auto inheritedType = inheritedTypes.getResolvedType(i)) {
+
         if (inheritedType->getClassOrBoundGenericClass()) {
-          superclassLoc = inherited.getSourceRange().Start;
+          superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
           return superclassLoc;
         }
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
           if (layout.explicitSuperclass) {
-            superclassLoc = inherited.getSourceRange().Start;
+            superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
             return superclassLoc;
           }
         }
