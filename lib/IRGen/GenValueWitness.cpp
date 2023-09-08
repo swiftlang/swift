@@ -905,6 +905,9 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
   if (!typeLayoutEntry->layoutString(IGM, genericSig) &&
       !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
     return nullptr;
+  } else if (typeLayoutEntry->copyDestroyKind(IGM) !=
+             EnumTypeLayoutEntry::CopyDestroyStrategy::Normal) {
+    return nullptr;
   } else if (typeLayoutEntry->isSingleton()) {
     return IGM.getSingletonEnumGetEnumTagFn();
   } else if (!typeLayoutEntry->isFixedSize(IGM)) {
@@ -938,6 +941,9 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
                                     GenericSignature genericSig) {
   if ((!typeLayoutEntry->layoutString(IGM, genericSig) &&
        !isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry))) {
+    return nullptr;
+  } else if (typeLayoutEntry->copyDestroyKind(IGM) !=
+             EnumTypeLayoutEntry::CopyDestroyStrategy::Normal) {
     return nullptr;
   } else if (typeLayoutEntry->isSingleton()) {
     return IGM.getSingletonEnumDestructiveInjectEnumTagFn();
