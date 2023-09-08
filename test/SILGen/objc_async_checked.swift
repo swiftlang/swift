@@ -217,6 +217,36 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s18objc_async_checked20testWithForeignError10slowServerySo04SlowI0C_tYaKF : $@convention(thin) @async (@guaranteed SlowServer) -> @error any Error
+// CHECK: [[STR:%.*]] = alloc_stack $String
+// CHECK: [[ERR:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
+// CHECK: inject_enum_addr [[ERR]] : $*Optional<NSError>, #Optional.none!enumelt
+// CHECK: [[METHOD:%.*]] = objc_method %0 : $SlowServer, #SlowServer.findAnswerFailingly!foreign : (SlowServer) -> () async throws -> String, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @convention(block) (Optional<NSString>, Optional<NSError>) -> (), SlowServer) -> ObjCBool
+// CHECK: [[RAW_CONT:%.*]] = get_async_continuation_addr [throws] String, {{.*}} : $*String
+// CHECK: [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<String, any Error> ([[RAW_CONT]] : $Builtin.RawUnsafeContinuation)
+// CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
+// CHECK: [[PROJECTED:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage Any
+// CHECK: [[CHECKED_CONT_SLOT:%.*]] = init_existential_addr [[PROJECTED]] : $*Any, $CheckedContinuation<String, any Error>
+// CHECK: [[CHECKED_CONT_INIT_FN:%.*]] = function_ref @$ss34_createCheckedThrowingContinuationyScCyxs5Error_pGSccyxsAB_pGnlF : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
+// CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<String, any Error>
+// CHECK: {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<String>([[CHECKED_CONT]], [[UNSAFE_CONT]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
+// CHECK: copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
+// CHECK: cond_br {{.*}}, [[RESUME:bb[0-9]+]], [[ERROR:bb[0-9]+]]
+//
+// CHECK: [[ERROR]]:
+// CHECK: [[ERR_VALUE:%.*]] = load [take] [[ERR]] : $*Optional<NSError>
+// CHECK: [[CONV_FN:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+// CHECK: [[SWIFT_ERROR:%.*]] = apply [[CONV_FN]]([[ERR_VALUE]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+// CHECK: [[PROJECTED_STORAGE:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage Any
+// CHECK: [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[PROJECTED_STORAGE]] : $*Any to $*@opened("{{.*}}", Any) Self
+// CHECK: [[CHECKED_CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened("{{.*}}", Any) Self to $*CheckedContinuation<String, any Error>
+// CHECK: [[ERROR_COPY:%.*]] = copy_value [[SWIFT_ERROR]] : $any Error
+// CHECK: [[RESUME_FN:%.*]] = function_ref @$ss43_resumeCheckedThrowingContinuationWithErroryyScCyxs0F0_pG_sAB_pntlF : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, any Error>, @owned any Error) -> ()
+// CHECK: {{.*}} = apply [[RESUME_FN]]<String>([[CHECKED_CONT]], [[ERROR_COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, any Error>, @owned any Error) -> ()
+func testWithForeignError(slowServer: SlowServer) async throws {
+  let _: String = try await slowServer.findAnswerFailingly()
+}
+
 // CHECK-LABEL: sil {{.*}}@${{.*}}26testThrowingMethodFromMain
 @MainActor
 func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
