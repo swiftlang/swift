@@ -218,6 +218,10 @@ Some conclusions:
 
 * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
 
+The `readnone` attribute cannot be used on functions that take
+nontrivial owned arguments for the reasons explained in the next
+section on `@_effects(readonly)`.
+
 ### `@_effects(readonly)`
 
 Defines that the function does not have any observable memory writes or any
@@ -225,7 +229,7 @@ other observable side effects, beside reading of memory.
 
 Similar to `readnone`, a `readonly` function is allowed to write to local objects.
 
-A function can be marked as `readonly` if it’s save to eliminate a call to such
+A function can be marked as `readonly` if it’s safe to eliminate a call to such
 a function in case its return value is not used.
 Example:
 
@@ -253,6 +257,44 @@ between those calls the member `i` of the class instance could be modified:
 ```
 
 The same conclusions as for `readnone` also apply to `readonly`.
+
+The `readonly` and `readnone` effects are sensitive to the ARC calling
+convention, which normally has no effect on language semantics. These
+effects attributes can only be used correctly by knowing whether the
+compiler will pass any nontrivial arguments as guaranteed or owned. If
+the function takes an owned argument, as is the case for initializers
+and setters, then `readonly` is likely invalid because removing the call
+would fail to release the argument. Additionally, the release itself
+may run a tree of deinitializers with potentially arbitrary side
+effects.
+
+In special situations, the library author may still want to use
+`readonly` for functions with owned arguments. They must be able to
+guarantee that the owned arguments are not effectively released from
+the caller's perspective. This could be because all paths through the
+function have an equivalent retain, or they may know that the argument
+is a tagged object for which a release has no effect. To make sure
+this is intentional, the library author must also explicitly specify
+`_effects(releasenone)` even though that is normally already implied
+by `readonly`.
+
+For example, it is valid to give the following trivial initializer
+`readonly` and `releasenone` attributes:
+
+    @_effects(readonly) @_effects(releasenone)
+    init(_ c: C) { self.c = c }
+
+If `C` is a class, then the value returned by the initializer must
+have at least one use in the form of a release. The optimizer,
+therefore, may not remove the call to the initializer without
+deliberately compensating for ownership.
+
+For the same reason that developers must take care regarding argument
+ownership, the compiler must always check for `readonly` and
+`readnone` effects attributes before transforming a function
+signature. Normally, this optimization can be done independent of
+language semantics, but such optimizations should be avoided for
+functions with these effects attributes.
 
 ### `@_effects(releasenone)`
 
