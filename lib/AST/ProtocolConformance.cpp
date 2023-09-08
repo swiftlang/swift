@@ -25,6 +25,7 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
@@ -933,6 +934,38 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
   return subst(IFS);
 }
 
+/// Check if the replacement is a one-element pack with a scalar type.
+static bool isVanishingTupleConformance(
+    RootProtocolConformance *generic,
+    SubstitutionMap substitutions) {
+  if (!isa<BuiltinTupleDecl>(generic->getDeclContext()->getSelfNominalTypeDecl()))
+    return false;
+
+  auto replacementTypes = substitutions.getReplacementTypes();
+  assert(replacementTypes.size() == 1);
+  auto packType = replacementTypes[0]->castTo<PackType>();
+
+  return (packType->getNumElements() == 1 &&
+          !packType->getElementTypes()[0]->is<PackExpansionType>());
+}
+
+/// Don't form a tuple conformance if the substituted type is unwrapped
+/// from a one-element tuple.
+///
+/// That is, [(repeat each T): P] ⊗ {each T := Pack{U};
+///                                  [each T: P]: Pack{ [U: P] }}
+///                 => [U: P]
+static ProtocolConformanceRef unwrapVanishingTupleConformance(
+    SubstitutionMap substitutions) {
+  auto conformances = substitutions.getConformances();
+  assert(conformances.size() == 1);
+  assert(conformances[0].isPack());
+  auto packConformance = conformances[0].getPack();
+
+  assert(packConformance->getPatternConformances().size() == 1);
+  return packConformance->getPatternConformances()[0];
+}
+
 ProtocolConformanceRef
 ProtocolConformance::subst(InFlightSubstitution &IFS) const {
   auto *mutableThis = const_cast<ProtocolConformance *>(this);
@@ -950,6 +983,9 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
     auto *generic = cast<NormalProtocolConformance>(mutableThis);
     auto subMap = SubstitutionMap::get(getGenericSignature(), IFS);
+
+    if (isVanishingTupleConformance(generic, subMap))
+      return unwrapVanishingTupleConformance(subMap);
 
     auto &ctx = substType->getASTContext();
     auto *concrete = ctx.getSpecializedConformance(substType, generic, subMap);
@@ -1015,6 +1051,9 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
     auto *generic = spec->getGenericConformance();
     auto subMap = spec->getSubstitutionMap().subst(IFS);
+
+    if (isVanishingTupleConformance(generic, subMap))
+      return unwrapVanishingTupleConformance(subMap);
 
     auto substType = spec->getType().subst(IFS);
 
