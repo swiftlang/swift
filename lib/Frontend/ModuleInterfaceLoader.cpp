@@ -820,15 +820,21 @@ class ModuleInterfaceLoaderImpl {
           return std::make_error_code(std::errc::not_supported);
         } else if (isInResourceDir(adjacentMod) &&
                    loadMode == ModuleLoadingMode::PreferSerialized &&
+                   !version::isCurrentCompilerTagged() &&
                    rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
                      serialization::Status::SDKMismatch) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
-          // of falling back. This is mainly to support development of Swift,
+          // of falling back. This is to support local development of Swift,
           // where one might change the module format version but forget to
           // recompile the standard library. If that happens, don't fall back
-          // and silently recompile the standard library -- instead, error like
-          // we used to.
+          // and silently recompile the standard library, raise an error
+          // instead.
+          //
+          // This logic is disabled for tagged compilers, so distributed
+          // compilers should ignore this restriction and rebuild all modules
+          // from a swiftinterface when required.
+          //
           // Still accept modules built with a different SDK, allowing the use
           // of one toolchain against a different SDK.
           LLVM_DEBUG(llvm::dbgs() << "Found out-of-date module in the "
