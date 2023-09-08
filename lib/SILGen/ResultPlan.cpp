@@ -881,7 +881,8 @@ public:
                 SILValue bridgedForeignError) override {
     // There should be no direct results from the call.
     assert(directResults.empty());
-    
+    auto &ctx = SGF.getASTContext();
+
     // Await the continuation we handed off to the completion handler.
     SILBasicBlock *resumeBlock = SGF.createBasicBlock();
     SILBasicBlock *errorBlock = nullptr;
@@ -923,9 +924,20 @@ public:
         SGF.B.setInsertionPoint(
             ++bridgedForeignError->getDefiningInstruction()->getIterator());
 
-        auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+        // FIXME: this case is not respecting checked bridging, and it's a
+        // great candidate for that. This situation comes up when bridging
+        // to an ObjC completion-handler method that returns a bool. It seems
+        // that bool indicates whether the handler was invoked. If it was not
+        // then it writes out an error. Here for the unsafe bridging, we're
+        // invoking the continuation by re-wrapping it in an
+        // UnsafeContinuation<_, Error> and then immediately calling its
+        // resume(throwing: error) method. For a checked bridging scenario, we
+        // would need to use a copy of the original CheckedContinuation that
+        // was passed to the callee. Whether that's by invoking the block
+        // ourselves, or just invoking the CheckedContinuation.
 
-        auto errorTy = SGF.getASTContext().getErrorExistentialType();
+        auto continuationDecl = ctx.getUnsafeContinuationDecl();
+        auto errorTy = ctx.getErrorExistentialType();
         auto continuationBGT =
             BoundGenericType::get(continuationDecl, Type(),
                                   {calleeTypeInfo.substResultType, errorTy});
@@ -976,7 +988,7 @@ public:
       
       Scope errorScope(SGF, loc);
 
-      auto errorTy = SGF.getASTContext().getErrorExistentialType();
+      auto errorTy = ctx.getErrorExistentialType();
       auto errorVal = SGF.B.createTermResult(
         SILType::getPrimitiveObjectType(errorTy), OwnershipKind::Owned);
 
