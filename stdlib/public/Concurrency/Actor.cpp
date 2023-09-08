@@ -1035,9 +1035,6 @@ static DefaultActor *asAbstract(DefaultActorImpl *actor) {
 static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor) {
   return reinterpret_cast<NonDefaultDistributedActorImpl*>(actor);
 }
-static NonDefaultDistributedActor *asAbstract(NonDefaultDistributedActorImpl *actor) {
-  return reinterpret_cast<NonDefaultDistributedActor*>(actor);
-}
 
 /*****************************************************************************/
 /******************** NEW DEFAULT ACTOR IMPLEMENTATION ***********************/
