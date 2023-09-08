@@ -193,11 +193,19 @@ public:
 
   // Override AccessUseDefChainVisitor to ignore access markers and find the
   // outer access base.
-  SILValue visitNestedAccess(BeginAccessInst *access) {
+  SILValue visitNestedAccessImpl(BeginAccessInst *access) {
     if (nestedAccessTy == NestedAccessType::IgnoreAccessBegin)
       return access->getSource();
 
     return SuperTy::visitNestedAccess(access);
+  }
+
+  SILValue visitNestedAccess(BeginAccessInst *access) {
+    auto value = visitNestedAccessImpl(access);
+    if (value) {
+      reenterUseDef(value);
+    }
+    return SILValue();
   }
 
   SILValue visitPhi(SILPhiArgument *phiArg) {
@@ -362,6 +370,18 @@ SILValue swift::getTypedAccessAddress(SILValue address) {
   return accessAddress;
 }
 
+namespace swift::test {
+static FunctionTest
+    GetTypedAccessAddress("get_typed_access_address",
+                          [](auto &function, auto &arguments, auto &test) {
+                            auto address = arguments.takeValue();
+                            function.dump();
+                            llvm::dbgs() << "Address: " << address;
+                            auto access = getTypedAccessAddress(address);
+                            llvm::dbgs() << "Access: " << access;
+                          });
+} // end namespace swift::test
+
 // TODO: When the optimizer stops stripping begin_access markers and SILGen
 // protects all memory operations with at least an "unsafe" access scope, then
 // we should be able to assert that this returns a BeginAccessInst.
@@ -378,6 +398,18 @@ SILValue swift::getAccessBase(SILValue address) {
                                IgnoreStorageCast)
       .findPossibleBaseAddress(address);
 }
+
+namespace swift::test {
+static FunctionTest GetAccessBaseTest("get_access_base",
+                                      [](auto &function, auto &arguments,
+                                         auto &test) {
+                                        auto address = arguments.takeValue();
+                                        function.dump();
+                                        llvm::dbgs() << "Address: " << address;
+                                        auto base = getAccessBase(address);
+                                        llvm::dbgs() << "Base: " << base;
+                                      });
+} // end namespace swift::test
 
 static bool isLetForBase(SILValue base) {
   // Is this an address of a "let" class member?
@@ -1159,6 +1191,18 @@ AccessStorageWithBase::computeInScope(SILValue sourceAddress) {
 AccessStorage AccessStorage::compute(SILValue sourceAddress) {
   return AccessStorageWithBase::compute(sourceAddress).storage;
 }
+
+namespace swift::test {
+static FunctionTest ComputeAccessStorage("compute_access_storage",
+                                      [](auto &function, auto &arguments,
+                                         auto &test) {
+                                        auto address = arguments.takeValue();
+                                        function.dump();
+                                        llvm::dbgs() << "Address: " << address;
+                                        auto accessStorage = AccessStorage::compute(address);
+                                        accessStorage.dump();
+                                      });
+} // end namespace swift::test
 
 AccessStorage AccessStorage::computeInScope(SILValue sourceAddress) {
   return AccessStorageWithBase::computeInScope(sourceAddress).storage;
