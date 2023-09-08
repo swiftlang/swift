@@ -7311,9 +7311,6 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (getAppliedResultBuilderTransform(closure))
     return true;
 
-  if (closure->hasSingleExpressionBody())
-    return true;
-
   if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
     return false;
 
