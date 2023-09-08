@@ -1280,7 +1280,7 @@ void SILGenFunction::emitProlog(
           // the instance properties of the class.
           return false;
 
-        case ActorIsolation::Independent:
+        case ActorIsolation::Nonisolated:
         case ActorIsolation::Unspecified:
           return false;
         }
@@ -1331,7 +1331,7 @@ void SILGenFunction::emitProlog(
     auto actorIsolation = getActorIsolation(funcDecl);
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
+    case ActorIsolation::Nonisolated:
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -1382,7 +1382,7 @@ void SILGenFunction::emitProlog(
     bool wantExecutor = F.isAsync() || wantDataRaceChecks;
     auto actorIsolation = closureExpr->getActorIsolation();
     switch (actorIsolation.getKind()) {
-    case ClosureActorIsolation::Independent:
+    case ClosureActorIsolation::Nonisolated:
       break;
 
     case ClosureActorIsolation::ActorInstance: {
@@ -1569,7 +1569,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
                              llvm::Optional<ManagedValue> maybeSelf) {
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
-  case ActorIsolation::Independent:
+  case ActorIsolation::Nonisolated:
     return llvm::None;
 
   case ActorIsolation::ActorInstance: {
@@ -1595,9 +1595,9 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
       getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
         return CE->getActorIsolation();
       });
-  if (isolation != ActorIsolation::Independent
+  if (isolation != ActorIsolation::Nonisolated
       && isolation != ActorIsolation::Unspecified) {
-    // TODO: Explicit hop with no hop-back should only be allowed in independent
+    // TODO: Explicit hop with no hop-back should only be allowed in nonisolated
     // async functions. But it needs work for any closure passed to
     // Task.detached, which currently has unspecified isolation.
     llvm::report_fatal_error(

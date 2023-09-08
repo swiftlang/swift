@@ -1607,7 +1607,7 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
-  case Independent:
+  case Nonisolated:
   case Unspecified:
     return false;
 
@@ -1621,7 +1621,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case Independent:
+  case Nonisolated:
   case Unspecified:
     return *this;
 
@@ -1645,8 +1645,8 @@ void swift::simple_display(
       out << "actor " << state.getActor()->getName();
       break;
 
-    case ActorIsolation::Independent:
-      out << "actor-independent";
+    case ActorIsolation::Nonisolated:
+      out << "nonisolated";
       break;
 
     case ActorIsolation::Unspecified:

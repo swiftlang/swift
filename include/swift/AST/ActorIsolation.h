@@ -68,10 +68,10 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration is explicitly specified to be independent of any actor,
+    /// The declaration is explicitly specified to be not isolated to any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
-    Independent,
+    Nonisolated,
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
@@ -104,8 +104,8 @@ public:
     return ActorIsolation(Unspecified, nullptr);
   }
 
-  static ActorIsolation forIndependent() {
-    return ActorIsolation(Independent, nullptr);
+  static ActorIsolation forNonisolated() {
+    return ActorIsolation(Nonisolated, nullptr);
   }
 
   static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
@@ -128,7 +128,7 @@ public:
 
   bool isUnspecified() const { return kind == Unspecified; }
   
-  bool isIndependent() const { return kind == Independent; }
+  bool isNonisolated() const { return kind == Nonisolated; }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
@@ -146,7 +146,7 @@ public:
       return true;
 
     case Unspecified:
-    case Independent:
+    case Nonisolated:
       return false;
     }
   }
@@ -195,7 +195,7 @@ public:
       return false;
 
     switch (lhs.getKind()) {
-    case Independent:
+    case Nonisolated:
     case Unspecified:
       return true;
 

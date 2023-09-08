@@ -788,7 +788,7 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   }
   case ActorIsolation::Unspecified:
-  case ActorIsolation::Independent:
+  case ActorIsolation::Nonisolated:
     return;
   }
 

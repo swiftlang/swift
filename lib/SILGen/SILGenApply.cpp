@@ -5514,7 +5514,7 @@ RValue SILGenFunction::emitApply(
       break;
 
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
+    case ActorIsolation::Nonisolated:
       llvm_unreachable("Not isolated");
       break;
     }
