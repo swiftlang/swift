@@ -2625,10 +2625,7 @@ NamingPatternRequest::evaluate(Evaluator &evaluator, VarDecl *VD) const {
     // the naming pattern as a side effect in this case, and TypeCheckStmt
     // and TypeCheckPattern handle the others. But that's all really gross.
     unsigned i = PBD->getPatternEntryIndexForVarDecl(VD);
-    (void)evaluateOrDefault(evaluator,
-                            PatternBindingEntryRequest{
-                                PBD, i, /*LeaveClosureBodiesUnchecked=*/false},
-                            nullptr);
+    (void)PBD->getCheckedPatternBindingEntry(i);
     if (PBD->isInvalid()) {
       VD->getParentPattern()->setType(ErrorType::get(Context));
       setBoundVarsTypeError(VD->getParentPattern(), Context);

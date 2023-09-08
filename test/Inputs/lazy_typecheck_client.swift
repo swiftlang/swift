@@ -20,19 +20,31 @@ func testGlobalFunctions() {
   }
 }
 
+func testGobalVars() {
+  let _: Int = publicGlobalVar
+  let _: String = publicGlobalVarInferredType
+  let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
+}
+
 func testPublicStruct() {
   let s = PublicStruct(x: 1)
-  _ = s.publicMethod()
+  let _: Int = s.publicMethod()
+  let _: Int = s.publicProperty
+  let _: String = s.publicPropertyInferredType
   PublicStruct.publicStaticMethod()
 }
 
 func testPublicClass() {
   let c = PublicClass(x: 2)
-  _ = c.publicMethod()
+  let _: Int = c.publicMethod()
+  let _: Int = c.publicProperty
+  let _: String = c.publicPropertyInferredType
   PublicClass.publicClassMethod()
 
   let d = PublicDerivedClass(x: 3)
-  _ = d.publicMethod()
+  let _: Int = d.publicMethod()
+  let _: Int = d.publicProperty
+  let _: String = d.publicPropertyInferredType
   PublicDerivedClass.publicClassMethod()
 }
 

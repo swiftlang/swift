@@ -26,6 +26,9 @@
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
 
+// CHECK:       public var publicGlobalVar: Swift.Int
+// CHECK:       public var publicGlobalVarInferredType: Swift.String
+// CHECK:       public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY): (Swift.Int, Swift.Int)
 // CHECK:       public protocol EmptyPublicProto {
 // CHECK:       }
 // CHECK:       public protocol PublicProto {
@@ -37,6 +40,8 @@
 // CHECK:       }
 // CHECK:       #endif
 // CHECK:       public struct PublicStruct {
+// CHECK:         public var publicProperty: Swift.Int
+// CHECK:         public var publicPropertyInferredType: Swift.String
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public static func publicStaticMethod()
@@ -45,6 +50,8 @@
 // CHECK:         public func publicMethod() -> T
 // CHECK:       }
 // CHECK:       public class PublicClass {
+// CHECK:         public var publicProperty: Swift.Int
+// CHECK:         public var publicPropertyInferredType: Swift.String
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public class func publicClassMethod()

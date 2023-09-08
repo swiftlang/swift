@@ -2300,13 +2300,10 @@ public:
 
     auto &Ctx = getASTContext();
     for (auto i : range(PBD->getNumPatternEntries())) {
-      const auto *entry =
-          PBD->isFullyValidated(i)
-              ? &PBD->getPatternList()[i]
-              : evaluateOrDefault(Ctx.evaluator,
-                                  PatternBindingEntryRequest{
-                                      PBD, i, LeaveClosureBodiesUnchecked},
-                                  nullptr);
+      const auto *entry = PBD->isFullyValidated(i)
+                              ? &PBD->getPatternList()[i]
+                              : PBD->getCheckedPatternBindingEntry(
+                                    i, LeaveClosureBodiesUnchecked);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);

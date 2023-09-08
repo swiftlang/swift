@@ -47,6 +47,15 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
   }
 }
 
+// MARK: - Global vars
+
+public var publicGlobalVar: Int = 0
+public var publicGlobalVarInferredType = ""
+public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
+
+var internalGlobalVar: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+var internalGlobalVarInferredType = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+
 // MARK: - Nominal types
 
 public protocol EmptyPublicProto {}
@@ -69,7 +78,8 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 }
 
 public struct PublicStruct {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -105,7 +115,8 @@ struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'Does
 }
 
 public class PublicClass {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -188,4 +199,3 @@ extension PublicGenericStruct where T == InternalStructForConstraint {}
 extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
 
 // FIXME: Test enums
-// FIXME: Test global vars

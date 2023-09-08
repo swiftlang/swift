@@ -3284,8 +3284,6 @@ public:
   /// anything needed by a client as unsafe as the client will reject reading
   /// it, but at the same time keep the safety checks precise to avoid
   /// XRef errors and such.
-  ///
-  /// \p decl should be either an \c ExtensionDecl or a \c ValueDecl.
   static bool isDeserializationSafe(const Decl *decl) {
     if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
       // Consider extensions as safe as their extended type.
@@ -3308,8 +3306,11 @@ public:
       // We can mark the extension unsafe only if it has no public
       // conformances.
       auto protocols = ext->getLocalProtocols(ConformanceLookupKind::All);
-      bool hasSafeConformances = std::any_of(protocols.begin(), protocols.end(),
-                                             isDeserializationSafe);
+      bool hasSafeConformances = std::any_of(
+          protocols.begin(), protocols.end(), [](ProtocolDecl *protocol) {
+            return isDeserializationSafe(protocol);
+          });
+
       if (hasSafeConformances)
         return true;
 
@@ -3320,11 +3321,26 @@ public:
       return false;
     }
 
-    auto value = cast<ValueDecl>(decl);
+    if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      // Pattern bindings are safe if any of their var decls are safe.
+      for (auto i : range(pbd->getNumPatternEntries())) {
+        if (auto *varDecl = pbd->getAnchoringVarDecl(i)) {
+          if (isDeserializationSafe(varDecl))
+            return true;
+        }
+      }
 
+      return false;
+    }
+
+    return isDeserializationSafe(cast<ValueDecl>(decl));
+  }
+
+  static bool isDeserializationSafe(const ValueDecl *value) {
     // A decl is safe if formally accessible publicly.
-    auto accessScope = value->getFormalAccessScope(/*useDC=*/nullptr,
-                       /*treatUsableFromInlineAsPublic=*/true);
+    auto accessScope =
+        value->getFormalAccessScope(/*useDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true);
     if (accessScope.isPublic() || accessScope.isPackage())
       return true;
 
@@ -3351,7 +3367,7 @@ public:
     }
 
     // Paramters don't have meaningful access control.
-    if (isa<ParamDecl>(decl) || isa<GenericTypeParamDecl>(decl))
+    if (isa<ParamDecl>(value) || isa<GenericTypeParamDecl>(value))
       return true;
 
     return false;
@@ -3919,7 +3935,13 @@ public:
         initContextIDs);
 
     for (auto entryIdx : range(binding->getNumPatternEntries())) {
-      writePattern(binding->getPattern(entryIdx));
+      auto pattern = binding->getPattern(entryIdx);
+
+      // Force the entry to be typechecked before attempting to serialize.
+      if (!pattern->hasType())
+        (void)binding->getCheckedPatternBindingEntry(entryIdx);
+
+      writePattern(pattern);
       // Ignore initializer; external clients don't need to know about it.
     }
   }
