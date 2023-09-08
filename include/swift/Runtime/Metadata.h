@@ -1007,6 +1007,18 @@ SWIFT_RUNTIME_STDLIB_SPI
 void _swift_registerConcurrencyStandardTypeDescriptors(
     const ConcurrencyStandardTypeDescriptors *descriptors);
 
+/// Check if the given generic arguments are valid inputs for the generic type
+/// context and if so call the metadata access function and return the metadata.
+///
+/// Note: This expects the caller to heap allocate all pack pointers within the
+/// generic arguments via 'swift_allocateMetadataPack'.
+SWIFT_RUNTIME_STDLIB_SPI
+SWIFT_CC(swift)
+const Metadata *_swift_instantiateCheckedGenericMetadata(
+    const TypeContextDescriptor *context,
+    const void * const *genericArgs,
+    size_t genericArgsSize);
+
 #pragma clang diagnostic pop
 
 } // end namespace swift
