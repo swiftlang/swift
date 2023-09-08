@@ -298,4 +298,52 @@ extension String {
       String._uncheckedFromUTF8($0)
     }
   }
+
+  @usableFromInline
+  internal static func _validate<Encoding: Unicode.Encoding>(
+    _ input: UnsafeBufferPointer<Encoding.CodeUnit>,
+    as encoding: Encoding.Type
+  ) -> String? {
+  fast: // fast-path
+    if encoding.CodeUnit.self == UInt8.self {
+      let bytes = _identityCast(input, to: UnsafeBufferPointer<UInt8>.self)
+      let isASCII: Bool
+      if encoding.self == UTF8.self {
+        guard case .success(let info) = validateUTF8(bytes) else { return nil }
+        isASCII = info.isASCII
+      } else if encoding.self == Unicode.ASCII.self {
+        guard _allASCII(bytes) else { return nil }
+        isASCII = true
+      } else {
+        break fast
+      }
+      return String._uncheckedFromUTF8(bytes, asciiPreScanResult: isASCII)
+    }
+
+    // slow-path
+    // this multiplier is a worst-case estimate
+    let multiplier = if encoding.self == UTF16.self { 3 } else { 4 }
+    return withUnsafeTemporaryAllocation(
+      of: UInt8.self, capacity: input.count * multiplier
+    ) {
+      output -> String? in
+      var isASCII = true
+      var index = output.startIndex
+      let error = transcode(
+        input.makeIterator(),
+        from: encoding.self,
+        to: UTF8.self,
+        stoppingOnError: true,
+        into: {
+          uint8 in
+          output[index] = uint8
+          output.formIndex(after: &index)
+          if isASCII && (uint8 & 0x80) == 0x80 { isASCII = false }
+        }
+      )
+      if error { return nil }
+      let bytes = UnsafeBufferPointer(start: output.baseAddress, count: index)
+      return String._uncheckedFromUTF8(bytes, asciiPreScanResult: isASCII)
+    }
+  }
 }
