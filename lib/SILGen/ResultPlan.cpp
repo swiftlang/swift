@@ -719,7 +719,11 @@ class ForeignAsyncInitializationPlan final : public ResultPlan {
   SILValue resumeBuf;
   SILValue continuation;
   ExecutorBreadcrumb breadcrumb;
-  
+
+  SILValue blockStorage;
+  CanType blockStorageTy;
+  CanType continuationTy;
+
 public:
   ForeignAsyncInitializationPlan(SILGenFunction &SGF, SILLocation loc,
                                  const CalleeTypeInfo &calleeTypeInfo)
@@ -820,9 +824,6 @@ public:
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                calleeTypeInfo.substResultType, throws);
 
-    SILValue blockStorage;
-    CanType blockStorageTy;
-    CanType continuationTy;
     std::tie(blockStorage, blockStorageTy, continuationTy) =
         emitBlockStorage(SGF, loc, throws);
 
@@ -907,7 +908,7 @@ public:
       // (1) fulfill the unsafe continuation with the foreign error
       // (2) branch to the await block
       {
-        // First, fulfill the unsafe continuation with the foreign error.
+        // First, fulfill the continuation with the foreign error.
         // Currently, that block's code looks something like
         //     %foreignError = ... : $*Optional<NSError>
         //     %converter = function_ref _convertNSErrorToError(_:)
@@ -915,57 +916,66 @@ public:
         //     [... insert here ...]
         //     destroy_value %error
         //     destroy_value %foreignError
-        // Insert code to fulfill it after the native %error is defined.  That
-        // code should structure the RawUnsafeContinuation (continuation) into
-        // an appropriately typed UnsafeContinuation and then pass that together
-        // with (a copy of) the error to
-        // _resumeUnsafeThrowingContinuationWithError.
+        // Insert code to fulfill it after the native %error is defined. That
+        // code should load UnsafeContinuation (or CheckedContinuation
+        // depending on mode) and then pass that together with (a copy of) the
+        // error to _resume{Unsafe, Checked}ThrowingContinuationWithError.
         // [foreign_error_block_with_foreign_async_convention]
         SGF.B.setInsertionPoint(
             ++bridgedForeignError->getDefiningInstruction()->getIterator());
 
-        // FIXME: this case is not respecting checked bridging, and it's a
-        // great candidate for that. This situation comes up when bridging
-        // to an ObjC completion-handler method that returns a bool. It seems
-        // that bool indicates whether the handler was invoked. If it was not
-        // then it writes out an error. Here for the unsafe bridging, we're
-        // invoking the continuation by re-wrapping it in an
-        // UnsafeContinuation<_, Error> and then immediately calling its
-        // resume(throwing: error) method. For a checked bridging scenario, we
-        // would need to use a copy of the original CheckedContinuation that
-        // was passed to the callee. Whether that's by invoking the block
-        // ourselves, or just invoking the CheckedContinuation.
+        bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
 
-        auto continuationDecl = ctx.getUnsafeContinuationDecl();
-        auto errorTy = ctx.getErrorExistentialType();
-        auto continuationBGT =
-            BoundGenericType::get(continuationDecl, Type(),
-                                  {calleeTypeInfo.substResultType, errorTy});
         auto env = SGF.F.getGenericEnvironment();
         auto sig = env ? env->getGenericSignature().getCanonicalSignature()
                        : CanGenericSignature();
-        auto mappedContinuationTy =
-            continuationBGT->mapTypeOutOfContext()->getReducedType(sig);
+
+        // Load unsafe or checked continuation from the block storage
+        // and call _resume{Unsafe, Checked}ThrowingContinuationWithError.
+
+        SILValue continuationAddr =
+            SGF.B.createProjectBlockStorage(loc, blockStorage);
+
+        ManagedValue continuation;
+        if (checkedBridging) {
+          FormalEvaluationScope scope(SGF);
+
+          auto underlyingValueTy =
+              OpenedArchetypeType::get(ctx.TheAnyType, sig);
+
+          auto underlyingValueAddr = SGF.emitOpenExistential(
+              loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
+              SGF.getLoweredType(underlyingValueTy), AccessKind::Read);
+
+          continuation = SGF.B.createUncheckedAddrCast(
+              loc, underlyingValueAddr,
+              SILType::getPrimitiveAddressType(continuationTy));
+        } else {
+          auto continuationVal = SGF.B.createLoad(
+              loc, continuationAddr, LoadOwnershipQualifier::Trivial);
+          continuation =
+              ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+        }
+
+        auto mappedOutContinuationTy =
+            continuationTy->mapTypeOutOfContext()->getReducedType(sig);
         auto resumeType =
-            cast<BoundGenericType>(mappedContinuationTy).getGenericArgs()[0];
-        auto continuationTy = continuationBGT->getCanonicalType();
+            cast<BoundGenericType>(mappedOutContinuationTy).getGenericArgs()[0];
 
         auto errorIntrinsic =
-            SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
+            checkedBridging
+                ? SGF.SGM.getResumeCheckedThrowingContinuationWithError()
+                : SGF.SGM.getResumeUnsafeThrowingContinuationWithError();
+
         Type replacementTypes[] = {
             SGF.F.mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          ArrayRef<ProtocolConformanceRef>{});
-        auto wrappedContinuation = SGF.B.createStruct(
-            loc, SILType::getPrimitiveObjectType(continuationTy),
-            {continuation});
 
-        auto continuationMV = ManagedValue::forObjectRValueWithoutOwnership(
-            SILValue(wrappedContinuation));
         SGF.emitApplyOfLibraryIntrinsic(
             loc, errorIntrinsic, subs,
-            {continuationMV,
+            {continuation,
              SGF.B.copyOwnedObjectRValue(loc, bridgedForeignError,
                                          ManagedValue::ScopeKind::Lexical)},
             SGFContext());
