@@ -2467,7 +2467,7 @@ namespace {
         auto valueRef = declRef->getDeclRef();
         auto value = valueRef.getDecl();
         auto loc = declRef->getLoc();
-        
+
         //FIXME: Should this be subsumed in reference checking?
         if (value->isLocalCapture())
           checkLocalCapture(valueRef, loc, declRef);
@@ -3103,11 +3103,6 @@ namespace {
       if (mayExitToNonisolated && fnType->isAsync() &&
           getContextIsolation().isActorIsolated())
         unsatisfiedIsolation = ActorIsolation::forNonisolated();
-
-      // move check for sendability of arguments earlier
-      if (!ctx.LangOpts.hasFeature(Feature::DeferredSendableChecking)) {
-        diagnoseApplyArgSendability(apply, getDeclContext());
-      }
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
