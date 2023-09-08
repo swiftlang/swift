@@ -4326,6 +4326,16 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                      [&]() { return getFormalAccess(); });
 }
 
+ImportAccessLevel ValueDecl::getImportAccessFrom(const DeclContext *useDC) const {
+  ModuleDecl *Mod = getModuleContext();
+  if (useDC && useDC->getParentModule() != Mod) {
+    if (auto useSF = useDC->getParentSourceFile()) {
+      return useSF->getImportAccessLevel(Mod);
+    }
+  }
+  return llvm::None;
+}
+
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
                                                  bool forConformance) const {
   assert(isSettable(DC));
