@@ -399,6 +399,17 @@ static StringRef getDumpString(ForeignErrorConvention::IsOwned_t owned) {
 
   llvm_unreachable("Unhandled ForeignErrorConvention::IsOwned_t in switch.");
 }
+static StringRef getDumpString(RequirementKind kind) {
+  switch (kind) {
+    case RequirementKind::SameShape: return "same_shape";
+    case RequirementKind::Conformance: return "conforms_to";
+    case RequirementKind::Layout: return "has_layout";
+    case RequirementKind::Superclass: return "subclass_of";
+    case RequirementKind::SameType: return "same_type";
+  }
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
+}
 static unsigned getDumpString(unsigned value) {
   return value;
 }
@@ -638,23 +649,51 @@ public:
     }, Label);
   }
 
-  void printRec(SubstitutionMap map) {
+  void printRec(SubstitutionMap map, StringRef label = "") {
     SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-    printRec(map, Dumped);
+    printRec(map, Dumped, label);
   }
 
-  void printRec(SubstitutionMap map, VisitedConformances &visited);
+  void printRec(const ProtocolConformanceRef &conf, StringRef label = "") {
+    SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+    printRec(conf, Dumped, label);
+  }
 
-  void printRec(ProtocolConformanceRef conf, StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      conf.dump(OS, Indent);
-    }, label);
+  void printRec(SubstitutionMap map, VisitedConformances &visited,
+                StringRef label = "");
+
+  void printRec(const ProtocolConformanceRef &conf,
+                VisitedConformances &visited, StringRef label = "");
+
+  void printRec(const ProtocolConformance *conformance,
+                VisitedConformances &visited, StringRef label = "");
+
+  void visitRequirement(const Requirement &requirement, StringRef label = "") {
+    printHead("requirement", ASTNodeColor, label);
+
+    PrintOptions opts;
+    opts.ProtocolQualifiedDependentMemberTypes = true;
+
+    printFieldQuotedRaw([&](raw_ostream &out) {
+      requirement.getFirstType().print(out, opts);
+    }, "");
+
+    printField(requirement.getKind(), "");
+
+    if (requirement.getKind() != RequirementKind::Layout
+          && requirement.getSecondType())
+      printFieldQuotedRaw([&](raw_ostream &out) {
+        requirement.getSecondType().print(out, opts);
+      }, "");
+    else if (requirement.getLayoutConstraint())
+      printFieldQuoted(requirement.getLayoutConstraint(), "");
+
+    printFoot();
   }
 
   void printRec(const Requirement &requirement, StringRef label = "") {
     printRecRaw([&](StringRef label) {
-      OS.indent(Indent);
-      requirement.dump(OS);
+      visitRequirement(requirement);
     });
   }
 
@@ -3352,49 +3391,34 @@ class PrintConformance : public PrintBase {
 public:
   using PrintBase::PrintBase;
 
-  using PrintBase::printRec;
-
-  void printRec(const ProtocolConformanceRef &conf,
-                VisitedConformances &visited, StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      visitProtocolConformanceRef(conf, visited);
-    }, label);
-  }
-
-  void printRec(const ProtocolConformance *conformance,
-                VisitedConformances &visited, StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      visitProtocolConformance(conformance, visited);
-    }, label);
-  }
-
   void visitProtocolConformanceRef(const ProtocolConformanceRef conformance,
-                                   VisitedConformances &visited) {
+                                   VisitedConformances &visited,
+                                   StringRef label) {
     if (conformance.isInvalid()) {
-      printHead("invalid_conformance", ASTNodeColor);
+      printHead("invalid_conformance", ASTNodeColor, label);
       printFoot();
     } else if (conformance.isConcrete()) {
-      visitProtocolConformance(conformance.getConcrete(), visited);
+      visitProtocolConformance(conformance.getConcrete(), visited, label);
     } else if (conformance.isPack()) {
-      visitPackConformance(conformance.getPack(), visited);
+      visitPackConformance(conformance.getPack(), visited, label);
     } else {
       assert(conformance.isAbstract());
 
-      printHead("abstract_conformance", ASTNodeColor);
+      printHead("abstract_conformance", ASTNodeColor, label);
       printFieldQuoted(conformance.getAbstract()->getName(), "protocol");
       printFoot();
     }
   }
 
   void visitProtocolConformance(const ProtocolConformance *conformance,
-                                VisitedConformances &visited) {
+                                VisitedConformances &visited, StringRef label) {
     // A recursive conformance shouldn't have its contents printed, or there's
     // infinite recursion. (This also avoids printing things that occur multiple
     // times in a conformance hierarchy.)
     auto shouldPrintDetails = visited.insert(conformance).second;
 
     auto printCommon = [&](StringRef kind) {
-      printHead(kind, ASTNodeColor);
+      printHead(kind, ASTNodeColor, label);
       printFieldQuoted(conformance->getType(), "type");
       printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
       printFlag(!shouldPrintDetails, "<details printed above>");
@@ -3504,8 +3528,8 @@ public:
   }
 
   void visitPackConformance(const PackConformance *conformance,
-                            VisitedConformances &visited) {
-    printHead("pack_conformance", ASTNodeColor);
+                            VisitedConformances &visited, StringRef label) {
+    printHead("pack_conformance", ASTNodeColor, label);
 
     printFieldQuoted(Type(conformance->getType()), "type");
     printFieldQuoted(conformance->getProtocol()->getName(), "protocol");
@@ -3519,7 +3543,7 @@ public:
 
   void visitSubstitutionMap(SubstitutionMap map,
                             SubstitutionMap::DumpStyle style,
-                            VisitedConformances &visited) {
+                            VisitedConformances &visited, StringRef label) {
     // In Minimal style, use single quote so this dump can appear in
     // double-quoted fields without escaping.
     std::optional<llvm::SaveAndRestore<char>> restoreQuote;
@@ -3527,7 +3551,7 @@ public:
       restoreQuote.emplace(quote, '\'');
 
     auto genericSig = map.getGenericSignature();
-    printHead("substitution_map", ASTNodeColor);
+    printHead("substitution_map", ASTNodeColor, label);
     SWIFT_DEFER { printFoot(); };
 
     if (genericSig.isNull()) {
@@ -3590,11 +3614,29 @@ public:
   }
 };
 
-void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited) {
+void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
+                         StringRef label) {
   printRecRaw([&](StringRef label) {
     PrintConformance(OS, Indent)
-        .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited);
-  });
+        .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited,
+                              label);
+  }, label);
+}
+
+void PrintBase::printRec(const ProtocolConformanceRef &ref,
+                         VisitedConformances &visited, StringRef label) {
+  printRecRaw([&](StringRef label) {
+    PrintConformance(OS, Indent)
+          .visitProtocolConformanceRef(ref, visited, label);
+  }, label);
+}
+
+void PrintBase::printRec(const ProtocolConformance *conformance,
+                         VisitedConformances &visited, StringRef label) {
+  printRecRaw([&](StringRef label) {
+    PrintConformance(OS, Indent)
+        .visitProtocolConformance(conformance, visited, label);
+  }, label);
 }
 
 } // end anonymous namespace
@@ -3610,12 +3652,12 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
   if (!details && isConcrete())
     visited.insert(getConcrete());
 
-  PrintConformance(out, indent).visitProtocolConformanceRef(*this, visited);
+  PrintConformance(out, indent).visitProtocolConformanceRef(*this, visited, "");
 }
 
 void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, 0).visitProtocolConformanceRef(*this, visited);
+  PrintConformance(out, 0).visitProtocolConformanceRef(*this, visited, "");
 }
 
 void ProtocolConformance::dump() const {
@@ -3626,18 +3668,18 @@ void ProtocolConformance::dump() const {
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitProtocolConformance(this, visited);
+  PrintConformance(out, indent).visitProtocolConformance(this, visited, "");
 }
 
 void PackConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitPackConformance(this, visited);
+  PrintConformance(out, indent).visitPackConformance(this, visited, "");
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
                            unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  PrintConformance(out, indent).visitSubstitutionMap(*this, style, visited);
+  PrintConformance(out, indent).visitSubstitutionMap(*this, style, visited, "");
 }
 
 void SubstitutionMap::dump() const {
@@ -4348,34 +4390,7 @@ void Requirement::dump() const {
   llvm::errs() << '\n';
 }
 void Requirement::dump(raw_ostream &out) const {
-  switch (getKind()) {
-  case RequirementKind::SameShape:
-    out << "same_shape: ";
-    break;
-  case RequirementKind::Conformance:
-    out << "conforms_to: ";
-    break;
-  case RequirementKind::Layout:
-    out << "layout: ";
-    break;
-  case RequirementKind::Superclass:
-    out << "superclass: ";
-    break;
-  case RequirementKind::SameType:
-    out << "same_type: ";
-    break;
-  }
-
-  PrintOptions opts;
-  opts.ProtocolQualifiedDependentMemberTypes = true;
-
-  getFirstType().print(out, opts);
-  out << " ";
-
-  if (getKind() != RequirementKind::Layout && getSecondType())
-    getSecondType().print(out, opts);
-  else if (getLayoutConstraint())
-    out << getLayoutConstraint();
+  PrintBase(out, 0).visitRequirement(*this);
 }
 
 void SILParameterInfo::dump() const {

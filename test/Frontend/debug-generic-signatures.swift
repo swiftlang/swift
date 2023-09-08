@@ -80,7 +80,7 @@ struct Generic<T> {}
 // CHECK-NEXT: (normal_conformance type="Generic<T>" protocol="P1"
 // CHECK-NEXT:   (assoc_type req="A" type="T")
 // CHECK-NEXT:   (value req="f()" witness="main.(file).Generic extension.f()@{{.*}}")
-// CHECK-NEXT:   conforms_to: T P1)
+// CHECK-NEXT:   (requirement "T" conforms_to "P1")
 extension Generic: P1 where T: P1 {
     typealias A = T
     func f() -> T { fatalError() }
@@ -99,8 +99,8 @@ class Super<T, U> {}
 // CHECK-NEXT:   (assoc_type req="B" type="T")
 // CHECK-NEXT:   (abstract_conformance protocol="P2")
 // CHECK-NEXT:   (abstract_conformance protocol="P2")
-// CHECK-NEXT:   conforms_to: T P2
-// CHECK-NEXT:   conforms_to: U P2)
+// CHECK-NEXT:   (requirement "T" conforms_to "P2")
+// CHECK-NEXT:   (requirement "U" conforms_to "P2"))
 extension Super: P2 where T: P2, U: P2 {
     typealias A = T
     typealias B = T
@@ -131,8 +131,8 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:       (assoc_type req="B" type="T")
 // CHECK-NEXT:       (abstract_conformance protocol="P2")
 // CHECK-NEXT:       (abstract_conformance protocol="P2")
-// CHECK-NEXT:       conforms_to: T P2
-// CHECK-NEXT:       conforms_to: U P2)))
+// CHECK-NEXT:       (requirement "T" conforms_to "P2")
+// CHECK-NEXT:       (requirement "U" conforms_to "P2"))))
 class Sub: Super<NonRecur, Recur> {}
 
 // Specialization of a recursive conformance should be okay: recursion detection
