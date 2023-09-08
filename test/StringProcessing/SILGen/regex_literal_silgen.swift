@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-bare-slash-regex -disable-availability-checking %s | %FileCheck %s
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 var s = #/abc/#
 // CHECK: [[REGEX_STR_LITERAL:%[0-9]+]] = string_literal utf8 "#/abc/#"

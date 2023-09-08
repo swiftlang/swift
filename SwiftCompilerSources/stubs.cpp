@@ -12,10 +12,11 @@
 
 extern "C" {
 
-void initializeSwiftModules();
 void initializeSwiftParseModules();
+void initializeSwiftModules();
 
 }
 
-void initializeSwiftModules() {}
-void initializeSwiftParseModules() {}
+void initializeSwiftModules() {
+  initializeSwiftParseModules();
+}

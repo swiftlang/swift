@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-import _RegexParserBridging
-import AST
-import Basic
+import CBasicBridging
+import CASTBridging
 
 #if canImport(_CompilerRegexParser)
 @_spi(CompilerInterface) import _CompilerRegexParser
 
-func registerRegexParser() {
+@_cdecl("initializeSwiftParseModules")
+public func initializeSwiftParseModules() {
   Parser_registerRegexLiteralParsingFn(_RegexLiteralParsingFn)
   Parser_registerRegexLiteralLexingFn(_RegexLiteralLexingFn)
 }
@@ -46,8 +46,8 @@ private func _RegexLiteralLexingFn(
   _ curPtrPtr: UnsafeMutablePointer<UnsafePointer<CChar>>,
   _ bufferEndPtr: UnsafePointer<CChar>,
   _ mustBeRegex: CBool,
-  _ bridgedDiagnosticEngine: BridgedOptionalDiagnosticEngine
-) -> /*CompletelyErroneous*/ CBool {
+  _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
+) -> /*CompletelyErroneous*/ Bool {
   let inputPtr = curPtrPtr.pointee
 
   guard let (resumePtr, error) = swiftCompilerLexRegexLiteral(
@@ -62,10 +62,16 @@ private func _RegexLiteralLexingFn(
 
   if let error = error {
     // Emit diagnostic if diagnostics are enabled.
-    if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
-      let startLoc = SourceLoc(
-        locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
-      diagEngine.diagnose(startLoc, .foreign_diagnostic, error.message)
+    if bridgedDiagnosticEngine.raw != nil {
+      let startLoc = BridgedSourceLoc(raw: error.location)
+      var message = error.message
+      let diag = message.withBridgedString { bridgedMessage in
+        Diagnostic_create(
+          bridgedDiagnosticEngine, .error, startLoc,
+          bridgedMessage
+        )
+      }
+      Diagnostic_finish(diag)
     }
     return error.completelyErroneous
   }
@@ -92,7 +98,7 @@ public func _RegexLiteralParsingFn(
   _ versionOut: UnsafeMutablePointer<CUnsignedInt>,
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: CUnsignedInt,
-  _ bridgedDiagnosticBaseLoc: swift.SourceLoc,
+  _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
   let str = String(cString: inputPtr)
@@ -106,13 +112,20 @@ public func _RegexLiteralParsingFn(
     versionOut.pointee = CUnsignedInt(version)
     return false
   } catch let error as CompilerParseError {
-    var diagLoc = SourceLoc(bridged: bridgedDiagnosticBaseLoc)
-    let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine)
-    if let _diagLoc = diagLoc, let errorLoc = error.location {
+    var diagLoc = bridgedDiagnosticBaseLoc
+    if diagLoc.raw != nil, let errorLoc = error.location {
       let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
-      diagLoc = _diagLoc.advanced(by: offset)
+      diagLoc = SourceLoc_advanced(diagLoc, SwiftInt(offset))
     }
-    diagEngine.diagnose(diagLoc, .foreign_diagnostic, error.message)
+
+    var message = error.message
+    let diag = message.withBridgedString { bridgedMessage in
+      Diagnostic_create(
+        bridgedDiagnosticEngine, .error, diagLoc,
+        bridgedMessage
+      )
+    }
+    Diagnostic_finish(diag)
     return true
   } catch {
     fatalError("Expected CompilerParseError")

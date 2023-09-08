@@ -4,7 +4,7 @@
 // REQUIRES: asserts
 
 // Required for regex
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 func then(_: Int = 0, x: Int = 0, fn: () -> Void = {}) {}
 

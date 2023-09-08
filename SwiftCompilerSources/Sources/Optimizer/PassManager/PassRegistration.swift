@@ -12,14 +12,13 @@
 
 import SIL
 import OptimizerBridging
-import Parse
 
 @_cdecl("initializeSwiftModules")
 public func initializeSwiftModules() {
+  initializeSwiftParseModules();
   registerSILClasses()
   registerSwiftAnalyses()
   registerSwiftPasses()
-  initializeSwiftParseModules()
   registerSILTests()
 }
 
