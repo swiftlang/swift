@@ -3265,9 +3265,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   size_t addConformances(const IterableDeclContext *declContext,
                          ConformanceLookupKind lookupKind,
                          SmallVectorImpl<TypeID> &data) {
-    // We don't expect to be serializing conformances for skipped decls.
-    assert(!S.shouldSkipDecl(declContext->getDecl()));
-
     size_t count = 0;
     for (auto conformance : declContext->getLocalConformances(lookupKind)) {
       if (S.shouldSkipDecl(conformance->getProtocol()))
@@ -3353,6 +3350,10 @@ public:
         if (isDeserializationSafe(wrapped))
           return true;
     }
+
+    // Paramters don't have meaningful access control.
+    if (isa<ParamDecl>(decl) || isa<GenericTypeParamDecl>(decl))
+      return true;
 
     return false;
   }
@@ -4903,11 +4904,16 @@ static bool canSkipWhenInvalid(const Decl *D) {
 }
 
 bool Serializer::shouldSkipDecl(const Decl *D) const {
-  if (Options.SerializeExternalDeclsOnly &&
-      !DeclSerializer::isDeserializationSafe(D))
-    return true;
+  // The presence of -experimental-serialize-external-decls-only is the only
+  // reason to omit decls during serialization.
+  if (!Options.SerializeExternalDeclsOnly)
+    return false;
 
-  return false;
+  // For our purposes, "deserialization safe" is the same thing as "external".
+  if (DeclSerializer::isDeserializationSafe(D))
+    return false;
+
+  return true;
 }
 
 void Serializer::writeASTBlockEntity(const Decl *D) {
