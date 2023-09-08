@@ -190,8 +190,8 @@ public:
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
       CanSILFunctionType blockType, CanType blockStorageType,
-      AbstractionPattern origFormalType, CanGenericSignature sig,
-      CalleeTypeInfo &calleeInfo);
+      CanType continuationType, AbstractionPattern origFormalType,
+      CanGenericSignature sig, CalleeTypeInfo &calleeInfo);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

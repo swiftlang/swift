@@ -200,8 +200,8 @@ static const clang::Type *prependParameterType(
 
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
     CanSILFunctionType blockType, CanType blockStorageType,
-    AbstractionPattern origFormalType, CanGenericSignature sig,
-    CalleeTypeInfo &calleeInfo) {
+    CanType continuationType, AbstractionPattern origFormalType,
+    CanGenericSignature sig, CalleeTypeInfo &calleeInfo) {
   auto convention = *calleeInfo.foreign.async;
   auto resumeType =
       calleeInfo.substResultType->mapTypeOutOfContext()->getReducedType(sig);
@@ -293,11 +293,33 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       // Get the continuation out of the block object.
       auto blockStorage = params[0].getValue();
-      auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-      auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
-                                           LoadOwnershipQualifier::Trivial);
-      auto continuation =
-          ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+      SILValue continuationAddr =
+          SGF.B.createProjectBlockStorage(loc, blockStorage);
+
+      auto &ctx = SGF.getASTContext();
+
+      bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
+
+      ManagedValue continuation;
+      if (checkedBridging) {
+        FormalEvaluationScope scope(SGF);
+
+        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType, sig);
+
+        auto underlyingValueAddr = SGF.emitOpenExistential(
+            loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
+            SGF.getLoweredType(underlyingValueTy), AccessKind::Read);
+
+        continuation = SGF.B.createUncheckedAddrCast(
+            loc, underlyingValueAddr,
+            SILType::getPrimitiveAddressType(
+                F->mapTypeIntoContext(continuationType)->getCanonicalType()));
+      } else {
+        auto continuationVal = SGF.B.createLoad(
+            loc, continuationAddr, LoadOwnershipQualifier::Trivial);
+        continuation =
+            ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+      }
 
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
@@ -311,8 +333,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
-        auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
+        auto errorIntrinsic =
+            checkedBridging ? getResumeCheckedThrowingContinuationWithError()
+                            : getResumeUnsafeThrowingContinuationWithError();
 
         auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -385,9 +411,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
       } else if (auto foreignError = calleeInfo.foreign.error) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
       } else {
-        resumeIntrinsic = getResumeUnsafeContinuation();
+        resumeIntrinsic = checkedBridging ? getResumeCheckedContinuation()
+                                          : getResumeUnsafeContinuation();
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
