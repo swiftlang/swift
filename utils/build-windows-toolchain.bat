@@ -188,13 +188,13 @@ cmake ^
 cmake --build "%BuildRoot%\curl" || (exit /b)
 cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
-setlocal enableextensions enabledelayedexpansion
 path %BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Runtimes\0.0.0\usr\bin;%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Toolchains\0.0.0+Asserts\usr\bin;%Path%
 
 :: Build Swift Syntax
 cmake ^
   -B "%BuildRoot%\99" ^
 
+  -D BUILD_SHARED_LIBS=YES ^
   -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
   -D CMAKE_C_COMPILER=cl.exe ^
   -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
@@ -215,8 +215,6 @@ cmake ^
 cmake --build %BuildRoot%\99 || (exit /b)
 cmake --build %BuildRoot%\99 --target install || (exit /b)
 
-endlocal
-
 :: Build Toolchain
 cmake ^
   -B "%BuildRoot%\1" ^
@@ -234,8 +232,8 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
 
-  -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/PFiles64/Swift/Toolchains/0.0.0+Asserts/usr/bin/swiftc.exe" ^
-  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Toolchains/0.0.0+Asserts/usr/bin/swiftc.exe" ^
+  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 
@@ -244,6 +242,9 @@ cmake ^
   -D CLANG_VENDOR_UTI="org.swift" ^
   -D LLVM_APPEND_VC_REV=NO ^
   -D LLVM_VERSION_SUFFIX="" ^
+  -D LLDB_PYTHON_EXE_RELATIVE_PATH=python.exe ^
+  -D LLDB_PYTHON_EXT_SUFFIX=.pyd ^
+  -D LLDB_PYTHON_RELATIVE_PATH=lib/site-packages ^
 
   -D SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY=YES ^
   -D SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP=YES ^
@@ -260,7 +261,7 @@ cmake ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
