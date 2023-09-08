@@ -17,6 +17,8 @@
 #ifndef SWIFT_REMOTE_METADATAREADER_H
 #define SWIFT_REMOTE_METADATAREADER_H
 
+#include "llvm/ADT/Hashing.h"
+
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Demangling/Demangler.h"
@@ -193,8 +195,18 @@ private:
   /// amounts of data when we encounter corrupt values for sizes/counts.
   static const uint64_t MaxMetadataSize = 1048576; // 1MB
 
-  /// A cache of built types, keyed by the address of the type.
-  std::unordered_map<StoredPointer, BuiltType> TypeCache;
+  /// Define a has function for a std::pair<StoredPointer, bool>
+  struct TypeCacheKeyHash {
+    std::size_t operator()(const std::pair<StoredPointer, bool> &x) const {
+      return llvm::hash_combine(x.first, x.second);
+    }
+  };
+
+  /// A cache of built types, keyed by the address of the type and whether the
+  /// request ignored articial superclasses or not.
+  std::unordered_map<std::pair<StoredPointer, bool>, BuiltType,
+                     TypeCacheKeyHash>
+      TypeCache;
 
   using MetadataRef = RemoteRef<const TargetMetadata<Runtime>>;
   using OwnedMetadataRef = MemoryReader::ReadBytesResult;
@@ -821,7 +833,9 @@ public:
   readTypeFromMetadata(StoredPointer MetadataAddress,
                        bool skipArtificialSubclasses = false,
                        int recursion_limit = defaultTypeRecursionLimit) {
-    auto Cached = TypeCache.find(MetadataAddress);
+    std::pair<StoredPointer, bool> TypeCacheKey(MetadataAddress,
+                                                skipArtificialSubclasses);
+    auto Cached = TypeCache.find(TypeCacheKey);
     if (Cached != TypeCache.end())
       return Cached->second;
 
@@ -841,7 +855,7 @@ public:
     // Insert a negative result into the cache now so that, if we recur with
     // the same address, we will return the negative result with the check
     // just above.
-    TypeCache.insert({MetadataAddress, BuiltType()});
+    TypeCache.insert({TypeCacheKey, BuiltType()});
 
     auto Meta = readMetadata(MetadataAddress);
     if (!Meta) return BuiltType();
@@ -890,7 +904,7 @@ public:
 
       auto BuiltTuple =
           Builder.createTupleType(elementTypes, labels);
-      TypeCache[MetadataAddress] = BuiltTuple;
+      TypeCache[TypeCacheKey] = BuiltTuple;
       return BuiltTuple;
     }
     case MetadataKind::Function: {
@@ -947,7 +961,7 @@ public:
 
       auto BuiltFunction = Builder.createFunctionType(
           Parameters, Result, flags, diffKind, globalActor);
-      TypeCache[MetadataAddress] = BuiltFunction;
+      TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }
     case MetadataKind::Existential: {
@@ -998,7 +1012,7 @@ public:
       }
       auto BuiltExist = Builder.createProtocolCompositionType(
         Protocols, SuperclassType, HasExplicitAnyObject);
-      TypeCache[MetadataAddress] = BuiltExist;
+      TypeCache[TypeCacheKey] = BuiltExist;
       return BuiltExist;
     }
     case MetadataKind::ExtendedExistential: {
@@ -1076,7 +1090,7 @@ public:
         }
       }
 
-      TypeCache[MetadataAddress] = builtProto;
+      TypeCache[TypeCacheKey] = builtProto;
       return builtProto;
     }
 
@@ -1086,7 +1100,7 @@ public:
           readTypeFromMetadata(Metatype->InstanceType, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltMetatype = Builder.createMetatypeType(Instance);
-      TypeCache[MetadataAddress] = BuiltMetatype;
+      TypeCache[TypeCacheKey] = BuiltMetatype;
       return BuiltMetatype;
     }
     case MetadataKind::ObjCClassWrapper: {
@@ -1098,7 +1112,7 @@ public:
         return BuiltType();
 
       auto BuiltObjCClass = Builder.createObjCClassType(std::move(className));
-      TypeCache[MetadataAddress] = BuiltObjCClass;
+      TypeCache[TypeCacheKey] = BuiltObjCClass;
       return BuiltObjCClass;
     }
     case MetadataKind::ExistentialMetatype: {
@@ -1107,7 +1121,7 @@ public:
           readTypeFromMetadata(Exist->InstanceType, false, recursion_limit);
       if (!Instance) return BuiltType();
       auto BuiltExist = Builder.createExistentialMetatypeType(Instance);
-      TypeCache[MetadataAddress] = BuiltExist;
+      TypeCache[TypeCacheKey] = BuiltExist;
       return BuiltExist;
     }
     case MetadataKind::ForeignReferenceType:
@@ -1131,7 +1145,7 @@ public:
       auto name = mangling.result();
 
       auto BuiltForeign = Builder.createForeignClassType(std::move(name));
-      TypeCache[MetadataAddress] = BuiltForeign;
+      TypeCache[TypeCacheKey] = BuiltForeign;
       return BuiltForeign;
     }
     case MetadataKind::HeapLocalVariable:
@@ -1142,7 +1156,7 @@ public:
     case MetadataKind::Opaque:
     default: {
       auto BuiltOpaque = Builder.getOpaqueType();
-      TypeCache[MetadataAddress] = BuiltOpaque;
+      TypeCache[TypeCacheKey] = BuiltOpaque;
       return BuiltOpaque;
     }
     }
@@ -3084,9 +3098,12 @@ private:
     // If we've skipped an artificial subclasses, check the cache at
     // the superclass.  (This also protects against recursion.)
     if (skipArtificialSubclasses && metadata != origMetadata) {
-      auto it = TypeCache.find(getAddress(metadata));
-      if (it != TypeCache.end())
+      auto it =
+          TypeCache.find({getAddress(metadata), skipArtificialSubclasses});
+      if (it != TypeCache.end()) {
+        TypeCache.erase({getAddress(origMetadata), skipArtificialSubclasses});
         return it->second;
+      }
     }
 
     // Read the nominal type descriptor.
@@ -3115,12 +3132,12 @@ private:
     if (!nominal)
       return BuiltType();
     
-    TypeCache[getAddress(metadata)] = nominal;
+    TypeCache[{getAddress(metadata), skipArtificialSubclasses}] = nominal;
 
     // If we've skipped an artificial subclass, remove the
     // recursion-protection entry we made for it.
     if (skipArtificialSubclasses && metadata != origMetadata) {
-      TypeCache.erase(getAddress(origMetadata));
+      TypeCache.erase({getAddress(origMetadata), skipArtificialSubclasses});
     }
 
     return nominal;
@@ -3151,7 +3168,7 @@ private:
                                skipArtificialSubclasses, recursion_limit);
     }
 
-    TypeCache[origMetadataPtr] = BuiltObjCClass;
+    TypeCache[{origMetadataPtr, skipArtificialSubclasses}] = BuiltObjCClass;
     return BuiltObjCClass;
   }
 
