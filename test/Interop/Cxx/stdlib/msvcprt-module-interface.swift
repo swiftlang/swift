@@ -15,10 +15,10 @@
 // CHECK-STRING:   struct basic_string<Int8, char_traits<Int8>, allocator<Int8>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
-// CHECK-STRING:   struct basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>> : CxxRandomAccessCollection {
+// CHECK-STRING:   struct basic_string<UInt16, char_traits<UInt16>, allocator<UInt16>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = CWideChar
 // CHECK-STRING:   }
 // CHECK-STRING:   typealias string = std.basic_string<Int8, char_traits<Int8>, allocator<Int8>>
-// CHECK-STRING:   typealias wstring = std.basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>>
+// CHECK-STRING:   typealias wstring = std.basic_string<UInt16, char_traits<UInt16>, allocator<UInt16>>
 // CHECK-STRING: }
 
