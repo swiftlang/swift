@@ -918,14 +918,14 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *
+ProtocolConformanceRef
 ProtocolConformance::subst(SubstitutionMap subMap,
                            SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(subMap, options);
   return subst(IFS);
 }
 
-ProtocolConformance *
+ProtocolConformanceRef
 ProtocolConformance::subst(TypeSubstitutionFn subs,
                            LookupConformanceFn conformances,
                            SubstOptions options) const {
@@ -933,48 +933,54 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
   return subst(IFS);
 }
 
-ProtocolConformance *
+ProtocolConformanceRef
 ProtocolConformance::subst(InFlightSubstitution &IFS) const {
+  auto *mutableThis = const_cast<ProtocolConformance *>(this);
+
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
     if (substType->isEqual(origType))
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
+    auto *generic = cast<NormalProtocolConformance>(mutableThis);
     auto subMap = SubstitutionMap::get(getGenericSignature(), IFS);
 
-    auto *mutableThis = const_cast<ProtocolConformance *>(this);
-    return substType->getASTContext()
-        .getSpecializedConformance(substType,
-                                   cast<NormalProtocolConformance>(mutableThis),
-                                   subMap);
+    auto &ctx = substType->getASTContext();
+    auto *concrete = ctx.getSpecializedConformance(substType, generic, subMap);
+
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Builtin: {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
 
     // We do an exact pointer equality check because subst() can
     // change sugar.
     if (substType.getPointer() == origType.getPointer())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
-    return substType->getASTContext()
+    auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Self:
-    return const_cast<ProtocolConformance*>(this);
+    return ProtocolConformanceRef(mutableThis);
+
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
@@ -983,31 +989,39 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype()) {
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
     }
 
     auto origBaseType = inheritedConformance->getType();
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(IFS);
+      auto substConformance = inheritedConformance->subst(IFS);
+      if (!substConformance.isConcrete())
+        return substConformance;
+
+      inheritedConformance = substConformance.getConcrete();
     }
 
     auto substType = origType.subst(IFS);
-    return substType->getASTContext()
+    auto *concrete = substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    auto genericConformance = spec->getGenericConformance();
-    auto subMap = spec->getSubstitutionMap();
 
-    auto origType = getType();
-    auto substType = origType.subst(IFS);
-    return substType->getASTContext()
-      .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(IFS));
+    auto *generic = spec->getGenericConformance();
+    auto subMap = spec->getSubstitutionMap().subst(IFS);
+
+    auto substType = spec->getType().subst(IFS);
+
+    auto &ctx = substType->getASTContext();
+    auto *concrete = ctx.getSpecializedConformance(substType, generic, subMap);
+
+    return ProtocolConformanceRef(concrete);
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
