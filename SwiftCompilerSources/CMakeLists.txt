@@ -241,15 +241,9 @@ else()
 #include \"Basic/BasicBridging.h\"
 #include \"Basic/SourceLoc.h\"
 
-#include \"AST/ASTBridging.h\"
-#include \"AST/DiagnosticEngine.h\"
-#include \"AST/DiagnosticConsumer.h\"
-
 #include \"SIL/SILBridging.h\"
 
 #include \"SILOptimizer/OptimizerBridging.h\"
-
-#include \"Parse/RegexParserBridging.h\"
 ")
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"

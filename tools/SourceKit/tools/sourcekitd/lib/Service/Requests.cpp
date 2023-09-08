@@ -111,6 +111,7 @@ void sourcekitd::initializeService(
     StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
   INITIALIZE_LLVM();
+  initializeSwiftParseModules();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
   GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,

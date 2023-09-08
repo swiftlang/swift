@@ -48,7 +48,7 @@ let package = Package(
     .library(
       name: "swiftCompilerModules",
       type: .static,
-      targets: ["Basic", "AST", "Parse", "SIL", "Optimizer", "_CompilerRegexParser"]),
+      targets: ["Basic", "SIL", "Optimizer"]),
   ],
   dependencies: [
   ],
@@ -56,31 +56,14 @@ let package = Package(
   // 'SwiftCompilerSources/Sources/CMakeLists.txt'
   targets: [
     .compilerModuleTarget(
-      name: "_CompilerRegexParser",
-      dependencies: [],
-      path: "_RegexParser_Sources",
-      swiftSettings: [
-        // Workaround until `_CompilerRegexParser` is imported as implementation-only
-        // by `_StringProcessing`.
-        .unsafeFlags([
-          "-Xfrontend",
-          "-disable-implicit-string-processing-module-import"
-        ])]),
-    .compilerModuleTarget(
       name: "Basic",
       dependencies: []),
-    .compilerModuleTarget(
-      name: "AST",
-      dependencies: ["Basic"]),
-    .compilerModuleTarget(
-      name: "Parse",
-      dependencies: ["Basic", "AST", "_CompilerRegexParser"]),
     .compilerModuleTarget(
       name: "SIL",
       dependencies: ["Basic"]),
     .compilerModuleTarget(
       name: "Optimizer",
-      dependencies: ["Basic", "SIL", "Parse"]),
+      dependencies: ["Basic", "SIL"]),
   ],
   cxxLanguageStandard: .cxx17
 )

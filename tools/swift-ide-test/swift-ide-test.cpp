@@ -4240,6 +4240,7 @@ std::string getDriverPath(StringRef MainExecutablePath) {
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
+  initializeSwiftParseModules();
   initializeSwiftModules();
 
   std::string mainExecutablePath = llvm::sys::fs::getMainExecutable(

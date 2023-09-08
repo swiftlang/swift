@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -experimental-skip-non-inlinable-function-bodies-without-types
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -experimental-skip-non-inlinable-function-bodies
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 // Make sure we properly handle `/.../` regex literals in skipped function
 // bodies. Currently we detect them and avoid skipping, but in the future we

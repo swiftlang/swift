@@ -12,10 +12,7 @@ module CBasicBridging {
 
 module ASTBridging {
   header "swift/AST/AnyFunctionRef.h"
-  header "swift/AST/ASTBridging.h"
   header "swift/AST/Builtins.h"
-  header "swift/AST/DiagnosticEngine.h"
-  header "swift/AST/DiagnosticConsumer.h"
   header "swift/AST/ForeignAsyncConvention.h"
   header "swift/AST/ForeignErrorConvention.h"
   header "swift/AST/SubstitutionMap.h"
@@ -39,10 +36,5 @@ module SILBridging {
 
 module OptimizerBridging {
   header "swift/SILOptimizer/OptimizerBridging.h"
-  export *
-}
-
-module _RegexParserBridging {
-  header "swift/Parse/RegexParserBridging.h"
   export *
 }

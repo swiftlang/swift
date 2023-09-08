@@ -15,13 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
+#include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Confusables.h"
-#include "swift/Parse/RegexParserBridging.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
@@ -35,9 +34,12 @@
 
 // Regex lexing delivered via libSwift.
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
+
+#if SWIFT_SWIFT_PARSER
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;
 }
+#endif
 
 using namespace swift;
 
@@ -2090,7 +2092,7 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   //   recovered from.
   auto *Ptr = TokStart;
   CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
+      &Ptr, BufferEnd, MustBeRegex, BridgedDiagnosticEngine{Diags});
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
