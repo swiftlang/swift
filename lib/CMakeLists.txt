@@ -101,13 +101,13 @@ if (SWIFT_SWIFT_PARSER)
 
   if(CMAKE_SYSTEM_NAME MATCHES Windows)
     foreach(implib ${SWIFT_SYNTAX_IMPORT_LIBRARIES})
-      add_custom_command(OUTPUT ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/lib/swift/windows/${implib}
+      add_custom_command(OUTPUT ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
         DEPENDS ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host/${implib}
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host/${implib} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/lib/swift/windows/${implib})
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host/${implib} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib})
       add_custom_target(copy_swiftSyntaxLibrary_${implib}
-        DEPENDS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/lib/swift/windows/${implib}
+        DEPENDS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
         COMMENT "Copying ${implib}")
-      swift_install_in_component(PROGRAMS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/lib/swift/windows/${implib}
+      swift_install_in_component(PROGRAMS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
         DESTINATION lib
         COMPONENT compiler)
       add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${implib})
