@@ -738,6 +738,75 @@ public:
     // A foreign async function shouldn't have any indirect results.
   }
 
+  std::tuple</*blockStorage=*/SILValue, /*blockStorageType=*/CanType,
+             /*continuationType=*/CanType>
+  emitBlockStorage(SILGenFunction &SGF, SILLocation loc, bool throws) {
+    auto &ctx = SGF.getASTContext();
+
+    // Wrap the Builtin.RawUnsafeContinuation in an
+    // UnsafeContinuation<T, E>.
+    auto *unsafeContinuationDecl = ctx.getUnsafeContinuationDecl();
+    auto errorTy = throws ? ctx.getErrorExistentialType() : ctx.getNeverType();
+    auto continuationTy =
+        BoundGenericType::get(unsafeContinuationDecl, /*parent=*/Type(),
+                              {calleeTypeInfo.substResultType, errorTy})
+            ->getCanonicalType();
+
+    auto wrappedContinuation = SGF.B.createStruct(
+        loc, SILType::getPrimitiveObjectType(continuationTy), {continuation});
+
+    const bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
+
+    // If checked bridging is enabled, wrap that continuation again in a
+    // CheckedContinuation<T, E>
+    if (checkedBridging) {
+      auto *checkedContinuationDecl = ctx.getCheckedContinuationDecl();
+      continuationTy =
+          BoundGenericType::get(checkedContinuationDecl, /*parent=*/Type(),
+                                {calleeTypeInfo.substResultType, errorTy})
+              ->getCanonicalType();
+    }
+
+    auto blockStorageTy = SILBlockStorageType::get(
+        checkedBridging ? ctx.TheAnyType : continuationTy);
+    auto blockStorage = SGF.emitTemporaryAllocation(
+        loc, SILType::getPrimitiveAddressType(blockStorageTy));
+
+    auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
+
+    // Stash continuation in a buffer for a block object.
+
+    if (checkedBridging) {
+      auto createIntrinsic =
+          throws ? SGF.SGM.getCreateCheckedThrowingContinuation()
+                 : SGF.SGM.getCreateCheckedContinuation();
+
+      // In this case block storage captures `Any` which would be initialized
+      // with an checked continuation.
+      auto underlyingContinuationAddr =
+          SGF.B.createInitExistentialAddr(loc, continuationAddr, continuationTy,
+                                          SGF.getLoweredType(continuationTy),
+                                          /*conformances=*/{});
+
+      auto subs = SubstitutionMap::get(createIntrinsic->getGenericSignature(),
+                                       {calleeTypeInfo.substResultType},
+                                       ArrayRef<ProtocolConformanceRef>{});
+
+      InitializationPtr underlyingInit(
+          new KnownAddressInitialization(underlyingContinuationAddr));
+      auto continuationMV =
+          ManagedValue::forRValueWithoutOwnership(wrappedContinuation);
+      SGF.emitApplyOfLibraryIntrinsic(loc, createIntrinsic, subs,
+                                      {continuationMV}, SGFContext())
+          .forwardInto(SGF, loc, underlyingInit.get());
+    } else {
+      SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
+                        StoreOwnershipQualifier::Trivial);
+    }
+
+    return std::make_tuple(blockStorage, blockStorageTy, continuationTy);
+  }
+
   ManagedValue
   emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
                                     AbstractionPattern origFormalType,
@@ -751,28 +820,11 @@ public:
     continuation = SGF.B.createGetAsyncContinuationAddr(loc, resumeBuf,
                                calleeTypeInfo.substResultType, throws);
 
-    // Wrap the Builtin.RawUnsafeContinuation in an
-    // UnsafeContinuation<T, E>.
-    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
-
-    auto errorTy = throws
-      ? SGF.getASTContext().getErrorExistentialType()
-      : SGF.getASTContext().getNeverType();
-    auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                                { calleeTypeInfo.substResultType, errorTy })
-      ->getCanonicalType();
-    auto wrappedContinuation =
-        SGF.B.createStruct(loc,
-                           SILType::getPrimitiveObjectType(continuationTy),
-                           {continuation});
-
-    // Stash it in a buffer for a block object.
-    auto blockStorageTy = SILBlockStorageType::get(continuationTy);
-    auto blockStorage = SGF.emitTemporaryAllocation(
-        loc, SILType::getPrimitiveAddressType(blockStorageTy));
-    auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-    SGF.B.createStore(loc, wrappedContinuation, continuationAddr,
-                      StoreOwnershipQualifier::Trivial);
+    SILValue blockStorage;
+    CanType blockStorageTy;
+    CanType continuationTy;
+    std::tie(blockStorage, blockStorageTy, continuationTy) =
+        emitBlockStorage(SGF, loc, throws);
 
     // Get the block invocation function for the given completion block type.
     auto completionHandlerIndex = calleeTypeInfo.foreign.async
@@ -797,6 +849,7 @@ public:
             cast<SILFunctionType>(
                 impFnTy->mapTypeOutOfContext()->getReducedType(sig)),
             blockStorageTy->mapTypeOutOfContext()->getReducedType(sig),
+            continuationTy->mapTypeOutOfContext()->getReducedType(sig),
             origFormalType, sig, calleeTypeInfo);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
 
