@@ -31,6 +31,8 @@ func testPublicStruct() {
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
   let _: String = s.publicPropertyInferredType
+  let _: Double = s.publicWrappedProperty
+  let _: Double = s.$publicWrappedProperty.wrappedValue
   PublicStruct.publicStaticMethod()
 }
 

@@ -2270,6 +2270,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Force implicit accessors to be created if they haven't been already.
+  if (shouldTypeCheck(Options)) {
+    ASD->visitEmittedAccessors([](AccessorDecl *accessor) {
+      (void)accessor;
+    });
+  }
+
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {

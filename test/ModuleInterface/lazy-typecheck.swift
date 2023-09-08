@@ -42,6 +42,14 @@
 // CHECK:       public struct PublicStruct {
 // CHECK:         public var publicProperty: Swift.Int
 // CHECK:         public var publicPropertyInferredType: Swift.String
+// CHECK:         @lazy_typecheck.PublicWrapper @_projectedValueProperty($publicWrappedProperty) public var publicWrappedProperty: Swift.Double {
+// CHECK-NEXT:      get
+// CHECK-NEXT:      set
+// CHECK-NEXT:      _modify
+// CHECK-NEXT:    }
+// CHECK:         public var $publicWrappedProperty: lazy_typecheck.PublicWrapper<Swift.Double> {
+// CHECK-NEXT:      get
+// CHECK-NEXT:    }
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
 // CHECK:         public static func publicStaticMethod()

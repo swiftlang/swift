@@ -47,6 +47,29 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
   }
 }
 
+// MARK: - Property wrappers
+
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public var wrappedValue: T {
+    get {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+    set {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+  }
+
+  public var projectedValue: PublicWrapper { self }
+
+  public init(wrappedValue value: T) {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+}
+
+@propertyWrapper
+struct InternalWrapper<T> {} // expected-error {{property wrapper type 'InternalWrapper' does not contain a non-static property named 'wrappedValue'}}
+
 // MARK: - Global vars
 
 public var publicGlobalVar: Int = 0
@@ -80,6 +103,7 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 public struct PublicStruct {
   public var publicProperty: Int
   public var publicPropertyInferredType = ""
+  @PublicWrapper public var publicWrappedProperty = 3.14
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
