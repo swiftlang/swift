@@ -296,3 +296,32 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 func checkCostcoMembership() async -> Bool {
   return await CostcoManager.shared().isCustomerEnrolled(inExecutiveProgram: Person.asCustomer())
 }
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@MainActor
+@objc protocol OptionalMemberLookups {
+  @objc optional func generateMaybe() async
+}
+
+extension OptionalMemberLookups {
+  // CHECK-LABEL: sil hidden [ossa] @$s18objc_async_checked21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
+  // CHECK:         [[SELF:%[0-9]+]] = copy_value {{.*}} : $Self
+  // CHECK:         [[METH:%[0-9]+]] = objc_method {{.*}} : $Self, #OptionalMemberLookups.generateMaybe!foreign : <Self where Self : OptionalMemberLookups> (Self) -> () async -> (), $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<(), Never> ({{.*}} : $Builtin.RawUnsafeContinuation)
+  // CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
+  // CHECK:         [[PROJECTED:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage Any
+  // CHECK:         [[CHECKED_CONT_SLOT:%.*]] = init_existential_addr [[PROJECTED]] : $*Any, $CheckedContinuation<(), Never>
+  // CHECK:         [[CHECKED_CONT_INIT_FN:%.*]] = function_ref @$ss26_createCheckedContinuationyScCyxs5NeverOGSccyxACGnlF : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, Never>) -> @out CheckedContinuation<τ_0_0, Never>
+  // CHECK:         [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<(), Never>
+  // CHECK:         {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<()>([[CHECKED_CONT]], [[UNSAFE_CONT]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, Never>) -> @out CheckedContinuation<τ_0_0, Never>
+  // CHECK:         copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<(), Never>
+  // CHECK:         = function_ref @$sIeyB_yt18objc_async_checked21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage Any) -> ()
+  // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage Any
+  // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         await_async_continuation {{.*}} : $Builtin.RawUnsafeContinuation, resume bb1
+  // CHECK:         hop_to_executor {{.*}} : $MainActor
+  // CHECK:        } // end sil function '$s18objc_async_checked21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF'
+  func testForceDirectCall() async -> Void {
+    await self.generateMaybe!()
+  }
+}
