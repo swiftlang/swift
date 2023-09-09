@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -O
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 
 // REQUIRES: executable_test
@@ -24,9 +25,9 @@ func test2() {
   expectEqual(ps.first, std.string())
   expectEqual(ps.second, std.string())*/
 
-  let ps2 = PairStrings(first: std.string("abc"), second: std.string("123"))
+  let ps2 = PairStrings(first: std.string("abc"), second: std.string())
   expectEqual(ps2.first, std.string("abc"))
-  expectEqual(ps2.second, std.string("123"))
+  expectEqual(ps2.second, std.string())
 }
 
 test2()
