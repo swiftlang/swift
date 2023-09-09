@@ -1146,6 +1146,15 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
 
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
 
+  // Handle vanishing tuples: don't devirtualize a call to a tuple conformance
+  // if the lookup type can possibly be unwrapped after substitution.
+  if (auto tupleType = dyn_cast<TupleType>(wmi->getLookupType())) {
+    if (tupleType->containsPackExpansionType() &&
+        tupleType->getNumScalarElements() <= 1) {
+      return false;
+    }
+  }
+
   std::tie(f, wt) = applySite.getModule().lookUpFunctionInWitnessTable(
       wmi->getConformance(), wmi->getMember(), SILModule::LinkingMode::LinkAll);
 

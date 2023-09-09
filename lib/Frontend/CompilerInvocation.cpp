@@ -1321,6 +1321,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     HadError = true;
   }
 
+  if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
+    auto value = llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+                     .Case("off", false)
+                     .Case("on", true)
+                     .Default(llvm::None);
+
+    if (value) {
+      Opts.UseCheckedAsyncObjCBridging = *value;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
