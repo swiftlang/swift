@@ -336,4 +336,11 @@ MAIN_ACTOR
 @property(readonly) BOOL isVisible;
 @end
 
+// rdar://114049646
+MAIN_ACTOR
+@protocol HotdogCompetitor
+- (nullable NSString *)pileOfHotdogsToEatWithLimit:(NSObject *)limit
+                                                   error:(NSError * __autoreleasing *)error;
+@end
+
 #pragma clang assume_nonnull end

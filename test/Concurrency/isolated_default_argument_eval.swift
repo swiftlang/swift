@@ -20,6 +20,8 @@ func nonisolatedAsyncCaller() async {
   // CHECK: [[GETARG:%[0-9]+]] = function_ref @$s30isolated_default_argument_eval19mainActorDefaultArg5valueySi_tFfA_
   // CHECK: hop_to_executor {{.*}} : $MainActor
   // CHECK-NEXT: apply [[GETARG]]()
+  // CHECK-NEXT: end_borrow {{.*}} : $MainActor
+  // CHECK-NEXT: destroy_value {{.*}} : $MainActor
   // CHECK-NEXT: hop_to_executor {{.*}} : $Optional<Builtin.Executor>
   await mainActorDefaultArg()
 }
