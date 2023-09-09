@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Callee.h"
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
@@ -199,12 +200,12 @@ static const clang::Type *prependParameterType(
 }
 
 SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
-    CanSILFunctionType blockType, CanType continuationTy,
-    AbstractionPattern origFormalType, CanGenericSignature sig,
-    ForeignAsyncConvention convention,
-    llvm::Optional<ForeignErrorConvention> foreignError) {
-  // Extract the result and error types from the continuation type.
-  auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
+    CanSILFunctionType blockType, CanType blockStorageType,
+    CanType continuationType, AbstractionPattern origFormalType,
+    CanGenericSignature sig, CalleeTypeInfo &calleeInfo) {
+  auto convention = *calleeInfo.foreign.async;
+  auto resumeType =
+      calleeInfo.substResultType->mapTypeOutOfContext()->getReducedType(sig);
 
   CanAnyFunctionType completionHandlerOrigTy = [&]() {
     auto completionHandlerOrigTy =
@@ -237,10 +238,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   // block buffer. The block storage holds the continuation we feed the
   // result values into.
   SmallVector<SILParameterInfo, 4> implArgs;
-  auto blockStorageTy = SILBlockStorageType::get(continuationTy);
-  implArgs.push_back(SILParameterInfo(blockStorageTy,
-                                ParameterConvention::Indirect_InoutAliasable));
-  
+  implArgs.push_back(SILParameterInfo(
+      blockStorageType, ParameterConvention::Indirect_InoutAliasable));
+
   std::copy(blockType->getParameters().begin(),
             blockType->getParameters().end(),
             std::back_inserter(implArgs));
@@ -248,7 +248,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   auto newClangTy = prependParameterType(
       getASTContext(),
       blockType->getClangTypeInfo().getType(),
-      getASTContext().getClangTypeForIRGen(blockStorageTy));
+      getASTContext().getClangTypeForIRGen(blockStorageType));
 
   auto implTy = SILFunctionType::get(
       sig,
@@ -294,11 +294,33 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       // Get the continuation out of the block object.
       auto blockStorage = params[0].getValue();
-      auto continuationAddr = SGF.B.createProjectBlockStorage(loc, blockStorage);
-      auto continuationVal = SGF.B.createLoad(loc, continuationAddr,
-                                           LoadOwnershipQualifier::Trivial);
-      auto continuation =
-          ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+      SILValue continuationAddr =
+          SGF.B.createProjectBlockStorage(loc, blockStorage);
+
+      auto &ctx = SGF.getASTContext();
+
+      bool checkedBridging = ctx.LangOpts.UseCheckedAsyncObjCBridging;
+
+      ManagedValue continuation;
+      if (checkedBridging) {
+        FormalEvaluationScope scope(SGF);
+
+        auto underlyingValueTy = OpenedArchetypeType::get(ctx.TheAnyType, sig);
+
+        auto underlyingValueAddr = SGF.emitOpenExistential(
+            loc, ManagedValue::forTrivialAddressRValue(continuationAddr),
+            SGF.getLoweredType(underlyingValueTy), AccessKind::Read);
+
+        continuation = SGF.B.createUncheckedAddrCast(
+            loc, underlyingValueAddr,
+            SILType::getPrimitiveAddressType(
+                F->mapTypeIntoContext(continuationType)->getCanonicalType()));
+      } else {
+        auto continuationVal = SGF.B.createLoad(
+            loc, continuationAddr, LoadOwnershipQualifier::Trivial);
+        continuation =
+            ManagedValue::forObjectRValueWithoutOwnership(continuationVal);
+      }
 
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
@@ -312,8 +334,12 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
-        auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
+        auto errorIntrinsic =
+            checkedBridging ? getResumeCheckedThrowingContinuationWithError()
+                            : getResumeUnsafeThrowingContinuationWithError();
 
         auto errorArgument = params[*errorIndex];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -385,10 +411,13 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         errorScope.pop();
         SGF.B.createBranch(loc, returnBB);
         SGF.B.emitBlock(noneErrorBB);
-      } else if (foreignError) {
-        resumeIntrinsic = getResumeUnsafeThrowingContinuation();
+      } else if (auto foreignError = calleeInfo.foreign.error) {
+        resumeIntrinsic = checkedBridging
+                              ? getResumeCheckedThrowingContinuation()
+                              : getResumeUnsafeThrowingContinuation();
       } else {
-        resumeIntrinsic = getResumeUnsafeContinuation();
+        resumeIntrinsic = checkedBridging ? getResumeCheckedContinuation()
+                                          : getResumeUnsafeContinuation();
       }
 
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
