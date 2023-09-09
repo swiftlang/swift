@@ -1875,8 +1875,8 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
 
 ActorIsolation ClosureActorIsolation::getActorIsolation() const {
   switch (getKind()) {
-  case ClosureActorIsolation::Independent:
-    return ActorIsolation::forIndependent().withPreconcurrency(
+  case ClosureActorIsolation::Nonisolated:
+    return ActorIsolation::forNonisolated().withPreconcurrency(
         preconcurrency());
 
   case ClosureActorIsolation::GlobalActor: {
