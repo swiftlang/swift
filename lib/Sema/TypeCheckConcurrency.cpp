@@ -1002,7 +1002,7 @@ bool swift::diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef,
     const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind, llvm::Optional<ActorIsolation> knownIsolation,
-    FunctionCheckKind funcCheckKind, SourceLoc diagnoseLoc) {
+    FunctionCheckOptions funcCheckOptions, SourceLoc diagnoseLoc) {
   // Retrieve the actor isolation to use in diagnostics.
   auto getActorIsolation = [&] {
     if (knownIsolation)
@@ -1025,7 +1025,7 @@ bool swift::diagnoseNonSendableTypesInReference(
   // For functions, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
-    if (funcCheckKind != FunctionCheckKind::Results) {
+    if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
       // only check params if funcCheckKind specifies so
       for (auto param : *function->getParameters()) {
         Type paramType = param->getInterfaceType().subst(subs);
@@ -1039,7 +1039,7 @@ bool swift::diagnoseNonSendableTypesInReference(
 
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
-      if (funcCheckKind != FunctionCheckKind::Params) {
+      if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
@@ -1069,7 +1069,7 @@ bool swift::diagnoseNonSendableTypesInReference(
 
   if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
     for (auto param : *subscript->getIndices()) {
-      if (funcCheckKind != FunctionCheckKind::Results) {
+      if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
         // Check params of this subscript override for sendability
         Type paramType = param->getInterfaceType().subst(subs);
         if (diagnoseNonSendableTypes(
@@ -1080,7 +1080,7 @@ bool swift::diagnoseNonSendableTypesInReference(
       }
     }
 
-    if (funcCheckKind != FunctionCheckKind::Results) {
+    if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
       // Check the element type of a subscript.
       Type resultType = subscript->getElementInterfaceType().subst(subs);
       if (diagnoseNonSendableTypes(
@@ -3180,7 +3180,12 @@ namespace {
         return diagnoseNonSendableTypesInReference(
                    base, declRef, getDeclContext(), loc,
                    SendableCheckReason::ExitingActor,
-                   result.isolation);
+                   result.isolation,
+                   // Function reference sendability can only cross isolation
+                   // boundaries when they're passed as an argument or called,
+                   // and their Sendability depends only on captures; do not
+                   // check the parameter or result types here.
+                   FunctionCheckOptions());
 
       case ActorReferenceResult::EntersActor:
         // Handle all of the checking below.

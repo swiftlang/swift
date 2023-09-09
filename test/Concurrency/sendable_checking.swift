@@ -249,7 +249,7 @@ func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> 
 final class NonSendable {
   // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // SendNonSendable emits 3 fewer errors here.
-  // expected-targeted-and-complete-note @-3 4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -286,13 +286,22 @@ func testNonSendableBaseArg() async {
 }
 
 @available(SwiftStdlib 5.1, *)
+@Sendable
+func globalSendable(_ ns: NonSendable) async {}
+
+@available(SwiftStdlib 5.1, *)
 @MainActor
 func callNonisolatedAsyncClosure(
   ns: NonSendable,
   g: (NonSendable) async -> Void
 ) async {
-  // FIXME: This should also produce a diagnostic with SendNonSendable, because
-  // the 'ns' parameter should be merged into the MainActor's region.
+  // FIXME: Both cases below should also produce a diagnostic with SendNonSendable,
+  // because the 'ns' parameter should be merged into the MainActor's region.
+
   await g(ns)
+  // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+
+  let f: (NonSendable) async -> () = globalSendable // okay
+  await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
 }
