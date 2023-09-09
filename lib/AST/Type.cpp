@@ -4765,8 +4765,9 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
 
-    // If the transform would yield a singleton tuple, and we didn't
-    // start with one, flatten to produce the element type.
+    // Handle vanishing tuples -- If the transform would yield a singleton
+    // tuple, and we didn't start with one, flatten to produce the
+    // element type.
     if (elements.size() == 1 &&
         !elements[0].getType()->is<PackExpansionType>() &&
         !(tuple->getNumElements() == 1 &&

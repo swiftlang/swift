@@ -299,23 +299,23 @@ public:
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
-  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
-  ProtocolConformance *subst(SubstitutionMap subMap,
-                             SubstOptions options = llvm::None) const;
+  ProtocolConformanceRef subst(SubstitutionMap subMap,
+                               SubstOptions options = llvm::None) const;
 
-  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
-  ProtocolConformance *subst(TypeSubstitutionFn subs,
-                             LookupConformanceFn conformances,
-                             SubstOptions options = llvm::None) const;
+  ProtocolConformanceRef subst(TypeSubstitutionFn subs,
+                               LookupConformanceFn conformances,
+                               SubstOptions options = llvm::None) const;
 
-  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// Substitute the conforming type and produce a ProtocolConformanceRef that
   /// applies to the substituted type.
   ///
   /// This function should generally not be used outside of the substitution
   /// subsystem.
-  ProtocolConformance *subst(InFlightSubstitution &IFS) const;
+  ProtocolConformanceRef subst(InFlightSubstitution &IFS) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;

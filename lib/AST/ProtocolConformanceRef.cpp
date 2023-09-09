@@ -87,7 +87,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
     return *this;
 
   if (isConcrete())
-    return ProtocolConformanceRef(getConcrete()->subst(IFS));
+    return getConcrete()->subst(IFS);
   if (isPack())
     return getPack()->subst(IFS);
 
@@ -126,7 +126,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
   if (isConcrete()) {
-    auto *concrete = getConcrete()->subst(
+    return getConcrete()->subst(
         [](SubstitutableType *type) -> Type {
           if (auto *archetypeType = type->getAs<ArchetypeType>())
             return archetypeType->getInterfaceType();
@@ -134,7 +134,6 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
         },
         MakeAbstractConformanceForGenericType(),
         SubstFlags::PreservePackExpansionLevel);
-    return ProtocolConformanceRef(concrete);
   } else if (isPack()) {
     return getPack()->subst(
         [](SubstitutableType *type) -> Type {

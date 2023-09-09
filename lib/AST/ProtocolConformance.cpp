@@ -25,6 +25,7 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PackConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
@@ -918,14 +919,14 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *
+ProtocolConformanceRef
 ProtocolConformance::subst(SubstitutionMap subMap,
                            SubstOptions options) const {
   InFlightSubstitutionViaSubMap IFS(subMap, options);
   return subst(IFS);
 }
 
-ProtocolConformance *
+ProtocolConformanceRef
 ProtocolConformance::subst(TypeSubstitutionFn subs,
                            LookupConformanceFn conformances,
                            SubstOptions options) const {
@@ -933,48 +934,89 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
   return subst(IFS);
 }
 
-ProtocolConformance *
+/// Check if the replacement is a one-element pack with a scalar type.
+static bool isVanishingTupleConformance(
+    RootProtocolConformance *generic,
+    SubstitutionMap substitutions) {
+  if (!isa<BuiltinTupleDecl>(generic->getDeclContext()->getSelfNominalTypeDecl()))
+    return false;
+
+  auto replacementTypes = substitutions.getReplacementTypes();
+  assert(replacementTypes.size() == 1);
+  auto packType = replacementTypes[0]->castTo<PackType>();
+
+  return (packType->getNumElements() == 1 &&
+          !packType->getElementTypes()[0]->is<PackExpansionType>());
+}
+
+/// Don't form a tuple conformance if the substituted type is unwrapped
+/// from a one-element tuple.
+///
+/// That is, [(repeat each T): P] ⊗ {each T := Pack{U};
+///                                  [each T: P]: Pack{ [U: P] }}
+///                 => [U: P]
+static ProtocolConformanceRef unwrapVanishingTupleConformance(
+    SubstitutionMap substitutions) {
+  auto conformances = substitutions.getConformances();
+  assert(conformances.size() == 1);
+  assert(conformances[0].isPack());
+  auto packConformance = conformances[0].getPack();
+
+  assert(packConformance->getPatternConformances().size() == 1);
+  return packConformance->getPatternConformances()[0];
+}
+
+ProtocolConformanceRef
 ProtocolConformance::subst(InFlightSubstitution &IFS) const {
+  auto *mutableThis = const_cast<ProtocolConformance *>(this);
+
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
     if (substType->isEqual(origType))
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
+    auto *generic = cast<NormalProtocolConformance>(mutableThis);
     auto subMap = SubstitutionMap::get(getGenericSignature(), IFS);
 
-    auto *mutableThis = const_cast<ProtocolConformance *>(this);
-    return substType->getASTContext()
-        .getSpecializedConformance(substType,
-                                   cast<NormalProtocolConformance>(mutableThis),
-                                   subMap);
+    if (isVanishingTupleConformance(generic, subMap))
+      return unwrapVanishingTupleConformance(subMap);
+
+    auto &ctx = substType->getASTContext();
+    auto *concrete = ctx.getSpecializedConformance(substType, generic, subMap);
+
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Builtin: {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
 
     // We do an exact pointer equality check because subst() can
     // change sugar.
     if (substType.getPointer() == origType.getPointer())
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
 
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
-    return substType->getASTContext()
+    auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Self:
-    return const_cast<ProtocolConformance*>(this);
+    return ProtocolConformanceRef(mutableThis);
+
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
@@ -983,31 +1025,42 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto origType = getType();
     if (!origType->hasTypeParameter() &&
         !origType->hasArchetype()) {
-      return const_cast<ProtocolConformance *>(this);
+      return ProtocolConformanceRef(mutableThis);
     }
 
     auto origBaseType = inheritedConformance->getType();
     if (origBaseType->hasTypeParameter() ||
         origBaseType->hasArchetype()) {
       // Substitute into the superclass.
-      inheritedConformance = inheritedConformance->subst(IFS);
+      auto substConformance = inheritedConformance->subst(IFS);
+      if (!substConformance.isConcrete())
+        return substConformance;
+
+      inheritedConformance = substConformance.getConcrete();
     }
 
     auto substType = origType.subst(IFS);
-    return substType->getASTContext()
+    auto *concrete = substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
+    return ProtocolConformanceRef(concrete);
   }
+
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    auto genericConformance = spec->getGenericConformance();
-    auto subMap = spec->getSubstitutionMap();
 
-    auto origType = getType();
-    auto substType = origType.subst(IFS);
-    return substType->getASTContext()
-      .getSpecializedConformance(substType, genericConformance,
-                                 subMap.subst(IFS));
+    auto *generic = spec->getGenericConformance();
+    auto subMap = spec->getSubstitutionMap().subst(IFS);
+
+    if (isVanishingTupleConformance(generic, subMap))
+      return unwrapVanishingTupleConformance(subMap);
+
+    auto substType = spec->getType().subst(IFS);
+
+    auto &ctx = substType->getASTContext();
+    auto *concrete = ctx.getSpecializedConformance(substType, generic, subMap);
+
+    return ProtocolConformanceRef(concrete);
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
