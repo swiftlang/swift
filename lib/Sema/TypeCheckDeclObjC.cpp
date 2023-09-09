@@ -481,7 +481,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     // in the generated header.
     return false;
 
-  case ActorIsolation::Independent:
+  case ActorIsolation::Nonisolated:
   case ActorIsolation::Unspecified:
     return false;
   }

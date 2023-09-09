@@ -2593,7 +2593,7 @@ public:
       << " discriminator=" << E->getRawDiscriminator();
 
     switch (auto isolation = E->getActorIsolation()) {
-    case ClosureActorIsolation::Independent:
+    case ClosureActorIsolation::Nonisolated:
       break;
 
     case ClosureActorIsolation::ActorInstance:
