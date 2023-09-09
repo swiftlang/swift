@@ -2354,7 +2354,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
             break;
 
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::Independent:
+          case ActorIsolation::Nonisolated:
           case ActorIsolation::GlobalActor:
             return true;
         }
@@ -10210,7 +10210,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
 
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       switch (auto isolation = closure->getActorIsolation()) {
-      case ClosureActorIsolation::Independent:
+      case ClosureActorIsolation::Nonisolated:
       case ClosureActorIsolation::GlobalActor:
         return false;
 

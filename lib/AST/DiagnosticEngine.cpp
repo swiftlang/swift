@@ -920,7 +920,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       break;
     }
 
-    case ActorIsolation::Independent:
+    case ActorIsolation::Nonisolated:
     case ActorIsolation::Unspecified:
       Out << "nonisolated";
       break;
