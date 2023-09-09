@@ -2731,6 +2731,13 @@ ASTContext::getSpecializedConformance(Type type,
   if (auto result = specializedConformances.FindNodeOrInsertPos(id, insertPos))
     return result;
 
+  // Vanishing tuple conformances must be handled by the caller.
+  if (isa<BuiltinTupleDecl>(generic->getDeclContext()->getSelfNominalTypeDecl())) {
+    assert(type->is<TupleType>() && "Vanishing tuple substitution is not "
+           "here. Did you mean to use ProtocolConformanceRef::subst() "
+           "instead?");
+  }
+
   // Build a new specialized conformance.
   auto result
     = new (*this, arena) SpecializedProtocolConformance(type, generic,

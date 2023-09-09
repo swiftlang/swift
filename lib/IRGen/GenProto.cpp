@@ -1190,7 +1190,7 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
 static const ProtocolConformance *
 mapConformanceIntoContext(const RootProtocolConformance *conf) {
   if (auto *genericEnv = conf->getDeclContext()->getGenericEnvironmentOfContext())
-    return conf->subst(genericEnv->getForwardingSubstitutionMap());
+    return conf->subst(genericEnv->getForwardingSubstitutionMap()).getConcrete();
   return conf;
 }
 
