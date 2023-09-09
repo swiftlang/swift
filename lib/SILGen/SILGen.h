@@ -32,6 +32,7 @@ namespace swift {
 namespace Lowering {
   class TypeConverter;
   class SILGenFunction;
+  class CalleeTypeInfo;
 
 /// An enum to indicate whether a protocol method requirement is satisfied by
 /// a free function, as for an operator requirement.
@@ -127,6 +128,12 @@ public:
   llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
   llvm::Optional<FuncDecl *> CheckExpectedExecutor;
 
+  llvm::Optional<FuncDecl*> CreateCheckedContinuation;
+  llvm::Optional<FuncDecl*> CreateCheckedThrowingContinuation;
+  llvm::Optional<FuncDecl*> ResumeCheckedContinuation;
+  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuation;
+  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
+
   llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
   llvm::Optional<FuncDecl *> GetMainExecutor;
   llvm::Optional<FuncDecl *> SwiftJobRun;
@@ -182,10 +189,9 @@ public:
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
-      CanSILFunctionType blockType, CanType continuationTy,
-      AbstractionPattern origFormalType, CanGenericSignature sig,
-      ForeignAsyncConvention convention,
-      llvm::Optional<ForeignErrorConvention> foreignError);
+      CanSILFunctionType blockType, CanType blockStorageType,
+      CanType continuationType, AbstractionPattern origFormalType,
+      CanGenericSignature sig, CalleeTypeInfo &calleeInfo);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -550,6 +556,17 @@ public:
   FuncDecl *getRunTaskForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
   FuncDecl *getCheckExpectedExecutor();
+
+  /// Retrieve the _Concurrency._createCheckedContinuation intrinsic.
+  FuncDecl *getCreateCheckedContinuation();
+  /// Retrieve the _Concurrency._createCheckedThrowingContinuation intrinsic.
+  FuncDecl *getCreateCheckedThrowingContinuation();
+  /// Retrieve the _Concurrency._resumeCheckedContinuation intrinsic.
+  FuncDecl *getResumeCheckedContinuation();
+  /// Retrieve the _Concurrency._resumeCheckedThrowingContinuation intrinsic.
+  FuncDecl *getResumeCheckedThrowingContinuation();
+  /// Retrieve the _Concurrency._resumeCheckedThrowingContinuationWithError intrinsic.
+  FuncDecl *getResumeCheckedThrowingContinuationWithError();
 
   /// Retrieve the _Concurrency._asyncMainDrainQueue intrinsic.
   FuncDecl *getAsyncMainDrainQueue();
