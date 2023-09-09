@@ -1512,6 +1512,15 @@ static bool isStoredProperty(ValueDecl const *member) {
   return false;
 }
 
+static bool isNonInheritedStorage(ValueDecl const *member,
+                                  DeclContext const *useDC) {
+  auto *nominal = useDC->getParent()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  return isStoredProperty(member) && member->getDeclContext() == nominal;
+}
+
 /// Based on the former escaping-use restriction, which was replaced by
 /// flow-isolation. We need this to support backwards compatability in the
 /// type-checker for programs prior to Swift 6.
@@ -1727,7 +1736,7 @@ static bool checkedByFlowIsolation(DeclContext const *refCxt,
     return false;
 
   // Stored properties are definitely OK.
-  if (isStoredProperty(member))
+  if (isNonInheritedStorage(member, fnDecl))
     return true;
 
   return false;
@@ -5659,7 +5668,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // FIXME: At the very least, we should consistently use
   // isActorInitOrDeInitContext here, but it only wants to think about actors.
   if (actorInstance && actorInstance->isSelf() &&
-      isStoredProperty(declRef.getDecl()) &&
+      isNonInheritedStorage(declRef.getDecl(), fromDC) &&
       declIsolation.isGlobalActor() &&
       (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
     return forSameConcurrencyDomain(declIsolation);
