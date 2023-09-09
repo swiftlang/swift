@@ -5554,10 +5554,6 @@ RValue SILGenFunction::emitApply(
     // plan's finish method is called, because it must happen in the
     // successors of the `await_async_continuation` terminator.
     resultPlan->deferExecutorBreadcrumb(std::move(breadcrumb));
-
-  } else {
-    // In the ordinary case, we hop back to the current executor
-    breadcrumb.emit(*this, loc);
   }
 
   // Pop the argument scope.
@@ -5628,6 +5624,14 @@ RValue SILGenFunction::emitApply(
                  !substFnConv.useLoweredAddresses());
           addManagedDirectResult(v, directResult);
         });
+  }
+
+  if (!calleeTypeInfo.foreign.async) {
+    // For a non-foreign-async callee, we hop back to the current executor
+    // _after_ popping the argument scope and collecting the results. This is
+    // important because we may need to, for example, retain one of the results
+    // prior to changing actors in the case of an autorelease'd return value.
+    breadcrumb.emit(*this, loc);
   }
 
   SILValue bridgedForeignError;
