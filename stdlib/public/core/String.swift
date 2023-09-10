@@ -493,7 +493,7 @@ extension String {
     self = String._fromNonContiguousUnsafeBitcastUTF8Repairing(codeUnits).0
   }
 
-  /// Creates a new `String` by copying and validating the sequence of
+  /// Creates a new string by copying and validating the sequence of
   /// code units passed in, according to the specified encoding.
   ///
   /// This initializer does not try to repair ill-formed code unit sequences.
@@ -553,8 +553,8 @@ extension String {
     }
   }
 
-  /// Creates a new `String` by copying and validating the sequence of
-  /// `Int8` passed in, according to the specified encoding.
+  /// Creates a new string by copying and validating the sequence of
+  /// code units passed in, according to the specified encoding.
   ///
   /// This initializer does not try to repair ill-formed code unit sequences.
   /// If any are found, the result of the initializer is `nil`.
@@ -596,9 +596,7 @@ extension String {
 
     // slow-path
     let uint8s = codeUnits.lazy.map(UInt8.init(bitPattern:))
-    let string = String(validating: uint8s, as: Encoding.self)
-    guard let string else { return nil }
-    self = string
+    self.init(validating: uint8s, as: Encoding.self)
   }
 
   /// Creates a new string with the specified capacity in UTF-8 code units, and
