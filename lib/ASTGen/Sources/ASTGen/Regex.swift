@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-//import AST
-//import Basic
+import CBasicBridging
 import CASTBridging
 
 #if canImport(_CompilerRegexParser)
@@ -114,9 +113,9 @@ public func _RegexLiteralParsingFn(
     return false
   } catch let error as CompilerParseError {
     var diagLoc = bridgedDiagnosticBaseLoc
-    if let _diagLoc = diagLoc.raw, let errorLoc = error.location {
+    if diagLoc.raw != nil, let errorLoc = error.location {
       let offset = str.utf8.distance(from: str.startIndex, to: errorLoc)
-      diagLoc = BridgedSourceLoc(raw: _diagLoc.advanced(by: offset))
+      diagLoc = SourceLoc_advanced(diagLoc, SwiftInt(offset))
     }
 
     var message = error.message
