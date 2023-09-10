@@ -128,3 +128,73 @@ func f3(v: NonPiecewiseMaterializableWithAggDifferentiableField) -> PiecewiseMat
 // CHECK:   destroy_value %13 : $NonPiecewiseMaterializableWithAggDifferentiableField 
 // CHECK:   return %16 : $NonPiecewiseMaterializableWithAggDifferentiableField 
 // CHECK: } // end sil function '$s19pullback_generation2f31vAA23PiecewiseMaterializableVAA03NondE26WithAggDifferentiableFieldV_tFTJpSpSr'
+
+//===----------------------------------------------------------------------===//
+// Pullback generation - `struct_extract`
+// - Adjoint of extracted element can be `AddElement`
+// - Just need to make sure that we are able to generate a pullback for B.x's 
+// getter
+//===----------------------------------------------------------------------===//
+struct A: Differentiable {
+    public var x: Float
+}
+
+struct B: Differentiable {
+    var y: A
+    
+    public init(a: A) {
+        self.y = a
+    }
+    
+    @differentiable(reverse)
+    public var x: Float {
+        get { return self.y.x }
+    }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s19pullback_generation1BV1xSfvgTJpSpSr : $@convention(thin) (Float) -> B.TangentVector {
+
+//===----------------------------------------------------------------------===//
+// Pullback generation - Inner values of concrete adjoints must be copied 
+// during indirect materialization
+//===----------------------------------------------------------------------===//
+
+struct NonTrivial {
+    var x: Float
+    var y: String
+}
+
+extension NonTrivial: Differentiable, Equatable, AdditiveArithmetic {
+    public typealias TangentVector = Self
+    mutating func move(by offset: TangentVector) {fatalError()}
+    public static var zero: Self {fatalError()}
+    public static func + (lhs: Self, rhs: Self) -> Self {fatalError()}
+    public static func - (lhs: Self, rhs: Self) -> Self {fatalError()}
+}
+
+@differentiable(reverse)
+func f4(a: NonTrivial) -> Float {
+    var sum: Float = 0
+    for _ in 0..<1 {
+        sum += a.x
+    }
+    return sum
+}
+
+// CHECK-LABEL: sil private [ossa] @$s19pullback_generation2f41aSfAA10NonTrivialV_tFTJpSpSr : $@convention(thin) (Float, @guaranteed Builtin.NativeObject) -> @owned NonTrivial {
+// CHECK: bb5(%67 : @owned $NonTrivial, %68 : $Float, %69 : @owned $(predecessor: _AD__$s19pullback_generation2f41aSfAA10NonTrivialV_tF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (@inout Float) -> Float)):
+// CHECK: %88 = alloc_stack $NonTrivial
+
+// Non-trivial value must be copied or there will be a
+// double consume when all owned parameters are destroyed 
+// at the end of the basic block.
+// CHECK: %89 = copy_value %67 : $NonTrivial              
+
+// CHECK: store %89 to [init] %88 : $*NonTrivial          
+// CHECK: %91 = struct_element_addr %88 : $*NonTrivial, #NonTrivial.x 
+// CHECK: %92 = alloc_stack $Float                        
+// CHECK: store %86 to [trivial] %92 : $*Float            
+// CHECK: %94 = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> () 
+// CHECK: %95 = metatype $@thick Float.Type               
+// CHECK: %96 = apply %94<Float>(%91, %92, %95) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: destroy_value %67 : $NonTrivial

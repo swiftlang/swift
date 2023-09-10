@@ -124,9 +124,13 @@ bb0(%0 : $(Float, Float)):
 // CHECK: } // end sil function 'function_with_tuple_extract_1TJpSpSr'
 
 //===----------------------------------------------------------------------===//
-// Pullback generation - `tuple_extract`
-// - Input to pullback has non-owned ownership semantics which requires copying
-// this value to stack before lifetime-ending uses. 
+// Pullback generation - Inner values of concrete adjoints must be copied 
+// during direct materialization. 
+// - If the input to pullback BB has non-owned ownership semantics we cannot 
+// perform a lifetime-ending operation on it.
+// - If the input to the pullback BB is an owned, non-trivial value we must 
+// copy it or there will be a double consume when all owned parameters are 
+// destroyed at the end of the basic block.
 //===----------------------------------------------------------------------===//
 sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @function_with_tuple_extract_2: $@convention(thin) (@guaranteed (X, X)) -> @owned X {
 }
@@ -164,3 +168,19 @@ bb0(%0 : @guaranteed $(X, X)):
 // CHECK:   destroy_value %19 : $(X, X)                     
 // CHECK:   return %21 : $(X, X)                            
 // CHECK: } // end sil function 'function_with_tuple_extract_2TJpSpSr'
+
+//===----------------------------------------------------------------------===//
+// Pullback generation - `tuple_extract`
+// - Adjoint of extracted element can be `AddElement`
+// - Just need to make sure that we are able to generate a pullback
+//===----------------------------------------------------------------------===//
+sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @function_with_tuple_extract_3: $@convention(thin) (((Float, Float), Float)) -> Float {
+}
+
+sil hidden [ossa] @function_with_tuple_extract_3: $@convention(thin) (((Float, Float), Float)) -> Float {
+bb0(%0 : $((Float, Float), Float)):
+  %1 = tuple_extract %0 : $((Float, Float), Float), 0
+  %2 = tuple_extract %1 : $(Float, Float), 0
+  return %2 : $Float
+}
+// CHECK-LABEL: sil private [ossa] @function_with_tuple_extract_3TJpSpSr : $@convention(thin) (Float) -> ((Float, Float), Float) {

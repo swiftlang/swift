@@ -424,7 +424,8 @@ private:
     /// the destination address.
     case AdjointValueKind::Concrete: {
       auto concreteVal = val.getConcreteValue();
-      builder.emitStoreValueOperation(loc, concreteVal, destAddress,
+      auto copyOfConcreteVal = builder.emitCopyValueOperation(loc, concreteVal);
+      builder.emitStoreValueOperation(loc, copyOfConcreteVal, destAddress,
                                       StoreOwnershipQualifier::Init);
       break;
     }
@@ -1241,16 +1242,13 @@ public:
         break;
       }
       case AdjointValueKind::Aggregate:
-      case AdjointValueKind::Concrete: {
+      case AdjointValueKind::Concrete:
+      case AdjointValueKind::AddElement: {
         auto baseAdj = makeZeroAdjointValue(tangentVectorSILTy);
         addAdjointValue(bb, sei->getOperand(),
                         makeAddElementAdjointValue(baseAdj, eltAdj, tanField),
                         loc);
         break;
-      }
-      case AdjointValueKind::AddElement: {
-        llvm_unreachable(
-            "Adjoint of extracted element in `StructExtractInst` cannot be of kind `AddElement`");
       }
       }
       break;
@@ -1439,7 +1437,8 @@ public:
       break;
     }
     case AdjointValueKind::Aggregate:
-    case AdjointValueKind::Concrete: {
+    case AdjointValueKind::Concrete:
+    case AdjointValueKind::AddElement: {
       auto tupleTy = tei->getTupleType();
       auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
       if (!tupleTanTupleTy) {
@@ -1465,10 +1464,6 @@ public:
             loc);
       }
       break;
-    }
-    case AdjointValueKind::AddElement: {
-        llvm_unreachable(
-            "Adjoint of extracted element in `TupleExtractInst` cannot be of kind `AddElement`");
     }
     }
   }
