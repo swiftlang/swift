@@ -228,11 +228,12 @@ private:
       auto zeroVal = emitZeroDirect(val.getSwiftType(), loc);
       return zeroVal;
     }
-    case AdjointValueKind::Aggregate:
-      llvm_unreachable(
-          "Tuples and structs are not supported in forward mode yet.");
     case AdjointValueKind::Concrete:
       return val.getConcreteValue();
+    case AdjointValueKind::Aggregate:
+    case AdjointValueKind::AddElement:
+      llvm_unreachable(
+          "Tuples and structs are not supported in forward mode yet.");
     }
     llvm_unreachable("Invalid adjoint value kind"); // silences MSVC C4715
   }
