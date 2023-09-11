@@ -1,8 +1,5 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none | %FileCheck %s
 
-// TODO: investigate why windows is generating more metadata.
-// XFAIL: OS=windows-msvc
-
 public class MyClass {}
 
 // CHECK-DAG: @"$s4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfD", ptr @"$s4main7MyClassCACycfC" }>

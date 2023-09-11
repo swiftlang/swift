@@ -68,6 +68,14 @@ public:
     static_assert(MetadataAdjustmentIndex::Class == 3,
                   "Adjustment index must be synchronized with this layout");
 
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      asImpl().noteAddressPoint();
+      asImpl().addSuperclass();
+      asImpl().addDestructorFunction();
+      addEmbeddedClassMembers(Target);
+      return;
+    }
+
     // Pointer to layout string
     asImpl().addLayoutStringPointer();
 
@@ -97,13 +105,6 @@ public:
 
     // Class members.
     addClassMembers(Target, Target);
-  }
-
-  void embeddedLayout() {
-    asImpl().noteAddressPoint();
-    asImpl().addSuperclass();
-    asImpl().addDestructorFunction();
-    addEmbeddedClassMembers(Target);
   }
 
   /// Notes the beginning of the field offset vector for a particular ancestor

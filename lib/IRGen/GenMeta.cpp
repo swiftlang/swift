@@ -3949,6 +3949,12 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        auto dtorRef = SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
+        addReifiedVTableEntry(dtorRef);
+        return;
+      }      
+
       if (asImpl().getFieldLayout().hasObjCImplementation())
         return;
 
@@ -4969,8 +4975,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
 void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                                       const ClassLayout &fragileLayout) {
-  assert(!classDecl->isForeign());
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+  assert(!classDecl->isForeign());
 
   // Set up a dummy global to stand in for the metadata object while we produce
   // relative references.
@@ -4984,7 +4990,7 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
 
   FixedClassMetadataBuilder metadataBuilder(IGM, classDecl, init,
                                             fragileLayout);
-  metadataBuilder.embeddedLayout();
+  metadataBuilder.layout();
   bool canBeConstant = metadataBuilder.canBeConstant();
   metadataBuilder.createMetadataAccessFunction();
 
@@ -4994,6 +5000,7 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   bool isPattern = false;
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                                     init.finishAndCreateFuture(), section);
+  (void)var;
 }
 
 void irgen::emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,
