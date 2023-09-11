@@ -12,6 +12,30 @@
 # directory.
 list(APPEND LLVM_COMMON_DEPENDS intrinsics_gen clang-tablegen-targets)
 
+# Set up for linking against swift-syntax.
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  set(SWIFT_SYNTAX_MODULES
+    SwiftBasicFormat
+    SwiftParser
+    SwiftParserDiagnostics
+    SwiftDiagnostics
+    SwiftSyntax
+    SwiftOperators
+    SwiftSyntaxBuilder
+    SwiftSyntaxMacros
+    SwiftSyntaxMacroExpansion
+    SwiftCompilerPluginMessageHandling
+  )
+
+  swift_install_in_component(
+    TARGETS ${SWIFT_SYNTAX_MODULES}
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+    COMPONENT compiler
+  )
+  # TODO: Install for Windoes
+  # TODO: Install .swiftmodule
+endif()
+
 add_subdirectory(APIDigester)
 add_subdirectory(AST)
 add_subdirectory(ASTGen)
