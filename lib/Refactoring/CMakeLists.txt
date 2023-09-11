@@ -1,4 +1,5 @@
 add_swift_host_library(swiftRefactoring STATIC
+  CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
   Refactoring.cpp
 )
