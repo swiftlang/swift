@@ -22,6 +22,4 @@
 // RUN: %target-swift-frontend -c %s -target arm64-apple-darwin23.0.0 -g -cas-backend -cas-emit-casid-file -cas-backend-mode=casid -cas-path %t/cas -o %t/test.id
 // RUN: not cat %t/test.id.casid
 
-// REQUIRES: _234234
-
 func testFunc() {}
