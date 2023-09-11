@@ -422,6 +422,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addPerformanceConstantPropagation();
 
   if (!P.getOptions().EnableOSSAModules) {
+    // Last chance to run ossa opts, run them here before lowering to non-ossa.
+    if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
+      P.addComputeSideEffects();
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
       return;
 
