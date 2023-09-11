@@ -1,57 +1,39 @@
-typedef unsigned NSUInteger;
-
-#define __CF_OPTIONS_ATTRIBUTES __attribute__((flag_enum,enum_extensibility(open)))
-#if (__cplusplus)
-#define CF_OPTIONS(_type, _name) __attribute__((availability(swift,unavailable))) _type _name; enum __CF_OPTIONS_ATTRIBUTES : _name
-#else
-#define CF_OPTIONS(_type, _name) enum __CF_OPTIONS_ATTRIBUTES _name : _type _name; enum _name : _type
-#endif
-
-typedef CF_OPTIONS(NSUInteger, NSEnumerationOptions) {
-  NSEnumerationConcurrent = (1UL << 0),
-  NSEnumerationReverse = (1UL << 1),
-};
+// Enum usage that is bitwise-able and assignable in C++, aka how CF_OPTIONS
+// does things.
+typedef int __attribute__((availability(swift, unavailable))) NSEnumerationOptions;
+enum : NSEnumerationOptions { NSEnumerationConcurrent, NSEnumerationReverse };
 
 @interface NSSet
 - (void)enumerateObjectsWithOptions:(NSEnumerationOptions)opts ;
 @end
 
-typedef CF_OPTIONS(NSUInteger, NSOrderedCollectionDifferenceCalculationOptions) {
+typedef int __attribute__((availability(swift, unavailable))) NSOrderedCollectionDifferenceCalculationOptions;
+enum : NSOrderedCollectionDifferenceCalculationOptions {
   NSOrderedCollectionDifferenceCalculationOptions1,
   NSOrderedCollectionDifferenceCalculationOptions2
 };
 
-typedef CF_OPTIONS(NSUInteger, NSCalendarUnit) {
-  NSCalendarUnit1,
-  NSCalendarUnit2
-};
+typedef int __attribute__((availability(swift, unavailable))) NSCalendarUnit;
+enum : NSCalendarUnit { NSCalendarUnit1, NSCalendarUnit2 };
 
-typedef CF_OPTIONS(NSUInteger, NSSearchPathDomainMask) {
-  NSSearchPathDomainMask1,
-  NSSearchPathDomainMask2
-};
+typedef int __attribute__((availability(swift, unavailable))) NSSearchPathDomainMask;
+enum : NSSearchPathDomainMask { NSSearchPathDomainMask1, NSSearchPathDomainMask2 };
 
-typedef CF_OPTIONS(NSUInteger, NSControlCharacterAction) {
-  NSControlCharacterAction1,
-  NSControlCharacterAction2
-};
+typedef int __attribute__((availability(swift, unavailable))) NSControlCharacterAction;
+enum : NSControlCharacterAction { NSControlCharacterAction1, NSControlCharacterAction2 };
 
-typedef CF_OPTIONS(NSUInteger, UIControlState) {
-  UIControlState1,
-  UIControlState2
-};
+typedef int __attribute__((availability(swift, unavailable))) UIControlState;
+enum : UIControlState { UIControlState1, UIControlState2 };
 
-typedef CF_OPTIONS(NSUInteger, UITableViewCellStateMask) {
-  UITableViewCellStateMask1,
-  UITableViewCellStateMask2
-};
+typedef int __attribute__((availability(swift, unavailable))) UITableViewCellStateMask;
+enum : UITableViewCellStateMask { UITableViewCellStateMask1, UITableViewCellStateMask2 };
 
-typedef CF_OPTIONS(NSUInteger, UIControlEvents) {
-  UIControlEvents1,
-  UIControlEvents2
-};
+typedef int __attribute__((availability(swift, unavailable))) UIControlEvents;
+enum : UIControlEvents { UIControlEvents1, UIControlEvents2 };
 
-typedef CF_OPTIONS(NSUInteger, UITableViewScrollPosition) {
+typedef int __attribute__((availability(swift, unavailable)))
+UITableViewScrollPosition;
+enum : UITableViewScrollPosition {
   UITableViewScrollPosition1,
   UITableViewScrollPosition2
 };
