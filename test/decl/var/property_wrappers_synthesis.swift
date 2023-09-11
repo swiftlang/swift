@@ -26,8 +26,8 @@ struct UseWrapper<T: DefaultInit> {
   var wrapped = T()
 
   // CHECK: pattern_binding_decl implicit
-  // CHECK-NEXT: pattern_typed implicit type='Wrapper<T>'
-  // CHECK-NEXT: pattern_named implicit type='Wrapper<T>' "_wrapped"
+  // CHECK-NEXT: pattern_typed implicit type="Wrapper<T>"
+  // CHECK-NEXT: pattern_named implicit type="Wrapper<T>" "_wrapped"
   // CHECK: constructor_ref_call_expr
   // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(wrappedValue:)
   init() { }
@@ -82,9 +82,9 @@ class MyObservedType {
   @Observable var observedProperty = 17
 
   // CHECK: accessor_decl{{.*}}get for="observedProperty"
-  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
+  // CHECK:   subscript_expr implicit type="@lvalue Int" decl="{{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)@
 
   // CHECK: accessor_decl{{.*}}set for="observedProperty"
-  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
+  // CHECK:   subscript_expr implicit type="@lvalue Int" decl="{{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)@
 }
 

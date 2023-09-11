@@ -40,11 +40,11 @@ let _: S1? = .init(S1())
 let _: S1? = .init(overloaded: ())
 // If members exist on Optional and Wrapped, always choose the one on optional
 // CHECK: declref_expr {{.*}} location={{.*}}optional_overload.swift:40
-// CHECK-SAME: decl=optional_overload.(file).Optional extension.init(overloaded:)
+// CHECK-SAME: decl="optional_overload.(file).Optional extension.init(overloaded:)@
 let _: S1? = .member_overload
 // Should choose the overload from Optional even if the Wrapped overload would otherwise have a better score
 // CHECK: member_ref_expr {{.*}} location={{.*}}optional_overload.swift:44
-// CHECK-SAME: decl=optional_overload.(file).Optional extension.member_overload
+// CHECK-SAME: decl="optional_overload.(file).Optional extension.member_overload@
 let _: S1? = .init(failable: ())
 let _: S1? = .member3()
 let _: S1? = .member4

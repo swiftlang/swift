@@ -28,7 +28,7 @@ extension MyActor {
 
     // CHECK: acceptAsyncClosure
     // CHECK: closure_expr
-    // CHECK-SAME: actor_isolated=closure_isolation.(file).MyActor extension.testClosureIsolation().self
+    // CHECK-SAME: actor_isolated="closure_isolation.(file).MyActor extension.testClosureIsolation().self@
     acceptAsyncClosure { await method() }
 
     // CHECK: acceptAsyncClosure
@@ -63,12 +63,12 @@ func someAsyncFunc() async { }
 @SomeGlobalActor func someGlobalActorFunc() async {
   // CHECK: acceptAsyncClosure
   // CHECK: closure_expr
-  // CHECK-SAME: global_actor_isolated=SomeGlobalActor
+  // CHECK-SAME: global_actor_isolated="SomeGlobalActor"
   acceptAsyncClosure { await someAsyncFunc() }
 
   // CHECK: acceptAsyncClosure
   // CHECK: closure_expr
-  // CHECK-SAME: global_actor_isolated=SomeGlobalActor
+  // CHECK-SAME: global_actor_isolated="SomeGlobalActor"
   acceptAsyncClosure { () async in print("hello") }
 
   // CHECK: acceptEscapingAsyncClosure

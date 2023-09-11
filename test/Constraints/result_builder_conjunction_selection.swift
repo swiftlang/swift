@@ -32,7 +32,7 @@ do {
   func test<T, U>(_: T, @Builder _: () -> some P<U>) {}
 
   // CHECK: ---Initial constraints for the given expression---
-  // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+  // CHECK: (integer_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
   // CHECK: (attempting type variable binding [[CLOSURE:\$T[0-9]+]] := () -> {{.*}}
   // CHECK-NOT: (attempting type variable binding [[LITERAL_VAR]] := {{.*}}
   // CHECK: (attempting conjunction element pattern binding element @ 0
@@ -48,7 +48,7 @@ do {
   func test<T, U>(_: T, @Builder _: (T) -> some P<U>) {}
 
   // CHECK: ---Initial constraints for the given expression---
-  // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+  // CHECK: (integer_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
   // CHECK: (attempting type variable binding [[LITERAL_VAR]] := Int
   // CHECK: (attempting conjunction element pattern binding element @ 0
   test(42) { v in
