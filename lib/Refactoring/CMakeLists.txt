@@ -1,5 +1,7 @@
 add_swift_host_library(swiftRefactoring STATIC
-  Refactoring.cpp)
+  ConvertStringConcatenationToInterpolation.cpp
+  Refactoring.cpp
+)
 
 target_link_libraries(swiftRefactoring PRIVATE
   swiftAST
