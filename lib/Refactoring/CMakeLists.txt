@@ -3,6 +3,7 @@ add_swift_host_library(swiftRefactoring STATIC
   AddExplicitCodableImplementation.cpp
   CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
+  ConvertToComputedProperty.cpp
   ConvertGuardExprToIfLetExpr.cpp
   ConvertIfLetExprToGuardExpr.cpp
   ConvertToDoCatch.cpp
