@@ -529,7 +529,8 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto *ActParam = std::find_if_not(
       genericParams->begin(), genericParams->end(),
       [this, &C, &module](GenericTypeParamDecl *param) {
-        return module->lookupConformance(
+        return module
+            ->lookupConformance(
                 mapTypeIntoContext(param->getDeclaredInterfaceType()),
                 C.getProtocol(KnownProtocolKind::DistributedActor))
             .isInvalid();
@@ -539,10 +540,12 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   auto *ErrParam = std::find_if_not(
       genericParams->begin(), genericParams->end(),
       [this, &C, &module, ActParam](GenericTypeParamDecl *param) {
-        return param == *ActParam || module->lookupConformance(
-                mapTypeIntoContext(param->getDeclaredInterfaceType()),
-                C.getProtocol(KnownProtocolKind::Error))
-            .isInvalid();
+        return param == *ActParam ||
+               module
+                   ->lookupConformance(
+                       mapTypeIntoContext(param->getDeclaredInterfaceType()),
+                       C.getProtocol(KnownProtocolKind::Error))
+                   .isInvalid();
       });
   if (!ErrParam) {
     return false;
@@ -553,11 +556,11 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // no requirements to check on `Res`
   GenericTypeParamDecl *ResParam = nullptr;
   if (!isVoidReturn) {
-    if (auto **foundResParm = std::find_if(
-        genericParams->begin(), genericParams->end(),
-        [ErrParam, ActParam](GenericTypeParamDecl *param) {
-      return param != *ErrParam && param != *ActParam;
-    })) {
+    if (auto **foundResParm =
+            std::find_if(genericParams->begin(), genericParams->end(),
+                         [ErrParam, ActParam](GenericTypeParamDecl *param) {
+                           return param != *ErrParam && param != *ActParam;
+                         })) {
       ResParam = *foundResParm;
     } else {
       return false;
@@ -582,38 +585,40 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // same_type: Act.ID FakeActorSystem.ActorID // LAST one
 
   // --- Check requirement: conforms_to: Act DistributedActor
-//  auto actorReq = requirements[0];
+  //  auto actorReq = requirements[0];
   auto distActorTy = C.getProtocol(KnownProtocolKind::DistributedActor)
                        ->getInterfaceType()
                        ->getMetatypeInstanceType();
 
-  auto foundActorRequirement = std::find_if(requirements.begin(), requirements.end(), [distActorTy](Requirement req) {
-    if (req.getKind() != RequirementKind::Conformance) {
-      return false;
-    }
-    if (!req.getSecondType()->isEqual(distActorTy)) {
-      return false;
-    }
-    return true;
-  });
+  auto foundActorRequirement = std::find_if(
+      requirements.begin(), requirements.end(), [distActorTy](Requirement req) {
+        if (req.getKind() != RequirementKind::Conformance) {
+          return false;
+        }
+        if (!req.getSecondType()->isEqual(distActorTy)) {
+          return false;
+        }
+        return true;
+      });
   if (!foundActorRequirement) {
     return false;
   }
 
   // --- Check requirement: conforms_to: Err Error
-//  auto errorReq = requirements[1];
+  //  auto errorReq = requirements[1];
   auto errorTy = C.getProtocol(KnownProtocolKind::Error)
                      ->getInterfaceType()
                      ->getMetatypeInstanceType();
-  auto foundErrorRequirement = std::find_if(requirements.begin(), requirements.end(), [errorTy](Requirement req) {
-    if (req.getKind() != RequirementKind::Conformance) {
-      return false;
-    }
-    if (!req.getSecondType()->isEqual(errorTy)) {
-      return false;
-    }
-    return true;
-  });
+  auto foundErrorRequirement = std::find_if(
+      requirements.begin(), requirements.end(), [errorTy](Requirement req) {
+        if (req.getKind() != RequirementKind::Conformance) {
+          return false;
+        }
+        if (!req.getSecondType()->isEqual(errorTy)) {
+          return false;
+        }
+        return true;
+      });
   if (!foundErrorRequirement) {
     return false;
   }
@@ -626,8 +631,8 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   } else if (ResParam) {
     assert(ResParam && "Non void function, yet no Res generic parameter found");
     auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
-        ->getMetatypeInstanceType()
-        ->getDesugaredType();
+                          ->getMetatypeInstanceType()
+                          ->getDesugaredType();
     auto resultParamType = func->mapTypeIntoContext(
         ResParam->getInterfaceType()->getMetatypeInstanceType());
     // The result of the function must be the `Res` generic argument.
@@ -635,8 +640,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
       return false;
     }
 
-    for (auto requirementProto: requirementProtos) {
-      auto conformance = module->lookupConformance(resultType, requirementProto);
+    for (auto requirementProto : requirementProtos) {
+      auto conformance =
+          module->lookupConformance(resultType, requirementProto);
       if (conformance.isInvalid()) {
         return false;
       }
