@@ -2,6 +2,7 @@ add_swift_host_library(swiftRefactoring STATIC
   CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
   Refactoring.cpp
+  ReplaceBodiesWithFatalError.cpp
 )
 
 target_link_libraries(swiftRefactoring PRIVATE
