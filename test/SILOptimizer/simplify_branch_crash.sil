@@ -1,0 +1,28 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-opt-pass-count=1.1 -simplification -simplify-instruction=br | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+// Check that branch simplification doesn't leave empty blocks.
+// -sil-opt-pass-count=1.1  prevents dead block elimination which would hide the problem.
+
+
+
+// CHECK-LABEL: sil @dont_leave_empty_blocks
+// CHECK:       bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'dont_leave_empty_blocks'
+sil @dont_leave_empty_blocks : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  return %0 : $Builtin.Int64
+}
