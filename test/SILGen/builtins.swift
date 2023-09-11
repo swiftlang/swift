@@ -876,3 +876,12 @@ func assumeTrue(_ x: Builtin.Int1) {
 func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
   Builtin.assumeAlignment(p, x)
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins9packCountyBwxxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> Builtin.Word {
+// CHECK: bb0(%0 : $*Pack{repeat each T}):
+// CHECK:   [[META:%.*]] = metatype $@thin (repeat each T).Type
+// CHECK:   [[PACK_LENGTH:%.*]] = pack_length $Pack{repeat each T}
+// CHECK:   return [[PACK_LENGTH]] : $Builtin.Word
+func packCount<each T>(_ x: repeat each T) -> Builtin.Word {
+  Builtin.packLength((repeat each T).self)
+}

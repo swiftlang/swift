@@ -1708,6 +1708,19 @@ static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
+static ManagedValue emitBuiltinPackLength(SILGenFunction &SGF, SILLocation loc,
+                                          SubstitutionMap subs,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+  auto argTy = args[0].getType().getASTType();
+  auto tupleTy = CanTupleType(argTy->getMetatypeInstanceType()
+      ->castTo<TupleType>());
+  auto packTy = tupleTy.getInducedPackType();
+
+  return ManagedValue::forObjectRValueWithoutOwnership(
+    SGF.B.createPackLength(loc, packTy));
+}
+
 static ManagedValue emitBuiltinAutoDiffCreateLinearMapContextWithType(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
