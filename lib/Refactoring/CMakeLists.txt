@@ -5,6 +5,7 @@ add_swift_host_library(swiftRefactoring STATIC
   ConvertIfLetExprToGuardExpr.cpp
   ConvertToSwitchStmt.cpp
   ConvertToTernaryExpr.cpp
+  ExpandTernaryExpr.cpp
   ExtractExpr.cpp
   ExtractExprBase.cpp
   ExtractRepeatedExpr.cpp
