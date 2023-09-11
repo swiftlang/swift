@@ -42,6 +42,27 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
+//
+// AST DUMPING TIPS
+// ================
+//
+// * Pass values before names (because names are often optional and can be
+//   omitted or empty).
+//
+// * Put all `printField*()` and `printFlag*()` calls before `printRec()` calls.
+//   `printRec()` variants print a child node, and all fields of the current
+//   node need to be printed before any child node is printed.
+//
+// * `printField()` expects a "simple" argument that will be converted to a
+//   keyword string by passing it through `getDumpString()`. For values that are
+//   at all complicated, use `printFieldQuoted()`, which will automatically
+//   quote and escape the value.
+//
+// * Confine all direct formatting for the console (e.g. printing quotes or
+//   parentheses) in `PrintBase`. Eventually we want to allow e.g. JSON dumping;
+//   limiting the amount of direct I/O helps us with that.
+//
+
 using namespace swift;
 
 struct TerminalColor {
@@ -437,121 +458,144 @@ static Type defaultGetTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
 using VisitedConformances = llvm::SmallPtrSetImpl<const ProtocolConformance *>;
 
 namespace {
-class PrintBase {
-  raw_ostream &OS;
-  unsigned Indent;
-public:
-  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
-  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-      GetTypeOfKeyPathComponent;
-  char quote = '"';
+  /// PrintBase - Base type for recursive structured dumps of AST nodes.
+  ///
+  /// Please keep direct I/O, especially of structural elements like
+  /// parentheses and quote marks, confined to this base class. This will help
+  /// if we eventually support alternate output formats for AST dumps.
+  class PrintBase {
+    raw_ostream &OS;
+    unsigned Indent;
+  public:
+    llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
+    llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
+    llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+        GetTypeOfKeyPathComponent;
+    char quote = '"';
 
-  explicit PrintBase(raw_ostream &os, unsigned indent = 0,
-                     llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
-                     llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
-                     llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-                     getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-  : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
-  GetTypeOfTypeRepr(getTypeOfTypeRepr),
-  GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
+    explicit PrintBase(raw_ostream &os, unsigned indent = 0,
+                       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
+                       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
+                       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                          getTypeOfKeyPathComponent =
+                              defaultGetTypeOfKeyPathComponent)
+        : OS(os), Indent(indent), GetTypeOfExpr(getTypeOfExpr),
+          GetTypeOfTypeRepr(getTypeOfTypeRepr),
+          GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
 
-  bool hasNonStandardOutput() {
-    return &OS != &llvm::errs() && &OS != &llvm::dbgs();
-  }
+    bool hasNonStandardOutput() {
+      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
+    }
 
-  template <typename Fn>
-  void printRecRaw(Fn Body, StringRef label = "") {
-    Indent += 2;
-    OS << '\n';
-    Body(label);
-    Indent -= 2;
-  }
+    /// Call `Body` in a context where the printer is ready for a child to be printed.
+    template <typename Fn>
+    void printRecArbitrary(Fn Body, StringRef label = "") {
+      Indent += 2;
+      OS << '\n';
+      Body(label);
+      Indent -= 2;
+    }
 
-  void printRec(Decl *D, StringRef label = "");
-  void printRec(Expr *E, StringRef label = "");
-  void printRec(Stmt *S, const ASTContext *Ctx, StringRef label = "");
-  void printRec(TypeRepr *T, StringRef label = "");
-  void printRec(const Pattern *P, StringRef label = "");
-  void printRec(Type ty, StringRef label = "");
+    /// Print a declaration as a child node.
+    void printRec(Decl *D, StringRef label = "");
 
-  void printRec(const ASTNode &Elt, const ASTContext *Ctx,
-                StringRef label = "") {
-    if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-      printRec(SubExpr, label);
-    else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-      printRec(SubStmt, Ctx, label);
-    else
-      printRec(Elt.get<Decl*>(), label);
-  }
+    /// Print an expression as a child node.
+    void printRec(Expr *E, StringRef label = "");
 
-  void printRec(StmtConditionElement C, const ASTContext *Ctx,
-                StringRef Label = "") {
-    switch (C.getKind()) {
-    case StmtConditionElement::CK_Boolean:
-      return printRec(C.getBoolean());
-    case StmtConditionElement::CK_PatternBinding:
-        printRecRaw([&](StringRef Label) {
-          printHead("pattern", PatternColor, Label);
-          printRec(C.getPattern());
-          printRec(C.getInitializer());
+    /// Print a statement as a child node.
+    void printRec(Stmt *S, const ASTContext *Ctx, StringRef label = "");
+
+    /// Print a type representation as a child node.
+    void printRec(TypeRepr *T, StringRef label = "");
+
+    /// Print a pattern as a child node.
+    void printRec(const Pattern *P, StringRef label = "");
+
+    /// Print a type as a child node.
+    void printRec(Type ty, StringRef label = "");
+
+    /// Print an \c ASTNode as a child node.
+    void printRec(const ASTNode &Elt, const ASTContext *Ctx,
+                  StringRef label = "") {
+      if (auto *SubExpr = Elt.dyn_cast<Expr*>())
+        printRec(SubExpr, label);
+      else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
+        printRec(SubStmt, Ctx, label);
+      else
+        printRec(Elt.get<Decl*>(), label);
+    }
+
+    /// Print a statement condition element as a child node.
+    void printRec(StmtConditionElement C, const ASTContext *Ctx,
+                  StringRef Label = "") {
+      switch (C.getKind()) {
+      case StmtConditionElement::CK_Boolean:
+        return printRec(C.getBoolean());
+      case StmtConditionElement::CK_PatternBinding:
+          printRecArbitrary([&](StringRef Label) {
+            printHead("pattern", PatternColor, Label);
+            printRec(C.getPattern());
+            printRec(C.getInitializer());
+            printFoot();
+          }, Label);
+        break;
+      case StmtConditionElement::CK_Availability:
+        printRecArbitrary([&](StringRef Label) {
+          printHead("#available", PatternColor, Label);
+          for (auto *Query : C.getAvailability()->getQueries()) {
+            OS << '\n';
+            switch (Query->getKind()) {
+            case AvailabilitySpecKind::PlatformVersionConstraint:
+              cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+              break;
+            case AvailabilitySpecKind::LanguageVersionConstraint:
+            case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+              cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+              break;
+            case AvailabilitySpecKind::OtherPlatform:
+              cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
+              break;
+            }
+          }
           printFoot();
         }, Label);
-      break;
-    case StmtConditionElement::CK_Availability:
-      printRecRaw([&](StringRef Label) {
-        printHead("#available", PatternColor, Label);
-        for (auto *Query : C.getAvailability()->getQueries()) {
-          OS << '\n';
-          switch (Query->getKind()) {
-          case AvailabilitySpecKind::PlatformVersionConstraint:
-            cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-            break;
-          case AvailabilitySpecKind::LanguageVersionConstraint:
-          case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-            cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-            break;
-          case AvailabilitySpecKind::OtherPlatform:
-            cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-            break;
-          }
+        break;
+      case StmtConditionElement::CK_HasSymbol:
+        printRecArbitrary([&](StringRef Label) {
+          printHead("#_hasSymbol", PatternColor, Label);
+          printSourceRange(C.getSourceRange(), Ctx);
+          printRec(C.getHasSymbolInfo()->getSymbolExpr());
+          printFoot();
+        }, Label);
+        break;
+      }
+    }
+
+    /// Print a range of nodes as a single "array" child node.
+    template <typename NodeRange>
+    void printRecRange(const NodeRange &range, StringRef topLabel) {
+      printRecArbitrary([&](StringRef topLabel) {
+        printHead("array", ASTNodeColor, topLabel);
+        for (auto node : range) {
+          printRec(node, "");
         }
         printFoot();
-      }, Label);
-      break;
-    case StmtConditionElement::CK_HasSymbol:
-      printRecRaw([&](StringRef Label) {
-        printHead("#_hasSymbol", PatternColor, Label);
-        printSourceRange(C.getSourceRange(), Ctx);
-        printRec(C.getHasSymbolInfo()->getSymbolExpr());
-        printFoot();
-      }, Label);
-      break;
+      }, topLabel);
     }
-  }
 
-  template <typename NodeRange>
-  void printRecRange(const NodeRange &range, StringRef topLabel) {
-    printRecRaw([&](StringRef topLabel) {
-      printHead("array", ASTNodeColor, topLabel);
-      for (auto node : range) {
-        printRec(node, "");
-      }
-      printFoot();
-    }, topLabel);
-  }
+    /// Print a range of nodes as a single "array" child node.
+    template <typename NodeRange>
+    void printRecRange(const NodeRange &range, const ASTContext *Ctx, StringRef topLabel) {
+      printRecArbitrary([&](StringRef topLabel) {
+        printHead("array", ASTNodeColor, topLabel);
+        for (auto node : range) {
+          printRec(node, Ctx, "");
+        }
+        printFoot();
+      }, topLabel);
+    }
 
-  template <typename NodeRange>
-  void printRecRange(const NodeRange &range, const ASTContext *Ctx, StringRef topLabel) {
-    printRecRaw([&](StringRef topLabel) {
-      printHead("array", ASTNodeColor, topLabel);
-      for (auto node : range) {
-        printRec(node, Ctx, "");
-      }
-      printFoot();
-    }, topLabel);
-  }
-
+    /// Print the beginning of a new node, including its type and an optional label for it.
     void printHead(StringRef Name, TerminalColor Color,
                            StringRef Label = "") {
       OS.indent(Indent);
@@ -564,254 +608,281 @@ public:
       PrintWithColorRAII(OS, Color) << Name;
     }
 
+    /// Print the end of a new node.
     void printFoot() {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-  void printRec(const Argument &arg) {
-    printRecRaw([&](StringRef L) {
-      printHead("argument", ExprColor, L);
+    /// Print a single argument as a child node.
+    void printRec(const Argument &arg) {
+      printRecArbitrary([&](StringRef L) {
+        printHead("argument", ExprColor, L);
 
-      auto label = arg.getLabel();
-      if (!label.empty()) {
-        printFieldQuoted(label.str(), "label", ArgumentsColor);
-      }
-      printFlag(arg.isInOut(), "inout", ArgModifierColor);
-
-      printRec(arg.getExpr());
-      printFoot();
-    });
-  }
-
-  void printRec(const ArgumentList *argList, StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      visitArgumentList(argList, label);
-    }, label);
-  }
-
-  void visitArgumentList(const ArgumentList *argList, StringRef label = "") {
-    printHead("argument_list", ExprColor, label);
-
-    printFlag(argList->isImplicit(), "implicit", ArgModifierColor);
-
-    if (argList->hasAnyArgumentLabels()) {
-      printFieldQuotedRaw([&](raw_ostream &OS) {
-        for (auto arg : *argList) {
-          auto label = arg.getLabel();
-          OS << (label.empty() ? "_" : label.str()) << ":";
+        auto label = arg.getLabel();
+        if (!label.empty()) {
+          printFieldQuoted(label.str(), "label", ArgumentsColor);
         }
-      }, "labels", ArgumentsColor);
+        printFlag(arg.isInOut(), "inout", ArgModifierColor);
+
+        printRec(arg.getExpr());
+        printFoot();
+      });
     }
 
-    for (auto arg : *argList) {
-      printRec(arg);
+    /// Print an argument list as a child node.
+    void printRec(const ArgumentList *argList, StringRef label = "") {
+      printRecArbitrary([&](StringRef label) {
+        visitArgumentList(argList, label);
+      }, label);
     }
 
-    printFoot();
-  }
+    /// Print an argument list node.
+    void visitArgumentList(const ArgumentList *argList, StringRef label = "") {
+      printHead("argument_list", ExprColor, label);
 
-  void printParameterList(const ParameterList *params,
-                          const ASTContext *ctx = nullptr,
-                          StringRef label = "") {
-    printHead("parameter_list", ParameterColor, label);
+      printFlag(argList->isImplicit(), "implicit", ArgModifierColor);
 
-    if (!ctx && params->size() != 0 && params->get(0))
-      ctx = &params->get(0)->getASTContext();
-    printSourceRange(params->getSourceRange(), ctx);
-
-    for (auto P : *params) {
-      printRec(const_cast<ParamDecl *>(P));
-    }
-
-    printFoot();
-  }
-
-  void printRec(const ParameterList *params, const ASTContext *ctx = nullptr,
-                StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      printParameterList(params, ctx, label);
-    }, label);
-  }
-
-  void printRec(const IfConfigClause &Clause, const ASTContext *Ctx = nullptr,
-                StringRef Label = "") {
-    printRecRaw([&](StringRef Label) {
-      printHead((Clause.Cond ? "#if:" : "#else:"), StmtColor, Label);
-
-      printFlag(Clause.isActive, "active", DeclModifierColor);
-
-      if (Clause.Cond) {
-        printRec(Clause.Cond);
+      if (argList->hasAnyArgumentLabels()) {
+        printFieldQuotedRaw([&](raw_ostream &OS) {
+          for (auto arg : *argList) {
+            auto label = arg.getLabel();
+            OS << (label.empty() ? "_" : label.str()) << ":";
+          }
+        }, "labels", ArgumentsColor);
       }
-      printRecRange(Clause.Elements, Ctx, "elements");
+
+      for (auto arg : *argList) {
+        printRec(arg);
+      }
 
       printFoot();
-    }, Label);
-  }
-
-  void printRec(SubstitutionMap map, StringRef label = "") {
-    SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-    printRec(map, Dumped, label);
-  }
-
-  void printRec(const ProtocolConformanceRef &conf, StringRef label = "") {
-    SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-    printRec(conf, Dumped, label);
-  }
-
-  void printRec(SubstitutionMap map, VisitedConformances &visited,
-                StringRef label = "");
-
-  void printRec(const ProtocolConformanceRef &conf,
-                VisitedConformances &visited, StringRef label = "");
-
-  void printRec(const ProtocolConformance *conformance,
-                VisitedConformances &visited, StringRef label = "");
-
-  void visitRequirement(const Requirement &requirement, StringRef label = "") {
-    printHead("requirement", ASTNodeColor, label);
-
-    PrintOptions opts;
-    opts.ProtocolQualifiedDependentMemberTypes = true;
-
-    printFieldQuotedRaw([&](raw_ostream &out) {
-      requirement.getFirstType().print(out, opts);
-    }, "");
-
-    printField(requirement.getKind(), "");
-
-    if (requirement.getKind() != RequirementKind::Layout
-          && requirement.getSecondType())
-      printFieldQuotedRaw([&](raw_ostream &out) {
-        requirement.getSecondType().print(out, opts);
-      }, "");
-    else if (requirement.getLayoutConstraint())
-      printFieldQuoted(requirement.getLayoutConstraint(), "");
-
-    printFoot();
-  }
-
-  void printRec(const Requirement &requirement, StringRef label = "") {
-    printRecRaw([&](StringRef label) {
-      visitRequirement(requirement);
-    });
-  }
-
-  // Print a field with a value.
-  template<typename Fn>
-  void printFieldRaw(Fn body, StringRef name,
-                      TerminalColor color = FieldLabelColor) {
-    OS << " ";
-    if (!name.empty())
-      PrintWithColorRAII(OS, color) << name << "=";
-    body(PrintWithColorRAII(OS, color).getOS());
-  }
-
-  // Print a field with a value.
-  template<typename T>
-  void printField(const T &value, StringRef name,
-                          TerminalColor color = FieldLabelColor) {
-    printFieldRaw([&](raw_ostream &OS) { OS << getDumpString(value); }, 
-                  name, color);
-  }
-
-  // Print a field with a value.
-  template<typename Fn>
-  void printFieldQuotedRaw(Fn body, StringRef name,
-                                TerminalColor color = FieldLabelColor) {
-    printFieldRaw([&](raw_ostream &OS) {
-      OS << quote;
-      { escaping_ostream escOS(OS); body(escOS); }
-      OS << quote;
-    }, name, color);
-  }
-
-  // Print a field with a value.
-  template<typename T>
-  void printFieldQuoted(const T &value, StringRef name,
-                                TerminalColor color = FieldLabelColor) {
-    printFieldQuotedRaw([&](raw_ostream &OS) { OS << value; }, name, color);
-  }
-
-  // Print a field with a value.
-  template<typename Fn>
-  void printFlagRaw(Fn body, TerminalColor color = FieldLabelColor) {
-    printFieldRaw(body, "", color);
-  }
-
-  // Print a single flag.
-  void printFlag(StringRef name, TerminalColor color = FieldLabelColor) {
-    printFieldRaw([&](raw_ostream &OS) { OS << name; }, "", color);
-  }
-
-  // Print a single flag if it is set.
-  void printFlag(bool isSet, StringRef name,
-                         TerminalColor color = FieldLabelColor) {
-    if (isSet)
-      printFlag(name, color);
-  }
-
-  void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
-                     StringRef label = "location") {
-    if (!L.isValid() || !Ctx)
-      return;
-
-    printFieldRaw([&](raw_ostream &OS) {
-      L.print(OS, Ctx->SourceMgr);
-    }, label, LocationColor);
-  }
-
-  void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
-    if (!R.isValid() || !Ctx)
-      return;
-
-    printFieldRaw([&](raw_ostream &OS) {
-      R.print(OS, Ctx->SourceMgr, /*PrintText=*/false);
-    }, "range", RangeColor);
-  }
-
-  template <typename Fn>
-  void printNameRaw(Fn body, bool leadingSpace = true) {
-    if (leadingSpace)
-      OS << ' ';
-    PrintWithColorRAII colored(OS, IdentifierColor);
-    OS << quote;
-    {
-      escaping_ostream escaping_os(OS);
-      body(escaping_os);
     }
-    OS << quote;
-  }
 
-  void printName(DeclName name, bool leadingSpace = true) {
-    printNameRaw([&](raw_ostream &OS) {
-      ::printName(OS, name);
-    }, leadingSpace);
-  }
+    /// Print a parameter list as a child node.
+    void printRec(const ParameterList *params, const ASTContext *ctx = nullptr,
+                  StringRef label = "") {
+      printRecArbitrary([&](StringRef label) {
+        visitParameterList(params, ctx, label);
+      }, label);
+    }
 
-  void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
-    if (D->getName()) {
-      printName(D->getName(), leadingSpace);
-    } else {
+    /// Print a parameter list node.
+    void visitParameterList(const ParameterList *params,
+                            const ASTContext *ctx = nullptr,
+                            StringRef label = "") {
+      printHead("parameter_list", ParameterColor, label);
+
+      if (!ctx && params->size() != 0 && params->get(0))
+        ctx = &params->get(0)->getASTContext();
+      printSourceRange(params->getSourceRange(), ctx);
+
+      for (auto P : *params) {
+        printRec(const_cast<ParamDecl *>(P));
+      }
+
+      printFoot();
+    }
+
+    /// Print an \c IfConfigClause as a child node.
+    void printRec(const IfConfigClause &Clause, const ASTContext *Ctx = nullptr,
+                  StringRef Label = "") {
+      printRecArbitrary([&](StringRef Label) {
+        printHead((Clause.Cond ? "#if:" : "#else:"), StmtColor, Label);
+
+        printFlag(Clause.isActive, "active", DeclModifierColor);
+
+        if (Clause.Cond) {
+          printRec(Clause.Cond);
+        }
+        printRecRange(Clause.Elements, Ctx, "elements");
+
+        printFoot();
+      }, Label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, StringRef label = "") {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(map, Dumped, label);
+    }
+
+    /// Print a substitution map as a child node.
+    void printRec(SubstitutionMap map, VisitedConformances &visited,
+                  StringRef label = "");
+
+    /// Print a substitution map as a child node.
+    void printRec(const ProtocolConformanceRef &conf,
+                  VisitedConformances &visited, StringRef label = "");
+
+    /// Print a conformance reference as a child node.
+    void printRec(const ProtocolConformanceRef &conf, StringRef label = "") {
+      SmallPtrSet<const ProtocolConformance *, 4> Dumped;
+      printRec(conf, Dumped, label);
+    }
+
+    /// Print a conformance reference as a child node.
+    void printRec(const ProtocolConformance *conformance,
+                  VisitedConformances &visited, StringRef label = "");
+
+    /// Print a requirement node.
+    void visitRequirement(const Requirement &requirement, StringRef label = "") {
+      printHead("requirement", ASTNodeColor, label);
+
+      PrintOptions opts;
+      opts.ProtocolQualifiedDependentMemberTypes = true;
+
+      printFieldQuotedRaw([&](raw_ostream &out) {
+        requirement.getFirstType().print(out, opts);
+      }, "");
+
+      printField(requirement.getKind(), "");
+
+      if (requirement.getKind() != RequirementKind::Layout
+            && requirement.getSecondType())
+        printFieldQuotedRaw([&](raw_ostream &out) {
+          requirement.getSecondType().print(out, opts);
+        }, "");
+      else if (requirement.getLayoutConstraint())
+        printFieldQuoted(requirement.getLayoutConstraint(), "");
+
+      printFoot();
+    }
+
+    /// Print a requirement as a child node.
+    void printRec(const Requirement &requirement, StringRef label = "") {
+      printRecArbitrary([&](StringRef label) {
+        visitRequirement(requirement);
+      });
+    }
+
+    /// Print a field with a short keyword-style value, printing the value by
+    /// passing a closure that takes a \c raw_ostream.
+    template<typename Fn>
+    void printFieldRaw(Fn body, StringRef name,
+                       TerminalColor color = FieldLabelColor) {
+      OS << " ";
+      if (!name.empty())
+        PrintWithColorRAII(OS, color) << name << "=";
+      body(PrintWithColorRAII(OS, color).getOS());
+    }
+
+    /// Print a field with a short keyword-style value. The value will be
+    /// formatted using a \c getDumpString() overload.
+    template<typename T>
+    void printField(const T &value, StringRef name,
+                    TerminalColor color = FieldLabelColor) {
+      printFieldRaw([&](raw_ostream &OS) { OS << getDumpString(value); },
+                    name, color);
+    }
+
+    /// Print a field with a long value that will be automatically quoted and
+    /// escaped, printing the value by passing a closure that takes a
+    /// \c raw_ostream.
+    template<typename Fn>
+    void printFieldQuotedRaw(Fn body, StringRef name,
+                                  TerminalColor color = FieldLabelColor) {
+      printFieldRaw([&](raw_ostream &OS) {
+        OS << quote;
+        { escaping_ostream escOS(OS); body(escOS); }
+        OS << quote;
+      }, name, color);
+    }
+
+    /// Print a field with a long value that will be automatically quoted and
+    /// escaped.
+    template<typename T>
+    void printFieldQuoted(const T &value, StringRef name,
+                                  TerminalColor color = FieldLabelColor) {
+      printFieldQuotedRaw([&](raw_ostream &OS) { OS << value; }, name, color);
+    }
+
+    /// Print a simple boolean value, printing the value by passing a closure
+    /// that takes a \c raw_ostream.
+    template<typename Fn>
+    void printFlagRaw(Fn body, TerminalColor color = FieldLabelColor) {
+      printFieldRaw(body, "", color);
+    }
+
+    /// Print a simple boolean value unconditionally.
+    void printFlag(StringRef name, TerminalColor color = FieldLabelColor) {
+      printFieldRaw([&](raw_ostream &OS) { OS << name; }, "", color);
+    }
+
+    /// Print a simple boolean value.
+    void printFlag(bool isSet, StringRef name,
+                   TerminalColor color = FieldLabelColor) {
+      if (isSet)
+        printFlag(name, color);
+    }
+
+    /// Print a field containing a node's source location.
+    void printSourceLoc(const SourceLoc L, const ASTContext *Ctx,
+                       StringRef label = "location") {
+      if (!L.isValid() || !Ctx)
+        return;
+
+      printFieldRaw([&](raw_ostream &OS) {
+        L.print(OS, Ctx->SourceMgr);
+      }, label, LocationColor);
+    }
+
+    /// Print a field containing a node's source range.
+    void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
+      if (!R.isValid() || !Ctx)
+        return;
+
+      printFieldRaw([&](raw_ostream &OS) {
+        R.print(OS, Ctx->SourceMgr, /*PrintText=*/false);
+      }, "range", RangeColor);
+    }
+
+    /// Print a field containing a node's name, printing the node's name by
+    /// passing a closure that takes a \c raw_ostream.
+    template <typename Fn>
+    void printNameRaw(Fn body, bool leadingSpace = true) {
       if (leadingSpace)
         OS << ' ';
-      PrintWithColorRAII(OS, IdentifierColor)
-        << "<anonymous @ " << (const void*)D << '>';
+      PrintWithColorRAII colored(OS, IdentifierColor);
+      OS << quote;
+      {
+        escaping_ostream escaping_os(OS);
+        body(escaping_os);
+      }
+      OS << quote;
     }
-  }
 
-  void printDeclNameField(const ValueDecl *D, StringRef name) {
-    printFieldRaw([&](raw_ostream &os) {
-      printDeclName(D, /*leadingSpace=*/false);
-    }, name);
-  }
+    /// Print a field containing a node's name.
+    void printName(DeclName name, bool leadingSpace = true) {
+      printNameRaw([&](raw_ostream &OS) {
+        ::printName(OS, name);
+      }, leadingSpace);
+    }
 
-  void printDeclRefField(ConcreteDeclRef declRef, StringRef label,
-                         TerminalColor Color = DeclColor) {
-    printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
-                        Color);
-  }
+    /// Print an unnamed field containing a node's name, read from a declaration.
+    void printDeclName(const ValueDecl *D, bool leadingSpace = true) {
+      if (D->getName()) {
+        printName(D->getName(), leadingSpace);
+      } else {
+        if (leadingSpace)
+          OS << ' ';
+        PrintWithColorRAII(OS, IdentifierColor)
+          << "<anonymous @ " << (const void*)D << '>';
+      }
+    }
 
+    /// Print a field containing a node's name, read from a declaration.
+    void printDeclNameField(const ValueDecl *D, StringRef name) {
+      printFieldRaw([&](raw_ostream &os) {
+        printDeclName(D, /*leadingSpace=*/false);
+      }, name);
+    }
+
+    /// Print a field containing a concrete reference to a declaration.
+    void printDeclRefField(ConcreteDeclRef declRef, StringRef label,
+                           TerminalColor Color = DeclColor) {
+      printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
+                          Color);
+    }
   };
 
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef>,
@@ -1267,6 +1338,10 @@ public:
       printFoot();
     }
 
+    void visitParameterList(ParameterList *PL, StringRef label) {
+      PrintBase::visitParameterList(PL, /*ctx=*/nullptr, label);
+    }
+
     void visitEnumCaseDecl(EnumCaseDecl *ECD, StringRef label) {
       printCommon(ECD, "enum_case_decl", label);
       for (EnumElementDecl *D : ECD->getElements()) {
@@ -1361,7 +1436,7 @@ public:
       }
 
       if (auto fac = D->getForeignAsyncConvention()) {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("foreign_async_convention", ASTNodeColor, label);
           if (auto type = fac->completionHandlerType())
             printFieldQuoted(type, "completion_handler_type", TypeColor);
@@ -1374,7 +1449,7 @@ public:
       }
 
       if (auto fec = D->getForeignErrorConvention()) {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("foreign_error_convention", ASTNodeColor, label);
           printField(fec->getKind(), "kind");
 
@@ -1475,7 +1550,7 @@ public:
       auto printRelationsRec =
           [&](ArrayRef<PrecedenceGroupDecl::Relation> rels, StringRef name) {
         if (rels.empty()) return;
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead(name, FieldLabelColor, label);
           for (auto &rel : rels)
             printFlag(rel.Name.str());
@@ -1547,7 +1622,8 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).printParameterList(this);
+  PrintDecl(OS, Indent)
+      .visitParameterList(const_cast<ParameterList *>(this), "");
 }
 
 void Decl::dump() const {
@@ -1882,7 +1958,7 @@ public:
     }
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
-      printRecRaw([&](StringRef label) {
+      printRecArbitrary([&](StringRef label) {
         printHead("case_label_item", StmtColor, label);
         printFlag(LabelItem.isDefault(), "default");
         
@@ -2153,7 +2229,7 @@ public:
 
     if (!E->isForOperator()) {
       for (auto D : E->getDecls()) {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("candidate_decl", DeclModifierColor, label);
           printNameRaw([&](raw_ostream &OS) { D->dumpRef(OS); });
           printFoot();
@@ -2261,7 +2337,7 @@ public:
       if (E->getElement(i))
         printRec(E->getElement(i));
       else {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("<tuple element default value>", ExprColor);
           printFoot();
         });
@@ -2889,11 +2965,11 @@ public:
 
     printFlag(E->isObjC(), "objc");
 
-    printRecRaw([&](StringRef label) {
+    printRecArbitrary([&](StringRef label) {
       printHead("components", ExprColor, label);
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           switch (component.getKind()) {
           case KeyPathExpr::Component::Kind::Invalid:
             printHead("invalid", ASTNodeColor);
@@ -3302,7 +3378,7 @@ public:
     printCommon("sil_box", label);
 
     for (auto &Field : T->getFields()) {
-      printRecRaw([&](StringRef label) {
+      printRecArbitrary([&](StringRef label) {
         printCommon("sil_box_field", label);
         printFlag(Field.isMutable(), "mutable");
 
@@ -3318,7 +3394,7 @@ public:
 };
 
 void PrintBase::printRec(Decl *D, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     if (!D) {
       printHead("<null decl>", DeclColor, label);
       printFoot();
@@ -3329,7 +3405,7 @@ void PrintBase::printRec(Decl *D, StringRef label) {
   }, label);
 }
 void PrintBase::printRec(Expr *E, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     if (!E) {
       printHead("<null expr>", ExprColor, label);
       printFoot();
@@ -3340,7 +3416,7 @@ void PrintBase::printRec(Expr *E, StringRef label) {
   }, label);
 }
 void PrintBase::printRec(Stmt *S, const ASTContext *Ctx, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     if (!S) {
       printHead("<null stmt>", ExprColor, label);
       printFoot();
@@ -3351,7 +3427,7 @@ void PrintBase::printRec(Stmt *S, const ASTContext *Ctx, StringRef label) {
   }, label);
 }
 void PrintBase::printRec(TypeRepr *T, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     if (!T) {
       printHead("<null typerepr>", TypeReprColor, label);
       printFoot();
@@ -3362,7 +3438,7 @@ void PrintBase::printRec(TypeRepr *T, StringRef label) {
   }, label);
 }
 void PrintBase::printRec(const Pattern *P, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     if (!P) {
       printHead("<null pattern>", PatternColor, label);
       printFoot();
@@ -3438,7 +3514,7 @@ public:
         } else {
           normal->forEachTypeWitness([&](const AssociatedTypeDecl *req, Type ty,
                                          const TypeDecl *) -> bool {
-            printRecRaw([&](StringRef label) {
+            printRecArbitrary([&](StringRef label) {
               printHead("assoc_type", ASTNodeColor, label);
               printFieldQuoted(req->getName(), "req");
               printFieldQuoted(Type(ty->getDesugaredType()), "type", TypeColor);
@@ -3448,7 +3524,7 @@ public:
           });
           normal->forEachValueWitness([&](const ValueDecl *req,
                                           Witness witness) {
-            printRecRaw([&](StringRef label) {
+            printRecArbitrary([&](StringRef label) {
               printHead("value", ASTNodeColor, label);
               printFieldQuoted(req->getName(), "req");
               if (!witness)
@@ -3473,7 +3549,7 @@ public:
             printRec(requirement);
           }
         } else {
-          printRecRaw([&](StringRef label) {
+          printRecArbitrary([&](StringRef label) {
             printHead("<conditional requirements unable to be computed>",
                       ASTNodeColor);
             printFoot();
@@ -3509,7 +3585,7 @@ public:
             printRec(subReq);
           }
         } else {
-          printRecRaw([&](StringRef label) {
+          printRecArbitrary([&](StringRef label) {
             printHead("<conditional requirements unable to be computed>",
                       ASTNodeColor);
             printFoot();
@@ -3585,7 +3661,7 @@ public:
       if (style == SubstitutionMap::DumpStyle::Minimal) {
         printSubstitution(genericParams[i], replacementTypes[i]);
       } else {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("substitution", ASTNodeColor, label);
           printSubstitution(genericParams[i], replacementTypes[i]);
           printFoot();
@@ -3603,7 +3679,7 @@ public:
       if (req.getKind() != RequirementKind::Conformance)
         continue;
 
-      printRecRaw([&](StringRef label) {
+      printRecArbitrary([&](StringRef label) {
         printHead("conformance", ASTNodeColor, label);
         printFieldQuoted(req.getFirstType(), "type");
         printRec(conformances.front(), visited);
@@ -3616,7 +3692,7 @@ public:
 
 void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
                          StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     PrintConformance(OS, Indent)
         .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited,
                               label);
@@ -3625,7 +3701,7 @@ void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
 
 void PrintBase::printRec(const ProtocolConformanceRef &ref,
                          VisitedConformances &visited, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     PrintConformance(OS, Indent)
           .visitProtocolConformanceRef(ref, visited, label);
   }, label);
@@ -3633,7 +3709,7 @@ void PrintBase::printRec(const ProtocolConformanceRef &ref,
 
 void PrintBase::printRec(const ProtocolConformance *conformance,
                          VisitedConformances &visited, StringRef label) {
-  printRecRaw([&](StringRef label) {
+  printRecArbitrary([&](StringRef label) {
     PrintConformance(OS, Indent)
         .visitProtocolConformance(conformance, visited, label);
   }, label);
@@ -3851,7 +3927,7 @@ namespace {
       printField(T->getNumElements(), "num_elements");
 
       for (const auto &elt : T->getElements()) {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("tuple_type_elt", FieldLabelColor, label);
           if (elt.hasName())
             printFieldQuoted(elt.getName().str(), "name");
@@ -4023,12 +4099,12 @@ namespace {
 
     void printAnyFunctionParamsRec(ArrayRef<AnyFunctionType::Param> params,
                                    StringRef label) {
-      printRecRaw([&](StringRef label) {
+      printRecArbitrary([&](StringRef label) {
         printCommon("function_params", label);
 
         printField(params.size(), "num_params");
         for (const auto &param : params) {
-          printRecRaw([&](StringRef label) {
+          printRecArbitrary([&](StringRef label) {
             printHead("param", FieldLabelColor, label);
 
             if (param.hasLabel())
@@ -4049,7 +4125,7 @@ namespace {
     void printClangTypeRec(const ClangTypeInfo &info, const ASTContext &ctx) {
       // [TODO: Improve-Clang-type-printing]
       if (!info.empty()) {
-        printRecRaw([&](StringRef label) {
+        printRecArbitrary([&](StringRef label) {
           printHead("clang_type", ASTNodeColor, label);
           printNameRaw([&](raw_ostream &OS) {
             auto &clangCtx = ctx.getClangModuleLoader()->getClangASTContext();
@@ -4093,7 +4169,7 @@ namespace {
     void visitGenericFunctionType(GenericFunctionType *T, StringRef label) {
       printAnyFunctionTypeCommonRec(T, label, "generic_function_type");
       // FIXME: generic signature dumping needs improvement
-      printRecRaw([&](StringRef label) {
+      printRecArbitrary([&](StringRef label) {
         printHead("generic_sig", TypeColor, label);
         printFieldQuoted(T->getGenericSignature()->getAsString(), "");
         printFoot();
@@ -4261,7 +4337,7 @@ namespace {
   };
 
   void PrintBase::printRec(Type type, StringRef label) {
-    printRecRaw([&](StringRef label) {
+    printRecArbitrary([&](StringRef label) {
       if (type.isNull()) {
         printHead("<null type>", DeclColor, label);
         printFoot();
