@@ -1875,49 +1875,37 @@ static bool isLiteral(SILValue val) {
 }
 
 SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
-  auto base = lookThroughOwnershipInsts(mdi->getBase());
-
-  // Simplify the base operand of a MarkDependenceInst to eliminate unnecessary
-  // instructions that aren't adding value.
-  //
-  // Conversions to Optional.Some(x) often happen here, this isn't important
-  // for us, we can just depend on 'x' directly.
-  if (auto *eiBase = dyn_cast<EnumInst>(base)) {
-    if (eiBase->hasOperand()) {
-      auto *use = &mdi->getOperandRef(MarkDependenceInst::Base);
-      OwnershipReplaceSingleUseHelper helper(ownershipFixupContext,
-                                             use, eiBase->getOperand());
-      if (helper) {
-        helper.perform();
-        tryEliminateOnlyOwnershipUsedForwardingInst(eiBase,
-                                                    getInstModCallbacks());
+  if (!mdi->getFunction()->hasOwnership()) {
+    // Simplify the base operand of a MarkDependenceInst to eliminate
+    // unnecessary instructions that aren't adding value.
+    //
+    // Conversions to Optional.Some(x) often happen here, this isn't important
+    // for us, we can just depend on 'x' directly.
+    if (auto *eiBase = dyn_cast<EnumInst>(mdi->getBase())) {
+      if (eiBase->hasOperand()) {
+        mdi->setBase(eiBase->getOperand());
+        if (eiBase->use_empty()) {
+          eraseInstFromFunction(*eiBase);
+        }
         return mdi;
       }
     }
-  }
 
-  // Conversions from a class to AnyObject also happen a lot, we can just depend
-  // on the class reference.
-  if (auto *ier = dyn_cast<InitExistentialRefInst>(base)) {
-    auto *use = &mdi->getOperandRef(MarkDependenceInst::Base);
-    OwnershipReplaceSingleUseHelper helper(ownershipFixupContext,
-                                           use, ier->getOperand());
-    if (helper) {
-      helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(ier, getInstModCallbacks());
+    // Conversions from a class to AnyObject also happen a lot, we can just
+    // depend on the class reference.
+    if (auto *ier = dyn_cast<InitExistentialRefInst>(mdi->getBase())) {
+      mdi->setBase(ier->getOperand());
+      if (ier->use_empty())
+        eraseInstFromFunction(*ier);
       return mdi;
     }
-  }
 
-  // Conversions from a class to AnyObject also happen a lot, we can just depend
-  // on the class reference.
-  if (auto *oeri = dyn_cast<OpenExistentialRefInst>(base)) {
-    auto *use = &mdi->getOperandRef(MarkDependenceInst::Base);
-    OwnershipReplaceSingleUseHelper helper(ownershipFixupContext,
-                                           use, oeri->getOperand());
-    if (helper) {
-      helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(oeri, getInstModCallbacks());
+    // Conversions from a class to AnyObject also happen a lot, we can just
+    // depend on the class reference.
+    if (auto *oeri = dyn_cast<OpenExistentialRefInst>(mdi->getBase())) {
+      mdi->setBase(oeri->getOperand());
+      if (oeri->use_empty())
+        eraseInstFromFunction(*oeri);
       return mdi;
     }
   }
@@ -1926,17 +1914,14 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // whose base is a trivial typed object. In such a case, the mark_dependence
   // does not have a meaning, so just eliminate it.
   {
-    SILType baseType = base->getType();
-    if (baseType.isObject()) {
-      if ((hasOwnership() && base->getOwnershipKind() == OwnershipKind::None) ||
-          baseType.isTrivial(*mdi->getFunction())) {
-        SILValue value = mdi->getValue();
-        replaceInstUsesWith(*mdi, value);
-        return eraseInstFromFunction(*mdi);
-      }
+    SILType baseType = mdi->getBase()->getType();
+    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+      SILValue value = mdi->getValue();
+      mdi->replaceAllUsesWith(value);
+      return eraseInstFromFunction(*mdi);
     }
   }
-  
+
   if (isLiteral(mdi->getValue())) {
     // A literal lives forever, so no mark_dependence is needed.
     // This pattern can occur after StringOptimization when a utf8CString of
