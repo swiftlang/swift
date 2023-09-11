@@ -1,6 +1,7 @@
 add_swift_host_library(swiftRefactoring STATIC
   CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
+  ConvertGuardExprToIfLetExpr.cpp
   ConvertToSwitchStmt.cpp
   ConvertToTernaryExpr.cpp
   ExtractRepeatedExpr.cpp
