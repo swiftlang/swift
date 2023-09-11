@@ -9,10 +9,6 @@ module CxxClassWithNSStringInit {
   requires cplusplus
 }
 
-module CustomNSOptions {
-  header "customNSOptions.h"
-}
-
 module NSOptionsMangling {
   header "NSOptionsMangling.h"
 }
