@@ -107,20 +107,20 @@ func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
   }
 }
 
-CStringTests.test("String.init(validatingUTF8:)") {
+CStringTests.test("String.init(validatingCString:)") {
   do {
     let (s, dealloc) = getASCIIUTF8()
-    expectEqual("ab", String(validatingUTF8: bindAsCChar(s)))
+    expectEqual("ab", String(validatingCString: bindAsCChar(s)))
     dealloc()
   }
   do {
     let (s, dealloc) = getNonASCIIUTF8()
-    expectEqual("аб", String(validatingUTF8: bindAsCChar(s)))
+    expectEqual("аб", String(validatingCString: bindAsCChar(s)))
     dealloc()
   }
   do {
     let (s, dealloc) = getIllFormedUTF8String1()
-    expectNil(String(validatingUTF8: bindAsCChar(s)))
+    expectNil(String(validatingCString: bindAsCChar(s)))
     dealloc()
   }
 }
@@ -324,14 +324,14 @@ CStringTests.test("String.cString.with.inout.CChar.conversion") {
   expectUnreachable()
 }
 
-CStringTests.test("String.validatingUTF8.with.Array.input") {
+CStringTests.test("String.validatingCString.with.Array.input") {
   guard #available(SwiftStdlib 5.7, *) else { return }
   do {
     let (u8p, dealloc) = getASCIIUTF8()
     defer { dealloc() }
     let buffer = UnsafeBufferPointer(start: u8p, count: getUTF8Length(u8p)+1)
     let str = buffer.withMemoryRebound(to: CChar.self) {
-      String(validatingUTF8: Array($0))
+      String(validatingCString: Array($0))
     }
     expectNotNil(str)
     str?.withCString {
@@ -344,41 +344,41 @@ CStringTests.test("String.validatingUTF8.with.Array.input") {
   // no need to test every case; that is covered in other tests
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
-    // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+    // withMessage: "input of String.init(validatingCString:) must be null-terminated"
   )
-  _ = String(validatingUTF8: [])
+  _ = String(validatingCString: [])
   expectUnreachable()
 }
 
-CStringTests.test("String.validatingUTF8.with.String.input") {
+CStringTests.test("String.validatingCString.with.String.input") {
   guard #available(SwiftStdlib 5.7, *) else { return }
   let (u8p, dealloc) = getASCIIUTF8()
   defer { dealloc() }
-  var str = String(validatingUTF8: "ab")
+  var str = String(validatingCString: "ab")
   expectNotNil(str)
   str?.withCString {
     $0.withMemoryRebound(to: UInt8.self, capacity: getUTF8Length(u8p)+1) {
       expectEqualCString(u8p, $0)
     }
   }
-  str = String(validatingUTF8: "")
+  str = String(validatingCString: "")
   expectNotNil(str)
   expectEqual(str?.isEmpty, true)
 }
 
-CStringTests.test("String.validatingUTF8.with.inout.conversion") {
+CStringTests.test("String.validatingCString.with.inout.conversion") {
   guard #available(SwiftStdlib 5.7, *) else { return }
   var c = CChar.zero
-  var str = String(validatingUTF8: &c)
+  var str = String(validatingCString: &c)
   expectNotNil(str)
   expectEqual(str?.isEmpty, true)
   c = 100
   guard enableCrashTests else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
-    // withMessage: "input of String.init(validatingUTF8:) must be null-terminated"
+    // withMessage: "input of String.init(validatingCString:) must be null-terminated"
   )
-  str = String(validatingUTF8: &c)
+  str = String(validatingCString: &c)
   expectUnreachable()
 }
 
