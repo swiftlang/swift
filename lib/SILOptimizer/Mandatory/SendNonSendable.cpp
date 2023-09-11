@@ -672,7 +672,8 @@ public:
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
   std::vector<PartitionOp> translateSILPhi(
-      std::vector<std::pair<std::vector<SILValue>, SILBasicBlock*>> branches) {
+      const std::vector<std::pair<std::vector<SILValue>, SILBasicBlock *>>
+          &branches) {
     SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
     for (const auto &[args, dest] : branches) {
       assert(args.size() >= dest->getNumArguments());
