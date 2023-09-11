@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -O
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -O -Xllvm -print-after-all
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop
 // RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop -O
 // RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop
