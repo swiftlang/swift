@@ -822,7 +822,8 @@ namespace {
         return;
 
       printFieldRaw([&](raw_ostream &OS) {
-        L.print(OS, Ctx->SourceMgr);
+        escaping_ostream escOS(OS);
+        L.print(escOS, Ctx->SourceMgr);
       }, label, LocationColor);
     }
 
@@ -832,7 +833,8 @@ namespace {
         return;
 
       printFieldRaw([&](raw_ostream &OS) {
-        R.print(OS, Ctx->SourceMgr, /*PrintText=*/false);
+        escaping_ostream escOS(OS);
+        R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
       }, "range", RangeColor);
     }
 
