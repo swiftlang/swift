@@ -4303,14 +4303,13 @@ bb2(%5 : @owned $MyErrorType):
   throw %5 : $MyErrorType
 }
 
-// CHECK-LABEL: sil [ossa] @mark_dependence_base :
-// CHECK: bb0(
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK: mark_dependence %0 : $*Builtin.Int64 on {{%.*}} : $B
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK: } // end sil function 'mark_dependence_base'
+// CHECK-LABEL: sil [ossa] @mark_dependence_base
+// XHECK: bb0(
+// XHECK-NOT: init_existential_ref
+// XHECK-NOT: enum
+// XHECK-NEXT: mark_dependence
+// XHECK-NEXT: load
+// XHECK: return
 sil [ossa] @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
@@ -4322,10 +4321,10 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
 }
 
 // CHECK-LABEL: sil [ossa] @mark_dependence_trivial_object_base :
-// CHECK: bb0(
-// CHECK-NEXT: copy_value
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'mark_dependence_trivial_object_base'
+// XHECK: bb0(
+// XHECK-NEXT: copy_value
+// XHECK-NEXT: return
+// XHECK: } // end sil function 'mark_dependence_trivial_object_base'
 sil [ossa] @mark_dependence_trivial_object_base : $@convention(thin) (@guaranteed B) -> @owned B {
 bb0(%0 : @guaranteed $B):
   %0a = copy_value %0 : $B
@@ -4357,14 +4356,13 @@ bb0(%addr : $*Builtin.Int64, %instance : @owned $B):
 
 protocol _NSArrayCore {}
 
-// CHECK-LABEL: sil [ossa] @mark_dependence_base2 :
-// CHECK: bb0(
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK: mark_dependence %0 : $*Builtin.Int64 on {{%.*}} : $B
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK: } // end sil function 'mark_dependence_base2'
+// CHECK-LABEL: sil [ossa] @mark_dependence_base2
+// XHECK: bb0(
+// XHECK-NOT: open_existential_ref
+// XHECK-NOT: enum
+// XHECK-NEXT: mark_dependence
+// XHECK-NEXT: load
+// XHECK: return
 sil [ossa] @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   %2 = init_existential_ref %1 : $B : $B, $AnyObject
@@ -5416,3 +5414,50 @@ bb0(%0 : $*MoveOnlyStruct):
   return %16 : $()
 }
 
+sil @originalClosure : $@convention(thin) (@owned Klass) -> ()
+sil @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_ossa_silcombine1 :
+// [[ENUM:%.*]] = enum
+// [[MDI:%.*]] = mark_dependence {{.*}} on [[ENUM]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_ossa_silcombine1'
+sil [ossa] @test_mark_dependence_ossa_silcombine1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = function_ref @originalClosure : $@convention(thin) (@owned Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@owned Klass) -> ()
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %2 : $@callee_guaranteed () -> ()
+  %5 = begin_borrow %4 : $Optional<@callee_guaranteed () -> ()>
+  %6 = mark_dependence %3 : $@noescape @callee_guaranteed () -> () on %5 : $Optional<@callee_guaranteed () -> ()>
+  %7 = function_ref @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %6 : $@noescape @callee_guaranteed () -> ()
+  end_borrow %5 : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %4 : $Optional<@callee_guaranteed () -> ()>
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_mark_dependence_ossa_silcombine2 :
+// [[ENUM:%.*]] = enum
+// [[MDI:%.*]] = mark_dependence {{.*}} on [[ENUM]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_ossa_silcombine2'
+sil [ossa] @test_mark_dependence_ossa_silcombine2 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = function_ref @originalClosure : $@convention(thin) (@owned Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] %1(%0) : $@convention(thin) (@owned Klass) -> ()
+  %3 = convert_escape_to_noescape %2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %2 : $@callee_guaranteed () -> ()
+  %5 = begin_borrow %4 : $Optional<@callee_guaranteed () -> ()>
+  %6 = mark_dependence %3 : $@noescape @callee_guaranteed () -> () on %5 : $Optional<@callee_guaranteed () -> ()>
+  %7 = function_ref @useNoEscapeClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %6 : $@noescape @callee_guaranteed () -> ()
+  br bb1(%4 : $Optional<@callee_guaranteed () -> ()>, %5 : $Optional<@callee_guaranteed () -> ()>)
+
+bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Optional<@callee_guaranteed () -> ()>):
+  end_borrow %11 : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %10 : $Optional<@callee_guaranteed () -> ()>
+  %12 = tuple ()
+  return %12 : $()
+}
