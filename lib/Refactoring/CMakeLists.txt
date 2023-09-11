@@ -5,6 +5,7 @@ add_swift_host_library(swiftRefactoring STATIC
   ConvertStringConcatenationToInterpolation.cpp
   ConvertGuardExprToIfLetExpr.cpp
   ConvertIfLetExprToGuardExpr.cpp
+  ConvertToDoCatch.cpp
   ConvertToSwitchStmt.cpp
   ConvertToTernaryExpr.cpp
   ExpandSwitchCases.cpp
