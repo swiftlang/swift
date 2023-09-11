@@ -8,6 +8,7 @@ add_swift_host_library(swiftRefactoring STATIC
   ExtractRepeatedExpr.cpp
   MoveMembersToExtension.cpp
   Refactoring.cpp
+  Renamer.cpp
   ExtractExprBase.cpp
   ReplaceBodiesWithFatalError.cpp
   Utils.cpp
