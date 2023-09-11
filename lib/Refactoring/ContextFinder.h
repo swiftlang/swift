@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/IDE/SourceEntityWalker.h"
 
 namespace swift {
 namespace refactoring {
