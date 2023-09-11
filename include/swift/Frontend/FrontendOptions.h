@@ -14,15 +14,14 @@
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
 #include "swift/Basic/FileTypes.h"
-#include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
-#include "clang/CAS/CASOptions.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
-#include "llvm/MC/MCTargetOptions.h"
+#include "clang/CAS/CASOptions.h"
 
 #include <set>
 #include <string>
@@ -149,15 +148,6 @@ public:
 
   /// CacheKey for input file.
   std::string InputFileKey;
-
-  /// Enable using the LLVM MCCAS backend for object file output.
-  bool UseCASBackend = false;
-
-  /// The output mode for the CAS Backend.
-  llvm::CASBackendMode CASObjMode;
-
-  /// Emit a .casid file next to the object file if CAS Backend is used.
-  bool EmitCASIDFile = false;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.

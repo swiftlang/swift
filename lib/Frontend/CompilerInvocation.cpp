@@ -266,10 +266,6 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
     }
   }(FrontendOpts.RequestedAction);
 
-  IRGenOpts.UseCASBackend = FrontendOpts.UseCASBackend;
-  IRGenOpts.CASObjMode = FrontendOpts.CASObjMode;
-  IRGenOpts.EmitCASIDFile = FrontendOpts.EmitCASIDFile;
-
   // If we're in JIT mode, set the requisite flags.
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate) {
     IRGenOpts.UseJIT = true;
@@ -1466,8 +1462,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory,
                                    const LangOptions &LangOpts,
-                                   const FrontendOptions &FrontendOpts,
-                                   bool RequiresCAS) {
+                                   const FrontendOptions &FrontendOpts) {
   using namespace options;
 
   if (const Arg *a = Args.getLastArg(OPT_tools_directory)) {
@@ -1595,7 +1590,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
-  if (RequiresCAS)
+  if (FrontendOpts.EnableCaching)
     Opts.CASOpts = FrontendOpts.CASOpts;
 
   return false;
@@ -3054,7 +3049,7 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory, LangOpts, FrontendOpts, requiresCAS())) {
+                             workingDirectory, LangOpts, FrontendOpts)) {
     return true;
   }
 

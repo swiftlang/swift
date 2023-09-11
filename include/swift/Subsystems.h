@@ -263,8 +263,7 @@ namespace swift {
                            const IRGenOptions &opts,
                            UnifiedStatsReporter *stats, DiagnosticEngine &diags,
                            llvm::raw_pwrite_stream &out,
-                           llvm::sys::Mutex *diagMutex = nullptr,
-                           llvm::raw_pwrite_stream *casid = nullptr);
+                           llvm::sys::Mutex *diagMutex = nullptr);
 
   /// Wrap a serialized module inside a swift AST section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
