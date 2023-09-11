@@ -207,7 +207,7 @@ class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
 
-  llvm::Optional<TrackableValue> trackIfNonSendable(SILValue value) const {
+  std::optional<TrackableValue> trackIfNonSendable(SILValue value) const {
     auto state = getTrackableValue(value);
     if (state.isNonSendable()) {
       return state;
@@ -1077,7 +1077,7 @@ enum class LocalConsumedReasonKind {
 // kind == NonLocal: an instruction outside this block
 struct LocalConsumedReason {
   LocalConsumedReasonKind kind;
-  llvm::Optional<PartitionOp> localInst;
+  std::optional<PartitionOp> localInst;
 
   static LocalConsumedReason ConsumeInst(PartitionOp localInst) {
     assert(localInst.getKind() == PartitionOpKind::Consume);
@@ -1097,7 +1097,7 @@ struct LocalConsumedReason {
 
 private:
   LocalConsumedReason(LocalConsumedReasonKind kind,
-                 llvm::Optional<PartitionOp> localInst = {})
+                 std::optional<PartitionOp> localInst = {})
       : kind(kind), localInst(localInst) {}
 };
 
@@ -1259,7 +1259,7 @@ class RaceTracer {
   void findAndAddConsumedReasons(
       SILBasicBlock * SILBlock, TrackableValueID consumedVal,
       ConsumedReason &consumedReason, unsigned distance,
-      llvm::Optional<PartitionOp> targetOp = {}) {
+      std::optional<PartitionOp> targetOp = {}) {
     assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
     LocalConsumedReason localReason
         = findLocalConsumedReason(SILBlock, consumedVal, targetOp);
@@ -1361,7 +1361,7 @@ class RaceTracer {
   // consumed, possibly local or nonlocal. Return the reason.
   LocalConsumedReason findLocalConsumedReason(
       SILBasicBlock * SILBlock, TrackableValueID consumedVal,
-      llvm::Optional<PartitionOp> targetOp = {}) {
+      std::optional<PartitionOp> targetOp = {}) {
     // if this is a query for consumption reason at block exit, check the cache
     if (!targetOp && consumedAtExitReasons.count({SILBlock, consumedVal}))
       return consumedAtExitReasons.at({SILBlock, consumedVal});
@@ -1372,7 +1372,7 @@ class RaceTracer {
     // so assert that it's actually consumed at exit
     assert(targetOp || block.getExitPartition().isConsumed(consumedVal));
 
-    llvm::Optional<LocalConsumedReason> consumedReason;
+    std::optional<LocalConsumedReason> consumedReason;
 
     Partition workingPartition = block.getEntryPartition();
 
