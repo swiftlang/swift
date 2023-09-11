@@ -13,6 +13,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -461,8 +462,9 @@ public:
   // require all non-sendable sources, merge their regions, and assign the
   // resulting region to all non-sendable targets, or assign non-sendable
   // targets to a fresh region if there are no non-sendable sources
-  std::vector<PartitionOp> translateSILMultiAssign(
-      std::vector<SILValue> tgts, std::vector<SILValue> srcs) {
+  template <typename TargetRange, typename SourceRange>
+  std::vector<PartitionOp> translateSILMultiAssign(const TargetRange &tgts,
+                                                   const SourceRange &srcs) {
 
     std::vector<SILValue> nonSendableSrcs;
     std::vector<SILValue> nonSendableTgts;
@@ -514,11 +516,8 @@ public:
     // if this apply does not cross isolation domains, it has normal,
     // non-consuming multi-assignment semantics
     if (!SILApplyCrossesIsolation(applyInst))
-      return translateSILMultiAssign(
-          getApplyResults(applyInst),
-          {applyInst->getOperandValues().begin(),
-           applyInst->getOperandValues().end()}
-      );
+      return translateSILMultiAssign(getApplyResults(applyInst),
+                                     applyInst->getOperandValues());
 
     if (auto cast = dyn_cast<ApplyInst>(applyInst))
       return translateIsolationCrossingSILApply(cast);
@@ -592,13 +591,15 @@ public:
   }
 
   std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
-    return translateSILMultiAssign({tgt}, {src});
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(tgt),
+                                   TinyPtrVector<SILValue>(src));
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
   std::vector<PartitionOp> translateSILAssignFresh(SILValue val) {
-    return translateSILMultiAssign({val}, {});
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
+                                   TinyPtrVector<SILValue>());
   }
 
   std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
@@ -644,7 +645,8 @@ public:
       enumOperands.push_back(selectEnumInst.getCase(i).second);
     if (selectEnumInst.hasDefault())
       enumOperands.push_back(selectEnumInst.getDefaultResult());
-    return translateSILMultiAssign({selectEnumInst->getResult(0)}, enumOperands);
+    return translateSILMultiAssign(
+        TinyPtrVector<SILValue>(selectEnumInst->getResult(0)), enumOperands);
   }
 
   std::vector<PartitionOp> translateSILSwitchEnum(
@@ -671,16 +673,20 @@ public:
   // merge of all values that could be passed to it from this basic block.
   std::vector<PartitionOp> translateSILPhi(
       std::vector<std::pair<std::vector<SILValue>, SILBasicBlock*>> branches) {
-    std::map<SILValue, std::vector<SILValue>> argSources;
+    SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
     for (const auto &[args, dest] : branches) {
       assert(args.size() >= dest->getNumArguments());
       for (unsigned i = 0; i < dest->getNumArguments(); i++)
-        argSources[dest->getArgument(i)].push_back(args[i]);
+        argSources.insert(dest->getArgument(i), args[i]);
     }
+    argSources.setFrozen();
     std::vector<PartitionOp> translated;
-    for (const auto &[arg, srcs] : argSources)
-      for (auto op : translateSILMultiAssign({arg}, srcs))
+    for (auto pair : argSources.getRange()) {
+      for (auto op : translateSILMultiAssign(
+               TinyPtrVector<SILValue>(pair.first), pair.second)) {
         translated.push_back(op);
+      }
+    }
     return translated;
   }
 
@@ -800,9 +806,8 @@ public:
       // handle tuple destruction
       auto *destructTupleInst = cast<DestructureTupleInst>(inst);
       return translateSILMultiAssign(
-          {destructTupleInst->getResults().begin(),
-           destructTupleInst->getResults().end()},
-          {destructTupleInst->getOperand()});
+          destructTupleInst->getResults(),
+          TinyPtrVector<SILValue>(destructTupleInst->getOperand()));
     }
 
     // handle instructions that aggregate their operands into a single structure
@@ -811,8 +816,8 @@ public:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
       return translateSILMultiAssign(
-          {inst->getResult(0)},
-          {inst->getOperandValues().begin(), inst->getOperandValues().end()});
+          TinyPtrVector<SILValue>(inst->getResult(0)),
+          inst->getOperandValues());
 
     // Handle returns and throws - require the operand to be non-consumed
     case SILInstructionKind::ReturnInst:
