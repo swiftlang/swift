@@ -71,6 +71,10 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  func erase(block: BasicBlock) {
+    _bridged.eraseBlock(block.bridged)
+  }
+
   func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
     if _bridged.tryOptimizeApplyOfPartialApply(closure.bridged) {
       notifyInstructionsChanged()
@@ -225,10 +229,6 @@ struct FunctionPassContext : MutatingContext {
       let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
       return _bridged.lookupStdlibFunction(nameStr).function
     }
-  }
-
-  func erase(block: BasicBlock) {
-    _bridged.eraseBlock(block.bridged)
   }
 
   func modifyEffects(in function: Function, _ body: (inout FunctionEffects) -> ()) {
