@@ -192,7 +192,6 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     return;
 
   AccessScope problematicAccessScope = AccessScope::getPublic();
-  ImportAccessLevel problematicImport = llvm::None;
 
   if (type) {
     llvm::Optional<AccessScope> typeAccessScope =
@@ -263,8 +262,16 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   const TypeRepr *complainRepr = TypeAccessScopeDiagnoser::findTypeWithScope(
       typeRepr, problematicAccessScope, useDC, checkUsableFromInline);
 
+  ImportAccessLevel complainImport = llvm::None;
+  if (complainRepr) {
+    const ValueDecl *VD =
+      static_cast<const IdentTypeRepr*>(complainRepr)->getBoundDecl();
+    assert(VD && "findTypeWithScope should return bound TypeReprs only");
+    complainImport = VD->getImportAccessFrom(useDC);
+  }
+
   diagnose(problematicAccessScope, complainRepr, downgradeToWarning,
-           problematicImport);
+           complainImport);
 }
 
 /// Checks if the access scope of the type described by \p TL is valid for the
