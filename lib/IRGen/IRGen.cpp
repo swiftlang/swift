@@ -128,6 +128,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
   TargetOpts.FunctionSections = Opts.FunctionSections;
 
+  // Set option to UseCASBackend if CAS was enabled on the command line.
+  TargetOpts.UseCASBackend = Opts.UseCASBackend;
+
+  // Set option to select the CASBackendMode.
+  TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
+
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
   // WebAssembly doesn't support atomics yet, see
@@ -605,17 +611,31 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   if (OutputFilename.empty())
     return false;
 
+  std::unique_ptr<raw_fd_ostream> CASIDFile;
+  if (Opts.UseCASBackend && Opts.EmitCASIDFile &&
+      Opts.CASObjMode != llvm::CASBackendMode::CASID &&
+      Opts.OutputKind == IRGenOutputKind::ObjectFile && OutputFilename != "-") {
+    std::string OutputFilenameCASID = std::string(OutputFilename);
+    OutputFilenameCASID.append(".casid");
+    std::error_code EC;
+    CASIDFile = std::make_unique<raw_fd_ostream>(OutputFilenameCASID, EC);
+    if (EC) {
+      diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+                   OutputFilename, std::move(EC.message()));
+      return true;
+    }
+  }
+
   return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
-                                    *OutputFile, DiagMutex);
+                             *OutputFile, DiagMutex,
+                             CASIDFile ? CASIDFile.get() : nullptr);
 }
 
-bool swift::compileAndWriteLLVM(llvm::Module *module,
-                                llvm::TargetMachine *targetMachine,
-                                const IRGenOptions &opts,
-                                UnifiedStatsReporter *stats,
-                                DiagnosticEngine &diags,
-                                llvm::raw_pwrite_stream &out,
-                                llvm::sys::Mutex *diagMutex) {
+bool swift::compileAndWriteLLVM(
+    llvm::Module *module, llvm::TargetMachine *targetMachine,
+    const IRGenOptions &opts, UnifiedStatsReporter *stats,
+    DiagnosticEngine &diags, llvm::raw_pwrite_stream &out,
+    llvm::sys::Mutex *diagMutex, llvm::raw_pwrite_stream *casid) {
 
   // Set up the final code emission pass. Bitcode/LLVM IR is emitted as part of
   // the optimization pass pipeline.
@@ -639,8 +659,8 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
-    bool fail = targetMachine->addPassesToEmitFile(EmitPasses, out, nullptr,
-                                                   FileType, !opts.Verify);
+    bool fail = targetMachine->addPassesToEmitFile(
+        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);

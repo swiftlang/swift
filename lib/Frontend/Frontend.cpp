@@ -414,7 +414,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
-  if (!Opts.EnableCaching)
+  if (!getInvocation().requiresCAS())
     return false;
 
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();

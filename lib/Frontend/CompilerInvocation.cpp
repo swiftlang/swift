@@ -266,6 +266,10 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
     }
   }(FrontendOpts.RequestedAction);
 
+  IRGenOpts.UseCASBackend = FrontendOpts.UseCASBackend;
+  IRGenOpts.CASObjMode = FrontendOpts.CASObjMode;
+  IRGenOpts.EmitCASIDFile = FrontendOpts.EmitCASIDFile;
+
   // If we're in JIT mode, set the requisite flags.
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate) {
     IRGenOpts.UseJIT = true;
@@ -1457,8 +1461,7 @@ static bool ValidateModulesOnceOptions(const ClangImporterOptions &Opts,
   return false;
 }
 
-static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
-                                   ArgList &Args,
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory,
                                    const LangOptions &LangOpts,
