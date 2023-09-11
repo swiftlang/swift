@@ -13,6 +13,7 @@
 #include "Utils.h"
 #include "swift/AST/NameLookup.h"
 
+using namespace swift;
 using namespace swift::refactoring;
 
 llvm::StringRef
@@ -55,4 +56,17 @@ llvm::StringRef swift::refactoring::correctNewDeclName(DeclContext *DC,
   ASTContext &Ctx = DC->getASTContext();
   lookupVisibleDecls(Consumer, DC, true);
   return correctNameInternal(Ctx, Name, AllVisibles);
+}
+
+/// If \p NTD is a protocol, return all the protocols it inherits from. If it's
+/// a type, return all the protocols it conforms to.
+SmallVector<ProtocolDecl *, 2>
+swift::refactoring::getAllProtocols(NominalTypeDecl *NTD) {
+  if (auto Proto = dyn_cast<ProtocolDecl>(NTD)) {
+    return SmallVector<ProtocolDecl *, 2>(
+        Proto->getInheritedProtocols().begin(),
+        Proto->getInheritedProtocols().end());
+  } else {
+    return NTD->getAllProtocols();
+  }
 }
