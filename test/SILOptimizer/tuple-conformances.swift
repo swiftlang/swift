@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil %s -enable-experimental-feature TupleConformances | %FileCheck %s
 
+// Required for experimental features
+// REQUIRES: asserts
+
 public typealias Tuple<each T> = (repeat each T)
 
 public protocol P {
