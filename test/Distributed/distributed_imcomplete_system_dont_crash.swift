@@ -7,9 +7,9 @@ import Distributed
 
 public final class CompletelyHollowActorSystem: DistributedActorSystem {
   // expected-error@-1{{type 'CompletelyHollowActorSystem' does not conform to protocol 'DistributedActorSystem'}}
-  // expected-note@-2{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+  // expected-note@-2{{add stubs for conformance}}
   // expected-error@-3{{class 'CompletelyHollowActorSystem' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-4{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
+  // expected-note@-4{{add stubs for conformance}}
   // expected-error@-5{{class 'CompletelyHollowActorSystem' is missing witness for protocol requirement 'remoteCallVoid'}}
 
   public typealias ActorID = String
@@ -42,6 +42,6 @@ public final class CompletelyHollowActorSystem_NotEvenTypes: DistributedActorSys
   // expected-error@-1{{type 'CompletelyHollowActorSystem_NotEvenTypes' does not conform to protocol 'DistributedActorSystem'}}
   // expected-error@-2{{class 'CompletelyHollowActorSystem_NotEvenTypes' is missing witness for protocol requirement 'remoteCallVoid'}}
   // expected-error@-3{{class 'CompletelyHollowActorSystem_NotEvenTypes' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-4{{protocol 'DistributedActorSystem' requires function 'remoteCall' with signature:}}
-  // expected-note@-5{{protocol 'DistributedActorSystem' requires function 'remoteCallVoid' with signature:}}
+  // expected-note@-4{{add stubs for conformance}}
+  // expected-note@-5{{add stubs for conformance}}
 }

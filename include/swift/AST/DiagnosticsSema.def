@@ -5348,9 +5348,9 @@ ERROR(broken_distributed_actor_requirement,none,
 ERROR(distributed_actor_system_conformance_missing_adhoc_requirement,none,
       "%kind0 is missing witness for protocol requirement %1",
       (const ValueDecl *, DeclName))
-NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
-      "protocol %0 requires function %1 with signature:\n%2",
-     (DeclName, DeclName, StringRef))
+//NOTE(note_distributed_actor_system_conformance_missing_adhoc_requirement,none,
+//      "protocol %0 requires function %1 with signature:\n%2",
+//     (DeclName, DeclName, StringRef))
 
 ERROR(override_implicit_unowned_executor,none,
       "cannot override an actor's 'unownedExecutor' property that wasn't "
