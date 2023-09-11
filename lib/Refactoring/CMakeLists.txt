@@ -21,6 +21,7 @@ add_swift_host_library(swiftRefactoring STATIC
   Refactoring.cpp
   Renamer.cpp
   ReplaceBodiesWithFatalError.cpp
+  SimplifyNumberLiteral.cpp
   Utils.cpp
 )
 
