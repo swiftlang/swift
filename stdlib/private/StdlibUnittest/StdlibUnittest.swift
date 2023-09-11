@@ -850,7 +850,7 @@ func _printDebuggingAdvice(_ fullTestName: String) {
 #else
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
-    if let interpreterCmd = String(validatingUTF8: interpreter!) {
+    if let interpreterCmd = String(validatingCString: interpreter!) {
         invocation.insert(interpreterCmd, at: 0)
     }
   }
