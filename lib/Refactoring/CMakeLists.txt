@@ -1,5 +1,6 @@
 add_swift_host_library(swiftRefactoring STATIC
   AddEquatableConformance.cpp
+  AddExplicitCodableImplementation.cpp
   CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
   ConvertGuardExprToIfLetExpr.cpp
