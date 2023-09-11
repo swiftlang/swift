@@ -12,6 +12,7 @@ add_swift_host_library(swiftRefactoring STATIC
   ExtractRepeatedExpr.cpp
   ExtractFunction.cpp
   FillProtocolStubs.cpp
+  LocalizeString.cpp
   MoveMembersToExtension.cpp
   Refactoring.cpp
   Renamer.cpp
