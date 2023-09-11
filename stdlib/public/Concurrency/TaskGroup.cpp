@@ -31,6 +31,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -1150,7 +1151,7 @@ static void _enqueueRawError(DiscardingTaskGroup *group,
 void AccumulatingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool hadErrorResult) {
   // Retain the task while it is in the queue; it must remain alive until
   // it is found by poll.  This retain will be balanced by the release in poll.
-  swift_retain(completedTask);
+  _swift_retain(completedTask);
 
   _enqueueCompletedTask(&readyQueue, completedTask, hadErrorResult);
 }
@@ -1178,7 +1179,7 @@ void DiscardingTaskGroup::enqueueCompletedTask(AsyncTask *completedTask, bool ha
   // Retain the task while it is in the queue; it must remain alive until
   // it is found by poll.  This retain will be balanced by the release in waitAll.
   assert(hadErrorResult); // a discarding group may only store an errored task.
-  swift_retain(completedTask);
+  _swift_retain(completedTask);
 
   _enqueueCompletedTask(&readyQueue, completedTask, hadErrorResult);
 }
@@ -1510,7 +1511,7 @@ TaskGroupBase::PreparedWaitingTask TaskGroupBase::prepareWaitingTaskWithTask(
         if (isDiscardingResults() && hadErrorResult && taskWasRetained) {
           // We only used the task to keep the error in the future fragment around
           // so now that we emitted the error and detached the task, we are free to release the task immediately.
-          swift_release(completedTask);
+          _swift_release(completedTask);
         }
 
         _swift_tsan_acquire(static_cast<Job *>(waitingTask));
@@ -1654,7 +1655,7 @@ static void swift_taskGroup_wait_next_throwingImpl(
       _swift_taskGroup_detachChild(asAbstract(group), completedTask);
 
       // Balance the retain done by enqueueCompletedTask.
-      swift_release(completedTask);
+      _swift_release(completedTask);
     }
 
     return waitingTask->runInFullyEstablishedContext();
@@ -1915,7 +1916,7 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
       _swift_taskGroup_detachChild(asAbstract(this), completedTask);
 
       // Balance the retain done by enqueueCompletedTask.
-      swift_release(completedTask);
+      _swift_release(completedTask);
     }
 
     // We MUST release the lock before we resume the waiting task, because the resumption
