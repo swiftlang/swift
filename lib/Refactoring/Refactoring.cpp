@@ -545,32 +545,6 @@ StringRef getDefaultPreferredName(RefactoringKind Kind) {
   }
 }
 
-bool RefactoringActionExtractExpr::
-isApplicable(const ResolvedRangeInfo &Info, DiagnosticEngine &Diag) {
-  switch (Info.Kind) {
-    case RangeKind::SingleExpression:
-      // We disallow extract literal expression for two reasons:
-      // (1) since we print the type for extracted expression, the type of a
-      // literal may print as "int2048" where it is not typically users' choice;
-      // (2) Extracting one literal provides little value for users.
-      return checkExtractConditions(Info, Diag).success();
-    case RangeKind::PartOfExpression:
-    case RangeKind::SingleDecl:
-    case RangeKind::MultiTypeMemberDecl:
-    case RangeKind::SingleStatement:
-    case RangeKind::MultiStatement:
-    case RangeKind::Invalid:
-      return false;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
-bool RefactoringActionExtractExpr::performChange() {
-  return RefactoringActionExtractExprBase(TheFile, RangeInfo,
-                                          DiagEngine, false, PreferredName,
-                                          EditConsumer).performChange();
-}
-
 /// Abstract helper class containing info about a TernaryExpr
 /// that can be expanded into an IfStmt.
 class ExpandableTernaryExprInfo {
