@@ -16,8 +16,9 @@
 
 namespace swift {
 namespace refactoring {
-llvm::StringRef correctNameInternal(ASTContext &Ctx, StringRef Name,
-                                    ArrayRef<ValueDecl *> AllVisibles);
+StringRef correctNameInternal(ASTContext &Ctx, StringRef Name,
+                              ArrayRef<ValueDecl *> AllVisibles);
 
+StringRef correctNewDeclName(DeclContext *DC, StringRef Name);
 }
 } // namespace swift

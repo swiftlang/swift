@@ -95,6 +95,109 @@ struct SimilarExprCollector : public SourceEntityWalker {
 
 } // namespace
 
+ExtractCheckResult
+swift::refactoring::checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
+                                           DiagnosticEngine &DiagEngine) {
+  SmallVector<CannotExtractReason, 2> AllReasons;
+  // If any declared declaration is referred out of the given range, return
+  // false.
+  auto Declared = RangeInfo.DeclaredDecls;
+  auto It = std::find_if(Declared.begin(), Declared.end(),
+                         [](DeclaredDecl DD) { return DD.ReferredAfterRange; });
+  if (It != Declared.end()) {
+    DiagEngine.diagnose(It->VD->getLoc(),
+                        diag::value_decl_referenced_out_of_range,
+                        It->VD->getName());
+    return ExtractCheckResult();
+  }
+
+  // We cannot extract a range with multi entry points.
+  if (!RangeInfo.HasSingleEntry) {
+    DiagEngine.diagnose(SourceLoc(), diag::multi_entry_range);
+    return ExtractCheckResult();
+  }
+
+  // We cannot extract code that is not sure to exit or not.
+  if (RangeInfo.exit() == ExitState::Unsure) {
+    return ExtractCheckResult();
+  }
+
+  // We cannot extract expressions of l-value type.
+  if (auto Ty = RangeInfo.getType()) {
+    if (Ty->hasLValueType() || Ty->is<InOutType>())
+      return ExtractCheckResult();
+
+    // Disallow extracting error type expressions/statements
+    // FIXME: diagnose what happened?
+    if (Ty->hasError())
+      return ExtractCheckResult();
+
+    if (Ty->isVoid()) {
+      AllReasons.emplace_back(CannotExtractReason::VoidType);
+    }
+  }
+
+  // We cannot extract a range with orphaned loop keyword.
+  switch (RangeInfo.Orphan) {
+  case swift::ide::OrphanKind::Continue:
+    DiagEngine.diagnose(SourceLoc(), diag::orphan_loop_keyword, "continue");
+    return ExtractCheckResult();
+  case swift::ide::OrphanKind::Break:
+    DiagEngine.diagnose(SourceLoc(), diag::orphan_loop_keyword, "break");
+    return ExtractCheckResult();
+  case swift::ide::OrphanKind::None:
+    break;
+  }
+
+  // Guard statement can not be extracted.
+  if (llvm::any_of(RangeInfo.ContainedNodes,
+                   [](ASTNode N) { return N.isStmt(StmtKind::Guard); })) {
+    return ExtractCheckResult();
+  }
+
+  // Disallow extracting certain kinds of statements.
+  if (RangeInfo.Kind == RangeKind::SingleStatement) {
+    Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
+
+    // These aren't independent statement.
+    if (isa<BraceStmt>(S) || isa<CaseStmt>(S))
+      return ExtractCheckResult();
+  }
+
+  // Disallow extracting literals.
+  if (RangeInfo.Kind == RangeKind::SingleExpression) {
+    Expr *E = RangeInfo.ContainedNodes[0].get<Expr *>();
+
+    // Until implementing the performChange() part of extracting trailing
+    // closures, we disable them for now.
+    if (isa<AbstractClosureExpr>(E))
+      return ExtractCheckResult();
+
+    if (isa<LiteralExpr>(E))
+      AllReasons.emplace_back(CannotExtractReason::Literal);
+  }
+
+  switch (RangeInfo.RangeContext->getContextKind()) {
+  case swift::DeclContextKind::Initializer:
+  case swift::DeclContextKind::SubscriptDecl:
+  case swift::DeclContextKind::EnumElementDecl:
+  case swift::DeclContextKind::AbstractFunctionDecl:
+  case swift::DeclContextKind::AbstractClosureExpr:
+  case swift::DeclContextKind::TopLevelCodeDecl:
+    break;
+
+  case swift::DeclContextKind::SerializedLocal:
+  case swift::DeclContextKind::Package:
+  case swift::DeclContextKind::Module:
+  case swift::DeclContextKind::FileUnit:
+  case swift::DeclContextKind::GenericTypeDecl:
+  case swift::DeclContextKind::ExtensionDecl:
+  case swift::DeclContextKind::MacroDecl:
+    return ExtractCheckResult();
+  }
+  return ExtractCheckResult(AllReasons);
+}
+
 bool RefactoringActionExtractExprBase::performChange() {
   // Check if the new name is ok.
   if (!Lexer::isIdentifier(PreferredName)) {

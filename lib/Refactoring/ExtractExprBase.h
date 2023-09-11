@@ -47,6 +47,9 @@ public:
   }
 };
 
+/// Check whether a given range can be extracted.
+/// Return true on successful condition checking,.
+/// Return false on failed conditions.
 ExtractCheckResult checkExtractConditions(const ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine);
 
