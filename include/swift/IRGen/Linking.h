@@ -89,6 +89,10 @@ inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
 
+inline bool isMetadataAllowedInEmbedded(CanType t) {
+  return isa<ClassType>(t);
+}
+
 inline bool isEmbedded(Decl *d) {
   return d->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
@@ -840,7 +844,7 @@ public:
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr) {
     assert(!isObjCImplementation(concreteType));
-    assert(!isEmbedded(concreteType));
+    assert(!isEmbedded(concreteType) || isMetadataAllowedInEmbedded(concreteType));
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadata, concreteType);
     entity.Data |= LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr));

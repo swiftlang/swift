@@ -1078,6 +1078,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
+  } else {
+    emitEmbeddedClassMetadata(*this, D, fragileLayout);
   }
 
   IRGen.addClassForEagerInitialization(D);
