@@ -15,10 +15,48 @@ class NonSendableKlass {
 actor Actor {
   var klass = NonSendableKlass()
   final var finalKlass = NonSendableKlass()
+
+  func useKlass(_ x: NonSendableKlass) {}
 }
 
 final actor FinalActor {
   var klass = NonSendableKlass()
+  func useKlass(_ x: NonSendableKlass) {}
+}
+
+func useInOut<T>(_ x: inout T) {}
+func useValue<T>(_ x: T) {}
+
+////////////////////////////
+// MARK: Actor Self Tests //
+////////////////////////////
+
+extension Actor {
+  func noWarningIfCallingGetter() async {
+    // We do not emit a warning in this case since we are calling transferring
+    // the result of a getter of an actor. The result of this getter could not
+    // have been returned from the actor without us emitting a warning as shown
+    // by the test klassGetter below.
+    await self.klass.asyncCall()
+  }
+
+  func warningIfCallingAsyncOnFinalField() async {
+    // Since we are calling finalKlass directly, we emit a warning here.
+    await self.finalKlass.asyncCall() // expected-warning {{}}
+  }
+
+  // We warn on this since we are escaping an actor field out of its isolation
+  // domain.
+  var klassGetter: NonSendableKlass {
+    self.finalKlass
+  }
+}
+
+extension FinalActor {
+  func warningIfCallingAsyncOnFinalField() async {
+    // Since our whole class is final, we emit the error directly here.
+    await self.klass.asyncCall() // expected-warning {{}}
+  }
 }
 
 /////////////////////////////
@@ -30,3 +68,61 @@ func formClosureWithoutCrashing() {
   var c = NonSendableKlass() // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
   let _ = { print(c) }
 }
+
+// In this test, closure is not promoted into its box form. As a result, we
+// treat assignments into contents as a merge operation rather than an assign.
+func closureInOut(_ a: Actor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+  closure = { useInOut(&contents) }
+
+  await a.useKlass(ns0) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await a.useKlass(ns1) // expected-note {{access here could race}}
+
+  closure() // expected-note {{access here could race}}
+}
+
+func closureInOut2(_ a: Actor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+
+  await a.useKlass(ns0) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+
+  closure = { useInOut(&contents) } // expected-note {{access here could race}}
+
+  await a.useKlass(ns1) // expected-note {{access here could race}}
+
+  closure()
+}
+
+func closureNonInOut(_ a: Actor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+
+  await a.useKlass(ns0)
+
+  closure = { useValue(contents) }
+
+  await a.useKlass(ns1) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+
+  closure() // expected-note {{access here could race}}
+}
+

@@ -394,7 +394,7 @@ public:
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
           [](const PartitionOp &, Element) {},
 
-      std::vector<Element> nonconsumables = {},
+      ArrayRef<Element> nonconsumables = {},
 
       llvm::function_ref<void(const PartitionOp &, Element)>
           handleConsumeNonConsumable = [](const PartitionOp &, Element) {}) {

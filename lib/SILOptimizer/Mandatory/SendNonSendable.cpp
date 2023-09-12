@@ -30,6 +30,8 @@
 
 using namespace swift;
 
+#pragma clang optimize off
+
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -240,6 +242,12 @@ class PartitionOpTranslator {
   //       utilities would make it easier than handrolling
   llvm::DenseSet<SILValue> capturedUIValues;
 
+  /// A list of values that can never be consumed.
+  ///
+  /// This includes all function arguments as well as ref_element_addr from
+  /// actors.
+  std::vector<TrackableValueID> neverConsumedValueIDs;
+
   TrackableValue getTrackableValue(SILValue value) const {
     value = getUnderlyingTrackedValue(value);
 
@@ -279,6 +287,21 @@ class PartitionOpTranslator {
     // Otherwise refer to the oracle.
     if (!isNonSendableType(value->getType()))
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+
+    // Check if our base is a ref_element_addr from an actor value. In such a
+    // case, add this id to the neverConsumedValueIDs.
+    if (isa<LoadInst, LoadBorrowInst>(iter.first->first)) {
+      auto *svi = cast<SingleValueInstruction>(iter.first->first);
+      auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
+      if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
+        if (storage.storage.getRoot()->getType().getASTType()->isActorType()) {
+          self->neverConsumedValueIDs.push_back(iter.first->second.getID());
+        }
+      }
+    }
+
+    // If our access storage is from a class, then see if we have an actor. In
+    // such a case, we need to add this id to the neverConsumed set.
 
     return {iter.first->first, iter.first->second};
   }
@@ -417,12 +440,9 @@ private:
   std::vector<TrackableValueID> getArgIDs() {
     std::vector<TrackableValueID> argIDs;
 
-    for (SILArgument *arg : function->getArguments())
-      if (auto state = trackIfNonSendable(arg))
-        argIDs.push_back(state->getID());
-
-    if (auto *selfArg = function->maybeGetSelfArgument()) {
-      if (auto state = trackIfNonSendable(selfArg)) {
+    for (SILArgument *arg : function->getArguments()) {
+      if (auto state = trackIfNonSendable(arg)) {
+        neverConsumedValueIDs.push_back(state->getID());
         argIDs.push_back(state->getID());
       }
     }
@@ -442,11 +462,8 @@ public:
   // Get the vector of IDs that cannot be legally consumed at any point in
   // this function. Since we place all args and self in a single region right
   // now, it is only necessary to choose a single representative of the set.
-  std::vector<TrackableValueID> getNonConsumables() {
-    if (const auto &argIDs = getArgIDs(); !argIDs.empty()) {
-      return {argIDs.front()};
-    }
-    return {};
+  ArrayRef<TrackableValueID> getNeverConsumedValues() {
+    return llvm::makeArrayRef(neverConsumedValueIDs);
   }
 
   // get the results of an apply instruction. This is the single result value
@@ -1049,7 +1066,7 @@ class BlockPartitionState {
     Partition workingPartition = entryPartition;
     for (auto &partitionOp : blockPartitionOps) {
       workingPartition.apply(partitionOp, handleFailure,
-                             translator.getNonConsumables(),
+                             translator.getNeverConsumedValues(),
                              handleConsumeNonConsumable);
     }
   }
