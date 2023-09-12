@@ -42,9 +42,10 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class, SILType classType,
   auto buf = M.allocate(size, alignof(SILVTable));
   SILVTable *vt = ::new (buf) SILVTable(Class, classType, Serialized, Entries);
   M.vtables.push_back(vt);
-  M.VTableMap[Class] = vt;
   if (vt->isSpecialized())
     M.SpecializedVTableMap[classType] = vt;
+  else
+    M.VTableMap[Class] = vt;
   // Update the Module's cache with new vtable + vtable entries:
   for (const Entry &entry : Entries) {
     M.VTableEntryCache.insert({{vt, entry.getMethod()}, entry});

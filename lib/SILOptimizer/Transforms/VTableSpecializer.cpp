@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "sil-vtable-specializer"
 
 #include "llvm/ADT/SmallVector.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
@@ -81,26 +82,10 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
     for (SILVTableEntry &entry : vtable->getMutableEntries()) {
       SILFunction *method = entry.getImplementation();
       if (!method->getLoweredFunctionType()->isPolymorphic()) continue;
-
-      if (entry.getKind() != SILVTableEntry::Kind::Inherited) {
-        vtable->dump();
-        entry.getMethod().dump();
-      }
-      assert(entry.getKind() == SILVTableEntry::Kind::Inherited);
-      Decl *classOfMethod =
-          entry.getMethod().getDecl()->getDeclContext()->getAsDecl();
-      SILType classTy = vtable->getClassType();
-      while (classTy.getClassOrBoundGenericClass() != classOfMethod) {
-        classTy = classTy.getSuperclass();
-      }
-      auto *classDecl = cast<ClassDecl>(classOfMethod);
-      SubstitutionMap subs = classTy.getASTType()->getContextSubstitutionMap(
-          classDecl->getParentModule(), classDecl);
-
-      SILFunction *specializedMethod =
-          specializeVTableMethod(method, subs, module);
-      entry.setImplementation(specializedMethod);
-      vtable->updateVTableCache(entry);
+      
+      ValueDecl *decl = entry.getMethod().getDecl();
+      module.getASTContext().Diags.diagnose(
+          decl->getLoc(), diag::non_final_generic_class_function);
     }
   }
 
@@ -152,9 +137,6 @@ SILFunction *VTableSpecializer::specializeVTableMethod(SILFunction *origMethod,
                           << '\n');
 
   if (!origMethod->getLoweredFunctionType()->isPolymorphic()) return origMethod;
-
-  LLVM_DEBUG(llvm::dbgs() << "specializeVTableMethod " << origMethod->getName()
-                          << '\n');
 
   ReabstractionInfo ReInfo(module.getSwiftModule(), module.isWholeModule(),
                            ApplySite(), origMethod, subs, IsNotSerialized,

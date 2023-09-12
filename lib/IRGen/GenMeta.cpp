@@ -5006,7 +5006,6 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                                             fragileLayout);
   metadataBuilder.layout();
   bool canBeConstant = metadataBuilder.canBeConstant();
-  metadataBuilder.createMetadataAccessFunction();
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
 
