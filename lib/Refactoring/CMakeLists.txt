@@ -1,6 +1,16 @@
 add_swift_host_library(swiftRefactoring STATIC
   AddEquatableConformance.cpp
   AddExplicitCodableImplementation.cpp
+  Async/AsyncConverter.cpp
+  Async/AsyncHandlerDesc.cpp
+  Async/AsyncRefactorings.cpp
+  Async/CallbackClassifier.cpp
+  Async/CallbackCondition.cpp
+  Async/DeclCollector.cpp
+  Async/DeclReferenceFinder.cpp
+  Async/ReferenceCollector.cpp
+  Async/ScopedDeclCollector.cpp
+  Async/Utils.cpp
   CollapseNestedIfStmt.cpp
   ConvertStringConcatenationToInterpolation.cpp
   ConvertToComputedProperty.cpp
