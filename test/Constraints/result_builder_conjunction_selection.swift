@@ -32,7 +32,7 @@ do {
   func test<T, U>(_: T, @Builder _: () -> some P<U>) {}
 
   // CHECK: ---Initial constraints for the given expression---
-  // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+  // CHECK: (integer_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
   // CHECK: (attempting type variable binding [[CLOSURE:\$T[0-9]+]] := () -> {{.*}}
   // CHECK-NOT: (attempting type variable binding [[LITERAL_VAR]] := {{.*}}
   // CHECK: (attempting conjunction element pattern binding element @ 0
@@ -48,7 +48,7 @@ do {
   func test<T, U>(_: T, @Builder _: (T) -> some P<U>) {}
 
   // CHECK: ---Initial constraints for the given expression---
-  // CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+  // CHECK: (integer_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
   // CHECK: (attempting type variable binding [[LITERAL_VAR]] := Int
   // CHECK: (attempting conjunction element pattern binding element @ 0
   test(42) { v in
@@ -63,12 +63,12 @@ do {
   // CHECK: ---Initial constraints for the given expression---
   // CHECK: (attempting type variable {{.*}} := () -> {{.*}}
   // CHECK: (attempting conjunction element pattern binding element @ 0 :
-  // CHECK-NEXT: (pattern_named 'x')
+  // CHECK-NEXT: (pattern_named "x")
   // CHECK: (attempting conjunction element syntactic element
   // CHECK-NEXT: (call_expr {{.*}}
   // CHECK: (attempting type variable {{.*}} := (Bool) -> {{.*}}
   // CHECK: (attempting conjunction element pattern binding element @ 0
-  // CHECK: (pattern_named implicit '$__builder{{.*}}')
+  // CHECK: (pattern_named implicit "$__builder{{.*}}")
   // CHECK: (applying conjunction result to outer context
   // CHECK: (attempting type variable {{.*}} := (Int?) -> {{.*}}
   // CHECK: (attempting disjunction choice {{.*}} bound to decl {{.*}}.Int.init(_:)

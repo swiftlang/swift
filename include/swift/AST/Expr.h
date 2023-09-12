@@ -1118,6 +1118,9 @@ public:
 #include "swift/AST/TokenKinds.def"
   };
 
+  static StringRef
+  getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind);
+
 private:
   ArgumentList *ArgList;
   SourceLoc PoundLoc;

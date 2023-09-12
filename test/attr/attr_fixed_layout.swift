@@ -7,21 +7,21 @@
 // Public types with @frozen are always fixed layout
 //
 
-// RESILIENCE-ON: struct_decl{{.*}}"Point" interface type='Point.Type' access=public non-resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"Point" interface type='Point.Type' access=public non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"Point" interface type="Point.Type" access=public non_resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"Point" interface type="Point.Type" access=public non_resilient
 @frozen public struct Point {
   let x, y: Int
 }
 
-// RESILIENCE-ON: struct_decl{{.*}}"FixedPoint" interface type='FixedPoint.Type' access=public non-resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"FixedPoint" interface type='FixedPoint.Type' access=public non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"FixedPoint" interface type="FixedPoint.Type" access=public non_resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"FixedPoint" interface type="FixedPoint.Type" access=public non_resilient
 @_fixed_layout public struct FixedPoint {
   // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
   let x, y: Int
 }
 
-// RESILIENCE-ON: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type='ChooseYourOwnAdventure.Type' access=public non-resilient
-// RESILIENCE-OFF: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type='ChooseYourOwnAdventure.Type' access=public non-resilient
+// RESILIENCE-ON: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type="ChooseYourOwnAdventure.Type" access=public non_resilient
+// RESILIENCE-OFF: enum_decl{{.*}}"ChooseYourOwnAdventure" interface type="ChooseYourOwnAdventure.Type" access=public non_resilient
 @frozen public enum ChooseYourOwnAdventure {
   case JumpIntoRabbitHole
   case EatMushroom
@@ -31,23 +31,23 @@
 // Public types are resilient when -enable-library-evolution is on
 //
 
-// RESILIENCE-ON: struct_decl{{.*}}"Size" interface type='Size.Type' access=public resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"Size" interface type='Size.Type' access=public non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"Size" interface type="Size.Type" access=public resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"Size" interface type="Size.Type" access=public non_resilient
 public struct Size {
   let w, h: Int
 }
 
-// RESILIENCE-ON: struct_decl{{.*}}"UsableFromInlineStruct" interface type='UsableFromInlineStruct.Type' access=internal non-resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"UsableFromInlineStruct" interface type='UsableFromInlineStruct.Type' access=internal non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"UsableFromInlineStruct" interface type="UsableFromInlineStruct.Type" access=internal non_resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"UsableFromInlineStruct" interface type="UsableFromInlineStruct.Type" access=internal non_resilient
 @frozen @usableFromInline struct UsableFromInlineStruct {}
 
-// RESILIENCE-ON: struct_decl{{.*}}"UsableFromInlineFixedStruct" interface type='UsableFromInlineFixedStruct.Type' access=internal non-resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"UsableFromInlineFixedStruct" interface type='UsableFromInlineFixedStruct.Type' access=internal non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"UsableFromInlineFixedStruct" interface type="UsableFromInlineFixedStruct.Type" access=internal non_resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"UsableFromInlineFixedStruct" interface type="UsableFromInlineFixedStruct.Type" access=internal non_resilient
 @_fixed_layout @usableFromInline struct UsableFromInlineFixedStruct {}
 // expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
 
-// RESILIENCE-ON: enum_decl{{.*}}"TaxCredit" interface type='TaxCredit.Type' access=public resilient
-// RESILIENCE-OFF: enum_decl{{.*}}"TaxCredit" interface type='TaxCredit.Type' access=public non-resilient
+// RESILIENCE-ON: enum_decl{{.*}}"TaxCredit" interface type="TaxCredit.Type" access=public resilient
+// RESILIENCE-OFF: enum_decl{{.*}}"TaxCredit" interface type="TaxCredit.Type" access=public non_resilient
 public enum TaxCredit {
   case EarnedIncome
   case MortgageDeduction
@@ -57,8 +57,8 @@ public enum TaxCredit {
 // Internal types are always fixed layout
 //
 
-// RESILIENCE-ON: struct_decl{{.*}}"Rectangle" interface type='Rectangle.Type' access=internal non-resilient
-// RESILIENCE-OFF: struct_decl{{.*}}"Rectangle" interface type='Rectangle.Type' access=internal non-resilient
+// RESILIENCE-ON: struct_decl{{.*}}"Rectangle" interface type="Rectangle.Type" access=internal non_resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"Rectangle" interface type="Rectangle.Type" access=internal non_resilient
 struct Rectangle {
   let topLeft: Point
   let bottomRight: Size

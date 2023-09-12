@@ -5,15 +5,15 @@
 // `0 as <#Type#>` should get literal bound early via equality constraint.
 
 // CHECK: ---Constraint solving at [{{.*}}:12:1 - line:12:13]---
-// CHECK: (integer_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+// CHECK: (integer_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
 // CHECK: Type Variables:
 // CHECK: [[LITERAL_VAR]] as UInt32 {{.*}}
 // CHECK-NOT: disjunction (remembered) \[\[locator@{{.*}} [Coerce@{{.*}}\]\]]:
 _ = UInt32(0)
 
 // CHECK: ---Constraint solving at [{{.*}}22:1 - line:22:13]---
-// CHECK: (coerce_expr implicit type='[[CAST_TYPE:\$T[0-9]+]]' {{.*}}
-// CHECK-NEXT: (nil_literal_expr type='[[LITERAL_VAR:\$T[0-9]+]]' {{.*}}
+// CHECK: (coerce_expr implicit type="[[CAST_TYPE:\$T[0-9]+]]" {{.*}}
+// CHECK-NEXT: (nil_literal_expr type="[[LITERAL_VAR:\$T[0-9]+]]" {{.*}}
 // CHECK: Type Variables:
 // CHECK: [[LITERAL_VAR]] as Int? {{.*}}
 // CHECK: disjunction (remembered) {{.*}}
