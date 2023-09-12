@@ -1690,18 +1690,19 @@ public:
       llvm_unreachable("Unexpected type of Optional.TangentVector");
 
     SILLocation loc = origData->getLoc();
-    StructElementAddrInst *adjOpt = builder.createStructElementAddr(
-        loc, adjStruct, adjOptVar);
+    StructElementAddrInst *adjOpt =
+        builder.createStructElementAddr(loc, adjStruct, adjOptVar);
 
     // unchecked_take_enum_data_addr is destructive, so copy
     // Optional<T.TangentVector> to a new alloca.
-    AllocStackInst *adjOptCopy = createFunctionLocalAllocation(adjOpt->getType(), loc);
-    builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake, IsInitialization);
+    AllocStackInst *adjOptCopy =
+        createFunctionLocalAllocation(adjOpt->getType(), loc);
+    builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake,
+                           IsInitialization);
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     UncheckedTakeEnumDataAddrInst *adjData =
-        builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy,
-                                                someElemDecl);
+        builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy, someElemDecl);
 
     setAdjointBuffer(bb, origData, adjData);
 
