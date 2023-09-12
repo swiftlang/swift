@@ -4294,19 +4294,26 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
       options.hasBase(TypeResolverContext::SubscriptDecl) ||
       options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
-    decltype(diag::attr_only_on_parameters) diagID;
-    if (options.getBaseContext() == TypeResolverContext::SubscriptDecl) {
+    auto diagID = diag::attr_only_on_parameters;
+    bool removeRepr = true;
+    if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
       diagID = diag::attr_not_on_subscript_parameters;
     } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
       diagID = diag::attr_not_on_variadic_parameters;
+    } else if (options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_not_on_enum_case_parameters;
     } else {
       diagID = diag::attr_only_on_parameters;
+      removeRepr = false;
     }
     StringRef name;
     if (ownershipRepr) {
       name = ownershipRepr->getSpecifierSpelling();
     }
-    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
+    auto diag = diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
+    if (removeRepr)
+      diag.fixItRemove(repr->getLoc());
+
     return ErrorType::get(getASTContext());
   }
 

@@ -3685,6 +3685,9 @@ ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_subscript_parameters,none,
       "'%0' must not be used on subscript parameters", (StringRef))
+ERROR(attr_not_on_enum_case_parameters,none,
+      "'%0' must not be used on enum case parameters", (StringRef))
+
 ERROR(attr_not_on_stored_properties,none,
       "'%0' must not be used on stored properties", (DeclAttribute))
 

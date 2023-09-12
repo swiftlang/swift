@@ -205,3 +205,10 @@ func rdar94888357() {
 
   let _ = S<String, String>("") // expected-error {{generic type 'S' specialized with too many type parameters (got 2, but expected 1)}}
 }
+
+// https://github.com/apple/swift/issues/68417
+enum E {
+  subscript(x: inout Int) -> Bool { true } // expected-error {{'inout' must not be used on subscript parameters}} {{16-22=}}
+  case c(x: inout Int) // expected-error {{'inout' must not be used on enum case parameters}} {{13-19=}}
+  func d(x: inout Int ...) // expected-error {{'inout' must not be used on variadic parameters}} {{13-19=}}
+}
