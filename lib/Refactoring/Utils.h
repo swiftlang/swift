@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_UTILS_H
+#define SWIFT_REFACTORING_UTILS_H
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
@@ -26,3 +29,5 @@ StringRef correctNewDeclName(DeclContext *DC, StringRef Name);
 SmallVector<ProtocolDecl *, 2> getAllProtocols(NominalTypeDecl *NTD);
 }
 } // namespace swift
+
+#endif

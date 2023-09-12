@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_ASYNCREFACTORING_H
+#define SWIFT_REFACTORING_ASYNCREFACTORING_H
+
 #include "ContextFinder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
@@ -1376,3 +1379,5 @@ private:
 } // namespace asyncrefactorings
 } // namespace refactoring
 } // namespace swift
+
+#endif

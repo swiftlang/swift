@@ -9,6 +9,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_REFACTORINGACTIONS_H
+#define SWIFT_REFACTORING_REFACTORINGACTIONS_H
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
@@ -130,3 +133,5 @@ public:
 
 } // end namespace refactoring
 } // end namespace swift
+
+#endif

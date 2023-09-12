@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_LOCALRENAME_H
+#define SWIFT_REFACTORING_LOCALRENAME_H
+
 #include "swift/Refactoring/Refactoring.h"
 
 namespace swift {
@@ -24,3 +27,5 @@ struct RenameInfo {
 llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
 } // namespace refactoring
 } // namespace swift
+
+#endif

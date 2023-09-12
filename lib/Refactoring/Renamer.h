@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_RENAME_H
+#define SWIFT_REFACTORING_RENAME_H
+
 #include "swift/Basic/SourceManager.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/Lexer.h"
@@ -100,3 +103,5 @@ public:
 
 } // namespace refactoring
 } // namespace swift
+
+#endif

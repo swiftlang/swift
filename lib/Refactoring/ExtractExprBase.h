@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_EXTRACTEXPRBASE_H
+#define SWIFT_REFACTORING_EXTRACTEXPRBASE_H
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/IDE/IDERequests.h"
@@ -80,3 +83,5 @@ public:
 
 } // namespace refactoring
 } // namespace swift
+
+#endif

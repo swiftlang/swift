@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_CONTEXTFINDER_H
+#define SWIFT_REFACTORING_CONTEXTFINDER_H
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
@@ -68,3 +71,5 @@ public:
 
 } // namespace refactoring
 } // namespace swift
+
+#endif

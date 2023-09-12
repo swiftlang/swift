@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_REFACTORING_ASYNCUTILS_H
+#define SWIFT_REFACTORING_ASYNCUTILS_H
+
 #include "swift/AST/Stmt.h"
 
 namespace swift {
@@ -31,3 +34,5 @@ FuncDecl *getUnderlyingFunc(const Expr *Fn);
 } // namespace asyncrefactorings
 } // namespace refactoring
 } // namespace swift
+
+#endif
