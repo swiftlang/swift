@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature SendNonSendable -disable-availability-checking -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix complete- %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-experimental-feature SendNonSendable -disable-availability-checking -verify -verify-additional-prefix sns-  %s -o /dev/null
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -8,7 +9,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass {
+class NonSendableKlass { // expected-complete-note 9{{}}
   func asyncCall() async {}
 }
 
@@ -33,11 +34,11 @@ func useValue<T>(_ x: T) {}
 
 extension Actor {
   func noWarningIfCallingGetter() async {
-    // We do not emit a warning in this case since we are calling transferring
-    // the result of a getter of an actor. The result of this getter could not
-    // have been returned from the actor without us emitting a warning as shown
-    // by the test klassGetter below.
+    // We should emit an error here since self is an actor which is non
+    // sendable, so we could be accessing isolated information from a part of
+    // the actor.
     await self.klass.asyncCall()
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
   }
 
   func warningIfCallingAsyncOnFinalField() async {
@@ -45,8 +46,7 @@ extension Actor {
     await self.finalKlass.asyncCall() // expected-warning {{}}
   }
 
-  // We warn on this since we are escaping an actor field out of its isolation
-  // domain.
+  // We do not warn on this since we warn in the caller of our getter instead.
   var klassGetter: NonSendableKlass {
     self.finalKlass
   }
@@ -82,10 +82,13 @@ func closureInOut(_ a: Actor) async {
   var closure = {}
   closure = { useInOut(&contents) }
 
-  await a.useKlass(ns0) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
-  await a.useKlass(ns1) // expected-note {{access here could race}}
+  await a.useKlass(ns0)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  // expected-sns-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await a.useKlass(ns1) // expected-sns-note {{access here could race}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
-  closure() // expected-note {{access here could race}}
+  closure() // expected-sns-note {{access here could race}}
 }
 
 func closureInOut2(_ a: Actor) async {
@@ -98,11 +101,13 @@ func closureInOut2(_ a: Actor) async {
 
   var closure = {}
 
-  await a.useKlass(ns0) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await a.useKlass(ns0) // expected-sns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
-  closure = { useInOut(&contents) } // expected-note {{access here could race}}
+  closure = { useInOut(&contents) } // expected-sns-note {{access here could race}}
 
-  await a.useKlass(ns1) // expected-note {{access here could race}}
+  await a.useKlass(ns1) // expected-sns-note {{access here could race}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure()
 }
@@ -118,11 +123,13 @@ func closureNonInOut(_ a: Actor) async {
   var closure = {}
 
   await a.useKlass(ns0)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure = { useValue(contents) }
 
-  await a.useKlass(ns1) // expected-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await a.useKlass(ns1) // expected-sns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
-  closure() // expected-note {{access here could race}}
+  closure() // expected-sns-note {{access here could race}}
 }
 
