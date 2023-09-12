@@ -38,6 +38,7 @@ struct MissingRemoteCall: DistributedActorSystem {
   }
 
   func makeInvocationEncoder() -> InvocationEncoder {
+    .init()
   }
 }
 

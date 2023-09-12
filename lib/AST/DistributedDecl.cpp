@@ -517,8 +517,9 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // --- Check parameter: returning: Res.Type
+  const ParamDecl *returnedTypeParam = nullptr;
   if (!isVoidReturn) {
-    auto returnedTypeParam = params->get(4);
+    returnedTypeParam = params->get(4);
     if (returnedTypeParam->getArgumentName() != C.Id_returning) {
       return false;
     }
@@ -526,47 +527,23 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
 
   // --- Check: Act: DistributedActor,
   //            Act.ID == Self.ActorID
-  auto *ActParam = std::find_if_not(
-      genericParams->begin(), genericParams->end(),
-      [this, &C, &module](GenericTypeParamDecl *param) {
-        return module
-            ->lookupConformance(
-                mapTypeIntoContext(param->getDeclaredInterfaceType()),
-                C.getProtocol(KnownProtocolKind::DistributedActor))
-            .isInvalid();
-      });
+  if (module->lookupConformance(
+              mapTypeIntoContext(actorParam->getInterfaceType()),
+              C.getProtocol(KnownProtocolKind::DistributedActor))
+          .isInvalid()) {
+    return false;
+  }
 
   // --- Check: Err: Error
-  auto *ErrParam = std::find_if_not(
-      genericParams->begin(), genericParams->end(),
-      [this, &C, &module, ActParam](GenericTypeParamDecl *param) {
-        return param == *ActParam ||
-               module
-                   ->lookupConformance(
-                       mapTypeIntoContext(param->getDeclaredInterfaceType()),
-                       C.getProtocol(KnownProtocolKind::Error))
-                   .isInvalid();
-      });
-  if (!ErrParam) {
+  if (module->conformsToProtocol(
+              mapTypeIntoContext(thrownTypeParam->getInterfaceType()
+                                     ->getMetatypeInstanceType()),
+              C.getErrorDecl())
+          .isInvalid()) {
     return false;
   }
 
   // --- Check: Res: SerializationRequirement
-  // We could have the `SerializationRequirement = Any` in which case there are
-  // no requirements to check on `Res`
-  GenericTypeParamDecl *ResParam = nullptr;
-  if (!isVoidReturn) {
-    if (auto **foundResParm =
-            std::find_if(genericParams->begin(), genericParams->end(),
-                         [ErrParam, ActParam](GenericTypeParamDecl *param) {
-                           return param != *ErrParam && param != *ActParam;
-                         })) {
-      ResParam = *foundResParm;
-    } else {
-      return false;
-    }
-  }
-
   auto sig = getGenericSignature();
   auto requirements = sig.getRequirements();
 
@@ -582,20 +559,22 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   // conforms_to: Res Encodable
   // ...
   // --------------------------------
-  // same_type: Act.ID FakeActorSystem.ActorID // LAST one
+  // same_type: Act.ID FakeActorSystem.ActorID
 
   // --- Check requirement: conforms_to: Act DistributedActor
-  //  auto actorReq = requirements[0];
   auto distActorTy = C.getProtocol(KnownProtocolKind::DistributedActor)
                        ->getInterfaceType()
                        ->getMetatypeInstanceType();
 
   auto foundActorRequirement = std::find_if(
-      requirements.begin(), requirements.end(), [distActorTy](Requirement req) {
-        if (req.getKind() != RequirementKind::Conformance) {
+      requirements.begin(), requirements.end(), [actorParam, distActorTy](Requirement req) {
+        if (!req.getFirstType()->isEqual(actorParam->getInterfaceType())) {
           return false;
         }
         if (!req.getSecondType()->isEqual(distActorTy)) {
+          return false;
+        }
+        if (req.getKind() != RequirementKind::Conformance) {
           return false;
         }
         return true;
@@ -605,16 +584,18 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // --- Check requirement: conforms_to: Err Error
-  //  auto errorReq = requirements[1];
   auto errorTy = C.getProtocol(KnownProtocolKind::Error)
                      ->getInterfaceType()
                      ->getMetatypeInstanceType();
   auto foundErrorRequirement = std::find_if(
-      requirements.begin(), requirements.end(), [errorTy](Requirement req) {
-        if (req.getKind() != RequirementKind::Conformance) {
+      requirements.begin(), requirements.end(), [thrownTypeParam, errorTy](Requirement req) {
+        if (!req.getFirstType()->isEqual(thrownTypeParam->getInterfaceType())) {
           return false;
         }
         if (!req.getSecondType()->isEqual(errorTy)) {
+          return false;
+        }
+        if (req.getKind() != RequirementKind::Conformance) {
           return false;
         }
         return true;
@@ -628,13 +609,12 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
     if (!func->getResultInterfaceType()->isVoid()) {
       return false;
     }
-  } else if (ResParam) {
-    assert(ResParam && "Non void function, yet no Res generic parameter found");
+  } else if (returnedTypeParam) {
     auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType())
                           ->getMetatypeInstanceType()
                           ->getDesugaredType();
     auto resultParamType = func->mapTypeIntoContext(
-        ResParam->getInterfaceType()->getMetatypeInstanceType());
+        returnedTypeParam->getInterfaceType()->getMetatypeInstanceType());
     // The result of the function must be the `Res` generic argument.
     if (!resultType->isEqual(resultParamType)) {
       return false;
@@ -650,15 +630,24 @@ bool AbstractFunctionDecl::isDistributedActorSystemRemoteCall(bool isVoidReturn)
   }
 
   // -- Check requirement: same_type Actor.ID Self.ActorID
-  auto actorIdReq = requirements.back();
-  if (actorIdReq.getKind() != RequirementKind::SameType) {
-    return false;
-  }
   auto expectedActorIdTy = getDistributedActorSystemActorIDType(systemNominal);
-  if (!actorIdReq.getSecondType()->isEqual(expectedActorIdTy)) {
+  auto foundActorIDRequirement = std::find_if(requirements.begin(), requirements.end(), [actorParam, expectedActorIdTy](Requirement req) {
+    if (!req.getFirstType()->isEqual(actorParam->getInterfaceType())) {
+      return false;
+    }
+    if (!req.getSecondType()->isEqual(expectedActorIdTy)) {
+      return false;
+    }
+    if (req.getKind() != RequirementKind::SameType) {
+      return false;
+    }
+    return true;
+  });
+  if (!foundActorIDRequirement) {
     return false;
   }
 
+  // we have an exact match!
   return true;
 }
 
