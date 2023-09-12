@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -O -Xllvm -print-after-all 2>&1
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop -O
 // RN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop
 // RN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop -O
 // RN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop
 // RUN: echo "DONEDONE"
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -O)
 
 // REQUIRES: executable_test
 
