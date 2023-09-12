@@ -33,11 +33,8 @@ func useValue<T>(_ x: T) {}
 ////////////////////////////
 
 extension Actor {
-  func noWarningIfCallingGetter() async {
-    // We should emit an error here since self is an actor which is non
-    // sendable, so we could be accessing isolated information from a part of
-    // the actor.
-    await self.klass.asyncCall()
+  func warningIfCallingGetter() async {
+    await self.klass.asyncCall() // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' outside of actor-isolated context may introduce data races}}
   }
 

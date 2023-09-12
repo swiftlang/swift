@@ -462,8 +462,13 @@ public:
   // Get the vector of IDs that cannot be legally consumed at any point in
   // this function. Since we place all args and self in a single region right
   // now, it is only necessary to choose a single representative of the set.
-  ArrayRef<TrackableValueID> getNeverConsumedValues() {
+  ArrayRef<TrackableValueID> getNeverConsumedValues() const {
     return llvm::makeArrayRef(neverConsumedValueIDs);
+  }
+
+  void sortUniqueNeverConsumedValues() {
+    // TODO: Make a FrozenSetVector.
+    sortUnique(neverConsumedValueIDs);
   }
 
   // get the results of an apply instruction. This is the single result value
@@ -488,8 +493,9 @@ public:
   // resulting region to all non-sendable targets, or assign non-sendable
   // targets to a fresh region if there are no non-sendable sources
   template <typename TargetRange, typename SourceRange>
-  std::vector<PartitionOp> translateSILMultiAssign(const TargetRange &tgts,
-                                                   const SourceRange &srcs) {
+  std::vector<PartitionOp>
+  translateSILMultiAssign(const TargetRange &tgts, const SourceRange &srcs,
+                          bool resultsActorIsolated = false) {
 
     std::vector<SILValue> nonSendableSrcs;
     std::vector<SILValue> nonSendableTgts;
@@ -521,17 +527,28 @@ public:
     if (nonSendableTgts.empty()) return translated;
 
     if (nonSendableSrcs.empty()) {
-      // if no non-sendable srcs, non-sendable tgts get a fresh region
+      // If no non-sendable srcs, non-sendable tgts get a fresh region.
       add_to_translation(AssignFresh(nonSendableTgts.front()));
     } else {
       add_to_translation(Assign(nonSendableTgts.front(),
                                 nonSendableSrcs.front()));
     }
 
-    // assign all targets to the target region
+    // If our results are actor isolated (and thus cannot be consumed)... add
+    // them to the neverConsumedValueID array.
+    if (resultsActorIsolated) {
+      neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.front()));
+    }
+
+    // Assign all targets to the target region.
     for (unsigned i = 1; i < nonSendableTgts.size(); i++) {
       add_to_translation(Assign(nonSendableTgts.at(i),
                                 nonSendableTgts.front()));
+
+      // If our results are actor isolated (and thus cannot be consumed)... add
+      // them to the neverConsumedValueID array.
+      if (resultsActorIsolated)
+        neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.at(i)));
     }
 
     return translated;
@@ -540,9 +557,20 @@ public:
   std::vector<PartitionOp> translateSILApply(SILInstruction *applyInst) {
     // if this apply does not cross isolation domains, it has normal,
     // non-consuming multi-assignment semantics
-    if (!SILApplyCrossesIsolation(applyInst))
+    if (!SILApplyCrossesIsolation(applyInst)) {
+      // TODO: How do we handle partial_apply here.
+      bool hasActorSelf = false;
+      if (auto fas = FullApplySite::isa(applyInst)) {
+        if (fas.hasSelfArgument()) {
+          if (auto self = fas.getSelfArgument()) {
+            hasActorSelf = self->getType().getASTType()->isActorType();
+          }
+        }
+      }
       return translateSILMultiAssign(getApplyResults(applyInst),
-                                     applyInst->getOperandValues());
+                                     applyInst->getOperandValues(),
+                                     hasActorSelf);
+    }
 
     if (auto cast = dyn_cast<ApplyInst>(applyInst))
       return translateIsolationCrossingSILApply(cast);
@@ -1609,6 +1637,9 @@ class PartitionAnalysis {
         }
       }
     }
+
+    // Now that we have finished processing, sort/unique our non consumed array.
+    translator.sortUniqueNeverConsumedValues();
   }
 
   // track the AST exprs that have already had diagnostics emitted about
