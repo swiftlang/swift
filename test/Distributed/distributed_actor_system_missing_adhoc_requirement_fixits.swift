@@ -8,10 +8,10 @@ import Distributed
 
 struct MissingRemoteCall: DistributedActorSystem {
   // expected-error@-1{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{add stubs for conformance}}{{51-51=func remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
+  // expected-note@-2{{add stubs for conformance}}{{51-51=\nfunc remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
 
   // expected-error@-4{{struct 'MissingRemoteCall' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{add stubs for conformance}}{{51-51=func remoteCallVoid<Act, Err>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type) async throws where Act: DistributedActor, Act.ID == ActorID, Err: Error {\n    <#code#>\n}\n}}
+  // expected-note@-5{{add stubs for conformance}}{{51-51=\nfunc remoteCallVoid<Act, Err>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type) async throws where Act: DistributedActor, Act.ID == ActorID, Err: Error {\n    <#code#>\n}\n}}
 
   typealias ActorID = ActorAddress
   typealias InvocationDecoder = FakeInvocationDecoder
@@ -43,10 +43,10 @@ struct MissingRemoteCall: DistributedActorSystem {
 
 public struct PublicMissingRemoteCall: DistributedActorSystem {
   // expected-error@-1{{struct 'PublicMissingRemoteCall' is missing witness for protocol requirement 'remoteCall'}}
-  // expected-note@-2{{add stubs for conformance}}{{64-64=public func remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
+  // expected-note@-2{{add stubs for conformance}}{{64-64=\npublic func remoteCall<Act, Err, Res>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type, returning: Res.Type) async throws -> Res where Act: DistributedActor, Act.ID == ActorID, Err: Error, Res: SerializationRequirement {\n    <#code#>\n}\n}}
 
   // expected-error@-4{{struct 'PublicMissingRemoteCall' is missing witness for protocol requirement 'remoteCallVoid'}}
-  // expected-note@-5{{add stubs for conformance}}{{64-64=public func remoteCallVoid<Act, Err>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type) async throws where Act: DistributedActor, Act.ID == ActorID, Err: Error {\n    <#code#>\n}\n}}
+  // expected-note@-5{{add stubs for conformance}}{{64-64=\npublic func remoteCallVoid<Act, Err>(on actor: Act, target: RemoteCallTarget, invocation: inout InvocationEncoder, throwing: Err.Type) async throws where Act: DistributedActor, Act.ID == ActorID, Err: Error {\n    <#code#>\n}\n}}
 
 
   public typealias ActorID = ActorAddress

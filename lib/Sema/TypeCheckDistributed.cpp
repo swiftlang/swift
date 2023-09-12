@@ -211,7 +211,6 @@ static bool checkAdHocRequirementAccessControl(
     return true;
 
   // === check access control
-  // TODO(distributed): this is for ad-hoc requirements and is likely too naive
   if (func->getEffectiveAccess() == decl->getEffectiveAccess()) {
     return false;
   }
@@ -236,6 +235,8 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
   llvm::raw_svector_ostream OS(Text);
   ExtraIndentStreamPrinter Printer(OS, CurrentIndent);
 
+  Printer.printNewline();
+  Printer.printIndent();
   Printer << (decl->getFormalAccess() == AccessLevel::Public ? "public " : "");
 
   if (identifier == C.Id_remoteCall) {
@@ -275,7 +276,9 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
   /// Print the "{ <#code#> }" placeholder body
   Printer << " {\n";
   Printer << ExtraIndent << getCodePlaceholder();
-  Printer << "\n}\n";
+  Printer.printNewline();
+  Printer.printIndent();
+  Printer << "}\n";
 
   decl->diagnose(
       diag::distributed_actor_system_conformance_missing_adhoc_requirement,

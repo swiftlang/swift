@@ -870,7 +870,7 @@ struct LargeSerializationReqFakeInvocationResultHandler: DistributedTargetInvoca
 
 struct BadResultHandler_missingOnReturn: DistributedTargetInvocationResultHandler {
   // expected-error@-1{{struct 'BadResultHandler_missingOnReturn' is missing witness for protocol requirement 'onReturn'}}
-  // expected-note@-2{{add stubs for conformance}}{{84-84=func onReturn<Success: SerializationRequirement>(value: Success) async throws {\n    <#code#>\n\}\n}}
+  // expected-note@-2{{add stubs for conformance}}{{84-84=\nfunc onReturn<Success: SerializationRequirement>(value: Success) async throws {\n    <#code#>\n\}\n}}
   typealias SerializationRequirement = Codable
 
   // func onReturn<Res: SerializationRequirement>(value: Res) async throws {} // MISSING
