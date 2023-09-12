@@ -770,6 +770,7 @@ public:
     case SILInstructionKind::PointerToAddressInst:
     case SILInstructionKind::ProjectBlockStorageInst:
     case SILInstructionKind::RefElementAddrInst:
+    case SILInstructionKind::ProjectBoxInst:
     case SILInstructionKind::RefToUnmanagedInst:
     case SILInstructionKind::StrongCopyUnownedValueInst:
     case SILInstructionKind::StructElementAddrInst:
