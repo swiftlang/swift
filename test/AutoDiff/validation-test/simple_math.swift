@@ -501,20 +501,17 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 
 // CHECK-LABEL: sil private [ossa] @${{.*}}doubled{{.*}}TJp{{.*}} : $@convention(thin) (Float, @owned {{.*}}) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float, [[PB0:%.*]] : {{.*}}, [[PB1:%.*]] : {{.*}}):
-// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
-// CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
-// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
-// CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
-// CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
-// CHECK:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
-// CHECK:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"
-// CHECK:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], {{.*}})
-// CHECK:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
-// CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
-// CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
-// CHECK: }
+// CHECK: [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK: ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
+// CHECK: [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT:%.*]] = alloc_stack $SmallTestModel.TangentVector 
+// CHECK: store [[TMP1]] to [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector
+// CHECK: [[TMP_RES_ADJ_STRUCT_FIELD:%.*]] = struct_element_addr [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector, #{{.*}}SmallTestModel.TangentVector.stored 
+// CHECK: [[TMP_RES_ADJ_STRUCT_ADD_ELT:%.*]] = alloc_stack $Float                        
+// CHECK: store [[ADJ_CONCRETE]] to [trivial] [[TMP_RES_ADJ_STRUCT_ADD_ELT]] : $*Float             
+// CHECK: [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+=" : <Self where Self : AdditiveArithmetic> (Self.Type) -> (inout Self, Self) -> () : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()                
+// CHECK: {{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES_ADJ_STRUCT_FIELD]], [[TMP_RES_ADJ_STRUCT_ADD_ELT]], {{.*}}) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
+// CHECK: [[RES_STRUCT:%.*]] = load [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector 
+// CHECK: return [[RES_STRUCT]] : $SmallTestModel.TangentVector
 
 runAllTests()
