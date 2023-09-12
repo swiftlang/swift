@@ -6,9 +6,9 @@ extension ASTGenVisitor {
     .stmt(
       BraceStmt_create(
         self.ctx,
-        self.bridgedSourceLoc(for: node.leftBrace),
+        node.leftBrace.bridgedSourceLoc(in: self),
         self.visit(node.statements),
-        self.bridgedSourceLoc(for: node.rightBrace)
+        node.rightBrace.bridgedSourceLoc(in: self)
       )
     )
   }
@@ -20,10 +20,10 @@ extension ASTGenVisitor {
     return .stmt(
       IfStmt_create(
         self.ctx,
-        self.bridgedSourceLoc(for: node.ifKeyword),
+        node.ifKeyword.bridgedSourceLoc(in: self),
         conditions.first!,
         self.visit(node.body).rawValue,
-        self.bridgedSourceLoc(for: node.elseKeyword),
+        node.elseKeyword.bridgedSourceLoc(in: self),
         self.visit(node.elseBody)?.rawValue
       )
     )
@@ -42,7 +42,7 @@ extension ASTGenVisitor {
     .stmt(
       ReturnStmt_create(
         self.ctx,
-        self.bridgedSourceLoc(for: node.returnKeyword),
+        node.returnKeyword.bridgedSourceLoc(in: self),
         self.visit(node.expression)?.rawValue
       )
     )

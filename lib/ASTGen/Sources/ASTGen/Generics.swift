@@ -10,10 +10,10 @@ extension ASTGenVisitor {
     .misc(
       GenericParamList_create(
         astContext: self.ctx,
-        leftAngleLoc: bridgedSourceLoc(for: node.leftAngle),
+        leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
         parameters: node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
         genericWhereClause: self.visit(node.genericWhereClause)?.rawValue,
-        rightAngleLoc: bridgedSourceLoc(for: node.rightAngle)
+        rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
       )
     )
   }
@@ -36,7 +36,7 @@ extension ASTGenVisitor {
       GenericTypeParamDecl_create(
         astContext: self.ctx,
         declContext: self.declContext,
-        eachKeywordLoc: self.bridgedSourceLoc(for: node.eachKeyword),
+        eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
         name: name,
         nameLoc: nameLoc,
         inheritedType: self.visit(node.inheritedType)?.rawValue,
@@ -50,14 +50,14 @@ extension ASTGenVisitor {
       switch $0.requirement {
       case .conformanceRequirement(let conformance):
         return BridgedRequirementRepr(
-          SeparatorLoc: self.bridgedSourceLoc(for: conformance.colon),
+          SeparatorLoc: conformance.colon.bridgedSourceLoc(in: self),
           Kind: .typeConstraint,
           FirstType: self.visit(conformance.leftType).rawValue,
           SecondType: self.visit(conformance.rightType).rawValue
         )
       case .sameTypeRequirement(let sameType):
         return BridgedRequirementRepr(
-          SeparatorLoc: self.bridgedSourceLoc(for: sameType.equal),
+          SeparatorLoc: sameType.equal.bridgedSourceLoc(in: self),
           Kind: .sameType,
           FirstType: self.visit(sameType.leftType).rawValue,
           SecondType: self.visit(sameType.rightType).rawValue
@@ -71,7 +71,7 @@ extension ASTGenVisitor {
     return .misc(
       TrailingWhereClause_create(
         astContext: self.ctx,
-        whereKeywordLoc: self.bridgedSourceLoc(for: node.whereKeyword),
+        whereKeywordLoc: node.whereKeyword.bridgedSourceLoc(in: self),
         requirements: requirements.bridgedArray(in: self)
       )
     )
