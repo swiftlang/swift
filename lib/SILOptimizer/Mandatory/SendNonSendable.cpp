@@ -225,6 +225,10 @@ class PartitionOpTranslator {
   /// ensure simplifyVal is called on SILValues before entering into this map
   llvm::DenseMap<SILValue, TrackableValueState> equivalenceClassValuesToState;
 
+#ifndef NDEBUG
+  llvm::DenseMap<unsigned, SILValue> stateIndexToEquivalenceClass;
+#endif
+
   // some values that AccessStorage claims are uniquely identified are still
   // captured (e.g. in a closure). This set is initialized upon
   // PartitionOpTranslator construction to store those values.
@@ -245,8 +249,12 @@ class PartitionOpTranslator {
 
     // If we did not insert, just return the already stored value.
     if (!iter.second) {
-      return {value, iter.first->second};
+      return {iter.first->first, iter.first->second};
     }
+
+#ifndef NDEBUG
+    self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+#endif
 
     // Otherwise, we need to compute our true aliased and sendable values. Begi
     // by seeing if we have a value that we can prove is not aliased.
@@ -930,6 +938,10 @@ public:
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
     int lastTranslationIndex = -1;
+#ifndef NDEBUG
+    llvm::SmallVector<unsigned, 8> opsToPrint;
+#endif
+
     for (SILInstruction &instruction : *basicBlock) {
       auto ops = translateSILInstruction(&instruction);
       for (PartitionOp &op : ops) {
@@ -943,10 +955,32 @@ public:
               instruction.getLoc().getSourceLoc().printLineAndColumn(
                   llvm::dbgs(), function->getASTContext().SourceMgr);
               llvm::dbgs() << " │ translation #" << translationIndex;
-              llvm::dbgs() << "\n └─────╼ ";
-            } else { llvm::dbgs() << "      └╼ "; } op.print(llvm::dbgs());
-            lastTranslationIndex = translationIndex;);
+              llvm::dbgs() << "\n ├─────╼ ";
+            } else {
+              llvm::dbgs() << " │    └╼ ";
+            }
+            op.print(llvm::dbgs());
+            lastTranslationIndex = translationIndex;
+        );
       }
+      LLVM_DEBUG(
+          if (ops.size()) {
+            llvm::dbgs() << " └─────╼ Used Values\n";
+            SWIFT_DEFER { opsToPrint.clear(); };
+            for (PartitionOp &op : ops) {
+              // Now dump our the root value we map.
+              for (unsigned opArg : op.getOpArgs()) {
+                // If we didn't insert, skip this. We only emit this once.
+                opsToPrint.push_back(opArg);
+              }
+            }
+            sortUnique(opsToPrint);
+            for (unsigned opArg : opsToPrint) {
+              llvm::dbgs() << "          └╼ ";
+              llvm::dbgs() << "%%" << opArg << ": " << stateIndexToEquivalenceClass[opArg];
+            }
+          }
+       );
     }
 
     return partitionOps;

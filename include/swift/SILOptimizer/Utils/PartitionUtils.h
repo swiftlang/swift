@@ -141,6 +141,8 @@ public:
 
   PartitionOpKind getKind() const { return OpKind; }
 
+  ArrayRef<Element> getOpArgs() const { return OpArgs; }
+
   SILInstruction *getSourceInst(bool assertNonNull = false) const {
     assert(!assertNonNull ||
            sourceInst && "PartitionOps should be assigned SILInstruction"
