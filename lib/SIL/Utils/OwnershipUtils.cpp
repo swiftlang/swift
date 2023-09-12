@@ -751,6 +751,30 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
   llvm_unreachable("covered switch");
 }
 
+SILValue BorrowingOperand::getScopeIntroducingUserResult() {
+  switch (kind) {
+  case BorrowingOperandKind::Invalid:
+  case BorrowingOperandKind::Yield:
+  case BorrowingOperandKind::Apply:
+  case BorrowingOperandKind::TryApply:
+    return SILValue();
+
+  case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::PartialApplyStack:
+  case BorrowingOperandKind::BeginBorrow:
+    return cast<SingleValueInstruction>(op->getUser());
+
+  case BorrowingOperandKind::BeginApply:
+    return cast<BeginApplyInst>(op->getUser())->getTokenResult();
+
+  case BorrowingOperandKind::Branch: {
+    PhiOperand phiOp(op);
+    return phiOp.getValue();
+  }
+  }
+  llvm_unreachable("covered switch");
+}
+
 void BorrowingOperand::getImplicitUses(
     SmallVectorImpl<Operand *> &foundUses) const {
   // FIXME: this visitScopeEndingUses should never return false once dead

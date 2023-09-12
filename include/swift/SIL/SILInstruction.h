@@ -1261,6 +1261,11 @@ public:
   ///
   /// \p inst is an OwnershipForwardingMixin
   static bool isAddressOnly(SILInstruction *inst);
+
+  // Call \p visitor on all forwarded results of the current forwarding
+  // operation.
+  static bool visitForwardedValues(SILInstruction *inst,
+                                   function_ref<bool(SILValue)> visitor);
 };
 
 /// A single value inst that forwards a static ownership from its first operand.
