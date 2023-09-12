@@ -27,13 +27,39 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SwiftCompilerPluginMessageHandling
   )
 
-  swift_install_in_component(
-    TARGETS ${SWIFT_SYNTAX_MODULES}
-    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
-    COMPONENT compiler
-  )
-  # TODO: Install for Windoes
-  # TODO: Install .swiftmodule
+  if(CMAKE_SYSTEM_NAME MATCHES Windows)
+    swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
+                               DESTINATION "bin"
+                               COMPONENT compiler)
+  else()
+    swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+                               COMPONENT compiler)
+  endif()
+
+  # Install import libraries in Windows.
+  if(CMAKE_SYSTEM_NAME MATCHES Windows)
+    list(TRANSFORM SWIFT_SYNTAX_MODULES
+         PREPEND "${CMAKE_IMPORT_LIBRARY_PREFIX}"
+         OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
+    list(TRANSFORM SWIFT_SYNTAX_IMPORT_LIBRARIES
+         APPEND "${CMAKE_IMPORT_LIBRARY_SUFFIX}"
+         OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
+    list(TRANSFORM SWIFT_SYNTAX_IMPORT_LIBRARIES
+         PREPEND "${SWIFT_HOST_LIBRARIES_DEST_DIR}/"
+         OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
+    swift_install_in_component(PROGRAMS "${SWIFT_SYNTAX_IMPORT_LIBRARIES}"
+                               DESTINATION lib
+                               COMPONENT compiler)
+  endif()
+
+  foreach(module ${SWIFT_SYNTAX_MODULES})
+    set(module_dir "${module}.swiftmodule")
+    set(module_file "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${module_dir}/${SWIFT_HOST_MODULE_TRIPLE}.swiftinterface")
+    swift_install_in_component(FILES "${module_file}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/${module_dir}"
+                               COMPONENT compiler)
+  endforeach()
 endif()
 
 add_subdirectory(APIDigester)
