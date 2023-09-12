@@ -203,8 +203,6 @@ enum class ReadImplKind {
 };
 enum { NumReadImplKindBits = 4 };
 
-StringRef getReadImplKindName(ReadImplKind kind);
-
 /// How are simple write accesses implemented?
 enum class WriteImplKind {
   /// It's immutable.
@@ -231,8 +229,6 @@ enum class WriteImplKind {
 };
 enum { NumWriteImplKindBits = 4 };
 
-StringRef getWriteImplKindName(WriteImplKind kind);
-
 /// How are read-write accesses implemented?
 enum class ReadWriteImplKind {
   /// It's immutable.
@@ -257,8 +253,6 @@ enum class ReadWriteImplKind {
   InheritedWithDidSet,
 };
 enum { NumReadWriteImplKindBits = 4 };
-
-StringRef getReadWriteImplKindName(ReadWriteImplKind kind);
 
 class StorageImplInfo {
   using IntType = uint16_t;
