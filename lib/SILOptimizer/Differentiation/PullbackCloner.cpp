@@ -324,6 +324,15 @@ private:
     return AdjointValue::createAggregate(allocator, remapType(type), elements);
   }
 
+  AdjointValue makeAddElementAdjointValue(AdjointValue baseAdjoint,
+                                          AdjointValue eltToAdd,
+                                          FieldLocator fieldLocator) {
+    auto *addElementValue =
+        new AddElementValue(baseAdjoint, eltToAdd, fieldLocator);
+    return AdjointValue::createAddElement(allocator, baseAdjoint.getType(),
+                                          addElementValue);
+  }
+
   //--------------------------------------------------------------------------//
   // Adjoint value materialization
   //--------------------------------------------------------------------------//
@@ -356,6 +365,19 @@ private:
     case AdjointValueKind::Concrete:
       result = val.getConcreteValue();
       break;
+    case AdjointValueKind::AddElement: {
+      auto adjointSILType = val.getAddElementValue()->baseAdjoint.getType();
+      auto *baseAdjAlloc = builder.createAllocStack(loc, adjointSILType);
+      materializeAdjointIndirect(val, baseAdjAlloc, loc);
+
+      auto baseAdjConcrete = recordTemporary(builder.emitLoadValueOperation(
+          loc, baseAdjAlloc, LoadOwnershipQualifier::Take));
+
+      builder.createDeallocStack(loc, baseAdjAlloc);
+
+      result = baseAdjConcrete;
+      break;
+    }
     }
     if (auto debugInfo = val.getDebugInfo())
       builder.createDebugValue(
@@ -401,11 +423,61 @@ private:
     }
     /// If adjoint value is concrete, it is already materialized. Store it in
     /// the destination address.
-    case AdjointValueKind::Concrete:
+    case AdjointValueKind::Concrete: {
       auto concreteVal = val.getConcreteValue();
-      builder.emitStoreValueOperation(loc, concreteVal, destAddress,
+      auto copyOfConcreteVal = builder.emitCopyValueOperation(loc, concreteVal);
+      builder.emitStoreValueOperation(loc, copyOfConcreteVal, destAddress,
                                       StoreOwnershipQualifier::Init);
       break;
+    }
+    case AdjointValueKind::AddElement: {
+      auto baseAdjoint = val;
+      auto baseAdjointType = baseAdjoint.getType();
+
+      // Current adjoint may be made up of layers of `AddElement` adjoints.
+      // We can iteratively gather the list of elements to add instead of making
+      // recursive calls to `materializeAdjointIndirect`.
+      SmallVector<AddElementValue *, 4> addEltAdjValues;
+
+      do {
+        auto addElementValue = baseAdjoint.getAddElementValue();
+        addEltAdjValues.push_back(addElementValue);
+        baseAdjoint = addElementValue->baseAdjoint;
+        assert(baseAdjointType == baseAdjoint.getType());
+      } while (baseAdjoint.getKind() == AdjointValueKind::AddElement);
+
+      materializeAdjointIndirect(baseAdjoint, destAddress, loc);
+
+      for (auto *addElementValue : addEltAdjValues) {
+        auto eltToAdd = addElementValue->eltToAdd;
+
+        SILValue baseAdjEltAddr;
+        if (baseAdjoint.getType().is<TupleType>()) {
+          baseAdjEltAddr = builder.createTupleElementAddr(
+              loc, destAddress, addElementValue->getFieldIndex());
+        } else {
+          baseAdjEltAddr = builder.createStructElementAddr(
+              loc, destAddress, addElementValue->getFieldDecl());
+        }
+
+        auto eltToAddMaterialized = materializeAdjointDirect(eltToAdd, loc);
+        // Copy `eltToAddMaterialized` so we have a value with owned ownership
+        // semantics, required for using `eltToAddMaterialized` in a `store`
+        // instruction.
+        auto eltToAddMaterializedCopy =
+            builder.emitCopyValueOperation(loc, eltToAddMaterialized);
+        auto *eltToAddAlloc = builder.createAllocStack(loc, eltToAdd.getType());
+        builder.emitStoreValueOperation(loc, eltToAddMaterializedCopy,
+                                        eltToAddAlloc,
+                                        StoreOwnershipQualifier::Init);
+
+        builder.emitInPlaceAdd(loc, baseAdjEltAddr, eltToAddAlloc);
+        builder.createDestroyAddr(loc, eltToAddAlloc);
+        builder.createDeallocStack(loc, eltToAddAlloc);
+      }
+
+      break;
+    }
     }
   }
 
@@ -1096,6 +1168,10 @@ public:
             "Aggregate adjoint values should not occur for `struct` "
             "instructions");
       }
+      case AdjointValueKind::AddElement: {
+        llvm_unreachable(
+            "Adjoint of `StructInst` cannot be of kind `AddElement`");
+      }
       }
       break;
     }
@@ -1151,41 +1227,29 @@ public:
     auto structTy = remapType(sei->getOperand()->getType()).getASTType();
     auto *tanField =
         getTangentStoredProperty(getContext(), sei, structTy, getInvoker());
+    assert(tanField && "Invalid projections should have been diagnosed");
     // Check the `struct_extract` operand's value tangent category.
     switch (getTangentValueCategory(sei->getOperand())) {
     case SILValueCategory::Object: {
       auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
-      auto *tangentVectorDecl =
-          tangentVectorTy->getStructOrBoundGenericStruct();
-      assert(tangentVectorDecl);
       auto tangentVectorSILTy =
           SILType::getPrimitiveObjectType(tangentVectorTy);
-      assert(tanField && "Invalid projections should have been diagnosed");
-      // Accumulate adjoint for the `struct_extract` operand.
-      auto av = getAdjointValue(bb, sei);
-      switch (av.getKind()) {
-      case AdjointValueKind::Zero:
+      auto eltAdj = getAdjointValue(bb, sei);
+
+      switch (eltAdj.getKind()) {
+      case AdjointValueKind::Zero: {
         addAdjointValue(bb, sei->getOperand(),
                         makeZeroAdjointValue(tangentVectorSILTy), loc);
         break;
+      }
+      case AdjointValueKind::Aggregate:
       case AdjointValueKind::Concrete:
-      case AdjointValueKind::Aggregate: {
-        SmallVector<AdjointValue, 8> eltVals;
-        for (auto *field : tangentVectorDecl->getStoredProperties()) {
-          if (field == tanField) {
-            eltVals.push_back(av);
-          } else {
-            auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-                field->getModuleContext(), field);
-            auto fieldTy = field->getInterfaceType().subst(substMap);
-            auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
-            assert(fieldSILTy.isObject());
-            eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
-          }
-        }
+      case AdjointValueKind::AddElement: {
+        auto baseAdj = makeZeroAdjointValue(tangentVectorSILTy);
         addAdjointValue(bb, sei->getOperand(),
-                        makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
+                        makeAddElementAdjointValue(baseAdj, eltAdj, tanField),
                         loc);
+        break;
       }
       }
       break;
@@ -1321,7 +1385,7 @@ public:
         }
         break;
       }
-      case AdjointValueKind::Aggregate:
+      case AdjointValueKind::Aggregate: {
         unsigned adjIndex = 0;
         for (auto i : range(ti->getElements().size())) {
           if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
@@ -1330,6 +1394,11 @@ public:
                           av.getAggregateElement(adjIndex++), loc);
         }
         break;
+      }
+      case AdjointValueKind::AddElement: {
+        llvm_unreachable(
+            "Adjoint of `TupleInst` cannot be of kind `AddElement`");
+      }
       }
       break;
     }
@@ -1359,42 +1428,42 @@ public:
   ///                            index corresponding to n
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *bb = tei->getParent();
+    auto loc = tei->getLoc();
     auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
-    auto av = getAdjointValue(bb, tei);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
+    auto eltAdj = getAdjointValue(bb, tei);
+    switch (eltAdj.getKind()) {
+    case AdjointValueKind::Zero: {
       addAdjointValue(bb, tei->getOperand(), makeZeroAdjointValue(tupleTanTy),
-                      tei->getLoc());
+                      loc);
       break;
+    }
     case AdjointValueKind::Aggregate:
-    case AdjointValueKind::Concrete: {
+    case AdjointValueKind::Concrete:
+    case AdjointValueKind::AddElement: {
       auto tupleTy = tei->getTupleType();
       auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
       if (!tupleTanTupleTy) {
-        addAdjointValue(bb, tei->getOperand(), av, tei->getLoc());
+        addAdjointValue(bb, tei->getOperand(), eltAdj, loc);
         break;
       }
-      SmallVector<AdjointValue, 8> elements;
-      unsigned adjIdx = 0;
+
+      unsigned elements = 0;
       for (unsigned i : range(tupleTy->getNumElements())) {
         if (!getTangentSpace(
                 tupleTy->getElement(i).getType()->getCanonicalType()))
           continue;
-        if (tei->getFieldIndex() == i)
-          elements.push_back(av);
-        else
-          elements.push_back(makeZeroAdjointValue(
-              getRemappedTangentType(SILType::getPrimitiveObjectType(
-                  tupleTanTupleTy->getElementType(adjIdx++)
-                      ->getCanonicalType()))));
+        elements++;
       }
-      if (elements.size() == 1) {
-        addAdjointValue(bb, tei->getOperand(), elements.front(), tei->getLoc());
-        break;
+
+      if (elements == 1) {
+        addAdjointValue(bb, tei->getOperand(), eltAdj, loc);
+      } else {
+        auto baseAdj = makeZeroAdjointValue(tupleTanTy);
+        addAdjointValue(
+            bb, tei->getOperand(),
+            makeAddElementAdjointValue(baseAdj, eltAdj, tei->getFieldIndex()),
+            loc);
       }
-      addAdjointValue(bb, tei->getOperand(),
-                      makeAggregateAdjointValue(tupleTanTy, elements),
-                      tei->getLoc());
       break;
     }
     }
@@ -2720,7 +2789,12 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
       addAdjointValue(origEntry, origSelf,
                       makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
                       pbLoc);
+
+      break;
     }
+    case AdjointValueKind::AddElement:
+      llvm_unreachable("Adjoint of an aggregate type's field cannot be of kind "
+                       "`AddElement`");
     }
     break;
   }
@@ -2960,7 +3034,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
 
 AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
     AdjointValue lhs, AdjointValue rhs, SILLocation loc) {
-  LLVM_DEBUG(getADDebugStream() << "Materializing adjoint directly.\nLHS: "
+  LLVM_DEBUG(getADDebugStream() << "Accumulating adjoint directly.\nLHS: "
                                 << lhs << "\nRHS: " << rhs << '\n');
   switch (lhs.getKind()) {
   // x
@@ -2977,7 +3051,7 @@ AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
     case AdjointValueKind::Zero:
       return lhs;
     // x + (y, z) => (x.0 + y, x.1 + z)
-    case AdjointValueKind::Aggregate:
+    case AdjointValueKind::Aggregate: {
       SmallVector<AdjointValue, 8> newElements;
       auto lhsTy = lhsVal->getType().getASTType();
       auto lhsValCopy = builder.emitCopyValueOperation(loc, lhsVal);
@@ -3005,13 +3079,24 @@ AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
       }
       return makeAggregateAdjointValue(lhsVal->getType(), newElements);
     }
+    // x + (baseAdjoint, index, eltToAdd) => (x+baseAdjoint, index, eltToAdd)
+    case AdjointValueKind::AddElement: {
+      auto *addElementValue = rhs.getAddElementValue();
+      auto baseAdjoint = addElementValue->baseAdjoint;
+      auto eltToAdd = addElementValue->eltToAdd;
+
+      auto newBaseAdjoint = accumulateAdjointsDirect(lhs, baseAdjoint, loc);
+      return makeAddElementAdjointValue(newBaseAdjoint, eltToAdd,
+                                        addElementValue->fieldLocator);
+    }
+    }
   }
   // 0
   case AdjointValueKind::Zero:
     // 0 + x => x
     return rhs;
   // (x, y)
-  case AdjointValueKind::Aggregate:
+  case AdjointValueKind::Aggregate: {
     switch (rhs.getKind()) {
     // (x, y) + z => (z.0 + x, z.1 + y)
     case AdjointValueKind::Concrete:
@@ -3027,7 +3112,51 @@ AdjointValue PullbackCloner::Implementation::accumulateAdjointsDirect(
             lhs.getAggregateElement(i), rhs.getAggregateElement(i), loc));
       return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
+    // (x.0, ..., x.n) + (baseAdjoint, index, eltToAdd) => (x + baseAdjoint,
+    // index, eltToAdd)
+    case AdjointValueKind::AddElement: {
+      auto *addElementValue = rhs.getAddElementValue();
+      auto baseAdjoint = addElementValue->baseAdjoint;
+      auto eltToAdd = addElementValue->eltToAdd;
+      auto newBaseAdjoint = accumulateAdjointsDirect(lhs, baseAdjoint, loc);
+
+      return makeAddElementAdjointValue(newBaseAdjoint, eltToAdd,
+                                        addElementValue->fieldLocator);
     }
+    }
+  }
+  // (baseAdjoint, index, eltToAdd)
+  case AdjointValueKind::AddElement: {
+    switch (rhs.getKind()) {
+    case AdjointValueKind::Zero:
+      return lhs;
+    // (baseAdjoint, index, eltToAdd) + x => (x + baseAdjoint, index, eltToAdd)
+    case AdjointValueKind::Concrete:
+    // (baseAdjoint, index, eltToAdd) + (x.0, ..., x.n) => (x + baseAdjoint,
+    // index, eltToAdd)
+    case AdjointValueKind::Aggregate:
+      return accumulateAdjointsDirect(rhs, lhs, loc);
+    // (baseAdjoint1, index1, eltToAdd1) + (baseAdjoint2, index2, eltToAdd2)
+    // => ((baseAdjoint1 + baseAdjoint2, index1, eltToAdd1), index2, eltToAdd2)
+    case AdjointValueKind::AddElement: {
+      auto *addElementValueLhs = lhs.getAddElementValue();
+      auto baseAdjointLhs = addElementValueLhs->baseAdjoint;
+      auto eltToAddLhs = addElementValueLhs->eltToAdd;
+
+      auto *addElementValueRhs = rhs.getAddElementValue();
+      auto baseAdjointRhs = addElementValueRhs->baseAdjoint;
+      auto eltToAddRhs = addElementValueRhs->eltToAdd;
+
+      auto sumOfBaseAdjoints =
+          accumulateAdjointsDirect(baseAdjointLhs, baseAdjointRhs, loc);
+      auto newBaseAdjoint = makeAddElementAdjointValue(
+          sumOfBaseAdjoints, eltToAddLhs, addElementValueLhs->fieldLocator);
+
+      return makeAddElementAdjointValue(newBaseAdjoint, eltToAddRhs,
+                                        addElementValueRhs->fieldLocator);
+    }
+    }
+  }
   }
   llvm_unreachable("Invalid adjoint value kind"); // silences MSVC C4715
 }
