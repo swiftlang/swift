@@ -142,6 +142,18 @@ static bool isInObjCImpl(const ValueDecl *VD) {
   return ED && ED->isObjCImplementation();
 }
 
+/// Triggering type checking requests while printing is desirable in compiler
+/// modes in which type checking is lazy and the printed content is expected to
+/// be complete (for example, when printing a .swiftinterface). In other
+/// contexts, though, triggering type checking could cause re-entrancy and
+/// should be avoided.
+static bool shouldTypeCheck(const PrintOptions &options) {
+  if (options.IsForSwiftInterface)
+    return true;
+
+  return false;
+}
+
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -2258,6 +2270,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Force implicit accessors to be created if they haven't been already.
+  if (shouldTypeCheck(Options)) {
+    ASD->visitEmittedAccessors([](AccessorDecl *accessor) {
+      (void)accessor;
+    });
+  }
+
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
@@ -3799,6 +3818,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   bool isFirst = true;
   for (auto idx : range(decl->getNumPatternEntries())) {
     auto *pattern = decl->getPattern(idx);
+
+    // Force the entry to be typechecked before attempting to print.
+    if (shouldTypeCheck(Options) && !pattern->hasType())
+      (void)decl->getCheckedPatternBindingEntry(idx);
+
     if (!shouldPrintPattern(pattern))
       continue;
     if (isFirst)

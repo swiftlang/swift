@@ -2116,6 +2116,11 @@ public:
     return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
   }
 
+  /// Returns the typechecked binding entry at the given index.
+  const PatternBindingEntry *
+  getCheckedPatternBindingEntry(unsigned i,
+                                bool leaveClosureBodiesUnchecked = false) const;
+
   /// Clean up walking the initializers for the pattern
   class InitIterator {
 

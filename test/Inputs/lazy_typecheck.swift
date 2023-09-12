@@ -47,6 +47,38 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
   }
 }
 
+// MARK: - Property wrappers
+
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public var wrappedValue: T {
+    get {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+    set {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+  }
+
+  public var projectedValue: PublicWrapper { self }
+
+  public init(wrappedValue value: T) {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+}
+
+@propertyWrapper
+struct InternalWrapper<T> {} // expected-error {{property wrapper type 'InternalWrapper' does not contain a non-static property named 'wrappedValue'}}
+
+// MARK: - Global vars
+
+public var publicGlobalVar: Int = 0
+public var publicGlobalVarInferredType = ""
+public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
+
+var internalGlobalVar: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+var internalGlobalVarInferredType = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+
 // MARK: - Nominal types
 
 public protocol EmptyPublicProto {}
@@ -69,7 +101,9 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 }
 
 public struct PublicStruct {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
+  @PublicWrapper public var publicWrappedProperty = 3.14
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -105,7 +139,8 @@ struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'Does
 }
 
 public class PublicClass {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -188,4 +223,3 @@ extension PublicGenericStruct where T == InternalStructForConstraint {}
 extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
 
 // FIXME: Test enums
-// FIXME: Test global vars
