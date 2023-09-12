@@ -4154,6 +4154,25 @@ ParserStatus Parser::parseDeclAttribute(
     return makeParserSuccess();
   }
 
+  // Rewrite @_unavailableInEmbedded into @available(*, unavailable) when in
+  // embedded Swift mode, or into nothing when in regular mode.
+  if (DK == DAK_Count && Tok.getText() == "_unavailableInEmbedded") {
+    SourceLoc attrLoc = consumeToken();
+    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+      StringRef Message = "unavailable in embedded Swift", Renamed;
+      auto attr = new (Context) AvailableAttr(AtLoc, SourceRange(AtLoc, attrLoc),
+                  PlatformKind::none,
+                  Message, Renamed, /*RenameDecl=*/nullptr,
+                  llvm::VersionTuple(), SourceRange(),
+                  llvm::VersionTuple(), SourceRange(),
+                  llvm::VersionTuple(), SourceRange(),
+                  PlatformAgnosticAvailabilityKind::Unavailable,
+                  /*Implicit=*/false, /*IsSPI=*/false);
+      Attributes.add(attr);
+    }
+    return makeParserSuccess();
+  }
+
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK)) {
     return parseNewDeclAttribute(Attributes, AtLoc, DK, isFromClangAttribute);
   }

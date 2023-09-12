@@ -345,12 +345,14 @@ static bool isInsideCompatibleUnavailableDeclaration(
     return false;
   }
 
-  // Refuse calling unavailable functions from unavailable code,
-  // but allow the use of types.
+  // Unless in embedded Swift mode, refuse calling unavailable functions from
+  // unavailable code, but allow the use of types.
   PlatformKind platform = attr->Platform;
-  if (platform == PlatformKind::none && !isa<TypeDecl>(D) &&
-      !isa<ExtensionDecl>(D)) {
-    return false;
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (platform == PlatformKind::none && !isa<TypeDecl>(D) &&
+        !isa<ExtensionDecl>(D)) {
+      return false;
+    }
   }
 
   return (*referencedPlatform == platform ||
