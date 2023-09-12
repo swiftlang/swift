@@ -1007,6 +1007,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // For embedded Swift: CMO is used to serialize libraries.
   P.addCrossModuleOptimization();
 
+  // For embedded Swift: Specialize generic class vtables.
+  P.addVTableSpecializer();
+
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();

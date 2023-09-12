@@ -256,60 +256,6 @@ public:
   }
 };
 
-class TypeReplacements {
-private:
-  llvm::Optional<SILType> resultType;
-  llvm::MapVector<unsigned, CanType> indirectResultTypes;
-  llvm::MapVector<unsigned, CanType> paramTypeReplacements;
-  llvm::MapVector<unsigned, CanType> yieldTypeReplacements;
-
-public:
-  llvm::Optional<SILType> getResultType() const { return resultType; }
-
-  void setResultType(SILType type) { resultType = type; }
-
-  bool hasResultType() const { return resultType.has_value(); }
-
-  const llvm::MapVector<unsigned, CanType> &getIndirectResultTypes() const {
-    return indirectResultTypes;
-  }
-
-  void addIndirectResultType(unsigned index, CanType type) {
-    indirectResultTypes.insert(std::make_pair(index, type));
-  }
-
-  bool hasIndirectResultTypes() const { return !indirectResultTypes.empty(); }
-
-  const llvm::MapVector<unsigned, CanType> &getParamTypeReplacements() const {
-    return paramTypeReplacements;
-  }
-
-  void addParameterTypeReplacement(unsigned index, CanType type) {
-    paramTypeReplacements.insert(std::make_pair(index, type));
-  }
-
-  bool hasParamTypeReplacements() const {
-    return !paramTypeReplacements.empty();
-  }
-
-  const llvm::MapVector<unsigned, CanType> &getYieldTypeReplacements() const {
-    return yieldTypeReplacements;
-  }
-
-  void addYieldTypeReplacement(unsigned index, CanType type) {
-    yieldTypeReplacements.insert(std::make_pair(index, type));
-  }
-
-  bool hasYieldTypeReplacements() const {
-    return !yieldTypeReplacements.empty();
-  }
-
-  bool hasTypeReplacements() const {
-    return hasResultType() || hasParamTypeReplacements() ||
-           hasIndirectResultTypes() || hasYieldTypeReplacements();
-  }
-};
-
 class SpecializedFunction {
 private:
   SILFunction *fn;
@@ -2362,10 +2308,10 @@ cleanupCallArguments(SILBuilder &builder, SILLocation loc,
 
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
-static ApplySite
-replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
+ApplySite
+swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
                              const ReabstractionInfo &reInfo,
-                             const TypeReplacements &typeReplacements = {}) {
+                             const TypeReplacements &typeReplacements) {
   SILBuilderWithScope builder(applySite.getInstruction());
   SILLocation loc = applySite.getLoc();
   SmallVector<SILValue, 4> arguments;

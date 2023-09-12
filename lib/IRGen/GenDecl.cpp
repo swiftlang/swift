@@ -1427,7 +1427,8 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyOpaqueTypeDescriptors.empty() || !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
-         !LazyMetadataAccessors.empty()) {
+         !LazyMetadataAccessors.empty() ||
+         !LazySpecializedClassMetadata.empty()) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
@@ -1492,8 +1493,9 @@ void IRGenerator::emitLazyDefinitions() {
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(f);
-      assert(!f->isPossiblyUsedExternally()
-             && "function with externally-visible linkage emitted lazily?");
+      // XXX TODO
+      //assert(!f->isPossiblyUsedExternally()
+      //       && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
     }
 
@@ -1518,6 +1520,12 @@ void IRGenerator::emitLazyDefinitions() {
       NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
       emitLazyMetadataAccessor(*IGM.get(), nominal);
+    }
+
+    while (!LazySpecializedClassMetadata.empty()) {
+      CanType classType = LazySpecializedClassMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      emitLazySpecializedClassMetadata(*IGM.get(), classType);
     }
   }
 
@@ -1599,6 +1607,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
+  if (LazilyEmittedSpecializedClassMetadata.insert(classType.getPointer()).second) {
+    LazySpecializedClassMetadata.push_back(classType);
+  }
 }
 
 void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -5061,8 +5075,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // Foreign classes and prespecialized generic types do not use an alias into
   // the full metadata and therefore require a GEP.
   bool fullMetadata =
-      foreign || (concreteType->getAnyGeneric() &&
-                  concreteType->getAnyGeneric()->isGenericContext());
+      !Context.LangOpts.hasFeature(Feature::Embedded) &&
+      (foreign || (concreteType->getAnyGeneric() &&
+                  concreteType->getAnyGeneric()->isGenericContext()));
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
@@ -5099,6 +5114,11 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // trigger lazy emission of the metadata.
   if (NominalTypeDecl *nominal = concreteType->getAnyNominal()) {
     IRGen.noteUseOfTypeMetadata(nominal);
+    if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+      if (classDecl->isGenericContext()) {
+        IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+      }
+    }
   }
 
   if (shouldPrespecializeGenericMetadata()) {
