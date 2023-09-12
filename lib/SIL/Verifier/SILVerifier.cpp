@@ -6923,7 +6923,8 @@ void SILVTable::verify(const SILModule &M) const {
       entry.getMethod().print(os);
     }
 
-    if (M.getStage() != SILStage::Lowered) {
+    if (M.getStage() != SILStage::Lowered &&
+        !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       SILVerifier(*entry.getImplementation(), /*passManager=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
