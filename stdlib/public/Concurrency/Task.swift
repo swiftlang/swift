@@ -76,6 +76,43 @@ import Swift
 /// like the reason for cancellation.
 /// This reflects the fact that a task can be canceled for many reasons,
 /// and additional reasons can accrue during the cancellation process.
+///
+/// ### Task closure lifetime
+/// Tasks initialized with a closure, representing the code that will be executed by this task.
+///
+/// Once this code has ran to completion, and the task therefore has completed, resulting in either
+/// a failure or result value, this closure is eagerly released.
+///
+/// Keeping the `Task` object retained, will not indefinitely keep the closure retained.
+/// This means that tasks rarely need to capture values as `weak`, since when they complete
+/// any references they hold are released (as the closure is released).
+///
+/// For example, in this example, it is not necessary to capture the actor as weak,
+/// because as the task completes it'll let go of the actor reference, breaking the
+/// reference cycle between the Task and the actor holding it.
+///
+/// ```
+/// struct Work: Sendable {}
+///
+/// actor Worker {
+///     var work: Task<Work, Never>?
+///
+///     deinit {
+///
+///         print("deinit")
+///     }
+///
+///     func start() {
+///         work = Task {
+///             return Work()
+///         }
+///     }
+/// }
+///
+/// await Actor().start()
+/// // no references to Actor other than inside the Task
+/// // as the Task completes; the closure is destroyed releasing the actor.
+/// ```
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct Task<Success: Sendable, Failure: Error>: Sendable {
