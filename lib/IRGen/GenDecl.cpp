@@ -4970,6 +4970,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                 : LinkEntity::forTypeMetadata(
                       concreteType, TypeMetadataAddress::FullMetadata));
 
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    entity = LinkEntity::forTypeMetadata(concreteType,
+                                         TypeMetadataAddress::AddressPoint);
+  }
+
   auto DbgTy = DebugTypeInfo::getGlobalMetadata(
       MetatypeType::get(concreteType),
       entity.getDefaultDeclarationType(*this)->getPointerTo(), Size(0),
@@ -4991,6 +4996,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
+  
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return var;
+  }
 
   /// For concrete metadata, we want to use the initializer on the
   /// "full metadata", and define the "direct" address point as an alias.

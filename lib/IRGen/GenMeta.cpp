@@ -3949,6 +3949,12 @@ namespace {
     }
 
     void addDestructorFunction() {
+      if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        auto dtorRef = SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
+        addReifiedVTableEntry(dtorRef);
+        return;
+      }      
+
       if (asImpl().getFieldLayout().hasObjCImplementation())
         return;
 
@@ -4965,6 +4971,36 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
       break;
     }
   }
+}
+
+void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
+                                      const ClassLayout &fragileLayout) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+  assert(!classDecl->isForeign());
+
+  // Set up a dummy global to stand in for the metadata object while we produce
+  // relative references.
+  ConstantInitBuilder builder(IGM);
+  auto init = builder.beginStruct();
+  init.setPacked(true);
+
+  auto strategy = IGM.getClassMetadataStrategy(classDecl);
+  assert(strategy == ClassMetadataStrategy::FixedOrUpdate ||
+         strategy == ClassMetadataStrategy::Fixed);
+
+  FixedClassMetadataBuilder metadataBuilder(IGM, classDecl, init,
+                                            fragileLayout);
+  metadataBuilder.layout();
+  bool canBeConstant = metadataBuilder.canBeConstant();
+  metadataBuilder.createMetadataAccessFunction();
+
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+
+  StringRef section{};
+  bool isPattern = false;
+  auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+                                    init.finishAndCreateFuture(), section);
+  (void)var;
 }
 
 void irgen::emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,
