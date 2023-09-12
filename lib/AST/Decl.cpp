@@ -2075,6 +2075,15 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
+const PatternBindingEntry *PatternBindingDecl::getCheckedPatternBindingEntry(
+    unsigned i, bool leaveClosureBodiesUnchecked) const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
+                                 leaveClosureBodiesUnchecked},
+      nullptr);
+}
+
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
                                     DeclContext *InitContext,
                                     bool isFullyValidated) {
