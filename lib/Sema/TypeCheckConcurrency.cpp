@@ -5480,6 +5480,15 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Apply unsafe concurrency features to the given function type.
   bool strictChecking = contextRequiresStrictConcurrencyChecking(
       dc, getType, isolatedByPreconcurrency);
+
+  auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl);
+  auto doesNotCapture = func->getCaptureInfo().getCaptures().empty();
+
+  if (doesNotCapture) {
+    fnType = fnType->withExtInfo(fnType->getExtInfo().withConcurrent());
+    return fnType;
+  }
+
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
 

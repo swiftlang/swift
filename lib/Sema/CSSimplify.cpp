@@ -9521,7 +9521,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Delay solving member constraint for unapplied methods
   // where the base type has a conditional Sendable conformance
-  if (functionRefKind == FunctionRefKind::Unapplied){
+  if (functionRefKind == FunctionRefKind::Unapplied) {
     auto sendableProtocol = DC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
     auto baseSendable = swift::TypeChecker::conformsToProtocol(instanceTy, sendableProtocol, DC->getParentModule());
 

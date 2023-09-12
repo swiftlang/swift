@@ -1160,7 +1160,6 @@ FunctionType *ConstraintSystem::openFunctionType(
        DeclContext *outerDC) {
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
     auto signature = genericFn->getGenericSignature();
-    //TO-DO Maybe update here
     openGenericParameters(outerDC, signature, replacements, locator);
 
     openGenericRequirements(outerDC, signature,
@@ -1672,7 +1671,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     OpenedTypeMap replacements;
 
-    // TO-DO check for sendable here and update type
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
     auto openedType = openFunctionType(
@@ -1711,8 +1709,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
-
-    //funcType = funcType->withExtInfo(functy->getExtInfo().withConcurrent())->castTo<AnyFunctionType>();
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -2628,13 +2624,14 @@ ConstraintSystem::getTypeOfMemberReference(
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
     auto sendableProtocol = useDC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
-    // FIXME: Handle conditional conformances
     auto baseSendable = TypeChecker::conformsToProtocol( baseOpenedTy, sendableProtocol, useDC->getParentModule());
-    
+
     if (isSendableType(useDC->getParentModule(), baseOpenedTy)) {
       if (baseSendable.getConditionalRequirements().empty())
+        //Functions w/o conditional conformances should be marked @Sendable
         functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
 
+      // Handle Conditional Conformances
       for (auto req : baseSendable.getConditionalRequirements()){
         if(!TypeChecker::conformsToProtocol( req.getFirstType(), sendableProtocol, useDC->getParentModule()).isInvalid()){
           functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
@@ -2646,6 +2643,12 @@ ConstraintSystem::getTypeOfMemberReference(
     FunctionType::ExtInfo info;
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
+
+    if (isSendableType(useDC->getParentModule(), baseOpenedTy)) {
+      // If this is actually a Sendable type, implicitly mark @Sendable
+      auto origFnType = openedType->castTo<FunctionType>();
+      openedType = origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
+    }
   }
 
   // Adjust the opened type for concurrency.

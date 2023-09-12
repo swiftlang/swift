@@ -77,8 +77,10 @@ g(InferredSendableE.f)
 g(GenericS<Int>.f)
 g(GenericC<Int>.f)
 
-g(GenericS<NonSendable>.f)
-g(GenericC<NonSendable>.f)
+g(GenericS<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable (GenericS<NonSendable>) -> (@Sendable () -> Void)' may introduce data races
+// expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
+g(GenericC<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable (GenericS<NonSendable>) -> (@Sendable () -> Void)' may introduce data races
+// expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {
@@ -90,6 +92,7 @@ func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
 executeAsTask(C().f)
 executeAsTask(S().f)
 executeAsTask(E().f)
+executeAsTask(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 // Declarations
 let us:  @Sendable (GenericS<Int>) -> (@Sendable () -> Void) = GenericS<Int>.f
@@ -104,9 +107,9 @@ var partialClass : @Sendable () -> Void = C().f
 var partialEnum : @Sendable () -> Void = E().f
 
 // Reassign
-partialClass = NonSendable().f
-partialStruct = NonSendable().f
-partialEnum = NonSendable().f
+partialClass = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialStruct = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+partialEnum = NonSendable().f // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 // Static Functions 
 struct World {
@@ -114,3 +117,21 @@ struct World {
 }
 
 let helloworld:  @Sendable () -> Void = World.greet
+
+class NonSendableC {
+    var x: Int = 0
+
+    // TO-DO: Invalidate Sendable annotation in follow-up PR
+    @Sendable func inc() {
+        x += 1
+    }
+}
+
+func doWork() -> Int {
+  Int.random(in: 1..<42)
+}
+
+// unapplied global func call
+let work: @Sendable () -> Int = doWork
+Task<Int, Never>.detached(priority: nil, operation: doWork)
+Task<Int, Never>.detached(priority: nil, operation: work)

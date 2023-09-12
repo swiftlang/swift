@@ -46,12 +46,3 @@ extension S: Sendable where T: Sendable {
 
 @available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFuncAsync() async { }
-
-func doWork() -> Int {
-  Int.random(in: 1..<42)
-}
-
-// unapplied global func call
-let work: @Sendable () -> Int = doWork
-Task<Int, Never>.detached(priority: nil, operation: doWork)
-Task<Int, Never>.detached(priority: nil, operation: work)
