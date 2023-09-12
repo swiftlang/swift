@@ -23,10 +23,10 @@ import ObjCModule
 
 let pureSwift = Int32(42)
 // FAIL-NOT:  var_decl
-// CHECK:     var_decl "pureSwift" {{.*}} type='Int32'
-// SWIFTONLY: var_decl "pureSwift" {{.*}} type='Int32' 
+// CHECK:     var_decl "pureSwift" {{.*}} type="Int32"
+// SWIFTONLY: var_decl "pureSwift" {{.*}} type="Int32" 
 
 let point = Point(x: 1, y: 2)
-// CHECK:     var_decl "point" {{.*}} type='Point'
+// CHECK:     var_decl "point" {{.*}} type="Point"
 // SWIFTONLY-NOT: var_decl "point"
 
