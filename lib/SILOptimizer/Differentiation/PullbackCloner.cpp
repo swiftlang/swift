@@ -1624,6 +1624,13 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
+  /// instructions.
+  ///
+  /// Original: y = init_enum_data_addr x
+  ///           inject_enum_addr y
+  ///
+  ///  Adjoint: adj[x] += unchecked_take_enum_data_addr adj[y]
   void visitInjectEnumAddrInst(InjectEnumAddrInst *inject) {
     SILBasicBlock *bb = inject->getParent();
     SILValue origEnum = inject->getOperand();
@@ -1682,25 +1689,30 @@ public:
     if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
       llvm_unreachable("Unexpected type of Optional.TangentVector");
 
+    SILLocation loc = origData->getLoc();
     StructElementAddrInst *adjOpt = builder.createStructElementAddr(
-        origData->getLoc(), adjStruct, adjOptVar);
+        loc, adjStruct, adjOptVar);
+
+    // unchecked_take_enum_data_addr is destructive, so copy
+    // Optional<T.TangentVector> to a new alloca.
+    AllocStackInst *adjOptCopy = createFunctionLocalAllocation(adjOpt->getType(), loc);
+    builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake, IsInitialization);
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
-
     UncheckedTakeEnumDataAddrInst *adjData =
-        builder.createUncheckedTakeEnumDataAddr(origData->getLoc(), adjOpt,
+        builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy,
                                                 someElemDecl);
 
     setAdjointBuffer(bb, origData, adjData);
 
-    // The Optional buffer is now invalidated, do not attempt to destroy it at
-    // the end of the pullback.
-    //
-    // FIXME: what to do with a partially destroyed struct?
-    //
-    destroyedLocalAllocations.insert(adjStruct);
+    // The Optional copy is invalidated, do not attempt to destroy it at the end
+    // of the pullback. The value returned from unchecked_take_enum_data_addr is
+    // destroyed in visitInitEnumDataAddrInst.
+    destroyedLocalAllocations.insert(adjOptCopy);
   }
 
+  /// Handle `init_enum_data_addr` instruction.
+  /// Destroy the value returned from `unchecked_take_enum_data_addr`.
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
     auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
     if (bufIt == bufferMap.end())
