@@ -1304,7 +1304,7 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef mo
 bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
     StringRef moduleName, StringRef interfacePath,
     ArrayRef<std::string> candidates, llvm::vfs::OutputBackend &backend,
-    StringRef outputPath) {
+    StringRef outputPath, bool forceForwardingModule) {
   // Derive .swiftmodule path from the .swiftinterface path.
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath = interfacePath;
@@ -1318,8 +1318,9 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
   std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
   for (auto mod: candidates) {
     // Check if the candidate compiled module is still up-to-date.
-    if (Impl.upToDateChecker.swiftModuleIsUpToDate(mod, Impl.rebuildInfo,
-                                                   deps, moduleBuffer)) {
+    if (Impl.upToDateChecker.swiftModuleIsUpToDate(mod, Impl.rebuildInfo, deps,
+                                                   moduleBuffer) ||
+        forceForwardingModule) {
       // If so, emit a forwarding module to the candidate.
       ForwardingModule FM(mod);
       auto hadError = withOutputPath(Ctx.Diags, backend, outputPath,

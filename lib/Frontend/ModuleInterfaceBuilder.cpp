@@ -193,16 +193,40 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     ArrayRef<std::string> CompiledCandidates,
     StringRef CompilerVersion) {
   auto Invocation = Instance.getInvocation();
-  // Try building forwarding module first. If succeed, return.
-  if (Instance.getASTContext()
-          .getModuleInterfaceChecker()
-          ->tryEmitForwardingModule(Invocation.getModuleName(), InterfacePath,
-                                    CompiledCandidates,
-                                    Instance.getOutputBackend(), OutputPath)) {
-    return std::error_code();
-  }
   FrontendOptions &FEOpts = Invocation.getFrontendOptions();
-  bool isTypeChecking = FEOpts.isTypeCheckAction();
+  if (FEOpts.RequestedAction ==
+          FrontendOptions::ActionType::CompileModuleFromInterface &&
+      FEOpts.DisableImplicitModules) {
+    // For explicit module builds, force the use of a forwarding
+    // module for known broken interfaces, otherwise build a fresh module from
+    // interface.
+    if (Instance.getASTContext().blockListConfig.hasBlockListAction(
+            Invocation.getModuleName(), BlockListKeyKind::ModuleName,
+            BlockListAction::DowngradeInterfaceVerificationFailure)) {
+      if (Instance.getASTContext()
+              .getModuleInterfaceChecker()
+              ->tryEmitForwardingModule(Invocation.getModuleName(),
+                                        InterfacePath, CompiledCandidates,
+                                        Instance.getOutputBackend(), OutputPath,
+                                        /* forceForwardingModule */ true)) {
+        return std::error_code();
+      }
+    }
+  } else {
+    // Try building forwarding module first. If succeed, return.
+    if (Instance.getASTContext()
+            .getModuleInterfaceChecker()
+            ->tryEmitForwardingModule(
+                Invocation.getModuleName(), InterfacePath, CompiledCandidates,
+                Instance.getOutputBackend(), OutputPath)) {
+      return std::error_code();
+    }
+  }
+
+  bool isTypeChecking =
+    (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck ||
+     FEOpts.RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface);
+
   const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
   StringRef InPath = InputInfo.getFileName();
 

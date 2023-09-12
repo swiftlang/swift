@@ -174,7 +174,8 @@ public:
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
                                llvm::vfs::OutputBackend &backend,
-                               StringRef outPath) = 0;
+                               StringRef outPath,
+                               bool forceForwardingModule = false) = 0;
   virtual ~ModuleInterfaceChecker() = default;
 };
 

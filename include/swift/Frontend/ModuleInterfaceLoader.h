@@ -522,7 +522,8 @@ public:
                                StringRef interfacePath,
                                ArrayRef<std::string> candidates,
                                llvm::vfs::OutputBackend &backend,
-                               StringRef outPath) override;
+                               StringRef outPath,
+                               bool forceForwardingModule) override;
   bool isCached(StringRef DepPath);
 };
 
