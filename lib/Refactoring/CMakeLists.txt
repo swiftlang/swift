@@ -9,6 +9,7 @@ add_swift_host_library(swiftRefactoring STATIC
   ConvertToDoCatch.cpp
   ConvertToSwitchStmt.cpp
   ConvertToTernaryExpr.cpp
+  ExpandMacro.cpp
   ExpandSwitchCases.cpp
   ExpandTernaryExpr.cpp
   ExtractExpr.cpp
