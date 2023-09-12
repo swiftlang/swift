@@ -95,16 +95,18 @@ import Swift
 /// struct Work: Sendable {}
 ///
 /// actor Worker {
-///     var work: Task<Work, Never>?
+///     var work: Task<Void, Never>?
+///     var result: Work?
 ///
 ///     deinit {
-///
 ///         print("deinit")
 ///     }
 ///
 ///     func start() {
 ///         work = Task {
-///             return Work()
+///             try? await Task.sleep(for: .seconds(3))
+///             self.work = Work() // we captured self
+///             // but as the task completes, this reference is released
 ///         }
 ///     }
 /// }
