@@ -996,6 +996,12 @@ namespace {
       // If we have a raw layout struct who is fixed size, it means the
       // layout of the struct is fully concrete.
       if (rawLayout) {
+        // Defer to this fixed type info for type layout if the raw layout
+        // specifies size and alignment.
+        if (rawLayout->getSizeAndAlignment()) {
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        }
+
         auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
         SILType loweredLikeType = IGM.getLoweredType(likeType);
 
@@ -1112,6 +1118,10 @@ namespace {
       // layout of the struct is dependent on the archetype of the thing it's
       // like.
       if (rawLayout) {
+        // Note: We don't have to handle the size and alignment case here for
+        // raw layout because those are always fixed, so only dependent layouts
+        // will be non-fixed.
+
         auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
         SILType loweredLikeType = IGM.getLoweredType(likeType);
 

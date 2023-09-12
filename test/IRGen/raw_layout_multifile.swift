@@ -5,6 +5,17 @@
 @_rawLayout(like: Int32)
 public struct Foo<T>: ~Copyable {}
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}5MyIntVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 4
+// stride
+// CHECK-SAME:  , {{i64|i32}} 4
+// flags: alignment 3, noncopyable
+// CHECK-SAME:  , <i32 0x800003>
+struct MyInt: ~Copyable {
+  let x: Int32Fake
+}
+
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}9BadBufferVWV" = {{.*}} %swift.vwtable
 // size
 // CHECK-SAME:  , {{i64|i32}} 48
@@ -37,4 +48,10 @@ public func something() -> Int64 {
 public func something2() -> Int64? {
   let buf = BadBuffer()
   return buf.buf.address[1]
+}
+
+// Force emission of MyInt's descriptor to be lazy...
+public func something3() -> Int32 {
+  let x = MyInt(x: Int32Fake())
+  return x.x.address.pointee
 }
