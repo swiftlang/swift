@@ -348,6 +348,10 @@ static void printImports(raw_ostream &out,
         out << "@_spi(" << spiName << ") ";
     }
 
+    if (M->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
+      out << "public ";
+    }
+
     out << "import ";
     if (Opts.AliasModuleNames &&
         AliasModuleNamesTargets.contains(importedModule->getName().str()))
