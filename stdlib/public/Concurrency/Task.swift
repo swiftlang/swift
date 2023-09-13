@@ -76,6 +76,67 @@ import Swift
 /// like the reason for cancellation.
 /// This reflects the fact that a task can be canceled for many reasons,
 /// and additional reasons can accrue during the cancellation process.
+///
+/// ### Task closure lifetime
+/// Tasks are initialized by passing a closure containing the code that will be executed by a given task.
+///
+/// After this code has run to completion, the task has completed, resulting in either
+/// a failure or result value, this closure is eagerly released.
+///
+/// Retaining a task object doesn't indefinitely retain the closure,
+/// because any references that a task holds are released
+/// after the task completes.
+/// Consequently, tasks rarely need to capture weak references to values.
+///
+/// For example, in the following snippet of code it is not necessary to capture the actor as `weak`,
+/// because as the task completes it'll let go of the actor reference, breaking the
+/// reference cycle between the Task and the actor holding it.
+///
+/// ```
+/// struct Work: Sendable {}
+///
+/// actor Worker {
+///     var work: Task<Void, Never>?
+///     var result: Work?
+///
+///     deinit {
+///         assert(work != nil)
+///         // even though the task is still retained,
+///         // once it completes it no longer causes a reference cycle with the actor
+///
+///         print("deinit actor")
+///     }
+///
+///     func start() {
+///         work = Task {
+///             print("start task work")
+///             try? await Task.sleep(for: .seconds(3))
+///             self.result = Work() // we captured self
+///             print("completed task work")
+///             // but as the task completes, this reference is released
+///         }
+///         // we keep a strong reference to the task
+///     }
+/// }
+/// ```
+///
+/// And using it like this:
+///
+/// ```
+/// await Actor().start()
+/// ```
+///
+/// Note that there is nothing, other than the Task's use of `self` retaining the actor,
+/// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
+/// So once the task completes and its the closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+///
+/// Therefore, the above call will consistently result in the following output:
+///
+/// ```
+/// start task work
+/// completed task work
+/// deinit actor
+/// ```
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct Task<Success: Sendable, Failure: Error>: Sendable {
