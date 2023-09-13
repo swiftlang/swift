@@ -261,7 +261,7 @@ struct BridgedFunction {
   }
 
   bool isGenericFunction() const {
-    return getFunction()->getGenericSignature().isNull();
+    return !getFunction()->getGenericSignature().isNull();
   }
 
   bool hasSemanticsAttr(llvm::StringRef attrName) const {
