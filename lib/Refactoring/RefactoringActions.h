@@ -25,17 +25,6 @@ namespace refactoring {
 using namespace swift;
 using namespace swift::ide;
 
-namespace {
-
-/// Get the source file that corresponds to the given buffer.
-SourceFile *getContainingFile(ModuleDecl *M, RangeConfig Range) {
-  auto &SM = M->getASTContext().SourceMgr;
-  // TODO: We should add an ID -> SourceFile mapping.
-  return M->getSourceFileContainingLocation(
-      SM.getRangeForBuffer(Range.BufferID).getStart());
-}
-} // namespace
-
 class RefactoringAction {
 protected:
   ModuleDecl *MD;
@@ -50,14 +39,7 @@ protected:
 public:
   RefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                     SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer)
-      : MD(MD), TheFile(getContainingFile(MD, Opts.Range)),
-        EditConsumer(EditConsumer), Ctx(MD->getASTContext()),
-        SM(MD->getASTContext().SourceMgr), DiagEngine(SM),
-        StartLoc(Lexer::getLocForStartOfToken(SM, Opts.Range.getStart(SM))),
-        PreferredName(Opts.PreferredName) {
-    DiagEngine.addConsumer(DiagConsumer);
-  }
+                    DiagnosticConsumer &DiagConsumer);
   virtual ~RefactoringAction() = default;
   virtual bool performChange() = 0;
 };
@@ -73,14 +55,7 @@ protected:
 public:
   TokenBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
-                              DiagnosticConsumer &DiagConsumer)
-      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {
-    // Resolve the sema token and save it for later use.
-    CursorInfo =
-        evaluateOrDefault(TheFile->getASTContext().evaluator,
-                          CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
-                          new ResolvedCursorInfo());
-  }
+                              DiagnosticConsumer &DiagConsumer);
 };
 
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
@@ -106,13 +81,7 @@ protected:
 public:
   RangeBasedRefactoringAction(ModuleDecl *MD, RefactoringOptions &Opts,
                               SourceEditConsumer &EditConsumer,
-                              DiagnosticConsumer &DiagConsumer)
-      : RefactoringAction(MD, Opts, EditConsumer, DiagConsumer),
-        RangeInfo(evaluateOrDefault(
-            MD->getASTContext().evaluator,
-            RangeInfoRequest(RangeInfoOwner(TheFile, Opts.Range.getStart(SM),
-                                            Opts.Range.getEnd(SM))),
-            ResolvedRangeInfo())) {}
+                              DiagnosticConsumer &DiagConsumer);
 };
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                      \

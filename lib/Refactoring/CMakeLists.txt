@@ -12,10 +12,10 @@ add_swift_host_library(swiftRefactoring STATIC
   Async/ScopedDeclCollector.cpp
   Async/Utils.cpp
   CollapseNestedIfStmt.cpp
-  ConvertStringConcatenationToInterpolation.cpp
-  ConvertToComputedProperty.cpp
   ConvertGuardExprToIfLetExpr.cpp
   ConvertIfLetExprToGuardExpr.cpp
+  ConvertStringConcatenationToInterpolation.cpp
+  ConvertToComputedProperty.cpp
   ConvertToDoCatch.cpp
   ConvertToSwitchStmt.cpp
   ConvertToTernaryExpr.cpp
@@ -24,8 +24,8 @@ add_swift_host_library(swiftRefactoring STATIC
   ExpandTernaryExpr.cpp
   ExtractExpr.cpp
   ExtractExprBase.cpp
-  ExtractRepeatedExpr.cpp
   ExtractFunction.cpp
+  ExtractRepeatedExpr.cpp
   FillProtocolStubs.cpp
   FindRenameRangesAnnotatingConsumer.cpp
   LocalizeString.cpp
@@ -33,6 +33,7 @@ add_swift_host_library(swiftRefactoring STATIC
   MemberwiseInitLocalRefactoring.cpp
   MoveMembersToExtension.cpp
   Refactoring.cpp
+  RefactoringAction.cpp
   Renamer.cpp
   ReplaceBodiesWithFatalError.cpp
   SimplifyNumberLiteral.cpp
