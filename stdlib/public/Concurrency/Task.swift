@@ -83,9 +83,10 @@ import Swift
 /// Once this code has ran to completion, and the task therefore has completed, resulting in either
 /// a failure or result value, this closure is eagerly released.
 ///
-/// Keeping the `Task` object retained, will not indefinitely keep the closure retained.
-/// This means that tasks rarely need to capture values as `weak`, since when they complete
-/// any references they hold are released (as the closure is released).
+/// Retaining a task object doesn't indefinitely retain the closure,
+/// because any references that a task holds are released
+/// after the task completes.
+/// Consequently, tasks rarely need to capture weak references to values.
 ///
 /// For example, in this example, it is not necessary to capture the actor as weak,
 /// because as the task completes it'll let go of the actor reference, breaking the
