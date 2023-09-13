@@ -123,6 +123,7 @@ import PrivateDep
 // RUN:   -enable-library-evolution -enable-testing \
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 // RUN: %target-swift-frontend -typecheck %t/ExporterClient.swift -I %t \
+// RUN:   -index-system-modules -index-ignore-stdlib -index-store-path %t/idx \
 // RUN:   -Rmodule-loading 2>&1 | %FileCheck -check-prefixes=CHECK-EXPORTER,HIDDEN-DEP %s
 // CHECK-EXPORTER: 'InternalDep' has an ignored transitive dependency on 'HiddenDep'
 
