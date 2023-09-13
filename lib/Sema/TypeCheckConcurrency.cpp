@@ -5481,12 +5481,19 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   bool strictChecking = contextRequiresStrictConcurrencyChecking(
       dc, getType, isolatedByPreconcurrency);
 
-  auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl);
-  auto doesNotCapture = func->getCaptureInfo().getCaptures().empty();
+  auto &ctx = dc->getASTContext();
+  bool inferredSendable =
+      ctx.LangOpts.hasFeature(Feature::InferSendableMethods);
 
-  if (doesNotCapture) {
-    fnType = fnType->withExtInfo(fnType->getExtInfo().withConcurrent());
-    return fnType;
+  if (inferredSendable) {
+    if (auto func = dyn_cast_or_null<AbstractFunctionDecl>(decl)) {
+      auto doesNotCapture = func->getCaptureInfo().getCaptures().empty();
+
+      if (doesNotCapture) {
+        fnType = fnType->withExtInfo(fnType->getExtInfo().withConcurrent());
+        return fnType;
+      }
+    }
   }
 
   fnType = applyUnsafeConcurrencyToFunctionType(

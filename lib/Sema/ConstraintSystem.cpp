@@ -2623,31 +2623,46 @@ ConstraintSystem::getTypeOfMemberReference(
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
-    auto sendableProtocol = useDC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
-    auto baseSendable = TypeChecker::conformsToProtocol( baseOpenedTy, sendableProtocol, useDC->getParentModule());
+    auto &ctx = DC->getASTContext();
+    auto *parentModule = useDC->getParentModule();
+    bool baseSendable = isSendableType(parentModule, baseOpenedTy);
+    bool inferredSendable =
+        ctx.LangOpts.hasFeature(Feature::InferSendableMethods);
 
-    if (isSendableType(useDC->getParentModule(), baseOpenedTy)) {
-      if (baseSendable.getConditionalRequirements().empty())
-        //Functions w/o conditional conformances should be marked @Sendable
-        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+    if (inferredSendable) {
+      auto sendableProtocol = parentModule->getASTContext().getProtocol(
+          KnownProtocolKind::Sendable);
+      auto baseConformance = TypeChecker::conformsToProtocol(
+          baseOpenedTy, sendableProtocol, parentModule);
 
-      // Handle Conditional Conformances
-      for (auto req : baseSendable.getConditionalRequirements()){
-        if(!TypeChecker::conformsToProtocol( req.getFirstType(), sendableProtocol, useDC->getParentModule()).isInvalid()){
+      if (baseSendable) {
+        // Add @Sendable to functions without conditional conformances
+        if (baseConformance.getConditionalRequirements().empty())
           functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+
+        // Handle Conditional Conformances
+        for (auto req : baseConformance.getConditionalRequirements()) {
+          if (!TypeChecker::conformsToProtocol(req.getFirstType(),
+                                               sendableProtocol, parentModule)
+                   .isInvalid())
+            functionType =
+                functionType
+                    ->withExtInfo(functionType->getExtInfo().withConcurrent())
+                    ->getAs<FunctionType>();
         }
       }
     }
-    
+
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
 
-    if (isSendableType(useDC->getParentModule(), baseOpenedTy)) {
-      // If this is actually a Sendable type, implicitly mark @Sendable
+    // Add @Sendable to openedType if possible
+    if (inferredSendable && baseSendable) {
       auto origFnType = openedType->castTo<FunctionType>();
-      openedType = origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
+      openedType =
+          origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
     }
   }
 

@@ -3579,6 +3579,8 @@ static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureInferSendableMethods(Decl *decl) { return false; }
+
 static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;
 }

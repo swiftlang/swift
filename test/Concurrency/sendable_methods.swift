@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift-enable -experimental-feature InferSendableMethods
 // REQUIRES: concurrency
 
 final class C : Sendable {
@@ -77,10 +77,8 @@ g(InferredSendableE.f)
 g(GenericS<Int>.f)
 g(GenericC<Int>.f)
 
-g(GenericS<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable (GenericS<NonSendable>) -> (@Sendable () -> Void)' may introduce data races
-// expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
-g(GenericC<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable (GenericS<NonSendable>) -> (@Sendable () -> Void)' may introduce data races
-// expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
+g(GenericS<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
+g(GenericC<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {

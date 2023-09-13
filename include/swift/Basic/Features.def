@@ -243,7 +243,6 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
-
 /// Enables noncopyable generics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
 
@@ -253,12 +252,18 @@ EXPERIMENTAL_FEATURE(TypedThrows, true)
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
+<<<<<<< HEAD
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
 
 /// Enable the `@extern` attribute.
 EXPERIMENTAL_FEATURE(Extern, true)
+=======
+// Infer Sendability of unapplied and partial applied methods
+// based on type. Global functions are always implicitly Sendable
+EXPERIMENTAL_FEATURE(InferSendableMethods, false)
+>>>>>>> 175f54caad6 ([Frontend] Feature flag for InferredSendableMethods)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

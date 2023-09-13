@@ -9494,6 +9494,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   Type baseObjTy = baseTy->getRValueType();
   Type instanceTy = baseObjTy;
 
+  auto &ctx = getASTContext();
   auto memberNode = simplifyLocatorToAnchor(memberLocator);
   auto memberLoc = memberNode ? memberNode.getStartLoc() : SourceLoc();
 
@@ -9521,13 +9522,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Delay solving member constraint for unapplied methods
   // where the base type has a conditional Sendable conformance
-  if (functionRefKind == FunctionRefKind::Unapplied) {
-    auto sendableProtocol = DC->getParentModule()->getASTContext().getProtocol(KnownProtocolKind::Sendable);
-    auto baseSendable = swift::TypeChecker::conformsToProtocol(instanceTy, sendableProtocol, DC->getParentModule());
+  if (ctx.LangOpts.hasFeature(Feature::InferSendableMethods)) {
+    if (functionRefKind == FunctionRefKind::Unapplied) {
+      auto sendableProtocol =
+          DC->getParentModule()->getASTContext().getProtocol(
+              KnownProtocolKind::Sendable);
+      auto baseSendable = swift::TypeChecker::conformsToProtocol(
+          instanceTy, sendableProtocol, DC->getParentModule());
 
-    if (!baseSendable.isInvalid() && !baseSendable.getConditionalRequirements().empty() && instanceTy->hasTypeVariable()) {
-      result.OverallResult = MemberLookupResult::Unsolved;
-      return result;
+      if (!baseSendable.isInvalid() &&
+          !baseSendable.getConditionalRequirements().empty() &&
+          instanceTy->hasTypeVariable()) {
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
     }
   }
 
@@ -9553,7 +9561,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
-  auto &ctx = getASTContext();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();
@@ -10531,8 +10538,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *memberRef = Constraint::createMemberOrOuterDisjunction(
-      *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
-       outerAlternatives, locator);
+          *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
+          outerAlternatives, locator);
 
       addUnsolvedConstraint(memberRef);
 
@@ -10587,7 +10594,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // It could either be a hole associated directly with the base
         // or a hole which came from result type of the chain.
         if (originatorLoc->isLastElement<
-            LocatorPathElt::UnresolvedMemberChainResult>()) {
+                LocatorPathElt::UnresolvedMemberChainResult>()) {
           auto *UMCR = castToExpr<UnresolvedMemberChainResultExpr>(
               originatorLoc->getAnchor());
           return UMCR->getChainBase() == getAsExpr(locator->getAnchor());
