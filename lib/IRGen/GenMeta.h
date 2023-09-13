@@ -83,6 +83,8 @@ namespace irgen {
   /// Emit the type metadata accessor for a type for which it might be used.
   void emitLazyMetadataAccessor(IRGenModule &IGM, NominalTypeDecl *type);
 
+  void emitLazySpecializedClassMetadata(IRGenModule &IGM, CanType classType);
+
   void emitLazyCanonicalSpecializedMetadataAccessor(IRGenModule &IGM,
                                                     CanType theType);
 

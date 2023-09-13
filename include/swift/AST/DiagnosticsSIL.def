@@ -358,6 +358,8 @@ ERROR(bad_attr_on_non_const_global,none,
       "global variable must be a compile-time constant to use %0 attribute", (StringRef))
 ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
+ERROR(non_final_generic_class_function,none,
+      "classes cannot have non-final generic fuctions in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 

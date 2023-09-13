@@ -4,8 +4,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -swift-version 5 -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded | %FileCheck %s
 
-// TODO: investigate why windows is generating more metadata.
-// XFAIL: OS=windows-msvc
+// REQUIRES: swift_in_compiler
 
 // BEGIN MyModule.swift
 
