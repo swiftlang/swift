@@ -78,7 +78,7 @@ import Swift
 /// and additional reasons can accrue during the cancellation process.
 ///
 /// ### Task closure lifetime
-/// Tasks initialized with a closure, representing the code that will be executed by this task.
+/// A task is initialized with a closure. containing the code that the task executes.
 ///
 /// After this code has run to completion, the task has completed, resulting in either
 /// a failure or result value, this closure is eagerly released.
