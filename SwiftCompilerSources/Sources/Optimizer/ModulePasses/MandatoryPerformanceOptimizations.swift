@@ -312,7 +312,7 @@ fileprivate struct FunctionWorklist {
   }
 
   mutating func addAllNonGenericFunctions(of moduleContext: ModulePassContext) {
-    for f in moduleContext.functions where f.isGenericFunction {
+    for f in moduleContext.functions where !f.isGenericFunction {
       pushIfNotVisited(f)
     }
     return
