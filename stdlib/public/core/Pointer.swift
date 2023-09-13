@@ -19,6 +19,7 @@ public typealias _CustomReflectableOrNone = Any
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, UnsafeRawPointer,
 /// UnsafeMutableRawPointer, and AutoreleasingUnsafeMutablePointer.
+@_fixed_layout
 public protocol _Pointer
 : Hashable, Strideable, CustomDebugStringConvertible, _CustomReflectableOrNone {
   /// A type that represents the distance between two pointers.

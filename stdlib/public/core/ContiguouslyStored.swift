@@ -15,6 +15,7 @@
 // deprecate this functionality.
 
 @usableFromInline
+@_fixed_layout
 internal protocol _HasContiguousBytes {
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R

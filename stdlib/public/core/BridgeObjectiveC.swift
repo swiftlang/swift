@@ -748,6 +748,7 @@ public func _extractDynamicValue<T>(_ value: T) -> AnyObject?
 @_silgen_name("_swift_bridgeToObjectiveCUsingProtocolIfPossible")
 public func _bridgeToObjectiveCUsingProtocolIfPossible<T>(_ value: T) -> AnyObject?
 
+@_fixed_layout
 internal protocol _Unwrappable {
   func _unwrap() -> Any?
 }

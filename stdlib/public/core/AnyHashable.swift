@@ -13,6 +13,7 @@
 /// A value that has a custom representation in `AnyHashable`.
 ///
 /// `Self` should also conform to `Hashable`.
+@_fixed_layout
 public protocol _HasCustomAnyHashableRepresentation {
   /// Returns a custom representation of `self` as `AnyHashable`.
   /// If returns nil, the default representation is used.
