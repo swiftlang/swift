@@ -3082,9 +3082,18 @@ Expr *Parser::parseExprAnonClosureArg() {
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
   }
-  // When the closure already has explicit parameters, offer their names as
-  // replacements.
+
+  // Check whether the closure already has explicit parameters.
   if (auto *params = closure->getParameters()) {
+    // If the explicit parameters are due to the anonymous parameters having
+    // already been set, retrieve the parameter from there.
+    if (closure->hasAnonymousClosureVars() && ArgNo < params->size()) {
+      return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(Loc),
+                                       /*Implicit=*/false);
+    }
+
+    // If the closure already has an explicit parameter, offer its name as
+    // a replacement.
     if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
       auto paramName = params->get(ArgNo)->getNameStr();
       diagnose(Loc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
