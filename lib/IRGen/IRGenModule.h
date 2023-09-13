@@ -327,6 +327,10 @@ private:
   /// The queue of lazy witness tables to emit.
   llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
 
+  llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
+
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
+
   llvm::SmallVector<ClassDecl *, 4> ClassesForEagerInitialization;
 
   llvm::SmallVector<ClassDecl *, 4> ObjCActorsNeedingSuperclassSwizzle;
@@ -471,6 +475,8 @@ public:
       LazyMetadataAccessors.insert(decl);
     }
   }
+
+  void noteUseOfSpecializedClassMetadata(CanType classType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);

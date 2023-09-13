@@ -234,6 +234,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
 
+  // For embedded Swift: Specialize generic class vtables.
+  P.addVTableSpecializer();
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();

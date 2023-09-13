@@ -1079,7 +1079,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
   } else {
-    emitEmbeddedClassMetadata(*this, D, fragileLayout);
+    if (!D->isGenericContext()) {
+      emitEmbeddedClassMetadata(*this, D, fragileLayout);
+    }
   }
 
   IRGen.addClassForEagerInitialization(D);

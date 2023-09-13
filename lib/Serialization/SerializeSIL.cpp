@@ -2807,6 +2807,9 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
     return;
 
+  if (vt.isSpecialized())
+    return;
+
   // Use the mangled name of the class as a key to distinguish between classes
   // which have the same name (but are in different contexts).
   Mangle::ASTMangler mangler;
