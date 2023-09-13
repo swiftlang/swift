@@ -382,6 +382,17 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
 
+  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
+    Opts.CASObjMode = llvm::StringSwitch<llvm::CASBackendMode>(A->getValue())
+                          .Case("native", llvm::CASBackendMode::Native)
+                          .Case("casid", llvm::CASBackendMode::CASID)
+                          .Case("verify", llvm::CASBackendMode::Verify)
+                          .Default(llvm::CASBackendMode::Native);
+  }
+
+  Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
+  Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
+
   return false;
 }
 
