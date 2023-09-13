@@ -73,10 +73,10 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         pass
 
     def should_install(self, host_target):
-        # The artifacts are copied to build directory of 'swift' and are
-        # installed as a part of 'swift' product.
-        return False
+        # When '--install-swift' is enabled, earlyswiftsyntax libraries are installed
+        # from 'swift' product.
+        return (self.should_build(host_target) and self.args.install_swiftsyntax and
+                "--install-swift" not in self.args.build_script_impl_args)
 
     def install(self, host_target):
-        # No-op.
-        pass
+        self.install_with_cmake(["install"], self.host_install_destdir(host_target))
