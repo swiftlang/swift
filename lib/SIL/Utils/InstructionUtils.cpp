@@ -806,11 +806,21 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case ExistentialRepresentation::Opaque:
       return RuntimeEffect::MetaData;
     case ExistentialRepresentation::Class: {
+      if (opType.isAnyObject()) {
+        if (inst->getModule().getASTContext().LangOpts.EnableObjCInterop) {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential |
+                 RuntimeEffect::ObjectiveC;
+        } else {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+        }
+      }
       auto *cl = opType.getClassOrBoundGenericClass();
-      bool usesObjCModel = cl->getObjectModel() == ReferenceCounting::ObjC;
-      if ((cl && usesObjCModel) || opType.isAnyObject())
-        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
-      return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+      bool usesObjCModel =
+          cl && cl->getObjectModel() == ReferenceCounting::ObjC;
+      if (usesObjCModel)
+        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC |
+               RuntimeEffect::Existential;
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     }
     case ExistentialRepresentation::None:
       return RuntimeEffect::NoEffect;
