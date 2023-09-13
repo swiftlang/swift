@@ -219,6 +219,13 @@ func testStringifyWithLocalTypes() {
   })
 }
 
+// Stringify in closures that have anonymous parameters.
+func testStringifyWithAnonymousParameters() {
+  {
+    _ = #stringify($0 + $1)
+  }(1, 2)
+}
+
 func maybeThrowing() throws -> Int { 5 }
 
 #if TEST_DIAGNOSTICS
