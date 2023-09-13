@@ -6923,7 +6923,8 @@ void SILVTable::verify(const SILModule &M) const {
       entry.getMethod().print(os);
     }
 
-    if (M.getStage() != SILStage::Lowered) {
+    if (M.getStage() != SILStage::Lowered &&
+        !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       SILVerifier(*entry.getImplementation(), /*passManager=*/nullptr,
                                               /*SingleFunction=*/true,
                                               /*checkLinearLifetime=*/ false)
@@ -7106,7 +7107,7 @@ void SILModule::verify(SILPassManager *passManager,
   llvm::DenseSet<ClassDecl*> vtableClasses;
   unsigned EntriesSZ = 0;
   for (const auto &vt : getVTables()) {
-    if (!vtableClasses.insert(vt->getClass()).second) {
+    if (!vt->isSpecialized() && !vtableClasses.insert(vt->getClass()).second) {
       llvm::errs() << "Vtable redefined: " << vt->getClass()->getName() << "!\n";
       assert(false && "triggering standard assertion failure routine");
     }

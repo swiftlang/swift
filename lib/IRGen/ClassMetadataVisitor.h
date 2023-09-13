@@ -63,6 +63,9 @@ protected:
     : super(IGM), Target(target),
       VTable(IGM.getSILModule().lookUpVTable(target, /*deserialize*/ false)) {}
 
+  ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target, SILVTable *vtable)
+    : super(IGM), Target(target), VTable(vtable) {}
+
 public:
   void layout() {
     static_assert(MetadataAdjustmentIndex::Class == 3,

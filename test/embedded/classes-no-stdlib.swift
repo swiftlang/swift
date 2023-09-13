@@ -7,7 +7,6 @@ public class MyClass {}
 // CHECK-DAG: define {{.*}}void @"$s4main7MyClassCfD"
 // CHECK-DAG: define {{.*}}ptr @"$s4main7MyClassCACycfC"
 // CHECK-DAG: define {{.*}}ptr @"$s4main7MyClassCACycfc"
-// CHECK-DAG: define {{.*}}%swift.metadata_response @"$s4main7MyClassCMa"
 
 public func foo() -> MyClass {
   return MyClass()
@@ -21,7 +20,6 @@ public class MySubClass: MyClass {}
 // CHECK-DAG: define {{.*}}ptr @"$s4main10MySubClassCACycfc"
 // CHECK-DAG: define {{.*}}ptr @"$s4main10MySubClassCfd"
 // CHECK-DAG: define {{.*}}void @"$s4main10MySubClassCfD"
-// CHECK-DAG: define {{.*}}%swift.metadata_response @"$s4main10MySubClassCMa"
 
 public func bar() -> MyClass {
   return MySubClass()

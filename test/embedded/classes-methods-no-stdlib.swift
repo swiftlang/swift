@@ -25,7 +25,6 @@ public func test(x: MyClass) {
   // CHECK: call swiftcc void @"$s4main7MyClassC3baryyF"
 
   let y = MySubClass()
-  // CHECK: call swiftcc %swift.metadata_response @"$s4main10MySubClassCMa"
   // CHECK: call swiftcc ptr @"$s4main10MySubClassCACycfC"
 
   y.foo() // does not go through the vtable

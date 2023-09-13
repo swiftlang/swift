@@ -3772,6 +3772,14 @@ namespace {
         FieldLayout(fieldLayout),
         MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
 
+    ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
+                             ConstantStructBuilder &builder,
+                             const ClassLayout &fieldLayout,
+                             SILVTable *vtable)
+      : super(IGM, theClass, vtable), B(builder),
+        FieldLayout(fieldLayout),
+        MetadataLayout(IGM.getClassMetadataLayout(theClass)) {}
+
   public:
     const ClassLayout &getFieldLayout() const { return FieldLayout; }
 
@@ -4208,6 +4216,12 @@ namespace {
                               ConstantStructBuilder &builder,
                               const ClassLayout &fieldLayout)
       : super(IGM, theClass, builder, fieldLayout) {}
+
+    FixedClassMetadataBuilder(IRGenModule &IGM, ClassDecl *theClass,
+                              ConstantStructBuilder &builder,
+                              const ClassLayout &fieldLayout,
+                              SILVTable *vtable)
+      : super(IGM, theClass, builder, fieldLayout, vtable) {}
 
     void addFieldOffset(VarDecl *var) {
       if (asImpl().getFieldLayout().hasObjCImplementation())
@@ -4992,13 +5006,43 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                                             fragileLayout);
   metadataBuilder.layout();
   bool canBeConstant = metadataBuilder.canBeConstant();
-  metadataBuilder.createMetadataAccessFunction();
 
   CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
 
   StringRef section{};
   bool isPattern = false;
   auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+                                    init.finishAndCreateFuture(), section);
+  (void)var;
+}
+
+void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
+                                             CanType classTy) {
+  auto &context = classTy->getNominalOrBoundGenericNominal()->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+    context, "emitting lazy specialized class metadata for", classTy);
+
+  SILType classType = SILType::getPrimitiveObjectType(classTy);
+  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+  
+  auto &fragileLayout =
+    classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
+
+  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
+
+  SILVTable *vtable = IGM.getSILModule().lookUpSpecializedVTable(classType);
+  assert(vtable);
+
+  FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout, vtable);
+  builder.layout();
+  bool canBeConstant = builder.canBeConstant();
+
+  StringRef section{};
+  auto var = IGM.defineTypeMetadata(classTy, false, canBeConstant,
                                     init.finishAndCreateFuture(), section);
   (void)var;
 }

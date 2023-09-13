@@ -737,6 +737,13 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
   if (auto cache = IGF.tryGetLocalTypeMetadata(theType, request))
     return cache;
 
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    MetadataResponse response = emitNominalPrespecializedGenericMetadataRef(
+        IGF, theDecl, theType, request, CanonicalSpecializedMetadata);
+    IGF.setScopedLocalTypeMetadata(theType, response);
+    return response;
+  }
+
   // Grab the substitutions.
   GenericArguments genericArgs;
   genericArgs.collect(IGF, theType);
@@ -3323,7 +3330,8 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
-      isa<PackType>(type)) {
+      isa<PackType>(type) ||
+      type->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 
@@ -3912,6 +3920,11 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
         result = IGF.Builder.CreateBitCast(result, IGF.IGM.TypeMetadataPtrTy);
       return result;
     }
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    llvm::Constant *result = IGF.IGM.getAddrOfTypeMetadata(type);
+    return result;
   }
 
   llvm::Value *result = IGF.emitTypeMetadataRef(type, request).getMetadata();
