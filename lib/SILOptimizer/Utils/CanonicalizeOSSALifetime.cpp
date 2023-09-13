@@ -286,9 +286,17 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
                              /*lifetimeEnding*/ false);
     }
   }
-  // Ignore barriers.edges.  The beginning of the targets of such edges should
-  // not be added to liveness.  These edges will be rediscovered when computing
-  // the liveness boundary.
+  for (auto *edge : barriers.edges) {
+    if (edge == getCurrentDef()->getParentBlock()) {
+      // A destroy should be inserted at the begin of this block, but that does
+      // not require adding any instructions to liveness.
+      continue;
+    }
+    auto *predecessor = edge->getSinglePredecessorBlock();
+    assert(predecessor);
+    liveness->updateForUse(&predecessor->back(),
+                           /*lifetimeEnding*/ false);
+  }
 }
 
 // Return true if \p inst is an end_access whose access scope overlaps the end
