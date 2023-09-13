@@ -80,7 +80,7 @@ import Swift
 /// ### Task closure lifetime
 /// Tasks initialized with a closure, representing the code that will be executed by this task.
 ///
-/// Once this code has ran to completion, and the task therefore has completed, resulting in either
+/// After this code has run to completion, the task has completed, resulting in either
 /// a failure or result value, this closure is eagerly released.
 ///
 /// Retaining a task object doesn't indefinitely retain the closure,
