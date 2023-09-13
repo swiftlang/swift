@@ -891,8 +891,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
       clang::DisableValidationForModuleKind::None;
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
-  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
-  invocation->getLangOpts()->CacheGeneratedPCH = true;
+  invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts().CacheGeneratedPCH = true;
   // If the underlying invocation is allowing PCH errors, then it "can be read",
   // even if it has its error bit set. Thus, don't override
   // `AllowPCHWithCompilerErrors`.
@@ -1735,15 +1735,15 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
 /// Returns the appropriate source input language based on language options.
 static clang::Language getLanguageFromOptions(
-    const clang::LangOptions *LangOpts) {
-  if (LangOpts->OpenCL)
+    const clang::LangOptions &LangOpts) {
+  if (LangOpts.OpenCL)
     return clang::Language::OpenCL;
-  if (LangOpts->CUDA)
+  if (LangOpts.CUDA)
     return clang::Language::CUDA;
-  if (LangOpts->ObjC)
-    return LangOpts->CPlusPlus ?
+  if (LangOpts.ObjC)
+    return LangOpts.CPlusPlus ?
         clang::Language::ObjCXX : clang::Language::ObjC;
-  return LangOpts->CPlusPlus ? clang::Language::CXX : clang::Language::C;
+  return LangOpts.CPlusPlus ? clang::Language::CXX : clang::Language::C;
 }
 
 /// Wraps the given frontend action in an index data recording action if the
@@ -1794,8 +1794,8 @@ bool ClangImporter::emitBridgingPCH(
   auto &invocation = emitInstance->getInvocation();
 
   auto LangOpts = invocation.getLangOpts();
-  LangOpts->NeededByPCHOrCompilationUsesPCH = true;
-  LangOpts->CacheGeneratedPCH = cached;
+  LangOpts.NeededByPCHOrCompilationUsesPCH = true;
+  LangOpts.CacheGeneratedPCH = cached;
 
   auto language = getLanguageFromOptions(LangOpts);
   auto inputFile = clang::FrontendInputFile(headerPath, language);
@@ -1851,9 +1851,9 @@ bool ClangImporter::emitPrecompiledModule(
   auto &invocation = emitInstance->getInvocation();
 
   auto LangOpts = invocation.getLangOpts();
-  LangOpts->setCompilingModule(clang::LangOptions::CMK_ModuleMap);
-  LangOpts->ModuleName = moduleName.str();
-  LangOpts->CurrentModule = LangOpts->ModuleName;
+  LangOpts.setCompilingModule(clang::LangOptions::CMK_ModuleMap);
+  LangOpts.ModuleName = moduleName.str();
+  LangOpts.CurrentModule = LangOpts.ModuleName;
 
   auto language = getLanguageFromOptions(LangOpts);
 
@@ -2037,7 +2037,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // For explicit module build, module should always exist but module map might
   // not be exist. Go straight to module loader.
-  if (Instance->getInvocation().getLangOpts()->ImplicitModules) {
+  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
     // Look up the top-level module first, to see if it exists at all.
     clang::Module *clangModule = clangHeaderSearch.lookupModule(
         realModuleName, /*ImportLoc=*/clang::SourceLocation(),
