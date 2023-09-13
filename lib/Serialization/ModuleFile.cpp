@@ -496,20 +496,20 @@ void ModuleFile::getImportedModules(SmallVectorImpl<ImportedModule> &results,
         continue;
 
     } else if (dep.isImplementationOnly()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::ImplementationOnly))
+      // Pretend we didn't have potentially optional imports if we weren't
+      // originally asked to load it.
+      if (!filter.contains(ModuleDecl::ImportFilterKind::ImplementationOnly) ||
+          !dep.isLoaded())
         continue;
-      if (!dep.isLoaded()) {
-        // Pretend we didn't have this import if we weren't originally asked to
-        // load it.
-        continue;
-      }
 
     } else if (dep.isInternalOrBelow()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::InternalOrBelow))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::InternalOrBelow) ||
+          !dep.isLoaded())
         continue;
 
     } else if (dep.isPackageOnly()) {
-      if (!filter.contains(ModuleDecl::ImportFilterKind::PackageOnly))
+      if (!filter.contains(ModuleDecl::ImportFilterKind::PackageOnly) ||
+          !dep.isLoaded())
         continue;
 
     } else {
