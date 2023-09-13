@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -O -import-objc-header %S/Inputs/StaticInline.h %s -emit-ir -disable-llvm-optzns | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name objc_retainAutoreleasedReturnValue -O -import-objc-header %S/Inputs/StaticInline.h %s -S -disable-llvm-optzns
 
 // REQUIRES: objc_interop
 // REQUIRES: CPU=x86_64
@@ -13,6 +14,13 @@ public func useClosure(_ dict: NSDictionary, _ action : (NSDictionary) -> ()) {
 
 @inline(never)
 public func test(_ dict: NSDictionary) {
+  useClosure(dict, { $0.objectEnumerator()} )
+}
+
+// Test should not crash in isel for optnone mode
+@_optimize(none)
+@inline(never)
+public func testOptNone(_ dict: NSDictionary) {
   useClosure(dict, { $0.objectEnumerator()} )
 }
 
