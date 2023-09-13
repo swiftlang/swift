@@ -141,6 +141,8 @@ public:
 
   PartitionOpKind getKind() const { return OpKind; }
 
+  ArrayRef<Element> getOpArgs() const { return OpArgs; }
+
   SILInstruction *getSourceInst(bool assertNonNull = false) const {
     assert(!assertNonNull ||
            sourceInst && "PartitionOps should be assigned SILInstruction"
@@ -152,38 +154,24 @@ public:
     return sourceExpr;
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
-    raw_ostream &os = llvm::errs();
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     switch (OpKind) {
     case PartitionOpKind::Assign:
-      os.changeColor(llvm::raw_ostream::CYAN, true);
-      os << "assign";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
+      os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::AssignFresh:
-      os.changeColor(llvm::raw_ostream::GREEN, true);
-      os << "assign_fresh";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "assign_fresh %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Consume:
-      os.changeColor(llvm::raw_ostream::RED, true);
-      os << "consume";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "consume %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
-      os.changeColor(llvm::raw_ostream::BLUE, true);
-      os << "merge";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
+      os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
       break;
     case PartitionOpKind::Require:
-      os.changeColor(llvm::raw_ostream::YELLOW, true);
-      os << "require";
-      os.resetColor();
-      os << " %%" << OpArgs[0] << "\n";
+      os << "require %%" << OpArgs[0] << "\n";
       break;
     }
   }
@@ -236,7 +224,7 @@ private:
 
     auto fail = [&](Element i, int type) {
       llvm::dbgs() << "FAIL(i=" << i << "; type=" << type << "): ";
-      dump();
+      print(llvm::dbgs());
       return false;
     };
 
@@ -382,14 +370,10 @@ public:
         fst_reduced.merge(i, Element(snd_label));
     }
 
-    LLVM_DEBUG(
-        llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
-        fst.dump();
-        llvm::dbgs() << "SND: ";
-        snd.dump();
-        llvm::dbgs() << "RESULT: ";
-        fst_reduced.dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
+               fst.print(llvm::dbgs()); llvm::dbgs() << "SND: ";
+               snd.print(llvm::dbgs()); llvm::dbgs() << "RESULT: ";
+               fst_reduced.print(llvm::dbgs()););
 
     assert(fst_reduced.is_canonical_correct());
 
@@ -410,7 +394,7 @@ public:
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
           [](const PartitionOp &, Element) {},
 
-      std::vector<Element> nonconsumables = {},
+      ArrayRef<Element> nonconsumables = {},
 
       llvm::function_ref<void(const PartitionOp &, Element)>
           handleConsumeNonConsumable = [](const PartitionOp &, Element) {}) {
@@ -531,24 +515,27 @@ public:
     llvm::dbgs() << "}\n";
   }
 
-  void dump() const LLVM_ATTRIBUTE_USED {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     std::map<Region, std::vector<Element>> buckets;
 
     for (auto [i, label] : labels)
       buckets[label].push_back(i);
 
-    llvm::dbgs() << "[";
+    os << "[";
     for (auto [label, indices] : buckets) {
-      llvm::dbgs() << (label.isConsumed() ? "{" : "(");
+      os << (label.isConsumed() ? "{" : "(");
       int j = 0;
       for (Element i : indices) {
-        llvm::dbgs() << (j++ ? " " : "") << i;
+        os << (j++ ? " " : "") << i;
       }
-      llvm::dbgs() << (label.isConsumed() ? "}" : ")");
+      os << (label.isConsumed() ? "}" : ")");
     }
-    llvm::dbgs() << "]\n";
+    os << "]\n";
   }
 };
-}
+
+} // namespace swift
 
 #endif // SWIFT_PARTITIONUTILS_H
