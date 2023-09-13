@@ -186,7 +186,7 @@ extension String {
   ///       `String.init?(validatingCString:)` instead.
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  @available(*, deprecated, renamed: "String.init(validatingCString:)")
+  @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: cString)
     guard let str = cString.withMemoryRebound(to: UInt8.self, capacity: len, {
