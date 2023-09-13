@@ -1401,11 +1401,12 @@ extension Dictionary {
     }
 
     public var description: String {
-      return _makeCollectionDescription()
+      _makeCollectionDescription()
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Keys")
+      _makeCollectionDescription(
+        withTypeName: "Dictionary.Keys", usingDebugDescriptions: true)
     }
   }
 
@@ -1483,11 +1484,12 @@ extension Dictionary {
     }
 
     public var description: String {
-      return _makeCollectionDescription()
+      _makeCollectionDescription()
     }
 
     public var debugDescription: String {
-      return _makeCollectionDescription(withTypeName: "Dictionary.Values")
+      _makeCollectionDescription(
+        withTypeName: "Dictionary.Values", usingDebugDescriptions: true)
     }
 
     @inlinable
@@ -1674,29 +1676,50 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
 }
 
 extension Collection {
-  // Utility method for KV collections that wish to implement
-  // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
-  // list of elements.
-  // FIXME: Doesn't use the withTypeName argument yet
+  /// Utility method for key-value collections that wish to implement
+  /// `CustomStringConvertible` and `CustomDebugStringConvertible` using a
+  /// bracketed list of elements, like a dictionary literal.
+  ///
+  /// - Parameter type: Currently unused.
+  /// - Parameter debug: If true, print elements using their debug-style
+  ///     descriptions. Otherwise use a regular string conversion.
   internal func _makeKeyValuePairDescription<K, V>(
-    withTypeName type: String? = nil
+    withTypeName type: String? = nil,
+    usingDebugDescriptions debug: Bool = false
   ) -> String where Element == (key: K, value: V) {
+    // FIXME: Doesn't use the withTypeName argument yet
 #if !SWIFT_STDLIB_STATIC_PRINT
     if self.isEmpty {
       return "[:]"
     }
-    
+
+    let printKey: (K, inout String) -> Void
+    if debug {
+      printKey = { debugPrint($0, terminator: "", to: &$1) }
+    } else if _needsQuotingInDescriptionLists(K.self) {
+      printKey = { $1 += "\($0)".debugDescription }
+    } else {
+      printKey = { print($0, terminator: "", to: &$1) }
+    }
+
+    let printValue: (V, inout String) -> Void
+    if debug {
+      printValue = { debugPrint($0, terminator: "", to: &$1) }
+    } else if _needsQuotingInDescriptionLists(V.self) {
+      printValue = { $1 += "\($0)".debugDescription }
+    } else {
+      printValue = { print($0, terminator: "", to: &$1) }
+    }
+
     var result = "["
-    var first = true
+    var prefix = ""
     for (k, v) in self {
-      if first {
-        first = false
-      } else {
-        result += ", "
-      }
-      debugPrint(k, terminator: "", to: &result)
+      result += prefix
+      prefix = ", "
+
+      printKey(k, &result)
       result += ": "
-      debugPrint(v, terminator: "", to: &result)
+      printValue(v, &result)
     }
     result += "]"
     return result
@@ -1709,13 +1732,13 @@ extension Collection {
 extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the dictionary.
   public var description: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription()
   }
 
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeKeyValuePairDescription()
+    _makeKeyValuePairDescription(usingDebugDescriptions: true)
   }
 }
 

@@ -1040,13 +1040,14 @@ extension ContiguousArray: CustomReflectable {
 extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeCollectionDescription()
+    _makeCollectionDescription()
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeCollectionDescription(withTypeName: "ContiguousArray")
+    _makeCollectionDescription(
+      withTypeName: "ContiguousArray", usingDebugDescriptions: true)
   }
 }
 

@@ -1136,13 +1136,14 @@ extension ArraySlice: CustomReflectable {
 extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeCollectionDescription()
+    _makeCollectionDescription()
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
-    return _makeCollectionDescription(withTypeName: "ArraySlice")
+    _makeCollectionDescription(
+      withTypeName: "ArraySlice", usingDebugDescriptions: true)
   }
 }
 
