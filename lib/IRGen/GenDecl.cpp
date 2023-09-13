@@ -5123,9 +5123,12 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // trigger lazy emission of the metadata.
   if (NominalTypeDecl *nominal = concreteType->getAnyNominal()) {
     IRGen.noteUseOfTypeMetadata(nominal);
-    if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (classDecl->isGenericContext()) {
-        IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+
+    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (classDecl->isGenericContext()) {
+          IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+        }
       }
     }
   }
