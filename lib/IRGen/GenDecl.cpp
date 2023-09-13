@@ -1239,7 +1239,7 @@ void IRGenModule::emitGlobalLists() {
 // Eagerly emit functions that are externally visible. Functions that are
 // dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
-  // Embedded Swift only emits specialized function, so don't emit genreic
+  // Embedded Swift only emits specialized function, so don't emit generic
   // functions, even if they're externally visible.
   if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
       f.getLoweredFunctionType()->getSubstGenericSignature()) {
@@ -1412,13 +1412,19 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
-    LazyTypeMetadata.clear();
-    LazySpecializedTypeMetadataRecords.clear();
-    LazyTypeContextDescriptors.clear();
-    LazyOpaqueTypeDescriptors.clear();
-    LazyCanonicalSpecializedMetadataAccessors.clear();
-    LazyMetadataAccessors.clear();
-    LazyWitnessTables.clear();
+    assert(LazyTypeMetadata.empty());
+    assert(LazySpecializedTypeMetadataRecords.empty());
+    assert(LazyTypeContextDescriptors.empty());
+    assert(LazyOpaqueTypeDescriptors.empty());
+    assert(LazyFieldDescriptors.empty());
+    // LazyFunctionDefinitions are allowed, but they must not be generic
+    for (SILFunction *f : LazyFunctionDefinitions) {
+      assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+    }
+    assert(LazyWitnessTables.empty());
+    assert(LazyCanonicalSpecializedMetadataAccessors.empty());
+    assert(LazyMetadataAccessors.empty());
+    // LazySpecializedClassMetadata is allowed
   }
 
   while (!LazyTypeMetadata.empty() ||
@@ -1493,9 +1499,8 @@ void IRGenerator::emitLazyDefinitions() {
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(f);
-      // XXX TODO
-      //assert(!f->isPossiblyUsedExternally()
-      //       && "function with externally-visible linkage emitted lazily?");
+      assert(!f->isPossiblyUsedExternally()
+             && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
     }
 
@@ -1536,6 +1541,10 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   // Add it to the queue if it hasn't already been put there.
   if (!LazilyEmittedFunctions.insert(f).second)
     return;
+    
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+  }
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFunctionDefinitions.push_back(f);

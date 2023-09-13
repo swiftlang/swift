@@ -38,7 +38,7 @@ namespace {
 
 class VTableSpecializer : public SILModuleTransform {
   bool specializeVTables(SILModule &module);
-  bool specializeVTableFor(AllocRefInst *allocRef, SILModule &module);
+  bool specializeVTableFor(SILType classTy, SILModule &module);
   SILFunction *specializeVTableMethod(SILFunction *origMethod,
                                       SubstitutionMap subs, SILModule &module);
   bool specializeClassMethodInst(ClassMethodInst *cm);
@@ -65,12 +65,12 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
     for (SILBasicBlock &block : func) {
       for (SILInstruction &inst : block) {
         if (auto *allocRef = dyn_cast<AllocRefInst>(&inst)) {
-          changed |= specializeVTableFor(allocRef, module);
-          continue;
-        }
-        if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
+          changed |= specializeVTableFor(allocRef->getType(), module);
+        } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
+          changed |= specializeVTableFor(
+              metatype->getType().getInstanceTypeOfMetatype(&func), module);
+        } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
           changed |= specializeClassMethodInst(cm);
-          continue;
         }
       }
     }
@@ -92,17 +92,17 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
   return changed;
 }
 
-bool VTableSpecializer::specializeVTableFor(AllocRefInst *allocRef,
+bool VTableSpecializer::specializeVTableFor(SILType classTy,
                                             SILModule &module) {
-  SILType classTy = allocRef->getType();
   CanType astType = classTy.getASTType();
   BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
   if (!genClassTy) return false;
 
   if (module.lookUpSpecializedVTable(classTy)) return false;
 
-  LLVM_DEBUG(llvm::dbgs() << "specializeVTableFor "
-                          << genClassTy->getDecl()->getName() << '\n');
+  LLVM_DEBUG(llvm::errs() << "specializeVTableFor "
+                          << genClassTy->getDecl()->getName() << ' '
+                          << genClassTy->getString() << '\n');
 
   ClassDecl *classDecl = genClassTy->getDecl();
   SILVTable *origVtable = module.lookUpVTable(classDecl);
@@ -133,7 +133,7 @@ bool VTableSpecializer::specializeVTableFor(AllocRefInst *allocRef,
 SILFunction *VTableSpecializer::specializeVTableMethod(SILFunction *origMethod,
                                                        SubstitutionMap subs,
                                                        SILModule &module) {
-  LLVM_DEBUG(llvm::dbgs() << "specializeVTableMethod " << origMethod->getName()
+  LLVM_DEBUG(llvm::errs() << "specializeVTableMethod " << origMethod->getName()
                           << '\n');
 
   if (!origMethod->getLoweredFunctionType()->isPolymorphic()) return origMethod;
