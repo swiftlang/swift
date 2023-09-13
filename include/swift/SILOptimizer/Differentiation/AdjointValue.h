@@ -25,6 +25,8 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Debug.h"
 
+#include <variant>
+
 namespace swift {
 namespace autodiff {
 
