@@ -349,6 +349,9 @@ private:
   Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
                                           Decl *container,
                                           llvm::Error &&error) const;
+  Decl *handleErrorAndSupplyMissingClassMember(
+      ASTContext &context, llvm::Error &&error,
+      ClassDecl *containingClass) const;
 
 public:
   /// Change the status of the current module.
