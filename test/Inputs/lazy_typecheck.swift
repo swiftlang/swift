@@ -242,3 +242,7 @@ extension PublicGenericStruct where T == InternalStructForConstraint {}
 
 extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
 
+// MARK: - Type aliases
+
+public typealias PublicStructAlias = PublicStruct
+typealias InternalTypeAlias = DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}

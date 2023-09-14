@@ -102,6 +102,7 @@
 // CHECK:         public func req() throws -> Swift.Int
 // CHECK:       }
 // CHECK:       #endif
+// CHECK:       public typealias PublicStructAlias = lazy_typecheck.PublicStruct
 // CHECK:       @available(*, unavailable)
 // CHECK-NEXT:  extension lazy_typecheck.PublicGenericStruct : lazy_typecheck.EmptyPublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 // CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}

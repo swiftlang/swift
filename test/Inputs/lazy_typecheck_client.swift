@@ -89,3 +89,7 @@ func takesEmptyProto<T: EmptyPublicProto>(_ t: T) {}
 func testConditionalConformance<T>(_ s: PublicGenericStruct<T>) {
   takesEmptyProto(s) // expected-error {{global function 'takesEmptyProto' requires}}
 }
+
+func testTypealiases() {
+  let _: PublicStruct = PublicStructAlias(x: 1)
+}
