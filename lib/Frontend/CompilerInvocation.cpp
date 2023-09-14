@@ -3099,6 +3099,9 @@ bool CompilerInvocation::parseArgs(
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  if (LangOpts.hasFeature(Feature::Embedded)) {
+    IRGenOpts.InternalizeAtLink = true;
+  }
 
   return false;
 }
