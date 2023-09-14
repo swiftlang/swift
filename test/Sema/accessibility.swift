@@ -641,7 +641,7 @@ public struct Subscripts {
   package subscript (x: PrivateStruct, y: String) -> String { return "" } // expected-error {{subscript cannot be declared package because its index uses a private type}}
   package subscript (x: String, y: PrivateStruct) -> String { return "" } // expected-error {{subscript cannot be declared package because its index uses a private type}}
   package subscript (x: InternalStruct, y: FilePrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared package because its index uses a fileprivate type}}
-  package subscript (x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared package because its element type uses a private type}}
+  package subscript (x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{subscript cannot be declared package because its index uses a fileprivate type}}
   package subscript (x: String, y: String) -> InternalStruct { return InternalStruct() } // expected-error {{subscript cannot be declared package because its element type uses an internal type}}
 }
 
@@ -654,12 +654,12 @@ public struct Methods {
   public func c(a: InternalStruct, b: PrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
   public func d(a: PrivateStruct, b: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared public because its parameter uses a private type}}
   public func e(a: Int, b: Int) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared public because its result uses an internal type}}
-  public func f(a: Int, b: PackageStruct) -> PackageStruct { return PackageStruct() } // expected-error {{method cannot be declared public because its parameter uses a package type}}
+  public func f(a: Int, b: PackageStruct) -> PackageStruct { return PackageStruct() } // expected-error {{method cannot be declared public because its result uses a package type}}
 
   package func x(x: PrivateStruct, y: String) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
   package func y(x: String, y: PrivateStruct) -> String { return "" } // expected-error {{method cannot be declared package because its parameter uses a private type}}
   package func z(x: InternalStruct, y: FilePrivateStruct) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its parameter uses a fileprivate type}}
-  package func w(x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared package because its result uses a private type}}
+  package func w(x: FilePrivateStruct, y: InternalStruct) -> PrivateStruct { return PrivateStruct() } // expected-error {{method cannot be declared package because its parameter uses a fileprivate type}}
   package func v(x: String, y: String) -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its result uses an internal type}}
   package func q() -> InternalStruct { return InternalStruct() } // expected-error {{method cannot be declared package because its result uses an internal type}}
 }
@@ -721,7 +721,7 @@ public protocol AssocTypes {
   associatedtype PrivatePackageConformer: PrivateProto = PackageStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
 
   associatedtype PrivatePrivateDefaultConformer: PrivateProto = PrivateStruct // expected-error {{associated type in a public protocol uses a private type in its requirement}}
-  associatedtype PackagePackageDefaultConformer: PackageProto = PackageStruct // expected-error {{associated type in a public protocol uses a package type in its requirement}}
+  associatedtype PackagePackageDefaultConformer: PackageProto = PackageStruct // expected-error {{associated type in a public protocol uses a package type in its default definition}}
 
   associatedtype PublicPublicDefaultConformer: PublicProto = PublicStruct
 }

@@ -61,28 +61,15 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     return false;
 
   // General check on access-level of the decl.
-  auto declAccessScope =
-      D->getFormalAccessScope(/*useDC=*/nullptr,
-                              /*allowUsableFromInline=*/true);
-
-  // If the decl is imported, check if the import lowers it's access level.
-  auto importAccessLevel = AccessLevel::Public;
-  ImportAccessLevel problematicImport = llvm::None;
-
   auto *DC = where.getDeclContext();
-  auto targetModule = D->getDeclContext()->getParentModule();
-  auto file = where.getDeclContext()->getParentSourceFile();
-  if (targetModule != DC->getParentModule() && file) {
-    problematicImport = file->getImportAccessLevel(targetModule);
-    if (problematicImport.has_value())
-      importAccessLevel = problematicImport->accessLevel;
-  }
+  auto declAccessScope =
+      D->getFormalAccessScope(/*useDC=*/DC,
+                              /*allowUsableFromInline=*/true);
 
   // Public declarations are OK, even if they're SPI or came from an
   // implementation-only import. We'll diagnose exportability violations
   // from diagnoseDeclRefExportability().
-  if (declAccessScope.isPublic() &&
-      importAccessLevel == AccessLevel::Public)
+  if (declAccessScope.isPublic())
     return false;
 
   auto &Context = DC->getASTContext();
@@ -119,20 +106,19 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
-  auto diagAccessLevel = std::min(declAccessScope.accessLevelForDiagnostics(),
-                                  importAccessLevel);
-
+  AccessLevel diagAccessLevel = declAccessScope.accessLevelForDiagnostics();
   Context.Diags.diagnose(loc, diagID, D, diagAccessLevel,
                          fragileKind.getSelector());
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
+  ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
-      diagAccessLevel == importAccessLevel) {
+      diagAccessLevel == problematicImport->accessLevel) {
     Context.Diags.diagnose(problematicImport->accessLevelLoc,
                            diag::decl_import_via_here, D,
                            problematicImport->accessLevel,
-                           problematicImport->module.importedModule->getName());
+                           problematicImport->module.importedModule);
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
