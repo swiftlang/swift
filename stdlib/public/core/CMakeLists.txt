@@ -10,13 +10,10 @@
 #
 #===----------------------------------------------------------------------===#
 
-# The list of sources without which it's impossible to build a core
-# standard library.  Try to add new standard library sources to
-# SWIFTLIB_SOURCES, below, rather than SWIFTLIB_ESSENTIAL, if
-# possible, to improve layering.  Check that you got it right by
-# configuring with -DSWIFT_CHECK_ESSENTIAL_STDLIB=YES
-set(SWIFTLIB_ESSENTIAL
-  ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+# The complete list of sources in the core standard library.
+set(SWIFTLIB_SOURCES
+  ### "ESSENTIAL" SOURCES
+  ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
   ArrayBody.swift
@@ -199,22 +196,10 @@ set(SWIFTLIB_ESSENTIAL
   StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
-  MigrationSupport.swift)
+  MigrationSupport.swift
 
-set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
-  AtomicInt.swift.gyb
-  FloatingPointParsing.swift.gyb
-  FloatingPointTypes.swift.gyb
-  IntegerTypes.swift.gyb
-  UnsafeBufferPointer.swift.gyb
-  UnsafeRawBufferPointer.swift.gyb
-  )
-
-# The complete list of sources in the core standard library.  Includes
-# all the essential sources listed above.
-set(SWIFTLIB_SOURCES
-  ${SWIFTLIB_ESSENTIAL}
-  ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
+  ### "NON-ESSENTIAL" SOURCES, LAYERED ON TOP OF THE "ESSENTIAL" ONES
+  ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
@@ -236,7 +221,12 @@ set(SWIFTLIB_SOURCES
   )
 
 set(SWIFTLIB_GYB_SOURCES
-  ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  AtomicInt.swift.gyb
+  FloatingPointParsing.swift.gyb
+  FloatingPointTypes.swift.gyb
+  IntegerTypes.swift.gyb
+  UnsafeBufferPointer.swift.gyb
+  UnsafeRawBufferPointer.swift.gyb
   Int128.swift.gyb
   Tuple.swift.gyb
   )
@@ -267,10 +257,6 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS")
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp;Synchronization)
 endif()
 
-option(SWIFT_CHECK_ESSENTIAL_STDLIB
-    "Check core standard library layering by linking its essential subset"
-    FALSE)
-
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
   list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
@@ -291,15 +277,6 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
-
-if(SWIFT_CHECK_ESSENTIAL_STDLIB)
-  add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
-      INSTALL_IN_COMPONENT never_install
-      ${SWIFTLIB_ESSENTIAL}
-      GYB_SOURCES
-        ${SWIFTLIB_ESSENTIAL_GYB_SOURCES})
-  target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
-endif()
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntime)
