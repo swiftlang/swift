@@ -340,7 +340,10 @@ public:
   void addLinkRuntimeLib(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &Arguments,
                          StringRef LibName) const;
-    
+
+  virtual void addPluginArguments(const llvm::opt::ArgList &Args,
+                                  llvm::opt::ArgStringList &Arguments) const {}
+
   /// Validates arguments passed to the toolchain.
   ///
   /// An override point for platform-specific subclasses to customize the

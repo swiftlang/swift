@@ -1,11 +1,12 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
 extension Array {
   public func withBridgedArrayRef<T>(_ c: (BridgedArrayRef) -> T) -> T {
     withUnsafeBytes { buf in
-      c(BridgedArrayRef(data: buf.baseAddress!, numElements: count))
+      c(BridgedArrayRef(data: buf.baseAddress!, numElements: SwiftInt(count)))
     }
   }
 }

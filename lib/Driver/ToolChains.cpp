@@ -376,30 +376,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   // options.
   inputArgs.AddAllArgs(arguments, options::OPT_plugin_search_Group);
   addPlatformSpecificPluginFrontendArgs(OI, output, inputArgs, arguments);
-  
-  // Toolchain-relative plugin paths
-  {
-    SmallString<64> pluginPath;
-    auto programPath = getDriver().getSwiftProgramPath();
-    CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-        programPath, /*shared=*/true, pluginPath);
 
-    auto defaultPluginPath = pluginPath;
-    llvm::sys::path::append(defaultPluginPath, "host", "plugins");
-
-    // Default plugin path.
-    arguments.push_back("-plugin-path");
-    arguments.push_back(inputArgs.MakeArgString(defaultPluginPath));
-
-    // Local plugin path.
-    llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
-    llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
-    llvm::sys::path::append(pluginPath, "local", "lib");
-    llvm::sys::path::append(pluginPath, "swift");
-    llvm::sys::path::append(pluginPath, "host", "plugins");
-    arguments.push_back("-plugin-path");
-    arguments.push_back(inputArgs.MakeArgString(pluginPath));
-  }
+  addPluginArguments(inputArgs, arguments);
 
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);

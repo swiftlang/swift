@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -18,7 +19,7 @@ extension ASTGenVisitor {
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
     var nodeName = node.name.text
     let name = nodeName.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
     let nameLoc = self.base.advanced(by: node.name.position.utf8Offset).raw
     let eachLoc = node.each.map { self.base.advanced(by: $0.position.utf8Offset).raw }
@@ -36,7 +37,7 @@ extension ASTGenVisitor {
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, eachLoc, genericParameterIndex,
+        self.ctx, self.declContext, name, nameLoc, eachLoc, SwiftInt(genericParameterIndex),
         eachLoc != nil))
   }
 }

@@ -6,8 +6,7 @@
 // RUN: %host-build-swift \
 // RUN:   -swift-version 5 -o %t/broken-plugin \
 // RUN:   -module-name=TestPlugin \
-// RUN:   %t/broken_plugin.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath -swift-version 5
+// RUN:   %t/broken_plugin.swift
 
 // RUN: not %swift-target-frontend \
 // RUN:   -typecheck \

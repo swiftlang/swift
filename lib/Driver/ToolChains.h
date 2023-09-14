@@ -65,7 +65,10 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
-    
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
+
   void validateArguments(DiagnosticEngine &diags,
                          const llvm::opt::ArgList &args,
                          StringRef defaultTarget) const override;
@@ -113,8 +116,12 @@ protected:
 public:
   Windows(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Windows() = default;
+
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY WebAssembly : public ToolChain {
@@ -168,6 +175,9 @@ public:
   ~GenericUnix() = default;
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Android : public GenericUnix {
