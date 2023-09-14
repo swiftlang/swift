@@ -208,6 +208,9 @@ cmake ^
   -D PACKAGE_VENDOR="swift.org" ^
   -D CLANG_VENDOR="swift.org" ^
   -D CLANG_VENDOR_UTI="org.swift" ^
+  -D LLDB_PYTHON_EXE_RELATIVE_PATH=python.exe ^
+  -D LLDB_PYTHON_EXT_SUFFIX=.pyd ^
+  -D LLDB_PYTHON_RELATIVE_PATH=lib/site-packages ^
   -D LLVM_APPEND_VC_REV=NO ^
   -D LLVM_VERSION_SUFFIX="" ^
 
