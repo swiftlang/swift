@@ -98,6 +98,16 @@ struct PaddedCell<T>: ~Copyable {}
 @_rawLayout(likeArrayOf: T, count: 8)
 struct SmallVectorBuf<T>: ~Copyable {}
 
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}14SmallVectorOf3VWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 0
+// stride
+// CHECK-SAME:  , {{i64|i32}} 0
+// flags: alignment 0, incomplete
+// CHECK-SAME:  , <i32 0x400000>
+@_rawLayout(likeArrayOf: T, count: 3)
+struct SmallVectorOf3<T>: ~Copyable {}
+
 // CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}8UsesCellVWV" = {{.*}} %swift.vwtable
 // size
 // CHECK-SAME:  , {{i64|i32}} 8
@@ -108,6 +118,28 @@ struct SmallVectorBuf<T>: ~Copyable {}
 struct UsesCell: ~Copyable {
     let someCondition: Bool
     let specialInt: Cell<Int32>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}13BufferOf3BoolVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 3
+// stride
+// CHECK-SAME:  , {{i64|i32}} 3
+// flags: alignment 0, noncopyable
+// CHECK-SAME:  , <i32 0x800000>
+struct BufferOf3Bool: ~Copyable {
+    let buffer: SmallVectorOf3<Bool>
+}
+
+// CHECK-LABEL: @"$s{{[A-Za-z0-9_]*}}9BadBufferVWV" = {{.*}} %swift.vwtable
+// size
+// CHECK-SAME:  , {{i64|i32}} 48
+// stride
+// CHECK-SAME:  , {{i64|i32}} 48
+// flags: alignment 7, noncopyable, is not inline
+// CHECK-SAME:  , <i32 0x820007>
+struct BadBuffer: ~Copyable {
+    let buffer: SmallVectorOf3<Int64?>
 }
 
 // Dependent layout metadata initialization:
