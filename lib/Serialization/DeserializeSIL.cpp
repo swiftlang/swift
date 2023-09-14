@@ -2327,11 +2327,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createMarkUninitialized(Loc, Val, Kind);
     break;
   }
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
-    using CheckKind = MarkUnresolvedNonCopyableValueInst::CheckKind;
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst: {
+    using CheckKind = MarkUnresolvedNonCopyableInst::CheckKind;
     auto Ty = MF->getType(TyID);
     auto CKind = CheckKind(Attr);
-    ResultInst = Builder.createMarkUnresolvedNonCopyableValueInst(
+    ResultInst = Builder.createMarkUnresolvedNonCopyableInst(
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         CKind);

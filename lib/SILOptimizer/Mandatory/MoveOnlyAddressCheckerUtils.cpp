@@ -101,7 +101,7 @@
 /// ```
 ///
 /// The variants of SMOA form can be classified by the specific
-/// mark_unresolved_non_copyable_value kind put on the the checker mark
+/// mark_unresolved_noncopyable kind put on the the checker mark
 /// instruction and are as follows:
 ///
 /// 1. no_consume_or_assign. This means that the address can only be consumed by
@@ -119,12 +119,12 @@
 /// fields, globals, and escaping mutable captures where we want the user to be
 /// able to update the value, but allowing for escapes of the value would break
 /// memory safety. In all cases where this is used, the
-/// mark_unresolved_non_copyable_value is used as the initial def of the value
+/// mark_unresolved_noncopyable is used as the initial def of the value
 /// lifetime. Example:
 ///
 /// 4. initable_but_not_consumable. This means that the address can only be
 /// initialized once but cannot be taken from or assigned over. It is assumed
-/// that the initial def will always be the mark_unresolved_non_copyable_value
+/// that the initial def will always be the mark_unresolved_noncopyable
 /// and that the value will be uninitialized at that point. Example:
 ///
 /// Algorithm Stages In Detail
@@ -376,13 +376,13 @@ static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
 /// use to ensure that we reinitialize \p value before the end of the function
 /// if we consume \p value in the function body.
 static bool isInOutDefThatNeedsEndOfFunctionLiveness(
-    MarkUnresolvedNonCopyableValueInst *markedAddr) {
+    MarkUnresolvedNonCopyableInst *markedAddr) {
   SILValue operand = markedAddr->getOperand();
 
   // Check for inout types of arguments that are marked with consumable and
   // assignable.
   if (markedAddr->getCheckKind() ==
-      MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable) {
+      MarkUnresolvedNonCopyableInst::CheckKind::ConsumableAndAssignable) {
     if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
       switch (fArg->getArgumentConvention()) {
       case SILArgumentConvention::Indirect_In:
@@ -420,14 +420,14 @@ static bool isCopyableValue(SILValue value) {
 //===----------------------------------------------------------------------===//
 
 void swift::siloptimizer::
-    searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
+    searchForCandidateAddressMarkUnresolvedNonCopyableInsts(
         SILFunction *fn,
-        llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        llvm::SmallSetVector<MarkUnresolvedNonCopyableInst *, 32>
             &moveIntroducersToProcess,
         DiagnosticEmitter &diagnosticEmitter) {
   for (auto &block : *fn) {
     for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-      auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&*ii);
+      auto *mmci = dyn_cast<MarkUnresolvedNonCopyableInst>(&*ii);
       ++ii;
 
       if (!mmci || !mmci->hasMoveCheckerKind() || !mmci->getType().isAddress())
@@ -445,7 +445,7 @@ void swift::siloptimizer::
 namespace {
 
 struct UseState {
-  MarkUnresolvedNonCopyableValueInst *address;
+  MarkUnresolvedNonCopyableInst *address;
 
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
@@ -519,7 +519,7 @@ struct UseState {
 
   SmallFrozenMultiMap<SILInstruction *, SILValue, 8> reinitToValueMultiMap;
 
-  /// The set of drop_deinits of this mark_unresolved_non_copyable_value
+  /// The set of drop_deinits of this mark_unresolved_noncopyable
   SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
 
   /// A "inout terminator use" is an implicit liveness use of the entire value
@@ -723,8 +723,8 @@ struct UseState {
       return;
     }
 
-    if (address->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
-                                       CheckKind::AssignableButNotConsumable) {
+    if (address->getCheckKind() ==
+        MarkUnresolvedNonCopyableInst::CheckKind::AssignableButNotConsumable) {
       if (auto *bai = dyn_cast<BeginAccessInst>(address->getOperand())) {
         for (auto *eai : bai->getEndAccesses()) {
           LLVM_DEBUG(llvm::dbgs() << "    Adding end_access as implicit end of "
@@ -969,7 +969,7 @@ void UseState::initializeLiveness(
         LLVM_DEBUG(
             llvm::dbgs()
             << "Found in/in_guaranteed/inout/inout_aliasable argument as "
-               "an init... adding mark_unresolved_non_copyable_value as "
+               "an init... adding mark_unresolved_noncopyable as "
                "init!\n");
         // We cheat here slightly and use our address's operand.
         recordInitUse(address, address, liveness.getTopLevelSpan());
@@ -991,7 +991,7 @@ void UseState::initializeLiveness(
 
   // See if our address is from a closure guaranteed box that we did not promote
   // to an address. In such a case, just treat our
-  // mark_unresolved_non_copyable_value as the init of our value.
+  // mark_unresolved_noncopyable as the init of our value.
   if (auto *projectBox = dyn_cast<ProjectBoxInst>(stripAccessMarkers(address->getOperand()))) {
     if (auto *fArg = dyn_cast<SILFunctionArgument>(projectBox->getOperand())) {
       if (fArg->isClosureCapture()) {
@@ -1003,7 +1003,7 @@ void UseState::initializeLiveness(
         // later invariants that we assert upon remain true.
         LLVM_DEBUG(llvm::dbgs()
                    << "Found move only arg closure box use... "
-                      "adding mark_unresolved_non_copyable_value as init!\n");
+                      "adding mark_unresolved_noncopyable as init!\n");
         recordInitUse(address, address, liveness.getTopLevelSpan());
         liveness.initializeDef(address, liveness.getTopLevelSpan());
       }
@@ -1011,30 +1011,28 @@ void UseState::initializeLiveness(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only var allocbox use... "
-                    "adding mark_unresolved_non_copyable_value as init!\n");
+                    "adding mark_unresolved_noncopyable as init!\n");
       recordInitUse(address, address, liveness.getTopLevelSpan());
       liveness.initializeDef(address, liveness.getTopLevelSpan());
     }
   }
 
   // Check if our address is from a ref_element_addr. In such a case, we treat
-  // the mark_unresolved_non_copyable_value as the initialization.
+  // the mark_unresolved_noncopyable as the initialization.
   if (auto *refEltAddr = dyn_cast<RefElementAddrInst>(
           stripAccessMarkers(address->getOperand()))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found ref_element_addr use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Found ref_element_addr use... "
+                               "adding mark_unresolved_noncopyable as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
 
   // Check if our address is from a global_addr. In such a case, we treat the
-  // mark_unresolved_non_copyable_value as the initialization.
+  // mark_unresolved_noncopyable as the initialization.
   if (auto *globalAddr =
           dyn_cast<GlobalAddrInst>(stripAccessMarkers(address->getOperand()))) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found global_addr use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Found global_addr use... "
+                               "adding mark_unresolved_noncopyable as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
@@ -1042,9 +1040,8 @@ void UseState::initializeLiveness(
   if (auto *ptai = dyn_cast<PointerToAddressInst>(
           stripAccessMarkers(address->getOperand()))) {
     assert(ptai->isStrict());
-    LLVM_DEBUG(llvm::dbgs()
-               << "Found pointer to address use... "
-                  "adding mark_unresolved_non_copyable_value as init!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Found pointer to address use... "
+                               "adding mark_unresolved_noncopyable as init!\n");
     recordInitUse(address, address, liveness.getTopLevelSpan());
     liveness.initializeDef(address, liveness.getTopLevelSpan());
   }
@@ -1063,10 +1060,10 @@ void UseState::initializeLiveness(
     // NOTE: We do not need to check for access scopes here since store_borrow
     // can only apply to alloc_stack today.
     if (auto *sbi = dyn_cast<StoreBorrowInst>(initInstAndValue.first)) {
-      // We can only store_borrow if our mark_unresolved_non_copyable_value is a
+      // We can only store_borrow if our mark_unresolved_noncopyable is a
       // no_consume_or_assign.
-      assert(address->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
-                                            CheckKind::NoConsumeOrAssign &&
+      assert(address->getCheckKind() ==
+                 MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign &&
              "store_borrow implies no_consume_or_assign since we cannot "
              "consume a borrowed inited value");
       for (auto *ebi : sbi->getEndBorrows()) {
@@ -1324,10 +1321,9 @@ struct MoveOnlyAddressCheckerPImpl {
 
   DominanceInfo *domTree;
 
-  /// A set of mark_unresolved_non_copyable_value that we are actually going to
+  /// A set of mark_unresolved_noncopyable that we are actually going to
   /// process.
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
-      moveIntroducersToProcess;
+  SmallSetVector<MarkUnresolvedNonCopyableInst *, 32> moveIntroducersToProcess;
 
   /// The instruction deleter used by \p canonicalizer.
   InstructionDeleter deleter;
@@ -1360,8 +1356,7 @@ struct MoveOnlyAddressCheckerPImpl {
         diagnosticEmitter(diagnosticEmitter), poa(poa), allocator(allocator) {
     deleter.setCallbacks(std::move(
         InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-          if (auto *mvi =
-                  dyn_cast<MarkUnresolvedNonCopyableValueInst>(instToDelete))
+          if (auto *mvi = dyn_cast<MarkUnresolvedNonCopyableInst>(instToDelete))
             moveIntroducersToProcess.remove(mvi);
           instToDelete->eraseFromParent();
         })));
@@ -1369,24 +1364,24 @@ struct MoveOnlyAddressCheckerPImpl {
   }
 
   /// Search through the current function for candidate
-  /// mark_unresolved_non_copyable_value [noimplicitcopy]. If we find one that
+  /// mark_unresolved_noncopyable [noimplicitcopy]. If we find one that
   /// does not fit a pattern that we understand, emit an error diagnostic
   /// telling the programmer that the move checker did not know how to recognize
   /// this code pattern.
   ///
   /// Returns true if we emitted a diagnostic. Returns false otherwise.
-  bool searchForCandidateMarkUnresolvedNonCopyableValueInsts();
+  bool searchForCandidateMarkUnresolvedNonCopyableInsts();
 
   /// Emits an error diagnostic for \p markedValue.
-  void performObjectCheck(MarkUnresolvedNonCopyableValueInst *markedValue);
+  void performObjectCheck(MarkUnresolvedNonCopyableInst *markedValue);
 
-  bool performSingleCheck(MarkUnresolvedNonCopyableValueInst *markedValue);
+  bool performSingleCheck(MarkUnresolvedNonCopyableInst *markedValue);
 
-  void insertDestroysOnBoundary(MarkUnresolvedNonCopyableValueInst *markedValue,
+  void insertDestroysOnBoundary(MarkUnresolvedNonCopyableInst *markedValue,
                                 FieldSensitiveMultiDefPrunedLiveRange &liveness,
                                 FieldSensitivePrunedLivenessBoundary &boundary);
 
-  void rewriteUses(MarkUnresolvedNonCopyableValueInst *markedValue,
+  void rewriteUses(MarkUnresolvedNonCopyableInst *markedValue,
                    FieldSensitiveMultiDefPrunedLiveRange &liveness,
                    const FieldSensitivePrunedLivenessBoundary &boundary);
 
@@ -1873,7 +1868,7 @@ namespace {
 struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   MoveOnlyAddressCheckerPImpl &moveChecker;
   UseState &useState;
-  MarkUnresolvedNonCopyableValueInst *markedValue;
+  MarkUnresolvedNonCopyableInst *markedValue;
   DiagnosticEmitter &diagnosticEmitter;
 
   // Pruned liveness used to validate that load [take]/load [copy] can be
@@ -1882,13 +1877,13 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
 
   GatherUsesVisitor(MoveOnlyAddressCheckerPImpl &moveChecker,
                     UseState &useState,
-                    MarkUnresolvedNonCopyableValueInst *markedValue,
+                    MarkUnresolvedNonCopyableInst *markedValue,
                     DiagnosticEmitter &diagnosticEmitter)
       : moveChecker(moveChecker), useState(useState), markedValue(markedValue),
         diagnosticEmitter(diagnosticEmitter) {}
 
   bool visitUse(Operand *op);
-  void reset(MarkUnresolvedNonCopyableValueInst *address) {
+  void reset(MarkUnresolvedNonCopyableInst *address) {
     useState.address = address;
   }
   void clear() { useState.clear(); }
@@ -2030,7 +2025,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
   if (auto *di = dyn_cast<DebugValueInst>(user)) {
     // Save the debug_value if it is attached directly to this
-    // mark_unresolved_non_copyable_value. If the underlying storage we're
+    // mark_unresolved_noncopyable. If the underlying storage we're
     // checking is immutable, then the access being checked is not confined to
     // an explicit access, but every other use of the storage must also be
     // immutable, so it is fine if we see debug_values or other uses that aren't
@@ -2062,7 +2057,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
 
     if (markedValue->getCheckKind() ==
-        MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
+        MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign) {
       if (isa<ProjectBoxInst>(stripAccessMarkers(markedValue->getOperand()))) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Found mark must check [nocopy] use of escaping box: " << *user);
@@ -2165,8 +2160,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // assignable_but_not_consumable checking, if we found any consumes of our
     // load, then we need to emit an error.
     auto checkKind = markedValue->getCheckKind();
-    if (checkKind != MarkUnresolvedNonCopyableValueInst::CheckKind::
-                         ConsumableAndAssignable) {
+    if (checkKind !=
+        MarkUnresolvedNonCopyableInst::CheckKind::ConsumableAndAssignable) {
       if (moveChecker.canonicalizer.foundAnyConsumingUses()) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Found mark must check [nocopy] error: " << *user);
@@ -2176,9 +2171,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
             fArg->getArgumentConvention().isInoutConvention()) {
-          assert(
-              checkKind ==
-              MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+          assert(checkKind ==
+                 MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign);
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
           return true;
@@ -2188,8 +2182,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         // not have any partial apply uses, then we know that we have a use of
         // an address only borrowed parameter that we need to
         if (fArg &&
-            checkKind == MarkUnresolvedNonCopyableValueInst::CheckKind::
-                             NoConsumeOrAssign &&
+            checkKind ==
+                MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign &&
             !moveChecker.canonicalizer.hasPartialApplyConsumingUse()) {
           moveChecker.diagnosticEmitter.emitObjectGuaranteedDiagnostic(
               markedValue);
@@ -2308,8 +2302,8 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     //
     // NOTE: Since SILGen eagerly loads loadable types from memory, this
     // generally will only handle address only types.
-    if (markedValue->getCheckKind() != MarkUnresolvedNonCopyableValueInst::
-                                           CheckKind::ConsumableAndAssignable) {
+    if (markedValue->getCheckKind() !=
+        MarkUnresolvedNonCopyableInst::CheckKind::ConsumableAndAssignable) {
       auto *fArg = dyn_cast<SILFunctionArgument>(
           stripAccessMarkers(markedValue->getOperand()));
       if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
@@ -2385,7 +2379,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
             stripAccessMarkers(markedValue->getOperand()))) {
       // If we are processing an inout convention and we emitted an error on the
       // partial_apply, we shouldn't process this
-      // mark_unresolved_non_copyable_value, but squelch the compiler doesn't
+      // mark_unresolved_noncopyable, but squelch the compiler doesn't
       // understand error.
       if (fArg->getArgumentConvention().isInoutConvention() &&
           pas->getCalleeFunction()->hasSemanticsAttr(
@@ -2806,7 +2800,7 @@ static void insertDestroyBeforeInstruction(UseState &addressUseState,
 }
 
 void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
-    MarkUnresolvedNonCopyableValueInst *markedValue,
+    MarkUnresolvedNonCopyableInst *markedValue,
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     FieldSensitivePrunedLivenessBoundary &boundary) {
   using IsInterestingUser = FieldSensitivePrunedLiveness::IsInterestingUser;
@@ -2819,7 +2813,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
   // NOTE: This also implies that we do not need to insert invalidating
   // debug_value undef since our value will not be invalidated.
   if (markedValue->getCheckKind() ==
-      MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
+      MarkUnresolvedNonCopyableInst::CheckKind::NoConsumeOrAssign) {
     LLVM_DEBUG(llvm::dbgs()
                << "    Skipping destroy insertion b/c no_consume_or_assign\n");
     consumes.finishRecordingFinalConsumes();
@@ -2970,7 +2964,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
       // checker expects (which is that values are always initialized at the def
       // point).
       if (markedValue && markedValue->getCheckKind() ==
-                             MarkUnresolvedNonCopyableValueInst::CheckKind::
+                             MarkUnresolvedNonCopyableInst::CheckKind::
                                  InitableButNotConsumable)
         continue;
 
@@ -2987,7 +2981,7 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
 }
 
 void MoveOnlyAddressCheckerPImpl::rewriteUses(
-    MarkUnresolvedNonCopyableValueInst *markedValue,
+    MarkUnresolvedNonCopyableInst *markedValue,
     FieldSensitiveMultiDefPrunedLiveRange &liveness,
     const FieldSensitivePrunedLivenessBoundary &boundary) {
   LLVM_DEBUG(llvm::dbgs() << "MoveOnlyAddressChecker Rewrite Uses!\n");
@@ -3014,7 +3008,7 @@ void MoveOnlyAddressCheckerPImpl::rewriteUses(
     // then these are the points where we implicitly destroy self to clean-up
     // that self var before exiting the scope. An explicit 'consume self'
     // that is thrown away is a consume of this
-    // mark_unresolved_non_copyable_value'd var and not a destroy of it,
+    // mark_unresolved_noncopyable'd var and not a destroy of it,
     // according to the use classifier.
     if (isDiscardingContext) {
 
@@ -3475,7 +3469,7 @@ void ExtendUnconsumedLiveness::addPreviousInstructionToLiveness(
 }
 
 bool MoveOnlyAddressCheckerPImpl::performSingleCheck(
-    MarkUnresolvedNonCopyableValueInst *markedAddress) {
+    MarkUnresolvedNonCopyableInst *markedAddress) {
   SWIFT_DEFER { diagnosticEmitter.clearUsesWithDiagnostic(); };
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
 
@@ -3655,19 +3649,17 @@ static llvm::cl::opt<uint64_t> NumTopLevelToProcess(
     llvm::cl::init(UINT64_MAX));
 #endif
 
-static llvm::cl::opt<bool>
-    DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst(
-        "sil-move-only-address-checker-dump-before-removing-mark-must-check",
-        llvm::cl::desc(
-            "When bisecting it is useful to dump the SIL before the "
-            "rest of the checker removes "
-            "mark_unresolved_non_copyable_value. This lets one "
-            "grab the SIL of a bad variable after all of the rest have "
-            "been processed to work with further in sil-opt."),
-        llvm::cl::init(false));
+static llvm::cl::opt<bool> DumpSILBeforeRemovingMarkUnresolvedNonCopyableInst(
+    "sil-move-only-address-checker-dump-before-removing-mark-must-check",
+    llvm::cl::desc("When bisecting it is useful to dump the SIL before the "
+                   "rest of the checker removes "
+                   "mark_unresolved_noncopyable. This lets one "
+                   "grab the SIL of a bad variable after all of the rest have "
+                   "been processed to work with further in sil-opt."),
+    llvm::cl::init(false));
 
 bool MoveOnlyAddressChecker::check(
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    SmallSetVector<MarkUnresolvedNonCopyableInst *, 32>
         &moveIntroducersToProcess) {
   assert(moveIntroducersToProcess.size() &&
          "Must have checks to process to call this function");
@@ -3705,7 +3697,7 @@ bool MoveOnlyAddressChecker::check(
     }
   }
 
-  if (DumpSILBeforeRemovingMarkUnresolvedNonCopyableValueInst) {
+  if (DumpSILBeforeRemovingMarkUnresolvedNonCopyableInst) {
     LLVM_DEBUG(llvm::dbgs()
                    << "Dumping SIL before removing mark must checks!\n";
                fn->dump());

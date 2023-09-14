@@ -494,7 +494,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::DropDeinitInst:
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:

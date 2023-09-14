@@ -1537,7 +1537,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(MVI->getAllowDiagnostics()) |
              (unsigned(MVI->isLexical() << 1)) |
              (unsigned(MVI->hasPointerEscape() << 2));
-    } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableValueInst>(&SI)) {
+    } else if (auto *I = dyn_cast<MarkUnresolvedNonCopyableInst>(&SI)) {
       Attr = unsigned(I->getCheckKind());
     } else if (auto *I = dyn_cast<MarkUnresolvedReferenceBindingInst>(&SI)) {
       Attr = unsigned(I->getKind());
@@ -1551,9 +1551,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst: {
     unsigned Attr =
-        unsigned(cast<MarkUnresolvedNonCopyableValueInst>(&SI)->getCheckKind());
+        unsigned(cast<MarkUnresolvedNonCopyableInst>(&SI)->getCheckKind());
     writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }

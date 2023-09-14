@@ -189,7 +189,7 @@ struct borrowtodestructure::Implementation {
   /// arguments.
   FieldSensitiveSSAPrunedLiveRange liveness;
 
-  /// The copy_value we insert upon our mark_unresolved_non_copyable_value or
+  /// The copy_value we insert upon our mark_unresolved_noncopyable or
   /// switch_enum argument so that we have an independent owned value.
   SILValue initialValue;
 
@@ -240,7 +240,7 @@ struct borrowtodestructure::Implementation {
 
   AvailableValues &computeAvailableValues(SILBasicBlock *block);
 
-  /// Returns mark_unresolved_non_copyable_value if we are processing borrows or
+  /// Returns mark_unresolved_noncopyable if we are processing borrows or
   /// the enum argument if we are processing switch_enum.
   SILValue getRootValue() const { return liveness.getRootValue(); }
 
@@ -248,9 +248,9 @@ struct borrowtodestructure::Implementation {
     return interface.diagnosticEmitter;
   }
 
-  /// Always returns the actual root mark_unresolved_non_copyable_value for both
+  /// Always returns the actual root mark_unresolved_noncopyable for both
   /// switch_enum args and normal borrow user checks.
-  MarkUnresolvedNonCopyableValueInst *getMarkedValue() const {
+  MarkUnresolvedNonCopyableInst *getMarkedValue() const {
     return interface.mmci;
   }
 
@@ -1385,7 +1385,7 @@ void Implementation::cleanup() {
 /// that the caller will fail in such a case.
 static bool gatherBorrows(SILValue rootValue,
                           StackList<BeginBorrowInst *> &borrowWorklist) {
-  // If we have a no implicit copy mark_unresolved_non_copyable_value, we do not
+  // If we have a no implicit copy mark_unresolved_noncopyable, we do not
   // run the borrow to destructure transform since:
   //
   // 1. If we have a move only type, we should have emitted an earlier error

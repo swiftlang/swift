@@ -37,7 +37,7 @@ public struct DeinitTest : ~Copyable {
 // CHECK-LABEL: sil [ossa] @$s26moveonly_library_evolution29callerArgumentSpillingTestArgyyAA13CopyableKlassCF : $@convention(thin) (@guaranteed CopyableKlass) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $CopyableKlass):
 // CHECK:    [[ADDR:%.*]] = ref_element_addr [[ARG]]
-// CHECK:    [[MARKED_ADDR:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ADDR]]
+// CHECK:    [[MARKED_ADDR:%.*]] = mark_unresolved_noncopyable [no_consume_or_assign] [[ADDR]]
 // CHECK:    [[GEP:%.*]] = struct_element_addr [[MARKED_ADDR]]
 // CHECK:    apply {{%.*}}([[GEP]]) : $@convention(thin) (@in_guaranteed EmptyStruct) -> ()
 // CHECK: } // end sil function '$s26moveonly_library_evolution29callerArgumentSpillingTestArgyyAA13CopyableKlassCF'
@@ -65,7 +65,7 @@ public class UsableFromInlineTestKlass {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed
     // CHECK:   [[FIELD:%.*]] = ref_element_addr [[ARG]]
     // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
-    // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ACCESS]]
+    // CHECK:   [[MARK:%.*]] = mark_unresolved_noncopyable [no_consume_or_assign] [[ACCESS]]
     // CHECK:   [[LOAD:%.*]] = load [copy] [[MARK]]
     // CHECK:   yield [[LOAD]]
     // CHECK: } // end sil function '$s26moveonly_library_evolution25UsableFromInlineTestKlassC1eAA1EVvr'
@@ -76,11 +76,11 @@ public class UsableFromInlineTestKlass {
     // CHECK:  [[VALUE:%.*]] = alloc_box ${ let E }
     // CHECK:  [[PROJECT:%.*]] = project_box [[VALUE]]
     // CHECK:  store [[NEW_VALUE]] to [init] [[PROJECT]]
-    // CHECK:  [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
+    // CHECK:  [[MARK:%.*]] = mark_unresolved_noncopyable [no_consume_or_assign] [[PROJECT]]
     // CHECK:  [[LOAD:%.*]] = load [copy] [[MARK]]
     // CHECK:  [[REF:%.*]] = ref_element_addr [[SELF]]
     // CHECK:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]
-    // CHECK:  [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
+    // CHECK:  [[MARK:%.*]] = mark_unresolved_noncopyable [assignable_but_not_consumable] [[ACCESS]]
     // CHECK:  assign [[LOAD]] to [[MARK]]
     // CHECK: } // end sil function '$s26moveonly_library_evolution25UsableFromInlineTestKlassC1eAA1EVvs'
 
@@ -89,7 +89,7 @@ public class UsableFromInlineTestKlass {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed
     // CHECK:   [[FIELD:%.*]] = ref_element_addr [[ARG]]
     // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[FIELD]]
-    // CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[ACCESS]]
+    // CHECK:   [[MARK:%.*]] = mark_unresolved_noncopyable [assignable_but_not_consumable] [[ACCESS]]
     // CHECK:   yield [[MARK]]
     // CHECK: } // end sil function '$s26moveonly_library_evolution25UsableFromInlineTestKlassC1eAA1EVvM'
     @usableFromInline

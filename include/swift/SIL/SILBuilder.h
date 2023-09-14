@@ -1439,10 +1439,10 @@ public:
         getSILDebugLocation(loc), srcAddr, takeAddr));
   }
 
-  MarkUnresolvedNonCopyableValueInst *createMarkUnresolvedNonCopyableValueInst(
+  MarkUnresolvedNonCopyableInst *createMarkUnresolvedNonCopyableInst(
       SILLocation loc, SILValue src,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind) {
-    return insert(new (getModule()) MarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableInst::CheckKind kind) {
+    return insert(new (getModule()) MarkUnresolvedNonCopyableInst(
         getSILDebugLocation(loc), src, kind));
   }
 

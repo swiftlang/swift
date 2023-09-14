@@ -1388,9 +1388,9 @@ public:
              // project_box is not normally an access projection but we treat it
              // as such when it operates on unchecked_take_enum_data_addr.
              || isa<ProjectBoxInst>(projectedAddr)
-             // Ignore mark_unresolved_non_copyable_value, we just look through
+             // Ignore mark_unresolved_noncopyable, we just look through
              // it when we see it.
-             || isa<MarkUnresolvedNonCopyableValueInst>(projectedAddr)
+             || isa<MarkUnresolvedNonCopyableInst>(projectedAddr)
              // Ignore moveonlywrapper_to_copyable_addr and
              // copyable_to_moveonlywrapper_addr, we just look through it when
              // we see it
@@ -1913,7 +1913,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
   }
 
   case SILInstructionKind::DropDeinitInst:
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst: {
     // Mark must check goes on the project_box, so it isn't a ref.
     assert(!dfs.isRef());
     pushUsers(svi, dfs);

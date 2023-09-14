@@ -2817,7 +2817,7 @@ which codegens to the following SIL::
   bb0(%0 : @noImplicitCopy $Klass):
     %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $@moveOnly Klass
     %2 = copy_value %1 : $@moveOnly Klass
-    %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $@moveOnly Klass
+    %3 = mark_unresolved_noncopyable [no_consume_or_assign] %2 : $@moveOnly Klass
     debug_value %3 : $@moveOnly Klass, let, name "x", argno 1
     %4 = begin_borrow %3 : $@moveOnly Klass
     %5 = function_ref @$s4test5KlassC11doSomethingyyF : $@convention(method) (@guaranteed Klass) -> ()
@@ -2887,7 +2887,7 @@ Today this codegens to the following Swift::
   bb0(%0 : @noImplicitCopy $Int):
     %1 = copyable_to_moveonlywrapper [owned] %0 : $Int
     %2 = move_value [lexical] %1 : $@moveOnly Int
-    %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $@moveOnly Int
+    %3 = mark_unresolved_noncopyable [consumable_and_assignable] %2 : $@moveOnly Int
     %5 = begin_borrow %3 : $@moveOnly Int
     %6 = begin_borrow %3 : $@moveOnly Int
     %7 = function_ref @addIntegers : $@convention(method) (Int, Int Int.Type) -> Int
@@ -2946,7 +2946,7 @@ A hypothetical SILGen for this code is as follows::
     %3 = begin_borrow [lexical] %0 : $Klass
     %4 = copy_value %3 : $Klass
     %5 = copyable_to_moveonlywrapper [owned] %4 : $Klass
-    %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $@moveOnly Klass
+    %6 = mark_unresolved_noncopyable [consumable_and_assignable] %5 : $@moveOnly Klass
     debug_value %6 : $@moveOnly Klass, let, name "value"
     %8 = begin_borrow %6 : $@moveOnly Klass
     %9 = copy_value %8 : $@moveOnly Klass
@@ -8484,11 +8484,11 @@ The remaining components identify the SIL differentiability witness:
 Optimizer Dataflow Marker Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-mark_unresolved_non_copyable_value
+mark_unresolved_noncopyable
 ```````````````
 ::
 
-  sil-instruction ::= 'mark_unresolved_non_copyable_value'
+  sil-instruction ::= 'mark_unresolved_noncopyable'
                       '[' sil-optimizer-analysis-marker ']'
 
   sil-optimizer-analysis-marker ::= 'consumable_and_assignable'
@@ -8496,7 +8496,7 @@ mark_unresolved_non_copyable_value
 
 A canary value inserted by a SIL generating frontend to signal to the move
 checker to check a specific value.  Valid only in Raw SIL. The relevant checkers
-should remove the `mark_unresolved_non_copyable_value`_ instruction after successfully running the
+should remove the `mark_unresolved_noncopyable`_ instruction after successfully running the
 relevant diagnostic. The idea here is that instead of needing to introduce
 multiple "flagging" instructions for the optimizer, we can just reuse this one
 instruction by varying the kind.

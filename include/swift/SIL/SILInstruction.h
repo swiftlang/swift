@@ -8302,9 +8302,9 @@ public:
 /// diagnostic based semantic checker. Example: no implicit copy. Only legal in
 /// Raw SIL so that we can guarantee canonical SIL has had all SSA based
 /// checking by the checkers that rely upon this instruction.
-class MarkUnresolvedNonCopyableValueInst
+class MarkUnresolvedNonCopyableInst
     : public UnaryInstructionBase<
-          SILInstructionKind::MarkUnresolvedNonCopyableValueInst,
+          SILInstructionKind::MarkUnresolvedNonCopyableInst,
           OwnershipForwardingSingleValueInstruction> {
   friend class SILBuilder;
 
@@ -8342,13 +8342,13 @@ public:
 private:
   CheckKind kind;
 
-  MarkUnresolvedNonCopyableValueInst(SILDebugLocation DebugLoc,
-                                     SILValue operand, CheckKind checkKind)
+  MarkUnresolvedNonCopyableInst(SILDebugLocation DebugLoc, SILValue operand,
+                                CheckKind checkKind)
       : UnaryInstructionBase(DebugLoc, operand, operand->getType(),
                              operand->getOwnershipKind()),
         kind(checkKind) {
     assert(operand->getType().isMoveOnly() &&
-           "mark_unresolved_non_copyable_value can only take a move only typed "
+           "mark_unresolved_noncopyable can only take a move only typed "
            "value");
   }
 
@@ -10594,7 +10594,7 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::DifferentiableFunctionInst:
-  case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkUnresolvedNonCopyableInst:
   case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
   case SILInstructionKind::ConvertFunctionInst:
   case SILInstructionKind::UpcastInst:

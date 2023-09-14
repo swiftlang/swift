@@ -822,9 +822,9 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // Look through mark_unresolved_non_copyable_value. To us, it is not
+    // Look through mark_unresolved_noncopyable. To us, it is not
     // interesting.
-    if (auto *mmi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(User)) {
+    if (auto *mmi = dyn_cast<MarkUnresolvedNonCopyableInst>(User)) {
       collectUses(mmi, BaseEltNo);
       continue;
     }
@@ -1643,8 +1643,7 @@ void ElementUseCollector::collectClassSelfUses(
     // and copy_value.
     if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User) ||
         isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User) ||
-        isa<CopyValueInst>(User) ||
-        isa<MarkUnresolvedNonCopyableValueInst>(User)) {
+        isa<CopyValueInst>(User) || isa<MarkUnresolvedNonCopyableInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1746,8 +1745,8 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
       continue;
     }
 
-    // Look through mark_unresolved_non_copyable_value.
-    if (auto *MMCI = dyn_cast<MarkUnresolvedNonCopyableValueInst>(User)) {
+    // Look through mark_unresolved_noncopyable.
+    if (auto *MMCI = dyn_cast<MarkUnresolvedNonCopyableInst>(User)) {
       collectDelegatingInitUses(TheMemory, UseInfo, MMCI);
       continue;
     }

@@ -489,10 +489,10 @@ public:
   createGuaranteedCopyableToMoveOnlyWrapperValue(SILLocation loc,
                                                  ManagedValue value);
 
-  using SILBuilder::createMarkUnresolvedNonCopyableValueInst;
-  ManagedValue createMarkUnresolvedNonCopyableValueInst(
+  using SILBuilder::createMarkUnresolvedNonCopyableInst;
+  ManagedValue createMarkUnresolvedNonCopyableInst(
       SILLocation loc, ManagedValue value,
-      MarkUnresolvedNonCopyableValueInst::CheckKind kind);
+      MarkUnresolvedNonCopyableInst::CheckKind kind);
 
   using SILBuilder::emitCopyValueOperation;
   ManagedValue emitCopyValueOperation(SILLocation Loc, ManagedValue v);
