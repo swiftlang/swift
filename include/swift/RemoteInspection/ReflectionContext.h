@@ -39,7 +39,6 @@
 #include "swift/Basic/Unreachable.h"
 
 #include <set>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -122,8 +121,7 @@ class ReflectionContext
   using super::readMetadata;
   using super::readObjCClassName;
   using super::readResolvedPointerValue;
-  std::unordered_map<typename super::StoredPointer, const RecordTypeInfo *>
-      Cache;
+  llvm::DenseMap<typename super::StoredPointer, const RecordTypeInfo *> Cache;
 
   /// All buffers we need to keep around long term. This will automatically free them
   /// when this object is destroyed.
