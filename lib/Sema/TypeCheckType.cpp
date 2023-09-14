@@ -4294,26 +4294,21 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
       options.hasBase(TypeResolverContext::SubscriptDecl) ||
       options.hasBase(TypeResolverContext::EnumElementDecl)) {
 
-    auto diagID = diag::attr_only_on_parameters;
-    bool removeRepr = true;
-    if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
-      diagID = diag::attr_not_on_subscript_parameters;
+    decltype(diag::attr_only_on_parameters) diagID;
+    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+        options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
     } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
       diagID = diag::attr_not_on_variadic_parameters;
-    } else if (options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagID = diag::attr_not_on_enum_case_parameters;
     } else {
       diagID = diag::attr_only_on_parameters;
-      removeRepr = false;
     }
+
     StringRef name;
     if (ownershipRepr) {
       name = ownershipRepr->getSpecifierSpelling();
     }
-    auto diag = diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
-    if (removeRepr)
-      diag.fixItRemove(repr->getLoc());
-
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(getASTContext());
   }
 
