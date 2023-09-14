@@ -1095,7 +1095,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
-                   Target.isOSDarwin());
+                   Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
 
   Opts.CForeignReferenceTypes =
       Args.hasArg(OPT_experimental_c_foreign_reference_types);
@@ -1332,6 +1332,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     if (FrontendOpts.InputsAndOutputs.hasPrimaryInputs()) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
+      HadError = true;
+    }
+
+    if (Opts.EnableObjCInterop) {
+      Diags.diagnose(SourceLoc(), diag::objc_with_embedded);
       HadError = true;
     }
   }
