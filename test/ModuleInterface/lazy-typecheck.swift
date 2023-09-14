@@ -69,6 +69,14 @@
 // CHECK:         override public init(x: Swift.Int)
 // CHECK:         deinit
 // CHECK:       }
+// CHECK:       public enum PublicEnum {
+// CHECK:         case a
+// CHECK:         case b(x: Swift.Int)
+// CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:         public var publicComputedVar: Swift.Int {
+// CHECK-NEXT:      get
+// CHECK-NEXT:    }
+// CHECK:       }
 // CHECK:       public struct PublicStructConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int

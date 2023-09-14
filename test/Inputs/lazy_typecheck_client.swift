@@ -50,6 +50,16 @@ func testPublicClass() {
   PublicDerivedClass.publicClassMethod()
 }
 
+func testPublicEnum(_ e: PublicEnum) {
+  switch e {
+  case .a: ()
+  case .b(let x): let _: Int = x
+  }
+
+  let _: Int = e.publicMethod()
+  let _: Int = e.publicComputedVar
+}
+
 func testConformances() {
   let array: [any PublicProto] = [
     PublicStructConformingToPublicProto(),

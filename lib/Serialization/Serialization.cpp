@@ -3416,9 +3416,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     UNREACHABLE(IfConfig);
     UNREACHABLE(PrecedenceGroup);
     UNREACHABLE(Operator);
-    UNREACHABLE(EnumCase);
 
 #undef UNREACHABLE
+
+    // Uninteresting decls are always considered external. A kind of decl might
+    // always be external if it is declared at the top level and access control
+    // does not apply to it. Or, a kind of decl could be considered always
+    // external because it is only found nested within other declarations that
+    // have their own access level, in which case we assume that the declaration
+    // context has already been checked.
+#define UNINTERESTING(KIND)                                                    \
+  bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
+    UNINTERESTING(EnumCase);
+
+#undef UNINTERESTING
   };
 
 public:
