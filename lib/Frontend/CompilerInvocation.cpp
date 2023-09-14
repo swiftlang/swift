@@ -185,12 +185,15 @@ void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
-                                      llvm::Triple &Triple) {
+                                      LangOptions &LangOpts) {
+  llvm::Triple &Triple = LangOpts.Target;
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   StringRef LibSubDir = getPlatformNameForTriple(Triple);
   if (tripleIsMacCatalystEnvironment(Triple))
     LibSubDir = "maccatalyst";
+  if (LangOpts.hasFeature(Feature::Embedded))
+    LibSubDir = "embedded";
 
   llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
@@ -294,7 +297,7 @@ setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
@@ -303,12 +306,12 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
   LangOpts.setTarget(Triple);
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
 }
 
 void CompilerInvocation::setSDKPath(const std::string &Path) {
   SearchPathOpts.setSDKPath(Path);
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
 }
 
 bool CompilerInvocation::setModuleAliasMap(std::vector<std::string> args,
@@ -1318,6 +1321,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Opts.hasFeature(Feature::Embedded)) {
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
+    Opts.DisableImplicitStringProcessingModuleImport = true;
 
     if (FrontendOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
@@ -3098,7 +3102,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts.Target);
+  updateRuntimeLibraryPaths(SearchPathOpts, LangOpts);
   setDefaultPrebuiltCacheIfNecessary();
   setDefaultBlocklistsIfNecessary();
 

@@ -566,8 +566,15 @@ extension AdditiveArithmetic {
 ///         print("\(z) is greater than \(x).")
 ///     }
 ///     // Prints "23 is greater than -23."
+
+#if !$Embedded
+public typealias _CustomStringConvertibleOrNone = CustomStringConvertible
+#else
+public typealias _CustomStringConvertibleOrNone = Any
+#endif
+
 public protocol BinaryInteger :
-  Hashable, Numeric, CustomStringConvertible, Strideable
+  Hashable, Numeric, _CustomStringConvertibleOrNone, Strideable
   where Magnitude: BinaryInteger, Magnitude.Magnitude == Magnitude
 {
   /// A Boolean value indicating whether this type is a signed integer type.
@@ -1493,6 +1500,7 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
+@_unavailableInEmbedded
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
@@ -1891,9 +1899,16 @@ extension BinaryInteger {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger: BinaryInteger, LosslessStringConvertible
+
+#if !$Embedded
+public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
+#else
+public typealias _LosslessStringConvertibleOrNone = Any
+#endif
+
+public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
 where Magnitude: FixedWidthInteger & UnsignedInteger,
-      Stride: FixedWidthInteger & SignedInteger {
+      Stride: FixedWidthInteger & SignedInteger, Stride.Stride == Stride {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -2609,6 +2624,7 @@ extension FixedWidthInteger {
   }
 }
 
+@_unavailableInEmbedded
 extension FixedWidthInteger {
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.
@@ -2719,7 +2735,7 @@ extension FixedWidthInteger {
     // If we used &+ instead, the result would be zero, which isn't helpful,
     // so we actually need to handle this case separately.
     if delta == Magnitude.max {
-      return Self(truncatingIfNeeded: generator.next() as Magnitude)
+      return Self(truncatingIfNeeded: generator.next())
     }
     // Need to widen delta to account for the right-endpoint of a closed range.
     delta += 1
@@ -3030,10 +3046,7 @@ extension FixedWidthInteger {
   @inline(__always)
   public init<T: BinaryFloatingPoint>(_ source: T) {
     guard let value = Self._convert(from: source).value else {
-      fatalError("""
-        \(T.self) value cannot be converted to \(Self.self) because it is \
-        outside the representable range
-        """)
+      fatalError()
     }
     self = value
   }
@@ -3339,6 +3352,7 @@ extension FixedWidthInteger {
   }
 }
 
+@_unavailableInEmbedded
 extension FixedWidthInteger {
   @inlinable
   public static func _random<R: RandomNumberGenerator>(

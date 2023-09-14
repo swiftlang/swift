@@ -243,7 +243,8 @@
     "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
-    "Instant.swift"
+    "Instant.swift",
+    "EmbeddedStubs.swift"
   ],
   "Result": [
     "Result.swift"

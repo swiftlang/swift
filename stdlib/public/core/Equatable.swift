@@ -247,10 +247,10 @@ extension Equatable {
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
 @inlinable // trivial-implementation
-public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
+public func ===<T: AnyObject, U: AnyObject>(lhs: T?, rhs: U?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
-    return ObjectIdentifier(l) == ObjectIdentifier(r)
+    return Builtin.bridgeToRawPointer(l) == Builtin.bridgeToRawPointer(r)
   case (nil, nil):
     return true
   default:
@@ -269,7 +269,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
 @inlinable // trivial-implementation
-public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
+public func !==<T: AnyObject, U: AnyObject>(lhs: T, rhs: U) -> Bool {
   return !(lhs === rhs)
 }
 

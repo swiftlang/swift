@@ -564,6 +564,12 @@ public func isKnownUniquelyReferenced<T: AnyObject>(_ object: inout T) -> Bool
   return _isUnique(&object)
 }
 
+@inlinable
+public func isKnownUniquelyReferenced(_ object: inout Builtin.NativeObject) -> Bool
+{
+  return _isUnique(&object)
+}
+
 /// Returns a Boolean value indicating whether the given object is known to
 /// have a single strong reference.
 ///

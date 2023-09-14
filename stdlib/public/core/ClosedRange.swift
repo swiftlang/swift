@@ -380,19 +380,29 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation...
   public var description: String {
+    #if $Embedded
+    fatalError()
+    #else
     return "\(lowerBound)...\(upperBound)"
+    #endif
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
+    #if $Embedded
+    fatalError()
+    #else
     return "ClosedRange(\(String(reflecting: lowerBound))"
     + "...\(String(reflecting: upperBound)))"
+    #endif
   }
 }
 
@@ -477,8 +487,12 @@ extension ClosedRange {
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride: SignedInteger
 
+@_unavailableInEmbedded
 extension ClosedRange: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
+    #if $Embedded
+    fatalError()
+    #else
     var container = try decoder.unkeyedContainer()
     let lowerBound = try container.decode(Bound.self)
     let upperBound = try container.decode(Bound.self)
@@ -489,9 +503,11 @@ extension ClosedRange: Decodable where Bound: Decodable {
           debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
     }
     self.init(_uncheckedBounds: (lower: lowerBound, upper: upperBound))
+    #endif
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()

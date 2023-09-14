@@ -18,7 +18,11 @@ where Indices == Range<Int> {
   var capacity: Int { get }
 
   /// An object that guarantees the lifetime of this array's elements.
+  #if !$Embedded
   var _owner: AnyObject? { get }
+  #else
+  var _owner: Builtin.NativeObject? { get }
+  #endif
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.

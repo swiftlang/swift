@@ -1,9 +1,9 @@
-// RUN: not %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -verify %s -parse-stdlib -enable-experimental-feature Embedded -wmo
 
 public protocol Player {}
 struct Concrete: Player {}
 
-// CHECK: error: existential can cause metadata allocation or locks
 public func test() -> any Player {
-  Concrete()
+  Concrete() // expected-error {{existential can cause metadata allocation or locks}}
+  // expected-note@-1 {{called from here}}
 }

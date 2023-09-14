@@ -39,6 +39,7 @@
 /// lifetime of an object. If an object has a stronger notion of identity, it
 /// may be appropriate to provide a custom implementation.
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 public protocol Identifiable<ID> {
 
   /// A type representing the stable identity of the entity associated with
@@ -50,6 +51,7 @@ public protocol Identifiable<ID> {
 }
 
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 extension Identifiable where Self: AnyObject {
   public var id: ObjectIdentifier {
     return ObjectIdentifier(self)

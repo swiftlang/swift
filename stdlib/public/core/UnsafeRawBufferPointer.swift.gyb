@@ -1143,11 +1143,16 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 }
 
+@_unavailableInEmbedded
 extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
+  #if $Embedded
+  fatalError()
+  #else
     return "${Self}"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+  #endif
   }
 }
 
