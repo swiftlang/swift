@@ -16,6 +16,9 @@
 // RUN:   -package-name package
 // REQUIRES: asserts
 
+/// swiftinterfaces don't need the flag.
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface)
+
 //--- PublicLib.swift
 //--- PackageLib.swift
 //--- InternalLib.swift
@@ -28,3 +31,8 @@ package import PackageLib // expected-error@:1 {{Access level on imports require
 internal import InternalLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
 fileprivate import FileprivateLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
 private import PrivateLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
+
+//--- Client.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -enable-library-evolution
+public import Swift
