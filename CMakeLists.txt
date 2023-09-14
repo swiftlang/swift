@@ -844,6 +844,24 @@ elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" OR SWIFT_SWIFT_PARSER)
   set(SWIFT_EXEC_FOR_SWIFT_MODULES "${CMAKE_Swift_COMPILER}")
 endif()
 
+# When we have the early SwiftSyntax build, we can include its parser.
+if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
+  set(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS
+    ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
+  if(NOT EXISTS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS}")
+    message(STATUS "Skipping Swift Swift parser integration due to missing early SwiftSyntax")
+  else()
+    set(SWIFT_SWIFT_PARSER TRUE)
+    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
+
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
+      message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
+      set(BOOTSTRAPPING_MODE "HOSTTOOLS")
+    endif()
+  endif()
+endif()
+
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
   if(SWIFT_ENABLE_ARRAY_COW_CHECKS)
     message(STATUS "array COW checks disabled when building the swift modules with host libraries")
@@ -948,24 +966,6 @@ if(XCODE)
   # by build-script. version-min flags are deprecated in favor of -target since
   # clang-11, so we might be able to undo this.
   set(SWIFT_SDKS "OSX")
-endif()
-
-# When we have the early SwiftSyntax build, we can include its parser.
-if(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR)
-  set(SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS
-    ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/cmake/SwiftSyntaxTargets.cmake)
-  if(NOT EXISTS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS}")
-    message(STATUS "Skipping Swift Swift parser integration due to missing early SwiftSyntax")
-  else()
-    set(SWIFT_SWIFT_PARSER TRUE)
-    include(${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_TARGETS})
-
-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-      # Only "HOSTTOOLS" is supported in Linux when Swift parser integration is enabled.
-      message(WARNING "Force setting BOOTSTRAPPING=HOSTTOOLS because Swift parser integration is enabled")
-      set(BOOTSTRAPPING_MODE "HOSTTOOLS")
-    endif()
-  endif()
 endif()
 
 
