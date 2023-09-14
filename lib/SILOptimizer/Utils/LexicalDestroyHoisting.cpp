@@ -184,6 +184,10 @@ private:
   void visitBarrierBlock(SILBasicBlock *block) {
     barriers.blocks.push_back(block);
   }
+
+  void visitInitialBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
 };
 
 Dataflow::Classification
