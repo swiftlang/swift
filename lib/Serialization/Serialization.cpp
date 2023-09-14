@@ -3413,7 +3413,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     UNREACHABLE(MacroExpansion);
     UNREACHABLE(GenericTypeParam);
     UNREACHABLE(Param);
-    UNREACHABLE(IfConfig);
     UNREACHABLE(PrecedenceGroup);
     UNREACHABLE(Operator);
 
@@ -3427,6 +3426,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // context has already been checked.
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
+    UNINTERESTING(IfConfig);
     UNINTERESTING(EnumCase);
 
 #undef UNINTERESTING

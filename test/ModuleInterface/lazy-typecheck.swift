@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -typecheck -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck
+// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -typecheck -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -DFLAG -experimental-lazy-typecheck
 // RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
@@ -103,6 +103,9 @@
 // CHECK:       }
 // CHECK:       #endif
 // CHECK:       public typealias PublicStructAlias = lazy_typecheck.PublicStruct
+// CHECK:       extension lazy_typecheck.PublicStruct {
+// CHECK:         public static func activeMethod()
+// CHECK:       }
 // CHECK:       @available(*, unavailable)
 // CHECK-NEXT:  extension lazy_typecheck.PublicGenericStruct : lazy_typecheck.EmptyPublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 // CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}

@@ -246,3 +246,13 @@ extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForCons
 
 public typealias PublicStructAlias = PublicStruct
 typealias InternalTypeAlias = DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+
+// MARK: - Compiler directives
+
+extension PublicStruct {
+#if FLAG
+  public static func activeMethod() {}
+#else
+  public static func inactiveMethod() -> DoesNotExist {}
+#endif
+}

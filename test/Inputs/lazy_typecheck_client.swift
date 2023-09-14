@@ -34,6 +34,7 @@ func testPublicStruct() {
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
   PublicStruct.publicStaticMethod()
+  PublicStruct.activeMethod()
 }
 
 func testPublicClass() {
