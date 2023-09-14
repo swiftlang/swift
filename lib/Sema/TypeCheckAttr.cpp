@@ -968,7 +968,8 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
 
 bool AttributeChecker::visitAbstractAccessControlAttr(
     AbstractAccessControlAttr *attr) {
-  // Access control attr may only be used on value decls and extensions.
+  // Access control attr may only be used on value decls, extensions and
+  // imports.
   if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D)) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
     return true;
@@ -996,7 +997,9 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
   }
 
   if (auto importDecl = dyn_cast<ImportDecl>(D)) {
-    if (!D->getASTContext().LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
+    SourceFile *File = D->getDeclContext()->getParentSourceFile();
+    if (!D->getASTContext().LangOpts.hasFeature(Feature::AccessLevelOnImport) &&
+        File && File->Kind != SourceFileKind::Interface) {
       diagnoseAndRemoveAttr(attr, diag::access_level_on_import_not_enabled);
       return true;
     }
