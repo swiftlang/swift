@@ -425,6 +425,8 @@ namespace {
         getLoadableSingleton()->reexplode(params, out);
     }
 
+    bool emitPayloadDirectlyIntoConstant() const override { return true; }
+
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
                                        SILType T,
                                        Address enumAddr) const override {
