@@ -85,6 +85,9 @@ using namespace metadataimpl;
 // types, so we explicitly define this symbol to be zero for now. Binaries
 // weak-import this symbol so they will resolve it to a zero address on older
 // runtimes as well.
+//
+// Note: If this symbol's value ever gets updated, the corresponding condition
+// handled by IRGen MUST be updated in tandem.
 __asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
 __asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
 #endif
