@@ -2177,7 +2177,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                     DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -F${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
