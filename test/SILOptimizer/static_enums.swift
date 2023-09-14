@@ -218,6 +218,12 @@ func printFunctionEnum() {
   }
 }
 
+enum SingleCaseEnum {
+  case a(b: Bool, i: Int)
+
+  static var x = Self.a(b:true, i: 42)
+}
+
 @main
 struct Main {
   static func main() {
@@ -293,6 +299,8 @@ struct Main {
     print("optSalmon:", optSalmon as Any)
     // CHECK-OUTPUT: test.C: 27
     printFunctionEnum()
+    // CHECK-OUTPUT: SingleCaseEnum: a(b: true, i: 42)
+    print("SingleCaseEnum:", SingleCaseEnum.x)
   }
 }
 
