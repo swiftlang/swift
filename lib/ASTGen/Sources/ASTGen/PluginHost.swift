@@ -121,7 +121,7 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: UInt(data.count)))
+      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: SwiftUInt(data.count)))
     }
     if hadError {
       throw PluginError.failedToSendMessage
@@ -277,7 +277,7 @@ class PluginDiagnosticsEngine {
       SwiftDiagnostic_create(
         cxxDiagnosticEngine, bridgedSeverity,
         cxxSourceLocation(at: position),
-        messageBuffer.baseAddress, messageBuffer.count)
+        messageBuffer.baseAddress, SwiftInt(messageBuffer.count))
     }
 
     // Emit highlights
@@ -296,7 +296,7 @@ class PluginDiagnosticsEngine {
       var newText = change.newText
       newText.withUTF8 { textBuffer in
         SwiftDiagnostic_fixItReplace(
-          diag, startLoc, endLoc, textBuffer.baseAddress, textBuffer.count)
+          diag, startLoc, endLoc, textBuffer.baseAddress, SwiftInt(textBuffer.count))
       }
     }
 

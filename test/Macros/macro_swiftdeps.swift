@@ -12,17 +12,10 @@
 // RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugin/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
-// RUN:   %S/Inputs/syntax_macro_definitions.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %S/Inputs/syntax_macro_definitions.swift
 
 //#-- Prepare the macro executable plugin.
-// RUN: %clang \
-// RUN:  -isysroot %host_sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/mock-plugin \
-// RUN:  %t/src/plugin.c
+// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/src/plugin.c
 
 //#-- Prepare the macro library.
 // RUN: %target-swift-frontend \
@@ -34,7 +27,7 @@
 // RUN:   -primary-file %t/src/macro_library.swift \
 // RUN:   -emit-reference-dependencies-path %t/macro_library.swiftdeps \
 // RUN:   -emit-dependencies-path %t/macro_library.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t/macro_library.swiftdeps %t/macro_library.swiftdeps.processed
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/macro_library.swiftdeps > %t/macro_library.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITH_PLUGIN %s < %t/macro_library.swiftdeps.processed
 
 //#-- Without macro (no -D USE_MACRO)
@@ -46,7 +39,7 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/without_macro.swiftdeps \
 // RUN:   -emit-dependencies-path %t/without_macro.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t/without_macro.swiftdeps %t/without_macro.swiftdeps.processed
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/without_macro.swiftdeps > %t/without_macro.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITHOUT_PLUGIN %s < %t/without_macro.swiftdeps.processed
 
 //#-- With macro - primary (-D USE_MACRO)
@@ -59,7 +52,7 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/with_macro_primary.swiftdeps \
 // RUN:   -emit-dependencies-path %t/with_macro_primary.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t/with_macro_primary.swiftdeps %t/with_macro_primary.swiftdeps.processed
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/with_macro_primary.swiftdeps > %t/with_macro_primary.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITH_PLUGIN %s < %t/with_macro_primary.swiftdeps.processed
 
 //#-- With macro - non-primary (-D USE_MACRO)
@@ -72,11 +65,11 @@
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -emit-reference-dependencies-path %t/with_macro_nonprimary.swiftdeps \
 // RUN:   -emit-dependencies-path %t/with_macro_nonprimary.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t/with_macro_nonprimary.swiftdeps %t/with_macro_nonprimary.swiftdeps.processed
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t/with_macro_nonprimary.swiftdeps > %t/with_macro_nonprimary.swiftdeps.processed
 // RUN: %FileCheck --check-prefix WITHOUT_PLUGIN %s < %t/with_macro_nonprimary.swiftdeps.processed
 
-// WITH_PLUGIN: externalDepend interface '' 'BUILD_DIR{{.*}}mock-plugin' false
-// WITH_PLUGIN: externalDepend interface '' 'BUILD_DIR{{.*}}libMacroDefinition.{{(dylib|so|dll)}}' false
+// WITH_PLUGIN: externalDepend interface '' '{{.*}}mock-plugin' false
+// WITH_PLUGIN: externalDepend interface '' '{{.*}}MacroDefinition.{{(dylib|so|dll)}}' false
 
 // WITHOUT_PLUGIN-NOT:  MacroDefinition
 // WITHOUT_PLUGIN-NOT:  mock-plugin

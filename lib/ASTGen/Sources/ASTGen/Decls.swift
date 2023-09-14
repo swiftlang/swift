@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -8,7 +9,7 @@ extension ASTGenVisitor {
     let equalLoc = self.base.advanced(by: node.initializer.equal.position.utf8Offset).raw
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
     let nameLoc = self.base.advanced(by: node.identifier.position.utf8Offset).raw
     let genericParams = node.genericParameterClause.map { self.visit($0).rawValue }
@@ -29,7 +30,7 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     let genericParams = node.genericParameterClause
@@ -52,7 +53,7 @@ extension ASTGenVisitor {
     let loc = self.base.advanced(by: node.position.utf8Offset).raw
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     let out = ClassDecl_create(ctx, loc, name, loc, declContext)
@@ -95,7 +96,7 @@ extension ASTGenVisitor {
       // Swift AST represents "_" as nil.
       var text = nodeFirstName.text
       firstName = text.withUTF8 { buf in
-        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
     } else {
       firstName = nil
@@ -104,7 +105,7 @@ extension ASTGenVisitor {
     if let nodeSecondName = node.secondName {
       var text = nodeSecondName.text
       secondName = text.withUTF8 { buf in
-        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+        SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
       }
     } else {
       secondName = nil
@@ -124,7 +125,7 @@ extension ASTGenVisitor {
 
     var nameText = node.identifier.text
     let name = nameText.withUTF8 { buf in
-      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, buf.count)
+      return SwiftASTContext_getIdentifier(ctx, buf.baseAddress, SwiftInt(buf.count))
     }
 
     let returnType: ASTNode?

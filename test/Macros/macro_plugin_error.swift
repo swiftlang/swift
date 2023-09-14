@@ -3,34 +3,28 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %clang \
-// RUN:  -isysroot %host_sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/mock-plugin \
-// RUN:  %t/plugin.c
+// RUN: %swift-build-cxx-plugin -o %t/mock-plugin %t/plugin.c
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   %t/test.swift \
-// RUN:   2>&1 | tee %t/macro-expansions.txt
+// RUN:   > %t/macro-expansions.txt 2>&1
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"BUILD_DIR{{.+}}test.swift","line":6,"offset":[[#]]},"source":"#fooMacro(1)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":6,"offset":[[#]]},"source":"#fooMacro(1)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"invalidResponse":{}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"BUILD_DIR{{.+}}test.swift","line":8,"offset":[[#]]},"source":"#fooMacro(2)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":8,"offset":[[#]]},"source":"#fooMacro(2)"}}}
 // ^ This messages causes the mock plugin exit because there's no matching expected message.
 
 // CHECK: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"protocolVersion":1}}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"BUILD_DIR{{.+}}test.swift","line":10,"offset":[[#]]},"source":"#fooMacro(3)"}}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"$s{{.+}}","macro":{"moduleName":"TestPlugin","name":"fooMacro","typeName":"FooMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{"column":19,"fileID":"MyApp/test.swift","fileName":"{{.+}}test.swift","line":10,"offset":[[#]]},"source":"#fooMacro(3)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2:]]) {"expandFreestandingMacroResult":{"diagnostics":[],"expandedSource":"3.description"}}
 
 //--- test.swift

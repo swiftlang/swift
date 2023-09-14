@@ -1,6 +1,7 @@
-// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -plugin-path %swift-host-lib-dir/plugins
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -plugin-path %swift-plugin-dir
+
+// REQUIRES: swift_swift_parser
 
 @OptionSet<UInt8>
 struct ShippingOptions {

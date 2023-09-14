@@ -18,8 +18,7 @@
 // RUN:   -emit-library -o %t/lib/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-library
 // RUN: %host-build-swift \
@@ -27,8 +26,7 @@
 // RUN:   -emit-library -o %t/lib/tmp/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D LOAD_PLUGIN_LIBRARY \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -external-plugin-path
 // RUN: %host-build-swift \
@@ -36,17 +34,10 @@
 // RUN:   -emit-library -o %t/external/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   -D EXTERNAL_PLUGIN_PATH \
-// RUN:   %t/src/MacroDefinition.swift \
-// RUN:   -g -no-toolchain-stdlib-rpath
+// RUN:   %t/src/MacroDefinition.swift
 
 //#-- For -load-plugin-executable
-// RUN: %clang \
-// RUN:  -isysroot %host_sdk \
-// RUN:  -I %swift_src_root/include \
-// RUN:  -L %swift-lib-dir -l_swiftMockPlugin \
-// RUN:  -Wl,-rpath,%swift-lib-dir \
-// RUN:  -o %t/libexec/MacroDefinitionPlugin \
-// RUN:  %t/src/MacroDefinition.c
+// RUN: %swift-build-cxx-plugin -o %t/libexec/MacroDefinitionPlugin %t/src/MacroDefinition.c
 
 //#-- Expect -load-plugin-library
 // RUN: %target-build-swift %t/src/test.swift \
