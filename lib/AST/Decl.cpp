@@ -4071,6 +4071,16 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     resultDC = resultDC->getParent();
   }
 
+  auto localImportRestriction = VD->getImportAccessFrom(useDC);
+  if (localImportRestriction.has_value()) {
+    AccessLevel importAccessLevel =
+      localImportRestriction.value().accessLevel;
+    if (access > importAccessLevel) {
+      access = std::min(access, importAccessLevel);
+      resultDC = useDC->getParentSourceFile();
+    }
+  }
+
   switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
@@ -4333,6 +4343,16 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool allowUsableFromInline) const {
   return checkAccess(useDC, this, forConformance, allowUsableFromInline,
                      [&]() { return getFormalAccess(); });
+}
+
+ImportAccessLevel ValueDecl::getImportAccessFrom(const DeclContext *useDC) const {
+  ModuleDecl *Mod = getModuleContext();
+  if (useDC && useDC->getParentModule() != Mod) {
+    if (auto useSF = useDC->getParentSourceFile()) {
+      return useSF->getImportAccessLevel(Mod);
+    }
+  }
+  return llvm::None;
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
