@@ -17,7 +17,6 @@
 #ifndef SWIFT_REMOTE_METADATAREADER_H
 #define SWIFT_REMOTE_METADATAREADER_H
 
-#include "llvm/ADT/Hashing.h"
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
@@ -34,7 +33,6 @@
 
 #include <type_traits>
 #include <vector>
-#include <unordered_map>
 
 #include <inttypes.h>
 
@@ -195,25 +193,43 @@ private:
   /// amounts of data when we encounter corrupt values for sizes/counts.
   static const uint64_t MaxMetadataSize = 1048576; // 1MB
 
-  /// Define a has function for a std::pair<StoredPointer, bool>
-  struct TypeCacheKeyHash {
-    std::size_t operator()(const std::pair<StoredPointer, bool> &x) const {
-      return llvm::hash_combine(x.first, x.second);
+  /// The dense map info for a std::pair<StoredPointer, bool>.
+  struct DenseMapInfoTypeCacheKey {
+    using Pair = std::pair<StoredPointer, bool>;
+    using StoredPointerInfo = llvm::DenseMapInfo<StoredPointer>;
+
+    static inline Pair getEmptyKey() {
+      // Since bool doesn't have an empty key implementation, we only use the
+      // StoredPointer's empty key.
+      return std::make_pair(StoredPointerInfo::getEmptyKey(), false);
+    }
+
+    static inline Pair getTombstoneKey() {
+      // Since bool doesn't have a tombstone key implementation, we only use the
+      // StoredPointer's tombstone key.
+      return std::make_pair(StoredPointerInfo::getTombstoneKey(), false);
+    }
+
+    static unsigned getHashValue(const Pair &PairVal) {
+      return llvm::hash_combine(PairVal.first, PairVal.second);
+    }
+
+    static bool isEqual(const Pair &LHS, const Pair &RHS) {
+      return LHS.first == RHS.first && LHS.second == RHS.second;
     }
   };
 
   /// A cache of built types, keyed by the address of the type and whether the
   /// request ignored articial superclasses or not.
-  std::unordered_map<std::pair<StoredPointer, bool>, BuiltType,
-                     TypeCacheKeyHash>
+  llvm::DenseMap<std::pair<StoredPointer, bool>, BuiltType,
+                 DenseMapInfoTypeCacheKey>
       TypeCache;
 
   using MetadataRef = RemoteRef<const TargetMetadata<Runtime>>;
   using OwnedMetadataRef = MemoryReader::ReadBytesResult;
 
   /// A cache of read type metadata, keyed by the address of the metadata.
-  std::unordered_map<StoredPointer, OwnedMetadataRef>
-    MetadataCache;
+  llvm::DenseMap<StoredPointer, OwnedMetadataRef> MetadataCache;
 
   using ContextDescriptorRef =
       RemoteRef<const TargetContextDescriptor<Runtime>>;
@@ -295,15 +311,14 @@ private:
 
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
-  std::unordered_map<StoredPointer, OwnedContextDescriptorRef>
-    ContextDescriptorCache;
+  llvm::DenseMap<StoredPointer, OwnedContextDescriptorRef>
+      ContextDescriptorCache;
 
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
   /// A cache of read extended existential shape metadata, keyed by the
   /// address of the shape metadata.
-  std::unordered_map<StoredPointer, OwnedShapeRef>
-    ShapeCache;
+  llvm::DenseMap<StoredPointer, OwnedShapeRef> ShapeCache;
 
   enum class IsaEncodingKind {
     /// We haven't checked yet.
