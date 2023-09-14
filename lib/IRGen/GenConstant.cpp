@@ -273,6 +273,11 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
                                      irgen::getPhysicalTupleElementStructIndex,
                                      flatten);
   } else if (auto *ei = dyn_cast<EnumInst>(operand)) {
+    auto &strategy = getEnumImplStrategy(IGM, ei->getType());
+    if (strategy.emitPayloadDirectlyIntoConstant()) {
+      return emitConstantValue(IGM, ei->getOperand(), flatten);
+    }
+
     Explosion data;
     if (ei->hasOperand()) {
       data = emitConstantValue(IGM, ei->getOperand(), /*flatten=*/ true);
@@ -282,10 +287,9 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     // arguments to the enum are constant, the builder never has to emit an
     // instruction. Instead it can constant fold everything and just returns
     // the final constant.
-    Explosion out;
     IRBuilder builder(IGM.getLLVMContext(), false);
-    getEnumImplStrategy(IGM, ei->getType())
-      .emitValueInjection(IGM, builder, ei->getElement(), data, out);
+    Explosion out;
+    strategy.emitValueInjection(IGM, builder, ei->getElement(), data, out);
     return replaceUnalignedIntegerValues(IGM, std::move(out));
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
     return emitConstantInt(IGM, ILI);
