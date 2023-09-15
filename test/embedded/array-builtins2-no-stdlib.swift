@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -target arm64e-apple-none | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 class MyClass {}
 
 struct MyStruct {
