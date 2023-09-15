@@ -145,6 +145,10 @@ foreach(sdk ${DISPATCH_SDKS})
 
     ExternalProject_Get_Property("${LIBDISPATCH_VARIANT_NAME}" install_dir)
 
+    if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+      add_dependencies("${LIBDISPATCH_VARIANT_NAME}" clang)
+    endif()
+
     # CMake does not like the addition of INTERFACE_INCLUDE_DIRECTORIES without
     # the directory existing.  Just create the location which will be populated
     # during the installation.
