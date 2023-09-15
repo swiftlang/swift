@@ -156,6 +156,23 @@ struct BridgedValueArray {
 struct BridgedOperand {
   swift::Operand * _Nonnull op;
 
+  enum class OperandOwnership {
+    NonUse,
+    TrivialUse,
+    InstantaneousUse,
+    UnownedInstantaneousUse,
+    ForwardingUnowned,
+    PointerEscape,
+    BitwiseEscape,
+    Borrow,
+    DestroyingConsume,
+    ForwardingConsume,
+    InteriorPointer,
+    GuaranteedForwarding,
+    EndBorrow,
+    Reborrow
+  };
+
   bool isTypeDependent() const { return op->isTypeDependent(); }
 
   bool isLifetimeEnding() const { return op->isLifetimeEnding(); }
@@ -168,6 +185,39 @@ struct BridgedOperand {
 
   SWIFT_IMPORT_UNSAFE
   inline BridgedInstruction getUser() const;
+
+  OperandOwnership getOperandOwnership() const {
+    switch (op->getOperandOwnership()) {
+    case swift::OperandOwnership::NonUse:
+      return OperandOwnership::NonUse;
+    case swift::OperandOwnership::TrivialUse:
+      return OperandOwnership::TrivialUse;
+    case swift::OperandOwnership::InstantaneousUse:
+      return OperandOwnership::InstantaneousUse;
+    case swift::OperandOwnership::UnownedInstantaneousUse:
+      return OperandOwnership::UnownedInstantaneousUse;
+    case swift::OperandOwnership::ForwardingUnowned:
+      return OperandOwnership::ForwardingUnowned;
+    case swift::OperandOwnership::PointerEscape:
+      return OperandOwnership::PointerEscape;
+    case swift::OperandOwnership::BitwiseEscape:
+      return OperandOwnership::BitwiseEscape;
+    case swift::OperandOwnership::Borrow:
+      return OperandOwnership::Borrow;
+    case swift::OperandOwnership::DestroyingConsume:
+      return OperandOwnership::DestroyingConsume;
+    case swift::OperandOwnership::ForwardingConsume:
+      return OperandOwnership::ForwardingConsume;
+    case swift::OperandOwnership::InteriorPointer:
+      return OperandOwnership::InteriorPointer;
+    case swift::OperandOwnership::GuaranteedForwarding:
+      return OperandOwnership::GuaranteedForwarding;
+    case swift::OperandOwnership::EndBorrow:
+      return OperandOwnership::EndBorrow;
+    case swift::OperandOwnership::Reborrow:
+      return OperandOwnership::Reborrow;
+    }
+  }
 };
 
 struct OptionalBridgedOperand {
