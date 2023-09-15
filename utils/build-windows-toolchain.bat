@@ -265,7 +265,7 @@ cmake ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk"
+  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
