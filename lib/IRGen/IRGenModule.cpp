@@ -1630,6 +1630,9 @@ void AutolinkKind::collectEntriesFromLibraries(
         continue;
       }
       case LibraryKind::Framework: {
+        if (!IGM.Triple.isOSBinFormatMachO())
+          continue;
+
         llvm::Metadata *args[] = {llvm::MDString::get(ctx, "-framework"),
                                   llvm::MDString::get(ctx, linkLib.getName())};
         Entries.insert(llvm::MDNode::get(ctx, args));
