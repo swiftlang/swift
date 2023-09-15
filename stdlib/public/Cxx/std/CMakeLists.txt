@@ -2,11 +2,13 @@
 # API Notes for the C++ Standard Library
 #
 set(output_dir "${SWIFTLIB_DIR}/apinotes")
-add_custom_target(CxxStdlib-apinotes
+add_custom_command_target(unused_var
+    CUSTOM_TARGET_NAME CxxStdlib-apinotes
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes" "${output_dir}"
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes
-    COMMENT "Copying CxxStdlib API Notes to ${output_dir}")
+    COMMENT "Copying CxxStdlib API Notes to ${output_dir}"
+    OUTPUT "${output_dir}/std.apinotes"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/std.apinotes")
 
 swift_install_in_component(FILES std.apinotes
     DESTINATION "lib/swift/apinotes"
