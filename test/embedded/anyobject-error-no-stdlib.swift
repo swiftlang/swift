@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -parse-stdlib %s -enable-experimental-feature Embedded -verify
+// RUN: %target-swift-emit-ir -parse-stdlib %s -enable-experimental-feature Embedded -verify -wmo
 
 public enum Never {}
 
