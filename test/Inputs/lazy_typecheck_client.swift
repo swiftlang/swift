@@ -94,3 +94,8 @@ func testConditionalConformance<T>(_ s: PublicGenericStruct<T>) {
 func testTypealiases() {
   let _: PublicStruct = PublicStructAlias(x: 1)
 }
+
+func testOperators() {
+  var a: PublicStruct
+  a <<< PublicStruct(x: 2)
+}

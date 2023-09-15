@@ -256,3 +256,18 @@ extension PublicStruct {
   public static func inactiveMethod() -> DoesNotExist {}
 #endif
 }
+
+// MARK: - Operators & Precedence Groups
+
+precedencegroup FooPrecedence {
+  assignment: true
+  associativity: right
+}
+
+infix operator <<<: FooPrecedence
+
+extension PublicStruct {
+  public static func <<<(lhs: inout Self, rhs: Self) {
+    lhs = rhs
+  }
+}

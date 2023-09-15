@@ -106,6 +106,14 @@
 // CHECK:       extension lazy_typecheck.PublicStruct {
 // CHECK:         public static func activeMethod()
 // CHECK:       }
+// CHECK:       precedencegroup FooPrecedence {
+// CHECK:         associativity: right
+// CHECK:         assignment: true
+// CHECK:       }
+// CHECK:       infix operator <<< : FooPrecedence
+// CHECK:       extension lazy_typecheck.PublicStruct {
+// CHECK:         public static func <<< (lhs: inout lazy_typecheck.PublicStruct, rhs: lazy_typecheck.PublicStruct)
+// CHECK:       }
 // CHECK:       @available(*, unavailable)
 // CHECK-NEXT:  extension lazy_typecheck.PublicGenericStruct : lazy_typecheck.EmptyPublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 // CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}
