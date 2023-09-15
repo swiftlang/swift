@@ -457,6 +457,15 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
   if (!binaryModuleImports)
     return binaryModuleImports.getError();
 
+  // Lookup optional imports of this module also
+  auto binaryModuleOptionalImports = getImportsOfModule(
+      modulePath, ModuleLoadingBehavior::Optional, isFramework,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.PackageName,
+      Ctx.SourceMgr.getFileSystem().get(),
+      Ctx.SearchPathOpts.DeserializedPathRecoverer);
+  if (!binaryModuleOptionalImports)
+    return binaryModuleImports.getError();
+
   auto importedModuleSet = binaryModuleImports.get().moduleImports;
   std::vector<std::string> importedModuleNames;
   importedModuleNames.reserve(importedModuleSet.size());
@@ -475,11 +484,17 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework) {
                      return N.str();
                   });
 
+  auto &importedOptionalModuleSet = binaryModuleOptionalImports.get().moduleImports;
+  std::vector<std::string> importedOptionalModuleNames;
+  for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
+    if (!importedModuleSet.contains(optionalImportedModule))
+      importedOptionalModuleNames.push_back(optionalImportedModule.str());
+
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
        modulePath.str(), moduleDocPath, sourceInfoPath,
-       importedModuleNames, importedHeaders, isFramework,
-       /*module-cache-key*/ "");
+       importedModuleNames, importedOptionalModuleNames,
+       importedHeaders, isFramework, /*module-cache-key*/ "");
 
   return std::move(dependencies);
 }
