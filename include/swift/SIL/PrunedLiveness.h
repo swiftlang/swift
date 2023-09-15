@@ -198,6 +198,17 @@ public:
     assert(!discoveredBlocks || discoveredBlocks->empty());
   }
 
+  PrunedLiveBlocks(PrunedLiveBlocks const &other,
+                   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : liveBlocks(other.liveBlocks.getFunction(), 2),
+        discoveredBlocks(discoveredBlocks) {
+    assert(!discoveredBlocks || other.discoveredBlocks);
+    for (auto &block : *other.liveBlocks.getFunction()) {
+      liveBlocks.set(&block, other.liveBlocks.get(&block));
+    }
+    initializedFlag = other.initializedFlag;
+  }
+
   bool isInitialized() const { return initializedFlag; }
 
   void initializeDiscoveredBlocks(
@@ -360,6 +371,10 @@ public:
   PrunedLiveness(SILFunction *function,
                  SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : liveBlocks(function, discoveredBlocks) {}
+
+  PrunedLiveness(PrunedLiveness const &other,
+                 SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : liveBlocks(other.liveBlocks, discoveredBlocks), users(other.users) {}
 
   bool isInitialized() const { return liveBlocks.isInitialized(); }
 
@@ -529,6 +544,10 @@ protected:
                   SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : PrunedLiveness(function, discoveredBlocks) {}
 
+  PrunedLiveRange(PrunedLiveRange const &other,
+                  SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : PrunedLiveness(other, discoveredBlocks) {}
+
   LiveRangeSummary recursivelyUpdateForDef(SILValue initialDef,
                                            ValueSet &visited,
                                            SILValue value);
@@ -625,6 +644,14 @@ public:
       SILFunction *function,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
       : PrunedLiveRange(function, discoveredBlocks) {}
+
+  SSAPrunedLiveness(
+      SSAPrunedLiveness const &other,
+      SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr)
+      : PrunedLiveRange(other, discoveredBlocks) {
+    def = other.def;
+    defInst = other.defInst;
+  }
 
   SILValue getDef() const { return def; }
 
