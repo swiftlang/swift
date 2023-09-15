@@ -122,7 +122,9 @@ public:
   /// Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
-  /// this diagnostic.
+  /// this diagnostic. NOTE: Do not persist either the SourceManager, or the
+  /// buffer names from the SourceManager, since it may not outlive the
+  /// DiagnosticConsumer (this is the case when building module interfaces).
   ///
   /// \param Info Information describing the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM,

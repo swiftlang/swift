@@ -228,11 +228,12 @@ namespace serialized_diagnostics {
 unsigned SerializedDiagnosticConsumer::getEmitFile(
     SourceManager &SM, StringRef Filename, unsigned bufferID
 ) {
-  // NOTE: Using Filename.data() here relies on SourceMgr using
-  // const char* as buffer identifiers.  This is fast, but may
-  // be brittle.  We can always switch over to using a StringMap.
-  // Note that the logic in EditorDiagConsumer::getBufferInfo
-  // will also need changing.
+  // FIXME: Using Filename.data() here is wrong, since the provided
+  // SourceManager may not live as long as this consumer (which is
+  // the case if it's a diagnostic produced from building a module
+  // interface). We ought to switch over to using a StringMap once
+  // buffer names are unique (currently not the case for
+  // pretty-printed decl buffers).
   unsigned &existingEntry = State->Files[Filename.data()];
   if (existingEntry)
     return existingEntry;

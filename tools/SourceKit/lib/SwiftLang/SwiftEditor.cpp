@@ -91,10 +91,6 @@ BufferInfoSharedPtr
 EditorDiagConsumer::getBufferInfo(StringRef FileName,
                                   llvm::Optional<unsigned> BufferID,
                                   swift::SourceManager &SM) {
-  // NOTE: Using StringRef as a key here relies on SourceMgr using const char*
-  // as buffer identifiers. This is fast, but may be brittle.  We can always
-  // switch over to using a StringMap. Note that the logic in
-  // SerializedDiagnosticConsumer::getEmitFile will also need changing.
   auto Result = BufferInfos.find(FileName);
   if (Result != BufferInfos.end())
     return Result->second;
