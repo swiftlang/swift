@@ -744,9 +744,10 @@ extension AddressUseDefWalker {
       return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))
     case let tea as TupleElementAddrInst:
       return walkUp(address: tea.tuple, path: path.push(.tupleField, index: tea.fieldIndex))
-    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-      return walkUp(address: (def as! UnaryInstruction).operand.value,
-                    path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
+    case let ida as InitEnumDataAddrInst:
+      return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
+    case let uteda as UncheckedTakeEnumDataAddrInst:
+      return walkUp(address: uteda.operand.value, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
     case is BeginAccessInst, is MarkUnresolvedNonCopyableValueInst:
