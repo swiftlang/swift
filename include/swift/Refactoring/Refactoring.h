@@ -13,10 +13,11 @@
 #ifndef SWIFT_IDE_REFACTORING_H
 #define SWIFT_IDE_REFACTORING_H
 
-#include "llvm/ADT/StringRef.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/IDE/Utils.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
   class ModuleDecl;
@@ -53,10 +54,42 @@ struct RenameLoc {
   unsigned Column;
   NameUsage Usage;
   StringRef OldName;
-  StringRef NewName; // May be empty.
+  /// The new name that should be given to this symbol.
+  ///
+  /// This may not be known if the rename locations are specified by the client
+  /// using the a rename locations dicationary in syntactic rename.
+  ///
+  /// May be empty.
+  StringRef NewName;
   const bool IsFunctionLike;
   const bool IsNonProtocolType;
 };
+
+/// An array of \c RenameLoc that also keeps the underlying string storage of
+/// the \c StringRef inside the \c RenameLoc alive.
+class RenameLocs {
+  std::vector<RenameLoc> Locs;
+  std::unique_ptr<StringScratchSpace> StringStorage;
+
+public:
+  ArrayRef<RenameLoc> getLocations() { return Locs; }
+
+  RenameLocs(std::vector<RenameLoc> Locs,
+             std::unique_ptr<StringScratchSpace> StringStorage)
+      : Locs(Locs), StringStorage(std::move(StringStorage)) {}
+
+  RenameLocs() {}
+};
+
+/// Return the location to rename when renaming the identifier at \p startLoc
+/// in \p SF
+/// - Parameters:
+///   - SF: The source file in which to perform local rename
+///   - startLoc: The location of the identifier that should be renamed
+///   - preferredName: The new name that should be assigned to the identifer
+///   - diags: If errors occur, a diagnostic is added to this diagnostic engine.
+RenameLocs localRenameLocs(SourceFile *SF, SourceLoc startLoc,
+                           StringRef preferredName, DiagnosticEngine &diags);
 
 struct RefactoringOptions {
   RefactoringKind Kind;

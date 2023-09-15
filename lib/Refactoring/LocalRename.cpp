@@ -283,21 +283,30 @@ swift::refactoring::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
 }
 
 class RenameRangeCollector : public IndexDataConsumer {
+  StringRef USR;
+  StringRef newName;
+  std::unique_ptr<StringScratchSpace> stringStorage;
+  std::vector<RenameLoc> locations;
+
 public:
   RenameRangeCollector(StringRef USR, StringRef newName)
-      : USR(USR), newName(newName) {}
+      : USR(USR), newName(newName), stringStorage(new StringScratchSpace()) {}
 
   RenameRangeCollector(const ValueDecl *D, StringRef newName)
-      : newName(newName) {
+      : newName(newName), stringStorage(new StringScratchSpace()) {
     SmallString<64> SS;
     llvm::raw_svector_ostream OS(SS);
     printValueDeclUSR(D, OS);
-    USR = stringStorage.copyString(SS.str());
+    USR = stringStorage->copyString(SS.str());
   }
 
   RenameRangeCollector(RenameRangeCollector &&collector) = default;
 
-  ArrayRef<RenameLoc> results() const { return locations; }
+  /// Take the resuls from the collector.
+  /// This invalidates the collector and must only be called once.
+  RenameLocs takeResults() {
+    return RenameLocs(locations, std::move(stringStorage));
+  }
 
 private:
   bool indexLocals() override { return true; }
@@ -337,12 +346,6 @@ private:
 
   llvm::Optional<RenameLoc>
   indexSymbolToRenameLoc(const index::IndexSymbol &symbol, StringRef NewName);
-
-private:
-  StringRef USR;
-  StringRef newName;
-  StringScratchSpace stringStorage;
-  std::vector<RenameLoc> locations;
 };
 
 llvm::Optional<RenameLoc>
@@ -384,7 +387,7 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
   default:
     break;
   }
-  StringRef oldName = stringStorage.copyString(symbol.name);
+  StringRef oldName = stringStorage->copyString(symbol.name);
   return RenameLoc{symbol.line,    symbol.column,    usage, oldName, newName,
                    isFunctionLike, isNonProtocolType};
 }
@@ -423,9 +426,9 @@ static void analyzeRenameScope(ValueDecl *VD,
   Scopes.push_back(Scope);
 }
 
-static llvm::Optional<RenameRangeCollector>
-localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
-             DiagnosticEngine &diags) {
+RenameLocs swift::ide::localRenameLocs(SourceFile *SF, SourceLoc startLoc,
+                                       StringRef preferredName,
+                                       DiagnosticEngine &diags) {
   auto cursorInfo =
       evaluateOrDefault(SF->getASTContext().evaluator,
                         CursorInfoRequest{CursorInfoOwner(SF, startLoc)},
@@ -434,7 +437,7 @@ localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
   llvm::Optional<RenameInfo> info = getRenameInfo(cursorInfo);
   if (!info) {
     diags.diagnose(startLoc, diag::unresolved_location);
-    return llvm::None;
+    return RenameLocs();
   }
 
   switch (info->Availability.AvailableKind) {
@@ -442,34 +445,34 @@ localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
     break;
   case RefactorAvailableKind::Unavailable_system_symbol:
     diags.diagnose(startLoc, diag::decl_is_system_symbol, info->VD->getName());
-    return llvm::None;
+    return RenameLocs();
   case RefactorAvailableKind::Unavailable_has_no_location:
     diags.diagnose(startLoc, diag::value_decl_no_loc, info->VD->getName());
-    return llvm::None;
+    return RenameLocs();
   case RefactorAvailableKind::Unavailable_has_no_name:
     diags.diagnose(startLoc, diag::decl_has_no_name);
-    return llvm::None;
+    return RenameLocs();
   case RefactorAvailableKind::Unavailable_has_no_accessibility:
     diags.diagnose(startLoc, diag::decl_no_accessibility);
-    return llvm::None;
+    return RenameLocs();
   case RefactorAvailableKind::Unavailable_decl_from_clang:
     diags.diagnose(startLoc, diag::decl_from_clang);
-    return llvm::None;
+    return RenameLocs();
   case RefactorAvailableKind::Unavailable_decl_in_macro:
     diags.diagnose(startLoc, diag::decl_in_macro);
-    return llvm::None;
+    return RenameLocs();
   }
 
   SmallVector<DeclContext *, 8> scopes;
   analyzeRenameScope(info->VD, scopes);
   if (scopes.empty())
-    return llvm::None;
+    return RenameLocs();
 
   RenameRangeCollector rangeCollector(info->VD, preferredName);
   for (DeclContext *DC : scopes)
     indexDeclContext(DC, rangeCollector);
 
-  return rangeCollector;
+  return rangeCollector.takeResults();
 }
 
 bool RefactoringActionLocalRename::performChange() {
@@ -487,14 +490,14 @@ bool RefactoringActionLocalRename::performChange() {
     return true;
   }
 
-  llvm::Optional<RenameRangeCollector> rangeCollector =
-      localRenames(TheFile, StartLoc, PreferredName, DiagEngine);
-  if (!rangeCollector)
+  RenameLocs renameRanges =
+      localRenameLocs(TheFile, StartLoc, PreferredName, DiagEngine);
+  if (renameRanges.getLocations().empty())
     return true;
 
   auto consumers = DiagEngine.takeConsumers();
   assert(consumers.size() == 1);
-  return syntacticRename(TheFile, rangeCollector->results(), EditConsumer,
+  return syntacticRename(TheFile, renameRanges.getLocations(), EditConsumer,
                          *consumers[0]);
 }
 
@@ -629,11 +632,10 @@ int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-  llvm::Optional<RenameRangeCollector> RangeCollector =
-      localRenames(SF, StartLoc, StringRef(), Diags);
-  if (!RangeCollector)
+  RenameLocs RenameRanges = localRenameLocs(SF, StartLoc, StringRef(), Diags);
+  if (RenameRanges.getLocations().empty())
     return true;
 
-  return findSyntacticRenameRanges(SF, RangeCollector->results(),
+  return findSyntacticRenameRanges(SF, RenameRanges.getLocations(),
                                    RenameConsumer, DiagConsumer);
 }
