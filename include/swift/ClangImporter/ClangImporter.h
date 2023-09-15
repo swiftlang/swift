@@ -603,8 +603,8 @@ public:
   /// Enable the symbolic import experimental feature for the given callback.
   void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
 
-  const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
-      const clang::Decl *candidateDecl) override;
+  static const clang::TypedefType *getTypedefForCXXCFOptionsDefinition(
+      const clang::Decl *candidateDecl, const ASTContext &ctx);
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };
