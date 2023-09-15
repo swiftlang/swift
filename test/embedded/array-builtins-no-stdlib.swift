@@ -12,7 +12,6 @@ struct MyStruct {
 
 public func foo(x: Builtin.RawPointer, y: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.copyArray(MyStruct.self, x, y, count)
-  Builtin.copyArray(MyStruct.self, x, y, count)
   Builtin.takeArrayNoAlias(MyStruct.self, x, y, count)
   Builtin.takeArrayFrontToBack(MyStruct.self, x, y, count)
   Builtin.takeArrayBackToFront(MyStruct.self, x, y, count)
@@ -30,7 +29,6 @@ public func bar(x: Builtin.RawPointer, y: Builtin.RawPointer, count: Builtin.Wor
 
 public struct MyGenericStruct<T> {
   public func foo(x: Builtin.RawPointer, y: Builtin.RawPointer, count: Builtin.Word) {
-    Builtin.copyArray(T.self, x, y, count)
     Builtin.copyArray(T.self, x, y, count)
     Builtin.takeArrayNoAlias(T.self, x, y, count)
     Builtin.takeArrayFrontToBack(T.self, x, y, count)
