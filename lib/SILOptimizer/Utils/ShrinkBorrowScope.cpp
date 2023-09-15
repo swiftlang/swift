@@ -213,6 +213,10 @@ private:
   void visitBarrierBlock(SILBasicBlock *block) {
     barriers.blocks.push_back(block);
   }
+
+  void visitInitialBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
 };
 
 /// Whether the specified value is %lifetime or its iterated copy_value.

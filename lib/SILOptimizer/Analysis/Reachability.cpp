@@ -70,6 +70,10 @@ private:
   void visitBarrierBlock(SILBasicBlock *block) {
     barriers.edges.push_back(block);
   }
+
+  void visitInitialBlock(SILBasicBlock *block) {
+    barriers.initialBlocks.push_back(block);
+  }
 };
 
 FindBarriersBackwardDataflow::Effect
