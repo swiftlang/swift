@@ -154,8 +154,6 @@ class DeadEndBlocks;
 /// blocks to the blocks that occur on or after the def block. If any uses is
 /// not dominated by a def block, then liveness will include the entry block,
 /// as if defined by a function argument
-///
-/// TODO: For efficiency, use BasicBlockBitfield rather than SmallDenseMap.
 class PrunedLiveBlocks {
 public:
   /// Per-block liveness state computed during backward dataflow propagation.
