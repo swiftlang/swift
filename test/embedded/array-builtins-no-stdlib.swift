@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -target arm64e-apple-none | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 // TODO: these builtins in embedded Swift have a completely different IRGen, we need executable tests for them.
 
 class MyClass {}
