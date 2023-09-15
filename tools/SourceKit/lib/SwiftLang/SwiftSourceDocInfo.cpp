@@ -2581,29 +2581,11 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         std::vector<ResolvedLoc> ResolvedLocs =
             resolveRenameLocations(Locs.getLocations(), *SrcFile, Diags);
 
-        // Record ranges in a set first so we don't record some ranges twice.
-        // This could happen in capture lists where e.g. `[foo]` is both the
-        // reference of the captured variable and the declaration of the
-        // variable usable in the closure.
-        llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> RangesSet;
-
         for (auto ResolvedLoc : ResolvedLocs) {
           unsigned Offset = SrcMgr.getLocOffsetInBuffer(
               ResolvedLoc.Range.getStart(), BufferID);
-          RangesSet.insert({Offset, ResolvedLoc.Range.getByteLength()});
+          Ranges.emplace_back(Offset, ResolvedLoc.Range.getByteLength());
         }
-
-        // Sort ranges so we get deterministic output.
-        Ranges.insert(Ranges.end(), RangesSet.begin(), RangesSet.end());
-        llvm::sort(Ranges,
-                   [](const std::pair<unsigned, unsigned> &LHS,
-                      const std::pair<unsigned, unsigned> &RHS) -> bool {
-                     if (LHS.first == RHS.first) {
-                       return LHS.second < RHS.second;
-                     } else {
-                       return LHS.first < RHS.first;
-                     }
-                   });
       };
       Action();
       RelatedIdentsInfo Info;
