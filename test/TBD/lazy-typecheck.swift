@@ -123,6 +123,7 @@ exports:
                        '_$s14lazy_typecheck19PublicGenericStructVyxGAA05EmptyC5ProtoA2A08InternalE13ForConstraintVRszlWP',
                        '_$s14lazy_typecheck19PublicRethrowsProtoMp', '_$s14lazy_typecheck19PublicRethrowsProtoP3reqSiyKFTj',
                        '_$s14lazy_typecheck19PublicRethrowsProtoP3reqSiyKFTq', '_$s14lazy_typecheck19PublicRethrowsProtoTL',
+                       '_$s14lazy_typecheck21publicSpecializedFuncyxxlF', '_$s14lazy_typecheck21publicSpecializedFuncyxxlFAA11PublicProto_p_Ts5',
                        '_$s14lazy_typecheck24publicFuncWithDefaultArgyS2iF', '_$s14lazy_typecheck27publicGlobalVarInferredTypeSSvM',
                        '_$s14lazy_typecheck27publicGlobalVarInferredTypeSSvg', '_$s14lazy_typecheck27publicGlobalVarInferredTypeSSvs',
                        '_$s14lazy_typecheck30publicFuncWithOpaqueReturnTypeQryF',

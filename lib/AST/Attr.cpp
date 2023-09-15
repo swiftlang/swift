@@ -1198,12 +1198,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
     SmallVector<Requirement, 4> requirementsScratch;
-    auto requirements = attr->getSpecializedSignature().getRequirements();
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
+    auto specializedSig = attr->getSpecializedSignature(FnDecl);
+    auto requirements = specializedSig.getRequirements();
     if (FnDecl && FnDecl->getGenericSignature()) {
       auto genericSig = FnDecl->getGenericSignature();
 
-      if (auto sig = attr->getSpecializedSignature()) {
+      if (auto sig = specializedSig) {
         requirementsScratch = sig.requirementsNotSatisfiedBy(genericSig);
         requirements = requirementsScratch;
       }
@@ -2200,6 +2201,14 @@ SpecializeAttr *SpecializeAttr::create(
 ValueDecl * SpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDecl) const {
   return evaluateOrDefault(onDecl->getASTContext().evaluator,
                            SpecializeAttrTargetDeclRequest{
+                               onDecl, const_cast<SpecializeAttr *>(this)},
+                           nullptr);
+}
+
+GenericSignature SpecializeAttr::getSpecializedSignature(
+    const AbstractFunctionDecl *onDecl) const {
+  return evaluateOrDefault(onDecl->getASTContext().evaluator,
+                           SerializeAttrGenericSignatureRequest{
                                onDecl, const_cast<SpecializeAttr *>(this)},
                            nullptr);
 }
