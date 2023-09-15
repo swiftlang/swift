@@ -921,7 +921,10 @@ function(_compile_swift_files
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   string(SHA1 file_name "'${source_files_quoted}'")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(GENERATE OUTPUT "${file_path}" CONTENT "'${source_files_quoted}'")
+  file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+  add_custom_command(
+    OUTPUT "${file_path}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}")
 
   # If this platform/architecture combo supports backward deployment to old
   # Objective-C runtimes, we need to copy a YAML file with legacy type layout
