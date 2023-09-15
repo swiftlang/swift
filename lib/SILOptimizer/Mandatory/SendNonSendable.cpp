@@ -13,6 +13,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -206,7 +207,7 @@ class PartitionOpTranslator {
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
 
-  llvm::Optional<TrackableValue> trackIfNonSendable(SILValue value) const {
+  std::optional<TrackableValue> trackIfNonSendable(SILValue value) const {
     auto state = getTrackableValue(value);
     if (state.isNonSendable()) {
       return state;
@@ -224,6 +225,10 @@ class PartitionOpTranslator {
   /// ensure simplifyVal is called on SILValues before entering into this map
   llvm::DenseMap<SILValue, TrackableValueState> equivalenceClassValuesToState;
 
+#ifndef NDEBUG
+  llvm::DenseMap<unsigned, SILValue> stateIndexToEquivalenceClass;
+#endif
+
   // some values that AccessStorage claims are uniquely identified are still
   // captured (e.g. in a closure). This set is initialized upon
   // PartitionOpTranslator construction to store those values.
@@ -235,6 +240,12 @@ class PartitionOpTranslator {
   //       utilities would make it easier than handrolling
   llvm::DenseSet<SILValue> capturedUIValues;
 
+  /// A list of values that can never be consumed.
+  ///
+  /// This includes all function arguments as well as ref_element_addr from
+  /// actors.
+  std::vector<TrackableValueID> neverConsumedValueIDs;
+
   TrackableValue getTrackableValue(SILValue value) const {
     value = getUnderlyingTrackedValue(value);
 
@@ -244,8 +255,12 @@ class PartitionOpTranslator {
 
     // If we did not insert, just return the already stored value.
     if (!iter.second) {
-      return {value, iter.first->second};
+      return {iter.first->first, iter.first->second};
     }
+
+#ifndef NDEBUG
+    self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
+#endif
 
     // Otherwise, we need to compute our true aliased and sendable values. Begi
     // by seeing if we have a value that we can prove is not aliased.
@@ -270,6 +285,21 @@ class PartitionOpTranslator {
     // Otherwise refer to the oracle.
     if (!isNonSendableType(value->getType()))
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
+
+    // Check if our base is a ref_element_addr from an actor value. In such a
+    // case, add this id to the neverConsumedValueIDs.
+    if (isa<LoadInst, LoadBorrowInst>(iter.first->first)) {
+      auto *svi = cast<SingleValueInstruction>(iter.first->first);
+      auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
+      if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
+        if (storage.storage.getRoot()->getType().getASTType()->isActorType()) {
+          self->neverConsumedValueIDs.push_back(iter.first->second.getID());
+        }
+      }
+    }
+
+    // If our access storage is from a class, then see if we have an actor. In
+    // such a case, we need to add this id to the neverConsumed set.
 
     return {iter.first->first, iter.first->second};
   }
@@ -408,12 +438,9 @@ private:
   std::vector<TrackableValueID> getArgIDs() {
     std::vector<TrackableValueID> argIDs;
 
-    for (SILArgument *arg : function->getArguments())
-      if (auto state = trackIfNonSendable(arg))
-        argIDs.push_back(state->getID());
-
-    if (auto *selfArg = function->maybeGetSelfArgument()) {
-      if (auto state = trackIfNonSendable(selfArg)) {
+    for (SILArgument *arg : function->getArguments()) {
+      if (auto state = trackIfNonSendable(arg)) {
+        neverConsumedValueIDs.push_back(state->getID());
         argIDs.push_back(state->getID());
       }
     }
@@ -433,11 +460,13 @@ public:
   // Get the vector of IDs that cannot be legally consumed at any point in
   // this function. Since we place all args and self in a single region right
   // now, it is only necessary to choose a single representative of the set.
-  std::vector<TrackableValueID> getNonConsumables() {
-    if (const auto &argIDs = getArgIDs(); !argIDs.empty()) {
-      return {argIDs.front()};
-    }
-    return {};
+  ArrayRef<TrackableValueID> getNeverConsumedValues() const {
+    return llvm::makeArrayRef(neverConsumedValueIDs);
+  }
+
+  void sortUniqueNeverConsumedValues() {
+    // TODO: Make a FrozenSetVector.
+    sortUnique(neverConsumedValueIDs);
   }
 
   // get the results of an apply instruction. This is the single result value
@@ -461,8 +490,10 @@ public:
   // require all non-sendable sources, merge their regions, and assign the
   // resulting region to all non-sendable targets, or assign non-sendable
   // targets to a fresh region if there are no non-sendable sources
-  std::vector<PartitionOp> translateSILMultiAssign(
-      std::vector<SILValue> tgts, std::vector<SILValue> srcs) {
+  template <typename TargetRange, typename SourceRange>
+  std::vector<PartitionOp>
+  translateSILMultiAssign(const TargetRange &tgts, const SourceRange &srcs,
+                          bool resultsActorIsolated = false) {
 
     std::vector<SILValue> nonSendableSrcs;
     std::vector<SILValue> nonSendableTgts;
@@ -494,17 +525,28 @@ public:
     if (nonSendableTgts.empty()) return translated;
 
     if (nonSendableSrcs.empty()) {
-      // if no non-sendable srcs, non-sendable tgts get a fresh region
+      // If no non-sendable srcs, non-sendable tgts get a fresh region.
       add_to_translation(AssignFresh(nonSendableTgts.front()));
     } else {
       add_to_translation(Assign(nonSendableTgts.front(),
                                 nonSendableSrcs.front()));
     }
 
-    // assign all targets to the target region
+    // If our results are actor isolated (and thus cannot be consumed)... add
+    // them to the neverConsumedValueID array.
+    if (resultsActorIsolated) {
+      neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.front()));
+    }
+
+    // Assign all targets to the target region.
     for (unsigned i = 1; i < nonSendableTgts.size(); i++) {
       add_to_translation(Assign(nonSendableTgts.at(i),
                                 nonSendableTgts.front()));
+
+      // If our results are actor isolated (and thus cannot be consumed)... add
+      // them to the neverConsumedValueID array.
+      if (resultsActorIsolated)
+        neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.at(i)));
     }
 
     return translated;
@@ -513,12 +555,20 @@ public:
   std::vector<PartitionOp> translateSILApply(SILInstruction *applyInst) {
     // if this apply does not cross isolation domains, it has normal,
     // non-consuming multi-assignment semantics
-    if (!SILApplyCrossesIsolation(applyInst))
-      return translateSILMultiAssign(
-          getApplyResults(applyInst),
-          {applyInst->getOperandValues().begin(),
-           applyInst->getOperandValues().end()}
-      );
+    if (!SILApplyCrossesIsolation(applyInst)) {
+      // TODO: How do we handle partial_apply here.
+      bool hasActorSelf = false;
+      if (auto fas = FullApplySite::isa(applyInst)) {
+        if (fas.hasSelfArgument()) {
+          if (auto self = fas.getSelfArgument()) {
+            hasActorSelf = self->getType().getASTType()->isActorType();
+          }
+        }
+      }
+      return translateSILMultiAssign(getApplyResults(applyInst),
+                                     applyInst->getOperandValues(),
+                                     hasActorSelf);
+    }
 
     if (auto cast = dyn_cast<ApplyInst>(applyInst))
       return translateIsolationCrossingSILApply(cast);
@@ -592,13 +642,15 @@ public:
   }
 
   std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
-    return translateSILMultiAssign({tgt}, {src});
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(tgt),
+                                   TinyPtrVector<SILValue>(src));
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
   std::vector<PartitionOp> translateSILAssignFresh(SILValue val) {
-    return translateSILMultiAssign({val}, {});
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
+                                   TinyPtrVector<SILValue>());
   }
 
   std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
@@ -644,7 +696,8 @@ public:
       enumOperands.push_back(selectEnumInst.getCase(i).second);
     if (selectEnumInst.hasDefault())
       enumOperands.push_back(selectEnumInst.getDefaultResult());
-    return translateSILMultiAssign({selectEnumInst->getResult(0)}, enumOperands);
+    return translateSILMultiAssign(
+        TinyPtrVector<SILValue>(selectEnumInst->getResult(0)), enumOperands);
   }
 
   std::vector<PartitionOp> translateSILSwitchEnum(
@@ -670,17 +723,22 @@ public:
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
   std::vector<PartitionOp> translateSILPhi(
-      std::vector<std::pair<std::vector<SILValue>, SILBasicBlock*>> branches) {
-    std::map<SILValue, std::vector<SILValue>> argSources;
+      const std::vector<std::pair<std::vector<SILValue>, SILBasicBlock *>>
+          &branches) {
+    SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
     for (const auto &[args, dest] : branches) {
       assert(args.size() >= dest->getNumArguments());
       for (unsigned i = 0; i < dest->getNumArguments(); i++)
-        argSources[dest->getArgument(i)].push_back(args[i]);
+        argSources.insert(dest->getArgument(i), args[i]);
     }
+    argSources.setFrozen();
     std::vector<PartitionOp> translated;
-    for (const auto &[arg, srcs] : argSources)
-      for (auto op : translateSILMultiAssign({arg}, srcs))
+    for (auto pair : argSources.getRange()) {
+      for (auto op : translateSILMultiAssign(
+               TinyPtrVector<SILValue>(pair.first), pair.second)) {
         translated.push_back(op);
+      }
+    }
     return translated;
   }
 
@@ -695,26 +753,37 @@ public:
   // to its effect on the non-Sendable partition, if it has one.
   //
   // The current pattern of
-  std::vector<PartitionOp> translateSILInstruction(SILInstruction *instruction) {
+  std::vector<PartitionOp> translateSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(translationIndex++;);
-    currentInstruction = instruction;
+    currentInstruction = inst;
 
+    switch (inst->getKind()) {
     // The following instructions are treated as assigning their result to a
     // fresh region.
-    if (isa<AllocBoxInst,
-            AllocPackInst,
-            AllocRefDynamicInst,
-            AllocRefInst,
-            AllocStackInst,
-            EnumInst,
-            KeyPathInst,
-            LiteralInst,
-            ObjCProtocolInst,
-            WitnessMethodInst>(instruction))
-      return translateSILAssignFresh(instruction->getResult(0));
+    case SILInstructionKind::AllocBoxInst:
+    case SILInstructionKind::AllocPackInst:
+    case SILInstructionKind::AllocRefDynamicInst:
+    case SILInstructionKind::AllocRefInst:
+    case SILInstructionKind::AllocStackInst:
+    case SILInstructionKind::EnumInst:
+    case SILInstructionKind::KeyPathInst:
+    case SILInstructionKind::FunctionRefInst:
+    case SILInstructionKind::DynamicFunctionRefInst:
+    case SILInstructionKind::PreviousDynamicFunctionRefInst:
+    case SILInstructionKind::GlobalAddrInst:
+    case SILInstructionKind::BaseAddrForOffsetInst:
+    case SILInstructionKind::GlobalValueInst:
+    case SILInstructionKind::IntegerLiteralInst:
+    case SILInstructionKind::FloatLiteralInst:
+    case SILInstructionKind::StringLiteralInst:
+    case SILInstructionKind::HasSymbolInst:
+    case SILInstructionKind::ObjCProtocolInst:
+    case SILInstructionKind::WitnessMethodInst:
+      return translateSILAssignFresh(inst->getResult(0));
 
-    if (isa<SelectEnumAddrInst, SelectEnumInst>(instruction))
-      return translateSILSelectEnum(instruction);
+    case SILInstructionKind::SelectEnumAddrInst:
+    case SILInstructionKind::SelectEnumInst:
+      return translateSILSelectEnum(inst);
 
     // The following instructions are treated as assignments of their result (tgt)
     // to their operand (src). This could yield a variety of behaviors depending
@@ -722,103 +791,104 @@ public:
     // TODO: we could reduce the size of PartitionOp sequences generated by
     //       treating some of these as lookthroughs in simplifyVal instead of
     //       as assignments
-    if (isa<AddressToPointerInst,
-            BeginAccessInst,
-            BeginBorrowInst,
-            CopyValueInst,
-            ConvertEscapeToNoEscapeInst,
-            ConvertFunctionInst,
-            CopyBlockInst,
-            CopyBlockWithoutEscapingInst,
-            IndexAddrInst,
-            InitBlockStorageHeaderInst,
-            InitEnumDataAddrInst,
-            InitExistentialAddrInst,
-            InitExistentialRefInst,
-            LoadInst,
-            LoadBorrowInst,
-            LoadWeakInst,
-            OpenExistentialAddrInst,
-            OpenExistentialBoxInst,
-            OpenExistentialRefInst,
-            PointerToAddressInst,
-            ProjectBlockStorageInst,
-            RefElementAddrInst,
-            RefToUnmanagedInst,
-            StrongCopyUnownedValueInst,
-            StructElementAddrInst,
-            StructExtractInst,
-            TailAddrInst,
-            ThickToObjCMetatypeInst,
-            ThinToThickFunctionInst,
-            TupleElementAddrInst,
-            UncheckedAddrCastInst,
-            UncheckedEnumDataInst,
-            UncheckedOwnershipConversionInst,
-            UncheckedRefCastInst,
-            UncheckedTakeEnumDataAddrInst,
-            UnmanagedToRefInst,
-            UpcastInst,
+    case SILInstructionKind::AddressToPointerInst:
+    case SILInstructionKind::BeginAccessInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::CopyBlockInst:
+    case SILInstructionKind::CopyBlockWithoutEscapingInst:
+    case SILInstructionKind::IndexAddrInst:
+    case SILInstructionKind::InitBlockStorageHeaderInst:
+    case SILInstructionKind::InitEnumDataAddrInst:
+    case SILInstructionKind::InitExistentialAddrInst:
+    case SILInstructionKind::InitExistentialRefInst:
+    case SILInstructionKind::LoadInst:
+    case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::LoadWeakInst:
+    case SILInstructionKind::OpenExistentialAddrInst:
+    case SILInstructionKind::OpenExistentialBoxInst:
+    case SILInstructionKind::OpenExistentialRefInst:
+    case SILInstructionKind::PointerToAddressInst:
+    case SILInstructionKind::ProjectBlockStorageInst:
+    case SILInstructionKind::RefElementAddrInst:
+    case SILInstructionKind::ProjectBoxInst:
+    case SILInstructionKind::RefToUnmanagedInst:
+    case SILInstructionKind::StrongCopyUnownedValueInst:
+    case SILInstructionKind::StructElementAddrInst:
+    case SILInstructionKind::StructExtractInst:
+    case SILInstructionKind::TailAddrInst:
+    case SILInstructionKind::ThickToObjCMetatypeInst:
+    case SILInstructionKind::ThinToThickFunctionInst:
+    case SILInstructionKind::TupleElementAddrInst:
+    case SILInstructionKind::UncheckedAddrCastInst:
+    case SILInstructionKind::UncheckedEnumDataInst:
+    case SILInstructionKind::UncheckedOwnershipConversionInst:
+    case SILInstructionKind::UncheckedRefCastInst:
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+    case SILInstructionKind::UnmanagedToRefInst:
+    case SILInstructionKind::UpcastInst:
 
-            //dynamic dispatch:
-            ClassMethodInst,
-            ObjCMethodInst,
-            SuperMethodInst,
-            ObjCSuperMethodInst
-            >(instruction))
-      return translateSILAssign(
-          instruction->getResult(0),
-          instruction->getOperand(0));
+    // Dynamic dispatch:
+    case SILInstructionKind::ClassMethodInst:
+    case SILInstructionKind::ObjCMethodInst:
+    case SILInstructionKind::SuperMethodInst:
+    case SILInstructionKind::ObjCSuperMethodInst:
+      return translateSILAssign(inst->getResult(0), inst->getOperand(0));
 
-    // these are treated as stores - meaning that they could write values into
+    // These are treated as stores - meaning that they could write values into
     // memory. The beahvior of this depends on whether the tgt addr is aliased,
-    // but conservative behavior is to treat these as merges of the regions
-    // of the src value and tgt addr
-    if (isa<CopyAddrInst,
-            ExplicitCopyAddrInst,
-            StoreInst,
-            StoreBorrowInst,
-            StoreWeakInst>(instruction))
-      return translateSILStore(
-          instruction->getOperand(1),
-          instruction->getOperand(0));
+    // but conservative behavior is to treat these as merges of the regions of
+    // the src value and tgt addr
+    case SILInstructionKind::CopyAddrInst:
+    case SILInstructionKind::ExplicitCopyAddrInst:
+    case SILInstructionKind::StoreInst:
+    case SILInstructionKind::StoreBorrowInst:
+    case SILInstructionKind::StoreWeakInst:
+      return translateSILStore(inst->getOperand(1), inst->getOperand(0));
 
-    // handle applications
-    if (isApplyInst(*instruction))
-      return translateSILApply(instruction);
+    case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::BeginApplyInst:
+    case SILInstructionKind::BuiltinInst:
+    case SILInstructionKind::PartialApplyInst:
+    case SILInstructionKind::TryApplyInst:
+      return translateSILApply(inst);
 
-    // handle tuple destruction
-    if (auto destructTupleInst = dyn_cast<DestructureTupleInst>(instruction))
+    case SILInstructionKind::DestructureTupleInst: {
+      // handle tuple destruction
+      auto *destructTupleInst = cast<DestructureTupleInst>(inst);
       return translateSILMultiAssign(
-          {destructTupleInst->getResults().begin(),
-           destructTupleInst->getResults().end()},
-          {destructTupleInst->getOperand()});
+          destructTupleInst->getResults(),
+          TinyPtrVector<SILValue>(destructTupleInst->getOperand()));
+    }
 
     // handle instructions that aggregate their operands into a single structure
     // - treated as a multi assign
-    if (isa<ObjectInst,
-            StructInst,
-            TupleInst>(instruction))
+    case SILInstructionKind::ObjectInst:
+    case SILInstructionKind::StructInst:
+    case SILInstructionKind::TupleInst:
       return translateSILMultiAssign(
-          {instruction->getResult(0)},
-          {instruction->getOperandValues().begin(),
-           instruction->getOperandValues().end()});
+          TinyPtrVector<SILValue>(inst->getResult(0)),
+          inst->getOperandValues());
 
     // Handle returns and throws - require the operand to be non-consumed
-    if (isa<ReturnInst, ThrowInst>(instruction))
-      return translateSILRequire(instruction->getOperand(0));
+    case SILInstructionKind::ReturnInst:
+    case SILInstructionKind::ThrowInst:
+      return translateSILRequire(inst->getOperand(0));
 
-    // handle branching terminators
-    // in particular, need to handle phi-node-like argument passing
-
-    if (auto branchInst = dyn_cast<BranchInst>(instruction)) {
+    // handle branching terminators. in particular, need to handle phi-node-like
+    // argument passing
+    case SILInstructionKind::BranchInst: {
+      auto *branchInst = cast<BranchInst>(inst);
       assert(branchInst->getNumArgs() == branchInst->getDestBB()->getNumArguments());
       return translateSILPhi(
           {{{branchInst->getArgs().begin(), branchInst->getArgs().end()},
             branchInst->getDestBB()}});
     }
 
-    if (auto condBranchInst = dyn_cast<CondBranchInst>(instruction)) {
+    case SILInstructionKind::CondBranchInst: {
+      auto *condBranchInst = cast<CondBranchInst>(inst);
       assert(condBranchInst->getNumTrueArgs() ==
              condBranchInst->getTrueBB()->getNumArguments());
       assert(condBranchInst->getNumFalseArgs() ==
@@ -833,22 +903,25 @@ public:
                                condBranchInst->getFalseBB()}});
     }
 
-    if (auto switchEnumInst = dyn_cast<SwitchEnumInst>(instruction))
-      return translateSILSwitchEnum(switchEnumInst);
+    case SILInstructionKind::SwitchEnumInst:
+      return translateSILSwitchEnum(cast<SwitchEnumInst>(inst));
 
-    if (auto dmBranchInst = dyn_cast<DynamicMethodBranchInst>(instruction)) {
+    case SILInstructionKind::DynamicMethodBranchInst: {
+      auto *dmBranchInst = cast<DynamicMethodBranchInst>(inst);
       assert(dmBranchInst->getHasMethodBB()->getNumArguments() <= 1);
       return translateSILPhi(
           {{{dmBranchInst->getOperand()}, dmBranchInst->getHasMethodBB()}});
     }
 
-    if (auto ccBranchInst = dyn_cast<CheckedCastBranchInst>(instruction)) {
+    case SILInstructionKind::CheckedCastBranchInst: {
+      auto *ccBranchInst = cast<CheckedCastBranchInst>(inst);
       assert(ccBranchInst->getSuccessBB()->getNumArguments() <= 1);
       return translateSILPhi(
           {{{ccBranchInst->getOperand()}, ccBranchInst->getSuccessBB()}});
     }
 
-    if (auto ccAddrBranchInst = dyn_cast<CheckedCastAddrBranchInst>(instruction)) {
+    case SILInstructionKind::CheckedCastAddrBranchInst: {
+      auto *ccAddrBranchInst = cast<CheckedCastAddrBranchInst>(inst);
       assert(ccAddrBranchInst->getSuccessBB()->getNumArguments() <= 1);
       return translateSILPhi({{{ccAddrBranchInst->getOperand(0)},
                                ccAddrBranchInst->getSuccessBB()}});
@@ -856,43 +929,42 @@ public:
 
     // these instructions are ignored because they cannot affect the partition
     // state - they do not manipulate what region non-sendable values lie in
-    if (isa<AllocGlobalInst,
-            DeallocBoxInst,
-            DeallocStackInst,
-            DebugValueInst,
-            DestroyAddrInst,
-            DestroyValueInst,
-            EndAccessInst,
-            EndBorrowInst,
-            EndLifetimeInst,
-            HopToExecutorInst,
-            InjectEnumAddrInst,
-            IsEscapingClosureInst, // ignored because result is always int
-            MarkDependenceInst,
-            MetatypeInst,
+    case SILInstructionKind::AllocGlobalInst:
+    case SILInstructionKind::DeallocBoxInst:
+    case SILInstructionKind::DeallocStackInst:
+    case SILInstructionKind::DebugValueInst:
+    case SILInstructionKind::DestroyAddrInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndAccessInst:
+    case SILInstructionKind::EndBorrowInst:
+    case SILInstructionKind::EndLifetimeInst:
+    case SILInstructionKind::HopToExecutorInst:
+    case SILInstructionKind::InjectEnumAddrInst:
+    case SILInstructionKind::IsEscapingClosureInst: // ignored because result is
+                                                    // always in
+    case SILInstructionKind::MarkDependenceInst:
+    case SILInstructionKind::MetatypeInst:
+    case SILInstructionKind::EndApplyInst:
+    case SILInstructionKind::AbortApplyInst:
 
-            EndApplyInst,
-            AbortApplyInst,
-
-            //ignored terminators
-            CondFailInst,
-            SwitchEnumAddrInst, // ignored as long as destinations can take no args
-            SwitchValueInst, // ignored as long as destinations can take no args
-            UnreachableInst,
-            UnwindInst,
-            YieldInst //TODO: yield should be handled
-    >(instruction))
-      //ignored instructions
+    // ignored terminators
+    case SILInstructionKind::CondFailInst:
+    case SILInstructionKind::SwitchEnumAddrInst: // ignored as long as
+                                                 // destinations can take no arg
+    case SILInstructionKind::SwitchValueInst: // ignored as long as destinations
+                                              // can take no args
+    case SILInstructionKind::UnreachableInst:
+    case SILInstructionKind::UnwindInst:
+    case SILInstructionKind::YieldInst: // TODO: yield should be handled
       return {};
 
-    LLVM_DEBUG(
-        llvm::errs().changeColor(llvm::raw_ostream::MAGENTA, true);
-        llvm::errs() << "warning: ";
-        llvm::errs().resetColor();
-        llvm::errs() << "unhandled instruction kind "
-                     << getSILInstructionName(instruction->getKind())
-                     << "\n";
-    );
+    default:
+      break;
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "warning: ";
+               llvm::dbgs() << "unhandled instruction kind "
+                            << getSILInstructionName(inst->getKind()) << "\n";);
 
     return {};
   }
@@ -901,20 +973,19 @@ public:
   // transformations to the non-Sendable partition that it induces.
   // it accomplished this by sequentially calling translateSILInstruction
   std::vector<PartitionOp> translateSILBasicBlock(SILBasicBlock *basicBlock) {
-    LLVM_DEBUG(
-        llvm::dbgs() << SEP_STR
-                     << "Compiling basic block for function "
-                     << basicBlock->getFunction()->getName()
-                     << ": ";
-        basicBlock->dumpID();
-        llvm::dbgs() << SEP_STR;
-        basicBlock->dump();
-        llvm::dbgs() << SEP_STR << "Results:\n";
-    );
+    LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Compiling basic block for function "
+                            << basicBlock->getFunction()->getName() << ": ";
+               basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
+               basicBlock->print(llvm::dbgs());
+               llvm::dbgs() << SEP_STR << "Results:\n";);
 
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
     int lastTranslationIndex = -1;
+#ifndef NDEBUG
+    llvm::SmallVector<unsigned, 8> opsToPrint;
+#endif
+
     for (SILInstruction &instruction : *basicBlock) {
       auto ops = translateSILInstruction(&instruction);
       for (PartitionOp &op : ops) {
@@ -923,19 +994,37 @@ public:
         LLVM_DEBUG(
             if (translationIndex != lastTranslationIndex) {
               llvm::dbgs() << " ┌─┬─╼";
-              instruction.dump();
+              instruction.print(llvm::dbgs());
               llvm::dbgs() << " │ └─╼  ";
               instruction.getLoc().getSourceLoc().printLineAndColumn(
                   llvm::dbgs(), function->getASTContext().SourceMgr);
               llvm::dbgs() << " │ translation #" << translationIndex;
-              llvm::dbgs() << "\n └─────╼ ";
+              llvm::dbgs() << "\n ├─────╼ ";
             } else {
-              llvm::dbgs() << "      └╼ ";
+              llvm::dbgs() << " │    └╼ ";
             }
-            op.dump();
+            op.print(llvm::dbgs());
             lastTranslationIndex = translationIndex;
         );
       }
+      LLVM_DEBUG(
+          if (ops.size()) {
+            llvm::dbgs() << " └─────╼ Used Values\n";
+            SWIFT_DEFER { opsToPrint.clear(); };
+            for (PartitionOp &op : ops) {
+              // Now dump our the root value we map.
+              for (unsigned opArg : op.getOpArgs()) {
+                // If we didn't insert, skip this. We only emit this once.
+                opsToPrint.push_back(opArg);
+              }
+            }
+            sortUnique(opsToPrint);
+            for (unsigned opArg : opsToPrint) {
+              llvm::dbgs() << "          └╼ ";
+              llvm::dbgs() << "%%" << opArg << ": " << stateIndexToEquivalenceClass[opArg];
+            }
+          }
+       );
     }
 
     return partitionOps;
@@ -1003,7 +1092,7 @@ class BlockPartitionState {
     Partition workingPartition = entryPartition;
     for (auto &partitionOp : blockPartitionOps) {
       workingPartition.apply(partitionOp, handleFailure,
-                             translator.getNonConsumables(),
+                             translator.getNeverConsumedValues(),
                              handleConsumeNonConsumable);
     }
   }
@@ -1024,36 +1113,32 @@ public:
     return exitPartition;
   }
 
-  void dump() LLVM_ATTRIBUTE_USED {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     LLVM_DEBUG(
-        llvm::dbgs() << SEP_STR
-                     << "BlockPartitionState[reached="
-                     << reached
-                     << ", needsUpdate="
-                     << needsUpdate
-                     << "]\nid: ";
-        basicBlock->dumpID();
-        llvm::dbgs() << "entry partition: ";
-        entryPartition.dump();
-        llvm::dbgs() << "exit partition: ";
-        exitPartition.dump();
-        llvm::dbgs() << "instructions:\n┌──────────╼\n";
-        for (PartitionOp op : blockPartitionOps) {
-          llvm::dbgs() << "│ ";
-          op.dump();
-        }
-        llvm::dbgs() << "└──────────╼\nSuccs:\n";
-        for (auto succ : basicBlock->getSuccessorBlocks()) {
-          llvm::dbgs() << "→";
-          succ->dumpID();
-        }
-        llvm::dbgs() << "Preds:\n";
-        for (auto pred : basicBlock->getPredecessorBlocks()) {
-          llvm::dbgs() << "←";
-          pred->dumpID();
-        }
-        llvm::dbgs()<< SEP_STR;
-    );
+        os << SEP_STR << "BlockPartitionState[reached=" << reached
+           << ", needsUpdate=" << needsUpdate << "]\nid: ";
+        basicBlock->printID(os); os << "entry partition: ";
+        entryPartition.print(os); os << "exit partition: ";
+        exitPartition.print(os);
+        os << "instructions:\n┌──────────╼\n"; for (PartitionOp op
+                                                    : blockPartitionOps) {
+          os << "│ ";
+          op.print(os);
+        } os << "└──────────╼\nSuccs:\n";
+        for (auto succ
+             : basicBlock->getSuccessorBlocks()) {
+          os << "→";
+          succ->printID(os);
+        } os
+        << "Preds:\n";
+        for (auto pred
+             : basicBlock->getPredecessorBlocks()) {
+          os << "←";
+          pred->printID(os);
+        } os
+        << SEP_STR;);
   }
 };
 
@@ -1070,7 +1155,7 @@ enum class LocalConsumedReasonKind {
 // kind == NonLocal: an instruction outside this block
 struct LocalConsumedReason {
   LocalConsumedReasonKind kind;
-  llvm::Optional<PartitionOp> localInst;
+  std::optional<PartitionOp> localInst;
 
   static LocalConsumedReason ConsumeInst(PartitionOp localInst) {
     assert(localInst.getKind() == PartitionOpKind::Consume);
@@ -1090,7 +1175,7 @@ struct LocalConsumedReason {
 
 private:
   LocalConsumedReason(LocalConsumedReasonKind kind,
-                 llvm::Optional<PartitionOp> localInst = {})
+                 std::optional<PartitionOp> localInst = {})
       : kind(kind), localInst(localInst) {}
 };
 
@@ -1209,17 +1294,19 @@ public:
     }
   }
 
-  void dump() const {
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
     forEachConsumeRequire(
-        [](const PartitionOp& consumeOp, unsigned numProcessed, unsigned numSkipped) {
-          llvm::dbgs() << " ┌──╼ CONSUME: ";
-          consumeOp.dump();
+        [&](const PartitionOp &consumeOp, unsigned numProcessed,
+            unsigned numSkipped) {
+          os << " ┌──╼ CONSUME: ";
+          consumeOp.print(os);
         },
-        [](const PartitionOp& requireOp) {
-          llvm::dbgs() << " ├╼ REQUIRE: ";
-          requireOp.dump();
-        }
-    );
+        [&](const PartitionOp &requireOp) {
+          os << " ├╼ REQUIRE: ";
+          requireOp.print(os);
+        });
   }
 };
 
@@ -1250,7 +1337,7 @@ class RaceTracer {
   void findAndAddConsumedReasons(
       SILBasicBlock * SILBlock, TrackableValueID consumedVal,
       ConsumedReason &consumedReason, unsigned distance,
-      llvm::Optional<PartitionOp> targetOp = {}) {
+      std::optional<PartitionOp> targetOp = {}) {
     assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
     LocalConsumedReason localReason
         = findLocalConsumedReason(SILBlock, consumedVal, targetOp);
@@ -1352,7 +1439,7 @@ class RaceTracer {
   // consumed, possibly local or nonlocal. Return the reason.
   LocalConsumedReason findLocalConsumedReason(
       SILBasicBlock * SILBlock, TrackableValueID consumedVal,
-      llvm::Optional<PartitionOp> targetOp = {}) {
+      std::optional<PartitionOp> targetOp = {}) {
     // if this is a query for consumption reason at block exit, check the cache
     if (!targetOp && consumedAtExitReasons.count({SILBlock, consumedVal}))
       return consumedAtExitReasons.at({SILBlock, consumedVal});
@@ -1363,7 +1450,7 @@ class RaceTracer {
     // so assert that it's actually consumed at exit
     assert(targetOp || block.getExitPartition().isConsumed(consumedVal));
 
-    llvm::Optional<LocalConsumedReason> consumedReason;
+    std::optional<LocalConsumedReason> consumedReason;
 
     Partition workingPartition = block.getEntryPartition();
 
@@ -1415,27 +1502,22 @@ class RaceTracer {
   }
 
   bool dumpBlockSearch(SILBasicBlock * SILBlock, TrackableValueID consumedVal) {
-    LLVM_DEBUG(
-        unsigned i = 0;
-        const BlockPartitionState &block = blockStates[SILBlock];
-        Partition working = block.getEntryPartition();
-        llvm::dbgs() << "┌──────────╼\n│ ";
-        working.dump();
-        block.forEachPartitionOp([&](const PartitionOp &op) {
-          llvm::dbgs() << "├[" << i++ << "] ";
-          op.dump();
-          working.apply(op);
-          llvm::dbgs() << "│ ";
-          if (working.isConsumed(consumedVal)) {
-            llvm::errs().changeColor(llvm::raw_ostream::RED, true);
-            llvm::errs() << "(" << consumedVal << " CONSUMED) ";
-            llvm::errs().resetColor();
-          }
-          working.dump();
-          return true;
-        });
-        llvm::dbgs() << "└──────────╼\n";
-    );
+    LLVM_DEBUG(unsigned i = 0;
+               const BlockPartitionState &block = blockStates[SILBlock];
+               Partition working = block.getEntryPartition();
+               llvm::dbgs() << "┌──────────╼\n│ "; working.print(llvm::dbgs());
+               block.forEachPartitionOp([&](const PartitionOp &op) {
+                 llvm::dbgs() << "├[" << i++ << "] ";
+                 op.print(llvm::dbgs());
+                 working.apply(op);
+                 llvm::dbgs() << "│ ";
+                 if (working.isConsumed(consumedVal)) {
+                   llvm::dbgs() << "(" << consumedVal << " CONSUMED) ";
+                 }
+                 working.print(llvm::dbgs());
+                 return true;
+               });
+               llvm::dbgs() << "└──────────╼\n";);
     return false;
   }
 
@@ -1553,6 +1635,9 @@ class PartitionAnalysis {
         }
       }
     }
+
+    // Now that we have finished processing, sort/unique our non consumed array.
+    translator.sortUniqueNeverConsumedValues();
   }
 
   // track the AST exprs that have already had diagnostics emitted about
@@ -1612,10 +1697,8 @@ class PartitionAnalysis {
           });
     }
 
-    LLVM_DEBUG(
-        llvm::dbgs() << "Accumulator Complete:\n";
-        raceTracer.getAccumulator().dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
+               raceTracer.getAccumulator().print(llvm::dbgs()););
 
     // ask the raceTracer to report diagnostics at the consumption sites
     // for all the racy requirement sites entered into it above
@@ -1680,22 +1763,20 @@ class PartitionAnalysis {
   }
 
 public:
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  void dump() LLVM_ATTRIBUTE_USED {
-    llvm::dbgs() << "\nPartitionAnalysis[fname=" << function->getName() << "]\n";
+  void print(llvm::raw_ostream &os) const {
+    os << "\nPartitionAnalysis[fname=" << function->getName() << "]\n";
 
     for (auto [_, blockState] : blockStates) {
-      blockState.dump();
+      blockState.print(os);
     }
   }
 
   static void performForFunction(SILFunction *function) {
     auto analysis = PartitionAnalysis(function);
     analysis.solve();
-    LLVM_DEBUG(
-        llvm::dbgs() << "SOLVED: ";
-        analysis.dump();
-    );
+    LLVM_DEBUG(llvm::dbgs() << "SOLVED: "; analysis.print(llvm::dbgs()););
     analysis.diagnose();
   }
 };

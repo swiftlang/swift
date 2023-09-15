@@ -189,6 +189,7 @@ public:
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
   SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS, unsigned indent = 0) const;
 };
 
 /// A TypeRepr for a type with a syntax error.  Can be used both as a

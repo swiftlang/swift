@@ -5514,7 +5514,7 @@ RValue SILGenFunction::emitApply(
       break;
 
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
+    case ActorIsolation::Nonisolated:
       llvm_unreachable("Not isolated");
       break;
     }
@@ -7023,11 +7023,10 @@ ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
   assert(visitor.varAddr && "didn't find var in pattern?");
   
   // Load and reabstract the value if needed.
-  auto genericSig = F.getLoweredFunctionType()->getInvocationGenericSignature();
   auto substVarTy = var->getTypeInContext()->getCanonicalType();
-  auto substAbstraction = AbstractionPattern(genericSig, substVarTy);
-  return emitLoad(loc, visitor.varAddr, substAbstraction, substVarTy,
-                  getTypeLowering(substAbstraction, substVarTy),
+  return emitLoad(loc, visitor.varAddr,
+                  AbstractionPattern::getOpaque(), substVarTy,
+                  getTypeLowering(substVarTy),
                   SGFContext(), IsNotTake);
 }
 

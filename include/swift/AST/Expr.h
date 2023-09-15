@@ -1118,6 +1118,9 @@ public:
 #include "swift/AST/TokenKinds.def"
   };
 
+  static StringRef
+  getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind);
+
 private:
   ArgumentList *ArgList;
   SourceLoc PoundLoc;
@@ -3778,8 +3781,8 @@ public:
 class ClosureActorIsolation {
 public:
   enum Kind {
-    /// The closure is independent of any actor.
-    Independent,
+    /// The closure is not isolated to any actor.
+    Nonisolated,
 
     /// The closure is tied to the actor instance described by the given
     /// \c VarDecl*, which is the (captured) `self` of an actor.
@@ -3810,7 +3813,7 @@ public:
   ClosureActorIsolation(bool preconcurrency = false)
       : storage(nullptr, preconcurrency) { }
 
-  static ClosureActorIsolation forIndependent(bool preconcurrency) {
+  static ClosureActorIsolation forNonisolated(bool preconcurrency) {
     return ClosureActorIsolation(preconcurrency);
   }
 
@@ -3827,7 +3830,7 @@ public:
   /// Determine the kind of isolation.
   Kind getKind() const {
     if (storage.getPointer().isNull())
-      return Kind::Independent;
+      return Kind::Nonisolated;
 
     if (storage.getPointer().is<VarDecl *>())
       return Kind::ActorInstance;
@@ -3837,7 +3840,7 @@ public:
 
   /// Whether the closure is isolated at all.
   explicit operator bool() const {
-    return getKind() != Kind::Independent;
+    return getKind() != Kind::Nonisolated;
   }
 
   /// Whether the closure is isolated at all.

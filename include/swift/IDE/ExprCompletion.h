@@ -90,9 +90,8 @@ public:
         AddUnresolvedMemberCompletions(AddUnresolvedMemberCompletions) {}
 
   /// \param CCLoc The location of the code completion token.
-  void deliverResults(SourceLoc CCLoc,
-                      ide::CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  void collectResults(SourceLoc CCLoc,
+                      ide::CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

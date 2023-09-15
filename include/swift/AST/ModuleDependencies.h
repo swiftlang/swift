@@ -116,8 +116,10 @@ public:
 
   ModuleDependencyInfoStorageBase(ModuleDependencyKind dependencyKind,
                                   const std::vector<std::string> &moduleImports,
+                                  const std::vector<std::string> &optionalModuleImports,
                                   StringRef moduleCacheKey = "")
       : dependencyKind(dependencyKind), moduleImports(moduleImports),
+        optionalModuleImports(optionalModuleImports),
         moduleCacheKey(moduleCacheKey.str()), resolved(false), finalized(false)  {}
 
   virtual ModuleDependencyInfoStorageBase *clone() const = 0;
@@ -296,11 +298,12 @@ public:
                                      const std::string &moduleDocPath,
                                      const std::string &sourceInfoPath,
                                      const std::vector<std::string> &moduleImports,
+                                     const std::vector<std::string> &optionalModuleImports,
                                      const std::vector<std::string> &headerImports,
                                      const bool isFramework,
                                      const std::string &moduleCacheKey)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
-                                        moduleImports, moduleCacheKey),
+                                        moduleImports, optionalModuleImports, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), preCompiledBridgingHeaderPaths(headerImports),
         isFramework(isFramework) {}
@@ -471,12 +474,14 @@ public:
       const std::string &moduleDocPath,
       const std::string &sourceInfoPath,
       const std::vector<std::string> &moduleImports,
+      const std::vector<std::string> &optionalModuleImports,
       const std::vector<std::string> &headerImports,
       bool isFramework, const std::string &moduleCacheKey) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
           compiledModulePath, moduleDocPath, sourceInfoPath,
-          moduleImports, headerImports, isFramework, moduleCacheKey));
+          moduleImports, optionalModuleImports,
+          headerImports, isFramework, moduleCacheKey));
   }
 
   /// Describe the main Swift module.

@@ -19,9 +19,13 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILDebugVariable.h"
+#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Debug.h"
+
+#include <variant>
 
 namespace swift {
 namespace autodiff {
@@ -38,9 +42,17 @@ enum AdjointValueKind {
 
   /// A concrete SIL value.
   Concrete,
+
+  /// A special adjoint, made up of 2 adjoints -- an aggregate base adjoint and
+  /// an element adjoint to add to one of its fields. This case exists to avoid
+  /// eager materialization of a base adjoint upon addition with one of its
+  /// fields.
+  AddElement,
 };
 
 class AdjointValue;
+
+struct AddElementValue;
 
 class AdjointValueBase {
   friend class AdjointValue;
@@ -60,9 +72,13 @@ class AdjointValueBase {
   union Value {
     unsigned numAggregateElements;
     SILValue concrete;
+    AddElementValue *addElementValue;
+
     Value(unsigned numAggregateElements)
         : numAggregateElements(numAggregateElements) {}
     Value(SILValue v) : concrete(v) {}
+    Value(AddElementValue *addElementValue)
+        : addElementValue(addElementValue) {}
     Value() {}
   } value;
 
@@ -86,6 +102,11 @@ class AdjointValueBase {
 
   explicit AdjointValueBase(SILType type, llvm::Optional<DebugInfo> debugInfo)
       : kind(AdjointValueKind::Zero), type(type), debugInfo(debugInfo) {}
+
+  explicit AdjointValueBase(SILType type, AddElementValue *addElementValue,
+                            llvm::Optional<DebugInfo> debugInfo)
+      : kind(AdjointValueKind::AddElement), type(type), debugInfo(debugInfo),
+        value(addElementValue) {}
 };
 
 /// A symbolic adjoint value that wraps a `SILValue`, a zero, or an aggregate
@@ -127,6 +148,14 @@ public:
     return new (buf) AdjointValueBase(type, elements, debugInfo);
   }
 
+  static AdjointValue
+  createAddElement(llvm::BumpPtrAllocator &allocator, SILType type,
+                   AddElementValue *addElementValue,
+                   llvm::Optional<DebugInfo> debugInfo = llvm::None) {
+    auto *buf = allocator.Allocate<AdjointValueBase>();
+    return new (buf) AdjointValueBase(type, addElementValue, debugInfo);
+  }
+
   AdjointValueKind getKind() const { return base->kind; }
   SILType getType() const { return base->type; }
   CanType getSwiftType() const { return getType().getASTType(); }
@@ -140,6 +169,9 @@ public:
   bool isZero() const { return getKind() == AdjointValueKind::Zero; }
   bool isAggregate() const { return getKind() == AdjointValueKind::Aggregate; }
   bool isConcrete() const { return getKind() == AdjointValueKind::Concrete; }
+  bool isAddElement() const {
+    return getKind() == AdjointValueKind::AddElement;
+  }
 
   unsigned getNumAggregateElements() const {
     assert(isAggregate());
@@ -162,39 +194,75 @@ public:
     return base->value.concrete;
   }
 
-  void print(llvm::raw_ostream &s) const {
-    switch (getKind()) {
-    case AdjointValueKind::Zero:
-      s << "Zero[" << getType() << ']';
-      break;
-    case AdjointValueKind::Aggregate:
-      s << "Aggregate[" << getType() << "](";
-      if (auto *decl =
-              getType().getASTType()->getStructOrBoundGenericStruct()) {
-        interleave(
-            llvm::zip(decl->getStoredProperties(), getAggregateElements()),
-            [&s](std::tuple<VarDecl *, const AdjointValue &> elt) {
-              s << std::get<0>(elt)->getName() << ": ";
-              std::get<1>(elt).print(s);
-            },
-            [&s] { s << ", "; });
-      } else if (getType().is<TupleType>()) {
-        interleave(
-            getAggregateElements(),
-            [&s](const AdjointValue &elt) { elt.print(s); },
-            [&s] { s << ", "; });
-      } else {
-        llvm_unreachable("Invalid aggregate");
-      }
-      s << ')';
-      break;
-    case AdjointValueKind::Concrete:
-      s << "Concrete[" << getType() << "](" << base->value.concrete << ')';
-      break;
-    }
+  AddElementValue *getAddElementValue() const {
+    assert(isAddElement());
+    return base->value.addElementValue;
   }
 
+  void print(llvm::raw_ostream &s) const;
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); };
+};
+
+/// An abstraction that represents the field locator in
+/// an `AddElement` adjoint kind. Depending on the aggregate
+/// kind - tuple or struct, of the `baseAdjoint` in an
+/// `AddElement` adjoint, the field locator may be an `unsigned int`
+/// or a `VarDecl *`.
+struct FieldLocator final {
+  FieldLocator(VarDecl *field) : inner(field) {}
+  FieldLocator(unsigned int index) : inner(index) {}
+
+  friend AddElementValue;
+
+private:
+  bool isTupleFieldLocator() const {
+    return std::holds_alternative<unsigned int>(inner);
+  }
+
+  const static constexpr std::true_type TUPLE_FIELD_LOCATOR_TAG =
+      std::true_type{};
+  const static constexpr std::false_type STRUCT_FIELD_LOCATOR_TAG =
+      std::false_type{};
+
+  unsigned int getInner(std::true_type) const {
+    return std::get<unsigned int>(inner);
+  }
+
+  VarDecl *getInner(std::false_type) const {
+    return std::get<VarDecl *>(inner);
+  }
+
+  std::variant<unsigned int, VarDecl *> inner;
+};
+
+/// The underlying value for an `AddElement` adjoint.
+struct AddElementValue final {
+  AdjointValue baseAdjoint;
+  AdjointValue eltToAdd;
+  FieldLocator fieldLocator;
+
+  AddElementValue(AdjointValue baseAdjoint, AdjointValue eltToAdd,
+                  FieldLocator fieldLocator)
+      : baseAdjoint(baseAdjoint), eltToAdd(eltToAdd),
+        fieldLocator(fieldLocator) {
+    assert(baseAdjoint.getType().is<TupleType>() ||
+           baseAdjoint.getType().getStructOrBoundGenericStruct() != nullptr);
+  }
+
+  bool isTupleAdjoint() const { return fieldLocator.isTupleFieldLocator(); }
+
+  bool isStructAdjoint() const { return !isTupleAdjoint(); }
+
+  VarDecl *getFieldDecl() const {
+    assert(isStructAdjoint());
+    return this->fieldLocator.getInner(FieldLocator::STRUCT_FIELD_LOCATOR_TAG);
+  }
+
+  unsigned int getFieldIndex() const {
+    assert(isTupleAdjoint());
+    return this->fieldLocator.getInner(FieldLocator::TUPLE_FIELD_LOCATOR_TAG);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

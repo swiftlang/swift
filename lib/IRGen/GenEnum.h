@@ -334,6 +334,11 @@ public:
                                   Explosion &params,
                                   Explosion &out) const = 0;
   
+  /// Return true for single-case (singleton) enums.
+  /// The enum doesn't need any tag bits and the payload of the enum case can
+  /// (and needs!) to be emitted as-is into a constant.
+  virtual bool emitPayloadDirectlyIntoConstant() const { return false; }
+
   /// Return an i1 value that indicates whether the specified loadable enum
   /// value holds the specified case.  This is a light-weight form of a switch.
   virtual llvm::Value *emitValueCaseTest(IRGenFunction &IGF,

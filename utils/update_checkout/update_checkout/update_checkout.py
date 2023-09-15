@@ -567,11 +567,11 @@ repositories.
 """)
     parser.add_argument(
         "--clone",
-        help="Obtain Sources for Swift and Related Projects",
+        help="obtain sources for Swift and related projects",
         action="store_true")
     parser.add_argument(
         "--clone-with-ssh",
-        help="Obtain Sources for Swift and Related Projects via SSH",
+        help="Obtain sources for Swift and related projects via SSH",
         action="store_true")
     parser.add_argument(
         "--skip-history",

@@ -59,6 +59,11 @@ namespace irgen {
                          const ClassLayout &fragileLayout,
                          const ClassLayout &resilientLayout);
 
+  /// Emit "embedded Swift" class metadata (a simple vtable) for the given class
+  /// declaration.
+  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
+                                 const ClassLayout &fragileLayout);
+
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
   llvm::Constant *emitForeignTypeMetadataInitializer(IRGenModule &IGM,
@@ -77,6 +82,8 @@ namespace irgen {
 
   /// Emit the type metadata accessor for a type for which it might be used.
   void emitLazyMetadataAccessor(IRGenModule &IGM, NominalTypeDecl *type);
+
+  void emitLazySpecializedClassMetadata(IRGenModule &IGM, CanType classType);
 
   void emitLazyCanonicalSpecializedMetadataAccessor(IRGenModule &IGM,
                                                     CanType theType);

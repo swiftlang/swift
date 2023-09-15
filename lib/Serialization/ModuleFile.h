@@ -621,6 +621,11 @@ public:
     return Core->Bits.HasHermeticSealAtLink;
   }
 
+  /// Whether this module was built using embedded Swift.
+  bool isEmbeddedSwiftModule() const {
+    return Core->Bits.IsEmbeddedSwiftModule;
+  }
+
   /// Whether this module was built with C++ interoperability enabled.
   bool hasCxxInteroperability() const {
     return Core->Bits.HasCxxInteroperability;

@@ -1497,3 +1497,31 @@ extension MyActor {
     }
   }
 }
+
+@MainActor
+class SuperWithNonisolatedInit {
+  static func isolatedToMainActor() {}
+
+  // expected-note@+1 2 {{mutation of this property is only permitted within the actor}}
+  var x: Int = 0 {
+    didSet {
+      SuperWithNonisolatedInit.isolatedToMainActor()
+    }
+  }
+
+  nonisolated init() {}
+}
+
+class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
+  override nonisolated init() {
+    super.init()
+
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    super.x = 10
+  }
+
+  nonisolated func f() {
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    super.x = 10
+  }
+}

@@ -917,7 +917,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     SourceLoc NREnd = NRStart.getAdvancedLoc(NTD->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
 
-    for (const TypeLoc &TL : NTD->getInherited()) {
+    for (const TypeLoc &TL : NTD->getInherited().getEntries()) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);
@@ -937,7 +937,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
       NSR = repr->getSourceRange();
     SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
 
-    for (const TypeLoc &TL : ED->getInherited()) {
+    for (const TypeLoc &TL : ED->getInherited().getEntries()) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);
@@ -1116,7 +1116,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
                                               GenericParamD->getSourceRange());
     SN.NameRange = CharSourceRange(GenericParamD->getNameLoc(),
                                    GenericParamD->getName().getLength());
-    for (const TypeLoc &TL : GenericParamD->getInherited()) {
+    for (const TypeLoc &TL : GenericParamD->getInherited().getEntries()) {
       CharSourceRange TR = charSourceRangeFromSourceRange(SM,
                                                           TL.getSourceRange());
       SN.InheritedTypeRanges.push_back(TR);

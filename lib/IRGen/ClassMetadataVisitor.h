@@ -63,10 +63,21 @@ protected:
     : super(IGM), Target(target),
       VTable(IGM.getSILModule().lookUpVTable(target, /*deserialize*/ false)) {}
 
+  ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target, SILVTable *vtable)
+    : super(IGM), Target(target), VTable(vtable) {}
+
 public:
   void layout() {
     static_assert(MetadataAdjustmentIndex::Class == 3,
                   "Adjustment index must be synchronized with this layout");
+
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      asImpl().noteAddressPoint();
+      asImpl().addSuperclass();
+      asImpl().addDestructorFunction();
+      addEmbeddedClassMembers(Target);
+      return;
+    }
 
     // Pointer to layout string
     asImpl().addLayoutStringPointer();
@@ -180,6 +191,21 @@ private:
     if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal,
                                  rootClass))
       return;
+
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
+  }
+
+  /// Add fields associated with the given class and its bases.
+  void addEmbeddedClassMembers(ClassDecl *theClass) {
+    // Visit the superclass first.
+    if (auto *superclassDecl = theClass->getSuperclassDecl()) {
+      addEmbeddedClassMembers(superclassDecl);
+    }
+
+    // Note that we have to emit a global variable storing the metadata
+    // start offset, or access remaining fields relative to one.
+    asImpl().noteStartOfImmediateMembers(theClass);
 
     // Add vtable entries.
     asImpl().addVTableEntries(theClass);

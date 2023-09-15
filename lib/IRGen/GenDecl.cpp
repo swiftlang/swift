@@ -536,7 +536,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   // libraries. This may however cause the library to get pulled in in
   // situations where it isn't useful, such as for dylibs, though this is
   // harmless aside from code size.
-  if (!IRGen.Opts.UseJIT) {
+  if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 StringRef libraryName, bool forceLoad) {
       llvm::Optional<llvm::VersionTuple> compatibilityVersion;
@@ -1239,6 +1239,13 @@ void IRGenModule::emitGlobalLists() {
 // Eagerly emit functions that are externally visible. Functions that are
 // dynamic replacements must also be eagerly emitted.
 static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
+  // Embedded Swift only emits specialized function, so don't emit generic
+  // functions, even if they're externally visible.
+  if (f.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      f.getLoweredFunctionType()->getSubstGenericSignature()) {
+    return true;
+  }
+  
   if (f.isPossiblyUsedExternally())
     return false;
 
@@ -1403,13 +1410,31 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    // In embedded Swift, the compiler cannot emit any metadata, etc.
+    assert(LazyTypeMetadata.empty());
+    assert(LazySpecializedTypeMetadataRecords.empty());
+    assert(LazyTypeContextDescriptors.empty());
+    assert(LazyOpaqueTypeDescriptors.empty());
+    assert(LazyFieldDescriptors.empty());
+    // LazyFunctionDefinitions are allowed, but they must not be generic
+    for (SILFunction *f : LazyFunctionDefinitions) {
+      assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+    }
+    assert(LazyWitnessTables.empty());
+    assert(LazyCanonicalSpecializedMetadataAccessors.empty());
+    assert(LazyMetadataAccessors.empty());
+    // LazySpecializedClassMetadata is allowed
+  }
+
   while (!LazyTypeMetadata.empty() ||
          !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyOpaqueTypeDescriptors.empty() || !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
-         !LazyMetadataAccessors.empty()) {
+         !LazyMetadataAccessors.empty() ||
+         !LazySpecializedClassMetadata.empty()) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
@@ -1501,6 +1526,12 @@ void IRGenerator::emitLazyDefinitions() {
       CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
       emitLazyMetadataAccessor(*IGM.get(), nominal);
     }
+
+    while (!LazySpecializedClassMetadata.empty()) {
+      CanType classType = LazySpecializedClassMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      emitLazySpecializedClassMetadata(*IGM.get(), classType);
+    }
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1510,6 +1541,10 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   // Add it to the queue if it hasn't already been put there.
   if (!LazilyEmittedFunctions.insert(f).second)
     return;
+    
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+  }
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFunctionDefinitions.push_back(f);
@@ -1581,6 +1616,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
+  if (LazilyEmittedSpecializedClassMetadata.insert(classType.getPointer()).second) {
+    LazySpecializedClassMetadata.push_back(classType);
+  }
 }
 
 void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
@@ -4952,6 +4993,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                 : LinkEntity::forTypeMetadata(
                       concreteType, TypeMetadataAddress::FullMetadata));
 
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    entity = LinkEntity::forTypeMetadata(concreteType,
+                                         TypeMetadataAddress::AddressPoint);
+  }
+
   auto DbgTy = DebugTypeInfo::getGlobalMetadata(
       MetatypeType::get(concreteType),
       entity.getDefaultDeclarationType(*this)->getPointerTo(), Size(0),
@@ -4973,6 +5019,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
   markGlobalAsUsedBasedOnLinkage(*this, link, var);
+  
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return var;
+  }
 
   /// For concrete metadata, we want to use the initializer on the
   /// "full metadata", and define the "direct" address point as an alias.
@@ -5034,8 +5084,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // Foreign classes and prespecialized generic types do not use an alias into
   // the full metadata and therefore require a GEP.
   bool fullMetadata =
-      foreign || (concreteType->getAnyGeneric() &&
-                  concreteType->getAnyGeneric()->isGenericContext());
+      !Context.LangOpts.hasFeature(Feature::Embedded) &&
+      (foreign || (concreteType->getAnyGeneric() &&
+                  concreteType->getAnyGeneric()->isGenericContext()));
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
@@ -5072,6 +5123,14 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   // trigger lazy emission of the metadata.
   if (NominalTypeDecl *nominal = concreteType->getAnyNominal()) {
     IRGen.noteUseOfTypeMetadata(nominal);
+
+    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (classDecl->isGenericContext()) {
+          IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+        }
+      }
+    }
   }
 
   if (shouldPrespecializeGenericMetadata()) {

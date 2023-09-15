@@ -20,22 +20,62 @@ func testGlobalFunctions() {
   }
 }
 
+func testGobalVars() {
+  let _: Int = publicGlobalVar
+  let _: String = publicGlobalVarInferredType
+  let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
+}
+
 func testPublicStruct() {
-  var s = PublicStruct(x: 1)
-  _ = s.publicMethod()
+  let s = PublicStruct(x: 1)
+  let _: Int = s.publicMethod()
+  let _: Int = s.publicProperty
+  let _: String = s.publicPropertyInferredType
+  let _: Double = s.publicWrappedProperty
+  let _: Double = s.$publicWrappedProperty.wrappedValue
   PublicStruct.publicStaticMethod()
 }
 
 func testPublicClass() {
   let c = PublicClass(x: 2)
-  _ = c.publicMethod()
+  let _: Int = c.publicMethod()
+  let _: Int = c.publicProperty
+  let _: String = c.publicPropertyInferredType
   PublicClass.publicClassMethod()
+
+  let d = PublicDerivedClass(x: 3)
+  let _: Int = d.publicMethod()
+  let _: Int = d.publicProperty
+  let _: String = d.publicPropertyInferredType
+  PublicDerivedClass.publicClassMethod()
 }
 
 func testConformances() {
-  let _: [any PublicProto] = [
+  let array: [any PublicProto] = [
     PublicStructConformingToPublicProto(),
+    PublicStructIndirectlyConformingToPublicProto(),
     PublicClassConformingToPublicProto(),
     "string",
+    PublicClassInheritingConformanceToPublicProto(),
   ]
+
+  for x in array {
+    _ = x.req()
+    constrainedGenericPublicFunction(x)
+  }
+}
+
+// FIXME: This conformance ought to be included to verify that a redundant
+// conformance diagnostic is emitted.
+// However, it turns out that the mechanism implemented by
+// https://github.com/apple/swift/pull/20433 doesn't actually work when a
+// module is built from .swiftinterface because the dummy conformance is marked
+// unavailable.
+//extension PublicGenericStruct: EmptyPublicProto {}
+
+func takesEmptyProto<T: EmptyPublicProto>(_ t: T) {}
+
+@available(*, unavailable)
+func testConditionalConformance<T>(_ s: PublicGenericStruct<T>) {
+  takesEmptyProto(s) // expected-error {{global function 'takesEmptyProto' requires}}
 }

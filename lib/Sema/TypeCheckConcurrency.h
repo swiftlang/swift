@@ -246,16 +246,17 @@ public:
   operator Kind() const { return kind; }
 };
 
-/// Specifies whether checks applied to function types should
-/// apply to their params, results, or both
+/// Individual options used with \c FunctionCheckOptions
 enum class FunctionCheckKind {
-  /// Check params and results
-  ParamsResults,
-  /// Check params only
-  Params,
-  /// Check results only
-  Results,
+  /// Check params
+  Params = 1 << 0,
+  /// Check results
+  Results = 1 << 1,
 };
+
+/// Specifies whether checks applied to function types should apply to
+/// their parameters, their results, both, or neither.
+using FunctionCheckOptions = OptionSet<FunctionCheckKind>;
 
 /// Diagnose the presence of any non-sendable types when referencing a
 /// given declaration from a particular declaration context.
@@ -280,7 +281,7 @@ enum class FunctionCheckKind {
 /// \param refKind Describes what kind of reference is being made, which is
 /// used to tailor the diagnostic.
 ///
-/// \param funcCheckKind Describes whether function types in this reference
+/// \param funcCheckOptions Describes whether function types in this reference
 /// should be checked for sendability of their results, params, or both
 ///
 /// \param diagnoseLoc Provides an alternative source location to `refLoc`
@@ -293,7 +294,10 @@ bool diagnoseNonSendableTypesInReference(
     const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind,
     llvm::Optional<ActorIsolation> knownIsolation = llvm::None,
-    FunctionCheckKind funcCheckKind = FunctionCheckKind::ParamsResults,
+    FunctionCheckOptions funcCheckOptions =
+        (FunctionCheckOptions() |
+         FunctionCheckKind::Params |
+         FunctionCheckKind::Results),
     SourceLoc diagnoseLoc = SourceLoc());
 
 /// Produce a diagnostic for a missing conformance to Sendable.

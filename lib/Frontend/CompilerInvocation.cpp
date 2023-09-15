@@ -1316,6 +1316,30 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
+  if (Opts.hasFeature(Feature::Embedded)) {
+    Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
+
+    if (FrontendOpts.EnableLibraryEvolution) {
+      Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
+      HadError = true;
+    }
+  }
+
+  if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
+    auto value = llvm::StringSwitch<llvm::Optional<bool>>(A->getValue())
+                     .Case("off", false)
+                     .Case("on", true)
+                     .Default(llvm::None);
+
+    if (value) {
+      Opts.UseCheckedAsyncObjCBridging = *value;
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -3072,6 +3096,9 @@ bool CompilerInvocation::parseArgs(
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  if (LangOpts.hasFeature(Feature::Embedded)) {
+    IRGenOpts.InternalizeAtLink = true;
+  }
 
   return false;
 }

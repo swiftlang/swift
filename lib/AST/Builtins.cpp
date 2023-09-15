@@ -235,21 +235,25 @@ static const char * const GenericParamNames[] = {
 };
 
 static GenericTypeParamDecl*
-createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
+createGenericParam(ASTContext &ctx, const char *name, unsigned index,
+                   bool isParameterPack = false) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
   return GenericTypeParamDecl::createImplicit(
-      &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index);
+      &M->getMainFile(FileUnitKind::Builtin), ident, /*depth*/ 0, index,
+                      isParameterPack);
 }
 
 /// Create a generic parameter list with multiple generic parameters.
 static GenericParamList *getGenericParams(ASTContext &ctx,
-                                          unsigned numParameters) {
+                                          unsigned numParameters,
+                                          bool areParameterPacks = false) {
   assert(numParameters <= std::size(GenericParamNames));
 
   SmallVector<GenericTypeParamDecl *, 2> genericParams;
   for (unsigned i = 0; i != numParameters; ++i)
-    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i));
+    genericParams.push_back(createGenericParam(ctx, GenericParamNames[i], i,
+                                               areParameterPacks));
 
   auto paramList = GenericParamList::create(ctx, SourceLoc(), genericParams,
                                             SourceLoc());
@@ -678,9 +682,11 @@ namespace {
 
   public:
     BuiltinFunctionBuilder(ASTContext &ctx, unsigned numGenericParams = 1,
-                           bool wantsAdditionalAnyObjectRequirement = false)
+                           bool wantsAdditionalAnyObjectRequirement = false,
+                           bool areParametersPacks = false)
         : Context(ctx) {
-      TheGenericParamList = getGenericParams(ctx, numGenericParams);
+      TheGenericParamList = getGenericParams(ctx, numGenericParams,
+                                             areParametersPacks);
       if (wantsAdditionalAnyObjectRequirement) {
         Requirement req(RequirementKind::Conformance,
                         TheGenericParamList->getParams()[0]->getInterfaceType(),
@@ -750,7 +756,7 @@ namespace {
       unsigned Index;
       Type build(BuiltinFunctionBuilder &builder) const {
         return builder.TheGenericParamList->getParams()[Index]
-            ->getDeclaredInterfaceType();
+                    ->getDeclaredInterfaceType();
       }
     };
     struct LambdaGenerator {
@@ -765,6 +771,16 @@ namespace {
       llvm::Optional<MetatypeRepresentation> Repr;
       Type build(BuiltinFunctionBuilder &builder) const {
         return MetatypeType::get(Object.build(builder), Repr);
+      }
+    };
+    template <class T>
+    struct PackExpansionGenerator {
+      T Object;
+      Type build(BuiltinFunctionBuilder &builder) const {
+        auto patternTy = Object.build(builder);
+        SmallVector<Type, 2> packs;
+        patternTy->getTypeParameterPacks(packs);
+        return PackExpansionType::get(patternTy, packs[0]);
       }
     };
   };
@@ -812,6 +828,12 @@ static BuiltinFunctionBuilder::MetatypeGenerator<T>
 makeMetatype(const T &object,
              llvm::Optional<MetatypeRepresentation> repr = llvm::None) {
   return { object, repr };
+}
+
+template <class T>
+static BuiltinFunctionBuilder::PackExpansionGenerator<T>
+makePackExpansion(const T &object) {
+  return { object };
 }
 
 /// Create a function with type <T> T -> ().
@@ -1934,6 +1956,18 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
+                                 /* anyObject */ false,
+                                 /* areParametersPack */ true);
+
+  auto paramTy = makeMetatype(makeTuple(makePackExpansion(makeGenericParam())));
+  builder.addParameter(paramTy);
+  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2975,6 +3009,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
     return getAutoDiffAllocateSubcontext(Context, Id);
+
+  case BuiltinValueKind::PackLength:
+    return getPackLength(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

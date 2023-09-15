@@ -142,6 +142,18 @@ static bool isInObjCImpl(const ValueDecl *VD) {
   return ED && ED->isObjCImplementation();
 }
 
+/// Triggering type checking requests while printing is desirable in compiler
+/// modes in which type checking is lazy and the printed content is expected to
+/// be complete (for example, when printing a .swiftinterface). In other
+/// contexts, though, triggering type checking could cause re-entrancy and
+/// should be avoided.
+static bool shouldTypeCheck(const PrintOptions &options) {
+  if (options.IsForSwiftInterface)
+    return true;
+
+  return false;
+}
+
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
@@ -2258,6 +2270,13 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Force implicit accessors to be created if they haven't been already.
+  if (shouldTypeCheck(Options)) {
+    ASD->visitEmittedAccessors([](AccessorDecl *accessor) {
+      (void)accessor;
+    });
+  }
+
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
@@ -2954,9 +2973,9 @@ static bool usesFeatureRethrowsProtocol(
     return false;
 
   // Check an inheritance clause for a marker protocol.
-  auto checkInherited = [&](ArrayRef<InheritedEntry> inherited) -> bool {
-    for (const auto &inheritedEntry : inherited) {
-      if (auto inheritedType = inheritedEntry.getType()) {
+  auto checkInherited = [&](InheritedTypes inherited) -> bool {
+    for (unsigned i : inherited.getIndices()) {
+      if (auto inheritedType = inherited.getResolvedType(i)) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
           for (ProtocolDecl *proto : layout.getProtocols()) {
@@ -3145,6 +3164,10 @@ static bool usesFeatureImplicitSelfCapture(Decl *decl) {
 }
 
 static bool usesFeatureBuiltinStackAlloc(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureEmbedded(Decl *decl) {
   return false;
 }
 
@@ -3795,6 +3818,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   bool isFirst = true;
   for (auto idx : range(decl->getNumPatternEntries())) {
     auto *pattern = decl->getPattern(idx);
+
+    // Force the entry to be typechecked before attempting to print.
+    if (shouldTypeCheck(Options) && !pattern->hasType())
+      (void)decl->getCheckedPatternBindingEntry(idx);
+
     if (!shouldPrintPattern(pattern))
       continue;
     if (isFirst)
@@ -7681,16 +7709,11 @@ void
 swift::getInheritedForPrinting(
     const Decl *decl, const PrintOptions &options,
     llvm::SmallVectorImpl<InheritedEntry> &Results) {
-  ArrayRef<InheritedEntry> inherited;
-  if (auto td = dyn_cast<TypeDecl>(decl)) {
-    inherited = td->getInherited();
-  } else if (auto ed = dyn_cast<ExtensionDecl>(decl)) {
-    inherited = ed->getInherited();
-  }
+  InheritedTypes inherited = InheritedTypes(decl);
 
   // Collect explicit inherited types.
-  for (auto entry: inherited) {
-    if (auto ty = entry.getType()) {
+  for (auto i : inherited.getIndices()) {
+    if (auto ty = inherited.getResolvedType(i)) {
       bool foundUnprintable = ty.findIf([&](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !options.shouldPrint(aliasTy->getDecl());
@@ -7704,7 +7727,7 @@ swift::getInheritedForPrinting(
         continue;
     }
 
-    Results.push_back(entry);
+    Results.push_back(inherited.getEntry(i));
   }
 
   // Collect synthesized conformances.
@@ -7831,7 +7854,7 @@ void GenericParamList::print(ASTPrinter &Printer,
         if (!P->getInherited().empty()) {
           Printer << " : ";
 
-          auto loc = P->getInherited()[0];
+          auto loc = P->getInherited().getEntry(0);
           if (willUseTypeReprPrinting(loc, nullptr, PO)) {
             loc.getTypeRepr()->print(Printer, PO);
           } else {

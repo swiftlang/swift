@@ -1527,6 +1527,47 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
 }
 
+InheritedTypes::InheritedTypes(
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl)
+    : Decl(decl) {
+  if (auto *typeDecl = decl.dyn_cast<const TypeDecl *>()) {
+    Entries = typeDecl->Inherited;
+  } else {
+    Entries = decl.get<const ExtensionDecl *>()->Inherited;
+  }
+}
+
+InheritedTypes::InheritedTypes(const class Decl *decl) {
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    Decl = typeDecl;
+    Entries = typeDecl->Inherited;
+  } else if (auto extensionDecl = dyn_cast<ExtensionDecl>(decl)) {
+    Decl = extensionDecl;
+    Entries = extensionDecl->Inherited;
+  } else {
+    Decl = nullptr;
+    Entries = ArrayRef<InheritedEntry>();
+  }
+}
+
+InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
+  Entries = typeDecl->Inherited;
+}
+
+InheritedTypes::InheritedTypes(const ExtensionDecl *extensionDecl)
+    : Decl(extensionDecl) {
+  Entries = extensionDecl->Inherited;
+}
+
+Type InheritedTypes::getResolvedType(unsigned i,
+                                     TypeResolutionStage stage) const {
+  ASTContext &ctx = Decl.is<const ExtensionDecl *>()
+                        ? Decl.get<const ExtensionDecl *>()->getASTContext()
+                        : Decl.get<const TypeDecl *>()->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, InheritedTypeRequest{Decl, i, stage},
+                           Type());
+}
+
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              TypeRepr *extendedType,
                              ArrayRef<InheritedEntry> inherited,
@@ -2034,6 +2075,15 @@ bool PatternBindingDecl::hasStorage() const {
   return false;
 }
 
+const PatternBindingEntry *PatternBindingDecl::getCheckedPatternBindingEntry(
+    unsigned i, bool leaveClosureBodiesUnchecked) const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      PatternBindingEntryRequest{const_cast<PatternBindingDecl *>(this), i,
+                                 leaveClosureBodiesUnchecked},
+      nullptr);
+}
+
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P,
                                     DeclContext *InitContext,
                                     bool isFullyValidated) {
@@ -2313,7 +2363,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
             break;
 
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::Independent:
+          case ActorIsolation::Nonisolated:
           case ActorIsolation::GlobalActor:
             return true;
         }
@@ -4021,6 +4071,16 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     resultDC = resultDC->getParent();
   }
 
+  auto localImportRestriction = VD->getImportAccessFrom(useDC);
+  if (localImportRestriction.has_value()) {
+    AccessLevel importAccessLevel =
+      localImportRestriction.value().accessLevel;
+    if (access > importAccessLevel) {
+      access = std::min(access, importAccessLevel);
+      resultDC = useDC->getParentSourceFile();
+    }
+  }
+
   switch (access) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
@@ -4283,6 +4343,16 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool allowUsableFromInline) const {
   return checkAccess(useDC, this, forConformance, allowUsableFromInline,
                      [&]() { return getFormalAccess(); });
+}
+
+ImportAccessLevel ValueDecl::getImportAccessFrom(const DeclContext *useDC) const {
+  ModuleDecl *Mod = getModuleContext();
+  if (useDC && useDC->getParentModule() != Mod) {
+    if (auto useSF = useDC->getParentSourceFile()) {
+      return useSF->getImportAccessLevel(Mod);
+    }
+  }
+  return llvm::None;
 }
 
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
@@ -5182,7 +5252,7 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
     startLoc = eachLoc;
 
   if (!getInherited().empty())
-    endLoc = getInherited().back().getSourceRange().End;
+    endLoc = getInherited().getEndLoc();
 
   return {startLoc, endLoc};
 }
@@ -5220,7 +5290,7 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
   } else if (auto defaultDefinition = getDefaultDefinitionTypeRepr()) {
     endLoc = defaultDefinition->getEndLoc();
   } else if (!getInherited().empty()) {
-    endLoc = getInherited().back().getSourceRange().End;
+    endLoc = getInherited().getEndLoc();
   } else {
     endLoc = getNameLoc();
   }
@@ -7861,27 +7931,30 @@ Type DeclContext::getSelfTypeInContext() const {
   return mapTypeIntoContext(getSelfInterfaceType());
 }
 
-TupleType *BuiltinTupleDecl::getTupleSelfType() const {
-  if (TupleSelfType)
-    return TupleSelfType;
-
+TupleType *BuiltinTupleDecl::getTupleSelfType(const ExtensionDecl *owner) const {
   auto &ctx = getASTContext();
 
-  // Get the generic parameter type 'Elements'.
-  auto paramType = getGenericParams()->getParams()[0]
-      ->getDeclaredInterfaceType();
+  // Get the generic parameter type 'each T'.
+  GenericParamList *genericParams;
+  if (owner != nullptr) {
+    genericParams = owner->getGenericParams();
+  } else {
+    genericParams = getGenericParams();
+  }
 
-  // Build the pack expansion type 'Elements...'.
+  assert(genericParams != nullptr);
+  assert(genericParams->getParams().size() == 1);
+  assert(genericParams->getOuterParameters() == nullptr);
+  auto paramType = genericParams->getParams()[0]->getDeclaredInterfaceType();
+
+  // Build the pack expansion type 'repeat each T'.
   Type packExpansionType = PackExpansionType::get(paramType, paramType);
 
-  // Build the one-element tuple type '(Elements...)'.
+  // Build the one-element tuple type '(repeat each T)'.
   SmallVector<TupleTypeElt, 1> elts;
   elts.push_back(packExpansionType);
 
-  const_cast<BuiltinTupleDecl *>(this)->TupleSelfType =
-      TupleType::get(elts, ctx);
-
-  return TupleSelfType;
+  return TupleType::get(elts, ctx);
 }
 
 /// Retrieve the interface type of 'self' for the given context.
@@ -7890,7 +7963,7 @@ Type DeclContext::getSelfInterfaceType() const {
 
   if (auto *nominalDecl = getSelfNominalTypeDecl()) {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
-      return builtinTupleDecl->getTupleSelfType();
+      return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
     if (isa<ProtocolDecl>(nominalDecl)) {
       auto *genericParams = nominalDecl->getGenericParams();
@@ -10166,7 +10239,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
 
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       switch (auto isolation = closure->getActorIsolation()) {
-      case ClosureActorIsolation::Independent:
+      case ClosureActorIsolation::Nonisolated:
       case ClosureActorIsolation::GlobalActor:
         return false;
 
@@ -10845,15 +10918,16 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
 
 void MacroDecl::getIntroducedConformances(
     NominalTypeDecl *attachedTo,
+    MacroRole role,
     SmallVectorImpl<ProtocolDecl *> &conformances) const {
-  auto *attr = getMacroRoleAttr(MacroRole::Extension);
+  auto *attr = getMacroRoleAttr(role);
   if (!attr)
     return;
 
   auto &ctx = getASTContext();
   auto constraintTypes = evaluateOrDefault(
       ctx.evaluator,
-      ResolveExtensionMacroConformances{attr, this},
+      ResolveMacroConformances{attr, this},
       {});
 
   for (auto constraint : constraintTypes) {

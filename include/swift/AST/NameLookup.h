@@ -620,17 +620,6 @@ SelfBounds getSelfBoundsFromWhereClause(
 /// given protocol or protocol extension.
 SelfBounds getSelfBoundsFromGenericSignature(const ExtensionDecl *extDecl);
 
-/// Retrieve the TypeLoc at the given \c index from among the set of
-/// type declarations that are directly "inherited" by the given declaration.
-inline const TypeLoc &getInheritedTypeLocAtIndex(
-    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned index) {
-  if (auto typeDecl = decl.dyn_cast<const TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<const ExtensionDecl *>()->getInherited()[index];
-}
-
 namespace namelookup {
 
 /// Searches through statements and patterns for local variable declarations.

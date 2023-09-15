@@ -546,6 +546,15 @@ SILMoveOnlyDeinit *SILModule::lookUpMoveOnlyDeinit(const NominalTypeDecl *C,
   return tbl;
 }
 
+SILVTable *SILModule::lookUpSpecializedVTable(SILType classTy) {
+  // First try to look up R from the lookup table.
+  auto R = SpecializedVTableMap.find(classTy);
+  if (R != SpecializedVTableMap.end())
+    return R->second;
+
+  return nullptr;
+}
+
 SerializedSILLoader *SILModule::getSILLoader() {
   // If the SILLoader is null, create it.
   if (!SILLoader)
@@ -896,6 +905,10 @@ bool SILModule::isStdlibModule() const {
 void SILModule::performOnceForPrespecializedImportedExtensions(
     llvm::function_ref<void(AbstractFunctionDecl *)> action) {
   if (prespecializedFunctionDeclsImported)
+    return;
+
+  // No prespecitalizations in embedded Swift
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return;
 
   SmallVector<ModuleDecl *, 8> importedModules;

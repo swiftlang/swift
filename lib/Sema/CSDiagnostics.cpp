@@ -2761,6 +2761,17 @@ bool ContextualFailure::diagnoseAsNote() {
     }
   }
 
+  // Note that mentions candidate type number of parameters diff.
+  auto fromFnType = getFromType()->getAs<FunctionType>();
+  auto toFnType = getToType()->getAs<FunctionType>();
+  if (fromFnType && toFnType &&
+      fromFnType->getNumParams() > toFnType->getNumParams()) {
+    emitDiagnosticAt(decl, diag::candidate_with_extraneous_args, fromFnType,
+                     fromFnType->getNumParams(), toFnType,
+                     toFnType->getNumParams());
+    return true;
+  }
+
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
@@ -3388,11 +3399,9 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   auto conformanceDiag =
       emitDiagnostic(diag::assign_protocol_conformance_fix_it, constraint,
                      nominal->getDescriptiveKind(), fromType);
-  if (nominal->getInherited().size() > 0) {
-    auto lastInherited = nominal->getInherited().back().getLoc();
-    auto lastInheritedEndLoc =
-        Lexer::getLocForEndOfToken(getASTContext().SourceMgr, lastInherited);
-    conformanceDiag.fixItInsert(lastInheritedEndLoc, ", " + protoString);
+  if (!nominal->getInherited().empty()) {
+    auto lastInheritedEndLoc = nominal->getInherited().getEndLoc();
+    conformanceDiag.fixItInsertAfter(lastInheritedEndLoc, ", " + protoString);
   } else {
     auto nameEndLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                                  nominal->getNameLoc());

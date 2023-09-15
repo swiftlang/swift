@@ -25,6 +25,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
@@ -372,7 +373,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (!Ctx.getOpts().PublicSymbolsOnly)
       return false;
 
-    if (NTD->hasClangNode())
+    // Don't skip nominals from clang modules; they have PublicNonUnique
+    // linkage.
+    if (isa<ClangModuleUnit>(NTD->getDeclContext()->getModuleScopeContext()))
       return false;
 
     return getDeclLinkage(NTD) != FormalLinkage::PublicUnique;
@@ -599,6 +602,9 @@ public:
 
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     if (canSkipNominal(NTD))
+      return;
+
+    if (NTD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
       return;
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();

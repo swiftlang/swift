@@ -226,16 +226,17 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     if (superclassLoc.isValid())
       return superclassLoc;
 
-    for (const auto &inherited : classDecl->getInherited()) {
-      if (auto inheritedType = inherited.getType()) {
+    auto inheritedTypes = classDecl->getInherited();
+    for (unsigned i : inheritedTypes.getIndices()) {
+      if (auto inheritedType = inheritedTypes.getEntry(i).getType()) {
         if (inheritedType->getClassOrBoundGenericClass()) {
-          superclassLoc = inherited.getSourceRange().Start;
+          superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
           return superclassLoc;
         }
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
           if (layout.explicitSuperclass) {
-            superclassLoc = inherited.getSourceRange().Start;
+            superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
             return superclassLoc;
           }
         }
@@ -506,7 +507,8 @@ void ConformanceLookupTable::addMacroGeneratedProtocols(
       MacroRole::Extension,
       [&](CustomAttr *attr, MacroDecl *macro) {
         SmallVector<ProtocolDecl *, 2> conformances;
-        macro->getIntroducedConformances(nominal, conformances);
+        macro->getIntroducedConformances(
+            nominal, MacroRole::Extension, conformances);
 
         for (auto *protocol : conformances) {
           addProtocol(protocol, attr->getLocation(), source);

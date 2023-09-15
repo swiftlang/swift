@@ -842,6 +842,26 @@ func testResilientSinglePayloadEnumSimpleTag() {
 
 testResilientSinglePayloadEnumSimpleTag()
 
+func testResilientSinglePayloadEnumIndirectTag() {
+    let x = switch getResilientSinglePayloadEnumIndirectNonEmpty(SimpleClass(x: 23)) {
+    case .nonEmpty: 0
+    case .empty: 1
+    }
+
+    // CHECK: Enum case: 0
+    print("Enum case: \(x)")
+
+    let y = switch getResilientSinglePayloadEnumIndirectEmpty() {
+    case .nonEmpty: 0
+    case .empty: 1
+    }
+
+    // CHECK: Enum case: 1
+    print("Enum case: \(y)")
+}
+
+testResilientSinglePayloadEnumIndirectTag()
+
 func testResilientSinglePayloadEnumComplexTag() {
     let x = switch getResilientSinglePayloadEnumComplexEmpty0() {
     case .nonEmpty: 0

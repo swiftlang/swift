@@ -347,6 +347,7 @@ public:
   ///     void visitBarrierInstruction(SILInstruction *)
   ///     void visitBarrierPhi(SILBasicBlock *)
   ///     void visitBarrierBlock(SILBasicBlock *)
+  ///     void visitInitialBlock(SILBasicBlock *)
   /// }
   template <typename Visitor>
   void findBarriers(Visitor &visitor);
@@ -423,6 +424,7 @@ private:
   ///     void visitBarrierInstruction(SILInstruction *)
   ///     void visitBarrierPhi(SILBasicBlock *)
   ///     void visitBarrierBlock(SILBasicBlock *)
+  ///     void visitInitialBlock(SILBasicBlock *)
   /// }
   template <typename Visitor>
   bool findBarrier(SILInstruction *from, SILBasicBlock *block,
@@ -710,6 +712,10 @@ IterativeBackwardReachability<Effects>::meetOverSuccessors(
 ///     /// Additionally, this may be invoked with the effective def block if
 ///     /// no barriers are found between the gens and it.
 ///     void visitBarrierBlock(SILBasicBlock *)
+///
+///     /// Invoked with either the function entry block or one of the specified
+///     /// initial blocks.
+///     void visitInitialBlock(SILBasicBlock *)
 /// }
 template <typename Effects>
 template <typename Visitor>
@@ -765,6 +771,10 @@ void IterativeBackwardReachability<Effects>::findBarriers(Visitor &visitor) {
 ///     /// Additionally, this may be invoked with the effective def block if
 ///     /// no barriers are found between the gens and it.
 ///     void visitBarrierBlock(SILBasicBlock *)
+///
+///     /// Invoked with either the function entry block or one of the specified
+///     /// initial blocks.
+///     void visitInitialBlock(SILBasicBlock *)
 /// }
 template <typename Effects>
 template <typename Visitor>
@@ -793,7 +803,7 @@ bool IterativeBackwardReachability<Effects>::findBarrier(SILInstruction *from,
   }
   assert(result.getEffectForBlock(block) != Effect::Kill());
   if (stopAtBlock(block)) {
-    visitor.visitBarrierBlock(block);
+    visitor.visitInitialBlock(block);
     return true;
   }
   return false;
@@ -921,6 +931,12 @@ struct ReachableBarriers final {
   /// (1) the target block is reachable-at-begin
   /// (2) at least one adjacent edge's target is not reachable-at-begin.
   llvm::SmallVector<SILBasicBlock *, 4> edges;
+
+  /// Terminal blocks that were reached; blocks such that
+  /// (1) the block is reachable-at-begin
+  /// (2) it is either the function's entry block or one of the blocks passed
+  /// to findBarriersBackward's \p initialBlocks parameter.
+  llvm::SmallVector<SILBasicBlock *, 2> initialBlocks;
 
   ReachableBarriers() {}
   ReachableBarriers(ReachableBarriers const &) = delete;

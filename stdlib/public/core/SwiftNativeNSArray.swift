@@ -367,9 +367,11 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
 
   internal func _destroyBridgedStorage(_ hb: __BridgingBufferStorage?) {
     if let bridgedStorage = hb {
-      let buffer = _BridgingBuffer(bridgedStorage)
-      let count = buffer.count
-      buffer.baseAddress.deinitialize(count: count)
+      withExtendedLifetime(bridgedStorage) {
+        let buffer = _BridgingBuffer(bridgedStorage)
+        let count = buffer.count
+        buffer.baseAddress.deinitialize(count: count)
+      }
     }
   }
 

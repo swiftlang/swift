@@ -593,8 +593,10 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
   // Look for types with the given default name that have appropriate
   // @_implements attributes.
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(adoptee->getAnyNominal(), defaultName,
-                      adoptee->getAnyNominal()->getStartLoc(),
+  dc->lookupQualified(dc->getSelfNominalTypeDecl(), defaultName,
+                      isa<ExtensionDecl>(dc)
+                      ? cast<ExtensionDecl>(dc)->getStartLoc()
+                      : cast<NominalTypeDecl>(dc)->getStartLoc(),
                       subOptions, lookupResults);
 
   InferredAssociatedTypesByWitnesses result;
@@ -819,7 +821,7 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
 
   // Look at all of the inherited protocols to determine whether they
   // require a fixed type for this associated type.
-  for (auto conformedProto : adoptee->getAnyNominal()->getAllProtocols()) {
+  for (auto conformedProto : dc->getSelfNominalTypeDecl()->getAllProtocols()) {
     if (conformedProto != assocType->getProtocol() &&
         !conformedProto->inheritsFrom(assocType->getProtocol()))
       continue;
@@ -888,7 +890,7 @@ AssociatedTypeInference::computeDerivedTypeWitness(
     return std::make_pair(Type(), nullptr);
 
   // Can we derive conformances for this protocol and adoptee?
-  NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
+  NominalTypeDecl *derivingTypeDecl = dc->getSelfNominalTypeDecl();
   if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
     return std::make_pair(Type(), nullptr);
@@ -942,7 +944,7 @@ void AssociatedTypeInference::collectAbstractTypeWitnesses(
   // First, look at all the protocols the adoptee conforms to and feed the
   // same-type constraints in their requirement signatures to the system.
   for (auto *const conformedProto :
-       adoptee->getAnyNominal()->getAllProtocols(/*sorted=*/true)) {
+       dc->getSelfNominalTypeDecl()->getAllProtocols(/*sorted=*/true)) {
     // FIXME: The RequirementMachine will assert on re-entrant construction.
     // We should find a more principled way of breaking this cycle.
     if (ctx.isRecursivelyConstructingRequirementMachine(
@@ -1407,10 +1409,10 @@ AssociatedTypeDecl *AssociatedTypeInference::inferAbstractTypeWitnesses(
       // witness failure and we haven't seen one already, write it down.
       auto *defaultedAssocType = witness.getDefaultedAssocType();
       if (defaultedAssocType && !failedDefaultedAssocType &&
-          !failed.isError()) {
+          failed.getKind() != CheckTypeWitnessResult::Error) {
         failedDefaultedAssocType = defaultedAssocType;
         failedDefaultedWitness = type;
-        failedDefaultedResult = std::move(failed);
+        failedDefaultedResult = failed;
       }
 
       return assocType;
@@ -1936,13 +1938,43 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
        failedDefaultedResult](NormalProtocolConformance *conformance) {
         auto proto = conformance->getProtocol();
         auto &diags = proto->getASTContext().Diags;
-        diags.diagnose(failedDefaultedAssocType,
-                       diag::default_associated_type_req_fail,
-                       failedDefaultedWitness,
-                       failedDefaultedAssocType,
-                       proto->getDeclaredInterfaceType(),
-                       failedDefaultedResult.getRequirement(),
-                       failedDefaultedResult.isConformanceRequirement());
+
+        switch (failedDefaultedResult.getKind()) {
+        case CheckTypeWitnessResult::Success:
+        case CheckTypeWitnessResult::Error:
+          llvm_unreachable("Should not end up here");
+
+        case CheckTypeWitnessResult::Conformance:
+        case CheckTypeWitnessResult::Layout:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_unsatisfied_conformance,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Superclass:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_unsatisfied_superclass,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+
+        case CheckTypeWitnessResult::Tuple:
+          diags.diagnose(
+             failedDefaultedAssocType,
+             diag::default_associated_type_tuple,
+             failedDefaultedWitness,
+             failedDefaultedAssocType,
+             proto->getDeclaredInterfaceType(),
+             failedDefaultedResult.getRequirement());
+          break;
+        }
       });
 
     return true;
@@ -1977,12 +2009,12 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
         diags.diagnose(assocType, diag::bad_associated_type_deduction,
                        assocType, proto);
         for (const auto &failed : failedSet) {
-          if (failed.Result.isError())
+          if (failed.Result.getKind() == CheckTypeWitnessResult::Error)
             continue;
 
           if ((!failed.TypeWitness->getAnyNominal() ||
                failed.TypeWitness->isExistentialType()) &&
-              failed.Result.isConformanceRequirement()) {
+              failed.Result.getKind() != CheckTypeWitnessResult::Superclass) {
             Type resultType;
             SourceRange typeRange;
             if (auto *var = dyn_cast<VarDecl>(failed.Witness)) {
@@ -2018,7 +2050,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             continue;
           }
           if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
-              failed.Result.isSuperclassRequirement()) {
+              failed.Result.getKind() == CheckTypeWitnessResult::Superclass) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_inherit_impossible,
                            assocType, failed.TypeWitness,
@@ -2026,11 +2058,36 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
             continue;
           }
 
-          diags.diagnose(failed.Witness,
-                         diag::associated_type_deduction_witness_failed,
-                         assocType, failed.TypeWitness,
-                         failed.Result.getRequirement(),
-                         failed.Result.isConformanceRequirement());
+          switch (failed.Result.getKind()) {
+          case CheckTypeWitnessResult::Success:
+          case CheckTypeWitnessResult::Error:
+            llvm_unreachable("Should not end up here");
+
+          case CheckTypeWitnessResult::Conformance:
+          case CheckTypeWitnessResult::Layout:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_unsatisfied_conformance,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+
+          case CheckTypeWitnessResult::Superclass:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_unsatisfied_superclass,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+
+          case CheckTypeWitnessResult::Tuple:
+            diags.diagnose(
+               failed.Witness,
+               diag::associated_type_deduction_tuple,
+               assocType, failed.TypeWitness,
+               failed.Result.getRequirement());
+            break;
+          }
         }
       });
 

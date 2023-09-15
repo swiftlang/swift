@@ -518,10 +518,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
-  case SILInstructionKind::OpenExistentialMetatypeInst:
-  case SILInstructionKind::OpenExistentialBoxInst:
-  case SILInstructionKind::OpenExistentialValueInst:
-  case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::ProjectBlockStorageInst:
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
@@ -569,6 +565,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::PackLengthInst:
   case SILInstructionKind::DebugStepInst:
     return RuntimeEffect::NoEffect;
+      
+  case SILInstructionKind::OpenExistentialMetatypeInst:
+  case SILInstructionKind::OpenExistentialBoxInst:
+  case SILInstructionKind::OpenExistentialValueInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+    return RuntimeEffect::Existential;
 
   case SILInstructionKind::DebugValueInst:
     // Ignore runtime calls of debug_value
@@ -636,10 +638,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::InitExistentialValueInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Allocating | RuntimeEffect::Releasing |
-           RuntimeEffect::MetaData;
+           RuntimeEffect::MetaData | RuntimeEffect::Existential;
 
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InitExistentialMetatypeInst:
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
   case SILInstructionKind::ObjCToThickMetatypeInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::MetaData;
@@ -655,18 +659,18 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::OpenExistentialAddrInst:
     if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
         OpenedExistentialAccess::Mutable)
-      return RuntimeEffect::Allocating;
-    return RuntimeEffect::NoEffect;
+      return RuntimeEffect::Allocating | RuntimeEffect::Existential;
+    return RuntimeEffect::Existential;
 
   case SILInstructionKind::OpenExistentialRefInst: {
     SILType opType = cast<OpenExistentialRefInst>(inst)->getOperand()->getType();
     impactType = opType;
     if (opType.getASTType()->isObjCExistentialType()) {
-      return RuntimeEffect::MetaData;
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     }
-    return RuntimeEffect::MetaData;
-    // TODO: should be NoEffect
-    //return RuntimeEffect::NoEffect;
+    return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+    // TODO: should be Existential
+    //return RuntimeEffect::Existential;
   }
 
   case SILInstructionKind::UnconditionalCheckedCastInst:
@@ -712,8 +716,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::Allocating;
   }
-  case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocExistentialBoxInst:
+    impactType = cast<SingleValueInstruction>(inst)->getType();
+    return RuntimeEffect::Allocating | RuntimeEffect::MetaData |
+           RuntimeEffect::Releasing | RuntimeEffect::Existential;
+  case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
     impactType = cast<SingleValueInstruction>(inst)->getType();
@@ -799,11 +806,21 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case ExistentialRepresentation::Opaque:
       return RuntimeEffect::MetaData;
     case ExistentialRepresentation::Class: {
+      if (opType.isAnyObject()) {
+        if (inst->getModule().getASTContext().LangOpts.EnableObjCInterop) {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential |
+                 RuntimeEffect::ObjectiveC;
+        } else {
+          return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+        }
+      }
       auto *cl = opType.getClassOrBoundGenericClass();
-      bool usesObjCModel = cl->getObjectModel() == ReferenceCounting::ObjC;
-      if ((cl && usesObjCModel) || opType.isAnyObject())
-        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
-      return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
+      bool usesObjCModel =
+          cl && cl->getObjectModel() == ReferenceCounting::ObjC;
+      if (usesObjCModel)
+        return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC |
+               RuntimeEffect::Existential;
+      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
     }
     case ExistentialRepresentation::None:
       return RuntimeEffect::NoEffect;
@@ -890,7 +907,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       rt |= RuntimeEffect::ObjectiveC | RuntimeEffect::MetaData;
       break;
     case SILFunctionTypeRepresentation::WitnessMethod:
-      rt |= RuntimeEffect::MetaData;
+      rt |= RuntimeEffect::MetaData | RuntimeEffect::Existential;
       break;
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::CXXMethod:

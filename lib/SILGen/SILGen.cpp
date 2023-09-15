@@ -467,6 +467,37 @@ SILGenModule::getCheckExpectedExecutor() {
                                     "_checkExpectedExecutor");
 }
 
+FuncDecl *
+SILGenModule::getCreateCheckedContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    CreateCheckedContinuation,
+                                    "_createCheckedContinuation");
+}
+FuncDecl *
+SILGenModule::getCreateCheckedThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    CreateCheckedThrowingContinuation,
+                                    "_createCheckedThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeCheckedContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeCheckedContinuation,
+                                    "_resumeCheckedContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeCheckedThrowingContinuation() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    ResumeCheckedThrowingContinuation,
+                                    "_resumeCheckedThrowingContinuation");
+}
+FuncDecl *
+SILGenModule::getResumeCheckedThrowingContinuationWithError() {
+  return lookupConcurrencyIntrinsic(
+      getASTContext(), ResumeCheckedThrowingContinuationWithError,
+      "_resumeCheckedThrowingContinuationWithError");
+}
+
 FuncDecl *SILGenModule::getAsyncMainDrainQueue() {
   return lookupConcurrencyIntrinsic(getASTContext(), AsyncMainDrainQueue,
                                     "_asyncMainDrainQueue");
@@ -715,11 +746,11 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
-  auto &IGM = *this;
+  auto &SGM = *this;
   auto *F = builder.getOrCreateFunction(
       getBestLocation(constant), constant, forDefinition,
-      [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
-        return IGM.getFunction(constant, NotForDefinition);
+      [&SGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
+        return SGM.getFunction(constant, NotForDefinition);
       });
 
   assert(F && "SILFunction should have been defined");

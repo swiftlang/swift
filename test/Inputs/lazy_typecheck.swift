@@ -47,19 +47,63 @@ public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-n
   }
 }
 
+// MARK: - Property wrappers
+
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public var wrappedValue: T {
+    get {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+    set {
+      _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+    }
+  }
+
+  public var projectedValue: PublicWrapper { self }
+
+  public init(wrappedValue value: T) {
+    _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+  }
+}
+
+@propertyWrapper
+struct InternalWrapper<T> {} // expected-error {{property wrapper type 'InternalWrapper' does not contain a non-static property named 'wrappedValue'}}
+
+// MARK: - Global vars
+
+public var publicGlobalVar: Int = 0
+public var publicGlobalVarInferredType = ""
+public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
+
+var internalGlobalVar: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+var internalGlobalVarInferredType = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
+
 // MARK: - Nominal types
+
+public protocol EmptyPublicProto {}
 
 public protocol PublicProto {
   func req() -> Int // expected-note 2 {{protocol requires function 'req()' with type '() -> Int'; add a stub for conformance}}
 }
 
+@rethrows public protocol PublicRethrowsProto {
+  func req() throws -> Int
+}
+
 protocol InternalProto {
-  func goodReq() -> Int // expected-note {{protocol requires function 'goodReq()' with type '() -> Int'; add a stub for conformance}}
+  func goodReq() -> Int // expected-note 2 {{protocol requires function 'goodReq()' with type '() -> Int'; add a stub for conformance}}
   func badReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
 
+protocol InternalProtoConformingToPublicProto: PublicProto {
+  func internalReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+}
+
 public struct PublicStruct {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
+  @PublicWrapper public var publicWrappedProperty = 3.14
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -82,6 +126,12 @@ public struct PublicStruct {
   }
 }
 
+public struct PublicGenericStruct<T> {
+  public func publicMethod() -> T {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'T'}}
+  }
+}
+
 struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
   var x: DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
 
@@ -89,7 +139,8 @@ struct InternalStruct: DoesNotExist { // expected-error {{cannot find type 'Does
 }
 
 public class PublicClass {
-  // FIXME: Test properties
+  public var publicProperty: Int
+  public var publicPropertyInferredType = ""
 
   public init(x: Int) {
     _ = DoesNotExist() // expected-error {{cannot find 'DoesNotExist' in scope}}
@@ -111,6 +162,8 @@ public class PublicClass {
 //  class func internalClassMethod() -> DoesNotExist {}
 }
 
+public class PublicDerivedClass: PublicClass {}
+
 class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
   init(x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
@@ -124,6 +177,13 @@ public struct PublicStructConformingToPublicProto: PublicProto {
   }
 }
 
+public struct PublicStructIndirectlyConformingToPublicProto: InternalProtoConformingToPublicProto {
+  public init() {}
+  public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
 public class PublicClassConformingToPublicProto: PublicProto {
   public init() {}
   public func req() -> Int {
@@ -131,8 +191,18 @@ public class PublicClassConformingToPublicProto: PublicProto {
   }
 }
 
+public class PublicClassInheritingConformanceToPublicProto: PublicClassConformingToPublicProto {}
+
 extension String: PublicProto {
   public func req() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+extension String: InternalProto {} // expected-error {{type 'String' does not conform to protocol 'InternalProto'}}
+
+extension Int: PublicRethrowsProto {
+  public func req() throws -> Int {
     return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
   }
 }
@@ -146,5 +216,10 @@ extension InternalStruct: PublicProto { // expected-error {{type 'InternalStruct
 struct InternalStructConformingToInternalProto: InternalProto { // expected-error {{type 'InternalStructConformingToInternalProto' does not conform to protocol 'InternalProto'}}
 }
 
+struct InternalStructForConstraint {}
+
+extension PublicGenericStruct where T == InternalStructForConstraint {}
+
+extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
+
 // FIXME: Test enums
-// FIXME: Test global vars

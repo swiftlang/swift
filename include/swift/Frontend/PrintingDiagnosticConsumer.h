@@ -50,7 +50,6 @@ class PrintingDiagnosticConsumer : public DiagnosticConsumer {
   /// The queued diagnostics structure.
   void *queuedDiagnostics = nullptr;
   llvm::DenseMap<unsigned, QueuedBuffer> queuedBuffers;
-  unsigned queuedDiagnosticsOutermostBufferID;
 
 public:
   PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs());

@@ -92,14 +92,12 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 /// file.
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  ArrayRef<InheritedEntry> inheritedClause;
+  auto inheritedClause = InheritedTypes(declUnion).getEntries();
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
   if ((ext = declUnion.dyn_cast<const ExtensionDecl *>())) {
     decl = ext;
-
-    inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
@@ -114,7 +112,6 @@ static void checkInheritanceClause(
   } else {
     typeDecl = declUnion.get<const TypeDecl *>();
     decl = typeDecl;
-    inheritedClause = typeDecl->getInherited();
   }
 
   // Can this declaration's inheritance clause contain a class or
@@ -1968,6 +1965,14 @@ public:
                      target->getModuleFilename());
     }
 
+    // Report use of package import when no package name is set.
+    if (ID->getAccessLevel() == AccessLevel::Package &&
+        getASTContext().LangOpts.PackageName.empty()) {
+      auto &diags = ID->getASTContext().Diags;
+      diags.diagnose(ID->getLoc(),
+                     diag::access_control_requires_package_name_import);
+    }
+
     // Report the public import of a private module.
     if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
       auto importer = ID->getModuleContext();
@@ -2295,13 +2300,10 @@ public:
 
     auto &Ctx = getASTContext();
     for (auto i : range(PBD->getNumPatternEntries())) {
-      const auto *entry =
-          PBD->isFullyValidated(i)
-              ? &PBD->getPatternList()[i]
-              : evaluateOrDefault(Ctx.evaluator,
-                                  PatternBindingEntryRequest{
-                                      PBD, i, LeaveClosureBodiesUnchecked},
-                                  nullptr);
+      const auto *entry = PBD->isFullyValidated(i)
+                              ? &PBD->getPatternList()[i]
+                              : PBD->getCheckedPatternBindingEntry(
+                                    i, LeaveClosureBodiesUnchecked);
       assert(entry && "No pattern binding entry?");
 
       const auto *Pat = PBD->getPattern(i);
@@ -2655,27 +2657,37 @@ public:
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
     auto *DC = NTD->getDeclContext();
+
+    // We don't allow nested types inside inlinable contexts.
     auto kind = DC->getFragileFunctionKind();
     if (kind.kind != FragileFunctionKind::None) {
       NTD->diagnose(diag::local_type_in_inlinable_function, NTD->getName(),
                     kind.getSelector());
     }
 
-    // We don't support protocols outside the top level of a file.
-    if (isa<ProtocolDecl>(NTD) &&
-        !NTD->getParent()->isModuleScopeContext()) {
-      NTD->diagnose(diag::unsupported_nested_protocol, NTD);
-      NTD->setInvalid();
-      return;
-    }
+    if (auto *parentDecl = DC->getSelfNominalTypeDecl()) {
+      // We don't allow types to be nested within a tuple extension.
+      if (isa<BuiltinTupleDecl>(parentDecl)) {
+        NTD->diagnose(diag::tuple_extension_nested_type, NTD);
+        return;
+      }
 
-    // We don't support nested types in protocols.
-    if (auto proto = DC->getSelfProtocolDecl()) {
-      if (DC->getExtendedProtocolDecl()) {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
-                      proto);
-      } else {
-        NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
+      // We don't support protocols outside the top level of a file.
+      if (isa<ProtocolDecl>(NTD) &&
+          !DC->isModuleScopeContext()) {
+        NTD->diagnose(diag::unsupported_nested_protocol, NTD);
+        NTD->setInvalid();
+        return;
+      }
+
+      // We don't support nested types in protocols.
+      if (auto proto = dyn_cast<ProtocolDecl>(parentDecl)) {
+        if (DC->getExtendedProtocolDecl()) {
+          NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
+                        proto);
+        } else {
+          NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
+        }
       }
     }
 
@@ -2731,14 +2743,14 @@ public:
       // The raw type must be one of the blessed literal convertible types.
       if (!computeAutomaticEnumValueKind(ED)) {
         if (!rawTy->is<ErrorType>()) {
-          DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+          DE.diagnose(ED->getInherited().getStartLoc(),
                       diag::raw_type_not_literal_convertible, rawTy);
         }
       }
       
       // We need at least one case to have a raw value.
       if (ED->getAllElements().empty()) {
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+        DE.diagnose(ED->getInherited().getStartLoc(),
                     diag::empty_enum_raw_type);
       }
     }
@@ -2968,7 +2980,7 @@ public:
           return;
 
         // go over the all types directly conformed-to by the extension
-        for (auto entry : extension->getInherited()) {
+        for (auto entry : extension->getInherited().getEntries()) {
           diagnoseIncompatibleWithMoveOnlyType(extension->getLoc(), nomDecl,
                                                entry.getType());
         }
@@ -3470,7 +3482,7 @@ public:
     if (EED->hasAssociatedValues()) {
       if (auto rawTy = ED->getRawType()) {
         EED->diagnose(diag::enum_with_raw_type_case_with_argument);
-        DE.diagnose(ED->getInherited().front().getSourceRange().Start,
+        DE.diagnose(ED->getInherited().getStartLoc(),
                     diag::enum_raw_type_here, rawTy);
         EED->setInvalid();
       }
@@ -3486,17 +3498,98 @@ public:
     checkAccessControl(EED);
   }
 
+  /// The extended type must be '(repeat each Element)' or a generic
+  /// typealias with that underlying type.
+  static bool isValidExtendedTypeForTupleExtension(ExtensionDecl *ED) {
+    auto extType = ED->getExtendedType();
+    auto selfType = ED->getSelfInterfaceType();
+
+    // The extended type must be '(repeat each Element)'.
+    if (extType->is<UnboundGenericType>()) {
+      auto *extDecl = extType->getAnyGeneric();
+      if (!extDecl->getDeclaredInterfaceType()->isEqual(selfType))
+        return false;
+    } else if (extType->is<TupleType>()) {
+      if (!extType->isEqual(selfType))
+        return false;
+    } else {
+      assert(false && "Huh?");
+    }
+
+    return true;
+  }
+
+  static void checkTupleExtension(ExtensionDecl *ED) {
+    auto *nominal = ED->getExtendedNominal();
+    if (!nominal || !isa<BuiltinTupleDecl>(nominal))
+      return;
+
+    auto &ctx = ED->getASTContext();
+
+    if (!ctx.LangOpts.hasFeature(Feature::TupleConformances)) {
+      ED->diagnose(diag::experimental_tuple_extension);
+    }
+
+    if (!isValidExtendedTypeForTupleExtension(ED)) {
+      ED->diagnose(diag::tuple_extension_wrong_type,
+                   ED->getSelfInterfaceType());
+    }
+
+    // Make sure we declare conformance to exactly one protocol.
+    auto protocols = ED->getLocalProtocols();
+    if (protocols.size() != 1) {
+      ED->diagnose(diag::tuple_extension_one_conformance);
+      return;
+    }
+
+    auto *protocol = protocols[0];
+
+    // Validate the generic signature.
+    auto genericSig = ED->getGenericSignature();
+
+    // We have a single parameter pack by construction, if we
+    // get this far.
+    auto params = genericSig.getGenericParams();
+    assert(params.size() == 1);
+    assert(params[0]->isParameterPack());
+
+    // Make sure we have a single conditional requirement,
+    // 'repeat each Element: P', where 'Element' is our pack
+    // and 'P' is the protocol above, and nothing else.
+    bool foundRequirement = false;
+    auto reqs = genericSig.getRequirements();
+    for (auto req : reqs) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getFirstType()->isEqual(params[0]) &&
+          req.getProtocolDecl() == protocol) {
+        assert(!foundRequirement);
+        foundRequirement = true;
+      } else {
+        if (req.getKind() == RequirementKind::Layout) {
+          ED->diagnose(diag::tuple_extension_extra_requirement,
+                       req.getFirstType(),
+                       unsigned(RequirementKind::Conformance),
+                       ctx.getAnyObjectType());
+        } else {
+          ED->diagnose(diag::tuple_extension_extra_requirement,
+                       req.getFirstType(),
+                       unsigned(req.getKind()),
+                       req.getSecondType());
+        }
+      }
+    }
+
+    if (!foundRequirement) {
+      ED->diagnose(diag::tuple_extension_missing_requirement,
+                   params[0], protocol->getDeclaredInterfaceType());
+    }
+  }
+
   void visitExtensionDecl(ExtensionDecl *ED) {
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
     auto *nominal = ED->getExtendedNominal();
-
-    // Diagnose experimental tuple extensions.
-    if (nominal && isa<BuiltinTupleDecl>(nominal) &&
-        !getASTContext().LangOpts.hasFeature(Feature::TupleConformances)) {
-      ED->diagnose(diag::experimental_tuple_extension);
-    }
 
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
@@ -3625,6 +3718,8 @@ public:
       TypeChecker::checkDistributedActor(SF, nominal);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(ED);
+
+    checkTupleExtension(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

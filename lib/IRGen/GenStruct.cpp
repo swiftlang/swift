@@ -990,6 +990,35 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
+      auto decl = T.getASTType()->getStructOrBoundGenericStruct();
+      auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
+
+      // If we have a raw layout struct who is fixed size, it means the
+      // layout of the struct is fully concrete.
+      if (rawLayout) {
+        // Defer to this fixed type info for type layout if the raw layout
+        // specifies size and alignment.
+        if (rawLayout->getSizeAndAlignment()) {
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        }
+
+        auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
+        SILType loweredLikeType = IGM.getLoweredType(likeType);
+
+        // The given struct type T that we're building is fully concrete, but
+        // our like type is still in terms of the potential archetype of the
+        // type.
+        auto subs = T.getASTType()->getContextSubstitutionMap(
+          IGM.getSwiftModule(), decl);
+
+        loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
+
+        // Array like raw layouts are still handled correctly even though the
+        // type layout entry is only that of the like type.
+        return IGM.getTypeInfo(loweredLikeType)
+            .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
+      }
+
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
@@ -1082,13 +1111,6 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
-      std::vector<TypeLayoutEntry *> fields;
-      for (auto &field : getFields()) {
-        auto fieldTy = field.getType(IGM, T);
-        fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
-      }
-
       auto decl = T.getASTType()->getStructOrBoundGenericStruct();
       auto rawLayout = decl->getAttrs().getAttribute<RawLayoutAttr>();
 
@@ -1096,13 +1118,12 @@ namespace {
       // layout of the struct is dependent on the archetype of the thing it's
       // like.
       if (rawLayout) {
-        SILType loweredLikeType;
+        // Note: We don't have to handle the size and alignment case here for
+        // raw layout because those are always fixed, so only dependent layouts
+        // will be non-fixed.
 
-        if (auto likeType = rawLayout->getResolvedScalarLikeType(decl)) {
-          loweredLikeType = IGM.getLoweredType(*likeType);
-        } else if (auto likeArray = rawLayout->getResolvedArrayLikeTypeAndCount(decl)) {
-          loweredLikeType = IGM.getLoweredType(likeArray->first);
-        }
+        auto likeType = rawLayout->getResolvedLikeType(decl)->getCanonicalType();
+        SILType loweredLikeType = IGM.getLoweredType(likeType);
 
         // The given struct type T that we're building may be in a generic
         // environment that is different than that which was built our
@@ -1113,10 +1134,18 @@ namespace {
 
         loweredLikeType = loweredLikeType.subst(IGM.getSILModule(), subs);
 
-        return IGM.getTypeInfo(loweredLikeType).buildTypeLayoutEntry(IGM,
-          loweredLikeType, useStructLayouts);
+        // Array like raw layouts are still handled correctly even though the
+        // type layout entry is only that of the like type.
+        return IGM.getTypeInfo(loweredLikeType)
+            .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
       }
 
+      std::vector<TypeLayoutEntry *> fields;
+      for (auto &field : getFields()) {
+        auto fieldTy = field.getType(IGM, T);
+        fields.push_back(
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
+      }
       assert(!fields.empty() &&
              "Empty structs should not be NonFixedStructTypeInfo");
 
@@ -1597,7 +1626,8 @@ const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.hasLazyMetadata(st)) {
+  if (!IRGen.hasLazyMetadata(st) &&
+      !st->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitStructMetadata(*this, st);
     emitFieldDescriptor(st);
   }

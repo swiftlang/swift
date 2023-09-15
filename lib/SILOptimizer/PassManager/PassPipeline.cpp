@@ -234,6 +234,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
 
+  // For embedded Swift: Specialize generic class vtables.
+  P.addVTableSpecializer();
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
@@ -1003,6 +1006,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // This needs to run pre-serialization because it needs to identify native
   // inlinable functions from imported ones.
   P.addOnonePrespecializations();
+
+  // For embedded Swift: CMO is used to serialize libraries.
+  P.addCrossModuleOptimization();
 
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");

@@ -156,6 +156,8 @@ isVisibleToObjC(const ValueDecl *VD, AccessLevel minRequiredAccess,
 StringRef
 swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
                                       CustomNamesOnly_t customNamesOnly) {
+  ASTContext& ctx = VD->getASTContext();
+
   if (const auto *Expose = VD->getAttrs().getAttribute<ExposeAttr>()) {
     if (!Expose->Name.empty())
       return Expose->Name;
@@ -166,6 +168,11 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
 
   if (isa<ConstructorDecl>(VD))
     return "init";
+
+  if (VD->isOperator()) {
+    std::string name = ("operator" + VD->getBaseIdentifier().str()).str();
+    return ctx.getIdentifier(name).str();
+  }
 
   if (auto *mod = dyn_cast<ModuleDecl>(VD)) {
     if (mod->isStdlibModule())
@@ -188,7 +195,7 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
         os << char(std::toupper(paramNameStr[0]));
         os << paramNameStr.drop_front(1);
       }
-      auto r = VD->getASTContext().getIdentifier(os.str());
+      auto r = ctx.getIdentifier(os.str());
       return r.str();
     }
 

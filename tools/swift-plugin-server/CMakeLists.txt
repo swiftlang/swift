@@ -16,6 +16,8 @@ if (SWIFT_SWIFT_PARSER)
     DEPENDENCIES
       swiftDemangling
       $<TARGET_OBJECTS:_swiftCSwiftPluginServer>
+    SWIFT_COMPONENT
+      compiler
     SWIFT_DEPENDENCIES
       SwiftSyntax::SwiftSyntaxMacros
       SwiftSyntax::SwiftSyntaxMacroExpansion
@@ -24,10 +26,5 @@ if (SWIFT_SWIFT_PARSER)
   )
   target_include_directories(swift-plugin-server PRIVATE
     Sources/CSwiftPluginServer/include
-  )
-  swift_install_in_component(TARGETS swift-plugin-server
-    RUNTIME
-      DESTINATION bin
-      COMPONENT compiler
   )
 endif()

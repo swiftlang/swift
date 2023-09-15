@@ -1,7 +1,7 @@
 /// Report the most restricted types when many types are problematic.
 
 // RUN: %empty-directory(%t)
-// RUN: split-file %s %t
+// RUN: split-file --leading-lines %s %t
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t
@@ -12,9 +12,11 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/LocalVsImportClient.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 
 //--- PublicLib.swift
 public struct PublicImportType {}
@@ -35,11 +37,11 @@ public struct PrivateImportType {}
 public import PublicLib
 package import PackageLib // expected-note {{struct 'PackageImportType' imported as 'package' from 'PackageLib' here}}
 internal import InternalLib // expected-note {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
-fileprivate import FileprivateLib // expected-note 2 {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
-private import PrivateLib // expected-note 2 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
+fileprivate import FileprivateLib // expected-note 3 {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
+private import PrivateLib // expected-note 1 {{struct 'PrivateImportType' imported as 'private' from 'PrivateLib' here}}
 
 /// Simple ordering
-public func publicFuncUsesPrivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType, e: PrivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a private type}}
+public func publicFuncUsesPrivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType, e: PrivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
     var _: PrivateImportType
 }
 public func publicFuncUsesFileprivate(_ a: PublicImportType, b: PackageImportType, c: InternalImportType, d: FileprivateImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}

@@ -81,6 +81,7 @@ public:
   void setNonOverridden(bool value) { IsNonOverridden = value; }
 
   SILFunction *getImplementation() const { return ImplAndKind.getPointer(); }
+  void setImplementation(SILFunction *f);
   
   void print(llvm::raw_ostream &os) const;
   
@@ -114,6 +115,8 @@ private:
   /// The ClassDecl mapped to this VTable.
   ClassDecl *Class;
 
+  SILType classType;
+
   /// Whether or not this vtable is serialized, which allows
   /// devirtualization from another module.
   bool Serialized : 1;
@@ -122,10 +125,18 @@ private:
   unsigned NumEntries : 31;
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
-  SILVTable(ClassDecl *c, IsSerialized_t serialized, ArrayRef<Entry> entries);
+  SILVTable(ClassDecl *c, SILType classType, IsSerialized_t serialized,
+            ArrayRef<Entry> entries);
 
-public:
+ public:
   ~SILVTable();
+
+  /// Create a new SILVTable with the given method-to-implementation mapping.
+  /// The SILDeclRef keys should reference the most-overridden members available
+  /// through the class.
+  static SILVTable *create(SILModule &M, ClassDecl *Class, SILType classType,
+                           IsSerialized_t Serialized,
+                           ArrayRef<Entry> Entries);
 
   /// Create a new SILVTable with the given method-to-implementation mapping.
   /// The SILDeclRef keys should reference the most-overridden members available
@@ -136,6 +147,11 @@ public:
 
   /// Return the class that the vtable represents.
   ClassDecl *getClass() const { return Class; }
+
+  bool isSpecialized() const {
+    return !classType.isNull();
+  }
+  SILType getClassType() const { return classType; }
 
   /// Returns true if this vtable is going to be (or was) serialized.
   IsSerialized_t isSerialized() const {

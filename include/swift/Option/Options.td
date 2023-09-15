@@ -77,6 +77,15 @@ def SwiftAPIDigesterOption : OptionFlag;
 // The option only functions in the new driver.
 def NewDriverOnlyOption : OptionFlag;
 
+// The option's argument is a path to a file that contains a list of files.
+def ArgumentIsFileList : OptionFlag;
+
+// The option that is cache invariant. Change this option doesn't affect the
+// content of any output file. The candidates are options like: `-o` which only
+// affects the location of the output file, or `-emit-module` which defines
+// which action is performed.
+def CacheInvariant : OptionFlag;
+
 /////////
 // Options
 
@@ -255,7 +264,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
-         SwiftAPIExtractOption, SwiftAPIDigesterOption]>,
+         SwiftAPIExtractOption, SwiftAPIDigesterOption, CacheInvariant]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
@@ -360,26 +369,26 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit a JSON file containing information about what modules were loaded">;
 def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit the loaded module trace JSON to <path>">,
   MetaVarName<"<path>">;
 def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   Alias<emit_loaded_module_trace_path>;
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
   HelpText<"Emit a remark if a cross-import of a module is triggered.">;
 
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
@@ -403,15 +412,15 @@ def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>;
 def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit the TBD file to <path>">,
   MetaVarName<"<path>">;
 def emit_tbd_path_EQ : Joined<["-"], "emit-tbd-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   Alias<emit_tbd_path>;
 def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
   Flags<[FrontendOption]>,
@@ -422,12 +431,12 @@ def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
-         ArgumentIsPath, SupplementaryOutput]>,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit a serialized diagnostics file to <path>">,
   MetaVarName<"<path>">;
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
-         ArgumentIsPath, SupplementaryOutput]>,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   Alias<serialize_diagnostics_path>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -540,42 +549,42 @@ def export_as : Separate<["-"], "export-as">,
   HelpText<"Module name to use when referenced in clients module interfaces">;
 
 def emit_module : Flag<["-"], "emit-module">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   Alias<emit_module_path>;
 
 def emit_module_summary :
   Flag<["-"], "emit-module-summary">,
-  Flags<[NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Output module summary file">;
 def emit_module_summary_path :
   Separate<["-"], "emit-module-summary-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module summary file to <path>">;
 
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
-  Flags<[NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Output module interface file">;
 def emit_module_interface_path :
   Separate<["-"], "emit-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
 def emit_private_module_interface_path :
   Separate<["-"], "emit-private-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
-         ArgumentIsPath, SupplementaryOutput]>,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
 def verify_emitted_module_interface :
@@ -601,27 +610,27 @@ def emit_module_source_info_path :
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
-  Flags<[NoInteractiveOption, HelpHidden, SupplementaryOutput]>;
+  Flags<[NoInteractiveOption, HelpHidden, SupplementaryOutput, CacheInvariant]>;
 def emit_parseable_module_interface_path :
   Separate<["-"], "emit-parseable-module-interface-path">,
   Alias<emit_module_interface_path>,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden, ArgumentIsPath,
-         SupplementaryOutput]>;
+         SupplementaryOutput, CacheInvariant]>;
 
 def emit_const_values :
   Flag<["-"], "emit-const-values">,
   Flags<[NoInteractiveOption, SupplementaryOutput]>;
 def emit_const_values_path : Separate<["-"], "emit-const-values-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Emit the extracted compile-time known values to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmodular-includes">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
@@ -629,7 +638,7 @@ def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmo
 
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput]>,
+         SupplementaryOutput, CacheInvariant]>,
   HelpText<"Emit an Objective-C and C++ header file to <path>">,
   Alias<emit_objc_header_path>;
 
@@ -896,7 +905,7 @@ def use_ld : Joined<["-"], "use-ld=">,
   Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Specifies the flavor of the linker to be used">;
 
-def ld_path : Joined<["--"], "ld-path=">,
+def ld_path : Joined<["-"], "ld-path=">,
   Flags<[HelpHidden, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the path to the linker to be used">;
 
@@ -1109,45 +1118,39 @@ def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 class ModeOpt : Group<modes_Group>;
 
 // Output Modes
+let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, CacheInvariant] in {
+
+def emit_object : Flag<["-"], "emit-object">,
+  HelpText<"Emit object file(s) (-c)">, ModeOpt;
+def emit_assembly : Flag<["-"], "emit-assembly">,
+  HelpText<"Emit assembly file(s) (-S)">, ModeOpt;
+def emit_bc : Flag<["-"], "emit-bc">,
+  HelpText<"Emit LLVM BC file(s)">, ModeOpt;
+def emit_irgen : Flag<["-"], "emit-irgen">,
+  HelpText<"Emit LLVM IR file(s) before LLVM optimizations">, ModeOpt;
+def emit_ir : Flag<["-"], "emit-ir">,
+  HelpText<"Emit LLVM IR file(s) after LLVM optimizations">, ModeOpt;
+def emit_sil : Flag<["-"], "emit-sil">,
+  HelpText<"Emit canonical SIL file(s)">, ModeOpt;
+def emit_silgen : Flag<["-"], "emit-silgen">,
+  HelpText<"Emit raw SIL file(s)">, ModeOpt;
+def emit_sib : Flag<["-"], "emit-sib">,
+  HelpText<"Emit serialized AST + canonical SIL file(s)">, ModeOpt;
+def emit_sibgen : Flag<["-"], "emit-sibgen">,
+  HelpText<"Emit serialized AST + raw SIL file(s)">, ModeOpt;
+def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
+  HelpText<"Emit a list of the imported modules">, ModeOpt;
+def emit_pcm : Flag<["-"], "emit-pcm">,
+  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt;
+
+} // end let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, CacheInvariant]
+
 def emit_executable : Flag<["-"], "emit-executable">,
   HelpText<"Emit a linked executable">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_library : Flag<["-"], "emit-library">,
   HelpText<"Emit a linked library">, ModeOpt,
   Flags<[NoInteractiveOption]>;
-def emit_object : Flag<["-"], "emit-object">,
-  HelpText<"Emit object file(s) (-c)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_assembly : Flag<["-"], "emit-assembly">,
-  HelpText<"Emit assembly file(s) (-S)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_bc : Flag<["-"], "emit-bc">,
-  HelpText<"Emit LLVM BC file(s)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_irgen : Flag<["-"], "emit-irgen">,
-  HelpText<"Emit LLVM IR file(s) before LLVM optimizations">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_ir : Flag<["-"], "emit-ir">,
-  HelpText<"Emit LLVM IR file(s) after LLVM optimizations">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_sil : Flag<["-"], "emit-sil">,
-  HelpText<"Emit canonical SIL file(s)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_silgen : Flag<["-"], "emit-silgen">,
-  HelpText<"Emit raw SIL file(s)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_sib : Flag<["-"], "emit-sib">,
-  HelpText<"Emit serialized AST + canonical SIL file(s)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_sibgen : Flag<["-"], "emit-sibgen">,
-  HelpText<"Emit serialized AST + raw SIL file(s)">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
-  HelpText<"Emit a list of the imported modules">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def emit_pcm : Flag<["-"], "emit-pcm">,
-  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -1240,7 +1243,7 @@ def force_single_frontend_invocation :
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>;
 
 def num_threads : Separate<["-"], "num-threads">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
   HelpText<"Enable multi-threading and specify number of threads">,
   MetaVarName<"<n>">;
 
@@ -1386,7 +1389,7 @@ def index_store_path : Separate<["-"], "index-store-path">,
   HelpText<"Store indexing data to <path>">;
 
 def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
-  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>, MetaVarName<"<path>">,
   HelpText<"Use <path> as the output path in the produced index data.">;
 
 def index_ignore_clang_modules : Flag<["-"], "index-ignore-clang-modules">,
@@ -1827,15 +1830,15 @@ def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   HelpText<"Enable compiler caching">;
 
 def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
-  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Show remarks for compiler caching">;
 
 def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
-  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Skip loading the compilation result from cache">;
 
 def cas_path: Separate<["-"], "cas-path">,
-  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Path to CAS">, MetaVarName<"<path>">;
 
 def cas_plugin_path: Separate<["-"], "cas-plugin-path">,

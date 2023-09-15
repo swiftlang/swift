@@ -116,13 +116,7 @@ class SwiftSyntax(product.Product):
         llvm_build_dir = os.path.realpath(llvm_build_dir)
 
         self.run_swiftsyntax_build_script(target=host_target,
-                                          command='test',
-                                          additional_params=[
-                                              '--filecheck-exec',
-                                              os.path.join(llvm_build_dir,
-                                                           'bin',
-                                                           'FileCheck')
-                                          ])
+                                          command='test')
 
     def should_install(self, host_target):
         return self.args.install_swiftsyntax

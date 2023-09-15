@@ -2469,6 +2469,19 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
       /*IsDefinition=*/true, /*IsOptimized=*/Opts.shouldOptimize());
 
+  // When the function is a method, we want a DW_AT_declaration there.
+  // Because there's no good way to cross the CU boundary to insert a nested
+  // DISubprogram definition in one CU into a type defined in another CU when
+  // doing LTO builds.
+  if (Rep == SILFunctionTypeRepresentation::Method) {
+    llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
+        /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
+        /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
+    Decl = DBuilder.createMethod(Scope, Name, LinkageName, File, Line, DIFnTy,
+                                 0, 0, nullptr, Flags, SPFlags,
+                                 TemplateParameters, Error);
+  }
+
   // Construct the DISubprogram.
   llvm::DISubprogram *SP = DBuilder.createFunction(
       Scope, Name, LinkageName, File, Line, DIFnTy, ScopeLine, Flags, SPFlags,

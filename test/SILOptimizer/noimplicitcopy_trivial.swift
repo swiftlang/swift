@@ -1093,8 +1093,6 @@ public func test3(i: consuming Int) -> Int {
   takeClosure { i }
 }
 
-// TODO: incorrect diagnostic:
-//       error: 'i' cannot be captured by an escaping closure since it is a borrowed parameter
-// public func test4(i: borrowing Int) -> Int {
-//  takeClosure { i }
-// }
+public func test4(i: borrowing Int) -> Int {  // expected-error {{'i' cannot be captured by an escaping closure}}
+  takeClosure { i } // expected-note {{closure capturing 'i' here}}
+}

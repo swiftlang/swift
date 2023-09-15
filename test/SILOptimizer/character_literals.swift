@@ -1,12 +1,10 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-ir  %s | %FileCheck %s
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,CPU=arm64
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
+// REQUIRES: PTRSIZE=64
 
 // This is an end-to-end test to ensure that the optimizer generates
 // a simple literal for character literals.
-
-// Please note: this test targets "core2" to ensure consistent output
-// on all x86 host processors.
 
 // We generate this as an LLVM constant global directly, no runtime heap
 // allocation. Match that.

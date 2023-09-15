@@ -103,11 +103,14 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-SourceLoc InheritedTypeRequest::getNearestLoc() const {
+const TypeLoc &InheritedTypeRequest::getTypeLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
-  return typeLoc.getLoc();
+  auto inheritedTypes = InheritedTypes(std::get<0>(storage));
+  return inheritedTypes.getEntry(std::get<1>(storage));
+}
+
+SourceLoc InheritedTypeRequest::getNearestLoc() const {
+  return getTypeLoc().getLoc();
 }
 
 bool InheritedTypeRequest::isCached() const {
@@ -115,9 +118,7 @@ bool InheritedTypeRequest::isCached() const {
 }
 
 llvm::Optional<Type> InheritedTypeRequest::getCachedResult() const {
-  const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
+  auto &typeLoc = getTypeLoc();
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -125,10 +126,7 @@ llvm::Optional<Type> InheritedTypeRequest::getCachedResult() const {
 }
 
 void InheritedTypeRequest::cacheResult(Type value) const {
-  const auto &storage = getStorage();
-  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
-                                             std::get<1>(storage));
-  const_cast<TypeLoc &>(typeLoc).setType(value);
+  const_cast<TypeLoc &>(getTypeLoc()).setType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -1607,7 +1605,7 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
-  case Independent:
+  case Nonisolated:
   case Unspecified:
     return false;
 
@@ -1621,7 +1619,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case Independent:
+  case Nonisolated:
   case Unspecified:
     return *this;
 
@@ -1645,8 +1643,8 @@ void swift::simple_display(
       out << "actor " << state.getActor()->getName();
       break;
 
-    case ActorIsolation::Independent:
-      out << "actor-independent";
+    case ActorIsolation::Nonisolated:
+      out << "nonisolated";
       break;
 
     case ActorIsolation::Unspecified:

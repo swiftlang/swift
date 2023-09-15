@@ -530,7 +530,8 @@ void updateProcessWideFrontendCounters(
   // On Darwin we have a lifetime max that's maintained by malloc we can
   // just directly query, even if we only make one query on shutdown.
   malloc_statistics_t Stats;
-  malloc_zone_statistics(malloc_default_zone(), &Stats);
+  // Query all zones.
+  malloc_zone_statistics(/*zone=*/NULL, &Stats);
   C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
 #else
   // If we don't have a malloc-tracked max-usage counter, we have to rely

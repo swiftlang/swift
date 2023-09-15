@@ -155,6 +155,7 @@ namespace swift {
     bool DisableCrossModuleIncrementalInfo = false;
     bool StaticLibrary = false;
     bool HermeticSealAtLink = false;
+    bool EmbeddedSwiftModule = false;
     bool IsOSSA = false;
     bool SerializeExternalDeclsOnly = false;
   };

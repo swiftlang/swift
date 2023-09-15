@@ -363,7 +363,7 @@ SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
 SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
               ConcreteDeclRef(UnresolvedMacroReference, const Decl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ResolveExtensionMacroConformances,
+SWIFT_REQUEST(TypeChecker, ResolveMacroConformances,
               ArrayRef<Type>(const MacroRoleAttr *, const Decl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,

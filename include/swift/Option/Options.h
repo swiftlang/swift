@@ -43,6 +43,8 @@ namespace options {
     NewDriverOnlyOption = (1 << 18),
     ModuleInterfaceOptionIgnorable = (1 << 19),
     ModuleInterfaceOptionIgnorablePrivate = (1 << 20),
+    ArgumentIsFileList = (1 << 21),
+    CacheInvariant = (1 << 22),
   };
 
   enum ID {

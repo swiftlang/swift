@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -checked-async-objc-bridging=off -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -275,4 +275,29 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:  }
 func checkCostcoMembership() async -> Bool {
   return await CostcoManager.shared().isCustomerEnrolled(inExecutiveProgram: Person.asCustomer())
+}
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@MainActor
+@objc protocol OptionalMemberLookups {
+  @objc optional func generateMaybe() async
+}
+
+extension OptionalMemberLookups {
+  // CHECK-LABEL: sil hidden [ossa] @$s10objc_async21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
+  // CHECK:         [[SELF:%[0-9]+]] = copy_value {{.*}} : $Self
+  // CHECK:         [[METH:%[0-9]+]] = objc_method {{.*}} : $Self, #OptionalMemberLookups.generateMaybe!foreign : <Self where Self : OptionalMemberLookups> (Self) -> () async -> (), $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         [[CONT:%.*]] = struct $UnsafeContinuation<(), Never> (%10 : $Builtin.RawUnsafeContinuation)
+  // CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<(), Never>
+  // CHECK:         [[PROJECTED:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage UnsafeContinuation<(), Never>
+  // CHECK:         store [[CONT]] to [trivial] [[PROJECTED]] : $*UnsafeContinuation<(), Never>
+  // CHECK:         = function_ref @$sIeyB_yt10objc_async21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
+  // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage UnsafeContinuation<(), Never>
+  // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
+  // CHECK:         await_async_continuation {{.*}} : $Builtin.RawUnsafeContinuation, resume bb1
+  // CHECK:         hop_to_executor {{.*}} : $MainActor
+  // CHECK:        } // end sil function '$s10objc_async21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF'
+  func testForceDirectCall() async -> Void {
+    await self.generateMaybe!()
+  }
 }

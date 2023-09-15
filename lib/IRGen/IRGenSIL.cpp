@@ -2361,6 +2361,10 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
   if (f->isExternalDeclaration())
     return;
 
+  if (Context.LangOpts.hasFeature(Feature::Embedded) &&
+      f->getLoweredFunctionType()->isPolymorphic())
+    return;
+
   // Do not emit bodies of public_external functions.
   if (hasPublicVisibility(f->getLinkage()) && f->isAvailableExternally())
     return;

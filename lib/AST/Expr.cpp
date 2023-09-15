@@ -1222,12 +1222,17 @@ StringRef ObjectLiteralExpr::getLiteralKindRawName() const {
   llvm_unreachable("unspecified literal");
 }
 
-StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
-  switch (getLiteralKind()) {
+StringRef ObjectLiteralExpr::
+getLiteralKindPlainName(ObjectLiteralExpr::LiteralKind kind) {
+  switch (kind) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case Name: return Desc;
 #include "swift/AST/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
+}
+
+StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
+  return ObjectLiteralExpr::getLiteralKindPlainName(getLiteralKind());
 }
 
 ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
@@ -1875,8 +1880,8 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
 
 ActorIsolation ClosureActorIsolation::getActorIsolation() const {
   switch (getKind()) {
-  case ClosureActorIsolation::Independent:
-    return ActorIsolation::forIndependent().withPreconcurrency(
+  case ClosureActorIsolation::Nonisolated:
+    return ActorIsolation::forNonisolated().withPreconcurrency(
         preconcurrency());
 
   case ClosureActorIsolation::GlobalActor: {

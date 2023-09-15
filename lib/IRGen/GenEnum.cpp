@@ -425,6 +425,8 @@ namespace {
         getLoadableSingleton()->reexplode(params, out);
     }
 
+    bool emitPayloadDirectlyIntoConstant() const override { return true; }
+
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
                                        SILType T,
                                        Address enumAddr) const override {
@@ -7158,7 +7160,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  if (!IRGen.hasLazyMetadata(theEnum)) {
+  if (!IRGen.hasLazyMetadata(theEnum) &&
+      !theEnum->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitEnumMetadata(*this, theEnum);
     emitFieldDescriptor(theEnum);
   }

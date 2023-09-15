@@ -128,20 +128,6 @@ namespace swift {
       ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
       Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
 
-  /// Resolve type of operator function with \c opName appending it to \c LHS.
-  ///
-  /// For \p refKind, use \c DeclRefKind::PostfixOperator for postfix operator,
-  /// or \c DeclRefKind::BinaryOperator for infix operator.
-  /// On success, returns resolved function type of the operator. The LHS should
-  /// already be type-checked. This function guarantees LHS not to be modified.
-  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                            Identifier opName,
-                                            DeclRefKind refKind,
-                                            ConcreteDeclRef &referencedDecl);
-
-  /// Typecheck the given expression.
-  bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
-
   /// Type check a function body element which is at \p TagetLoc.
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
                              SourceLoc TargetLoc);

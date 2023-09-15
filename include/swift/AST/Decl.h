@@ -35,6 +35,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -662,7 +663,7 @@ protected:
     HasAnyUnavailableDuringLoweringValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -705,6 +706,9 @@ protected:
 
     /// Whether this module was built with -experimental-hermetic-seal-at-link.
     HasHermeticSealAtLink : 1,
+
+    /// Whether this module was built with embedded Swift.
+    IsEmbeddedSwiftModule : 1,
 
     /// Whether this module has been compiled with comprehensive checking for
     /// concurrency, e.g., Sendable checking.
@@ -1547,6 +1551,53 @@ struct InheritedEntry : public TypeLoc {
     : TypeLoc(typeLoc), isUnchecked(isUnchecked) { }
 };
 
+/// A wrapper for the collection of inherited types for either a `TypeDecl` or
+/// an `ExtensionDecl`.
+class InheritedTypes {
+  llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> Decl;
+  ArrayRef<InheritedEntry> Entries;
+
+public:
+  InheritedTypes(
+      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
+  InheritedTypes(const class Decl *decl);
+  InheritedTypes(const TypeDecl *typeDecl);
+  InheritedTypes(const ExtensionDecl *extensionDecl);
+
+  bool empty() const { return Entries.empty(); }
+  size_t size() const { return Entries.size(); }
+  IntRange<size_t> const getIndices() { return indices(Entries); }
+
+  /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
+  /// given index.
+  TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
+
+  /// Returns the `Type` for the entry of the inheritance clause at the given
+  /// index, resolved at the given stage, or `Type()` if resolution fails.
+  Type getResolvedType(unsigned i, TypeResolutionStage stage =
+                                       TypeResolutionStage::Interface) const;
+
+  /// Returns the underlying array of inherited type entries.
+  ///
+  /// NOTE: The `Type` associated with an entry may not be resolved yet.
+  ArrayRef<InheritedEntry> getEntries() const { return Entries; }
+
+  /// Returns the entry of the inheritance clause at the given index.
+  ///
+  /// NOTE: The `Type` associated with the entry may not be resolved yet.
+  const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
+
+  /// Returns the source location of the beginning of the inheritance clause.
+  SourceLoc getStartLoc() const {
+    return getEntries().front().getSourceRange().Start;
+  }
+
+  /// Returns the source location of the end of the inheritance clause.
+  SourceLoc getEndLoc() const {
+    return getEntries().back().getSourceRange().End;
+  }
+};
+
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
@@ -1582,6 +1633,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class MemberLookupTable;
   friend class ConformanceLookupTable;
   friend class IterableDeclContext;
+  friend class InheritedTypes;
 
   ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
                 ArrayRef<InheritedEntry> inherited,
@@ -1662,7 +1714,7 @@ public:
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
+  InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
@@ -2063,6 +2115,11 @@ public:
   ArrayRef<PatternBindingEntry> getPatternList() const {
     return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
   }
+
+  /// Returns the typechecked binding entry at the given index.
+  const PatternBindingEntry *
+  getCheckedPatternBindingEntry(unsigned i,
+                                bool leaveClosureBodiesUnchecked = false) const;
 
   /// Clean up walking the initializers for the pattern
   class InitIterator {
@@ -2731,6 +2788,16 @@ public:
                         bool forConformance = false,
                         bool allowUsableFromInline = false) const;
 
+  using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
+
+  /// Returns the import that may restrict the access to this decl
+  /// from \p useDC.
+  ///
+  /// If this decl and \p useDC are from the same module it returns
+  /// \c llvm::None. If there are many imports, it returns the most
+  /// permissive one.
+  ImportAccessLevel getImportAccessFrom(const DeclContext *useDC) const;
+
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes
   /// \c \@testable into account.
@@ -2994,6 +3061,8 @@ protected:
            ArrayRef<InheritedEntry> inherited) :
     ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
+  friend class InheritedTypes;
+
 public:
   Identifier getName() const { return getBaseIdentifier(); }
 
@@ -3009,7 +3078,7 @@ public:
 
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
-  ArrayRef<InheritedEntry> getInherited() const { return Inherited; }
+  InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
@@ -5178,13 +5247,11 @@ public:
 /// and conformances for tuple types.
 ///
 /// - The declared interface type is the special TheTupleType singleton.
-/// - The generic parameter list has one pack generic parameter, <Elements...>
-/// - The generic signature has no requirements, <Elements...>
+/// - The generic parameter list has one pack generic parameter, <each Element>
+/// - The generic signature has no requirements, <each Element>
 /// - The self interface type is the tuple type containing a single pack
-///   expansion, (Elements...).
+///   expansion, (repeat each Element).
 class BuiltinTupleDecl final : public NominalTypeDecl {
-  TupleType *TupleSelfType = nullptr;
-
 public:
   BuiltinTupleDecl(Identifier Name, DeclContext *Parent);
 
@@ -5192,7 +5259,7 @@ public:
     return SourceRange();
   }
 
-  TupleType *getTupleSelfType() const;
+  TupleType *getTupleSelfType(const ExtensionDecl *owner) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -8650,6 +8717,7 @@ public:
   /// be added if this macro does not contain an extension role.
   void getIntroducedConformances(
       NominalTypeDecl *attachedTo,
+      MacroRole role,
       SmallVectorImpl<ProtocolDecl *> &conformances) const;
 
   /// Returns a DeclName that represents arbitrary names.
