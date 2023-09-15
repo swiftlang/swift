@@ -9,9 +9,9 @@
 // CHECK: func mutateIt(_: Empty)
 
 // CHECK: class IntPair {
-// CHECK:   var a: Int32
-// CHECK:   var b: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   class func create() -> IntPair!
+// CHECK:   var a: Int32
+// CHECK:   var b: Int32
 // CHECK: }
 // CHECK: func mutateIt(_ x: IntPair!)
