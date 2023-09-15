@@ -179,15 +179,10 @@ private extension BuiltinInst {
       return
     }
     
-    // Must be single use so that we can use replaceAll
-    guard metatypeInst.uses.isSingleUse else {
-      return
-    }
-    
     let instanceType = metatypeInst.type.instanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
     let metatype = builder.createMetatype(of: instanceType, representation: .Thin)
-    metatypeInst.uses.replaceAll(with: metatype, context)
+    operands[0].set(to: metatype, context)
   }
 }
 
