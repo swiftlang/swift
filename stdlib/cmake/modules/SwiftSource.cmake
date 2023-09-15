@@ -1001,7 +1001,9 @@ function(_compile_swift_files
     if(SWIFTFILE_STATIC)
       set(command_copy_interface_file)
       if(interface_file)
-        set(command_copy_interface_file COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static})
+        set(command_copy_interface_file
+          COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static}
+          COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${private_interface_file} ${private_interface_file_static})
       endif()
       add_custom_command_target(
         module_dependency_target_static
