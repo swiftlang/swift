@@ -154,6 +154,7 @@ extension String {
   @inlinable
   @_alwaysEmitIntoClient
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
+    // FIXME: https://github.com/apple/swift/issues/68433 (rdar://115296219)
     self.init(validatingUTF8: nullTerminatedUTF8)
   }
 
