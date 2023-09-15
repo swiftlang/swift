@@ -16,6 +16,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
@@ -3276,162 +3277,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     return count;
   }
 
-  class ExternallyAccessibleDeclVisitor
-      : public DeclVisitor<ExternallyAccessibleDeclVisitor, bool> {
-  public:
-    ExternallyAccessibleDeclVisitor(){};
-
-    bool visit(const Decl *D) {
-      if (auto value = dyn_cast<ValueDecl>(D)) {
-        // A decl is externally accessible if it has a public access level.
-        auto accessScope =
-            value->getFormalAccessScope(/*useDC=*/nullptr,
-                                        /*treatUsableFromInlineAsPublic=*/true);
-        if (accessScope.isPublic() || accessScope.isPackage())
-          return true;
-      }
-
-      return DeclVisitor<ExternallyAccessibleDeclVisitor, bool>::visit(
-          const_cast<Decl *>(D));
-    }
-
-    // Force all decl kinds to be handled explicitly.
-    bool visitDecl(const Decl *D) = delete;
-    bool visitValueDecl(const ValueDecl *valueDecl) = delete;
-
-    bool visitExtensionDecl(const ExtensionDecl *ext) {
-      // Extensions must extend externally accessible types to be externally
-      // accessible.
-      auto nominalType = ext->getExtendedNominal();
-      if (!nominalType ||
-          !isDeserializationSafe(nominalType))
-        return false;
-
-      // If the extension has any externally accessible members, then it is
-      // externally accessible.
-      auto members = ext->getMembers();
-      auto hasSafeMembers = std::any_of(members.begin(), members.end(),
-        [](const Decl *D) -> bool {
-          if (auto VD = dyn_cast<ValueDecl>(D))
-            return isDeserializationSafe(VD);
-          return true;
-        });
-      if (hasSafeMembers)
-        return true;
-
-      // If the extension has any externally accessible conformances, then it is
-      // externally accessible.
-      auto protocols = ext->getLocalProtocols(ConformanceLookupKind::All);
-      bool hasSafeConformances = std::any_of(
-          protocols.begin(), protocols.end(), [this](ProtocolDecl *protocol) {
-            return visit(protocol);
-          });
-
-      if (hasSafeConformances)
-        return true;
-
-      // Truly empty extensions are externally accessible. This can occur in
-      // swiftinterfaces, for example.
-      if (members.empty() && protocols.size() == 0)
-        return true;
-
-      return false;
-    }
-
-    bool visitPatternBindingDecl(const PatternBindingDecl *pbd) {
-      // Pattern bindings are externally accessible if any of their var decls
-      // are externally accessible.
-      for (auto i : range(pbd->getNumPatternEntries())) {
-        if (auto *varDecl = pbd->getAnchoringVarDecl(i)) {
-          if (isDeserializationSafe(varDecl))
-            return true;
-        }
-      }
-
-      return false;
-    }
-
-    bool visitVarDecl(const VarDecl *var) {
-      if (var->isLayoutExposedToClients())
-        return true;
-
-      // Consider all lazy var storage as externally accessible.
-      // FIXME: We should keep track of what lazy var is associated to the
-      //        storage for them to preserve the same accessibility.
-      if (var->isLazyStorageProperty())
-        return true;
-
-      // Property wrapper storage is as externally accessible as the wrapped
-      // property.
-      if (VarDecl *wrapped = var->getOriginalWrappedProperty())
-        if (visit(wrapped))
-          return true;
-
-      return false;
-    }
-
-    bool visitAccessorDecl(const AccessorDecl *accessor) {
-      // Accessors are as externally accessible as the storage.
-      return visit(accessor->getStorage());
-    }
-
-    // ValueDecls with effectively public access are considered externally
-    // accessible and are handled in visit(Decl *) above. Some specific kinds of
-    // ValueDecls with additional, unique rules are handled individually above.
-    // ValueDecls that are not effectively public and do not have unique rules
-    // are by default externally inaccessable.
-#define DEFAULT_TO_ACCESS_LEVEL(KIND)                                          \
-  bool visit##KIND##Decl(const KIND##Decl *D) {                                \
-    static_assert(std::is_convertible<KIND##Decl *, ValueDecl *>::value,       \
-                  "##KIND##Decl must be a ValueDecl");                         \
-    return false;                                                              \
-  }
-    DEFAULT_TO_ACCESS_LEVEL(NominalType);
-    DEFAULT_TO_ACCESS_LEVEL(OpaqueType);
-    DEFAULT_TO_ACCESS_LEVEL(TypeAlias);
-    DEFAULT_TO_ACCESS_LEVEL(AssociatedType);
-    DEFAULT_TO_ACCESS_LEVEL(AbstractStorage);
-    DEFAULT_TO_ACCESS_LEVEL(AbstractFunction);
-    DEFAULT_TO_ACCESS_LEVEL(Macro);
-    DEFAULT_TO_ACCESS_LEVEL(EnumElement);
-
-#undef DEFAULT_TO_ACCESS_LEVEL
-
-    // There are several kinds of decls which we never expect to encounter in
-    // external accessibility queries.
-#define UNREACHABLE(KIND)                                                      \
-  bool visit##KIND##Decl(const KIND##Decl *D) {                                \
-    llvm_unreachable("unexpected decl kind");                                  \
-    return true;                                                               \
-  }
-    UNREACHABLE(Module);
-    UNREACHABLE(TopLevelCode);
-    UNREACHABLE(Import);
-    UNREACHABLE(PoundDiagnostic);
-    UNREACHABLE(Missing);
-    UNREACHABLE(MissingMember);
-    UNREACHABLE(MacroExpansion);
-    UNREACHABLE(GenericTypeParam);
-    UNREACHABLE(Param);
-
-#undef UNREACHABLE
-
-    // Uninteresting decls are always considered external. A kind of decl might
-    // always be external if it is declared at the top level and access control
-    // does not apply to it. Or, a kind of decl could be considered always
-    // external because it is only found nested within other declarations that
-    // have their own access level, in which case we assume that the declaration
-    // context has already been checked.
-#define UNINTERESTING(KIND)                                                    \
-  bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
-    UNINTERESTING(IfConfig);
-    UNINTERESTING(PrecedenceGroup);
-    UNINTERESTING(EnumCase);
-    UNINTERESTING(Operator);
-
-#undef UNINTERESTING
-  };
-
 public:
   /// Determine if \p decl is safe to deserialize when it's public
   /// or otherwise needed by the client in normal builds, this should usually
@@ -3441,7 +3286,7 @@ public:
   /// it, but at the same time keep the safety checks precise to avoid
   /// XRef errors and such.
   static bool isDeserializationSafe(const Decl *decl) {
-    return ExternallyAccessibleDeclVisitor().visit(decl);
+    return DeclExportabilityVisitor().visit(decl);
   }
 
 private:
