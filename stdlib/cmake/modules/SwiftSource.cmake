@@ -921,7 +921,10 @@ function(_compile_swift_files
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   string(SHA1 file_name "'${source_files_quoted}'")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(WRITE "${file_path}" "'${source_files_quoted}'")
+  file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+  add_custom_command(
+    OUTPUT "${file_path}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}")
 
   # If this platform/architecture combo supports backward deployment to old
   # Objective-C runtimes, we need to copy a YAML file with legacy type layout
@@ -1001,7 +1004,9 @@ function(_compile_swift_files
     if(SWIFTFILE_STATIC)
       set(command_copy_interface_file)
       if(interface_file)
-        set(command_copy_interface_file COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static})
+        set(command_copy_interface_file
+          COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${interface_file} ${interface_file_static}
+          COMMAND "${CMAKE_COMMAND}" "-E" "copy" ${private_interface_file} ${private_interface_file_static})
       endif()
       add_custom_command_target(
         module_dependency_target_static
