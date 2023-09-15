@@ -722,14 +722,14 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
 
 struct swift::ide::SourceEditJsonConsumer::Implementation {
   llvm::raw_ostream &OS;
-  std::vector<SingleEdit> AllEdits;
+  SourceEdits AllEdits;
   Implementation(llvm::raw_ostream &OS) : OS(OS) {}
   ~Implementation() {
     writeEditsInJson(AllEdits, OS);
   }
   void accept(SourceManager &SM, CharSourceRange Range,
               llvm::StringRef Text) {
-    AllEdits.push_back({SM, Range, Text.str()});
+    AllEdits.addEdit(SM, Range, Text);
   }
 };
 
