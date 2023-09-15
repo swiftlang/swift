@@ -16,7 +16,7 @@
 #include "SourceKit/Core/LangSupport.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringMap.h"
 
 namespace SourceKit {
 
@@ -27,7 +27,7 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
   llvm::DenseMap<unsigned, DiagnosticsTy> BufferDiagnostics;
   DiagnosticsTy InvalidLocDiagnostics;
 
-  llvm::MapVector<StringRef, BufferInfoSharedPtr> BufferInfos;
+  llvm::StringMap<BufferInfoSharedPtr> BufferInfos;
 
   int LastDiagBufferID = -1;
   unsigned LastDiagIndex = 0;
