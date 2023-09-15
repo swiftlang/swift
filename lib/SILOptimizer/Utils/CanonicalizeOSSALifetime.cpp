@@ -287,16 +287,15 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
     }
   }
   for (auto *edge : barriers.edges) {
-    if (edge == getCurrentDef()->getParentBlock()) {
-      // A destroy should be inserted at the begin of this block, but that does
-      // not require adding any instructions to liveness.
-      continue;
-    }
     auto *predecessor = edge->getSinglePredecessorBlock();
     assert(predecessor);
     liveness->updateForUse(&predecessor->back(),
                            /*lifetimeEnding*/ false);
   }
+  // Ignore barriers.initialBlocks.  If the collection is non-empty, it
+  // contains the def-block.  Its presence means that no barriers were found
+  // between lifetime ends and def.  In that case, no new instructions need to
+  // be added to liveness.
 }
 
 // Return true if \p inst is an end_access whose access scope overlaps the end

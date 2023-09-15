@@ -318,6 +318,10 @@ private:
       result.barrierBlocks.insert(block);
     }
 
+    void visitInitialBlock(SILBasicBlock *block) {
+      result.barrierBlocks.insert(block);
+    }
+
     /// VisitBarrierAccessScopes::Visitor
 
     ArrayRef<SILBasicBlock *> roots();
