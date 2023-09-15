@@ -2489,129 +2489,6 @@ SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
 // SwiftLangSupport::findRelatedIdentifiersInFile
 //===----------------------------------------------------------------------===//
 
-namespace {
-class RelatedIdScanner : public SourceEntityWalker {
-  ValueDecl *Dcl;
-  llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges;
-  /// Declarations that are tied to the same name as \c Dcl and should thus also
-  /// be renamed if \c Dcl is renamed. Most notabliy this contains closure
-  /// captures like `[foo]`.
-  llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls;
-  SourceManager &SourceMgr;
-  unsigned BufferID = -1;
-  bool Cancelled = false;
-
-public:
-  explicit RelatedIdScanner(
-      SourceFile &SrcFile, unsigned BufferID, ValueDecl *D,
-      llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> &Ranges,
-      llvm::SmallVectorImpl<ValueDecl *> &RelatedDecls)
-      : Ranges(Ranges), RelatedDecls(RelatedDecls),
-        SourceMgr(SrcFile.getASTContext().SourceMgr), BufferID(BufferID) {
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      // Always use the canonical var decl for comparison. This is so we
-      // pick up all occurrences of x in case statements like the below:
-      //   case .first(let x), .second(let x)
-      //     fallthrough
-      //   case .third(let x)
-      //     print(x)
-      Dcl = V->getCanonicalVarDecl();
-
-      // If we have a property wrapper backing property or projected value, use
-      // the wrapped property instead (i.e. if this is _foo or $foo, pretend
-      // it's foo).
-      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
-        Dcl = Wrapped;
-      }
-    } else {
-      Dcl = D;
-    }
-  }
-
-private:
-  bool walkToExprPre(Expr *E) override {
-    if (Cancelled)
-      return false;
-
-    // Check if there are closure captures like `[foo]` where the caputred
-    // variable should also be renamed
-    if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
-      for (auto ShorthandShadow : getShorthandShadows(CaptureList)) {
-        if (ShorthandShadow.first == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.second);
-        } else if (ShorthandShadow.second == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.first);
-        }
-      }
-    }
-    return true;
-  }
-
-  bool walkToStmtPre(Stmt *S) override {
-    if (Cancelled)
-      return false;
-
-    if (auto CondStmt = dyn_cast<LabeledConditionalStmt>(S)) {
-      for (auto ShorthandShadow : getShorthandShadows(CondStmt)) {
-        if (ShorthandShadow.first == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.second);
-        } else if (ShorthandShadow.second == Dcl) {
-          RelatedDecls.push_back(ShorthandShadow.first);
-        }
-      }
-    }
-    return true;
-  }
-
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (Cancelled)
-      return false;
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      // Handle references to the implicitly generated vars in case statements
-      // matching multiple patterns
-      D = V->getCanonicalVarDecl();
-    }
-    if (D == Dcl)
-      return passId(Range);
-    return true;
-  }
-
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
-    if (Cancelled)
-      return false;
-
-    if (auto *V = dyn_cast<VarDecl>(D)) {
-      D = V->getCanonicalVarDecl();
-
-      // If we have a property wrapper backing property or projected value, use
-      // the wrapped property for comparison instead (i.e. if this is _foo or
-      // $foo, pretend it's foo).
-      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1 &&
-               (Range.str().front() == '_' || Range.str().front() == '$'));
-        D = Wrapped;
-        Range = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
-      }
-    } else if (CtorTyRef) {
-      D = CtorTyRef;
-    }
-
-    if (D == Dcl)
-      return passId(Range);
-    return true;
-  }
-
-  bool passId(CharSourceRange Range) {
-    unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(),BufferID);
-    Ranges.insert({Offset, Range.getByteLength()});
-    return !Cancelled;
-  }
-};
-
-} // end anonymous namespace
-
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
@@ -2661,10 +2538,13 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (Loc.isInvalid())
           return;
 
+        SourceManager &SrcMgr = CompInst.getASTContext().SourceMgr;
+
         ResolvedCursorInfoPtr CursorInfo =
             evaluateOrDefault(CompInst.getASTContext().evaluator,
                               CursorInfoRequest{CursorInfoOwner(SrcFile, Loc)},
                               new ResolvedCursorInfo());
+
         auto ValueRefCursorInfo =
             dyn_cast<ResolvedValueRefCursorInfo>(CursorInfo);
         if (!ValueRefCursorInfo)
@@ -2684,40 +2564,33 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (VD->isOperator())
           return;
 
+        llvm::Optional<RenameInfo> info = getRenameInfo(CursorInfo);
+
+        if (!info) {
+          return;
+        }
+
+        RenameLocs Locs =
+            localRenameLocs(SrcFile, *info, /*newName=*/StringRef());
+
+        // Ignore any errors produced by `resolveRenameLocations` since, if some
+        // symbol failed to resolve, we still want to return all the other
+        // symbols. This makes related idents more fault-tolerant.
+        DiagnosticEngine Diags(SrcMgr);
+
+        std::vector<ResolvedLoc> ResolvedLocs =
+            resolveRenameLocations(Locs.getLocations(), *SrcFile, Diags);
+
         // Record ranges in a set first so we don't record some ranges twice.
         // This could happen in capture lists where e.g. `[foo]` is both the
         // reference of the captured variable and the declaration of the
         // variable usable in the closure.
         llvm::SmallDenseSet<std::pair<unsigned, unsigned>, 8> RangesSet;
 
-        // List of decls whose ranges should be reported as related identifiers.
-        SmallVector<ValueDecl *, 2> Worklist;
-        Worklist.push_back(VD);
-
-        // Decls that we have already visited, so we don't walk circles.
-        SmallPtrSet<ValueDecl *, 2> VisitedDecls;
-        while (!Worklist.empty()) {
-          ValueDecl *Dcl = Worklist.back();
-          Worklist.pop_back();
-          if (!VisitedDecls.insert(Dcl).second) {
-            // We have already visited this decl. Don't visit it again.
-            continue;
-          }
-
-          RelatedIdScanner Scanner(*SrcFile, BufferID, Dcl, RangesSet,
-                                   Worklist);
-
-          if (auto *Case = getCaseStmtOfCanonicalVar(Dcl)) {
-            Scanner.walk(Case);
-            while ((Case = Case->getFallthroughDest().getPtrOrNull())) {
-              Scanner.walk(Case);
-            }
-          } else if (DeclContext *LocalDC =
-                         Dcl->getDeclContext()->getLocalContext()) {
-            Scanner.walk(LocalDC);
-          } else {
-            Scanner.walk(*SrcFile);
-          }
+        for (auto ResolvedLoc : ResolvedLocs) {
+          unsigned Offset = SrcMgr.getLocOffsetInBuffer(
+              ResolvedLoc.Range.getStart(), BufferID);
+          RangesSet.insert({Offset, ResolvedLoc.Range.getByteLength()});
         }
 
         // Sort ranges so we get deterministic output.

@@ -33,14 +33,32 @@ enum class RefactoringKind : int8_t {
 #include "RefactoringKinds.def"
 };
 
-struct RangeConfig {
-  unsigned BufferID;
-  unsigned Line;
-  unsigned Column;
-  unsigned Length;
-  SourceLoc getStart(SourceManager &SM);
-  SourceLoc getEnd(SourceManager &SM);
+enum class RefactorAvailableKind {
+  Available,
+  Unavailable_system_symbol,
+  Unavailable_has_no_location,
+  Unavailable_has_no_name,
+  Unavailable_has_no_accessibility,
+  Unavailable_decl_from_clang,
+  Unavailable_decl_in_macro,
 };
+
+struct RefactorAvailabilityInfo {
+  RefactoringKind Kind;
+  RefactorAvailableKind AvailableKind;
+  RefactorAvailabilityInfo(RefactoringKind Kind,
+                           RefactorAvailableKind AvailableKind)
+      : Kind(Kind), AvailableKind(AvailableKind) {}
+  RefactorAvailabilityInfo(RefactoringKind Kind)
+      : RefactorAvailabilityInfo(Kind, RefactorAvailableKind::Available) {}
+};
+
+struct RenameInfo {
+  ValueDecl *VD;
+  RefactorAvailabilityInfo Availability;
+};
+
+llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
 
 enum class NameUsage {
   Unknown,
@@ -59,7 +77,7 @@ struct RenameLoc {
   /// This may not be known if the rename locations are specified by the client
   /// using the a rename locations dicationary in syntactic rename.
   ///
-  /// May be empty.
+  /// May be empty if no new name was specified in `localRenameLocs`.
   StringRef NewName;
   const bool IsFunctionLike;
   const bool IsNonProtocolType;
@@ -82,14 +100,33 @@ public:
 };
 
 /// Return the location to rename when renaming the identifier at \p startLoc
-/// in \p SF
+/// in \p SF.
+///
 /// - Parameters:
 ///   - SF: The source file in which to perform local rename
-///   - startLoc: The location of the identifier that should be renamed
-///   - preferredName: The new name that should be assigned to the identifer
-///   - diags: If errors occur, a diagnostic is added to this diagnostic engine.
-RenameLocs localRenameLocs(SourceFile *SF, SourceLoc startLoc,
-                           StringRef preferredName, DiagnosticEngine &diags);
+///   - renameInfo: Information about the symbol to rename. See `getRenameInfo`
+///   - newName: The new name that should be assigned to the identifer. Can
+///     be empty, in which case the new name of all `RenameLoc`s will also be
+///     empty.
+RenameLocs localRenameLocs(SourceFile *SF, RenameInfo renameInfo,
+                           StringRef newName);
+
+/// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
+///
+/// These resolve locations contain more structured information, such as the
+/// range of the base name to rename and the ranges of the argument labels.
+std::vector<ResolvedLoc> resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
+                                                SourceFile &SF,
+                                                DiagnosticEngine &Diags);
+
+struct RangeConfig {
+  unsigned BufferID;
+  unsigned Line;
+  unsigned Column;
+  unsigned Length;
+  SourceLoc getStart(SourceManager &SM);
+  SourceLoc getEnd(SourceManager &SM);
+};
 
 struct RefactoringOptions {
   RefactoringKind Kind;
@@ -103,26 +140,6 @@ struct RenameRangeDetail {
   CharSourceRange Range;
   RefactoringRangeKind RangeKind;
   llvm::Optional<unsigned> Index;
-};
-
-enum class RefactorAvailableKind {
-  Available,
-  Unavailable_system_symbol,
-  Unavailable_has_no_location,
-  Unavailable_has_no_name,
-  Unavailable_has_no_accessibility,
-  Unavailable_decl_from_clang,
-  Unavailable_decl_in_macro,
-};
-
-struct RefactorAvailabilityInfo {
-  RefactoringKind Kind;
-  RefactorAvailableKind AvailableKind;
-  RefactorAvailabilityInfo(RefactoringKind Kind,
-                           RefactorAvailableKind AvailableKind)
-      : Kind(Kind), AvailableKind(AvailableKind) {}
-  RefactorAvailabilityInfo(RefactoringKind Kind)
-      : RefactorAvailabilityInfo(Kind, RefactorAvailableKind::Available) {}
 };
 
 class FindRenameRangesConsumer {
