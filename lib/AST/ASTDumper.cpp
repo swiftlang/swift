@@ -2592,7 +2592,7 @@ public:
     PrintWithColorRAII(OS, DiscriminatorColor)
       << " discriminator=" << E->getRawDiscriminator();
 
-    switch (auto isolation = E->getActorIsolation()) {
+    switch (auto isolation = E->getClosureActorIsolation()) {
     case ClosureActorIsolation::Nonisolated:
       break;
 
