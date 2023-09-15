@@ -32,7 +32,8 @@ extension BuiltinInst : OnoneSimplifyable {
            .Strideof,
            .Alignof:
         optimizeTargetTypeConst(context)
-      case .CopyArray,
+      case .DestroyArray,
+           .CopyArray,
            .TakeArrayNoAlias,
            .TakeArrayFrontToBack,
            .TakeArrayBackToFront,

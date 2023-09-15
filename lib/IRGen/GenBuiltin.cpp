@@ -1105,7 +1105,42 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    
+
+    if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      SILType elemTy = valueTy.first;
+      const TypeInfo &elemTI = valueTy.second;
+
+      llvm::Value *firstElem = IGF.Builder.CreateBitCast(
+          ptr, elemTI.getStorageType()->getPointerTo());
+
+      auto *origBB = IGF.Builder.GetInsertBlock();
+      auto *headerBB = IGF.createBasicBlock("loop_header");
+      auto *loopBB = IGF.createBasicBlock("loop_body");
+      auto *exitBB = IGF.createBasicBlock("loop_exit");
+      IGF.Builder.CreateBr(headerBB);
+      IGF.Builder.emitBlock(headerBB);
+      auto *phi = IGF.Builder.CreatePHI(count->getType(), 2);
+      phi->addIncoming(llvm::ConstantInt::get(count->getType(), 0), origBB);
+      llvm::Value *cmp = IGF.Builder.CreateICmpSLT(phi, count);
+      IGF.Builder.CreateCondBr(cmp, loopBB, exitBB);
+
+      IGF.Builder.emitBlock(loopBB);
+      auto *addr = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
+                                                 firstElem, phi);
+
+      bool isOutlined = false;
+      elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
+                     isOutlined);
+
+      auto *one = llvm::ConstantInt::get(count->getType(), 1);
+      auto *add = IGF.Builder.CreateAdd(phi, one);
+      phi->addIncoming(add, loopBB);
+      IGF.Builder.CreateBr(headerBB);
+
+      IGF.Builder.emitBlock(exitBB);
+      return;
+    }
+
     ptr = IGF.Builder.CreateBitCast(ptr,
                               valueTy.second.getStorageType()->getPointerTo());
     Address array = valueTy.second.getAddressForPointer(ptr);
