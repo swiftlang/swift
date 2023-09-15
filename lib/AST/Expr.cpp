@@ -2019,7 +2019,7 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
 
 ClosureActorIsolation
 swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
-  return CE->getActorIsolation();
+  return CE->getClosureActorIsolation();
 }
 
 llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>

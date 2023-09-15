@@ -1380,7 +1380,7 @@ void SILGenFunction::emitProlog(
     }
   } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
     bool wantExecutor = F.isAsync() || wantDataRaceChecks;
-    auto actorIsolation = closureExpr->getActorIsolation();
+    auto actorIsolation = closureExpr->getClosureActorIsolation();
     switch (actorIsolation.getKind()) {
     case ClosureActorIsolation::Nonisolated:
       break;
@@ -1593,7 +1593,7 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   }
   auto isolation =
       getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
-        return CE->getActorIsolation();
+        return CE->getClosureActorIsolation();
       });
   if (isolation != ActorIsolation::Nonisolated
       && isolation != ActorIsolation::Unspecified) {

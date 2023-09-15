@@ -10305,7 +10305,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
     }
 
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      switch (auto isolation = closure->getActorIsolation()) {
+      switch (auto isolation = closure->getClosureActorIsolation()) {
       case ClosureActorIsolation::Nonisolated:
       case ClosureActorIsolation::GlobalActor:
         return false;

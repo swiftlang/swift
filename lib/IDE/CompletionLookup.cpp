@@ -777,7 +777,7 @@ void CompletionLookup::analyzeActorIsolation(
       if (isolation != ClosureActorIsolations.end()) {
         return isolation->second;
       } else {
-        return CE->getActorIsolation();
+        return CE->getClosureActorIsolation();
       }
     };
     auto contextIsolation = getActorIsolationOfContext(

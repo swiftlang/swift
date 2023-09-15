@@ -2687,7 +2687,7 @@ public:
 
     printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
 
-    switch (auto isolation = E->getActorIsolation()) {
+    switch (auto isolation = E->getClosureActorIsolation()) {
     case ClosureActorIsolation::Nonisolated:
       break;
 

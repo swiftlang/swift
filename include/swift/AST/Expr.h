@@ -3951,7 +3951,9 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
-  ClosureActorIsolation getActorIsolation() const { return actorIsolation; }
+  ClosureActorIsolation getClosureActorIsolation() const {
+    return actorIsolation;
+  }
 
   void setActorIsolation(ClosureActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;

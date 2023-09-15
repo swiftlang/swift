@@ -2968,7 +2968,7 @@ static bool okToRemoveGlobalActor(ConstraintSystem &cs,
     // So, I expect the existing isolation to always be set to the default.
     // If the assertion below starts tripping, then this ad-hoc inference
     // is no longer needed!
-    auto existingIso = ace->getActorIsolation();
+    auto existingIso = ace->getClosureActorIsolation();
     if (existingIso != ClosureActorIsolation()) {
       assert(false && "somebody set the closure's isolation already?");
       return existingIso;
