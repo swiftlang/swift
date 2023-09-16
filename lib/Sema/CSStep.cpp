@@ -945,7 +945,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
 
       if (Solutions.size() == 1) {
         auto score = Solutions.front().getFixedScore();
-        if (score.Data[SK_Fix] > 0 && !CS.getASTContext().CompletionCallback)
+        if (score.Data[SK_Fix] > 0 && !CS.isForCodeCompletion())
           Producer.markExhausted();
       }
     } else if (Solutions.size() != 1) {

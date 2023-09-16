@@ -74,9 +74,8 @@ class SyntacticElementTarget;
 // so they could be made friends of ConstraintSystem.
 namespace TypeChecker {
 
-llvm::Optional<BraceStmt *> applyResultBuilderBodyTransform(
-    FuncDecl *func, Type builderType,
-    bool ClosuresInResultBuilderDontParticipateInInference);
+llvm::Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
+                                                            Type builderType);
 
 llvm::Optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
@@ -1815,12 +1814,6 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x100,
-
-  /// Non solver-based code completion expects that closures inside result
-  /// builders don't participate in inference.
-  /// Once all code completion kinds are migrated to solver-based we should be
-  /// able to remove this flag.
-  ClosuresInResultBuildersDontParticipateInInference = 0x200,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2877,9 +2870,8 @@ private:
 
   // FIXME: Perhaps these belong on ConstraintSystem itself.
   friend llvm::Optional<BraceStmt *>
-  swift::TypeChecker::applyResultBuilderBodyTransform(
-      FuncDecl *func, Type builderType,
-      bool ClosuresInResultBuilderDontParticipateInInference);
+  swift::TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func,
+                                                      Type builderType);
 
   friend llvm::Optional<SyntacticElementTarget>
   swift::TypeChecker::typeCheckExpression(

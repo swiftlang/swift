@@ -7311,24 +7311,13 @@ bool ConstraintSystem::participatesInInference(ClosureExpr *closure) const {
   if (getAppliedResultBuilderTransform(closure))
     return true;
 
-  if (closure->hasSingleExpressionBody())
-    return true;
-
   if (Options.contains(ConstraintSystemFlags::LeaveClosureBodyUnchecked))
     return false;
 
   if (closure->hasEmptyBody())
     return false;
 
-  // If body is nested in a parent that has a function builder applied,
-  // let's prevent inference until result builders.
-  if (Options.contains(
-          ConstraintSystemFlags::
-              ClosuresInResultBuildersDontParticipateInInference)) {
-    return !isInResultBuilderContext(closure);
-  } else {
-    return true;
-  }
+  return true;
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
