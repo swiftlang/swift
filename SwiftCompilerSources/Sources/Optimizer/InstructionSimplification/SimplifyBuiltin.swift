@@ -32,6 +32,16 @@ extension BuiltinInst : OnoneSimplifyable {
            .Strideof,
            .Alignof:
         optimizeTargetTypeConst(context)
+      case .DestroyArray,
+           .CopyArray,
+           .TakeArrayNoAlias,
+           .TakeArrayFrontToBack,
+           .TakeArrayBackToFront,
+           .AssignCopyArrayNoAlias,
+           .AssignCopyArrayFrontToBack,
+           .AssignCopyArrayBackToFront,
+           .AssignTakeArray:
+        optimizeArrayBuiltin(context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -161,6 +171,18 @@ private extension BuiltinInst {
     let literal = builder.createIntegerLiteral(value, type: type)
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
+  }
+  
+  func optimizeArrayBuiltin(_ context: SimplifyContext) {
+    guard let metatypeInst = operands[0].value as? MetatypeInst,
+          metatypeInst.type.representationOfMetatype(in: parentFunction) == .Thick else {
+      return
+    }
+    
+    let instanceType = metatypeInst.type.instanceTypeOfMetatype(in: parentFunction)
+    let builder = Builder(before: self, context)
+    let metatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    operands[0].set(to: metatype, context)
   }
 }
 

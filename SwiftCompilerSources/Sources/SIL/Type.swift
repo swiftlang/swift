@@ -90,6 +90,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     bridged.getInstanceTypeOfMetatype(function.bridged.getFunction()).type
   }
 
+  public func representationOfMetatype(in function: Function) -> swift.MetatypeRepresentation {
+    bridged.getRepresentationOfMetatype(function.bridged.getFunction())
+  }
+
   public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }
 
   public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }

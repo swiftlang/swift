@@ -1105,7 +1105,42 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
-    
+
+    if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      SILType elemTy = valueTy.first;
+      const TypeInfo &elemTI = valueTy.second;
+
+      llvm::Value *firstElem = IGF.Builder.CreateBitCast(
+          ptr, elemTI.getStorageType()->getPointerTo());
+
+      auto *origBB = IGF.Builder.GetInsertBlock();
+      auto *headerBB = IGF.createBasicBlock("loop_header");
+      auto *loopBB = IGF.createBasicBlock("loop_body");
+      auto *exitBB = IGF.createBasicBlock("loop_exit");
+      IGF.Builder.CreateBr(headerBB);
+      IGF.Builder.emitBlock(headerBB);
+      auto *phi = IGF.Builder.CreatePHI(count->getType(), 2);
+      phi->addIncoming(llvm::ConstantInt::get(count->getType(), 0), origBB);
+      llvm::Value *cmp = IGF.Builder.CreateICmpSLT(phi, count);
+      IGF.Builder.CreateCondBr(cmp, loopBB, exitBB);
+
+      IGF.Builder.emitBlock(loopBB);
+      auto *addr = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
+                                                 firstElem, phi);
+
+      bool isOutlined = false;
+      elemTI.destroy(IGF, elemTI.getAddressForPointer(addr), elemTy,
+                     isOutlined);
+
+      auto *one = llvm::ConstantInt::get(count->getType(), 1);
+      auto *add = IGF.Builder.CreateAdd(phi, one);
+      phi->addIncoming(add, loopBB);
+      IGF.Builder.CreateBr(headerBB);
+
+      IGF.Builder.emitBlock(exitBB);
+      return;
+    }
+
     ptr = IGF.Builder.CreateBitCast(ptr,
                               valueTy.second.getStorageType()->getPointerTo());
     Address array = valueTy.second.getAddressForPointer(ptr);
@@ -1128,7 +1163,81 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     llvm::Value *dest = args.claimNext();
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
-    
+
+    if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      auto tyPair = getLoweredTypeAndTypeInfo(
+          IGF.IGM, substitutions.getReplacementTypes()[0]);
+      SILType elemTy = tyPair.first;
+      const TypeInfo &elemTI = tyPair.second;
+
+      llvm::Value *firstSrcElem = IGF.Builder.CreateBitCast(
+          src, elemTI.getStorageType()->getPointerTo());
+      llvm::Value *firstDestElem = IGF.Builder.CreateBitCast(
+          dest, elemTI.getStorageType()->getPointerTo());
+
+      auto *origBB = IGF.Builder.GetInsertBlock();
+      auto *headerBB = IGF.createBasicBlock("loop_header");
+      auto *loopBB = IGF.createBasicBlock("loop_body");
+      auto *exitBB = IGF.createBasicBlock("loop_exit");
+      IGF.Builder.CreateBr(headerBB);
+      IGF.Builder.emitBlock(headerBB);
+      auto *phi = IGF.Builder.CreatePHI(count->getType(), 2);
+      phi->addIncoming(llvm::ConstantInt::get(count->getType(), 0), origBB);
+      llvm::Value *cmp = IGF.Builder.CreateICmpSLT(phi, count);
+      IGF.Builder.CreateCondBr(cmp, loopBB, exitBB);
+
+      IGF.Builder.emitBlock(loopBB);
+      llvm::Value *idx = phi;
+
+      switch (Builtin.ID) {
+      case BuiltinValueKind::TakeArrayBackToFront:
+      case BuiltinValueKind::AssignCopyArrayBackToFront: {
+        llvm::Value *countMinusIdx = IGF.Builder.CreateSub(count, phi);
+        auto *one = llvm::ConstantInt::get(count->getType(), 1);
+        idx = IGF.Builder.CreateSub(countMinusIdx, one);
+        break;
+      }
+      default:
+        break;
+      }
+
+      auto *srcElem = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
+                                                    firstSrcElem, idx);
+      auto *destElem = IGF.Builder.CreateInBoundsGEP(elemTI.getStorageType(),
+                                                     firstDestElem, idx);
+      Address destAddr = elemTI.getAddressForPointer(destElem);
+      Address srcAddr = elemTI.getAddressForPointer(srcElem);
+
+      bool isOutlined = false;
+      switch (Builtin.ID) {
+      case BuiltinValueKind::CopyArray:
+        elemTI.initializeWithCopy(IGF, destAddr, srcAddr, elemTy, isOutlined);
+        break;
+      case BuiltinValueKind::TakeArrayNoAlias:
+      case BuiltinValueKind::TakeArrayFrontToBack:
+      case BuiltinValueKind::TakeArrayBackToFront:
+        elemTI.initializeWithTake(IGF, destAddr, srcAddr, elemTy, isOutlined);
+        break;
+      case BuiltinValueKind::AssignCopyArrayNoAlias:
+      case BuiltinValueKind::AssignCopyArrayFrontToBack:
+      case BuiltinValueKind::AssignCopyArrayBackToFront:
+        elemTI.assignWithCopy(IGF, destAddr, srcAddr, elemTy, isOutlined);
+        break;
+      case BuiltinValueKind::AssignTakeArray:
+        elemTI.assignWithTake(IGF, destAddr, srcAddr, elemTy, isOutlined);
+        break;
+      default:
+        llvm_unreachable("out of sync with if condition");
+      }
+      auto *one = llvm::ConstantInt::get(count->getType(), 1);
+      auto *addIdx = IGF.Builder.CreateAdd(phi, one);
+      phi->addIncoming(addIdx, loopBB);
+      IGF.Builder.CreateBr(headerBB);
+
+      IGF.Builder.emitBlock(exitBB);
+      return;
+    }
+
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
                                              substitutions.getReplacementTypes()[0]);
     
