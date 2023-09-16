@@ -319,7 +319,7 @@ public:
 
     currentDef = def;
 
-    if (maximizeLifetime) {
+    if (maximizeLifetime || respectsDeinitBarriers()) {
       liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     }
     liveness->initializeDef(getCurrentDef());
@@ -405,8 +405,9 @@ private:
 
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
-  void recordConsumingUse(Operand *use) {
-    consumingBlocks.insert(use->getUser()->getParent());
+  void recordConsumingUse(Operand *use) { recordConsumingUser(use->getUser()); }
+  void recordConsumingUser(SILInstruction *user) {
+    consumingBlocks.insert(user->getParent());
   }
   bool computeCanonicalLiveness();
 

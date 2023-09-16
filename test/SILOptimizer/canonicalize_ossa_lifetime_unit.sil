@@ -181,8 +181,7 @@ entry(%instance : @owned $MoE):
   return %retval : $()
 }
 
-// CHECK-LABEL: begin running test 1 of 1 on respect_boundary_edges_when_extending_to_deinit_barriers: canonicalize-ossa-lifetime with: true, false, true, @argument
-// respect_boundary_edges_when_extending_to_deinit_barriers
+// CHECK-LABEL: begin running test 1 of 1 on respect_boundary_edges_when_extending_to_deinit_barriers
 // CHECK-LABEL: sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         apply {{%[^,]+}}()
@@ -191,8 +190,9 @@ entry(%instance : @owned $MoE):
 // CHECK:         unreachable
 // CHECK:       [[DESTROY]]:
 // CHECK:         destroy_value [[INSTANCE]] : $C
+// CHECK:         return
 // CHECK-LABEL: } // end sil function 'respect_boundary_edges_when_extending_to_deinit_barriers'
-// CHECK-LABEL: end running test 1 of 1 on respect_boundary_edges_when_extending_to_deinit_barriers: canonicalize-ossa-lifetime with: true, false, true, @argument
+// CHECK-LABEL: end running test 1 of 1 on respect_boundary_edges_when_extending_to_deinit_barriers
 sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
   test_specification "canonicalize-ossa-lifetime true false true @argument"
@@ -201,6 +201,100 @@ entry(%instance : @owned $C):
   cond_br undef, die, destroy
 
 die:
+  unreachable
+
+destroy:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on respect_boundary_edges_when_extending_to_deinit_barriers_2
+// CHECK-LABEL: sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers_2 : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[DESTROY:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         apply
+// CHECK:         unreachable
+// CHECK:       [[DESTROY]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'respect_boundary_edges_when_extending_to_deinit_barriers_2'
+// CHECK-LABEL: end running test {{.*}} on respect_boundary_edges_when_extending_to_deinit_barriers_2
+sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers_2 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  test_specification "canonicalize-ossa-lifetime true false true @argument"
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  cond_br undef, die, destroy
+
+die:
+  apply %barrier() : $@convention(thin) () -> ()
+  br rlydie
+
+rlydie:
+  unreachable
+
+destroy:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on respect_boundary_edges_when_extending_to_deinit_barriers_3
+// CHECK-LABEL: sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers_3 : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[DESTROY:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         apply
+// CHECK-NOT:     destroy_value [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK:       [[DESTROY]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'respect_boundary_edges_when_extending_to_deinit_barriers_3'
+// CHECK-LABEL: end running test {{.*}} on respect_boundary_edges_when_extending_to_deinit_barriers_3
+sil [ossa] @respect_boundary_edges_when_extending_to_deinit_barriers_3 : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  test_specification "canonicalize-ossa-lifetime true false true @argument"
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  cond_br undef, die, destroy
+
+die:
+  apply %barrier() : $@convention(thin) () -> ()
+  unreachable
+
+destroy:
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Verify that an explicit destroy_value which happens to be just before an
+// unreachable isn't deleted if liveness extends to the previous instruction.
+// CHECK-LABEL: begin running test 1 of 1 on respect_preexisting_destroy_values_when_extending_to_deinit_barriers
+// CHECK-LABEL: sil [ossa] @respect_preexisting_destroy_values_when_extending_to_deinit_barriers : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[DESTROY:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         apply {{%[^,]+}}()
+// CHECK:         destroy_value [[INSTANCE]] : $C
+// CHECK:         unreachable
+// CHECK:       [[DESTROY]]:
+// CHECK:         destroy_value [[INSTANCE]] : $C
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'respect_preexisting_destroy_values_when_extending_to_deinit_barriers'
+// CHECK-LABEL: end running test 1 of 1 on respect_preexisting_destroy_values_when_extending_to_deinit_barriers
+sil [ossa] @respect_preexisting_destroy_values_when_extending_to_deinit_barriers : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  test_specification "canonicalize-ossa-lifetime true false true @argument"
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  cond_br undef, die, destroy
+
+die:
+  apply %barrier() : $@convention(thin) () -> ()
+  destroy_value %instance : $C
   unreachable
 
 destroy:
