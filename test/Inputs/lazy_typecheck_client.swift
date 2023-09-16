@@ -34,6 +34,7 @@ func testPublicStruct() {
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
   PublicStruct.publicStaticMethod()
+  PublicStruct.activeMethod()
 }
 
 func testPublicClass() {
@@ -48,6 +49,16 @@ func testPublicClass() {
   let _: Int = d.publicProperty
   let _: String = d.publicPropertyInferredType
   PublicDerivedClass.publicClassMethod()
+}
+
+func testPublicEnum(_ e: PublicEnum) {
+  switch e {
+  case .a: ()
+  case .b(let x): let _: Int = x
+  }
+
+  let _: Int = e.publicMethod()
+  let _: Int = e.publicComputedVar
 }
 
 func testConformances() {
@@ -78,4 +89,13 @@ func takesEmptyProto<T: EmptyPublicProto>(_ t: T) {}
 @available(*, unavailable)
 func testConditionalConformance<T>(_ s: PublicGenericStruct<T>) {
   takesEmptyProto(s) // expected-error {{global function 'takesEmptyProto' requires}}
+}
+
+func testTypealiases() {
+  let _: PublicStruct = PublicStructAlias(x: 1)
+}
+
+func testOperators() {
+  var a: PublicStruct
+  a <<< PublicStruct(x: 2)
 }

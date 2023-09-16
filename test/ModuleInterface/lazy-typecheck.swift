@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -typecheck -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck
+// RUN: %target-swift-frontend -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -typecheck -emit-module-interface-path %t/lazy_typecheck.swiftinterface -enable-library-evolution -parse-as-library -package-name Package -DFLAG -experimental-lazy-typecheck
 // RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
@@ -69,6 +69,14 @@
 // CHECK:         override public init(x: Swift.Int)
 // CHECK:         deinit
 // CHECK:       }
+// CHECK:       public enum PublicEnum {
+// CHECK:         case a
+// CHECK:         case b(x: Swift.Int)
+// CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:         public var publicComputedVar: Swift.Int {
+// CHECK-NEXT:      get
+// CHECK-NEXT:    }
+// CHECK:       }
 // CHECK:       public struct PublicStructConformingToPublicProto : lazy_typecheck.PublicProto {
 // CHECK:         public init()
 // CHECK:         public func req() -> Swift.Int
@@ -94,6 +102,18 @@
 // CHECK:         public func req() throws -> Swift.Int
 // CHECK:       }
 // CHECK:       #endif
+// CHECK:       public typealias PublicStructAlias = lazy_typecheck.PublicStruct
+// CHECK:       extension lazy_typecheck.PublicStruct {
+// CHECK:         public static func activeMethod()
+// CHECK:       }
+// CHECK:       precedencegroup FooPrecedence {
+// CHECK:         associativity: right
+// CHECK:         assignment: true
+// CHECK:       }
+// CHECK:       infix operator <<< : FooPrecedence
+// CHECK:       extension lazy_typecheck.PublicStruct {
+// CHECK:         public static func <<< (lhs: inout lazy_typecheck.PublicStruct, rhs: lazy_typecheck.PublicStruct)
+// CHECK:       }
 // CHECK:       @available(*, unavailable)
 // CHECK-NEXT:  extension lazy_typecheck.PublicGenericStruct : lazy_typecheck.EmptyPublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
 // CHECK:       extension lazy_typecheck.PublicStructIndirectlyConformingToPublicProto : lazy_typecheck.PublicProto {}

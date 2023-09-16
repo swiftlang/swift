@@ -1,4 +1,4 @@
-  //===--- Serialization.cpp - Read and write Swift modules -----------------===//
+//===--- Serialization.cpp - Read and write Swift modules -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,6 +16,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
@@ -3286,92 +3287,7 @@ public:
   /// it, but at the same time keep the safety checks precise to avoid
   /// XRef errors and such.
   static bool isDeserializationSafe(const Decl *decl) {
-    if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-      // Consider extensions as safe as their extended type.
-      auto nominalType = ext->getExtendedNominal();
-      if (!nominalType ||
-          !isDeserializationSafe(nominalType))
-        return false;
-
-      // We can mark the extension unsafe only if it has no public members.
-      auto members = ext->getMembers();
-      auto hasSafeMembers = std::any_of(members.begin(), members.end(),
-        [](const Decl *D) -> bool {
-          if (auto VD = dyn_cast<ValueDecl>(D))
-            return isDeserializationSafe(VD);
-          return true;
-        });
-      if (hasSafeMembers)
-        return true;
-
-      // We can mark the extension unsafe only if it has no public
-      // conformances.
-      auto protocols = ext->getLocalProtocols(ConformanceLookupKind::All);
-      bool hasSafeConformances = std::any_of(
-          protocols.begin(), protocols.end(), [](ProtocolDecl *protocol) {
-            return isDeserializationSafe(protocol);
-          });
-
-      if (hasSafeConformances)
-        return true;
-
-      // Truly empty extensions are safe, it may happen in swiftinterfaces.
-      if (members.empty() && protocols.size() == 0)
-        return true;
-
-      return false;
-    }
-
-    if (auto pbd = dyn_cast<PatternBindingDecl>(decl)) {
-      // Pattern bindings are safe if any of their var decls are safe.
-      for (auto i : range(pbd->getNumPatternEntries())) {
-        if (auto *varDecl = pbd->getAnchoringVarDecl(i)) {
-          if (isDeserializationSafe(varDecl))
-            return true;
-        }
-      }
-
-      return false;
-    }
-
-    return isDeserializationSafe(cast<ValueDecl>(decl));
-  }
-
-  static bool isDeserializationSafe(const ValueDecl *value) {
-    // A decl is safe if formally accessible publicly.
-    auto accessScope =
-        value->getFormalAccessScope(/*useDC=*/nullptr,
-                                    /*treatUsableFromInlineAsPublic=*/true);
-    if (accessScope.isPublic() || accessScope.isPackage())
-      return true;
-
-    if (auto accessor = dyn_cast<AccessorDecl>(value))
-      // Accessors are as safe as their storage.
-      if (isDeserializationSafe(accessor->getStorage()))
-        return true;
-
-    // Frozen fields are always safe.
-    if (auto var = dyn_cast<VarDecl>(value)) {
-      if (var->isLayoutExposedToClients())
-        return true;
-
-      // Consider all lazy var storage as "safe".
-      // FIXME: We should keep track of what lazy var is associated to the
-      //        storage for them to preserve the same safeness.
-      if (var->isLazyStorageProperty())
-        return true;
-
-      // Property wrappers storage is as safe as the wrapped property.
-      if (VarDecl *wrapped = var->getOriginalWrappedProperty())
-        if (isDeserializationSafe(wrapped))
-          return true;
-    }
-
-    // Paramters don't have meaningful access control.
-    if (isa<ParamDecl>(value) || isa<GenericTypeParamDecl>(value))
-      return true;
-
-    return false;
+    return DeclExportabilityVisitor().visit(decl);
   }
 
 private:

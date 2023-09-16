@@ -168,6 +168,26 @@ class InternalClass: DoesNotExist { // expected-error {{cannot find type 'DoesNo
   init(x: DoesNotExist) {} // expected-error {{cannot find type 'DoesNotExist' in scope}}
 }
 
+public enum PublicEnum {
+  case a
+  case b(x: Int)
+
+  public func publicMethod() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+
+  public var publicComputedVar: Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+}
+
+enum InternalEnum {
+  case bad(DoesNotExist) // expected-error {{cannot find type 'DoesNotExist' in scope}}
+
+  func method() -> DoesNotExist { // expected-error {{cannot find type 'DoesNotExist' in scope}}
+  }
+}
+
 // MARK: - Conformances
 
 public struct PublicStructConformingToPublicProto: PublicProto {
@@ -222,4 +242,32 @@ extension PublicGenericStruct where T == InternalStructForConstraint {}
 
 extension PublicGenericStruct: EmptyPublicProto where T == InternalStructForConstraint {}
 
-// FIXME: Test enums
+// MARK: - Type aliases
+
+public typealias PublicStructAlias = PublicStruct
+typealias InternalTypeAlias = DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
+
+// MARK: - Compiler directives
+
+extension PublicStruct {
+#if FLAG
+  public static func activeMethod() {}
+#else
+  public static func inactiveMethod() -> DoesNotExist {}
+#endif
+}
+
+// MARK: - Operators & Precedence Groups
+
+precedencegroup FooPrecedence {
+  assignment: true
+  associativity: right
+}
+
+infix operator <<<: FooPrecedence
+
+extension PublicStruct {
+  public static func <<<(lhs: inout Self, rhs: Self) {
+    lhs = rhs
+  }
+}
