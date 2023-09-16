@@ -17,12 +17,12 @@ where Indices == Range<Int> {
   /// The number of elements the Array can store without reallocation.
   var capacity: Int { get }
 
-  /// An object that guarantees the lifetime of this array's elements.
-  #if !$Embedded
-  var _owner: AnyObject? { get }
-  #else
-  var _owner: Builtin.NativeObject? { get }
+  #if $Embedded
+  typealias AnyObject = Builtin.NativeObject
   #endif
+
+  /// An object that guarantees the lifetime of this array's elements.
+  var _owner: AnyObject? { get }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.

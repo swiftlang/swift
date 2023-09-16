@@ -844,31 +844,25 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 #endif
 
-  #if !$Embedded
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
+
   /// An object that keeps the elements stored in this buffer alive.
   @inlinable
   internal var owner: AnyObject {
+    #if !$Embedded
     return _storage
+    #else
+    return Builtin.castToNativeObject(_storage)
+    #endif
   }
 
   /// An object that keeps the elements stored in this buffer alive.
   @inlinable
   internal var nativeOwner: AnyObject {
-    return _storage
+    return owner
   }
-  #else
-  /// An object that keeps the elements stored in this buffer alive.
-  @inlinable
-  internal var owner: Builtin.NativeObject {
-    return Builtin.castToNativeObject(_storage)
-  }
-
-  /// An object that keeps the elements stored in this buffer alive.
-  @inlinable
-  internal var nativeOwner: Builtin.NativeObject {
-    return Builtin.castToNativeObject(_storage)
-  }
-  #endif
 
   /// A value that identifies the storage used by the buffer.
   ///

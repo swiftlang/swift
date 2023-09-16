@@ -26,14 +26,9 @@ internal struct _SliceBuffer<Element>
   @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
-  #if $Embedded
   /// An object that keeps the elements stored in this buffer alive.
   @usableFromInline
-  internal var owner: Builtin.NativeObject
-  #else
-  @usableFromInline
   internal var owner: AnyObject
-  #endif
 
   @usableFromInline
   internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
