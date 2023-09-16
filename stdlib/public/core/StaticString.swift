@@ -206,7 +206,7 @@ public struct StaticString: Sendable {
         start: utf8Start, count: utf8CodeUnitCount))
     } else {
       #if $Embedded
-      fatalError()
+      fatalError("non-pointer representation not support in embedded Swift")
       #else
       return unicodeScalar.withUTF8CodeUnits { body($0) }
       #endif
