@@ -2735,7 +2735,7 @@ extension FixedWidthInteger {
     // If we used &+ instead, the result would be zero, which isn't helpful,
     // so we actually need to handle this case separately.
     if delta == Magnitude.max {
-      return Self(truncatingIfNeeded: generator.next())
+      return Self(truncatingIfNeeded: generator.next() as Magnitude)
     }
     // Need to widen delta to account for the right-endpoint of a closed range.
     delta += 1
