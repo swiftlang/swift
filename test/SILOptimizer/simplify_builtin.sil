@@ -383,3 +383,110 @@ bb0:
   return %4 : $Int8
 }
 
+// CHECK-LABEL: sil @convert_thick_to_thin1
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "copyArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin1 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "copyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin2
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayNoAlias"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin2 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayNoAlias"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin3
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayFrontToBack"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin3 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayFrontToBack"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin4
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayBackToFront"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin4 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayBackToFront"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin5
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayNoAlias"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin5 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayNoAlias"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin6
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayFrontToBack"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin6 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayFrontToBack"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin7
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayBackToFront"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin7 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayBackToFront"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin8
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignTakeArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin8 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignTakeArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin9
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "destroyArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin9 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "destroyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}

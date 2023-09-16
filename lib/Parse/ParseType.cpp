@@ -588,7 +588,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 /// \param sourceLoc The source location at which to start processing a type.
 /// \param endSourceLoc Will receive the source location immediately following the type.
 extern "C" TypeRepr *swift_ASTGen_buildTypeRepr(
-    void *sourceFile, const void *_Nullable sourceLoc,
+    void *diagEngine, void *sourceFile, const void *_Nullable sourceLoc,
     void *declContext, void *astContext, const void *_Nullable *endSourceLoc);
 
 /// parseType
@@ -606,7 +606,7 @@ ParserResult<TypeRepr> Parser::parseType(
       [&](void *exportedSourceFile, const void *sourceLoc) {
         const void *endLocPtr = nullptr;
         TypeRepr *typeRepr = swift_ASTGen_buildTypeRepr(
-            exportedSourceFile, Tok.getLoc().getOpaquePointerValue(),
+            &Diags, exportedSourceFile, Tok.getLoc().getOpaquePointerValue(),
             CurDeclContext, &Context, &endLocPtr);
         return std::make_pair(typeRepr, endLocPtr);
       });

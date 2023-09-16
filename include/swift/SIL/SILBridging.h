@@ -1357,6 +1357,13 @@ struct BridgedBuilder{
                                                instance.getSILValue(),
                                                src->getConformances())};
   }
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction createMetatype(swift::SILType type, swift::MetatypeRepresentation representation) const {
+    swift::MetatypeType *mt = swift::MetatypeType::get(type.getASTType(), representation);
+    swift::SILType t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
+    return {builder().createMetatype(regularLoc(), t)};
+  }
 };
 
 // AST bridging
