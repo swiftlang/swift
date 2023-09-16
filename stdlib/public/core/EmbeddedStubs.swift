@@ -104,6 +104,9 @@ extension String {
 }
 
 @_unavailableInEmbedded
+extension String: ExpressibleByStringInterpolation { }
+
+@_unavailableInEmbedded
 public protocol LosslessStringConvertible: CustomStringConvertible {
   init?(_ description: String)
 }

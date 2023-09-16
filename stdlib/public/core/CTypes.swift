@@ -268,15 +268,11 @@ public struct CVaListPointer {
 @_unavailableInEmbedded
 extension CVaListPointer: CustomDebugStringConvertible {
   public var debugDescription: String {
-    #if !$Embedded
     return "(\(_value.__stack.debugDescription), " +
            "\(_value.__gr_top.debugDescription), " +
            "\(_value.__vr_top.debugDescription), " +
            "\(_value.__gr_off), " +
            "\(_value.__vr_off))"
-    #else
-    fatalError()
-    #endif
   }
 }
 

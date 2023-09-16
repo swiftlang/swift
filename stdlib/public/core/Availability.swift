@@ -109,14 +109,10 @@ extension _SwiftStdlibVersion {
 extension _SwiftStdlibVersion: CustomStringConvertible {
   @available(SwiftStdlib 5.7, *)
   public var description: String {
-    #if $Embedded
-    fatalError()
-    #else
     let major = _value >> 16
     let minor = (_value >> 8) & 0xFF
     let patch = _value & 0xFF
     return "\(major).\(minor).\(patch)"
-    #endif
   }
 }
 

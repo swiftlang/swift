@@ -1194,12 +1194,8 @@ extension Unsafe${Mutable}BufferPointer {
 extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
-  #if $Embedded
-  fatalError()
-  #else
     return "Unsafe${Mutable}BufferPointer"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
-  #endif
   }
 }
 %end

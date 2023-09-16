@@ -3046,7 +3046,14 @@ extension FixedWidthInteger {
   @inline(__always)
   public init<T: BinaryFloatingPoint>(_ source: T) {
     guard let value = Self._convert(from: source).value else {
-      fatalError()
+      #if !$Embedded
+      fatalError("""
+        \(T.self) value cannot be converted to \(Self.self) because it is \
+        outside the representable range
+        """)
+      #else
+      fatalError("value not representable")
+      #endif
     }
     self = value
   }
