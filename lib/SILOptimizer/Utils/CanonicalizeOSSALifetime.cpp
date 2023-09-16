@@ -1124,7 +1124,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     clear();
     return false;
   }
-  if (currentDef->isLexical()) {
+  if (respectsDeinitBarriers()) {
     extendLivenessToDeinitBarriers();
   }
   if (accessBlockAnalysis) {

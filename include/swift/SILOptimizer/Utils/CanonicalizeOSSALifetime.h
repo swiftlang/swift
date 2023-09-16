@@ -396,6 +396,13 @@ public:
   UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
+  bool respectsDeinitBarriers() const {
+    if (!currentDef->isLexical())
+      return false;
+    auto &module = currentDef->getFunction()->getModule();
+    return module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
+  }
+
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) {
