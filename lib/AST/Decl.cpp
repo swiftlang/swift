@@ -10209,12 +10209,14 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
     }
 
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      switch (auto isolation = closure->getClosureActorIsolation()) {
-      case ClosureActorIsolation::Nonisolated:
-      case ClosureActorIsolation::GlobalActor:
+      switch (auto isolation = closure->getActorIsolation()) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
         return false;
 
-      case ClosureActorIsolation::ActorInstance:
+      case ActorIsolation::ActorInstance:
         auto isolatedVar = isolation.getActorInstance();
         return isolatedVar->isSelfParameter() ||
             isolatedVar-isSelfParamCapture();

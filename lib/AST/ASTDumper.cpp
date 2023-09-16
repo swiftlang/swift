@@ -2592,16 +2592,18 @@ public:
     PrintWithColorRAII(OS, DiscriminatorColor)
       << " discriminator=" << E->getRawDiscriminator();
 
-    switch (auto isolation = E->getClosureActorIsolation()) {
-    case ClosureActorIsolation::Nonisolated:
+    switch (auto isolation = E->getActorIsolation()) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
       break;
 
-    case ClosureActorIsolation::ActorInstance:
+    case ActorIsolation::ActorInstance:
       PrintWithColorRAII(OS, CapturesColor) << " actor-isolated="
         << isolation.getActorInstance()->printRef();
       break;
 
-    case ClosureActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       PrintWithColorRAII(OS, CapturesColor) << " global-actor-isolated="
         << isolation.getGlobalActor().getString();
       break;

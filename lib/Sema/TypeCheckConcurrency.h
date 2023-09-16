@@ -33,7 +33,6 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
-class ClosureActorIsolation;
 class ClosureExpr;
 class ConcreteDeclRef;
 class CustomAttr;
