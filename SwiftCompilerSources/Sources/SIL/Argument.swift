@@ -52,28 +52,40 @@ final public class FunctionArgument : Argument {
   }
 }
 
-final public class BlockArgument : Argument {
-  public var isPhiArgument: Bool {
-    parentBlock.predecessors.allSatisfy {
-      let term = $0.terminator
-      return term is BranchInst || term is CondBranchInst
-    }
+public struct Phi {
+  public let value: Argument
+
+  // TODO: Remove the CondBr case. All passes avoid critical edges. It is only included here for compatibility with .sil tests that have not been migrated.
+  public init?(_ value: Value) {
+    guard let argument = value as? Argument else { return nil }
+    var preds = argument.parentBlock.predecessors
+    guard let pred = preds.next() else { return nil }
+    let term = pred.terminator
+    guard term is BranchInst || term is CondBranchInst else { return nil }
+    self.value = argument
+  }
+  
+  public var predecessors: PredecessorList {
+    return value.parentBlock.predecessors
   }
 
-  public var incomingPhiOperands: LazyMapSequence<PredecessorList, Operand> {
-    assert(isPhiArgument)
-    let idx = index
-    return parentBlock.predecessors.lazy.map {
+  public var successor: BasicBlock {
+    return value.parentBlock
+  }
+
+  public var incomingOperands: LazyMapSequence<PredecessorList, Operand> {
+    let blockArgIdx = value.index
+    return predecessors.lazy.map {
       switch $0.terminator {
         case let br as BranchInst:
-          return br.operands[idx]
+          return br.operands[blockArgIdx]
         case let condBr as CondBranchInst:
-          if condBr.trueBlock == self.parentBlock {
-            assert(condBr.falseBlock != self.parentBlock)
-            return condBr.trueOperands[idx]
+          if condBr.trueBlock == successor {
+            assert(condBr.falseBlock != successor)
+            return condBr.trueOperands[blockArgIdx]
           } else {
-            assert(condBr.falseBlock == self.parentBlock)
-            return condBr.falseOperands[idx]
+            assert(condBr.falseBlock == successor)
+            return condBr.falseOperands[blockArgIdx]
           }
         default:
           fatalError("wrong terminator for phi-argument")
@@ -81,8 +93,50 @@ final public class BlockArgument : Argument {
     }
   }
 
-  public var incomingPhiValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
-    incomingPhiOperands.lazy.map { $0.value }
+  public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
+    incomingOperands.lazy.map { $0.value }
+  }
+
+  public static func ==(lhs: Phi, rhs: Phi) -> Bool {
+    lhs.value === rhs.value
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
+  }
+}
+
+public struct TerminatorResult {
+  public let value: Argument
+
+  public init?(_ value: Value) {
+    guard let argument = value as? Argument else { return nil }
+    var preds = argument.parentBlock.predecessors
+    guard let pred = preds.next() else { return nil }
+    let term = pred.terminator
+    if term is BranchInst || term is CondBranchInst { return nil }
+    self.value = argument
+  }
+
+  public var terminator: TermInst {
+    var preds = value.parentBlock.predecessors
+    return preds.next()!.terminator
+  }
+  
+  public var predecessor: BasicBlock {
+    return terminator.parentBlock
+  }
+
+  public var successor: BasicBlock {
+    return value.parentBlock
+  }
+
+  public static func ==(lhs: TerminatorResult, rhs: TerminatorResult) -> Bool {
+    lhs.value == rhs.value
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
   }
 }
 
@@ -242,7 +296,6 @@ public enum ArgumentConvention {
 
 extension BridgedArgument {
   public var argument: Argument { obj.getAs(Argument.self) }
-  public var blockArgument: BlockArgument { obj.getAs(BlockArgument.self) }
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
 }
 

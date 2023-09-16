@@ -69,7 +69,7 @@ void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
     return SILBasicBlock::registerBridgedMetatype(metatype);
   if (className == "GlobalVariable")
     return SILGlobalVariable::registerBridgedMetatype(metatype);
-  if (className == "BlockArgument") {
+  if (className == "Argument") {
     nodeMetatypes[(unsigned)SILNodeKind::SILPhiArgument] = metatype;
     return;
   }
