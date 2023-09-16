@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -target arm64-apple-macosx10.13 -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-tbd-path %t/lazy_typecheck.tbd -enable-library-evolution -parse-as-library -package-name Package -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
+// RUN: %target-swift-frontend -target arm64-apple-macosx10.13 -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-tbd-path %t/lazy_typecheck.tbd -enable-library-evolution -parse-as-library -package-name Package -DFLAG -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
 // RUN: %llvm-readtapi %t/lazy_typecheck.tbd %t/expected.tbd
 
 // REQUIRES: OS=macosx
@@ -56,7 +56,12 @@ exports:
                        '_$s14lazy_typecheck034PublicStructIndirectlyConformingToC5ProtoVMa',
                        '_$s14lazy_typecheck034PublicStructIndirectlyConformingToC5ProtoVMn',
                        '_$s14lazy_typecheck034PublicStructIndirectlyConformingToC5ProtoVN',
-                       '_$s14lazy_typecheck10publicFuncSiyF', '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTj',
+                       '_$s14lazy_typecheck10PublicEnumO12publicMethodSiyF', '_$s14lazy_typecheck10PublicEnumO17publicComputedVarSivg',
+                       '_$s14lazy_typecheck10PublicEnumO17publicComputedVarSivpMV',
+                       '_$s14lazy_typecheck10PublicEnumO1ayA2CmFWC', '_$s14lazy_typecheck10PublicEnumO1byACSi_tcACmFWC',
+                       '_$s14lazy_typecheck10PublicEnumOMa', '_$s14lazy_typecheck10PublicEnumOMn',
+                       '_$s14lazy_typecheck10PublicEnumON', '_$s14lazy_typecheck10publicFuncSiyF',
+                       '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTj',
                        '_$s14lazy_typecheck11PublicClassC06publicD6MethodyyFZTq',
                        '_$s14lazy_typecheck11PublicClassC12publicMethodSiyFTj', '_$s14lazy_typecheck11PublicClassC12publicMethodSiyFTq',
                        '_$s14lazy_typecheck11PublicClassC14publicPropertySivMTj',
@@ -81,8 +86,8 @@ exports:
                        '_$s14lazy_typecheck11PublicClassCfD', '_$s14lazy_typecheck11PublicClassCfd',
                        '_$s14lazy_typecheck11PublicProtoMp', '_$s14lazy_typecheck11PublicProtoP3reqSiyFTj',
                        '_$s14lazy_typecheck11PublicProtoP3reqSiyFTq', '_$s14lazy_typecheck11PublicProtoTL',
-                       '_$s14lazy_typecheck11packageFuncSiyF', '_$s14lazy_typecheck12PublicStructV12publicMethodSiyF',
-                       '_$s14lazy_typecheck12PublicStructV14publicPropertySivM',
+                       '_$s14lazy_typecheck11packageFuncSiyF', '_$s14lazy_typecheck12PublicStructV12activeMethodyyFZ',
+                       '_$s14lazy_typecheck12PublicStructV12publicMethodSiyF', '_$s14lazy_typecheck12PublicStructV14publicPropertySivM',
                        '_$s14lazy_typecheck12PublicStructV14publicPropertySivg',
                        '_$s14lazy_typecheck12PublicStructV14publicPropertySivpMV',
                        '_$s14lazy_typecheck12PublicStructV14publicPropertySivs',
@@ -97,8 +102,9 @@ exports:
                        '_$s14lazy_typecheck12PublicStructV26publicPropertyInferredTypeSSvg',
                        '_$s14lazy_typecheck12PublicStructV26publicPropertyInferredTypeSSvpMV',
                        '_$s14lazy_typecheck12PublicStructV26publicPropertyInferredTypeSSvs',
-                       '_$s14lazy_typecheck12PublicStructVMa', '_$s14lazy_typecheck12PublicStructVMn',
-                       '_$s14lazy_typecheck12PublicStructVN', '_$s14lazy_typecheck13PublicWrapperV12wrappedValueACyxGx_tcfC',
+                       '_$s14lazy_typecheck12PublicStructV3llloiyyACz_ACtFZ', '_$s14lazy_typecheck12PublicStructVMa',
+                       '_$s14lazy_typecheck12PublicStructVMn', '_$s14lazy_typecheck12PublicStructVN',
+                       '_$s14lazy_typecheck13PublicWrapperV12wrappedValueACyxGx_tcfC',
                        '_$s14lazy_typecheck13PublicWrapperV12wrappedValuexvM', '_$s14lazy_typecheck13PublicWrapperV12wrappedValuexvg',
                        '_$s14lazy_typecheck13PublicWrapperV12wrappedValuexvpMV',
                        '_$s14lazy_typecheck13PublicWrapperV12wrappedValuexvs', '_$s14lazy_typecheck13PublicWrapperV14projectedValueACyxGvg',
