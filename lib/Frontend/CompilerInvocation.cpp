@@ -1327,6 +1327,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
       HadError = true;
     }
+
+    if (FrontendOpts.InputsAndOutputs.hasPrimaryInputs()) {
+      Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
+      HadError = true;
+    }
   }
 
   if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
@@ -1342,15 +1347,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       HadError = true;
     }
-  }
-
-  // Is this the correct way to query for WMO?
-  bool isWMO =
-    Args.hasArg(OPT_wmo) ||
-    Args.hasArg(OPT_whole_module_optimization);
-  if (!isWMO && Opts.hasFeature(Feature::Embedded)) {
-    Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
-    HadError = true;
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
