@@ -2606,11 +2606,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
   if (auto *func = dyn_cast<FuncDecl>(DC)) {
     if (Type builderType = getResultBuilderType(func)) {
       if (func->getBody()) {
-        auto optBody = TypeChecker::applyResultBuilderBodyTransform(
-            func, builderType,
-            /*ClosuresInResultBuilderDontParticipateInInference=*/
-            ctx.CompletionCallback == nullptr &&
-                ctx.SolutionCallback == nullptr);
+        auto optBody =
+            TypeChecker::applyResultBuilderBodyTransform(func, builderType);
         if ((ctx.CompletionCallback && ctx.CompletionCallback->gotCallback()) ||
             (ctx.SolutionCallback && ctx.SolutionCallback->gotCallback())) {
           // We already informed the completion callback of solutions found by
@@ -2633,31 +2630,14 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
     }
   }
 
-  // The enclosing closure might be a single expression closure or a function
-  // builder closure. In such cases, the body elements are type checked with
-  // the closure itself. So we need to try type checking the enclosing closure
-  // signature first unless it has already been type checked.
+  // If the context is a closure, type check the entire surrounding closure.
+  // Conjunction constraints ensure that statements unrelated to the one that
+  // contains the code completion token are not type checked.
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
     if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
       swift::typeCheckASTNodeAtLoc(
           TypeCheckASTNodeAtLocContext::declContext(CE->getParent()),
           CE->getLoc());
-      // We need the actor isolation of the closure to be set so that we can
-      // annotate results that are on the same global actor.
-      // Since we are evaluating TypeCheckASTNodeAtLocRequest for every closure
-      // from outermost to innermost, we don't want to call checkActorIsolation,
-      // because that would cause actor isolation to be checked multiple times
-      // for nested closures. Instead, call determineClosureActorIsolation
-      // directly and set the closure's actor isolation manually. We can
-      // guarantee of that the actor isolation of enclosing closures have their
-      // isolation checked before nested ones are being checked by the way
-      // TypeCheckASTNodeAtLocRequest is called multiple times, as described
-      // above.
-      auto ActorIsolation = determineClosureActorIsolation(
-          CE, __Expr_getType, __AbstractClosureExpr_getActorIsolation);
-      CE->setActorIsolation(ActorIsolation);
-      // Type checking the parent closure also type checked this node.
-      // Nothing to do anymore.
       return false;
     }
   }

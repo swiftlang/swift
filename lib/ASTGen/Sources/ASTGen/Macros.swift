@@ -13,7 +13,6 @@
 import CASTBridging
 import SwiftDiagnostics
 import SwiftOperators
-import SwiftParser
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 import SwiftSyntaxMacroExpansion

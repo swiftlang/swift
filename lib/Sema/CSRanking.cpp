@@ -1008,7 +1008,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // problems with restating requirements in protocols.
     identical = false;
 
-    if (cs.Context.CompletionCallback) {
+    if (cs.isForCodeCompletion()) {
       // Don't rank based on overload choices of function calls that contain the
       // code completion token.
       ASTNode anchor = simplifyLocatorToAnchor(overload.locator);

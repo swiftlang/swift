@@ -1,8 +1,8 @@
 // Building with regular Swift should succeed
-// RUN: %target-swift-emit-ir %s -parse-stdlib
+// RUN: %target-swift-emit-ir %s -parse-stdlib  -wmo
 
 // Building with embedded Swift should produce unavailability errors
-// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded
+// RUN: %target-typecheck-verify-swift -parse-stdlib -enable-experimental-feature Embedded  -wmo
 
 @_unavailableInEmbedded
 public func embedded() { }
