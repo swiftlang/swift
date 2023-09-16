@@ -7,8 +7,8 @@
 // - (2) unavailable function bodies is removed in embedded Swift,
 // - (3) the test() function is not reported by the existential checker.
 
-// RUN: %target-swift-frontend -emit-ir %s -parse-stdlib | %FileCheck %s --check-prefix CHECK-A
-// RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded | %FileCheck %s --check-prefix CHECK-B
+// RUN: %target-swift-frontend -emit-ir %s -parse-stdlib  -wmo | %FileCheck %s --check-prefix CHECK-A
+// RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s --check-prefix CHECK-B
 
 public protocol Player {}
 struct Concrete: Player {}

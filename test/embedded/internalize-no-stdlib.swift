@@ -1,7 +1,7 @@
 // This test checks that embedded Swift doesn't mark public functions/symbols as llvm.used / llvm.compiler.used
 
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-elf | %FileCheck %s --check-prefix CHECK-ELF
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-macho | %FileCheck %s --check-prefix CHECK-MACHO
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-elf -wmo | %FileCheck %s --check-prefix CHECK-ELF
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-macho -wmo | %FileCheck %s --check-prefix CHECK-MACHO
 
 // REQUIRES: swift_in_compiler
 
