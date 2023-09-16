@@ -428,10 +428,17 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   llvm_unreachable("Unhandled SDKNodeKind in switch");
 }
 
-SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
+SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx, ArrayRef<ModuleDecl*> modules) {
   SDKNodeInitInfo Info(Ctx);
-  Info.Name = Ctx.buffer("TopLevel");
-  Info.PrintedName = Ctx.buffer("TopLevel");
+  StringRef name = Ctx.buffer("NO_MODULE");
+  if (modules.size() == 1) {
+    // use the module name
+    name = Ctx.buffer(modules[0]->getName().str());
+  } else if (!modules.empty()) {
+    name = Ctx.buffer("MULTI_MODULES");
+  }
+  Info.Name = name;
+  Info.PrintedName = name;
   llvm::transform(Ctx.getOpts().ToolArgs, std::back_inserter(Info.ToolArgs),
                   [&](std::string s) { return Ctx.buffer(s); });
   Info.JsonFormatVer = DIGESTER_JSON_VERSION;
@@ -1976,8 +1983,13 @@ void SwiftDeclCollector::printTopLevelNames() {
     llvm::outs() << Node->getKind() << ": " << Node->getName() << '\n';
   }
 }
-
-void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
+SwiftDeclCollector::SwiftDeclCollector(SDKContext &Ctx,
+                                       ArrayRef<ModuleDecl*> Modules) : Ctx(Ctx),
+    RootNode(SDKNodeRoot::getInstance(Ctx, Modules)) {
+  if (Modules.empty()) {
+    return;
+  }
+  assert(!Modules.empty());
   for (auto M: Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     swift::getTopLevelDeclsForDisplay(M, Decls);
@@ -2544,8 +2556,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   if (Opts.Verbose)
     llvm::errs() << "Scanning symbols...\n";
 
-  SwiftDeclCollector Collector(SDKCtx);
-  Collector.lookupVisibleDecls(Modules);
+  SwiftDeclCollector Collector(SDKCtx, Modules);
   return Collector.getSDKRoot();
 }
 
@@ -2603,7 +2614,11 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os,
   opts.SkipRemoveDeprecatedCheck = false;
   opts.Verbose = false;
   SDKContext ctx(opts);
-  SwiftDeclCollector collector(ctx);
+  llvm::SmallVector<ModuleDecl*, 4> modules;
+  if (!Empty) {
+    modules.push_back(MD);
+  }
+  SwiftDeclCollector collector(ctx, modules);
   ConstExtractor extractor(ctx, MD->getASTContext());
   PayLoad payload;
   SWIFT_DEFER {
@@ -2613,7 +2628,6 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os,
   if (Empty) {
     return;
   }
-  collector.lookupVisibleDecls({MD});
   extractor.extract(MD);
 }
 
