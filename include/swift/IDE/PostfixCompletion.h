@@ -63,7 +63,7 @@ class PostfixCompletionCallback : public TypeCheckCompletionCallback {
 
     /// Actor isolations that were determined during constraint solving but that
     /// haven't been saved to the AST.
-    llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+    llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
         ClosureActorIsolations;
 
     /// Checks whether this result has the same \c BaseTy and \c BaseDecl as

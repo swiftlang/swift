@@ -2012,14 +2012,9 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
   return nullptr;
 }
 
-ClosureActorIsolation
+ActorIsolation
 swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
-  return CE->getClosureActorIsolation();
-}
-
-llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
-swift::_getRef__AbstractClosureExpr_getActorIsolation() {
-  return __AbstractClosureExpr_getActorIsolation;
+  return CE->getActorIsolation();
 }
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
