@@ -83,7 +83,7 @@ public:
 
 private:
   union {
-    NominalTypeDecl *actor;
+    llvm::PointerUnion<NominalTypeDecl *, VarDecl *> actorInstance;
     Type globalActor;
     void *pointer;
   };
@@ -91,9 +91,9 @@ private:
   unsigned isolatedByPreconcurrency : 1;
   unsigned parameterIndex : 28;
 
-  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex)
-      : actor(actor), kind(kind), isolatedByPreconcurrency(false),
-        parameterIndex(parameterIndex) { }
+  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
+
+  ActorIsolation(Kind kind, VarDecl *capturedActor);
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
@@ -115,6 +115,10 @@ public:
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+  }
+
+  static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
+    return ActorIsolation(ActorInstance, capturedActor);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
@@ -151,10 +155,9 @@ public:
     }
   }
 
-  NominalTypeDecl *getActor() const {
-    assert(getKind() == ActorInstance);
-    return actor;
-  }
+  NominalTypeDecl *getActor() const;
+
+  VarDecl *getCapturedActor() const;
 
   bool isGlobalActor() const {
     return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
@@ -200,7 +203,8 @@ public:
       return true;
 
     case ActorInstance:
-      return lhs.actor == rhs.actor && lhs.parameterIndex == rhs.parameterIndex;
+      return (lhs.getActor() == rhs.getActor() &&
+              lhs.parameterIndex == rhs.parameterIndex);
 
     case GlobalActor:
     case GlobalActorUnsafe:

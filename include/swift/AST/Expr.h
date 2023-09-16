@@ -3868,14 +3868,15 @@ class AbstractClosureExpr : public DeclContext, public Expr {
   ParameterList *parameterList;
 
   /// Actor isolation of the closure.
-  ClosureActorIsolation actorIsolation;
+  ActorIsolation actorIsolation;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
-        parameterList(nullptr) {
+        parameterList(nullptr),
+        actorIsolation(ActorIsolation::forUnspecified()) {
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
@@ -3948,12 +3949,35 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
-  ClosureActorIsolation getClosureActorIsolation() const {
+  ActorIsolation getActorIsolation() const {
     return actorIsolation;
   }
 
-  void setActorIsolation(ClosureActorIsolation actorIsolation) {
+  void setActorIsolation(ActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;
+  }
+
+  ClosureActorIsolation getClosureActorIsolation() const {
+    bool preconcurrency = actorIsolation.preconcurrency();
+
+    switch (actorIsolation) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+      return ClosureActorIsolation::forNonisolated(preconcurrency);
+
+    case ActorIsolation::ActorInstance:
+      return ClosureActorIsolation::forActorInstance(
+          actorIsolation.getCapturedActor(), preconcurrency);
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      return ClosureActorIsolation::forGlobalActor(
+          actorIsolation.getGlobalActor(), preconcurrency);
+    }
+  }
+
+  void setActorIsolation(ClosureActorIsolation closureIsolation) {
+    this->actorIsolation = closureIsolation.getActorIsolation();
   }
 
   static bool classof(const Expr *E) {
