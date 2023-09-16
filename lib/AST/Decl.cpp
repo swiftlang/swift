@@ -10333,7 +10333,7 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
 
 ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
-    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+    llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
@@ -10349,7 +10349,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getActorIsolation(var);
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
-    return getClosureActorIsolation(closure).getActorIsolation();
+    return getClosureActorIsolation(closure);
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
@@ -10619,7 +10619,7 @@ NominalTypeDecl *ActorIsolation::getActor() const {
   return actorInstance.get<NominalTypeDecl *>();
 }
 
-VarDecl *ActorIsolation::getCapturedActor() const {
+VarDecl *ActorIsolation::getActorInstance() const {
   assert(getKind() == ActorInstance);
   return actorInstance.dyn_cast<VarDecl *>();
 }

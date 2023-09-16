@@ -3970,7 +3970,7 @@ public:
 
     case ActorIsolation::ActorInstance:
       return ClosureActorIsolation::forActorInstance(
-          actorIsolation.getCapturedActor(), preconcurrency);
+          actorIsolation.getActorInstance(), preconcurrency);
 
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:

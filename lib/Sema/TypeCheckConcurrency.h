@@ -240,7 +240,7 @@ public:
       llvm::Optional<ReferencedActor> actorInstance = llvm::None,
       llvm::Optional<ActorIsolation> knownDeclIsolation = llvm::None,
       llvm::Optional<ActorIsolation> knownContextIsolation = llvm::None,
-      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+      llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
           getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
   operator Kind() const { return kind; }

@@ -131,7 +131,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool CanCurrDeclContextHandleAsync = false;
   /// Actor isolations that were determined during constraint solving but that
   /// haven't been saved to the AST.
-  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+  llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
       ClosureActorIsolations;
   bool HaveDot = false;
   bool IsUnwrappedOptional = false;
@@ -253,7 +253,7 @@ public:
   }
 
   void setClosureActorIsolations(
-      llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+      llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
           ClosureActorIsolations) {
     this->ClosureActorIsolations = ClosureActorIsolations;
   }

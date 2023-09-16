@@ -1593,7 +1593,7 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
   }
   auto isolation =
       getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
-        return CE->getClosureActorIsolation();
+        return CE->getActorIsolation();
       });
   if (isolation != ActorIsolation::Nonisolated
       && isolation != ActorIsolation::Unspecified) {
