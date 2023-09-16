@@ -603,7 +603,7 @@ class BuildScriptInvocation(object):
         # the build-script code base. The main difference is that these are all
         # build, tested, and installed all at once instead of performing build,
         # test, install like a normal build-script product.
-        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
+        builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
@@ -615,6 +615,11 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_lldb)
         builder.add_impl_product(products.LibDispatch,
                                  is_enabled=self.args.build_libdispatch)
+
+        # Begin a new build-script-impl pipeline that builds libraries that we
+        # build as part of build-script-impl but that we should eventually move
+        # onto build-script products.
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
         builder.add_impl_product(products.XCTest,
