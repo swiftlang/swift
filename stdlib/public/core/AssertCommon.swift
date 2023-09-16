@@ -89,7 +89,6 @@ internal func _fatalErrorFlags() -> UInt32 {
 @usableFromInline
 @inline(never)
 @_semantics("programtermination_point")
-@_alwaysEmitIntoClient
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
