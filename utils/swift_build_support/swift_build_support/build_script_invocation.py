@@ -629,10 +629,10 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftSyntax,
                             is_enabled=self.args.build_swiftsyntax)
-        builder.add_product(products.SKStressTester,
-                            is_enabled=self.args.build_skstresstester)
         builder.add_product(products.SwiftFormat,
                             is_enabled=self.args.build_swiftformat)
+        builder.add_product(products.SKStressTester,
+                            is_enabled=self.args.build_skstresstester)
         builder.add_product(products.SwiftEvolve,
                             is_enabled=self.args.build_swiftevolve)
         builder.add_product(products.IndexStoreDB,
