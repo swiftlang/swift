@@ -1,6 +1,5 @@
 import CASTBridging
 import CBasicBridging
-import SwiftParser
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
@@ -8,22 +7,19 @@ import SwiftSyntax
 
 extension ASTGenVisitor {
   func visit(_ node: GenericParameterClauseSyntax) -> ASTNode {
-    let lAngleLoc = bridgedSourceLoc(for: node.leftAngle)
-    let whereLoc = bridgedSourceLoc(for: node.genericWhereClause?.whereKeyword)
-    let rAngleLoc = bridgedSourceLoc(for: node.rightAngle)
-    return .misc(
-      self.withBridgedParametersAndRequirements(node) { params, reqs in
-        return GenericParamList_create(self.ctx, lAngleLoc, params, whereLoc, reqs, rAngleLoc)
-      })
+    .misc(
+      GenericParamList_create(
+        astContext: self.ctx,
+        leftAngleLoc: bridgedSourceLoc(for: node.leftAngle),
+        parameters: node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
+        genericWhereClause: self.visit(node.genericWhereClause)?.rawValue,
+        rightAngleLoc: bridgedSourceLoc(for: node.rightAngle)
+      )
+    )
   }
 
   func visit(_ node: GenericParameterSyntax) -> ASTNode {
-    var nodeName = node.name.text
-    let name = nodeName.withBridgedString { bridgedName in
-      return ASTContext_getIdentifier(ctx, bridgedName)
-    }
-    let nameLoc = bridgedSourceLoc(for: node.name)
-    let eachLoc = bridgedSourceLoc(for: node.eachKeyword)
+    let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
     var genericParameterIndex: Int?
     for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
@@ -38,62 +34,46 @@ extension ASTGenVisitor {
 
     return .decl(
       GenericTypeParamDecl_create(
-        self.ctx, self.declContext, name, nameLoc, eachLoc, SwiftInt(genericParameterIndex),
-        eachLoc.raw != nil))
+        astContext: self.ctx,
+        declContext: self.declContext,
+        eachKeywordLoc: self.bridgedSourceLoc(for: node.eachKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        inheritedType: self.visit(node.inheritedType)?.rawValue,
+        index: SwiftInt(genericParameterIndex)
+      )
+    )
   }
-}
 
-extension ASTGenVisitor {
-  private func withBridgedParametersAndRequirements<T>(
-    _ node: GenericParameterClauseSyntax,
-    action: (BridgedArrayRef, BridgedArrayRef) -> T
-  ) -> T {
-    var params = [UnsafeMutableRawPointer]()
-    var requirements = [BridgedRequirementRepr]()
-    for param in node.parameters {
-      let loweredParameter = self.visit(param).rawValue
-      params.append(loweredParameter)
-
-      guard let requirement = param.inheritedType else {
-        continue
-      }
-
-      let loweredRequirement = self.visit(requirement)
-      GenericTypeParamDecl_setInheritedType(self.ctx, loweredParameter, loweredRequirement.rawValue)
-    }
-
-    if let nodeRequirements = node.genericWhereClause?.requirements {
-      for requirement in nodeRequirements {
-        switch requirement.requirement {
-        case .conformanceRequirement(let conformance):
-          let firstType = self.visit(conformance.leftType).rawValue
-          let separatorLoc = bridgedSourceLoc(for: conformance.colon)
-          let secondType = self.visit(conformance.rightType).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .typeConstraint,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .sameTypeRequirement(let sameType):
-          let firstType = self.visit(sameType.leftType).rawValue
-          let separatorLoc = bridgedSourceLoc(for: sameType.equal)
-          let secondType = self.visit(sameType.rightType).rawValue
-          requirements.append(
-            BridgedRequirementRepr(
-              SeparatorLoc: separatorLoc,
-              Kind: .sameType,
-              FirstType: firstType,
-              SecondType: secondType))
-        case .layoutRequirement(_):
-          fatalError("Cannot handle layout requirements!")
-        }
+  func visit(_ node: GenericWhereClauseSyntax) -> ASTNode {
+    let requirements = node.requirements.lazy.map {
+      switch $0.requirement {
+      case .conformanceRequirement(let conformance):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.bridgedSourceLoc(for: conformance.colon),
+          Kind: .typeConstraint,
+          FirstType: self.visit(conformance.leftType).rawValue,
+          SecondType: self.visit(conformance.rightType).rawValue
+        )
+      case .sameTypeRequirement(let sameType):
+        return BridgedRequirementRepr(
+          SeparatorLoc: self.bridgedSourceLoc(for: sameType.equal),
+          Kind: .sameType,
+          FirstType: self.visit(sameType.leftType).rawValue,
+          SecondType: self.visit(sameType.rightType).rawValue
+        )
+      case .layoutRequirement(_):
+        // FIXME: Implement layout requirement translation.
+        fatalError("Translation of layout requirements not implemented!")
       }
     }
-    return params.withBridgedArrayRef { params in
-      return requirements.withBridgedArrayRef { reqs in
-        return action(params, reqs)
-      }
-    }
+
+    return .misc(
+      TrailingWhereClause_create(
+        astContext: self.ctx,
+        whereKeywordLoc: self.bridgedSourceLoc(for: node.whereKeyword),
+        requirements: requirements.bridgedArray(in: self)
+      )
+    )
   }
 }

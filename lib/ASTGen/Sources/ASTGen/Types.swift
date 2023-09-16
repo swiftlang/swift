@@ -1,9 +1,9 @@
 import CASTBridging
-import SwiftParser
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
 import SwiftSyntax
+import SwiftDiagnostics
 
 extension ASTGenVisitor {
   public func visit(_ node: IdentifierTypeSyntax) -> ASTNode {
@@ -14,25 +14,26 @@ extension ASTGenVisitor {
       return .type(EmptyCompositionTypeRepr_create(self.ctx, loc))
     }
 
-    var text = node.name.text
-    let id = text.withBridgedString { bridgedText in
-      return ASTContext_getIdentifier(ctx, bridgedText)
-    }
+    let id = node.name.bridgedIdentifier(in: self)
 
     guard let generics = node.genericArgumentClause else {
       return .type(SimpleIdentTypeRepr_create(ctx, loc, id))
     }
 
-    let lAngle = bridgedSourceLoc(for: generics.leftAngle)
-    let rAngle = bridgedSourceLoc(for: generics.rightAngle)
+    let genericArguments = generics.arguments.lazy.map {
+      self.visit($0.argument).rawValue
+    }
+
     return .type(
-      generics.arguments.map({
-        self.visit($0.argument).rawValue
-      }).withBridgedArrayRef {
-          genericArgs in
-          GenericIdentTypeRepr_create(
-            self.ctx, id, loc, genericArgs, lAngle, rAngle)
-      })
+      GenericIdentTypeRepr_create(
+        self.ctx,
+        id,
+        loc,
+        genericArguments.bridgedArray(in: self),
+        bridgedSourceLoc(for: generics.leftAngle),
+        bridgedSourceLoc(for: generics.rightAngle)
+      )
+    )
   }
 
   public func visit(_ node: MemberTypeSyntax) -> ASTNode {
@@ -41,23 +42,23 @@ extension ASTGenVisitor {
 
     var baseType = Syntax(node)
     while let memberType = baseType.as(MemberTypeSyntax.self) {
-      let nameToken = memberType.name
-      let generics = memberType.genericArgumentClause
+      let (name, nameLoc) = memberType.name.bridgedIdentifierAndSourceLoc(in: self)
 
-      var nameText = nameToken.text
-      let name = nameText.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      }
-      let nameLoc = bridgedSourceLoc(for: nameToken)
+      if let generics = memberType.genericArgumentClause {
+        let genericArguments = generics.arguments.lazy.map {
+          self.visit($0.argument).rawValue
+        }
 
-      if let generics = generics {
-        let lAngle = bridgedSourceLoc(for: generics.leftAngle)
-        let rAngle = bridgedSourceLoc(for: generics.rightAngle)
         reverseMemberComponents.append(
-          generics.arguments.map({ self.visit($0.argument).rawValue }).withBridgedArrayRef {
-            genericArgs in
-            GenericIdentTypeRepr_create(self.ctx, name, nameLoc, genericArgs, lAngle, rAngle)
-          })
+          GenericIdentTypeRepr_create(
+            self.ctx,
+            name,
+            nameLoc,
+            genericArguments.bridgedArray(in: self),
+            bridgedSourceLoc(for: generics.leftAngle),
+            bridgedSourceLoc(for: generics.rightAngle)
+          )
+        )
       } else {
         reverseMemberComponents.append(SimpleIdentTypeRepr_create(self.ctx, nameLoc, name))
       }
@@ -66,11 +67,9 @@ extension ASTGenVisitor {
     }
 
     let baseComponent = visit(baseType).rawValue
+    let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
 
-    return .type(
-      reverseMemberComponents.reversed().withBridgedArrayRef { memberComponents in
-        return MemberTypeRepr_create(self.ctx, baseComponent, memberComponents)
-      })
+    return .type(MemberTypeRepr_create(self.ctx, baseComponent, memberComponents))
   }
 
   public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
@@ -120,35 +119,50 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: TupleTypeSyntax) -> ASTNode {
-    return self.withBridgedTupleElements(node.elements) { elements in
-      let lParenLoc = bridgedSourceLoc(for: node.leftParen)
-      let rParenLoc = bridgedSourceLoc(for: node.rightParen)
-      return .type(TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc))
-    }
+    .type(
+      TupleTypeRepr_create(
+        self.ctx,
+        self.visit(node.elements),
+        bridgedSourceLoc(for: node.leftParen),
+        bridgedSourceLoc(for: node.rightParen)
+      )
+    )
   }
 
   public func visit(_ node: CompositionTypeSyntax) -> ASTNode {
     assert(node.elements.count > 1)
-    let types = node.elements.map { visit($0.type) }.map { $0.rawValue }
-    let firstTypeLoc = bridgedSourceLoc(for: node.elements.first?.type)
-    let firstAmpLoc = bridgedSourceLoc(for: node.elements.first?.ampersand)
+
+    let types = node.elements.lazy.map {
+      visit($0.type).rawValue
+    }
+
     return .type(
-      types.withBridgedArrayRef { types in
-        return CompositionTypeRepr_create(self.ctx, types, firstTypeLoc, firstAmpLoc)
-      })
+      CompositionTypeRepr_create(
+        self.ctx,
+        types.bridgedArray(in: self),
+        bridgedSourceLoc(for: node.elements.first?.type),
+        bridgedSourceLoc(for: node.elements.first?.ampersand)
+      )
+    )
   }
 
   public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
-    return self.withBridgedTupleElements(node.parameters) { elements in
-      let lParenLoc = bridgedSourceLoc(for: node.leftParen)
-      let rParenLoc = bridgedSourceLoc(for: node.rightParen)
-      let args = TupleTypeRepr_create(self.ctx, elements, lParenLoc, rParenLoc)
-      let asyncLoc = bridgedSourceLoc(for: node.effectSpecifiers?.asyncSpecifier)
-      let throwsLoc = bridgedSourceLoc(for: node.effectSpecifiers?.throwsSpecifier)
-      let arrowLoc = bridgedSourceLoc(for: node.returnClause.arrow)
-      let retTy = visit(node.returnClause.type).rawValue
-      return .type(FunctionTypeRepr_create(self.ctx, args, asyncLoc, throwsLoc, arrowLoc, retTy))
-    }
+    .type(
+      FunctionTypeRepr_create(
+        self.ctx,
+        // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
+        TupleTypeRepr_create(
+          self.ctx,
+          self.visit(node.parameters),
+          bridgedSourceLoc(for: node.leftParen),
+          bridgedSourceLoc(for: node.rightParen)
+        ),
+        bridgedSourceLoc(for: node.effectSpecifiers?.asyncSpecifier),
+        bridgedSourceLoc(for: node.effectSpecifiers?.throwsSpecifier),
+        bridgedSourceLoc(for: node.returnClause.arrow),
+        visit(node.returnClause.type).rawValue
+      )
+    )
   }
 
   public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
@@ -166,27 +180,36 @@ extension ASTGenVisitor {
       return .type(ExistentialTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     }
   }
+}
 
+// MARK: - SpecifierTypeRepr/AttrubutedTypeRepr
+
+extension BridgedAttributedTypeSpecifier {
+  fileprivate init?(from tokenKind: TokenKind) {
+    switch tokenKind {
+    case .keyword(.inout): self = .inOut
+    case .keyword(.borrowing): self = .borrowing
+    case .keyword(.consuming): self = .consuming
+    case .keyword(.__shared): self = .legacyShared
+    case .keyword(.__owned): self = .legacyOwned
+    case .keyword(._const): self = .const
+    case .keyword(.isolated): self = .isolated
+    default: return nil
+    }
+  }
+}
+
+extension ASTGenVisitor {
   public func visit(_ node: AttributedTypeSyntax) -> ASTNode {
     var type = visit(node.baseType)
 
     // Handle specifiers.
     if let specifier = node.specifier {
-      let specifierLoc = bridgedSourceLoc(for: specifier)
-
-      let kind: BridgedAttributedTypeSpecifier
-      switch specifier.tokenKind {
-        case .keyword(.inout): kind = .inOut
-        case .keyword(.borrowing): kind = .borrowing
-        case .keyword(.consuming): kind = .consuming
-        case .keyword(.__shared): kind = .legacyShared
-        case .keyword(.__owned): kind = .legacyOwned
-        case .keyword(._const): kind = .const
-        case .keyword(.isolated): kind = .isolated
-        default: fatalError("unhandled specifier \(specifier.debugDescription)")
+      if let kind = BridgedAttributedTypeSpecifier(from: specifier.tokenKind) {
+        type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, bridgedSourceLoc(for: specifier)))
+      } else {
+        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
       }
-
-      type = .type(AttributedTypeSpecifierRepr_create(self.ctx, type.rawValue, kind, specifierLoc))
     }
 
     // Handle type attributes.
@@ -244,50 +267,33 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  private func withBridgedTupleElements<T>(
-    _ elementList: TupleTypeElementListSyntax,
-    action: (BridgedArrayRef) -> T
-  ) -> T {
-    var elements = [BridgedTupleTypeElement]()
-    for element in elementList {
-      var nameText = element.firstName?.text
-      let name = nameText?.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      } ?? nil
-      let nameLoc = bridgedSourceLoc(for: element.firstName)
-      var secondNameText = element.secondName?.text
-      let secondName = secondNameText?.withBridgedString { bridgedName in
-        return ASTContext_getIdentifier(ctx, bridgedName)
-      } ?? nil
-      let secondNameLoc = bridgedSourceLoc(for: element.secondName)
-      let colonLoc = bridgedSourceLoc(for: element.colon)
+  func visit(_ node: TupleTypeElementListSyntax) -> BridgedArrayRef {
+    node.lazy.map { element in
+      let (firstName, firstNameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
+      let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
       var type = visit(element.type).rawValue
       if let ellipsis = element.ellipsis {
-        let ellipsisLoc = bridgedSourceLoc(at: ellipsis.positionAfterSkippingLeadingTrivia)
-        type = VarargTypeRepr_create(self.ctx, type, ellipsisLoc)
+        type = VarargTypeRepr_create(self.ctx, type, self.bridgedSourceLoc(for: ellipsis))
       }
-      let trailingCommaLoc = bridgedSourceLoc(for: element.trailingComma)
 
-      elements.append(
-        BridgedTupleTypeElement(
-          Name: name,
-          NameLoc: nameLoc,
-          SecondName: secondName,
-          SecondNameLoc: secondNameLoc,
-          UnderscoreLoc: nil, /*N.B. Only important for SIL*/
-          ColonLoc: colonLoc,
-          Type: type,
-          TrailingCommaLoc: trailingCommaLoc))
-    }
-    return elements.withBridgedArrayRef { elements in
-      return action(elements)
-    }
+      return BridgedTupleTypeElement(
+        Name: firstName,
+        NameLoc: firstNameLoc,
+        SecondName: secondName,
+        SecondNameLoc: secondNameLoc,
+        UnderscoreLoc: nil, /*N.B. Only important for SIL*/
+        ColonLoc: self.bridgedSourceLoc(for: element.colon),
+        Type: type,
+        TrailingCommaLoc: self.bridgedSourceLoc(for: element.trailingComma)
+      )
+    }.bridgedArray(in: self)
   }
 }
 
 @_cdecl("swift_ASTGen_buildTypeRepr")
 @usableFromInline
 func buildTypeRepr(
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafeRawPointer,
   typeLocPtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
@@ -313,8 +319,10 @@ func buildTypeRepr(
   endTypeLocPtr.pointee = sourceFile.pointee.buffer.baseAddress!.advanced(by: typeSyntax.endPosition.utf8Offset)
 
   // Convert the type syntax node.
-  let typeReprNode = ASTGenVisitor(ctx: BridgedASTContext(raw: ctx), base: sourceFile.pointee.buffer, declContext: BridgedDeclContext(raw: dc))
-    .visit(typeSyntax)
-
-  return typeReprNode.rawValue
+  return ASTGenVisitor(
+    diagnosticEngine: .init(raw: diagEnginePtr),
+    sourceBuffer: sourceFile.pointee.buffer,
+    declContext: BridgedDeclContext(raw: dc),
+    astContext: BridgedASTContext(raw: ctx)
+  ).visit(typeSyntax).rawValue
 }

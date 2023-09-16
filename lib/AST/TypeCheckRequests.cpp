@@ -376,6 +376,20 @@ void RequirementSignatureRequest::cacheResult(RequirementSignature value) const 
 }
 
 //----------------------------------------------------------------------------//
+// DefaultDefinitionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<Type> DefaultDefinitionTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedDefaultDefinitionType();
+}
+
+void DefaultDefinitionTypeRequest::cacheResult(Type value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setDefaultDefinitionType(value);
+}
+
+//----------------------------------------------------------------------------//
 // Requirement computation.
 //----------------------------------------------------------------------------//
 

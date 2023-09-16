@@ -30,31 +30,6 @@
 
 using namespace swift;
 
-/// Determine the kind of a default argument given a parsed
-/// expression that has not yet been type-checked.
-static DefaultArgumentKind getDefaultArgKind(Expr *init) {
-  if (!init)
-    return DefaultArgumentKind::None;
-
-  // Parse an as-written 'nil' expression as the special NilLiteral kind,
-  // which is emitted by the caller and can participate in rethrows
-  // checking.
-  if (isa<NilLiteralExpr>(init))
-    return DefaultArgumentKind::NilLiteral;
-
-  auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
-  if (!magic)
-    return DefaultArgumentKind::Normal;
-
-  switch (magic->getKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-  case MagicIdentifierLiteralExpr::NAME: return DefaultArgumentKind::NAME;
-#include "swift/AST/MagicIdentifierKinds.def"
-  }
-
-  llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
-}
-
 void Parser::DefaultArgumentInfo::setFunctionContext(
     DeclContext *DC, ParameterList *paramList){
   for (auto context : ParsedContexts) {

@@ -3307,9 +3307,9 @@ public:
     // serialized/deserialized there, so the actual Decl doesn't need to store
     // it.
     TrailingWhereClause *trailingWhere = nullptr;
-    auto assocType = MF.createDecl<AssociatedTypeDecl>(
-        DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), trailingWhere,
-        &MF, defaultDefinitionID);
+    auto *assocType = AssociatedTypeDecl::createDeserialized(
+        ctx, DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(),
+        trailingWhere, &MF, defaultDefinitionID);
     declOrOffset = assocType;
 
     assert(!assocType->getDeclaredInterfaceType()->hasError() &&

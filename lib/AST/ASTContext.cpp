@@ -341,7 +341,7 @@ struct ASTContext::Implementation {
     DelayedMissingWitnesses;
 
   /// Stores information about lazy deserialization of various declarations.
-  llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
+  llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
   /// A fake generic parameter list <Self> for parsing @opened archetypes
   /// in textual SIL.
@@ -2829,23 +2829,30 @@ PackConformance *PackConformance::get(PackType *conformingType,
   return result;
 }
 
-LazyContextData *ASTContext::getOrCreateLazyContextData(
-                                                const DeclContext *dc,
-                                                LazyMemberLoader *lazyLoader) {
-  LazyContextData *&entry = getImpl().LazyContexts[dc];
-  if (entry) {
+LazyContextData *ASTContext::getLazyContextData(const Decl *decl) const {
+  return getImpl().LazyContexts.lookup(decl);
+}
+
+LazyContextData *
+ASTContext::getOrCreateLazyContextData(const Decl *decl,
+                                       LazyMemberLoader *lazyLoader) {
+  if (auto *data = getLazyContextData(decl)) {
     // Make sure we didn't provide an incompatible lazy loader.
-    assert(!lazyLoader || lazyLoader == entry->loader);
-    return entry;
+    assert(!lazyLoader || lazyLoader == data->loader);
+    return data;
   }
+
+  LazyContextData *&entry = getImpl().LazyContexts[decl];
 
   // Create new lazy context data with the given loader.
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
-  if (isa<ProtocolDecl>(dc))
+  if (isa<ProtocolDecl>(decl)) {
     entry = Allocate<LazyProtocolData>();
-  else {
-    assert(isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc));
+  } else if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl)) {
     entry = Allocate<LazyIterableDeclContextData>();
+  } else {
+    assert(isa<AssociatedTypeDecl>(decl));
+    entry = Allocate<LazyAssociatedTypeData>();
   }
 
   entry->loader = lazyLoader;

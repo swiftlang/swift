@@ -194,11 +194,9 @@ swift_ASTGen_emitParserDiagnostics(void *diagEngine, void *sourceFile,
                                    int downgradePlaceholderErrorsToWarnings);
 
 // Build AST nodes for the top-level entities in the syntax.
-extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
-                                                   void *declContext,
-                                                   void *astContext,
-                                                   void *outputContext,
-                                                   void (*)(void *, void *));
+extern "C" void swift_ASTGen_buildTopLevelASTNodes(
+    void *diagEngine, void *sourceFile, void *declContext, void *astContext,
+    void *outputContext, void (*)(void *, void *));
 
 /// Main entrypoint for the parser.
 ///
@@ -382,8 +380,9 @@ void Parser::parseSourceFileViaASTGen(
 
   // If we want to do ASTGen, do so now.
   if (langOpts.hasFeature(Feature::ParserASTGen)) {
-    swift_ASTGen_buildTopLevelASTNodes(exportedSourceFile, CurDeclContext,
-                                       &Context, &items, appendToVector);
+    swift_ASTGen_buildTopLevelASTNodes(&Diags, exportedSourceFile,
+                                       CurDeclContext, &Context, &items,
+                                       appendToVector);
 
     // Spin the C++ parser to the end; we won't be using it.
     while (!Tok.is(tok::eof)) {
@@ -7071,9 +7070,9 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
     return Status;
   }
 
-  auto assocType = new (Context)
-      AssociatedTypeDecl(CurDeclContext, AssociatedTypeLoc, Id, IdLoc,
-                         UnderlyingTy.getPtrOrNull(), TrailingWhere);
+  auto assocType = AssociatedTypeDecl::createParsed(
+      Context, CurDeclContext, AssociatedTypeLoc, Id, IdLoc,
+      UnderlyingTy.getPtrOrNull(), TrailingWhere);
   assocType->getAttrs() = Attributes;
   if (!Inherited.empty())
     assocType->setInherited(Context.AllocateCopy(Inherited));

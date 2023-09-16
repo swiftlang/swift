@@ -528,10 +528,10 @@ public:
 };
 
 /// Compute the default definition type of an associated type.
-class DefaultDefinitionTypeRequest :
-    public SimpleRequest<DefaultDefinitionTypeRequest,
-                         Type(AssociatedTypeDecl *),
-                         RequestFlags::Cached> {
+class DefaultDefinitionTypeRequest
+    : public SimpleRequest<DefaultDefinitionTypeRequest,
+                           Type(AssociatedTypeDecl *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -544,6 +544,8 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
+  llvm::Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
 };
 
 /// Describes the owner of a where clause, from which we can extract

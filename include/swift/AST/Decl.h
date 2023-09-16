@@ -548,6 +548,11 @@ protected:
     IsOpaqueType : 1
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, TypeDecl, 1,
+    /// Whether we have computed the default type.
+    IsDefaultDefinitionTypeComputed : 1
+  );
+
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
@@ -3692,24 +3697,28 @@ class AssociatedTypeDecl : public TypeDecl {
   SourceLoc KeywordLoc;
 
   /// The default definition.
-  TypeRepr *DefaultDefinition;
+  TypeLoc DefaultDefinition;
 
   /// The where clause attached to the associated type.
   TrailingWhereClause *TrailingWhere;
 
-  LazyMemberLoader *Resolver = nullptr;
-  uint64_t ResolverContextData;
-
   friend class DefaultDefinitionTypeRequest;
 
-public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc, TypeRepr *defaultDefinition,
                      TrailingWhereClause *trailingWhere);
-  AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
-                     LazyMemberLoader *definitionResolver,
-                     uint64_t resolverData);
+
+public:
+  static AssociatedTypeDecl *createParsed(ASTContext &ctx, DeclContext *dc,
+                                          SourceLoc keywordLoc, Identifier name,
+                                          SourceLoc nameLoc,
+                                          TypeRepr *defaultDefinition,
+                                          TrailingWhereClause *trailingWhere);
+
+  static AssociatedTypeDecl *createDeserialized(
+      ASTContext &ctx, DeclContext *dc, SourceLoc keywordLoc, Identifier name,
+      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
+      LazyMemberLoader *lazyLoader, uint64_t defaultDefinitionTypeData);
 
   /// Get the protocol in which this associated type is declared.
   ProtocolDecl *getProtocol() const {
@@ -3720,15 +3729,25 @@ public:
   bool hasDefaultDefinitionType() const {
     // If we have a TypeRepr, return true immediately without kicking off
     // a request.
-    return DefaultDefinition || getDefaultDefinitionType();
+    return DefaultDefinition.getTypeRepr() || getDefaultDefinitionType();
   }
 
   /// Retrieve the default definition type.
   Type getDefaultDefinitionType() const;
 
+  /// Retrieve the default definition type if computed, `None` otherwise.
+  ///
+  /// \Note Should only be used for dumping.
+  llvm::Optional<Type> getCachedDefaultDefinitionType() const;
+
+private:
+  /// Set the computed default definition type.
+  void setDefaultDefinitionType(Type ty);
+
+public:
   /// Retrieve the default definition as written in the source.
   TypeRepr *getDefaultDefinitionTypeRepr() const {
-    return DefaultDefinition;
+    return DefaultDefinition.getTypeRepr();
   }
 
   /// Retrieve the trailing where clause for this associated type, if any.
