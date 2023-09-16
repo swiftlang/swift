@@ -389,9 +389,8 @@ extension PointerToAddressInst {
 
       mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
         switch value {
-        case is BlockArgument, is MarkDependenceInst, is CopyValueInst,
-             is StructExtractInst, is TupleExtractInst, is StructInst, is TupleInst,
-             is FunctionArgument, is AddressToPointerInst:
+        case is Argument, is MarkDependenceInst, is CopyValueInst,
+             is StructExtractInst, is TupleExtractInst, is StructInst, is TupleInst, is AddressToPointerInst:
           return walkUpDefault(value: value, path: path)
         default:
           return .abortWalk

@@ -680,11 +680,11 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: def.type))
     case is AllocBoxInst:
       return cachedWalkDown(addressOrValue: def, path: path.with(knownType: nil))
-    case let arg as BlockArgument:
-      let block = arg.parentBlock
-      switch block.singlePredecessor!.terminator {
+    case let arg as Argument:
+      guard let termResult = TerminatorResult(arg) else { return isEscaping }
+      switch termResult.terminator {
       case let ta as TryApplyInst:
-        if block != ta.normalBlock { return isEscaping }
+        if termResult.successor != ta.normalBlock { return isEscaping }
         return walkUpApplyResult(apply: ta, path: path.with(knownType: nil))
       default:
         return isEscaping
