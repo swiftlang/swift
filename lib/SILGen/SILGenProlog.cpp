@@ -1380,19 +1380,21 @@ void SILGenFunction::emitProlog(
     }
   } else if (auto *closureExpr = dyn_cast<AbstractClosureExpr>(FunctionDC)) {
     bool wantExecutor = F.isAsync() || wantDataRaceChecks;
-    auto actorIsolation = closureExpr->getClosureActorIsolation();
+    auto actorIsolation = closureExpr->getActorIsolation();
     switch (actorIsolation.getKind()) {
-    case ClosureActorIsolation::Nonisolated:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
       break;
 
-    case ClosureActorIsolation::ActorInstance: {
+    case ActorIsolation::ActorInstance: {
       if (wantExecutor) {
         loadExpectedExecutorForLocalVar(actorIsolation.getActorInstance());
       }
       break;
     }
 
-    case ClosureActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       if (wantExecutor) {
         ExpectedExecutor =
           emitLoadGlobalActorExecutor(actorIsolation.getGlobalActor());

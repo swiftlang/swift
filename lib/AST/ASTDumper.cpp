@@ -2687,16 +2687,18 @@ public:
 
     printField(E->getRawDiscriminator(), "discriminator", DiscriminatorColor);
 
-    switch (auto isolation = E->getClosureActorIsolation()) {
-    case ClosureActorIsolation::Nonisolated:
+    switch (auto isolation = E->getActorIsolation()) {
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
       break;
 
-    case ClosureActorIsolation::ActorInstance:
+    case ActorIsolation::ActorInstance:
       printFieldQuoted(isolation.getActorInstance()->printRef(),
                        "actor_isolated", CapturesColor);
       break;
 
-    case ClosureActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       printFieldQuoted(isolation.getGlobalActor().getString(),
                        "global_actor_isolated", CapturesColor);
       break;
