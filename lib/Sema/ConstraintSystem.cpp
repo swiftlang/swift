@@ -1664,6 +1664,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
+  auto &ctx = getASTContext();
+  
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -1709,7 +1711,14 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
-
+    
+    if (ctx.LangOpts.hasFeature(Feature::InferSendableMethods)) {
+      // All global functions should be @Sendable
+      if(funcDecl->getDeclContext()->isLocalContext()) {
+        funcType = funcType->withExtInfo(funcType->getExtInfo().withConcurrent())->getAs<AnyFunctionType>();
+      }
+    }
+    
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
@@ -2625,7 +2634,7 @@ ConstraintSystem::getTypeOfMemberReference(
                                                        functionType, locator);
     auto &ctx = DC->getASTContext();
     auto *parentModule = useDC->getParentModule();
-    bool baseSendable = isSendableType(parentModule, baseOpenedTy);
+    bool baseTypeSendable = isSendableType(parentModule, baseOpenedTy);
     bool inferredSendable =
         ctx.LangOpts.hasFeature(Feature::InferSendableMethods);
 
@@ -2635,20 +2644,24 @@ ConstraintSystem::getTypeOfMemberReference(
       auto baseConformance = TypeChecker::conformsToProtocol(
           baseOpenedTy, sendableProtocol, parentModule);
 
-      if (baseSendable) {
+      if (baseTypeSendable) {
         // Add @Sendable to functions without conditional conformances
-        if (baseConformance.getConditionalRequirements().empty())
+        if (baseConformance.getConditionalRequirements().empty()){
           functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
-
-        // Handle Conditional Conformances
-        for (auto req : baseConformance.getConditionalRequirements()) {
-          if (!TypeChecker::conformsToProtocol(req.getFirstType(),
-                                               sendableProtocol, parentModule)
-                   .isInvalid())
+        } else {
+          // Handle Conditional Conformances
+          auto substitutionMap = SubstitutionMap::getProtocolSubstitutions(
+                                                                           sendableProtocol, baseOpenedTy,
+                                                                           baseConformance);
+          
+          auto result = TypeChecker::checkGenericArguments(parentModule, baseConformance.getConditionalRequirements(), QuerySubstitutionMap{substitutionMap} );
+          
+          if (result == CheckGenericArgumentsResult::Success) {
             functionType =
-                functionType
-                    ->withExtInfo(functionType->getExtInfo().withConcurrent())
-                    ->getAs<FunctionType>();
+            functionType
+            ->withExtInfo(functionType->getExtInfo().withConcurrent())
+            ->getAs<FunctionType>();
+          }
         }
       }
     }
@@ -2659,10 +2672,10 @@ ConstraintSystem::getTypeOfMemberReference(
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
 
     // Add @Sendable to openedType if possible
-    if (inferredSendable && baseSendable) {
+    if (inferredSendable){
       auto origFnType = openedType->castTo<FunctionType>();
       openedType =
-          origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
+      origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
     }
   }
 
