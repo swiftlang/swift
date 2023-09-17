@@ -7,5 +7,5 @@ public func embedded() { }
 public func regular() { }
 #endif
 
-// CHECK:    define swiftcc void @"$s12conditionals7regularyyF"()
-// EMBEDDED: define swiftcc void @"$s12conditionals8embeddedyyF"()
+// CHECK:    define {{.*}}void @"$s12conditionals7regularyyF"()
+// EMBEDDED: define {{.*}}void @"$s12conditionals8embeddedyyF"()
