@@ -1,13 +1,11 @@
 import CASTBridging
 
-// Needed to use SyntaxTransformVisitor's visit method.
-@_spi(SyntaxTransformVisitor)
 @_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftDiagnostics
 
 extension ASTGenVisitor {
-  public func visit(_ node: IdentifierTypeSyntax) -> ASTNode {
+  public func generate(_ node: IdentifierTypeSyntax) -> ASTNode {
     let loc = node.bridgedSourceLoc(in: self)
 
     // If this is the bare 'Any' keyword, produce an empty composition type.
@@ -22,7 +20,7 @@ extension ASTGenVisitor {
     }
 
     let genericArguments = generics.arguments.lazy.map {
-      self.visit($0.argument).rawValue
+      self.generate($0.argument).rawValue
     }
 
     return .type(
@@ -37,7 +35,7 @@ extension ASTGenVisitor {
     )
   }
 
-  public func visit(_ node: MemberTypeSyntax) -> ASTNode {
+  public func generate(_ node: MemberTypeSyntax) -> ASTNode {
     // Gather the member components, in decreasing depth order.
     var reverseMemberComponents = [UnsafeMutableRawPointer]()
 
@@ -47,7 +45,7 @@ extension ASTGenVisitor {
 
       if let generics = memberType.genericArgumentClause {
         let genericArguments = generics.arguments.lazy.map {
-          self.visit($0.argument).rawValue
+          self.generate($0.argument).rawValue
         }
 
         reverseMemberComponents.append(
@@ -67,22 +65,22 @@ extension ASTGenVisitor {
       baseType = Syntax(memberType.baseType)
     }
 
-    let baseComponent = visit(baseType).rawValue
+    let baseComponent = generate(baseType).rawValue
     let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
 
     return .type(MemberTypeRepr_create(self.ctx, baseComponent, memberComponents))
   }
 
-  public func visit(_ node: ArrayTypeSyntax) -> ASTNode {
-    let elementType = visit(node.element).rawValue
+  public func generate(_ node: ArrayTypeSyntax) -> ASTNode {
+    let elementType = generate(node.element).rawValue
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
     return .type(ArrayTypeRepr_create(self.ctx, elementType, lSquareLoc, rSquareLoc))
   }
 
-  public func visit(_ node: DictionaryTypeSyntax) -> ASTNode {
-    let keyType = visit(node.key).rawValue
-    let valueType = visit(node.value).rawValue
+  public func generate(_ node: DictionaryTypeSyntax) -> ASTNode {
+    let keyType = generate(node.key).rawValue
+    let valueType = generate(node.value).rawValue
     let colonLoc = node.colon.bridgedSourceLoc(in: self)
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
@@ -90,8 +88,8 @@ extension ASTGenVisitor {
       DictionaryTypeRepr_create(self.ctx, keyType, valueType, colonLoc, lSquareLoc, rSquareLoc))
   }
 
-  public func visit(_ node: MetatypeTypeSyntax) -> ASTNode {
-    let baseType = visit(node.baseType).rawValue
+  public func generate(_ node: MetatypeTypeSyntax) -> ASTNode {
+    let baseType = generate(node.baseType).rawValue
     let tyLoc = node.metatypeSpecifier.bridgedSourceLoc(in: self)
     if node.metatypeSpecifier.text == "Type" {
       return .type(MetatypeTypeRepr_create(self.ctx, baseType, tyLoc))
@@ -101,40 +99,40 @@ extension ASTGenVisitor {
     }
   }
 
-  public func visit(_ node: ImplicitlyUnwrappedOptionalTypeSyntax) -> ASTNode {
-    let base = visit(node.wrappedType).rawValue
+  public func generate(_ node: ImplicitlyUnwrappedOptionalTypeSyntax) -> ASTNode {
+    let base = generate(node.wrappedType).rawValue
     let exclaimLoc = node.exclamationMark.bridgedSourceLoc(in: self)
     return .type(ImplicitlyUnwrappedOptionalTypeRepr_create(self.ctx, base, exclaimLoc))
   }
 
-  public func visit(_ node: OptionalTypeSyntax) -> ASTNode {
-    let base = visit(node.wrappedType).rawValue
+  public func generate(_ node: OptionalTypeSyntax) -> ASTNode {
+    let base = generate(node.wrappedType).rawValue
     let questionLoc = node.questionMark.bridgedSourceLoc(in: self)
     return .type(OptionalTypeRepr_create(self.ctx, base, questionLoc))
   }
 
-  public func visit(_ node: PackExpansionTypeSyntax) -> ASTNode {
-    let base = visit(node.repetitionPattern).rawValue
+  public func generate(_ node: PackExpansionTypeSyntax) -> ASTNode {
+    let base = generate(node.repetitionPattern).rawValue
     let repeatLoc = node.repeatKeyword.bridgedSourceLoc(in: self)
     return .type(PackExpansionTypeRepr_create(self.ctx, base, repeatLoc))
   }
 
-  public func visit(_ node: TupleTypeSyntax) -> ASTNode {
+  public func generate(_ node: TupleTypeSyntax) -> ASTNode {
     .type(
       TupleTypeRepr_create(
         self.ctx,
-        self.visit(node.elements),
+        self.generate(node.elements),
         node.leftParen.bridgedSourceLoc(in: self),
         node.rightParen.bridgedSourceLoc(in: self)
       )
     )
   }
 
-  public func visit(_ node: CompositionTypeSyntax) -> ASTNode {
+  public func generate(_ node: CompositionTypeSyntax) -> ASTNode {
     assert(node.elements.count > 1)
 
     let types = node.elements.lazy.map {
-      visit($0.type).rawValue
+      generate($0.type).rawValue
     }
 
     return .type(
@@ -147,34 +145,34 @@ extension ASTGenVisitor {
     )
   }
 
-  public func visit(_ node: FunctionTypeSyntax) -> ASTNode {
+  public func generate(_ node: FunctionTypeSyntax) -> ASTNode {
     .type(
       FunctionTypeRepr_create(
         self.ctx,
         // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
         TupleTypeRepr_create(
           self.ctx,
-          self.visit(node.parameters),
+          self.generate(node.parameters),
           node.leftParen.bridgedSourceLoc(in: self),
           node.rightParen.bridgedSourceLoc(in: self)
         ),
         (node.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
         (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-        self.visit(node.effectSpecifiers?.thrownError?.type)?.rawValue,
+        self.generate(node.effectSpecifiers?.thrownError?.type)?.rawValue,
         node.returnClause.arrow.bridgedSourceLoc(in: self),
-        visit(node.returnClause.type).rawValue
+        generate(node.returnClause.type).rawValue
       )
     )
   }
 
-  public func visit(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
-    let baseTy = visit(node.type).rawValue
+  public func generate(_ node: NamedOpaqueReturnTypeSyntax) -> ASTNode {
+    let baseTy = generate(node.type).rawValue
     return .type(NamedOpaqueReturnTypeRepr_create(self.ctx, baseTy))
   }
 
-  public func visit(_ node: SomeOrAnyTypeSyntax) -> ASTNode {
+  public func generate(_ node: SomeOrAnyTypeSyntax) -> ASTNode {
     let someOrAnyLoc = node.someOrAnySpecifier.bridgedSourceLoc(in: self)
-    let baseTy = visit(node.constraint).rawValue
+    let baseTy = generate(node.constraint).rawValue
     if node.someOrAnySpecifier.text == "some" {
       return .type(OpaqueReturnTypeRepr_create(self.ctx, someOrAnyLoc, baseTy))
     } else {
@@ -202,8 +200,8 @@ extension BridgedAttributedTypeSpecifier {
 }
 
 extension ASTGenVisitor {
-  public func visit(_ node: AttributedTypeSyntax) -> ASTNode {
-    var type = visit(node.baseType)
+  public func generate(_ node: AttributedTypeSyntax) -> ASTNode {
+    var type = generate(node.baseType)
 
     // Handle specifiers.
     if let specifier = node.specifier {
@@ -269,11 +267,11 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func visit(_ node: TupleTypeElementListSyntax) -> BridgedArrayRef {
+  func generate(_ node: TupleTypeElementListSyntax) -> BridgedArrayRef {
     node.lazy.map { element in
       let (firstName, firstNameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
       let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
-      var type = visit(element.type).rawValue
+      var type = generate(element.type).rawValue
       if let ellipsis = element.ellipsis {
         type = VarargTypeRepr_create(self.ctx, type, ellipsis.bridgedSourceLoc(in: self))
       }
@@ -326,5 +324,5 @@ func buildTypeRepr(
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: BridgedDeclContext(raw: dc),
     astContext: BridgedASTContext(raw: ctx)
-  ).visit(typeSyntax).rawValue
+  ).generate(typeSyntax).rawValue
 }

@@ -1,16 +1,13 @@
 import CASTBridging
-
-// Needed to use SyntaxTransformVisitor's visit method.
-@_spi(SyntaxTransformVisitor)
 import SwiftSyntax
 import SwiftDiagnostics
 
 extension ASTGenVisitor {
-  public func visit(_ node: ClosureExprSyntax) -> ASTNode {
+  public func generate(_ node: ClosureExprSyntax) -> ASTNode {
     let body = BraceStmt_create(
       self.ctx,
       node.leftBrace.bridgedSourceLoc(in: self),
-      self.visit(node.statements),
+      self.generate(node.statements),
       node.rightBrace.bridgedSourceLoc(in: self)
     )
 
@@ -18,7 +15,7 @@ extension ASTGenVisitor {
     return .expr(ClosureExpr_create(self.ctx, body, self.declContext))
   }
 
-  public func visit(_ node: FunctionCallExprSyntax) -> ASTNode {
+  public func generate(_ node: FunctionCallExprSyntax) -> ASTNode {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
         self.diagnose(Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .leftParen)))
@@ -39,34 +36,34 @@ extension ASTGenVisitor {
       node.trailingClosure = nil
     }
 
-    let argumentTuple = self.visit(node.arguments, leftParen: node.leftParen, rightParen: node.rightParen)
+    let argumentTuple = self.generate(node.arguments, leftParen: node.leftParen, rightParen: node.rightParen)
       .rawValue
-    let callee = visit(node.calledExpression).rawValue
+    let callee = generate(node.calledExpression).rawValue
 
     return .expr(FunctionCallExpr_create(self.ctx, callee, argumentTuple))
   }
 
-  public func visit(_ node: DeclReferenceExprSyntax) -> ASTNode {
+  public func generate(_ node: DeclReferenceExprSyntax) -> ASTNode {
     let (name, nameLoc) = node.baseName.bridgedIdentifierAndSourceLoc(in: self)
 
     return .expr(IdentifierExpr_create(self.ctx, name, nameLoc))
   }
 
-  public func visit(_ node: IdentifierPatternSyntax) -> ASTNode {
+  public func generate(_ node: IdentifierPatternSyntax) -> ASTNode {
     let (name, nameLoc) = node.identifier.bridgedIdentifierAndSourceLoc(in: self)
 
     return .expr(IdentifierExpr_create(self.ctx, name, nameLoc))
   }
 
-  public func visit(_ node: MemberAccessExprSyntax) -> ASTNode {
+  public func generate(_ node: MemberAccessExprSyntax) -> ASTNode {
     let loc = node.bridgedSourceLoc(in: self)
-    let base = visit(node.base!).rawValue
+    let base = generate(node.base!).rawValue
     let name = node.declName.baseName.bridgedIdentifier(in: self)
 
     return .expr(UnresolvedDotExpr_create(ctx, base, loc, name, loc))
   }
 
-  public func visit(_ node: IfExprSyntax) -> ASTNode {
+  public func generate(_ node: IfExprSyntax) -> ASTNode {
     let stmt = makeIfStmt(node).rawValue
 
     // Wrap in a SingleValueStmtExpr to embed as an expression.
@@ -75,16 +72,16 @@ extension ASTGenVisitor {
     return .expr(sve)
   }
 
-  public func visit(_ node: TupleExprSyntax) -> ASTNode {
-    self.visit(node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
+  public func generate(_ node: TupleExprSyntax) -> ASTNode {
+    self.generate(node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
   }
 }
 
 extension ASTGenVisitor {
   /// Generate a tuple expression from a ``LabeledExprListSyntax`` and parentheses.
-  func visit(_ node: LabeledExprListSyntax, leftParen: TokenSyntax?, rightParen: TokenSyntax?) -> ASTNode {
+  func generate(_ node: LabeledExprListSyntax, leftParen: TokenSyntax?, rightParen: TokenSyntax?) -> ASTNode {
     let expressions = node.lazy.map {
-      self.visit($0.expression).rawValue
+      self.generate($0.expression).rawValue
     }
     let labels = node.lazy.map {
       $0.label.bridgedIdentifier(in: self)

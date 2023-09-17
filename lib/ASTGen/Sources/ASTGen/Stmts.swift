@@ -2,19 +2,19 @@ import CASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func visit(_ node: CodeBlockSyntax) -> ASTNode {
+  public func generate(_ node: CodeBlockSyntax) -> ASTNode {
     .stmt(
       BraceStmt_create(
         self.ctx,
         node.leftBrace.bridgedSourceLoc(in: self),
-        self.visit(node.statements),
+        self.generate(node.statements),
         node.rightBrace.bridgedSourceLoc(in: self)
       )
     )
   }
 
   func makeIfStmt(_ node: IfExprSyntax) -> ASTNode {
-    let conditions = node.conditions.map { self.visit($0).rawValue }
+    let conditions = node.conditions.map { self.generate($0).rawValue }
     assert(conditions.count == 1)  // TODO: handle multiple conditions.
 
     return .stmt(
@@ -22,14 +22,14 @@ extension ASTGenVisitor {
         self.ctx,
         node.ifKeyword.bridgedSourceLoc(in: self),
         conditions.first!,
-        self.visit(node.body).rawValue,
+        self.generate(node.body).rawValue,
         node.elseKeyword.bridgedSourceLoc(in: self),
-        self.visit(node.elseBody)?.rawValue
+        self.generate(node.elseBody)?.rawValue
       )
     )
   }
 
-  public func visit(_ node: ExpressionStmtSyntax) -> ASTNode {
+  public func generate(_ node: ExpressionStmtSyntax) -> ASTNode {
     switch Syntax(node.expression).as(SyntaxEnum.self) {
     case .ifExpr(let e):
       return makeIfStmt(e)
@@ -38,12 +38,12 @@ extension ASTGenVisitor {
     }
   }
 
-  public func visit(_ node: ReturnStmtSyntax) -> ASTNode {
+  public func generate(_ node: ReturnStmtSyntax) -> ASTNode {
     .stmt(
       ReturnStmt_create(
         self.ctx,
         node.returnKeyword.bridgedSourceLoc(in: self),
-        self.visit(node.expression)?.rawValue
+        self.generate(node.expression)?.rawValue
       )
     )
   }
