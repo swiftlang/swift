@@ -3107,6 +3107,7 @@ bool CompilerInvocation::parseArgs(
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
+    IRGenOpts.DisableLegacyTypeInfo = true;
   }
 
   return false;
