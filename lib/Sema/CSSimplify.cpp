@@ -2960,7 +2960,7 @@ static bool isPreconcurrency(ConstraintSystem &cs, DeclContext *dc) {
 static bool okToRemoveGlobalActor(ConstraintSystem &cs,
                                   DeclContext *dc,
                                   Type globalActor, Type ty) {
-  auto findGlobalActorForClosure = [&](AbstractClosureExpr *ace) -> ClosureActorIsolation {
+  auto findGlobalActorForClosure = [&](AbstractClosureExpr *ace) -> ActorIsolation {
     // FIXME: Because the actor isolation checking happens after constraint
     // solving, the closure expression does not yet have its actor isolation
     // set, i.e., the code that would call
@@ -2969,7 +2969,7 @@ static bool okToRemoveGlobalActor(ConstraintSystem &cs,
     // If the assertion below starts tripping, then this ad-hoc inference
     // is no longer needed!
     auto existingIso = ace->getActorIsolation();
-    if (existingIso != ClosureActorIsolation()) {
+    if (existingIso != ActorIsolation::forUnspecified()) {
       assert(false && "somebody set the closure's isolation already?");
       return existingIso;
     }
@@ -2980,8 +2980,8 @@ static bool okToRemoveGlobalActor(ConstraintSystem &cs,
     if (auto closType = GetClosureType{cs}(ace)) {
       if (auto fnTy = closType->getAs<AnyFunctionType>()) {
         if (auto globActor = fnTy->getGlobalActor()) {
-          return ClosureActorIsolation::forGlobalActor(globActor,
-                                                       isPreconcurrency(cs, ace));
+          return ActorIsolation::forGlobalActor(globActor, /*unsafe=*/false)
+              .withPreconcurrency(isPreconcurrency(cs, ace));
         }
       }
     }
@@ -2989,8 +2989,8 @@ static bool okToRemoveGlobalActor(ConstraintSystem &cs,
     // otherwise, check for an explicit annotation
     if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
       if (auto globActor = getExplicitGlobalActor(ce)) {
-        return ClosureActorIsolation::forGlobalActor(globActor,
-                                                     isPreconcurrency(cs, ce));
+        return ActorIsolation::forGlobalActor(globActor, /*unsafe=*/false)
+            .withPreconcurrency(isPreconcurrency(cs, ace));
       }
     }
 

@@ -111,7 +111,7 @@ void PostfixCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
                              [&](const Solution &S) { sawSolution(S); });
 }
 
-static ClosureActorIsolation
+static ActorIsolation
 getClosureActorIsolation(const Solution &S, AbstractClosureExpr *ACE) {
   auto getType = [&S](Expr *E) -> Type {
     // Prefer the contextual type of the closure because it might be 'weaker'
@@ -213,7 +213,7 @@ void PostfixCompletionCallback::sawSolutionImpl(
       isImplicitSingleExpressionReturn(CS, CompletionExpr);
 
   bool IsInAsyncContext = isContextAsync(S, DC);
-  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+  llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
       ClosureActorIsolations;
   for (auto SAT : S.targets) {
     if (auto ACE = getAsExpr<AbstractClosureExpr>(SAT.second.getAsASTNode())) {

@@ -3777,92 +3777,6 @@ public:
   }
 };
 
-/// Actor isolation for a closure.
-class ClosureActorIsolation {
-public:
-  enum Kind {
-    /// The closure is not isolated to any actor.
-    Nonisolated,
-
-    /// The closure is tied to the actor instance described by the given
-    /// \c VarDecl*, which is the (captured) `self` of an actor.
-    ActorInstance,
-
-    /// The closure is tied to the global actor described by the given type.
-    GlobalActor,
-  };
-
-private:
-    /// The actor to which this closure is isolated, plus a bit indicating
-    /// whether the isolation was imposed by a preconcurrency declaration.
-    ///
-    /// There are three possible states for the pointer:
-    ///   - NULL: The closure is independent of any actor.
-    ///   - VarDecl*: The 'self' variable for the actor instance to which
-    ///     this closure is isolated. It will always have a type that conforms
-    ///     to the \c Actor protocol.
-    ///   - Type: The type of the global actor on which
-  llvm::PointerIntPair<llvm::PointerUnion<VarDecl *, Type>, 1, bool> storage;
-
-  ClosureActorIsolation(VarDecl *selfDecl, bool preconcurrency)
-      : storage(selfDecl, preconcurrency) { }
-  ClosureActorIsolation(Type globalActorType, bool preconcurrency)
-      : storage(globalActorType, preconcurrency) { }
-
-public:
-  ClosureActorIsolation(bool preconcurrency = false)
-      : storage(nullptr, preconcurrency) { }
-
-  static ClosureActorIsolation forNonisolated(bool preconcurrency) {
-    return ClosureActorIsolation(preconcurrency);
-  }
-
-  static ClosureActorIsolation forActorInstance(VarDecl *selfDecl,
-                                                bool preconcurrency) {
-    return ClosureActorIsolation(selfDecl, preconcurrency);
-  }
-
-  static ClosureActorIsolation forGlobalActor(Type globalActorType,
-                                              bool preconcurrency) {
-    return ClosureActorIsolation(globalActorType, preconcurrency);
-  }
-
-  /// Determine the kind of isolation.
-  Kind getKind() const {
-    if (storage.getPointer().isNull())
-      return Kind::Nonisolated;
-
-    if (storage.getPointer().is<VarDecl *>())
-      return Kind::ActorInstance;
-
-    return Kind::GlobalActor;
-  }
-
-  /// Whether the closure is isolated at all.
-  explicit operator bool() const {
-    return getKind() != Kind::Nonisolated;
-  }
-
-  /// Whether the closure is isolated at all.
-  operator Kind() const {
-    return getKind();
-  }
-
-  VarDecl *getActorInstance() const {
-    return storage.getPointer().dyn_cast<VarDecl *>();
-  }
-
-  Type getGlobalActor() const {
-    return storage.getPointer().dyn_cast<Type>();
-  }
-
-  bool preconcurrency() const {
-    return storage.getInt();
-  }
-
-  ActorIsolation getActorIsolation() const;
-};
-
 /// A base class for closure expressions.
 class AbstractClosureExpr : public DeclContext, public Expr {
   CaptureInfo Captures;
@@ -3871,14 +3785,15 @@ class AbstractClosureExpr : public DeclContext, public Expr {
   ParameterList *parameterList;
 
   /// Actor isolation of the closure.
-  ClosureActorIsolation actorIsolation;
+  ActorIsolation actorIsolation;
 
 public:
   AbstractClosureExpr(ExprKind Kind, Type FnType, bool Implicit,
                       DeclContext *Parent)
       : DeclContext(DeclContextKind::AbstractClosureExpr, Parent),
         Expr(Kind, Implicit, FnType),
-        parameterList(nullptr) {
+        parameterList(nullptr),
+        actorIsolation(ActorIsolation::forUnspecified()) {
     Bits.AbstractClosureExpr.Discriminator = InvalidDiscriminator;
   }
 
@@ -3951,9 +3866,11 @@ public:
   /// returns nullptr if the closure doesn't have a body
   BraceStmt *getBody() const;
 
-  ClosureActorIsolation getActorIsolation() const { return actorIsolation; }
+  ActorIsolation getActorIsolation() const {
+    return actorIsolation;
+  }
 
-  void setActorIsolation(ClosureActorIsolation actorIsolation) {
+  void setActorIsolation(ActorIsolation actorIsolation) {
     this->actorIsolation = actorIsolation;
   }
 
