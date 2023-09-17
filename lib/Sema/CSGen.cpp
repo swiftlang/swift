@@ -4863,26 +4863,29 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
     ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
+  
   Expr *anchor = getAsExpr(locator.getAnchor());
   if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
     anchor = apply->getFn();
   }
 
-  if (argLabel.hasDollarPrefix() && (!param || !param->hasExternalPropertyWrapper())) {
-    if (!shouldAttemptFixes())
-      return getTypeMatchFailure(locator);
-
-    recordAnyTypeVarAsPotentialHole(paramType);
-
-    auto *loc = getConstraintLocator(locator);
-    auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
-    if (recordFix(fix))
-      return getTypeMatchFailure(locator);
-
-    return getTypeMatchSuccess();
-  }
-
   if (argLabel.hasDollarPrefix()) {
+    // Add constraints for projected property value
+    if (!param || !param->hasExternalPropertyWrapper()) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      recordAnyTypeVarAsPotentialHole(paramType);
+
+      auto *loc = getConstraintLocator(locator);
+      auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
+      if (recordFix(fix)) {
+        return getTypeMatchFailure(locator);
+      } else {
+        return getTypeMatchSuccess();
+      }
+    }
+
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
     if (param->hasImplicitPropertyWrapper()) {
@@ -4893,14 +4896,19 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     }
 
     appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::ProjectedValue });
-  } else if (param->hasExternalPropertyWrapper()) {
+  } else {
+    // Add constraints for wrapped property value
+
+    if (!param->allAttachedPropertyWrappersHaveWrappedValueInit()) {
+      return getTypeMatchFailure(locator);
+      // TODO: Record a CSFix instead?
+    }
+
     Type wrappedValueType = computeWrappedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, wrappedValueType, locator);
     setType(param->getPropertyWrapperWrappedValueVar(), wrappedValueType);
 
     appliedPropertyWrappers[anchor].push_back({ wrapperType, PropertyWrapperInitKind::WrappedValue });
-  } else {
-    return getTypeMatchFailure(locator);
   }
 
   return getTypeMatchSuccess();

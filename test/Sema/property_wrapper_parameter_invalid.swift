@@ -279,3 +279,14 @@ func testInvalidWrapperInference() {
   // expected-error@+1 {{contextual closure type '() -> Void' expects 0 arguments, but 1 was used in closure body}}
   testExtraParameter { $value in }
 }
+
+@propertyWrapper
+struct ProjectionOnlyWrapper {
+  var wrappedValue: String
+
+  var projectedValue: String { self.wrappedValue }
+  init(projectedValue: String) { self.wrappedValue = projectedValue }
+}
+
+func testParameterWithoutWrappedValueInit(@ProjectionOnlyWrapper value: String) {}
+_ = testParameterWithoutWrappedValueInit(value: "") // expected-error {{type of expression is ambiguous without a type annotation}}
