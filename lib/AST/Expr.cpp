@@ -1878,29 +1878,6 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   return otherCtorRef;
 }
 
-ActorIsolation ClosureActorIsolation::getActorIsolation() const {
-  switch (getKind()) {
-  case ClosureActorIsolation::Nonisolated:
-    return ActorIsolation::forNonisolated().withPreconcurrency(
-        preconcurrency());
-
-  case ClosureActorIsolation::GlobalActor: {
-    return ActorIsolation::forGlobalActor(getGlobalActor(), /*unsafe=*/false)
-        .withPreconcurrency(preconcurrency());
-  }
-
-  case ClosureActorIsolation::ActorInstance: {
-    auto selfDecl = getActorInstance();
-    auto actor =
-        selfDecl->getTypeInContext()->getReferenceStorageReferent()->getAnyActor();
-    assert(actor && "Bad closure actor isolation?");
-    // FIXME: This could be a parameter... or a capture... hmmm.
-    return ActorIsolation::forActorInstanceSelf(actor).withPreconcurrency(
-        preconcurrency());
-  }
-  }
-}
-
 unsigned AbstractClosureExpr::getDiscriminator() const {
   auto raw = getRawDiscriminator();
   if (raw != InvalidDiscriminator)
@@ -2017,14 +1994,9 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
   return nullptr;
 }
 
-ClosureActorIsolation
+ActorIsolation
 swift::__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE) {
   return CE->getActorIsolation();
-}
-
-llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
-swift::_getRef__AbstractClosureExpr_getActorIsolation() {
-  return __AbstractClosureExpr_getActorIsolation;
 }
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
