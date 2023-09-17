@@ -1903,12 +1903,12 @@ extension BinaryInteger {
 #if !$Embedded
 public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
 #else
-public typealias _LosslessStringConvertibleOrNone = Any
+public protocol _LosslessStringConvertibleOrNone {}
 #endif
 
 public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
 where Magnitude: FixedWidthInteger & UnsignedInteger,
-      Stride: FixedWidthInteger & SignedInteger, Stride.Stride == Stride {
+      Stride: FixedWidthInteger & SignedInteger {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
