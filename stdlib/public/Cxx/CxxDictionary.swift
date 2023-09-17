@@ -25,6 +25,8 @@ public protocol CxxDictionary<Key, Value> {
   associatedtype Size: BinaryInteger
   associatedtype InsertionResult
 
+  init()
+
   /// Do not implement this function manually in Swift.
   func __findUnsafe(_ key: Key) -> RawIterator
 
@@ -61,24 +63,6 @@ extension CxxDictionary {
       return iter.pointee.second
     }
   }
-  
-  func filter(
-    _ isIncluded: (_ key: Key, _ value: Value) throws -> Bool
-) rethrows -> [Key: Value] {
-    var filteredDictionary: [Key: Value] = [:]
-    var iterator = __beginUnsafe(Key) 
-    let endIterator = __endUnsafe()
-
-    while iterator != endIterator {
-        let pair = iterator.pointee
-        if try isIncluded(pair.first, pair.second) {
-            filteredDictionary[pair.first] = pair.second
-        }
-        iterator = iterator.successor() 
-    }
-
-    return filteredDictionary
-}
 }
 
 extension CxxDictionary {
@@ -107,4 +91,22 @@ extension CxxDictionary {
       }
     }
   }
+  
+  public func filter(
+    _ isIncluded: (_ key: Key, _ value: Value) throws -> Bool
+) rethrows -> Self {
+    var filteredDictionary: Self.init()
+    var iterator = __beginUnsafe() 
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+        let pair = iterator.pointee
+        if try isIncluded(pair.first, pair.second) {
+            filteredDictionary[pair.first] = pair.second
+        }
+        iterator = iterator.successor() 
+    }
+
+    return filteredDictionary
+}
 }
