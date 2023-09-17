@@ -1,6 +1,4 @@
 // REQUIRES: shell
-// Also uses awk:
-// XFAIL OS=windows
 
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
