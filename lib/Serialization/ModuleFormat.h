@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 808; // @_expose(wasm)
+const uint16_t SWIFTMODULE_VERSION_MINOR = 809; // typed throws
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1505,6 +1505,7 @@ namespace decls_block {
     BCFixed<1>,  // stub implementation?
     BCFixed<1>,  // async?
     BCFixed<1>,  // throws?
+    TypeIDField,  // thrown error
     CtorInitializerKindField,  // initializer kind
     GenericSignatureIDField, // generic environment
     DeclIDField, // overridden decl
@@ -1579,6 +1580,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
+    TypeIDField,  // thrown error
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?
@@ -1640,6 +1642,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
+    TypeIDField,  // thrown error
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
     BCFixed<1>,   // IUO result?

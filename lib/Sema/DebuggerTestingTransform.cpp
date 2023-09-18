@@ -269,7 +269,7 @@ private:
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
-                    SourceLoc(), SourceLoc(),
+                    SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
                     SourceLoc(), SourceLoc(), nullptr,
                     getCurrentDeclContext());
     Closure->setImplicit(true);

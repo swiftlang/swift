@@ -3406,6 +3406,7 @@ public:
     DeclContextID contextID;
     bool isIUO, isFailable;
     bool isImplicit, isObjC, hasStubImplementation, throws, async;
+    TypeID thrownTypeID;
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
@@ -3416,7 +3417,8 @@ public:
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                isFailable, isIUO, isImplicit,
                                                isObjC, hasStubImplementation,
-                                               async, throws, storedInitKind,
+                                               async, throws, thrownTypeID,
+                                               storedInitKind,
                                                genericSigID,
                                                overriddenID,
                                                overriddenAffectsABI,
@@ -3484,12 +3486,18 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto thrownTypeOrError = MF.getTypeChecked(thrownTypeID);
+    if (!thrownTypeOrError)
+      return thrownTypeOrError.takeError();
+    const auto thrownType = thrownTypeOrError.get();
+
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
                                                /*Async=*/async,
                                                /*AsyncLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
+                                               TypeLoc::withoutLoc(thrownType),
                                                /*BodyParams=*/nullptr,
                                                genericParams, parent);
     declOrOffset = ctor;
@@ -3823,6 +3831,7 @@ public:
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
     uint8_t rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
+    TypeID thrownTypeID;
     unsigned numNameComponentsBiased;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
@@ -3841,7 +3850,7 @@ public:
                                           isStatic, rawStaticSpelling, isObjC,
                                           rawMutModifier,
                                           hasForcedStaticDispatch,
-                                          async, throws,
+                                          async, throws, thrownTypeID,
                                           genericSigID,
                                           resultInterfaceTypeID,
                                           isIUO,
@@ -3859,7 +3868,7 @@ public:
                                               isStatic, rawStaticSpelling, isObjC,
                                               rawMutModifier,
                                               hasForcedStaticDispatch,
-                                              async, throws,
+                                              async, throws, thrownTypeID,
                                               genericSigID,
                                               resultInterfaceTypeID,
                                               isIUO,
@@ -3976,15 +3985,20 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
+    auto thrownTypeOrError = MF.getTypeChecked(thrownTypeID);
+    if (!thrownTypeOrError)
+      return thrownTypeOrError.takeError();
+    const auto thrownType = thrownTypeOrError.get();
+
     FuncDecl *fn;
     if (!isAccessor) {
       fn = FuncDecl::createDeserialized(ctx, staticSpelling.value(), name,
-                                        async, throws, genericParams,
-                                        resultType, DC);
+                                        async, throws, thrownType,
+                                        genericParams, resultType, DC);
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
           ctx, accessorKind, storage, staticSpelling.value(), async, throws,
-          resultType, DC);
+          thrownType, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;

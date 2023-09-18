@@ -255,6 +255,7 @@ extension ASTGenVisitor {
       parameterList: self.visit(node.signature.parameterClause).rawValue,
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
+      thrownType: self.visit(node.signature.effectSpecifiers?.thrownType?.type)?.rawValue,
       returnType: self.visit(node.signature.returnClause?.type)?.rawValue,
       genericWhereClause: self.visit(node.genericWhereClause)?.rawValue
     )
@@ -279,6 +280,7 @@ extension ASTGenVisitor {
       parameterList: self.visit(node.signature.parameterClause).rawValue,
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
+      thrownType: self.visit(node.signature.effectSpecifiers?.thrownType?.type)?.rawValue,
       genericWhereClause: self.visit(node.genericWhereClause)?.rawValue
     )
 

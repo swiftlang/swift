@@ -159,6 +159,7 @@ extension ASTGenVisitor {
         ),
         (node.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
         (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
+        self.visit(node.effectSpecifiers?.thrownType?.type)?.rawValue,
         node.returnClause.arrow.bridgedSourceLoc(in: self),
         visit(node.returnClause.type).rawValue
       )

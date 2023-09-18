@@ -2192,8 +2192,8 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc*/ loc, AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), getterParams, Type(),
-      storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      getterParams, Type(), storage->getDeclContext());
   getter->setSynthesized();
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -2289,8 +2289,8 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(), AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, Type(),
-      storage->getDeclContext());
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, Type(), storage->getDeclContext());
   setter->setSynthesized();
 
   if (isMutating)
@@ -2368,7 +2368,8 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(), kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), params, retTy, dc);
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      params, retTy, dc);
   accessor->setSynthesized();
 
   if (isMutating)

@@ -1450,6 +1450,10 @@ namespace {
         }
       }
 
+      if (auto thrownTypeRepr = D->getThrownTypeRepr()) {
+        printRec(thrownTypeRepr, "thrown_type");
+      }
+
       if (auto fac = D->getForeignAsyncConvention()) {
         printRecArbitrary([&](StringRef label) {
           printHead("foreign_async_convention", ASTNodeColor, label);

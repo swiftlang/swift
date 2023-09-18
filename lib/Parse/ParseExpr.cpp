@@ -124,14 +124,16 @@ ParserResult<Expr> Parser::parseExprAs() {
 /// parseExprArrow
 ///
 ///   expr-arrow:
-///     'async'? 'throws'? '->'
+///     'async'? ('throws' ('(' type ')')?)? '->'
 ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
   ParserStatus status;
 
+  TypeRepr *thrownTyRepr = nullptr;
   status |= parseEffectsSpecifiers(SourceLoc(),
                                    asyncLoc, /*reasync=*/nullptr,
-                                   throwsLoc, /*rethrows=*/nullptr);
+                                   throwsLoc, /*rethrows=*/nullptr,
+                                   thrownTyRepr);
   if (status.hasCodeCompletion() && !CodeCompletionCallbacks) {
     // Trigger delayed parsing, no need to continue.
     return status;
@@ -149,9 +151,15 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   parseEffectsSpecifiers(arrowLoc,
                          asyncLoc, /*reasync=*/nullptr,
-                         throwsLoc, /*rethrows=*/nullptr);
+                         throwsLoc, /*rethrows=*/nullptr,
+                         thrownTyRepr);
 
-  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
+  Expr *thrownTy = nullptr;
+  if (thrownTyRepr) {
+    thrownTy = new (Context) TypeExpr(thrownTyRepr);
+  }
+
+  auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, thrownTy, arrowLoc);
   return makeParserResult(arrow);
 }
 
@@ -2523,7 +2531,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     SmallVectorImpl<CaptureListEntry> &captureList,
     VarDecl *&capturedSelfDecl,
     ParameterList *&params,
-    SourceLoc &asyncLoc, SourceLoc &throwsLoc,
+    SourceLoc &asyncLoc, SourceLoc &throwsLoc, TypeExpr *&thrownType,
     SourceLoc &arrowLoc,
     TypeExpr *&explicitResultType, SourceLoc &inLoc) {
   // Clear out result parameters.
@@ -2532,6 +2540,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   capturedSelfDecl = nullptr;
   params = nullptr;
   throwsLoc = SourceLoc();
+  thrownType = nullptr;
   arrowLoc = SourceLoc();
   explicitResultType = nullptr;
   inLoc = SourceLoc();
@@ -2539,15 +2548,22 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   // Consume 'async', 'throws', and 'rethrows', but in any order.
   auto consumeEffectsSpecifiers = [&] {
     while (isEffectsSpecifier(Tok) ||
-           (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()))
+           (Tok.is(tok::code_complete) && !Tok.isAtStartOfLine())) {
+      bool isThrows = isThrowsEffectSpecifier(Tok);
+
       consumeToken();
+
+      if (isThrows && Tok.is(tok::l_paren))
+        skipSingle();
+    }
   };
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
           tok::at_sign, tok::l_paren, tok::l_square, tok::identifier,
-          tok::kw__, tok::code_complete)) {
+          tok::kw__, tok::code_complete) ||
+      (Tok.is(tok::kw_throws) && peekToken().is(tok::l_paren))) {
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
@@ -2605,7 +2621,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         consumeEffectsSpecifiers();
       }
     }
-    
+
     // Parse the 'in' at the end.
     if (Tok.isNot(tok::kw_in))
       return makeParserSuccess();
@@ -2817,9 +2833,12 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       params = ParameterList::create(Context, elements);
     }
 
+    TypeRepr *thrownTypeRepr = nullptr;
+
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync*/nullptr,
-                                     throwsLoc, /*rethrows*/nullptr);
+                                     throwsLoc, /*rethrows*/nullptr,
+                                     thrownTypeRepr);
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
@@ -2839,9 +2858,12 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // Check for 'throws' and 'rethrows' after the type and correct it.
         parseEffectsSpecifiers(arrowLoc,
                                asyncLoc, /*reasync*/nullptr,
-                               throwsLoc, /*rethrows*/nullptr);
+                               throwsLoc, /*rethrows*/nullptr, thrownTypeRepr);
       }
     }
+
+    if (thrownTypeRepr)
+      thrownType = new (Context) TypeExpr(thrownTypeRepr);
   }
 
   // Parse the 'in'.
@@ -2943,17 +2965,18 @@ ParserResult<Expr> Parser::parseExprClosure() {
   ParameterList *params = nullptr;
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
+  TypeExpr *thrownType;
   SourceLoc arrowLoc;
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
   Status |= parseClosureSignatureIfPresent(
       attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
-      throwsLoc, arrowLoc, explicitResultType, inLoc);
+      throwsLoc, thrownType, arrowLoc, explicitResultType, inLoc);
 
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
       attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
-      arrowLoc, inLoc, explicitResultType, CurDeclContext);
+      thrownType, arrowLoc, inLoc, explicitResultType, CurDeclContext);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.

@@ -1240,7 +1240,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto *const encodeDecl = FuncDecl::createImplicit(
       C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
-      /*Throws=*/true, /*GenericParams=*/nullptr, params, returnType,
+      /*Throws=*/true, /*ThrownType=*/Type(),
+      /*GenericParams=*/nullptr, params, returnType,
       conformanceDC);
   encodeDecl->setSynthesized();
 
@@ -1891,7 +1892,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
       new (C) ConstructorDecl(name, SourceLoc(),
                               /*Failable=*/false,SourceLoc(),
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
-                              /*Throws=*/true, SourceLoc(), paramList,
+                              /*Throws=*/true, SourceLoc(),
+                              /*ThrownType=*/TypeLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();

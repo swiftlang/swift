@@ -1081,6 +1081,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       Context, StaticSpellingKind::None, name, /*NameLoc=*/PreviousLoc,
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrownType=*/Type(),
       /*GenericParams*/ nullptr, params, TupleType::getEmpty(Context),
       CurDeclContext);
   ParserStatus Status;

@@ -6942,6 +6942,9 @@ protected:
   /// Location of the 'throws' token.
   SourceLoc ThrowsLoc;
 
+  /// The error type that is being thrown.
+  TypeLoc ThrownType;
+
   struct {
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
@@ -6950,12 +6953,13 @@ protected:
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,
                        bool Throws, SourceLoc ThrowsLoc,
+                       TypeLoc ThrownTy,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
       : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent,
                        GenericParams),
         ValueDecl(Kind, Parent, Name, NameLoc), BodyAndFP(), AsyncLoc(AsyncLoc),
-        ThrowsLoc(ThrowsLoc) {
+        ThrowsLoc(ThrowsLoc), ThrownType(ThrownTy) {
     setBodyKind(BodyKind::None);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
@@ -7052,6 +7056,14 @@ public:
 
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
+
+  /// Retrieves the type representation for the thrown type.
+  TypeRepr *getThrownTypeRepr() const {
+    return ThrownType.getTypeRepr();
+  }
+
+  /// Retrieves the thrown interface type.
+  Type getThrownInterfaceType() const;
 
   /// Returns if the function throws or is async.
   bool hasEffect(EffectKind kind) const;
@@ -7443,12 +7455,13 @@ protected:
            DeclName Name, SourceLoc NameLoc,
            bool Async, SourceLoc AsyncLoc,
            bool Throws, SourceLoc ThrowsLoc,
+           TypeLoc ThrownTy,
            bool HasImplicitSelfDecl,
            GenericParamList *GenericParams, DeclContext *Parent)
     : AbstractFunctionDecl(Kind, Parent,
                            Name, NameLoc,
                            Async, AsyncLoc,
-                           Throws, ThrowsLoc,
+                           Throws, ThrowsLoc, ThrownTy,
                            HasImplicitSelfDecl, GenericParams),
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
@@ -7473,6 +7486,7 @@ private:
                               DeclName Name, SourceLoc NameLoc,
                               bool Async, SourceLoc AsyncLoc,
                               bool Throws, SourceLoc ThrowsLoc,
+                              TypeLoc ThrownTy,
                               GenericParamList *GenericParams,
                               DeclContext *Parent,
                               ClangNode ClangN);
@@ -7496,6 +7510,7 @@ public:
   static FuncDecl *createDeserialized(ASTContext &Context,
                                       StaticSpellingKind StaticSpelling,
                                       DeclName Name, bool Async, bool Throws,
+                                      Type ThrownType,
                                       GenericParamList *GenericParams,
                                       Type FnRetType, DeclContext *Parent);
 
@@ -7503,6 +7518,7 @@ public:
                           StaticSpellingKind StaticSpelling, SourceLoc FuncLoc,
                           DeclName Name, SourceLoc NameLoc, bool Async,
                           SourceLoc AsyncLoc, bool Throws, SourceLoc ThrowsLoc,
+                          TypeRepr *ThrownTyR,
                           GenericParamList *GenericParams,
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
                           DeclContext *Parent);
@@ -7510,13 +7526,15 @@ public:
   static FuncDecl *createImplicit(ASTContext &Context,
                                   StaticSpellingKind StaticSpelling,
                                   DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, GenericParamList *GenericParams,
+                                  bool Throws, Type ThrownType,
+                                  GenericParamList *GenericParams,
                                   ParameterList *BodyParams, Type FnRetType,
                                   DeclContext *Parent);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
                                   DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, ParameterList *BodyParams,
+                                  bool Throws, Type ThrownType,
+                                  ParameterList *BodyParams,
                                   Type FnRetType,
                                   GenericParamList *GenericParams,
                                   DeclContext *Parent, ClangNode ClangN);
@@ -7649,11 +7667,12 @@ class AccessorDecl final : public FuncDecl {
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+               TypeLoc thrownTy,
                bool hasImplicitSelfDecl, DeclContext *parent)
       : FuncDecl(DeclKind::Accessor, staticLoc, staticSpelling,
                  /*func loc*/ declLoc,
                  /*name*/ Identifier(), /*name loc*/ declLoc, async, asyncLoc,
-                 throws, throwsLoc, hasImplicitSelfDecl,
+                 throws, throwsLoc, thrownTy, hasImplicitSelfDecl,
                  /*genericParams*/ nullptr, parent),
         AccessorKeywordLoc(accessorKeywordLoc), Storage(storage) {
     assert(!async || accessorKind == AccessorKind::Get
@@ -7666,6 +7685,7 @@ class AccessorDecl final : public FuncDecl {
              AccessorKind accessorKind, AbstractStorageDecl *storage,
              SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
              SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
+             TypeLoc thrownTy,
              DeclContext *parent, ClangNode clangNode);
 
   llvm::Optional<bool> getCachedIsTransparent() const {
@@ -7682,6 +7702,7 @@ public:
                                           AbstractStorageDecl *storage,
                                           StaticSpellingKind staticSpelling,
                                           bool async, bool throws,
+                                          Type thrownType,
                                           Type fnRetType, DeclContext *parent);
 
   static AccessorDecl *
@@ -7689,7 +7710,8 @@ public:
          AccessorKind accessorKind, AbstractStorageDecl *storage,
          SourceLoc staticLoc, StaticSpellingKind staticSpelling, bool async,
          SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
-         ParameterList *parameterList, Type fnRetType, DeclContext *parent,
+         TypeLoc thrownType, ParameterList *parameterList, Type fnRetType,
+         DeclContext *parent,
          ClangNode clangNode = ClangNode());
 
   SourceLoc getAccessorKeywordLoc() const { return AccessorKeywordLoc; }
@@ -8052,6 +8074,7 @@ public:
                   bool Failable, SourceLoc FailabilityLoc,
                   bool Async, SourceLoc AsyncLoc,
                   bool Throws, SourceLoc ThrowsLoc,
+                  TypeLoc thrownTy,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
                   DeclContext *Parent);
@@ -8062,6 +8085,7 @@ public:
                  bool failable, SourceLoc failabilityLoc, 
                  bool async, SourceLoc asyncLoc,
                  bool throws, SourceLoc throwsLoc,
+                 Type thrownTy,
                  ParameterList *bodyParams, GenericParamList *genericParams,
                  DeclContext *parent);
 

@@ -343,7 +343,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   DeclName Name(Context, Id, paramList);
   auto *const FD = FuncDecl::createImplicit(
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
-      /*Async=*/false, /*Throws=*/false,
+      /*Async=*/false, /*Throws=*/false, /*thrownType=*/Type(),
       /*GenericParams=*/nullptr, paramList, ResType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -364,7 +364,7 @@ getBuiltinFunctionImpl(SynthesisContext &SC, Identifier id,
   DeclName name(SC.Context, id, params);
   auto *FD = FuncDecl::createImplicit(
       SC.Context, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
-      extInfo.isAsync(), extInfo.isThrowing(),
+      extInfo.isAsync(), extInfo.isThrowing(), /*thrownType=*/Type(),
       genericParams, params, resultType, SC.DC);
   FD->setAccess(AccessLevel::Public);
   FD->setGenericSignature(signature);
@@ -450,7 +450,7 @@ getBuiltinGenericFunction(Identifier Id,
       Context, StaticSpellingKind::None, Name,
       /*NameLoc=*/SourceLoc(),
       Async,
-      Throws != BuiltinThrowsKind::None,
+      Throws != BuiltinThrowsKind::None, /*thrownType=*/Type(),
       GenericParams, paramList, ResType, DC);
 
   func->setAccess(AccessLevel::Public);

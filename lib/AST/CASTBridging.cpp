@@ -432,7 +432,8 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
                 void *_Nullable opaqueGenericParamList,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
-                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType,
+                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueThrownType,
+                void *_Nullable opaqueReturnType,
                 void *_Nullable opaqueGenericWhereClause) {
   ASTContext &context = convertASTContext(cContext);
 
@@ -440,11 +441,13 @@ FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
   auto declName = DeclName(context, convertIdentifier(cName), paramList);
   auto asyncLoc = convertSourceLoc(cAsyncLoc);
   auto throwsLoc = convertSourceLoc(cThrowsLoc);
+  // FIXME: rethrows
 
   auto *decl = FuncDecl::create(
       context, convertSourceLoc(cStaticLoc), StaticSpellingKind::None,
       convertSourceLoc(cFuncKeywordLoc), declName, convertSourceLoc(cNameLoc),
       asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(), throwsLoc,
+      static_cast<TypeRepr *>(opaqueThrownType),
       static_cast<GenericParamList *>(opaqueGenericParamList), paramList,
       static_cast<TypeRepr *>(opaqueReturnType),
       convertDeclContext(cDeclContext));
@@ -459,6 +462,7 @@ BridgedDeclContextAndDecl ConstructorDecl_create(
     BridgedSourceLoc cInitKeywordLoc, BridgedSourceLoc cFailabilityMarkLoc,
     bool isIUO, void *_Nullable opaqueGenericParams, void *opaqueParameterList,
     BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
+    void *_Nullable opaqueThrownType,
     void *_Nullable opaqueGenericWhereClause) {
   assert((bool)cFailabilityMarkLoc.raw || !isIUO);
 
@@ -470,11 +474,12 @@ BridgedDeclContextAndDecl ConstructorDecl_create(
   auto asyncLoc = convertSourceLoc(cAsyncLoc);
   auto throwsLoc = convertSourceLoc(cThrowsLoc);
   auto failabilityMarkLoc = convertSourceLoc(cFailabilityMarkLoc);
+  // FIXME: rethrows
 
   auto *decl = new (context) ConstructorDecl(
       declName, convertSourceLoc(cInitKeywordLoc), failabilityMarkLoc.isValid(),
       failabilityMarkLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(),
-      throwsLoc, parameterList,
+      throwsLoc, static_cast<TypeRepr *>(opaqueThrownType), parameterList,
       static_cast<GenericParamList *>(opaqueGenericParams),
       convertDeclContext(cDeclContext));
   decl->setTrailingWhereClause(
@@ -544,7 +549,8 @@ void *ClosureExpr_create(BridgedASTContext cContext, void *body,
 
   auto *out = new (context)
       ClosureExpr(attributes, bracketRange, nullptr, nullptr, asyncLoc,
-                  throwsLoc, arrowLoc, inLoc, nullptr, declContext);
+                  throwsLoc, /*FIXME:thrownType=*/nullptr, arrowLoc, inLoc,
+                  nullptr, declContext);
   out->setBody((BraceStmt *)body, true);
   out->setParameterList(params);
   return (Expr *)out;
@@ -1061,11 +1067,12 @@ void *CompositionTypeRepr_create(BridgedASTContext cContext,
 void *FunctionTypeRepr_create(BridgedASTContext cContext, void *argsTy,
                               BridgedSourceLoc cAsyncLoc,
                               BridgedSourceLoc cThrowsLoc,
+                              void * _Nullable thrownType,
                               BridgedSourceLoc cArrowLoc, void *returnType) {
   ASTContext &context = convertASTContext(cContext);
   return new (context) FunctionTypeRepr(
       nullptr, (TupleTypeRepr *)argsTy, convertSourceLoc(cAsyncLoc),
-      convertSourceLoc(cThrowsLoc), convertSourceLoc(cArrowLoc),
+      convertSourceLoc(cThrowsLoc), (TypeRepr *)thrownType, convertSourceLoc(cArrowLoc),
       (TypeRepr *)returnType);
 }
 

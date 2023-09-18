@@ -507,6 +507,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (visit(AFD->getParameters()))
       return true;
 
+    if (auto *const ThrownTyR = AFD->getThrownTypeRepr()) {
+      if (doIt(ThrownTyR))
+        return true;
+    }
+
     if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
       if (!isa<AccessorDecl>(FD))
         if (auto *const TyR = FD->getResultTypeRepr())
@@ -996,6 +1001,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (visit(expr->getParameters()))
       return nullptr;
 
+    if (auto thrownTypeRepr = expr->getExplicitThrownTypeRepr()) {
+      if (doIt(thrownTypeRepr))
+        return nullptr;
+    }
+
     if (expr->hasExplicitResultType()) {
       if (doIt(expr->getExplicitResultTypeRepr()))
         return nullptr;
@@ -1085,6 +1095,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Args = doIt(Args);
       if (!Args) return nullptr;
       E->setArgsExpr(Args);
+    }
+    if (Expr *Thrown = E->getThrownTypeExpr()) {
+      Thrown = doIt(Thrown);
+      if (!Thrown) return nullptr;
+      E->setThrownTypeExpr(Thrown);
     }
     if (Expr *Result = E->getResultExpr()) {
       Result = doIt(Result);

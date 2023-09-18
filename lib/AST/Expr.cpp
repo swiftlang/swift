@@ -2035,6 +2035,13 @@ bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
 }
 
+void ClosureExpr::setExplicitThrownType(Type thrownType) {
+  assert(thrownType && !thrownType->hasTypeVariable() &&
+         !thrownType->hasPlaceholder());
+  assert(ThrownType);
+  ThrownType->setType(MetatypeType::get(thrownType));
+}
+
 void ClosureExpr::setExplicitResultType(Type ty) {
   assert(ty && !ty->hasTypeVariable() && !ty->hasPlaceholder());
   ExplicitResultTypeAndBodyState.getPointer()

@@ -329,6 +329,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                               /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+                              /*ThrownType=*/TypeLoc(),
                               paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
@@ -709,6 +710,11 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     bodyParam->setInterfaceType(substTy);
   }
 
+  Type thrownType;
+  if (auto superThrownType = superclassCtor->getThrownInterfaceType()) {
+    thrownType = superThrownType.subst(subMap);
+  }
+
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
   auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
@@ -721,6 +727,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
+                              TypeLoc::withoutLoc(thrownType),
                               bodyParams, genericParams, implCtx);
 
   ctor->setImplicit();

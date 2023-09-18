@@ -4404,8 +4404,19 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     if (AFD->hasThrows()) {
       if (AFD->getAttrs().hasAttribute<RethrowsAttr>())
         Printer << " " << tok::kw_rethrows;
-      else
+      else {
         Printer << " " << tok::kw_throws;
+
+        if (auto thrownType = AFD->getThrownInterfaceType()) {
+          auto errorType = AFD->getASTContext().getErrorExistentialType();
+          TypeRepr *thrownTypeRepr = AFD->getThrownTypeRepr();
+          if (!errorType || !thrownType->isEqual(errorType) ||
+              (thrownTypeRepr && Options.PreferTypeRepr)) {
+            TypeLoc thrownTyLoc(thrownTypeRepr, thrownType);
+            printTypeLoc(thrownTyLoc);
+          }
+        }
+      }
     }
   }
 }

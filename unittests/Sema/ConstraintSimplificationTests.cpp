@@ -79,6 +79,7 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
       /*capturedSelfDecl=*/nullptr, ParameterList::create(Context, {paramDecl}),
       /*asyncLoc=*/SourceLoc(),
       /*throwsLoc=*/SourceLoc(),
+      /*thrownType=*/nullptr,
       /*arrowLoc=*/SourceLoc(),
       /*inLoc=*/SourceLoc(),
       /*explicitResultType=*/nullptr,

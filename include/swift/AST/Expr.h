@@ -3981,6 +3981,9 @@ private:
   /// The location of the "in", if present.
   SourceLoc InLoc;
 
+  /// The explcitly-specified thrown type.
+  TypeExpr *ThrownType;
+
   /// The explicitly-specified result type.
   llvm::PointerIntPair<TypeExpr *, 2, BodyState> ExplicitResultTypeAndBodyState;
 
@@ -3991,14 +3994,14 @@ public:
   ClosureExpr(const DeclAttributes &attributes,
               SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
-              SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
-              DeclContext *parent)
+              TypeExpr *thrownType, SourceLoc arrowLoc, SourceLoc inLoc,
+              TypeExpr *explicitResultType, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           parent),
       Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
-      InLoc(inLoc),
+      InLoc(inLoc), ThrownType(thrownType),
       ExplicitResultTypeAndBodyState(explicitResultType, BodyState::Parsed),
       Body(nullptr) {
     setParameterList(params);
@@ -4090,6 +4093,24 @@ public:
   /// Retrieve the location of the 'throws' for a closure that has it.
   SourceLoc getThrowsLoc() const {
     return ThrowsLoc;
+  }
+
+  /// Retrieve the explicitly-thrown type.
+  Type getExplicitThrownType() const {
+    if (ThrownType)
+      return ThrownType->getInstanceType();
+
+    return nullptr;
+  }
+
+  void setExplicitThrownType(Type thrownType);
+
+  /// Retrieve the explicitly-thrown type representation.
+  TypeRepr *getExplicitThrownTypeRepr() const {
+    if (ThrownType)
+      return ThrownType->getTypeRepr();
+
+    return nullptr;
   }
 
   Type getExplicitResultType() const {
@@ -5177,24 +5198,30 @@ class ArrowExpr : public Expr {
   SourceLoc ArrowLoc;
   Expr *Args;
   Expr *Result;
+  Expr *ThrownType;
+
 public:
   ArrowExpr(Expr *Args, SourceLoc AsyncLoc, SourceLoc ThrowsLoc,
-            SourceLoc ArrowLoc, Expr *Result)
+            Expr *ThrownType, SourceLoc ArrowLoc, Expr *Result)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
       AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc), Args(Args),
-      Result(Result)
+      Result(Result), ThrownType(ThrownType)
   { }
 
-  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, SourceLoc ArrowLoc)
+  ArrowExpr(SourceLoc AsyncLoc, SourceLoc ThrowsLoc, Expr *ThrownType,
+            SourceLoc ArrowLoc)
     : Expr(ExprKind::Arrow, /*implicit=*/false, Type()),
       AsyncLoc(AsyncLoc), ThrowsLoc(ThrowsLoc), ArrowLoc(ArrowLoc),
-      Args(nullptr), Result(nullptr)
+      Args(nullptr), Result(nullptr), ThrownType(ThrownType)
   { }
 
   Expr *getArgsExpr() const { return Args; }
   void setArgsExpr(Expr *E) { Args = E; }
   Expr *getResultExpr() const { return Result; }
   void setResultExpr(Expr *E) { Result = E; }
+  Expr *getThrownTypeExpr() const { return ThrownType; }
+  void setThrownTypeExpr(Expr *E) { ThrownType = E; }
+
   SourceLoc getAsyncLoc() const { return AsyncLoc; }
   SourceLoc getThrowsLoc() const { return ThrowsLoc; }
   SourceLoc getArrowLoc() const { return ArrowLoc; }
