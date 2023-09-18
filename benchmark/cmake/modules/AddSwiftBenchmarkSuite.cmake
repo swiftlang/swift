@@ -354,6 +354,7 @@ function (swift_benchmark_compile_archopts)
   set(common_options
       "-c"
       "-target" "${target}"
+      "-module-cache-path" "${CMAKE_CURRENT_BINARY_DIR}/modulecache"
       "-${BENCH_COMPILE_ARCHOPTS_OPT}" ${PAGE_ALIGNMENT_OPTION})
       #"-Xfrontend" "-enable-experimental-feature"
       #"-Xfrontend" "LayoutPrespecialization")
