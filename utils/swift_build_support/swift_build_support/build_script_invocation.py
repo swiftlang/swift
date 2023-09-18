@@ -445,6 +445,15 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.coverage_db)
             ]
 
+        # '--install-swiftsyntax' is a legacy form of 'swift-syntax-lib'
+        # install component.
+        if (args.install_swiftsyntax and
+                '--install-swift' not in args.build_script_impl_args):
+            impl_args += [
+                "--install-swift",
+                "--swift-install-components=swift-syntax-lib"
+            ]
+
         if args.llvm_install_components:
             impl_args += [
                 "--llvm-install-components=%s" % args.llvm_install_components
