@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 // LOCAL_STRING_TESTVALUE-NOT: name=testValue
 // LOCAL_STRING_TESTVALUE:     Decl[LocalVar]/Local: testValue[#String#]; name=testValue
