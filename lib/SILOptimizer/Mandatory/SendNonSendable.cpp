@@ -556,18 +556,35 @@ public:
     // if this apply does not cross isolation domains, it has normal,
     // non-consuming multi-assignment semantics
     if (!SILApplyCrossesIsolation(applyInst)) {
-      // TODO: How do we handle partial_apply here.
-      bool hasActorSelf = false;
+      bool isolatedToActor = false;
+
+      // If our apply site has an actor self, we want to mark that any results
+      // of the function cannot be transferred away since conservatively
+      //
+      // TODO: Should we do this for all arguments... that is if an actor is
+      // just passed as a function argument, do we error upon it.
       if (auto fas = FullApplySite::isa(applyInst)) {
-        if (fas.hasSelfArgument()) {
+        if (!fas.getSubstCalleeType()->isSendable() && fas.hasSelfArgument()) {
           if (auto self = fas.getSelfArgument()) {
-            hasActorSelf = self->getType().getASTType()->isActorType();
+            isolatedToActor = self->getType().getASTType()->isActorType();
+          }
+        }
+      } else if (auto *pai = dyn_cast<PartialApplyInst>(applyInst)) {
+        if (!pai->getSubstCalleeType()->isSendable()) {
+          // If we ever capture an actor, we need to mark this closure as not
+          // being able to be transferred conservatively.
+          for (auto opValue : pai->getOperandValues()) {
+            if (opValue->getType().getASTType()->isActorType()) {
+              isolatedToActor = true;
+              break;
+            }
           }
         }
       }
+
       return translateSILMultiAssign(getApplyResults(applyInst),
                                      applyInst->getOperandValues(),
-                                     hasActorSelf);
+                                     isolatedToActor);
     }
 
     if (auto cast = dyn_cast<ApplyInst>(applyInst))
@@ -1638,6 +1655,12 @@ class PartitionAnalysis {
 
     // Now that we have finished processing, sort/unique our non consumed array.
     translator.sortUniqueNeverConsumedValues();
+
+    LLVM_DEBUG(llvm::dbgs() << "Never Consumed IDs!\n";
+               for (auto value
+                    : translator.getNeverConsumedValues()) {
+                 llvm::dbgs() << "    %%" << value << '\n';
+               });
   }
 
   // track the AST exprs that have already had diagnostics emitted about

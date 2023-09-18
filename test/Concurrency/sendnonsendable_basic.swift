@@ -10,6 +10,7 @@
 
 /// Classes are always non-sendable, so this is non-sendable
 class NonSendableKlass { // expected-complete-note 9{{}}
+  // expected-note @-1 {{}}
   func asyncCall() async {}
 }
 
@@ -18,6 +19,7 @@ actor Actor {
   final var finalKlass = NonSendableKlass()
 
   func useKlass(_ x: NonSendableKlass) {}
+  func safeToCall() async {}
 }
 
 final actor FinalActor {
@@ -27,6 +29,8 @@ final actor FinalActor {
 
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
+
+@MainActor func transferToMain<T>(_ t: T) {}
 
 ////////////////////////////
 // MARK: Actor Self Tests //
@@ -76,16 +80,16 @@ func closureInOut(_ a: Actor) async {
   contents = ns0
   contents = ns1
 
-  var closure = {}
+  var closure = {} // expected-warning {{}}
   closure = { useInOut(&contents) }
 
   await a.useKlass(ns0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
   // expected-sns-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+
+  // If the merge did not happen, then ns1 wouldn't have errored.
   await a.useKlass(ns1) // expected-sns-note {{access here could race}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
-
-  closure() // expected-sns-note {{access here could race}}
 }
 
 func closureInOut2(_ a: Actor) async {
@@ -130,3 +134,140 @@ func closureNonInOut(_ a: Actor) async {
   closure() // expected-sns-note {{access here could race}}
 }
 
+// Make sure that we error if a field of the actor is captured in the closure
+// and we transfer the closure.
+extension Actor {
+  func transferClosureCaptureSelfTest() async {
+    let closure = {
+      print(self.klass)
+    }
+
+    // Iterated closure
+    let closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-sns-warning @-1 {{passing argument of non-sendable type '() -> ()' from actor-isolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+
+    // If we did not already emit for closure, we would emit for this as
+    // well. See below.
+    await transferToMain(closure2)
+    // expected-sns-note @-1 {{access here could race}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func transferClosureCaptureSelfTestTransitiveClosure() async {
+    let closure = {
+      print(self.klass)
+    }
+
+    // Iterated closure
+    let closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure2) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func transferClosureCaptureSelfTestTransitiveVarClosure() async {
+    let closure = {
+      print(self.klass)
+    }
+
+    // Iterated closure
+    var closure2 = {}
+    closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure2) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func transferClosureCaptureSelfTestTransitiveVarClosure2() async {
+    var closure = {}
+    closure = {
+      print(self.klass)
+    }
+
+    // Iterated closure
+    let closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure2) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func transferClosureCaptureSelfTestTransitiveVarClosure3() async {
+    var closure = {}
+    let k = self.klass
+    closure = {
+      print(k)
+    }
+
+    // Iterated closure
+    let closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure2) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func transferClosureCaptureSelfTestTransitiveVarSelfAlone() async {
+    var closure = {}
+    closure = {
+      print(self)
+    }
+
+    // Iterated closure
+    let closure2 = {
+      closure()
+    }
+
+    await transferToMain(closure2) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func testClosureIfActorUseIsForFullApplySite() async {
+    // This works b/c we are returning the partial_apply as a result. Since the
+    // partial_apply is not sendable, things propagate.
+    let closure = { (k: NonSendableKlass) -> (() -> ()) in
+      {
+        print(k)
+      }
+    }(self.klass)
+    await transferToMain(closure) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func testClosureIfActorUseIsForSendableFullApplySite() async {
+    let closure = { (k: NonSendableKlass) -> (@Sendable () -> ()) in
+      {
+        print(k) // expected-warning {{capture of 'k' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+      }
+    }(self.klass)
+    await transferToMain(closure) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  }
+
+  func testSendableClosure() async {
+    // This is safe in both modes since closure is sendable.
+    let closure: @Sendable () async -> () = {
+      await self.safeToCall()
+    }
+
+    await transferToMain(closure)
+  }
+}

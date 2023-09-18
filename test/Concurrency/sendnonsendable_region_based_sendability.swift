@@ -357,8 +357,10 @@ actor A_Sendable {
         // This is not a cross-isolation call, so it should be permitted
         foo_noniso(captures_self)
 
-        // This is a cross-isolation, but self is Sendable, so it should be permitted
-        await a.foo(captures_self)
+        // This is a cross-isolation, but self is Sendable, so we might be able to permit it.
+        //
+        // TODO: We would need to understand how the value is used within the body of bar.
+        await a.foo(captures_self) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
         // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
