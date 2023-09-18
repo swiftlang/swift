@@ -1042,6 +1042,8 @@ bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
     return false;
   if (getSILOptions().shouldOptimize())
     return false;
+  if (LangOpts.hasFeature(Feature::Embedded))
+    return false;
 
   // If we are not executing an action that has a dependency on
   // SwiftOnoneSupport, don't load it.

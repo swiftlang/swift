@@ -49,9 +49,9 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
-      "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
+      "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB} "IS_STDLIB" IS_STDLIB_arg)
@@ -65,6 +65,7 @@ function(handle_swift_sources
                  STATIC_arg)
   translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   translate_flag(${SWIFTSOURCES_IS_FRAGILE} "IS_FRAGILE" IS_FRAGILE_arg)
+  translate_flag(${SWIFTSOURCES_ONLY_SWIFTMODULE} "ONLY_SWIFTMODULE" ONLY_SWIFTMODULE_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
   endif()
@@ -146,6 +147,7 @@ function(handle_swift_sources
         SDK ${SWIFTSOURCES_SDK}
         ARCHITECTURE ${SWIFTSOURCES_ARCHITECTURE}
         MODULE_NAME ${SWIFTSOURCES_MODULE_NAME}
+        MODULE_DIR ${SWIFTSOURCES_MODULE_DIR}
         ${IS_MAIN_arg}
         ${IS_STDLIB_arg}
         ${IS_STDLIB_CORE_arg}
@@ -154,6 +156,7 @@ function(handle_swift_sources
         ${STATIC_arg}
         ${BOOTSTRAPPING_arg}
         ${IS_FRAGILE_arg}
+        ${ONLY_SWIFTMODULE_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
         MACCATALYST_BUILD_FLAVOR "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
@@ -378,7 +381,7 @@ function(_compile_swift_files
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -903,13 +906,7 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # First generate the obj dirs
   list(REMOVE_DUPLICATES dirs_to_create)
-  add_custom_command_target(
-      create_dirs_dependency_target
-      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
-      OUTPUT ${dirs_to_create}
-      COMMENT "Generating dirs for ${first_output}")
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
@@ -940,8 +937,10 @@ function(_compile_swift_files
     set(copy_legacy_layouts_dep)
   endif()
 
+  if(NOT SWIFTFILE_ONLY_SWIFTMODULE)
   add_custom_command_target(
       dependency_target
+      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
       COMMAND
         ${set_environment_args}
         "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
@@ -955,10 +954,10 @@ function(_compile_swift_files
         ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
-        ${create_dirs_dependency_target}
         ${copy_legacy_layouts_dep}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
+  endif()
 
   # This is the target to generate:
   #
@@ -978,6 +977,7 @@ function(_compile_swift_files
   if (NOT SWIFTFILE_IS_MAIN)
     add_custom_command_target(
         module_dependency_target
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" ${module_outputs}
         COMMAND
@@ -997,7 +997,6 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
-          ${create_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
 
@@ -1010,6 +1009,7 @@ function(_compile_swift_files
       endif()
       add_custom_command_target(
         module_dependency_target_static
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir_static}
           ${specific_module_dir_static}
@@ -1026,7 +1026,6 @@ function(_compile_swift_files
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
-          ${create_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${module_file}")
       set("${dependency_module_target_out_var_name}" "${module_dependency_target_static}" PARENT_SCOPE)
@@ -1084,6 +1083,7 @@ function(_compile_swift_files
     # This is the target to generate the .sib files. It is not built by default.
     add_custom_command_target(
         sib_dependency_target
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           ${set_environment_args}
           "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
@@ -1096,7 +1096,6 @@ function(_compile_swift_files
           "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${create_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sib_file}"
         EXCLUDE_FROM_ALL)
@@ -1104,6 +1103,7 @@ function(_compile_swift_files
 
     add_custom_command_target(
         sibopt_dependency_target
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           ${set_environment_args}
           "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
@@ -1116,7 +1116,6 @@ function(_compile_swift_files
           "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${create_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
         COMMENT "Generating ${sibopt_file}"
         EXCLUDE_FROM_ALL)
@@ -1125,6 +1124,7 @@ function(_compile_swift_files
     # This is the target to generate the .sibgen files. It is not built by default.
     add_custom_command_target(
         sibgen_dependency_target
+        COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
         COMMAND
           ${set_environment_args}
           "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
@@ -1137,7 +1137,6 @@ function(_compile_swift_files
           "${file_path}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
-          ${create_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
           COMMENT "Generating ${sibgen_file}"
           EXCLUDE_FROM_ALL)

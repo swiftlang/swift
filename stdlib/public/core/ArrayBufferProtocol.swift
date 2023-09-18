@@ -97,6 +97,10 @@ where Indices == Range<Int> {
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int { get }
 
+  #if $Embedded
+  typealias AnyObject = Builtin.NativeObject
+  #endif
+
   /// An object that keeps the elements stored in this buffer alive.
   var owner: AnyObject { get }
 
