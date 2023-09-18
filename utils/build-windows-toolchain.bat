@@ -50,6 +50,8 @@ del /f /q "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap"
 del /f /q "%VCToolsInstallDir%\include\module.modulemap"
 del /f /q "%VCToolsInstallDir%\include\vcruntime.apinotes"
 
+call :FetchWiX || (exit /b)
+call :FetchX64Toolchain || (exit /b)
 call :CloneDependencies || (exit /b)
 call :CloneRepositories || (exit /b)
 
@@ -186,6 +188,33 @@ cmake ^
 cmake --build "%BuildRoot%\curl" || (exit /b)
 cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
+path %BuildRoot%\toolchains\5.9.0\PFiles64\Swift\runtime-development\usr\bin;%BuildRoot%\toolchains\5.9.0\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin;%Path%
+
+:: Build Swift Syntax
+cmake ^
+  -B "%BuildRoot%\99" ^
+
+  -D BUILD_SHARED_LIBS=YES ^
+  -D CMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE% ^
+  -D CMAKE_C_COMPILER=cl.exe ^
+  -D CMAKE_C_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_CXX_COMPILER=cl ^
+  -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
+  -D CMAKE_MT=mt ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+
+  -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
+
+  -D SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26=YES ^
+
+  -G Ninja ^
+  -S %SourceRoot%\swift-syntax || (exit /b)
+cmake --build %BuildRoot%\99 || (exit /b)
+cmake --build %BuildRoot%\99 --target install || (exit /b)
+
 :: Build Toolchain
 cmake ^
   -B "%BuildRoot%\1" ^
@@ -202,6 +231,9 @@ cmake ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
   -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
+
+  -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe" ^
+  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 
@@ -225,9 +257,11 @@ cmake ^
   -D LLVM_EXTERNAL_CMARK_SOURCE_DIR="%SourceRoot%\cmark" ^
   -D PYTHON_HOME=%PYTHON_HOME% ^
   -D PYTHON_EXECUTABLE=%PYTHON_HOME%\python.exe ^
+  -D SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR="%BuildRoot%\99" ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
+  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
@@ -814,6 +848,31 @@ git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
 git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
+
+goto :eof
+endlocal
+
+:FetchWiX
+setlocal enableextensions enabledelayedexpansion
+
+if exist wix-4.0.1 goto :eof
+curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.1 -o wix-4.0.1.zip
+md WiX-4.0.1
+cd WiX-4.0.1 || exit (/b)
+tar -xf ../wix-4.0.1.zip || exit (/b)
+
+goto :eof
+endlocal
+
+:FetchX64Toolchain
+setlocal enableextensions enabledelayedexpansion
+
+curl.exe -k -sOL "https://download.swift.org/swift-5.9-release/windows10/swift-5.9-RELEASE/swift-5.9-RELEASE-windows10.exe" || (exit /b)
+"WiX-4.0.1\tools\net6.0\any\wix.exe" burn extract swift-5.9-RELEASE-windows10.exe -o %BuildRoot%\toolchains || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a0" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a1" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a2" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a3" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
 
 goto :eof
 endlocal
