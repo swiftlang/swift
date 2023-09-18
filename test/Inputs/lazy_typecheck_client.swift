@@ -14,6 +14,8 @@ func testGlobalFunctions() {
   _ = packageFunc()
   #endif
   constrainedGenericPublicFunction(ConformsToPublicProto())
+  _ = publicSpecializedFunc(4)
+  _ = publicSpecializedFunc(ConformsToPublicProto())
   if #available(SwiftStdlib 5.1, *) {
     _ = publicFuncWithOpaqueReturnType()
     _ = publicAEICFuncWithOpaqueReturnType()

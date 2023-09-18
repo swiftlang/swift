@@ -1427,6 +1427,7 @@ class SpecializeAttr final
       private llvm::TrailingObjects<SpecializeAttr, Identifier,
                                     AvailableAttr *, Type> {
   friend class SpecializeAttrTargetDeclRequest;
+  friend class SerializeAttrGenericSignatureRequest;
   friend TrailingObjects;
 
 public:
@@ -1519,14 +1520,6 @@ public:
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature getSpecializedSignature() const {
-    return specializedSignature;
-  }
-
-  void setSpecializedSignature(GenericSignature newSig) {
-    specializedSignature = newSig;
-  }
-
   bool isExported() const {
     return Bits.SpecializeAttr.exported;
   }
@@ -1549,6 +1542,10 @@ public:
 
   /// \p forDecl is the value decl that the attribute belongs to.
   ValueDecl *getTargetFunctionDecl(const ValueDecl *forDecl) const;
+
+  /// \p forDecl is the value decl that the attribute belongs to.
+  GenericSignature
+  getSpecializedSignature(const AbstractFunctionDecl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;
