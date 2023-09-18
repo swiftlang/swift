@@ -1464,13 +1464,17 @@ static bool performCompile(CompilerInstance &Instance,
   }() && "Only supports parsing .swift files");
 
   bool hadError = performAction(Instance, ReturnValue, observer);
+  auto canIgnoreErrorForExit = [&Instance, &opts]() {
+    return opts.AllowModuleWithCompilerErrors ||
+      (opts.isTypeCheckAction() && Instance.downgradeInterfaceVerificationErrors());
+  };
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
   if (Instance.hasASTContext() &&
       FrontendOptions::doesActionPerformEndOfPipelineActions(Action)) {
     performEndOfPipelineActions(Instance);
-    if (!opts.AllowModuleWithCompilerErrors)
+    if (!canIgnoreErrorForExit())
       hadError |= Instance.getASTContext().hadError();
   }
   return hadError;
