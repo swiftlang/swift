@@ -175,6 +175,7 @@ internal func _assertionFailure(
   Builtin.int_trap()
 }
 
+#if $Embedded
 @usableFromInline
 @inline(never)
 @_semantics("programtermination_point")
@@ -184,6 +185,7 @@ internal func _assertionFailure(
 ) -> Never {
   Builtin.int_trap()
 }
+#endif
 
 /// This function should be used only in the implementation of stdlib
 /// assertions.
