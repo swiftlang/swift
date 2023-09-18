@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 
 // Test is unexpectedly passing on no_assert config on Linux
 
