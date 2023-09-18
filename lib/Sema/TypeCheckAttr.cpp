@@ -2834,10 +2834,25 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     return;
   }
 
+  (void)attr->getSpecializedSignature(FD);
+}
+
+GenericSignature
+SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
+                                               const AbstractFunctionDecl *FD,
+                                               SpecializeAttr *attr) const {
+  if (attr->specializedSignature)
+    return attr->specializedSignature;
+
+  auto &Ctx = FD->getASTContext();
+  auto genericSig = FD->getGenericSignature();
+  if (!genericSig)
+    return nullptr;
+
   InferredGenericSignatureRequest request{
       genericSig.getPointer(),
       /*genericParams=*/nullptr,
-      WhereClauseOwner(FD, attr),
+      WhereClauseOwner(const_cast<AbstractFunctionDecl *>(FD), attr),
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
       /*allowConcreteGenericParams=*/true};
@@ -2865,10 +2880,26 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     attr->setTypeErasedParams(typeErasedParams);
   }
 
-  attr->setSpecializedSignature(specializedSig);
-
   // Check the target function if there is one.
   attr->getTargetFunctionDecl(FD);
+
+  return specializedSig;
+}
+
+llvm::Optional<GenericSignature>
+SerializeAttrGenericSignatureRequest::getCachedResult() const {
+  const auto &storage = getStorage();
+  SpecializeAttr *attr = std::get<1>(storage);
+  if (auto signature = attr->specializedSignature)
+    return signature;
+  return llvm::None;
+}
+
+void SerializeAttrGenericSignatureRequest::cacheResult(
+    GenericSignature signature) const {
+  const auto &storage = getStorage();
+  SpecializeAttr *attr = std::get<1>(storage);
+  attr->specializedSignature = signature;
 }
 
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {

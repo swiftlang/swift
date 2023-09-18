@@ -33,6 +33,11 @@ public func constrainedGenericPublicFunction<T>(_ t: T) where T: PublicProto {
   doesNotExist() // expected-error {{cannot find 'doesNotExist' in scope}}
 }
 
+@_specialize(exported: true, where T == PublicProto)
+public func publicSpecializedFunc<T>(_ t: T) -> T {
+  return doesNotExist() // expected-error {{cannot find 'doesNotExist' in scope}}
+}
+
 @available(SwiftStdlib 5.1, *)
 public func publicFuncWithOpaqueReturnType() -> some PublicProto { // expected-note {{opaque return type declared here}}
   return 1 // expected-error {{return type of global function 'publicFuncWithOpaqueReturnType()' requires that 'Int' conform to 'PublicProto'}}

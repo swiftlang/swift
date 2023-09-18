@@ -14,6 +14,8 @@
 // CHECK-NEXT:    return 1
 // CHECK-NEXT:  }
 // CHECK:       public func constrainedGenericPublicFunction<T>(_ t: T) where T : lazy_typecheck.PublicProto
+// CHECK:       @_specialize(exported: true, kind: full, where T == any lazy_typecheck.PublicProto)
+// CHECK-NEXT:  public func publicSpecializedFunc<T>(_ t: T) -> T
 // CHECK:       @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 // CHECK-NEXT:  public func publicFuncWithOpaqueReturnType() -> some lazy_typecheck.PublicProto
 

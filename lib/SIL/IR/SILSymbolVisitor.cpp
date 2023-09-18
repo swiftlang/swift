@@ -442,8 +442,9 @@ public:
       if (!attr->isExported())
         continue;
 
-      auto erasedSignature = attr->getSpecializedSignature().typeErased(
-          attr->getTypeErasedParams());
+      auto specializedSignature = attr->getSpecializedSignature(AFD);
+      auto erasedSignature =
+          specializedSignature.typeErased(attr->getTypeErasedParams());
 
       if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
         addFunction(SILDeclRef(targetFun, erasedSignature),
