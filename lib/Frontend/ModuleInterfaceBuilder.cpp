@@ -187,18 +187,6 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   return false;
 }
 
-static bool shouldDowngradeInterfaceVerificationError(const FrontendOptions &opts,
-                                                      ASTContext &ctx) {
-  if (ctx.blockListConfig.hasBlockListAction(opts.ModuleName,
-                                             BlockListKeyKind::ModuleName,
-                        BlockListAction::DowngradeInterfaceVerificationFailure)) {
-    ctx.Diags.diagnose(SourceLoc(), diag::interface_block_listed_broken,
-                       opts.ModuleName);
-    return true;
-  }
-  return opts.DowngradeInterfaceVerificationError;
-}
-
 std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     StringRef InterfacePath, StringRef OutputPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
@@ -214,8 +202,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
     return std::error_code();
   }
   FrontendOptions &FEOpts = Invocation.getFrontendOptions();
-  bool isTypeChecking =
-      (FEOpts.RequestedAction == FrontendOptions::ActionType::Typecheck);
+  bool isTypeChecking = FEOpts.isTypeCheckAction();
   const auto &InputInfo = FEOpts.InputsAndOutputs.firstInput();
   StringRef InPath = InputInfo.getFileName();
 
@@ -227,7 +214,7 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
 
   LLVM_DEBUG(llvm::dbgs() << "Performing sema\n");
   if (isTypeChecking &&
-      shouldDowngradeInterfaceVerificationError(FEOpts, Instance.getASTContext())) {
+      Instance.downgradeInterfaceVerificationErrors()) {
     ErrorDowngradeConsumerRAII R(Instance.getDiags());
     Instance.performSema();
     return std::error_code();
