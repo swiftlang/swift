@@ -16,11 +16,17 @@ public typealias _CustomReflectableOrNone = CustomReflectable
 public typealias _CustomReflectableOrNone = Any
 #endif
 
+#if !$Embedded
+public typealias _CustomDebugStringConvertibleOrNone = CustomDebugStringConvertible
+#else
+public typealias _CustomDebugStringConvertibleOrNone = Any
+#endif
+
 /// A stdlib-internal protocol modeled by the intrinsic pointer types,
 /// UnsafeMutablePointer, UnsafePointer, UnsafeRawPointer,
 /// UnsafeMutableRawPointer, and AutoreleasingUnsafeMutablePointer.
 public protocol _Pointer
-: Hashable, Strideable, CustomDebugStringConvertible, _CustomReflectableOrNone {
+: Hashable, Strideable, _CustomDebugStringConvertibleOrNone, _CustomReflectableOrNone {
   /// A type that represents the distance between two pointers.
   typealias Distance = Int
   
@@ -303,6 +309,7 @@ extension _Pointer /*: Hashable */ {
   }
 }
 
+@_unavailableInEmbedded
 extension _Pointer /*: CustomDebugStringConvertible */ {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
@@ -408,6 +415,8 @@ func _convertInOutToPointerArgument<
   return ToPointer(from)
 }
 
+#if !$Embedded
+
 /// Derive a pointer argument from a value array parameter.
 ///
 /// This always produces a non-null pointer, even if the array doesn't have any
@@ -459,3 +468,25 @@ func _convertConstStringToUTF8PointerArgument<
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }
+
+#else
+
+@_unavailableInEmbedded public
+func _convertConstArrayToPointerArgument<FromElement,ToPointer: _Pointer>(
+    _ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
+  fatalError("unreachable in embedded Swift (marked as unavailable)")
+}
+
+@_unavailableInEmbedded public
+func _convertMutableArrayToPointerArgument<FromElement, ToPointer: _Pointer>(
+    _ a: inout [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
+  fatalError("unreachable in embedded Swift (marked as unavailable)")
+}
+
+@_unavailableInEmbedded public
+func _convertConstStringToUTF8PointerArgument<ToPointer: _Pointer>(
+    _ str: String) -> (Builtin.NativeObject?, ToPointer) {
+  fatalError("unreachable in embedded Swift (marked as unavailable)")
+}
+
+#endif

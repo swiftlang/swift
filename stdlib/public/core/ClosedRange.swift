@@ -380,6 +380,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation...
@@ -388,6 +389,7 @@ extension ClosedRange: CustomStringConvertible {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
@@ -477,6 +479,7 @@ extension ClosedRange {
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride: SignedInteger
 
+@_unavailableInEmbedded
 extension ClosedRange: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
@@ -492,6 +495,7 @@ extension ClosedRange: Decodable where Bound: Decodable {
   }
 }
 
+@_unavailableInEmbedded
 extension ClosedRange: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()

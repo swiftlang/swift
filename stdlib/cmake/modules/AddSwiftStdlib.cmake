@@ -679,6 +679,9 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
 # SDK sdk
 #   SDK to build for.
 #
@@ -744,6 +747,7 @@ function(add_swift_target_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
+        ONLY_SWIFTMODULE
         NO_LINK_NAME
         INSTALL_WITH_SHARED
         IS_FRAGILE)
@@ -760,6 +764,7 @@ function(add_swift_target_library_single target name)
         MACCATALYST_BUILD_FLAVOR
         BACK_DEPLOYMENT_LIBRARY
         ENABLE_LTO
+        MODULE_DIR
         BOOTSTRAPPING)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
@@ -815,7 +820,8 @@ function(add_swift_target_library_single target name)
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
-     NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY)
+     NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND
+     NOT SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
@@ -879,6 +885,8 @@ function(add_swift_target_library_single target name)
     set(libkind SHARED)
   elseif(SWIFTLIB_SINGLE_STATIC)
     set(libkind STATIC)
+  elseif(SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
+    set(libkind NONE)
   else()
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
@@ -954,11 +962,13 @@ function(add_swift_target_library_single target name)
       SDK ${SWIFTLIB_SINGLE_SDK}
       ARCHITECTURE ${SWIFTLIB_SINGLE_ARCHITECTURE}
       MODULE_NAME ${module_name}
+      MODULE_DIR ${SWIFTLIB_SINGLE_MODULE_DIR}
       COMPILE_FLAGS ${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}
       ${SWIFTLIB_SINGLE_IS_STDLIB_keyword}
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
+      ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
       ${SWIFTLIB_SINGLE_NO_LINK_NAME_keyword}
@@ -1034,6 +1044,12 @@ function(add_swift_target_library_single target name)
   if(libkind STREQUAL "SHARED")
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
          ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY})
+  endif()
+
+  if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
+    add_custom_target("${target}"
+      DEPENDS "${swift_module_dependency_target}")
+    return()
   endif()
 
   add_library("${target}" ${libkind}

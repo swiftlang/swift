@@ -15,6 +15,7 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 @frozen
+@_unavailableInEmbedded
 public struct Unmanaged<Instance: AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance
@@ -243,5 +244,6 @@ public struct Unmanaged<Instance: AnyObject> {
 #endif
 }
 
+@_unavailableInEmbedded
 extension Unmanaged: Sendable where Instance: Sendable { }
 

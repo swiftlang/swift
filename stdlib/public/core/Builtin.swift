@@ -487,6 +487,7 @@ func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
 // Values -> BridgeObject
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
   _internalInvariant(!_isObjCTaggedPointer(x))
   let object = Builtin.castToBridgeObject(x, 0._builtinWordValue)
@@ -496,6 +497,7 @@ public func _bridgeObject(fromNative x: AnyObject) -> Builtin.BridgeObject {
 
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(
   fromNonTaggedObjC x: AnyObject
 ) -> Builtin.BridgeObject {
@@ -558,6 +560,7 @@ public func _bridgeObject(toTagPayload x: Builtin.BridgeObject) -> UInt {
 
 @inline(__always)
 @inlinable
+@_unavailableInEmbedded
 public func _bridgeObject(
   fromNativeObject x: Builtin.NativeObject
 ) -> Builtin.BridgeObject {
@@ -570,6 +573,7 @@ public func _bridgeObject(
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
   _internalInvariant(!_isObjCTaggedPointer(x))
   let native = Builtin.unsafeCastToNativeObject(x)
@@ -579,6 +583,7 @@ public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public func _nativeObject(
   fromBridge x: Builtin.BridgeObject
 ) -> Builtin.NativeObject {
@@ -611,6 +616,7 @@ extension ManagedBufferPointer {
 ///   `bits & _objectPointerSpareBits == bits`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _makeNativeBridgeObject(
   _ nativeObject: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -624,6 +630,7 @@ internal func _makeNativeBridgeObject(
 /// Create a `BridgeObject` around the given `objCObject`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public // @testable
 func _makeObjCBridgeObject(
   _ objCObject: AnyObject
@@ -644,6 +651,7 @@ func _makeObjCBridgeObject(
 ///      _objectPointerIsObjCBit`.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _makeBridgeObject(
   _ object: AnyObject, _ bits: UInt
 ) -> Builtin.BridgeObject {
@@ -784,6 +792,7 @@ internal func _isComputed(_ value: Int) -> Bool {
 
 /// Extract an object reference from an Any known to contain an object.
 @inlinable
+@_unavailableInEmbedded
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   _internalInvariant(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
@@ -1048,6 +1057,7 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
 /// in the function containing the call to this SPI.
 @_transparent
 @_alwaysEmitIntoClient
+@_unavailableInEmbedded
 public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
   return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
