@@ -92,6 +92,7 @@ public struct ${Self} {
 }
 
 ${Availability(bits)}
+@_unavailableInEmbedded
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   ///
@@ -114,6 +115,7 @@ extension ${Self}: CustomStringConvertible {
 }
 
 ${Availability(bits)}
+@_unavailableInEmbedded
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   ///
@@ -129,6 +131,7 @@ extension ${Self}: CustomDebugStringConvertible {
 }
 
 ${Availability(bits)}
+@_unavailableInEmbedded
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
@@ -1003,6 +1006,7 @@ extension ${Self}: Hashable {
 }
 
 % if bits != 16:
+@_unavailableInEmbedded
 extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
@@ -1279,6 +1283,7 @@ extension ${Self}: Strideable {
 //===----------------------------------------------------------------------===//
 
 % if bits != 16:
+@_unavailableInEmbedded
 internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   internal typealias Base = ${Self}
 

@@ -507,6 +507,7 @@ internal class __ContiguousArrayStorageBase
 
   /// A type that every element in the array is.
   @inlinable
+  @_unavailableInEmbedded
   internal var staticElementType: Any.Type {
     _internalInvariantFailure(
       "Concrete subclasses must implement staticElementType")

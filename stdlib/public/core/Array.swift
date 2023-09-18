@@ -476,6 +476,10 @@ extension Array: _ArrayProtocol {
     return _getCapacity()
   }
 
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
+
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
   public // @testable
@@ -1249,6 +1253,7 @@ extension Array: RangeReplaceableCollection {
 
     if _slowPath(writtenUpTo == buf.endIndex) {
 
+#if !$Embedded
       // A shortcut for appending an Array: If newElements is an Array then it's
       // guaranteed that buf.initialize(from: newElements) already appended all
       // elements. It reduces code size, because the following code
@@ -1258,6 +1263,7 @@ extension Array: RangeReplaceableCollection {
         _internalInvariant(remainder.next() == nil)
         return
       }
+#endif
 
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
@@ -1463,6 +1469,7 @@ extension Array: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
@@ -1479,6 +1486,7 @@ extension Array: CustomStringConvertible, CustomDebugStringConvertible {
 
 extension Array {
   @usableFromInline @_transparent
+  @_unavailableInEmbedded
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -1957,6 +1965,7 @@ extension Array {
 }
 #endif
 
+@_unavailableInEmbedded
 extension Array: _HasCustomAnyHashableRepresentation
   where Element: Hashable {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
@@ -1964,11 +1973,13 @@ extension Array: _HasCustomAnyHashableRepresentation
   }
 }
 
+@_unavailableInEmbedded
 internal protocol _ArrayAnyHashableProtocol: _AnyHashableBox {
   var count: Int { get }
   subscript(index: Int) -> AnyHashable { get }
 }
 
+@_unavailableInEmbedded
 internal struct _ArrayAnyHashableBox<Element: Hashable>
   : _ArrayAnyHashableProtocol {
   internal let _value: [Element]

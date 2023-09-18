@@ -17,6 +17,11 @@ internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
     RandomAccessCollection
 {
+  #if $Embedded
+  @usableFromInline
+  typealias AnyObject = Builtin.NativeObject
+  #endif
+
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
@@ -67,7 +72,11 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal init() {
     let empty = _ContiguousArrayBuffer<Element>()
-    self.owner = empty.owner
+    #if $Embedded
+    self.owner = Builtin.castToNativeObject(_emptyArrayStorage)
+    #else
+    self.owner = _emptyArrayStorage
+    #endif
     self.subscriptBaseAddress = empty.firstElementAddress
     self.startIndex = empty.startIndex
     self.endIndexAndFlags = 1
@@ -87,7 +96,12 @@ internal struct _SliceBuffer<Element>
   @inlinable // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = owner is __ContiguousArrayStorageBase
+    let isNativeStorage: Bool
+    #if !$Embedded
+    isNativeStorage = owner is __ContiguousArrayStorageBase
+    #else
+    isNativeStorage = true
+    #endif
     _internalInvariant(isNativeStorage == isNative)
     if isNative {
       _internalInvariant(count <= nativeBuffer.count)
@@ -102,8 +116,13 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal var nativeBuffer: NativeBuffer {
     _internalInvariant(_hasNativeBuffer)
+    #if !$Embedded
     return NativeBuffer(
       owner as? __ContiguousArrayStorageBase ?? _emptyArrayStorage)
+    #else
+    return NativeBuffer(unsafeBitCast(_nativeObject(toNative: owner),
+      to: __ContiguousArrayStorageBase.self))
+    #endif
   }
 
   @inlinable

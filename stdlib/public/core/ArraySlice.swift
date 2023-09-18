@@ -261,6 +261,10 @@ extension ArraySlice: _ArrayProtocol {
     return _getCapacity()
   }
 
+  #if $Embedded
+  public typealias AnyObject = Builtin.NativeObject
+  #endif
+
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
   public // @testable
@@ -1133,6 +1137,7 @@ extension ArraySlice: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 extension ArraySlice: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {

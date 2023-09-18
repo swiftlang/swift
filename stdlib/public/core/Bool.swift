@@ -111,6 +111,7 @@ public struct Bool: Sendable {
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
+  @_unavailableInEmbedded
   public static func random<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Bool {
@@ -134,6 +135,7 @@ public struct Bool: Sendable {
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
+  @_unavailableInEmbedded
   public static func random() -> Bool {
     var g = SystemRandomNumberGenerator()
     return Bool.random(using: &g)
@@ -170,6 +172,7 @@ extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral
   }
 }
 
+@_unavailableInEmbedded
 extension Bool: CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
@@ -197,6 +200,7 @@ extension Bool: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///

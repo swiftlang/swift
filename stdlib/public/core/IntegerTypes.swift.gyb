@@ -1689,6 +1689,7 @@ extension ${Self}: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
@@ -1803,6 +1804,7 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
+@_unavailableInEmbedded
 internal struct _IntegerAnyHashableBox<
   Base: FixedWidthInteger
 >: _AnyHashableBox {

@@ -205,7 +205,11 @@ public struct StaticString: Sendable {
       return body(UnsafeBufferPointer(
         start: utf8Start, count: utf8CodeUnitCount))
     } else {
+      #if $Embedded
+      fatalError("non-pointer representation not support in embedded Swift")
+      #else
       return unicodeScalar.withUTF8CodeUnits { body($0) }
+      #endif
     }
   }
 }
@@ -292,6 +296,7 @@ extension StaticString: ExpressibleByStringLiteral {
   }
 }
 
+@_unavailableInEmbedded
 extension StaticString: CustomStringConvertible {
 
   /// A textual representation of the static string.
@@ -300,6 +305,7 @@ extension StaticString: CustomStringConvertible {
   }
 }
 
+@_unavailableInEmbedded
 extension StaticString: CustomDebugStringConvertible {
 
   /// A textual representation of the static string, suitable for debugging.

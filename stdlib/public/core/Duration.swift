@@ -209,6 +209,7 @@ extension Duration {
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension Duration: Codable {
   @available(SwiftStdlib 5.7, *)
   public init(from decoder: Decoder) throws {
@@ -325,6 +326,7 @@ extension Duration {
 }
 
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension Duration: CustomStringConvertible {
   @available(SwiftStdlib 5.7, *)
   public var description: String {
