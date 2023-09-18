@@ -131,7 +131,10 @@ Solution ConstraintSystem::finalize() {
   if (solverState && solverState->PartialSolutionScope) {
     firstFixIndex = solverState->PartialSolutionScope->numFixes;
   }
-  solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
+
+  for (const auto &fix :
+       llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
+    solution.Fixes.push_back(fix);
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
@@ -199,11 +202,18 @@ Solution ConstraintSystem::finalize() {
   }
 
   solution.targets = targets;
-  solution.caseLabelItems = caseLabelItems;
-  solution.exprPatterns = exprPatterns;
-  solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
-  solution.preconcurrencyClosures.append(preconcurrencyClosures.begin(),
-                                         preconcurrencyClosures.end());
+
+  for (const auto &item : caseLabelItems)
+    solution.caseLabelItems.insert(item);
+
+  for (const auto &pattern : exprPatterns)
+    solution.exprPatterns.insert(pattern);
+
+  for (const auto &param : isolatedParams)
+    solution.isolatedParams.push_back(param);
+
+  for (const auto &closure : preconcurrencyClosures)
+    solution.preconcurrencyClosures.push_back(closure);
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -231,7 +241,8 @@ Solution ConstraintSystem::finalize() {
     solution.PackExpansionEnvironments.insert(env);
   }
 
-  solution.PackEnvironments = PackEnvironments;
+  for (const auto &packEnv : PackEnvironments)
+    solution.PackEnvironments.insert(packEnv);
 
   return solution;
 }
