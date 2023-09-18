@@ -5497,10 +5497,6 @@ public:
   /// part of the constraint system.
   void forEachExpr(Expr *expr, llvm::function_ref<Expr *(Expr *)> callback);
 
-  /// Determine whether one of the parent closures the given one is nested
-  /// in (if any) has a result builder applied to its body.
-  bool isInResultBuilderContext(ClosureExpr *closure) const;
-
   /// Determine whether referencing the given member on the
   /// given existential base type is supported. This is the case only if the
   /// type of the member, spelled in the context of \p baseTy, does not contain
