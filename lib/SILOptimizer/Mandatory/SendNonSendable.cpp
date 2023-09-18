@@ -187,6 +187,76 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
+class PartitionOpTranslator;
+
+struct PartitionOpBuilder {
+  /// Parent translator that contains state.
+  PartitionOpTranslator *translater;
+
+  /// Used to statefully track the instruction currently being translated, for
+  /// insertion into generated PartitionOps.
+  SILInstruction *currentInst = nullptr;
+
+  /// List of partition ops mapped to the current instruction. Used when
+  /// generating partition ops.
+  SmallVector<PartitionOp, 8> currentInstPartitionOps;
+
+  void reset(SILInstruction *inst) {
+    currentInst = inst;
+    currentInstPartitionOps.clear();
+  }
+
+  TrackableValueID lookupValueID(SILValue value);
+  bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
+
+  void addAssignFresh(SILValue value) {
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::AssignFresh(lookupValueID(value), currentInst));
+  }
+
+  void addAssign(SILValue tgt, SILValue src) {
+    assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
+           "source value of assignment should already have been encountered");
+
+    if (lookupValueID(tgt) == lookupValueID(src))
+      return;
+
+    currentInstPartitionOps.emplace_back(PartitionOp::Assign(
+        lookupValueID(tgt), lookupValueID(src), currentInst));
+  }
+
+  void addConsume(SILValue value, Expr *sourceExpr = nullptr) {
+    assert(valueHasID(value) &&
+           "consumed value should already have been encountered");
+
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::Consume(lookupValueID(value), currentInst, sourceExpr));
+  }
+
+  void addMerge(SILValue fst, SILValue snd) {
+    assert(valueHasID(fst, /*dumpIfHasNoID=*/true) &&
+           valueHasID(snd, /*dumpIfHasNoID=*/true) &&
+           "merged values should already have been encountered");
+
+    if (lookupValueID(fst) == lookupValueID(snd))
+      return;
+
+    currentInstPartitionOps.emplace_back(PartitionOp::Merge(
+        lookupValueID(fst), lookupValueID(snd), currentInst));
+  }
+
+  void addRequire(SILValue value) {
+    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
+           "required value should already have been encountered");
+    currentInstPartitionOps.emplace_back(
+        PartitionOp::Require(lookupValueID(value), currentInst));
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const;
+};
+
 // PartitionOpTranslator is responsible for performing the translation from
 // SILInstructions to PartitionOps. Not all SILInstructions have an effect on
 // the region partition, and some have multiple effects - such as an application
@@ -204,16 +274,10 @@ public:
 // TODO: when translating basic blocks, optimizations might be possible
 //       that reduce lists of PartitionOps to smaller, equivalent lists
 class PartitionOpTranslator {
+  friend PartitionOpBuilder;
+
   SILFunction *function;
   ProtocolDecl *sendableProtocol;
-
-  std::optional<TrackableValue> trackIfNonSendable(SILValue value) const {
-    auto state = getTrackableValue(value);
-    if (state.isNonSendable()) {
-      return state;
-    }
-    return {};
-  }
 
   /// A map from the representative of an equivalence class of values to their
   /// TrackableValueState. The state contains both the unique value id for the
@@ -245,6 +309,21 @@ class PartitionOpTranslator {
   /// This includes all function arguments as well as ref_element_addr from
   /// actors.
   std::vector<TrackableValueID> neverConsumedValueIDs;
+
+  /// A cache of argument IDs.
+  SmallVector<TrackableValueID> argIDs;
+
+  /// A builder struct that we use to convert individual instructions into lists
+  /// of PartitionOps.
+  PartitionOpBuilder builder;
+
+  std::optional<TrackableValue> trackIfNonSendable(SILValue value) const {
+    auto state = getTrackableValue(value);
+    if (state.isNonSendable()) {
+      return state;
+    }
+    return {};
+  }
 
   TrackableValue getTrackableValue(SILValue value) const {
     value = getUnderlyingTrackedValue(value);
@@ -329,13 +408,15 @@ class PartitionOpTranslator {
 public:
   // create a new PartitionOpTranslator, all that's needed is the underlying
   // SIL function
-  PartitionOpTranslator(SILFunction *function) :
-      function(function),
-      sendableProtocol(function->getASTContext()
-                           .getProtocol(KnownProtocolKind::Sendable)) {
+  PartitionOpTranslator(SILFunction *function)
+      : function(function),
+        sendableProtocol(
+            function->getASTContext().getProtocol(KnownProtocolKind::Sendable)),
+        builder() {
     assert(sendableProtocol && "PartitionOpTranslators should only be created "
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
+    builder.translater = this;
     initCapturedUIValues();
   }
 
@@ -352,7 +433,7 @@ private:
     return hasID;
   }
 
-  // lookup the internally assigned unique ID of a SILValue, or create one
+  /// Create or lookup the internally assigned unique ID of a SILValue.
   TrackableValueID lookupValueID(SILValue value) {
     auto state = getTrackableValue(value);
     assert(state.isNonSendable() &&
@@ -376,73 +457,25 @@ private:
     }
   }
 
-  // Used to statefully track the instruction currently being translated, for
-  // insertion into generated PartitionOps.
-  SILInstruction *currentInstruction;
-
-  // ===========================================================================
-  // The following section of functions create fresh PartitionOps referencing
-  // the current value of currentInstruction for ease of programming.
-
-  std::vector<PartitionOp> AssignFresh(SILValue value) {
-    return {PartitionOp::AssignFresh(
-        lookupValueID(value),
-        currentInstruction)};
-  }
-
-  std::vector<PartitionOp> Assign(SILValue tgt, SILValue src) {
-    assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
-           "source value of assignment should already have been encountered");
-
-    if (lookupValueID(tgt) == lookupValueID(src))
-      return {}; //noop
-
-    return {PartitionOp::Assign(
-        lookupValueID(tgt),
-        lookupValueID(src),
-        currentInstruction)};
-  }
-
-  std::vector<PartitionOp> Consume(SILValue value, Expr *sourceExpr = nullptr) {
-    assert(valueHasID(value) &&
-           "consumed value should already have been encountered");
-
-    return {PartitionOp::Consume(
-        lookupValueID(value),
-        currentInstruction,
-        sourceExpr)};
-  }
-
-  std::vector<PartitionOp> Merge(SILValue fst, SILValue snd) {
-    assert(valueHasID(fst, /*dumpIfHasNoID=*/true) && valueHasID(snd, /*dumpIfHasNoID=*/true) &&
-           "merged values should already have been encountered");
-
-    if (lookupValueID(fst) == lookupValueID(snd))
-      return {}; //noop
-
-    return {PartitionOp::Merge(lookupValueID(fst), lookupValueID(snd),
-                              currentInstruction)};
-  }
-
-  std::vector<PartitionOp> Require(SILValue value) {
-    assert(valueHasID(value, /*dumpIfHasNoID=*/true) &&
-           "required value should already have been encountered");
-    return {PartitionOp::Require(
-        lookupValueID(value),
-        currentInstruction)};
-  }
   // ===========================================================================
 
-  // Get the vector of IDs corresponding to the arguments to the underlying
-  // function, and the self parameter if there is one.
-  std::vector<TrackableValueID> getArgIDs() {
-    std::vector<TrackableValueID> argIDs;
+  /// Get the vector of IDs corresponding to the arguments to the underlying
+  /// function, and the self parameter if there is one.
+  ArrayRef<TrackableValueID> getArgIDs() const {
+    auto functionArguments = function->getArguments();
+    if (functionArguments.empty())
+      return {};
 
-    for (SILArgument *arg : function->getArguments()) {
-      if (auto state = trackIfNonSendable(arg)) {
-        neverConsumedValueIDs.push_back(state->getID());
-        argIDs.push_back(state->getID());
-      }
+    // If we have arguments and argIDs is empty, then we need to initialize our
+    // lazy array.
+    if (argIDs.empty()) {
+      auto *self = const_cast<PartitionOpTranslator *>(this);
+      for (SILArgument *arg : functionArguments) {
+        if (auto state = trackIfNonSendable(arg)) {
+          self->neverConsumedValueIDs.push_back(state->getID());
+          self->argIDs.push_back(state->getID());
+        }
+      }      
     }
 
     return argIDs;
@@ -472,14 +505,19 @@ public:
   // get the results of an apply instruction. This is the single result value
   // for most apply instructions, but for try apply it is the two arguments
   // to each succ block
-  std::vector<SILValue> getApplyResults(const SILInstruction *inst) {
-    if (isa<ApplyInst, BeginApplyInst, BuiltinInst, PartialApplyInst>(inst))
-      return {inst->getResults().begin(), inst->getResults().end()};
-    if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst))
-      return {tryApplyInst->getNormalBB()->getArgument(0),
-               tryApplyInst->getErrorBB()->getArgument(0)};
-    llvm_unreachable("all apply instructions should be covered");
-    return {};
+  void getApplyResults(const SILInstruction *inst, SmallVectorImpl<SILValue> &foundResults) {
+    if (isa<ApplyInst, BeginApplyInst, BuiltinInst, PartialApplyInst>(inst)) {
+      copy(inst->getResults(), std::back_inserter(foundResults));
+      return;
+    }
+
+    if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst)) {
+      foundResults.emplace_back(tryApplyInst->getNormalBB()->getArgument(0));
+      foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
+      return;
+    }
+
+    llvm::report_fatal_error("all apply instructions should be covered");
   }
 
   // ===========================================================================
@@ -491,68 +529,60 @@ public:
   // resulting region to all non-sendable targets, or assign non-sendable
   // targets to a fresh region if there are no non-sendable sources
   template <typename TargetRange, typename SourceRange>
-  std::vector<PartitionOp>
-  translateSILMultiAssign(const TargetRange &tgts, const SourceRange &srcs,
-                          bool resultsActorIsolated = false) {
+  void translateSILMultiAssign(const TargetRange &resultValues,
+                               const SourceRange &sourceValues,
+                               bool resultsActorIsolated = false) {
+    SmallVector<SILValue, 8> nonSendableOperands;
+    SmallVector<SILValue, 8> nonSendableResults;
 
-    std::vector<SILValue> nonSendableSrcs;
-    std::vector<SILValue> nonSendableTgts;
-
-    for (SILValue src : srcs)
+    for (SILValue src : sourceValues)
       if (auto value = trackIfNonSendable(src))
-        nonSendableSrcs.push_back(value->getRepresentative());
+        nonSendableOperands.push_back(value->getRepresentative());
 
-    for (SILValue tgt : tgts)
-      if (auto value = trackIfNonSendable(tgt))
-        nonSendableTgts.push_back(value->getRepresentative());
-
-    std::vector<PartitionOp> translated;
-    auto add_to_translation = [&](std::vector<PartitionOp> ops) {
-      for (auto op : ops) translated.push_back(op);
-    };
+    for (SILValue result : resultValues)
+      if (auto value = trackIfNonSendable(result))
+        nonSendableResults.push_back(value->getRepresentative());
 
     // require all srcs
-    for (auto src : nonSendableSrcs)
-      add_to_translation(Require(src));
+    for (auto src : nonSendableOperands)
+      builder.addRequire(src);
 
     // merge all srcs
-    for (unsigned i = 1; i < nonSendableSrcs.size(); i++) {
-      add_to_translation(Merge(nonSendableSrcs.at(i-1),
-                               nonSendableSrcs.at(i)));
+    for (unsigned i = 1; i < nonSendableOperands.size(); i++) {
+      builder.addMerge(nonSendableOperands[i - 1], nonSendableOperands[i]);
     }
 
-    // if no non-sendable tgts, return at this point
-    if (nonSendableTgts.empty()) return translated;
+    // If we do not have any non sendable results
+    if (nonSendableResults.empty())
+      return;
 
-    if (nonSendableSrcs.empty()) {
+    if (nonSendableOperands.empty()) {
       // If no non-sendable srcs, non-sendable tgts get a fresh region.
-      add_to_translation(AssignFresh(nonSendableTgts.front()));
+      builder.addAssignFresh(nonSendableResults.front());
     } else {
-      add_to_translation(Assign(nonSendableTgts.front(),
-                                nonSendableSrcs.front()));
+      builder.addAssign(nonSendableResults.front(),
+                        nonSendableOperands.front());
     }
 
     // If our results are actor isolated (and thus cannot be consumed)... add
     // them to the neverConsumedValueID array.
     if (resultsActorIsolated) {
-      neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.front()));
+      neverConsumedValueIDs.push_back(
+          lookupValueID(nonSendableResults.front()));
     }
 
     // Assign all targets to the target region.
-    for (unsigned i = 1; i < nonSendableTgts.size(); i++) {
-      add_to_translation(Assign(nonSendableTgts.at(i),
-                                nonSendableTgts.front()));
+    for (unsigned i = 1; i < nonSendableResults.size(); i++) {
+      builder.addAssign(nonSendableResults[i], nonSendableResults.front());
 
       // If our results are actor isolated (and thus cannot be consumed)... add
       // them to the neverConsumedValueID array.
       if (resultsActorIsolated)
-        neverConsumedValueIDs.push_back(lookupValueID(nonSendableTgts.at(i)));
+        neverConsumedValueIDs.push_back(lookupValueID(nonSendableResults[i]));
     }
-
-    return translated;
   }
 
-  std::vector<PartitionOp> translateSILApply(SILInstruction *applyInst) {
+  void translateSILApply(SILInstruction *applyInst) {
     // if this apply does not cross isolation domains, it has normal,
     // non-consuming multi-assignment semantics
     if (!SILApplyCrossesIsolation(applyInst)) {
@@ -582,7 +612,9 @@ public:
         }
       }
 
-      return translateSILMultiAssign(getApplyResults(applyInst),
+      SmallVector<SILValue, 8> applyResults;
+      getApplyResults(applyInst, applyResults);
+      return translateSILMultiAssign(applyResults,
                                      applyInst->getOperandValues(),
                                      isolatedToActor);
     }
@@ -599,17 +631,14 @@ public:
 
   // handles the semantics for SIL applies that cross isolation
   // in particular, all arguments are consumed
-  std::vector<PartitionOp> translateIsolationCrossingSILApply(
-     ApplySite applySite) {
+  void translateIsolationCrossingSILApply(ApplySite applySite) {
     ApplyExpr *sourceApply = applySite.getLoc().getAsASTNode<ApplyExpr>();
     assert(sourceApply && "only ApplyExpr's should cross isolation domains");
-
-    std::vector<PartitionOp> translated;
 
     // require all operands
     for (auto op : applySite->getOperandValues())
       if (auto value = trackIfNonSendable(op))
-        translated.push_back(Require(value->getRepresentative()).front());
+        builder.addRequire(value->getRepresentative());
 
     auto getSourceArg = [&](unsigned i) {
       if (i < sourceApply->getArgs()->size())
@@ -628,17 +657,14 @@ public:
       int argNum = 0;
       for (auto arg : ops) {
         if (auto value = trackIfNonSendable(arg))
-          translated.push_back(
-              Consume(value->getRepresentative(), getSourceArg(argNum))
-                  .front());
+          builder.addConsume(value->getRepresentative(), getSourceArg(argNum));
         argNum++;
       }
     };
 
     auto handleSILSelf = [&](SILValue self) {
       if (auto value = trackIfNonSendable(self))
-        translated.push_back(
-            Consume(value->getRepresentative(), getSourceSelf()).front());
+        builder.addConsume(value->getRepresentative(), getSourceSelf());
     };
 
     if (applySite.hasSelfArgument()) {
@@ -651,32 +677,32 @@ public:
     // non-sendable results can't be returned from cross-isolation calls without
     // a diagnostic emitted elsewhere. Here, give them a fresh value for better
     // diagnostics hereafter
-    for (auto result : getApplyResults(*applySite))
+    SmallVector<SILValue, 8> applyResults;
+    getApplyResults(*applySite, applyResults);
+    for (auto result : applyResults)
       if (auto value = trackIfNonSendable(result))
-        translated.push_back(AssignFresh(value->getRepresentative()).front());
-
-    return translated;
+        builder.addAssignFresh(value->getRepresentative());
   }
 
-  std::vector<PartitionOp> translateSILAssign(SILValue tgt, SILValue src) {
+  void translateSILAssign(SILValue tgt, SILValue src) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(tgt),
                                    TinyPtrVector<SILValue>(src));
   }
 
   // If the passed SILValue is NonSendable, then create a fresh region for it,
   // otherwise do nothing.
-  std::vector<PartitionOp> translateSILAssignFresh(SILValue val) {
+  void translateSILAssignFresh(SILValue val) {
     return translateSILMultiAssign(TinyPtrVector<SILValue>(val),
                                    TinyPtrVector<SILValue>());
   }
 
-  std::vector<PartitionOp> translateSILMerge(SILValue fst, SILValue snd) {
+  void translateSILMerge(SILValue fst, SILValue snd) {
     auto nonSendableFst = trackIfNonSendable(fst);
     auto nonSendableSnd = trackIfNonSendable(snd);
-    if (nonSendableFst && nonSendableSnd)
-      return Merge(nonSendableFst->getRepresentative(),
-                   nonSendableSnd->getRepresentative());
-    return {};
+    if (!nonSendableFst || !nonSendableSnd)
+      return;
+    builder.addMerge(nonSendableFst->getRepresentative(),
+                     nonSendableSnd->getRepresentative());
   }
 
   // if the tgt is known to be unaliased (computed thropugh a combination
@@ -684,9 +710,8 @@ public:
   // captures by applications), then these can be treated as assignments
   // of tgt to src. If the tgt could be aliased, then we must instead treat
   // them as merges, to ensure any aliases of tgt are also updated.
-  std::vector<PartitionOp> translateSILStore(SILValue tgt, SILValue src) {
+  void translateSILStore(SILValue tgt, SILValue src) {
     if (auto nonSendableTgt = trackIfNonSendable(tgt)) {
-
       // stores to unaliased storage can be treated as assignments, not merges
       if (nonSendableTgt.value().isNoAlias())
         return translateSILAssign(tgt, src);
@@ -696,19 +721,16 @@ public:
     }
 
     // stores to storage of non-Sendable type can be ignored
-    return {};
   }
 
-  std::vector<PartitionOp> translateSILRequire(SILValue val) {
+  void translateSILRequire(SILValue val) {
     if (auto nonSendableVal = trackIfNonSendable(val))
-      return Require(nonSendableVal->getRepresentative());
-    return {};
+      return builder.addRequire(nonSendableVal->getRepresentative());
   }
 
   // an enum select is just a multi assign
-  std::vector<PartitionOp> translateSILSelectEnum(
-      SelectEnumOperation selectEnumInst) {
-    std::vector<SILValue> enumOperands;
+  void translateSILSelectEnum(SelectEnumOperation selectEnumInst) {
+    SmallVector<SILValue, 8> enumOperands;
     for (unsigned i = 0; i < selectEnumInst.getNumCases(); i ++)
       enumOperands.push_back(selectEnumInst.getCase(i).second);
     if (selectEnumInst.hasDefault())
@@ -717,8 +739,7 @@ public:
         TinyPtrVector<SILValue>(selectEnumInst->getResult(0)), enumOperands);
   }
 
-  std::vector<PartitionOp> translateSILSwitchEnum(
-      SwitchEnumInst *switchEnumInst) {
+  void translateSILSwitchEnum(SwitchEnumInst *switchEnumInst) {
     std::vector<std::pair<std::vector<SILValue>, SILBasicBlock*>> branches;
 
     // accumulate each switch case that branches to a basic block with an arg
@@ -730,7 +751,8 @@ public:
         branches.push_back({{switchEnumInst->getOperand()}, dest});
       }
     }
-    return translateSILPhi(branches);
+
+    translateSILPhi(branches);
   }
 
   // translate a SIL instruction corresponding to possible branches with args
@@ -739,7 +761,7 @@ public:
   // and a pointer to the bb being branches to itself.
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
-  std::vector<PartitionOp> translateSILPhi(
+  void translateSILPhi(
       const std::vector<std::pair<std::vector<SILValue>, SILBasicBlock *>>
           &branches) {
     SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
@@ -749,30 +771,20 @@ public:
         argSources.insert(dest->getArgument(i), args[i]);
     }
     argSources.setFrozen();
-    std::vector<PartitionOp> translated;
     for (auto pair : argSources.getRange()) {
-      for (auto op : translateSILMultiAssign(
-               TinyPtrVector<SILValue>(pair.first), pair.second)) {
-        translated.push_back(op);
-      }
+      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second);
     }
-    return translated;
   }
 
   // ===========================================================================
-
-  // used to index the translations of SILInstructions performed
-  // for refrence and debugging
-  static inline int translationIndex = 0;
-
   // Some SILInstructions contribute to the partition of non-Sendable values
   // being analyzed. translateSILInstruction translate a SILInstruction
   // to its effect on the non-Sendable partition, if it has one.
   //
   // The current pattern of
-  std::vector<PartitionOp> translateSILInstruction(SILInstruction *inst) {
-    LLVM_DEBUG(translationIndex++;);
-    currentInstruction = inst;
+  void translateSILInstruction(SILInstruction *inst) {
+    builder.reset(inst);
+    SWIFT_DEFER { LLVM_DEBUG(builder.print(llvm::dbgs())); };
 
     switch (inst->getKind()) {
     // The following instructions are treated as assigning their result to a
@@ -973,7 +985,7 @@ public:
     case SILInstructionKind::UnreachableInst:
     case SILInstructionKind::UnwindInst:
     case SILInstructionKind::YieldInst: // TODO: yield should be handled
-      return {};
+      return;
 
     default:
       break;
@@ -983,7 +995,7 @@ public:
                llvm::dbgs() << "unhandled instruction kind "
                             << getSILInstructionName(inst->getKind()) << "\n";);
 
-    return {};
+    return;
   }
 
   // translateSILBasicBlock reduces a SIL basic block to the vector of
@@ -998,55 +1010,69 @@ public:
 
     //translate each SIL instruction to a PartitionOp, if necessary
     std::vector<PartitionOp> partitionOps;
-    int lastTranslationIndex = -1;
-#ifndef NDEBUG
-    llvm::SmallVector<unsigned, 8> opsToPrint;
-#endif
-
-    for (SILInstruction &instruction : *basicBlock) {
-      auto ops = translateSILInstruction(&instruction);
-      for (PartitionOp &op : ops) {
-        partitionOps.push_back(op);
-
-        LLVM_DEBUG(
-            if (translationIndex != lastTranslationIndex) {
-              llvm::dbgs() << " ┌─┬─╼";
-              instruction.print(llvm::dbgs());
-              llvm::dbgs() << " │ └─╼  ";
-              instruction.getLoc().getSourceLoc().printLineAndColumn(
-                  llvm::dbgs(), function->getASTContext().SourceMgr);
-              llvm::dbgs() << " │ translation #" << translationIndex;
-              llvm::dbgs() << "\n ├─────╼ ";
-            } else {
-              llvm::dbgs() << " │    └╼ ";
-            }
-            op.print(llvm::dbgs());
-            lastTranslationIndex = translationIndex;
-        );
-      }
-      LLVM_DEBUG(
-          if (ops.size()) {
-            llvm::dbgs() << " └─────╼ Used Values\n";
-            SWIFT_DEFER { opsToPrint.clear(); };
-            for (PartitionOp &op : ops) {
-              // Now dump our the root value we map.
-              for (unsigned opArg : op.getOpArgs()) {
-                // If we didn't insert, skip this. We only emit this once.
-                opsToPrint.push_back(opArg);
-              }
-            }
-            sortUnique(opsToPrint);
-            for (unsigned opArg : opsToPrint) {
-              llvm::dbgs() << "          └╼ ";
-              llvm::dbgs() << "%%" << opArg << ": " << stateIndexToEquivalenceClass[opArg];
-            }
-          }
-       );
+    for (auto &instruction : *basicBlock) {
+      translateSILInstruction(&instruction);
+      copy(builder.currentInstPartitionOps, std::back_inserter(partitionOps));
     }
 
     return partitionOps;
   }
 };
+
+TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
+  return translater->lookupValueID(value);
+}
+
+bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
+  return translater->valueHasID(value, dumpIfHasNoID);
+}
+
+void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
+#ifndef NDEBUG
+  // If we do not have anything to dump, just return.
+  if (currentInstPartitionOps.empty())
+    return;
+
+  // First line.
+  llvm::dbgs() << " ┌─┬─╼";
+  currentInst->print(llvm::dbgs());
+
+  // Second line.
+  llvm::dbgs() << " │ └─╼  ";
+  currentInst->getLoc().getSourceLoc().printLineAndColumn(
+      llvm::dbgs(), currentInst->getFunction()->getASTContext().SourceMgr);
+
+  auto ops = llvm::makeArrayRef(currentInstPartitionOps);
+
+  // First op on its own line.
+  llvm::dbgs() << "\n ├─────╼ ";
+  ops.front().print(llvm::dbgs());
+
+  // Rest of ops each on their own line.
+  for (const PartitionOp &op : ops.drop_front()) {
+    llvm::dbgs() << " │    └╼ ";
+    op.print(llvm::dbgs());
+  }
+
+  // Now print out a translation from region to equivalence class value.
+  llvm::dbgs() << " └─────╼ Used Values\n";
+  llvm::SmallVector<unsigned, 8> opsToPrint;
+  SWIFT_DEFER { opsToPrint.clear(); };
+  for (const PartitionOp &op : ops) {
+    // Now dump our the root value we map.
+    for (unsigned opArg : op.getOpArgs()) {
+      // If we didn't insert, skip this. We only emit this once.
+      opsToPrint.push_back(opArg);
+    }
+  }
+  sortUnique(opsToPrint);
+  for (unsigned opArg : opsToPrint) {
+    llvm::dbgs() << "          └╼ ";
+    llvm::dbgs() << "%%" << opArg << ": "
+                 << translater->stateIndexToEquivalenceClass[opArg];
+  }
+#endif
+}
 
 // Instances of BlockPartitionState record all relevant state about a
 // SILBasicBlock for the region-based Sendable checking fixpoint analysis.
