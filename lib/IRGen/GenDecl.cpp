@@ -1407,6 +1407,11 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
   emitLazyTypeContextDescriptor(IGM, &decl, RequireMetadata);
 }
 
+static bool loweredFunctionHasGenericArguments(SILFunction *f) {
+  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
+  return s && !s->areAllParamsConcrete();
+}
+
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
@@ -1419,7 +1424,7 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyFieldDescriptors.empty());
     // LazyFunctionDefinitions are allowed, but they must not be generic
     for (SILFunction *f : LazyFunctionDefinitions) {
-      assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+      assert(!loweredFunctionHasGenericArguments(f));
     }
     assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
@@ -1499,8 +1504,13 @@ void IRGenerator::emitLazyDefinitions() {
     while (!LazyFunctionDefinitions.empty()) {
       SILFunction *f = LazyFunctionDefinitions.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(f);
-      assert(!f->isPossiblyUsedExternally()
-             && "function with externally-visible linkage emitted lazily?");
+      // In embedded Swift, we can gain public / externally-visible functions
+      // by deserializing them from imported modules, or by the CMO pass making
+      // local functions public. TODO: We should internalize as a separate pass.
+      if (!SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        assert(!f->isPossiblyUsedExternally()
+               && "function with externally-visible linkage emitted lazily?");
+      }
       IGM->emitSILFunction(f);
     }
 
@@ -1541,9 +1551,10 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
   // Add it to the queue if it hasn't already been put there.
   if (!LazilyEmittedFunctions.insert(f).second)
     return;
-    
+
+  // Embedded Swift doesn't expect any generic functions to be referenced.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    assert(!f->getLoweredFunctionType()->getSubstGenericSignature());
+    assert(!loweredFunctionHasGenericArguments(f));
   }
 
   assert(!FinishedEmittingLazyDefinitions);

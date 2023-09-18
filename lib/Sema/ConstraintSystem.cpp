@@ -4187,13 +4187,35 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
   return Ty->getRValueType();
 }
 
+template <typename T>
+static inline size_t size_in_bytes(const T &x) {
+  return (x.size() * (sizeof(typename T::key_type) + sizeof(unsigned))) +
+         (x.size() * (sizeof(typename T::value_type)));
+}
+
 size_t Solution::getTotalMemory() const {
   return sizeof(*this) + typeBindings.getMemorySize() +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
-         llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
+         (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
+         OpenedPackExpansionTypes.getMemorySize() +
+         PackExpansionEnvironments.getMemorySize() +
+         size_in_bytes(PackEnvironments) +
          (DefaultedConstraints.size() * sizeof(void *)) +
+         ImplicitCallAsFunctionRoots.getMemorySize() +
+         nodeTypes.getMemorySize() +
+         keyPathComponentTypes.getMemorySize() +
+         size_in_bytes(KeyPaths) +
+         (contextualTypes.size() * sizeof(ASTNode))  +
+         size_in_bytes(targets) +
+         size_in_bytes(caseLabelItems) +
+         size_in_bytes(exprPatterns) +
+         (isolatedParams.size() * sizeof(void *)) +
+         (preconcurrencyClosures.size() * sizeof(void *)) +
+         size_in_bytes(resultBuilderTransformed) +
+         size_in_bytes(appliedPropertyWrappers) +
+         size_in_bytes(argumentLists) +
          ImplicitCallAsFunctionRoots.getMemorySize();
 }
 
