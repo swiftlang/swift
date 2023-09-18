@@ -216,7 +216,7 @@ class JSONFixitWriter
   std::string FixitsOutputPath;
   std::unique_ptr<llvm::raw_ostream> OSPtr;
   bool FixitAll;
-  std::vector<SingleEdit> AllEdits;
+  SourceEdits AllEdits;
 
 public:
   JSONFixitWriter(std::string fixitsOutputPath,
@@ -229,9 +229,8 @@ private:
                         const DiagnosticInfo &Info) override {
     if (!(FixitAll || shouldTakeFixit(Info)))
       return;
-    for (const auto &Fix : Info.FixIts) {
-      AllEdits.push_back({SM, Fix.getRange(), Fix.getText().str()});
-    }
+    for (const auto &Fix : Info.FixIts)
+      AllEdits.addEdit(SM, Fix.getRange(), Fix.getText());
   }
 
   bool finishProcessing() override {
@@ -251,7 +250,7 @@ private:
       return true;
     }
 
-    swift::writeEditsInJson(llvm::makeArrayRef(AllEdits), *OS);
+    swift::writeEditsInJson(AllEdits, *OS);
     return false;
   }
 };
