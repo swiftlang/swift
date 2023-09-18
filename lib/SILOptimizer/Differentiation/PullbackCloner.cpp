@@ -681,11 +681,12 @@ private:
                                         SILValue wrappedAdjoint,
                                         SILType optionalTy);
 
-  /// Accumulate SILValueCategory::Address optional value from `wrappedAdjoint`.
-  void accumulateAdjointForOptional(SILBasicBlock *bb, SILValue optionalValue,
-                                    SILValue wrappedAdjoint);
+  /// Accumulate optional buffer from `wrappedAdjoint`.
+  void accumulateAdjointForOptionalBuffer(SILBasicBlock *bb,
+                                          SILValue optionalBuffer,
+                                          SILValue wrappedAdjoint);
 
-  /// Set SILValueCategory::Object optional value from `wrappedAdjoint`.
+  /// Set optional value from `wrappedAdjoint`.
   void setAdjointValueForOptional(SILBasicBlock *bb, SILValue optionalValue,
                                   SILValue wrappedAdjoint);
 
@@ -1793,7 +1794,7 @@ public:
       errorOccurred = true;
       return;
     }
-    accumulateAdjointForOptional(bb, utedai->getOperand(), adjDest);
+    accumulateAdjointForOptionalBuffer(bb, utedai->getOperand(), adjDest);
     builder.emitZeroIntoBuffer(utedai->getLoc(), adjDest, IsNotInitialization);
   }
 
@@ -2466,19 +2467,19 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   return optTanAdjBuf;
 }
 
-// Accumulate adjoint for the incoming `Optional` value.
-void PullbackCloner::Implementation::accumulateAdjointForOptional(
-    SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
-  assert(getTangentValueCategory(optionalValue) == SILValueCategory::Address);
+// Accumulate adjoint for the incoming `Optional` buffer.
+void PullbackCloner::Implementation::accumulateAdjointForOptionalBuffer(
+    SILBasicBlock *bb, SILValue optionalBuffer, SILValue wrappedAdjoint) {
+  assert(getTangentValueCategory(optionalBuffer) == SILValueCategory::Address);
   auto pbLoc = getPullback().getLocation();
 
   // Allocate and initialize Optional<Wrapped>.TangentVector from
   // Wrapped.TangentVector
   AllocStackInst *optTanAdjBuf =
-      createOptionalAdjoint(bb, wrappedAdjoint, optionalValue->getType());
+      createOptionalAdjoint(bb, wrappedAdjoint, optionalBuffer->getType());
 
-  // Accumulate into optionalValue
-  addToAdjointBuffer(bb, optionalValue, optTanAdjBuf, pbLoc);
+  // Accumulate into optionalBuffer
+  addToAdjointBuffer(bb, optionalBuffer, optTanAdjBuf, pbLoc);
   builder.emitDestroyAddr(pbLoc, optTanAdjBuf);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 }
@@ -2709,7 +2710,7 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           // Handle `switch_enum` on `Optional`.
           auto termInst = bbArg->getSingleTerminator();
           if (isSwitchEnumInstOnOptional(termInst))
-            accumulateAdjointForOptional(bb, incomingValue, bbArgAdjBuf);
+            accumulateAdjointForOptionalBuffer(bb, incomingValue, bbArgAdjBuf);
           else
             addToAdjointBuffer(bb, incomingValue, bbArgAdjBuf, pbLoc);
         }
