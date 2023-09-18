@@ -63,7 +63,6 @@ set(SWIFTLIB_SOURCES
   ErrorType.swift
   ExistentialCollection.swift
   Filter.swift
-  FixedArray.swift
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
