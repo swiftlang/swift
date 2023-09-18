@@ -68,7 +68,7 @@ static void transferSpecializeAttributeTargets(SILModule &M,
           SA, M.getSwiftModule()->getASTContext());
 
       targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          M, SA->getSpecializedSignature(vd), SA->getTypeErasedParams(),
           SA->isExported(), kind, nullptr,
           spiGroupIdent, vd->getModuleContext(), availability));
     }

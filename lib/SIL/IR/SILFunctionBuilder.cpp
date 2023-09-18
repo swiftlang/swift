@@ -72,7 +72,7 @@ void SILFunctionBuilder::addFunctionAttributes(
             : SILSpecializeAttr::SpecializationKind::Partial;
     assert(!constant.isNull());
     SILFunction *targetFunction = nullptr;
-    auto *attributedFuncDecl = constant.getDecl();
+    auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
     auto *targetFunctionDecl = SA->getTargetFunctionDecl(attributedFuncDecl);
     // Filter out _spi.
     auto spiGroups = SA->getSPIGroups();
@@ -91,16 +91,17 @@ void SILFunctionBuilder::addFunctionAttributes(
     auto availability =
       AvailabilityInference::annotatedAvailableRangeForAttr(SA,
          M.getSwiftModule()->getASTContext());
+    auto specializedSignature = SA->getSpecializedSignature(attributedFuncDecl);
     if (targetFunctionDecl) {
       SILDeclRef declRef(targetFunctionDecl, constant.kind, false);
       targetFunction = getOrCreateDeclaration(targetFunctionDecl, declRef);
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          M, specializedSignature, SA->getTypeErasedParams(),
           SA->isExported(), kind, targetFunction, spiGroupIdent,
           attributedFuncDecl->getModuleContext(), availability));
     } else {
       F->addSpecializeAttr(SILSpecializeAttr::create(
-          M, SA->getSpecializedSignature(), SA->getTypeErasedParams(),
+          M, specializedSignature, SA->getTypeErasedParams(),
           SA->isExported(), kind, nullptr, spiGroupIdent,
           attributedFuncDecl->getModuleContext(), availability));
     }
