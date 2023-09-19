@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   ComputeEscapeEffects.swift
   ComputeSideEffects.swift
   DeadStoreElimination.swift
+  DiagnoseLifetimeDependence.swift
   InitializeStaticGlobals.swift
   LetPropertyLowering.swift
   ObjectOutliner.swift

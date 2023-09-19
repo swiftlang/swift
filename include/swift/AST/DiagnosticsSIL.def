@@ -888,5 +888,16 @@ WARNING(call_site_consumption_yields_race, none,
 NOTE(possible_racy_access_site, none,
      "access here could race", ())
 
+ERROR(lifetime_value_outside_scope, none,
+      "lifetime-dependent value escapes its scope", ())
+ERROR(lifetime_variable_outside_scope, none,
+      "lifetime-dependent variable '%0' escapes its scope", (Identifier))
+NOTE(lifetime_outside_scope_parent, none,
+     "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_use, none,
+     "this use of the lifetime-dependent value is out of scope", ())
+NOTE(lifetime_outside_scope_escape, none,
+     "this use causes the lifetime-dependent value to escape", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -192,6 +192,8 @@ PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
 PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
      "Diagnose Invalid Escaping Captures")
+SWIFT_FUNCTION_PASS(DiagnoseLifetimeDependence, "diagnose-lifetime-dependence",
+     "Diagnose Lifetime Dependence")
 PASS(DiagnoseLifetimeIssues, "diagnose-lifetime-issues",
      "Diagnose Lifetime Issues")
 PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",

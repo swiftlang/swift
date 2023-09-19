@@ -87,6 +87,7 @@ private func registerSwiftPasses() {
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
   registerPass(earlyRedundantLoadElimination, { earlyRedundantLoadElimination.run($0) })
+  registerPass(diagnoseLifetimeDependencePass, { diagnoseLifetimeDependencePass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginCOWMutationInst.self, { run(BeginCOWMutationInst.self, $0) })
