@@ -310,14 +310,34 @@ struct ModuleRebuildInfo {
       return "compiled with an older version of the compiler";
     case Status::FormatTooNew:
       return "compiled with a newer version of the compiler";
+    case Status::RevisionIncompatible:
+      return "compiled with a different version of the compiler";
+    case Status::NotInOSSA:
+      return "module was not built with OSSA";
+    case Status::MissingDependency:
+      return "missing dependency";
+    case Status::MissingUnderlyingModule:
+      return "missing underlying module";
+    case Status::CircularDependency:
+      return "circular dependency";
+    case Status::FailedToLoadBridgingHeader:
+      return "failed to load bridging header";
     case Status::Malformed:
       return "malformed";
+    case Status::MalformedDocumentation:
+      return "malformed documentation";
+    case Status::NameMismatch:
+      return "name mismatch";
     case Status::TargetIncompatible:
       return "compiled for a different target platform";
     case Status::TargetTooNew:
       return "target platform newer than current platform";
-    default: return nullptr;
+    case Status::SDKMismatch:
+      return "SDK does not match";
+    case Status::Valid:
+      return nullptr;
     }
+    llvm_unreachable("bad status");
   }
 
   /// Emits a diagnostic for all out-of-date compiled or forwarding modules
