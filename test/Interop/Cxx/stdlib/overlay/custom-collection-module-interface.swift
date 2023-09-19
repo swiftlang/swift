@@ -18,14 +18,14 @@
 // CHECK:   typealias RawIterator = SimpleCollectionReadOnly.iterator
 // CHECK: }
 
-// CHECK: struct HasInheritedTemplatedConstRACIterator<Int32> : CxxRandomAccessCollection {
-// CHECK:   typealias Element = InheritedTemplatedConstRACIterator<Int32>.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIterator<Int32>>
-// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIterator<Int32>
+// CHECK: struct HasInheritedTemplatedConstRACIterator<CInt> : CxxRandomAccessCollection {
+// CHECK:   typealias Element = InheritedTemplatedConstRACIterator<CInt>.Pointee
+// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIterator<CInt>>
+// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIterator<CInt>
 // CHECK: }
 
-// CHECK: struct HasInheritedTemplatedConstRACIteratorOutOfLineOps<Int32> : CxxRandomAccessCollection {
-// CHECK:   typealias Element = InheritedTemplatedConstRACIteratorOutOfLineOps<Int32>.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIteratorOutOfLineOps<Int32>>
-// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIteratorOutOfLineOps<Int32>
+// CHECK: struct HasInheritedTemplatedConstRACIteratorOutOfLineOps<CInt> : CxxRandomAccessCollection {
+// CHECK:   typealias Element = InheritedTemplatedConstRACIteratorOutOfLineOps<CInt>.Pointee
+// CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIteratorOutOfLineOps<CInt>>
+// CHECK:   typealias RawIterator = InheritedTemplatedConstRACIteratorOutOfLineOps<CInt>
 // CHECK: }

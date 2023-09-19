@@ -5,7 +5,7 @@
 // CHECK-NEXT:   @available(*, unavailable, message: "virtual functions are not yet available in Swift")
 // CHECK-NEXT:   mutating func foo()
 
-// CHECK: struct Derived<Int32> {
+// CHECK: struct Derived<CInt> {
 // CHECK: @available(*, unavailable, message: "virtual functions are not yet available in Swift")
 // CHECK:  mutating func foo()
 // CHECK: }

@@ -10,14 +10,14 @@
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
-// CHECK-IOSFWD:     struct basic_string<Int8, char_traits<Int8>, allocator<Int8>> : CxxRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CChar, char_traits<CChar>, allocator<CChar>> : CxxRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     struct basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>> : CxxRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>> : CxxRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CWideChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     typealias string = std.__1.basic_string<Int8, char_traits<Int8>, allocator<Int8>>
-// CHECK-IOSFWD:     typealias wstring = std.__1.basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>>
+// CHECK-IOSFWD:     typealias string = std.__1.basic_string<CChar, char_traits<CChar>, allocator<CChar>>
+// CHECK-IOSFWD:     typealias wstring = std.__1.basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>>
 // CHECK-IOSFWD:   }
 // CHECK-IOSFWD: }
 

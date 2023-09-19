@@ -94,7 +94,7 @@
 
 // CHECK: struct TemplatedArray<T> {
 // CHECK: }
-// CHECK: struct TemplatedArray<Double> {
+// CHECK: struct TemplatedArray<CDouble> {
 // CHECK:   subscript(i: Int32) -> Double
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
@@ -103,7 +103,7 @@
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ i: Int32) -> UnsafePointer<Double>
 // CHECK: }
-// CHECK: typealias TemplatedDoubleArray = TemplatedArray<Double>
+// CHECK: typealias TemplatedDoubleArray = TemplatedArray<CDouble>
 
 
 // CHECK: struct TemplatedSubscriptArray {
@@ -140,12 +140,12 @@
 
 // CHECK: struct TemplatedArrayByVal<T> {
 // CHECK: }
-// CHECK: struct TemplatedArrayByVal<Double> {
+// CHECK: struct TemplatedArrayByVal<CDouble> {
 // CHECK:   subscript(i: Int32) -> Double { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ i: Int32) -> Double
 // CHECK: }
-// CHECK: typealias TemplatedDoubleArrayByVal = TemplatedArrayByVal<Double>
+// CHECK: typealias TemplatedDoubleArrayByVal = TemplatedArrayByVal<CDouble>
 
 // CHECK: struct TemplatedByVal<T> {
 // CHECK-NEXT: }

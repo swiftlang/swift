@@ -11,11 +11,11 @@
 // REQUIRES: OS=linux-gnu
 
 // CHECK-STD: enum std {
-// CHECK-STRING:   struct basic_string<Int8, char_traits<Int8>, allocator<Int8>> : CxxRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.char_traits<Int8>.char_type
+// CHECK-STRING:   struct basic_string<CChar, char_traits<CChar>, allocator<CChar>> : CxxRandomAccessCollection {
+// CHECK-STRING:     typealias value_type = std.char_traits<CChar>.char_type
 // CHECK-STRING:   }
-// CHECK-STRING:   struct basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>> : CxxRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.char_traits<Scalar>.char_type
+// CHECK-STRING:   struct basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>> : CxxRandomAccessCollection {
+// CHECK-STRING:     typealias value_type = std.char_traits<CWideChar>.char_type
 // CHECK-STRING:   }
 
 // CHECK-TO-STRING:   static func to_string(_ __val: Int32) -> std{{(.__cxx11)?}}.string
@@ -23,6 +23,6 @@
 
 // CHECK-SIZE-T:   typealias size_t = Int
 
-// CHECK-STRING:   typealias string =  std{{(.__cxx11)?}}.basic_string<Int8, char_traits<Int8>, allocator<Int8>>
-// CHECK-STRING:   typealias wstring =  std{{(.__cxx11)?}}.basic_string<Scalar, char_traits<Scalar>, allocator<Scalar>>
+// CHECK-STRING:   typealias string =  std{{(.__cxx11)?}}.basic_string<CChar, char_traits<CChar>, allocator<CChar>>
+// CHECK-STRING:   typealias wstring =  std{{(.__cxx11)?}}.basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>>
 // CHECK-STD: }
