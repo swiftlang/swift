@@ -385,7 +385,15 @@ add_swift_target_library(swiftCore
 #
 # For now, we build a hardcoded list of target triples of the embedded stdlib,
 # and only when building Swift on macOS.
-if(SWIFT_HOST_VARIANT STREQUAL "macosx")
+set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB TRUE)
+if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+elseif(NOT SWIFT_INCLUDE_TOOLS)
+  # Temporarily, only build embedded stdlib when building the compiler, to
+  # unblock CI jobs that run against old(er) toolchains.
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+endif()
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
   set(EMBEDDED_STDLIB_TARGET_TRIPLES
     # arch module_name            target triple
