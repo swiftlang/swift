@@ -2107,6 +2107,13 @@ void SDKNodeRoot::jsonize(json::Output &out) {
     out.mapOptional(getKeyContent(Ctx, KeyKind::KK_tool_arguments).data(), ToolArgs);
 }
 
+llvm::Optional<StringRef> SDKNodeRoot::getSingleModuleName() const {
+  auto rawName = getName();
+  if (rawName == "MULTI_MODULE" || rawName == "NO_MODULE")
+    return llvm::None;
+  return rawName;
+}
+
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   output(out, KeyKind::KK_usr, Usr);
