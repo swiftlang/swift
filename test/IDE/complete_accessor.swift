@@ -3,6 +3,7 @@
 
 // WITH_GETSET: Keyword/None:                       get; name=get
 // WITH_GETSET: Keyword/None:                       set; name=set
+// WITH_GETSET: Keyword/None:                       init; name=init
 // NO_GETSET-NOT: get
 // NO_GETSET-NOT: set
 

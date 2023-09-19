@@ -161,3 +161,56 @@ func implicit_iuo_unwrap_sourceLocation(_ value: Int!) {
   use_unwrapped(value)
 #sourceLocation() // reset
 }
+
+
+// CHECK-LABEL:  sil hidden [ossa] @$s8optional0A20_to_existential_castyyF : $@convention(thin) () -> () {
+// CHECK:  bb0:
+// CHECK:    [[MEM:%.*]] = alloc_stack $Any
+// CHECK:    [[ADDR:%.*]] = init_existential_addr [[MEM]] : $*Any, $Optional<Int>
+// CHECK:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:    [[CLOSURE:%.*]] = function_ref @$s8optional0A20_to_existential_castyyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
+// CHECK:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
+
+// CHECK:  bb1([[RESULT:%.*]] : $Int):
+// CHECK:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
+// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:    br bb2
+
+// CHECK:      bb2:
+// CHECK-NEXT:   destroy_addr [[MEM]] : $*Any
+// CHECK-NEXT:   dealloc_stack [[MEM]] : $*Any
+// CHECK:        return
+
+// CHECK:  bb3([[ERR:%.*]] : @owned $any Error):
+// CHECK:    destroy_value [[ERR]] : $any Error
+// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.none!enumelt
+// CHECK:    br bb2
+// CHECK:  }
+func optional_to_existential_cast() {
+  let _: Any = try? {() throws in 3 }()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8optional0A29_to_existential_cast_RETURNEDypyF : $@convention(thin) () -> @out Any {
+// CHECK:  bb0([[MEM:%.*]] : $*Any):
+// CHECK:    [[ADDR:%.*]] = init_existential_addr [[MEM]] : $*Any, $Optional<Int>
+// CHECK:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:    [[CLOSURE:%.*]] = function_ref @$s8optional0A29_to_existential_cast_RETURNEDypyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
+// CHECK:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
+
+// CHECK:  bb1([[RESULT:%.*]] : $Int):
+// CHECK:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
+// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// CHECK:    br bb2
+
+// CHECK:      bb2:
+// CHECK-NEXT:  = tuple ()
+// CHECK-NEXT:        return
+
+// CHECK:  bb3([[ERR:%.*]] : @owned $any Error):
+// CHECK:    destroy_value [[ERR]] : $any Error
+// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.none!enumelt
+// CHECK:    br bb2
+// CHECK:  }
+func optional_to_existential_cast_RETURNED() -> Any {
+  return try? {() throws in 3 }()
+}

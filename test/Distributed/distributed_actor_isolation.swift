@@ -258,3 +258,5 @@ extension Greeting where SerializationRequirement == Codable {
     try await greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }
+
+func isolated_generic_ok<T: DistributedActor>(_ t: isolated T) {}
