@@ -1394,9 +1394,13 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
   // If both old and new enqueue are implemented, but the old one cannot be removed,
   // emit a warning that the new enqueue is unused.
   if (!canRemoveOldDecls && unownedEnqueueWitnessDecl && moveOnlyEnqueueWitnessDecl) {
-    if (!isStdlibDefaultImplDecl(moveOnlyEnqueueWitnessDecl)) {
+    if (!isStdlibDefaultImplDecl(moveOnlyEnqueueWitnessDecl) &&
+        !isStdlibDefaultImplDecl(unownedEnqueueWitnessDecl)) {
       diags.diagnose(moveOnlyEnqueueWitnessDecl->getLoc(),
                      diag::executor_enqueue_unused_implementation);
+      if (auto decl = unownedEnqueueWitnessDecl) {
+         decl->diagnose(diag::decl_declared_here, decl);
+      }
     }
   }
 
