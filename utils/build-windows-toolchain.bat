@@ -209,10 +209,10 @@ cmake ^
   -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
+  -D CMAKE_Swift_FLAGS_RELEASE="-O" ^
+  -D CMAKE_Swift_FLAGS_RELWITHDEBINFO="-O" ^
 
   -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
-
-  -D SWIFT_SYNTAX_ENABLE_WMO_PRE_3_26=YES ^
 
   -G Ninja ^
   -S %SourceRoot%\swift-syntax || (exit /b)
