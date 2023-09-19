@@ -407,13 +407,14 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(ParenType, SugarType);
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
     HasGlobalActor : 1,
+    HasThrownError : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -3319,6 +3320,8 @@ protected:
           !Info.value().getClangTypeInfo().empty();
       Bits.AnyFunctionType.HasGlobalActor =
           !Info.value().getGlobalActor().isNull();
+      Bits.AnyFunctionType.HasThrownError =
+          !Info.value().getThrownError().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3330,6 +3333,7 @@ protected:
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
       Bits.AnyFunctionType.HasGlobalActor = false;
+      Bits.AnyFunctionType.HasThrownError = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -3372,10 +3376,15 @@ public:
     return Bits.AnyFunctionType.HasGlobalActor;
   }
 
+  bool hasThrownError() const {
+    return Bits.AnyFunctionType.HasThrownError;
+  }
+
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
 
   Type getGlobalActor() const;
+  Type getThrownError() const;
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -3400,23 +3409,14 @@ public:
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
-                   getGlobalActor());
+                   getGlobalActor(), getThrownError());
   }
 
   /// Get the canonical ExtInfo for the function type.
   ///
   /// The parameter useClangFunctionType is present only for staging purposes.
   /// In the future, we will always use the canonical clang function type.
-  ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const {
-    assert(hasExtInfo());
-    Type globalActor = getGlobalActor();
-    if (globalActor)
-      globalActor = globalActor->getCanonicalType();
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
-                   useClangFunctionType ? getCanonicalClangTypeInfo()
-                                        : ClangTypeInfo(),
-                   globalActor);
-  }
+  ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const;
 
   bool hasSameExtInfoAs(const AnyFunctionType *otherFn);
 
@@ -3642,7 +3642,7 @@ class FunctionType final
   }
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() ? 1 : 0;
+    return hasGlobalActor() + hasThrownError();
   }
 
 public:
@@ -3667,9 +3667,15 @@ public:
   Type getGlobalActor() const {
     if (!hasGlobalActor())
       return Type();
-    return *getTrailingObjects<Type>();
+    return getTrailingObjects<Type>()[0];
   }
 
+  Type getThrownError() const {
+    if (!hasThrownError())
+      return Type();
+    return getTrailingObjects<Type>()[hasGlobalActor()];
+  }
+                                      
   void Profile(llvm::FoldingSetNodeID &ID) {
     llvm::Optional<ExtInfo> info = llvm::None;
     if (hasExtInfo())
@@ -3774,7 +3780,7 @@ class GenericFunctionType final : public AnyFunctionType,
   }
                                     
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return hasGlobalActor() ? 1 : 0;
+    return hasGlobalActor() + hasThrownError();
   }
 
   /// Construct a new generic function type.
@@ -3796,9 +3802,15 @@ public:
   Type getGlobalActor() const {
     if (!hasGlobalActor())
       return Type();
-    return *getTrailingObjects<Type>();
+    return getTrailingObjects<Type>()[0];
   }
 
+  Type getThrownError() const {
+    if (!hasThrownError())
+      return Type();
+    return getTrailingObjects<Type>()[hasGlobalActor()];
+  }
+                                    
   /// Retrieve the generic signature of this function type.
   GenericSignature getGenericSignature() const {
     return Signature;

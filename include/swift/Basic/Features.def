@@ -235,8 +235,12 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
+
 /// Enables noncopyable generics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
+
+/// Enables typed throws.
+EXPERIMENTAL_FEATURE(TypedThrows, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

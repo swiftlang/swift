@@ -5344,6 +5344,7 @@ public:
         fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
+        S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         globalActor);
 
@@ -5359,6 +5360,7 @@ public:
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
+        S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));

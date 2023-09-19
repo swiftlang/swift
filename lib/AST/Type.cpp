@@ -3321,7 +3321,7 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (ext2.isThrowing() &&
         !(ext2.isAsync() &&
           matchMode.contains(TypeMatchFlags::AllowABICompatible))) {
-      ext1 = ext1.withThrows(true);
+      ext1 = ext1.withThrows(true, ext2.getThrownError());
     }
 
     // Removing '@Sendable' is ABI-compatible because there's nothing wrong with
@@ -4000,6 +4000,17 @@ ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   }
 }
 
+Type AnyFunctionType::getThrownError() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getThrownError();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getThrownError();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 Type AnyFunctionType::getGlobalActor() const {
   switch (getKind()) {
   case TypeKind::Function:
@@ -4013,6 +4024,39 @@ Type AnyFunctionType::getGlobalActor() const {
 
 ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
   return getClangTypeInfo().getCanonical();
+}
+
+ASTExtInfo
+AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
+  assert(hasExtInfo());
+  Type globalActor = getGlobalActor();
+  if (globalActor)
+    globalActor = globalActor->getCanonicalType();
+
+  // When there is an explicitly-specified thrown error, canonicalize it's type.
+  auto bits = Bits.AnyFunctionType.ExtInfoBits;
+  Type thrownError = getThrownError();
+  if (thrownError) {
+    thrownError = thrownError->getCanonicalType();
+
+    //   - If the thrown error is `any Error`, the function throws and we
+    //     drop the thrown error.
+    if (thrownError->isEqual(
+            thrownError->getASTContext().getErrorExistentialType())) {
+      thrownError = Type();
+
+      //   - If the thrown error is `Never`, the function does not throw and
+      //     we drop the thrown error.
+    } else if (thrownError->isNever()) {
+      thrownError = Type();
+      bits = bits & ~ASTExtInfoBuilder::ThrowsMask;
+    }
+  }
+
+  return ExtInfo(bits,
+                 useClangFunctionType ? getCanonicalClangTypeInfo()
+                                      : ClangTypeInfo(),
+                 globalActor, thrownError);
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4854,6 +4898,18 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
+    // Transform the thrown error.
+    Type thrownError;
+    if (Type origThrownError = function->getThrownError()) {
+      thrownError = origThrownError.transformWithPosition(
+          TypePosition::Invariant, fn);
+      if (!thrownError)
+        return Type();
+
+      if (thrownError.getPointer() != origThrownError.getPointer())
+        isUnchanged = false;
+    }
+    
     // Transform the global actor.
     Type globalActorType;
     if (Type origGlobalActorType = function->getGlobalActor()) {
@@ -4883,18 +4939,22 @@ case TypeKind::Id:
       auto genericSig = genericFnType->getGenericSignature();
       if (!function->hasExtInfo())
         return GenericFunctionType::get(genericSig, substParams, resultTy);
-      return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      function->getExtInfo()
-                                          .withGlobalActor(globalActorType));
+      return GenericFunctionType::get(
+               genericSig, substParams, resultTy,
+               function->getExtInfo()
+                 .withGlobalActor(globalActorType)
+                 .withThrows(function->isThrowing(), thrownError));
     }
 
     if (isUnchanged) return *this;
 
     if (!function->hasExtInfo())
       return FunctionType::get(substParams, resultTy);
-    return FunctionType::get(substParams, resultTy,
-                             function->getExtInfo()
-                                 .withGlobalActor(globalActorType));
+    return FunctionType::get(
+             substParams, resultTy,
+             function->getExtInfo()
+               .withGlobalActor(globalActorType)
+               .withThrows(function->isThrowing(), thrownError));
   }
 
   case TypeKind::ArraySlice: {
@@ -5355,7 +5415,7 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
 }
 
 AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
-  auto info = getExtInfo().intoBuilder().withThrows(false).build();
+  auto info = getExtInfo().intoBuilder().withThrows(false, Type()).build();
   return withExtInfo(info);
 }
 

@@ -958,7 +958,7 @@ private:
   void printDeclGenericRequirements(GenericContext *decl);
   void printPrimaryAssociatedTypes(ProtocolDecl *decl);
   void printBodyIfNecessary(const AbstractFunctionDecl *decl);
-
+  void printThrownErrorIfNecessary(const AbstractFunctionDecl *decl);
   void printEnumElement(EnumElementDecl *elt);
 
   /// \returns true if anything was printed.
@@ -2215,7 +2215,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
     if (asyncGet) printWithSpace("async");
 
-    if (throwsGet) printWithSpace("throws");
+    if (throwsGet) {
+      printWithSpace("throws");
+      printThrownErrorIfNecessary(ASD->getAccessor(AccessorKind::Get));
+    }
 
     if (settable) {
       if (nonmutatingSetter) printWithSpace("nonmutating");
@@ -2360,8 +2363,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       if (accessor->getAccessorKind() == AccessorKind::Get) {
         if (asyncGet)
           printWithSpace("async");
-        if (throwsGet)
+        if (throwsGet) {
           printWithSpace("throws");
+          printThrownErrorIfNecessary(accessor);
+        }
       }
     } else {
       {
@@ -3538,6 +3543,13 @@ static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
 }
 
+static bool usesFeatureTypedThrows(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+    return func->getThrownTypeRepr() != nullptr;
+
+  return false;
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4372,6 +4384,22 @@ void PrintAST::printParameterList(ParameterList *PL,
   Printer << ")";
 }
 
+void PrintAST::printThrownErrorIfNecessary(const AbstractFunctionDecl *AFD) {
+  auto thrownType = AFD->getThrownInterfaceType();
+  if (!thrownType)
+    return;
+
+  auto errorType = AFD->getASTContext().getErrorExistentialType();
+  TypeRepr *thrownTypeRepr = AFD->getThrownTypeRepr();
+  if (!errorType || !thrownType->isEqual(errorType) ||
+      (thrownTypeRepr && Options.PreferTypeRepr)) {
+    Printer << "(";
+    TypeLoc thrownTyLoc(thrownTypeRepr, thrownType);
+    printTypeLoc(thrownTyLoc);
+    Printer << ")";
+  }
+}
+
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   auto BodyParams = AFD->getParameters();
   auto curTy = AFD->getInterfaceType();
@@ -4406,16 +4434,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
         Printer << " " << tok::kw_rethrows;
       else {
         Printer << " " << tok::kw_throws;
-
-        if (auto thrownType = AFD->getThrownInterfaceType()) {
-          auto errorType = AFD->getASTContext().getErrorExistentialType();
-          TypeRepr *thrownTypeRepr = AFD->getThrownTypeRepr();
-          if (!errorType || !thrownType->isEqual(errorType) ||
-              (thrownTypeRepr && Options.PreferTypeRepr)) {
-            TypeLoc thrownTyLoc(thrownTypeRepr, thrownType);
-            printTypeLoc(thrownTyLoc);
-          }
-        }
+        printThrownErrorIfNecessary(AFD);
       }
     }
   }
@@ -4481,7 +4500,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
 
   // handle effects specifiers before the body
   if (decl->hasAsync()) Printer << " async";
-  if (decl->hasThrows()) Printer << " throws";
+  if (decl->hasThrows()) {
+    Printer << " throws";
+    printThrownErrorIfNecessary(decl);
+  }
 
   printBodyIfNecessary(decl);
 }
@@ -6720,8 +6742,15 @@ public:
         Printer.printKeyword("async", Options);
       }
 
-      if (T->isThrowing())
+      if (T->isThrowing()) {
         Printer << " " << tok::kw_throws;
+
+        if (auto thrownError = T->getThrownError()) {
+          Printer << "(";
+          thrownError->print(Printer, Options);
+          Printer << ")";
+        }
+      }
     }
 
     Printer << " -> ";
@@ -6767,8 +6796,15 @@ public:
        Printer.printKeyword("async", Options);
      }
 
-     if (T->isThrowing())
+     if (T->isThrowing()) {
        Printer << " " << tok::kw_throws;
+
+        if (auto thrownError = T->getThrownError()) {
+          Printer << "(";
+          thrownError->print(Printer, Options);
+          Printer << ")";
+        }
+      }
    }
 
     Printer << " -> ";

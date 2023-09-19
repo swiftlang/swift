@@ -6478,6 +6478,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
   bool noescape = false, concurrent, async, throws;
+  TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
   TypeID globalActorTypeID;
@@ -6485,12 +6486,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (!isGeneric) {
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, concurrent,
-        async, throws, rawDiffKind, globalActorTypeID);
+        async, throws, thrownErrorID, rawDiffKind, globalActorTypeID);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, concurrent, async, throws,
-        rawDiffKind, globalActorTypeID, rawGenericSig);
+        thrownErrorID, rawDiffKind, globalActorTypeID, rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -6498,6 +6499,15 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
   if (!representation.has_value())
     return MF.diagnoseFatal();
+
+  Type thrownError;
+  if (thrownErrorID) {
+    auto thrownErrorTy = MF.getTypeChecked(thrownErrorID);
+    if (!thrownErrorTy)
+      return thrownErrorTy.takeError();
+
+    thrownError = thrownErrorTy.get();
+  }
 
   auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
   if (!diffKind.has_value())
@@ -6521,7 +6531,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   }
 
   auto info =
-      FunctionType::ExtInfoBuilder(*representation, noescape, throws, *diffKind,
+      FunctionType::ExtInfoBuilder(*representation, noescape, throws,
+                                   thrownError, *diffKind,
                                    clangFunctionType, globalActor)
           .withConcurrent(concurrent)
           .withAsync(async)

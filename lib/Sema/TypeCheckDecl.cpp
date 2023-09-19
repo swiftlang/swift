@@ -2085,6 +2085,34 @@ static Type buildAddressorResultType(AccessorDecl *addressor,
 }
 
 Type
+ThrownTypeRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *func
+) const {
+  ASTContext &ctx = func->getASTContext();
+
+  TypeRepr *typeRepr = func->getThrownTypeRepr();
+  if (!typeRepr) {
+    // There is no explicit thrown type, so return a NULL type.
+    return Type();
+  }
+
+  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+    ctx.Diags.diagnose(typeRepr->getLoc(), diag::experimental_typed_throws);
+  }
+
+  auto options = TypeResolutionOptions(TypeResolverContext::None);
+  if (func->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
+
+  auto *const dc = func->getInnermostDeclContext();
+  return TypeResolution::forInterface(dc, options,
+                                      /*unboundTyOpener*/ nullptr,
+                                      PlaceholderType::get,
+                                      /*packElementOpener*/ nullptr)
+      .resolveType(typeRepr);
+}
+
+Type
 ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
@@ -2486,6 +2514,25 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     AnyFunctionType::ExtInfoBuilder infoBuilder;
 
+    // Thrown error type.
+    Type thrownTy = AFD->getThrownInterfaceType();
+    if (thrownTy) {
+      thrownTy = AFD->getThrownInterfaceType();
+      ProtocolDecl *errorProto = Context.getErrorDecl();
+      if (thrownTy && errorProto) {
+        Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
+        if (!TypeChecker::conformsToProtocol(
+                thrownTyInContext, errorProto, AFD->getParentModule())) {
+          SourceLoc loc;
+          if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
+            loc = thrownTypeRepr->getLoc();
+          else
+            loc = AFD->getLoc();
+          Context.Diags.diagnose(loc, diag::thrown_type_not_error, thrownTy);
+        }
+      }
+    }
+
     // Result
     Type resultTy;
     if (auto fn = dyn_cast<FuncDecl>(D)) {
@@ -2507,7 +2554,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       infoBuilder = infoBuilder.withAsync(AFD->hasAsync());
       infoBuilder = infoBuilder.withConcurrent(AFD->isSendable());
       // 'throws' only applies to the innermost function.
-      infoBuilder = infoBuilder.withThrows(AFD->hasThrows());
+      infoBuilder = infoBuilder.withThrows(AFD->hasThrows(), thrownTy);
       // Defer bodies must not escape.
       if (auto fd = dyn_cast<FuncDecl>(D))
         infoBuilder = infoBuilder.withNoEscape(fd->isDeferBody());

@@ -4627,13 +4627,13 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   // Build the uncurried function type.
   if (innerExtInfo.isThrowing())
-    extInfo = extInfo.withThrows(true);
+    extInfo = extInfo.withThrows(true, innerExtInfo.getThrownError());
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
 
   // Distributed thunks are always `async throws`
   if (constant.isDistributedThunk()) {
-    extInfo = extInfo.withAsync(true).withThrows(true);
+    extInfo = extInfo.withAsync(true).withThrows(true, Type());
   }
 
   // If this is a C++ constructor, don't add the metatype "self" parameter

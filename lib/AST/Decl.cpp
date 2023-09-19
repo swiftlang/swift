@@ -946,13 +946,10 @@ bool Decl::preconcurrency() const {
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
-  if (!hasThrows())
-    return Type();
-
-  // TODO: if there was an explicitly-specified thrown error type
-  // representation, use that for the computation.
-
-  return getASTContext().getErrorExistentialType();
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      ThrownTypeRequest{const_cast<AbstractFunctionDecl *>(this)},
+      Type());
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -3238,7 +3235,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
       .withRepresentation(info.getRepresentation())
       .withConcurrent(info.isSendable())
       .withAsync(info.isAsync())
-      .withThrows(info.isThrowing())
+      .withThrows(info.isThrowing(), info.getThrownError())
       .withClangFunctionType(info.getClangTypeInfo().getType())
       .build();
 }

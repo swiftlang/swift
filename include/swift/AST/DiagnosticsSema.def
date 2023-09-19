@@ -5048,6 +5048,12 @@ WARNING(no_throw_in_try,none,
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
 
+ERROR(experimental_typed_throws,none,
+      "typed throws is an experimental feature", ())
+
+ERROR(thrown_type_not_error,none,
+      "thrown type %0 does not conform to the 'Error' protocol", (Type))
+
 //------------------------------------------------------------------------------
 // MARK: Concurrency
 //------------------------------------------------------------------------------

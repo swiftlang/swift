@@ -4179,6 +4179,9 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
       }
+      if (Type thrownError = T->getThrownError()) {
+        printFieldQuoted(thrownError.getString(), "thrown_error");
+      }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");
       }

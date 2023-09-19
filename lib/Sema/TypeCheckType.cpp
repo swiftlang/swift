@@ -3620,9 +3620,31 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  Type thrownTy;
+  if (auto thrownTypeRepr = repr->getThrownTypeRepr()) {
+    ASTContext &ctx = getASTContext();
+    if (!ctx.LangOpts.hasFeature(Feature::TypedThrows)) {
+      diagnoseInvalid(
+          thrownTypeRepr, thrownTypeRepr->getLoc(), diag::experimental_typed_throws);
+    }
+
+    auto thrownTypeOptions = options.withoutContext();
+    thrownTy = resolveType(thrownTypeRepr, thrownTypeOptions);
+    if (thrownTy->hasError()) {
+      thrownTy = Type();
+    } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+               !TypeChecker::conformsToProtocol(
+                  thrownTy, ctx.getErrorDecl(),
+                  resolution.getDeclContext()->getParentModule())) {
+      diagnoseInvalid(
+          thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
+          thrownTy);
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
-      FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
-      /*clangFunctionType*/ nullptr, Type());
+      FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
+      diffKind, /*clangFunctionType*/ nullptr, Type());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)

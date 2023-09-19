@@ -1193,6 +1193,7 @@ namespace decls_block {
     BCFixed<1>,                      // concurrent?
     BCFixed<1>,                      // async?
     BCFixed<1>,                      // throws?
+    TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     TypeIDField                      // global actor
     // trailed by parameters
@@ -1286,6 +1287,7 @@ namespace decls_block {
     BCFixed<1>,                      // concurrent?
     BCFixed<1>,                      // async?
     BCFixed<1>,                      // throws?
+    TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     TypeIDField,                     // global actor
     GenericSignatureIDField          // generic signature

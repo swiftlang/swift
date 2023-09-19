@@ -192,7 +192,7 @@ enum class TypeResolverContext : uint8_t {
   AssociatedTypeInherited,
 
   /// Whether this is a custom attribute.
-  CustomAttr
+  CustomAttr,
 };
 
 /// Options that determine how type resolution should work.
