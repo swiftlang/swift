@@ -2413,7 +2413,7 @@ public:
     // Check if the collected uses are well-scoped.
     for (auto *use : uses) {
       auto *user = use->getUser();
-      if (deadEndBlocks->isDeadEnd(user->getParent())) {
+      if (deadEndBlocks && deadEndBlocks->isDeadEnd(user->getParent())) {
         continue;
       }
       if (scopedAddress.isScopeEndingUse(use)) {
