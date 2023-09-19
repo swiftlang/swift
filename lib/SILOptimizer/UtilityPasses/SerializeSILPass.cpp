@@ -40,42 +40,6 @@ public:
     clonedEntryBlock = fun.createBasicBlock();
   }
 
-  SILType remapType(SILType Ty) {
-    if (!Ty.getASTType()->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return Ty;
-
-    return getBuilder().getTypeLowering(Ty).getLoweredType().getCategoryType(
-        Ty.getCategory());
-  }
-
-  CanType remapASTType(CanType ty) {
-    if (!ty->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return ty;
-    // Remap types containing opaque result types in the current context.
-    return getBuilder()
-        .getTypeLowering(SILType::getPrimitiveObjectType(ty))
-        .getLoweredType()
-        .getASTType();
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    auto context = getBuilder().getTypeExpansionContext();
-    auto conformance = conf;
-    if (ty->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, ty, context);
-    }
-    return conformance;
-  }
-
   void replace();
 };
 } // namespace
