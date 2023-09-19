@@ -348,3 +348,12 @@ func getValues(
     actor.dictionary[key]
   }
 }
+
+func isolated_generic_bad_1<T>(_ t: isolated T) {}
+// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+func isolated_generic_bad_2<T: Equatable>(_ t: isolated T) {}
+// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+func isolated_generic_bad_3<T: AnyActor>(_ t: isolated T) {}
+// expected-error@-1 {{'isolated' parameter 'T' must conform to 'Actor' or 'DistributedActor' protocol}}
+
+func isolated_generic_ok_1<T: Actor>(_ t: isolated T) {}

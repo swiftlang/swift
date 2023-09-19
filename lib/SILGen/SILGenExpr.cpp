@@ -1210,18 +1210,27 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
+  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
+      SGF.silConv.useLoweredAddresses());
 
   std::unique_ptr<TemporaryInitialization> optTemp;
-  if (!usingProvidedContext && isByAddress) {
+  if (!isByAddress) {
+    // If the caller produced a context for us, but we're not going
+    // to use it, make sure we don't.
+    optInit = nullptr;
+  } else if (!usingProvidedContext) {
     // Allocate the temporary for the Optional<T> if we didn't get one from the
-    // context.
+    // context.  This needs to happen outside of the cleanups scope we're about
+    // to push.
     optTemp = SGF.emitTemporary(E, optTL);
     optInit = optTemp.get();
-  } else if (!usingProvidedContext) {
-    // If the caller produced a context for us, but we can't use it, then don't.
-    optInit = nullptr;
   }
+  assert(isByAddress == (optInit != nullptr));
+
+  // Acquire the address to emit into outside of the cleanups scope.
+  SILValue optAddr;
+  if (isByAddress)
+    optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
 
   FullExpr localCleanups(SGF.Cleanups, E);
 
@@ -1234,8 +1243,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SILValue branchArg;
   if (shouldWrapInOptional) {
     if (isByAddress) {
-      assert(optInit);
-      SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
+      assert(optAddr);
       SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
     } else {
       ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
@@ -1245,8 +1253,11 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   }
   else {
     if (isByAddress) {
-      assert(optInit);
-      SGF.emitExprInto(E->getSubExpr(), optInit);
+      assert(optAddr);
+      // We've already computed the address where we want the result.
+      KnownAddressInitialization normalInit(optAddr);
+      SGF.emitExprInto(E->getSubExpr(), &normalInit);
+      normalInit.finishInitialization(SGF);
     } else {
       ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
       branchArg = subExprValue.forward(SGF);
@@ -1264,10 +1275,8 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     if (!isByAddress)
       return RValue(SGF, E,
                     SGF.emitManagedRValueWithCleanup(branchArg, optTL));
-    
-    if (shouldWrapInOptional) {
-      optInit->finishInitialization(SGF);
-    }
+
+    optInit->finishInitialization(SGF);
 
     // If we emitted into the provided context, we're done.
     if (usingProvidedContext)
@@ -1294,8 +1303,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   catchCleanups.pop();
 
   if (isByAddress) {
-    SGF.emitInjectOptionalNothingInto(E,
-                    optInit->getAddressForInPlaceInitialization(SGF, E), optTL);
+    SGF.emitInjectOptionalNothingInto(E, optAddr, optTL);
     SGF.B.createBranch(E, contBB);
   } else {
     auto branchArg = SGF.getOptionalNoneValue(E, optTL);
@@ -1313,9 +1321,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
 
-  if (shouldWrapInOptional) {
-    optInit->finishInitialization(SGF);
-  }
+  optInit->finishInitialization(SGF);
   
   // If we emitted into the provided context, we're done.
   if (usingProvidedContext)
