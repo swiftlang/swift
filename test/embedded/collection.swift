@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -enforce-exclusivity=none %s -c -o %t/a.o
-// RUN: %target-clang %t/a.o -o %t/a.out
+// RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
+// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
@@ -23,14 +24,12 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-@_silgen_name("vprintf")
-func vprintf(_: UnsafePointer<UInt8>, _: UnsafeRawPointer)
+@_silgen_name("print_long")
+func print_long(_: Int)
 
-var global: Int = 0
-public func print(_ n: Int) {
-    let f: StaticString = "%d\n"
-    global = n
-    vprintf(f.utf8Start, &global)
+public func print(_ n: Int, terminator: StaticString = "\n") {
+    print_long(n)
+    print("", terminator: terminator)
 }
 
 @_silgen_name("malloc")
