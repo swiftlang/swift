@@ -268,6 +268,12 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       static_cast<const IdentTypeRepr*>(complainRepr)->getBoundDecl();
     assert(VD && "findTypeWithScope should return bound TypeReprs only");
     complainImport = VD->getImportAccessFrom(useDC);
+
+    // Don't complain about an import that doesn't restrict the access
+    // level of the decl. This can happen with imported `package` decls.
+    if (complainImport.has_value() &&
+        complainImport->accessLevel >= VD->getFormalAccess())
+      complainImport = llvm::None;
   }
 
   diagnose(problematicAccessScope, complainRepr, downgradeToWarning,
