@@ -50,17 +50,7 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
-      let vTablesFunctionsBefore = Set(moduleContext.vTables.flatMap { $0.entries.map { $0.function } })
-
-      optimize(function: f, context)
-
-      let vTablesFunctionsAfter = Set(moduleContext.vTables.flatMap { $0.entries.map { $0.function } })
-      // Optimizing can trigger vtable specialization, add new vtable entries to the worklist
-      for f in vTablesFunctionsAfter.subtracting(vTablesFunctionsBefore) {
-        worklist.pushIfNotVisited(f)
-      }
-
-      worklist.add(calleesOf: f)
+      optimize(function: f, context, &worklist)
     }
   }
 }
@@ -70,7 +60,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
   
   var changed = true
@@ -85,6 +75,12 @@ private func optimize(function: Function, _ context: FunctionPassContext) {
       switch instruction {
       case let apply as FullApplySite:
         inlineAndDevirtualize(apply: apply, alreadyInlinedFunctions: &alreadyInlinedFunctions, context, simplifyCtxt)
+      case let alloc as AllocRefInst:
+        specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, &worklist)
+      case let metatype as MetatypeInst:
+        specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, &worklist)
+      case let classMethod as ClassMethodInst:
+        _ = context.specializeClassMethodInst(classMethod)
       default:
         break
       }
@@ -92,13 +88,23 @@ private func optimize(function: Function, _ context: FunctionPassContext) {
 
     _ = context.specializeApplies(in: function, isMandatory: true)
 
-    changed = context.specializeVTables(in: function) || changed
-
     removeUnusedMetatypeInstructions(in: function, context)
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
     changed = context.optimizeMemoryAccesses(in: function) || changed
     _ = context.eliminateDeadAllocations(in: function)
+  }
+
+  worklist.add(calleesOf: function)
+}
+
+private func specializeVTableAndAddEntriesToWorklist(for type: Type, in function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
+  guard let vtable = context.specializeVTable(for: type, in: function) else {
+    return
+  }
+
+  for entry in vtable.entries {
+    worklist.pushIfNotVisited(entry.function)
   }
 }
 

@@ -597,7 +597,9 @@ bool optimizeMemoryAccesses(SILFunction *fn);
 /// See the PredictableDeadAllocationElimination pass.
 bool eliminateDeadAllocations(SILFunction *fn);
 
-bool specializeVTables(SILFunction *fn, SILTransform *transform);
+SILVTable *specializeVTableForType(SILType type, SILModule &mod, SILTransform *transform);
+
+bool specializeClassMethodInst(ClassMethodInst *cm);
 
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,

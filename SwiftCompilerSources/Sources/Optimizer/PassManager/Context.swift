@@ -267,8 +267,16 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
-  func specializeVTables(in function: Function) -> Bool {
-    if _bridged.specializeVTables(function.bridged) {
+  func specializeVTable(for type: Type, in function: Function) -> VTable? {
+    guard let vtablePtr = _bridged.specializeVTableForType(type.bridged, function.bridged) else {
+      return nil
+    }
+    notifyInstructionsChanged()
+    return VTable(bridged: BridgedVTable(vTable: vtablePtr))
+  }
+
+  func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
+    if _bridged.specializeClassMethodInst(cm.bridged) {
       notifyInstructionsChanged()
       return true
     }

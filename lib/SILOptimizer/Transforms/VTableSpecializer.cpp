@@ -53,26 +53,26 @@ class VTableSpecializer : public SILModuleTransform {
 
 }  // end anonymous namespace
 
-static bool specializeVTableFor(SILType classTy, SILModule &module,
-                                SILTransform *transform);
 static SILFunction *specializeVTableMethod(SILFunction *origMethod,
                                            SubstitutionMap subs,
                                            SILModule &module,
                                            SILTransform *transform);
-static bool specializeClassMethodInst(ClassMethodInst *cm);
 
 static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
                                         SILTransform *transform) {
   bool changed = false;
-  if (func.getLoweredFunctionType()->isPolymorphic()) return changed;
+  if (func.getLoweredFunctionType()->isPolymorphic())
+    return changed;
 
   for (SILBasicBlock &block : func) {
     for (SILInstruction &inst : block) {
       if (auto *allocRef = dyn_cast<AllocRefInst>(&inst)) {
-        changed |= specializeVTableFor(allocRef->getType(), module, transform);
+        changed |= (specializeVTableForType(allocRef->getType(), module,
+                                            transform) != nullptr);
       } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
-        changed |= specializeVTableFor(
-            metatype->getType().getInstanceTypeOfMetatype(&func), module, transform);
+        changed |= (specializeVTableForType(
+                        metatype->getType().getInstanceTypeOfMetatype(&func),
+                        module, transform) != nullptr);
       } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
         changed |= specializeClassMethodInst(cm);
       }
@@ -104,13 +104,16 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
   return changed;
 }
 
-static bool specializeVTableFor(SILType classTy, SILModule &module,
+SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
                                 SILTransform *transform) {
+  if (!module.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return nullptr;
+
   CanType astType = classTy.getASTType();
   BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
-  if (!genClassTy) return false;
+  if (!genClassTy) return nullptr;
 
-  if (module.lookUpSpecializedVTable(classTy)) return false;
+  if (module.lookUpSpecializedVTable(classTy)) return nullptr;
 
   LLVM_DEBUG(llvm::errs() << "specializeVTableFor "
                           << genClassTy->getDecl()->getName() << ' '
@@ -138,8 +141,9 @@ static bool specializeVTableFor(SILType classTy, SILModule &module,
                                         entry.isNonOverridden()));
   }
 
-  SILVTable::create(module, classDecl, classTy, IsNotSerialized, newEntries);
-  return true;
+  SILVTable *vtable = SILVTable::create(module, classDecl, classTy,
+                                        IsNotSerialized, newEntries);
+  return vtable;
 }
 
 static SILFunction *specializeVTableMethod(SILFunction *origMethod,
@@ -185,7 +189,13 @@ static SILFunction *specializeVTableMethod(SILFunction *origMethod,
   return SpecializedF;
 }
 
-static bool specializeClassMethodInst(ClassMethodInst *cm) {
+bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
+  SILFunction *f = cm->getFunction();
+  SILModule &m = f->getModule();
+
+  if (!m.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   SILValue instance = cm->getOperand();
   SILType classTy = instance->getType();
   CanType astType = classTy.getASTType();
@@ -197,9 +207,6 @@ static bool specializeClassMethodInst(ClassMethodInst *cm) {
       classDecl->getParentModule(), classDecl);
 
   SILType funcTy = cm->getType();
-
-  SILFunction *f = cm->getFunction();
-  SILModule &m = f->getModule();
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
@@ -228,12 +235,6 @@ static bool specializeClassMethodInst(ClassMethodInst *cm) {
   }
 
   return true;
-}
-
-bool swift::specializeVTables(SILFunction *fn, SILTransform *transform) {
-  if (!fn->getModule.getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return false;
-  return specializeVTablesInFunction(*fn, fn->getModule(), transform);
 }
 
 SILTransform *swift::createVTableSpecializer() {
