@@ -1106,3 +1106,20 @@ bb0(%0 : $Y, %1 : $Act):
   strong_release %3 : $C2
   return %7 : $A
 }
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @hoist_release_over_end_init_let_ref :
+// CHECK-RELEASE-HOISTING:         alloc_ref
+// CHECK-RELEASE-HOISTING-NEXT:    strong_release
+// CHECK-RELEASE-HOISTING-NEXT:    br bb1
+// CHECK-RELEASE-HOISTING:       } // end sil function 'hoist_release_over_end_init_let_ref'
+sil @hoist_release_over_end_init_let_ref : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref $C
+  br bb1
+bb1:
+  %3 = end_init_let_ref %0 : $B
+  strong_release %1 : $C
+  %5 = tuple()
+  return %5 : $()
+}
+
