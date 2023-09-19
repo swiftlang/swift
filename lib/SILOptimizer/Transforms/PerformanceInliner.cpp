@@ -497,6 +497,8 @@ bool SILPerformanceInliner::isProfitableToInline(
         }
       } else if (auto ri = dyn_cast<ReturnInst>(&I)) {
         SILValue retVal = ri->getOperand();
+        if (auto *eir = dyn_cast<EndInitLetRefInst>(retVal))
+          retVal = eir->getOperand();
         if (auto *uci = dyn_cast<UpcastInst>(retVal))
           retVal = uci->getOperand();
 

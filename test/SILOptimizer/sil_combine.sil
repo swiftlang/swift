@@ -2617,20 +2617,6 @@ bb0(%0 : $*B):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @delete_dead_alloc_ref
-// CHECK: bb0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @delete_dead_alloc_ref : $() -> () {
-bb0:
-  %1 = alloc_ref $B
-  set_deallocating %1 : $B
-  fix_lifetime %1 : $B
-  dealloc_ref %1 : $B
-  %2 = tuple()
-  return %2 : $()
-}
-
 // CHECK-LABEL: sil @delete_dead_alloc_stack2
 // CHECK: bb0
 // CHECK-NEXT: destroy_addr %0
@@ -3520,31 +3506,6 @@ bb0:
   return %9 : $AnyObject
 }
 
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref $B
-  dealloc_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref_stack
-// CHECK-NEXT: bb0
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
-sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $B
-  set_deallocating %1 : $B
-  dealloc_stack_ref %1 : $B
-  %3 = tuple ()
-  return %3 : $()
-}
 
 // Int1_const == x -> x == Int1_const
 // CHECK-LABEL: sil @canonicalize_bool_eq_checks

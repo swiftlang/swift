@@ -342,22 +342,6 @@ struct AccessPath : CustomStringConvertible {
   }
 }
 
-private extension SmallProjectionPath {
-  /// Returns true if the path only contains projections which can be materialized as
-  /// SIL struct or tuple projection instructions - for values or addresses.
-  var isMaterializable: Bool {
-    let (kind, _, subPath) = pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField, .tupleField:
-      return subPath.isMaterializable
-    default:
-      return false
-    }
-  }
-}
-
 private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
   switch value {
   case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst:
@@ -561,6 +545,8 @@ extension Value {
     while true {
       switch value {
       case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
+           is EndInitLetRefInst,
+           is BeginDeallocRefInst,
            is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst:
         value = (value as! Instruction).operands[0].value
       case let mvr as MultipleValueInstructionResult:

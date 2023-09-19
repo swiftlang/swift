@@ -93,11 +93,11 @@ sil [ossa] @trivial_destructor_trivial : $@convention(thin) () -> () {
 // CHECK-NEXT: return
 sil [ossa] @devirtualized_destructor : $@convention(thin) () -> () {
   %0 = alloc_ref $NontrivialDestructor
-  set_deallocating %0 : $NontrivialDestructor
-  fix_lifetime %0 : $NontrivialDestructor
-  dealloc_ref %0 : $NontrivialDestructor
-  %1 = tuple()
-  return %1 : $()
+  %1 = begin_dealloc_ref %0 : $NontrivialDestructor of %0 : $NontrivialDestructor
+  fix_lifetime %1 : $NontrivialDestructor
+  dealloc_ref %1 : $NontrivialDestructor
+  %4 = tuple()
+  return %4 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @store_to_non_trivial_property1
@@ -111,8 +111,8 @@ bb0:
   %3 = ref_element_addr %2 : $NontrivialDestructor, #NontrivialDestructor.p
   store %0 to [init] %3 : $*Kl
   end_borrow %2 : $NontrivialDestructor
-  set_deallocating %1 : $NontrivialDestructor
-  destroy_value %1 : $NontrivialDestructor
+  %6 = begin_dealloc_ref %1 : $NontrivialDestructor of %1 : $NontrivialDestructor
+  destroy_value %6 : $NontrivialDestructor
   dealloc_stack_ref %1 : $NontrivialDestructor
   %r = tuple ()
   return %r : $()
@@ -130,8 +130,8 @@ bb0(%0 : $Int):
   store %0 to [trivial] %4 : $*Int
   end_access %4 : $*Int
   end_borrow %2 : $NontrivialDestructor
-  set_deallocating %1 : $NontrivialDestructor
-  dealloc_ref %1 : $NontrivialDestructor
+  %6 = begin_dealloc_ref %1 : $NontrivialDestructor of %1 : $NontrivialDestructor
+  dealloc_ref %6 : $NontrivialDestructor
   dealloc_stack_ref %1 : $NontrivialDestructor
   %r = tuple ()
   return %r : $()
@@ -403,12 +403,15 @@ bb0:
   %27 = integer_literal $Builtin.Word, 1
   %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
   store %copy to [init] %28 : $*Kl
-  set_deallocating %4 : $ArrayStorage
-  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  end_borrow %5 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
+  %7 = begin_borrow %6 : $ArrayStorage
+  %8 = ref_tail_addr %7 : $ArrayStorage, $Kl
+  %65 = address_to_pointer %8 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  end_borrow %5 : $ArrayStorage
-  dealloc_ref %4 : $ArrayStorage
+  end_borrow %7 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -439,13 +442,15 @@ bb0(%0 : @guaranteed $String, %1 : $Int, %2 : $UInt):
   %30 = tuple_element_addr %28 : $*(Int, String), 1
   store %1 to [trivial] %29 : $*Int
   store %copy1 to [init] %30 : $*String
-  set_deallocating %5 : $__ContiguousArrayStorageBase
-  %64 = ref_tail_addr %b : $__ContiguousArrayStorageBase, $(Int, String)
+  end_borrow %b : $__ContiguousArrayStorageBase
+  %31 = begin_dealloc_ref %5 : $__ContiguousArrayStorageBase of %4 : $_ContiguousArrayStorage<(Int, String)>
+  %b2 = begin_borrow %31 : $__ContiguousArrayStorageBase
+  %64 = ref_tail_addr %b2 : $__ContiguousArrayStorageBase, $(Int, String)
   %65 = address_to_pointer %64 : $*(Int, String) to $Builtin.RawPointer
   %66 = metatype $@thick (Int, String).Type
   %67 = builtin "destroyArray"<(Int, String)>(%66 : $@thick (Int, String).Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  end_borrow %b : $__ContiguousArrayStorageBase
-  dealloc_ref %5 : $__ContiguousArrayStorageBase
+  end_borrow %b2 : $__ContiguousArrayStorageBase
+  dealloc_ref %31 : $__ContiguousArrayStorageBase
   dealloc_stack_ref %4 : $_ContiguousArrayStorage<(Int, String)>
   %10 = tuple ()
   return %10 : $()

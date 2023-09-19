@@ -14,6 +14,7 @@
 // RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-init.sib; %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC1nACSi_tcfc' %t/mangle-ext-init.sib | %FileCheck %s -check-prefix=EXTRACT-INIT
 // RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-now.sib; %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC3nowSiyF' %t/mangle-ext-now.sib | %FileCheck %s -check-prefix=EXTRACT-NOW
 
+// REQUIRES: swift_in_compiler
 
 // EXTRACT-FOO-NOT: sil hidden @$s5basic1XV4testyyF : $@convention(method) (X) -> () {
 // EXTRACT-FOO-NOT: sil hidden @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
@@ -45,6 +46,7 @@
 
 // EXTRACT-INIT-LABEL:   sil @$s5basic7VehicleC1nACSi_tcfc : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
+// EXTRACT-INIT-NEXT:      end_init_let_ref
 // EXTRACT-INIT-NEXT:      ref_element_addr
 // EXTRACT-INIT-NEXT:      begin_access [init] [static]
 // EXTRACT-INIT-NEXT:      store

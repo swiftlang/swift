@@ -118,10 +118,14 @@ public struct Builder {
     return notifyNew(load.getAs(LoadInst.self))
   }
 
-  @discardableResult
-  public func createSetDeallocating(operand: Value, isAtomic: Bool) -> SetDeallocatingInst {
-    let setDeallocating = bridged.createSetDeallocating(operand.bridged, isAtomic)
-    return notifyNew(setDeallocating.getAs(SetDeallocatingInst.self))
+  public func createBeginDeallocRef(reference: Value, allocation: AllocRefInstBase) -> BeginDeallocRefInst {
+    let beginDealloc = bridged.createBeginDeallocRef(reference.bridged, allocation.bridged)
+    return notifyNew(beginDealloc.getAs(BeginDeallocRefInst.self))
+  }
+
+  public func createEndInitLetRef(operand: Value) -> EndInitLetRefInst {
+    let endInit = bridged.createEndInitLetRef(operand.bridged)
+    return notifyNew(endInit.getAs(EndInitLetRefInst.self))
   }
 
   @discardableResult
@@ -309,9 +313,14 @@ public struct Builder {
                                                            useConformancesOf.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
-  
+
   public func createMetatype(of type: Type, representation: swift.MetatypeRepresentation) -> MetatypeInst {
     let metatype = bridged.createMetatype(type.bridged, representation)
     return notifyNew(metatype.getAs(MetatypeInst.self))
+  }
+
+  public func createEndCOWMutation(instance: Value, keepUnique: Bool = false) -> EndCOWMutationInst {
+    let endMutation = bridged.createEndCOWMutation(instance.bridged, keepUnique)
+    return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 }

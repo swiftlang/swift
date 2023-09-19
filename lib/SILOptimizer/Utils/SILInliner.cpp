@@ -943,6 +943,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RefToRawPointerInst:
 
   case SILInstructionKind::UpcastInst:
+  case SILInstructionKind::EndInitLetRefInst:
 
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::ConvertFunctionInst:
@@ -1094,7 +1095,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::StrongReleaseInst:
-  case SILInstructionKind::SetDeallocatingInst:
+  case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:

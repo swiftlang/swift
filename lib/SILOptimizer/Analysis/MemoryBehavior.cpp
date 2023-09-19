@@ -174,7 +174,6 @@ public:
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
   MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
-  MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
   MemBehavior visitDebugValueInst(DebugValueInst *dv);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -366,10 +365,6 @@ MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
 MemBehavior
 MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
   return AA->getMemoryEffectOnEscapedAddress(V, DVI);
-}
-
-MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
-  return MemBehavior::None;
 }
 
 MemBehavior MemoryBehaviorVisitor::

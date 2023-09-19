@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -O -emit-sil -sil-verify-all -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 // RUN: %target-swift-frontend -O -emit-sil -Xllvm -sil-verify-force-analysis-around-pass=devirtualizer -Xllvm -sil-disable-pass=function-signature-opts %s | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 //===----------------------------------------------------------------------===//
 // testReturnSelf: Call to a protocol extension method with
 // an existential self that can be type-propagated.
@@ -22,7 +24,8 @@ extension P {
 
 final class C: P {}
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned any P {
-// CHECK: [[E1:%.*]] = init_existential_ref %0 : $C : $C, $any P
+// CHECK: [[EI:%.*]] = end_init_let_ref %0
+// CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $C : $C, $any P
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any P to $@opened("{{.*}}", any P) Self
 // CHECK: [[F1:%.*]] = function_ref @$s32sil_combine_concrete_existential1PPAAE10returnSelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK: [[C1:%.*]] = apply [[F1]]<@opened("{{.*}}", any P) Self>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
@@ -57,7 +60,8 @@ final class CC: PP {
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<any PP> {
-// CHECK: [[E1:%.*]] = init_existential_ref %0 : $CC : $CC, $any PP
+// CHECK: [[EI:%.*]] = end_init_let_ref %0
+// CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $CC : $CC, $any PP
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened("{{.*}}", any PP) Self
 // CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}", any PP) Self : $@opened("{{.*}}", any PP) Self, $any PP
 // CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened("{{.*}}", any PP) Self

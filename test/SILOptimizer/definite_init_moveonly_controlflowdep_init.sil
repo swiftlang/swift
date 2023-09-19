@@ -13,7 +13,8 @@ sil @closureTakeVal : $@convention(thin) (@guaranteed { let S }) -> ()
 
 // CHECK-LABEL: sil hidden [ossa] @letControlFlowDependentInitializationNoEscape : $@convention(thin) () -> () {
 // CHECK: [[STACK:%.*]] = alloc_stack
-// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// CHECK: [[MU:%.*]] = mark_uninitialized [var] [[STACK]]
+// CHECK: [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[MU]]
 // CHECK: cond_br undef, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
 //
 // CHECK: [[LHS_BB]]:
@@ -68,7 +69,8 @@ bb3:
 
 // CHECK-LABEL: sil hidden [ossa] @letControlFlowDependentInitializationEscape : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box
-// CHECK: [[PROJECT:%.*]] = project_box [[BOX]]
+// CHECK: [[MU:%.*]] = mark_uninitialized [var] [[BOX]]
+// CHECK: [[PROJECT:%.*]] = project_box [[MU]]
 // CHECK: cond_br undef, [[LHS_BB:bb[0-9]+]], [[RHS_BB:bb[0-9]+]]
 //
 // CHECK: [[LHS_BB]]:

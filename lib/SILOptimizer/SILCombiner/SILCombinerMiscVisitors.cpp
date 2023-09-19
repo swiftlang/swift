@@ -745,32 +745,6 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   return eraseInstFromFunction(*AS);
 }
 
-SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
-  // Check if the only uses are deallocating stack or deallocating.
-  SmallPtrSet<SILInstruction *, 16> ToDelete;
-  bool HasNonRemovableUses = false;
-  for (auto UI = AR->use_begin(), UE = AR->use_end(); UI != UE;) {
-    auto *Op = *UI;
-    ++UI;
-    auto *User = Op->getUser();
-    if (!isa<DeallocRefInst>(User) && !isa<SetDeallocatingInst>(User) &&
-        !isa<FixLifetimeInst>(User) && !isa<DeallocStackRefInst>(User)) {
-      HasNonRemovableUses = true;
-      break;
-    }
-    ToDelete.insert(User);
-  }
-
-  if (HasNonRemovableUses)
-    return nullptr;
-
-  // Remove the instruction and all its uses.
-  for (auto *I : ToDelete)
-    eraseInstFromFunction(*I);
-  eraseInstFromFunction(*AR);
-  return nullptr;
-}
-
 /// Returns the base address if \p val is an index_addr with constant index.
 static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
   auto *IA = dyn_cast<IndexAddrInst>(val);

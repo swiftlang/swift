@@ -1545,8 +1545,8 @@ bb0:
   %3 = struct $Int (%2 : $Builtin.Int64)
   %4 = ref_element_addr %1 : $foo, #foo.a
   store %3 to %4 : $*Int
-  set_deallocating %1 : $foo
-  dealloc_ref %1 : $foo
+  %6 = begin_dealloc_ref %1 : $foo of %1 : $foo
+  dealloc_ref %6 : $foo
   dealloc_stack_ref %1 : $foo
   return %3 : $Int
 }

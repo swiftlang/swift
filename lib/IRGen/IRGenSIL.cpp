@@ -1295,7 +1295,8 @@ public:
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
   void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
-  void visitSetDeallocatingInst(SetDeallocatingInst *i);
+  void visitBeginDeallocRefInst(BeginDeallocRefInst *i);
+  void visitEndInitLetRefInst(EndInitLetRefInst *i);
   void visitObjectInst(ObjectInst *i)  {
     llvm_unreachable("object instruction cannot appear in a function");
   }
@@ -4819,8 +4820,12 @@ void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
   emitObjCAutoreleaseCall(val);
 }
 
-void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
-  auto *ARI = dyn_cast<AllocRefInst>(i->getOperand());
+void IRGenSILFunction::visitBeginDeallocRefInst(BeginDeallocRefInst *i) {
+  Explosion lowered = getLoweredExplosion(i->getReference());
+  llvm::Value *ref = *lowered.begin();
+  setLoweredExplosion(i, lowered);
+
+  AllocRefInst *ARI = dyn_cast<AllocRefInst>(i->getAllocation());
   if (ARI && StackAllocs.count(ARI)) {
     if (ARI->isBare())
       return;
@@ -4840,7 +4845,7 @@ void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
     for (++Iter; Iter != End; ++Iter) {
       SILInstruction *I = &*Iter;
       if (auto *DRI = dyn_cast<DeallocRefInst>(I)) {
-        if (DRI->getOperand() == ARI) {
+        if (DRI->getOperand() == i) {
           // The set_deallocating is followed by a dealloc_ref -> we can ignore
           // it.
           return;
@@ -4852,8 +4857,12 @@ void IRGenSILFunction::visitSetDeallocatingInst(SetDeallocatingInst *i) {
         break;
     }
   }
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  emitNativeSetDeallocating(lowered.claimNext());
+  emitNativeSetDeallocating(ref);
+}
+
+void IRGenSILFunction::visitEndInitLetRefInst(EndInitLetRefInst *i) {
+  Explosion v = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(i, v);
 }
 
 void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
@@ -5843,7 +5852,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // Lower the operand.
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  auto *ARI = dyn_cast<AllocRefInstBase>(i->getOperand());
+  SILValue op = i->getOperand();
+  if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(op))
+    op = beginDealloc->getAllocation();
+  auto *ARI = dyn_cast<AllocRefInstBase>(op);
   if (ARI && StackAllocs.count(ARI)) {
     // We can ignore dealloc_refs for stack allocated objects.
     //

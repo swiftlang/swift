@@ -349,9 +349,14 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-      is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
+         is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
+    case let beginDealloc as BeginDeallocRefInst:
+      if operand.index == 0 {
+        return walkDownUses(ofValue: beginDealloc, path: path)
+      }
+      return .continueWalk
     case let mdi as MarkDependenceInst:
       if operand.index == 0 {
         return walkDownUses(ofValue: mdi, path: path)
@@ -655,8 +660,9 @@ extension ValueUseDefWalker {
     case let oer as OpenExistentialRefInst:
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-      is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst,
-      is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
+         is UpcastInst, is UncheckedRefCastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is BeginDeallocRefInst,
+         is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let arg as BlockArgument:
       if arg.isPhiArgument {
@@ -738,9 +744,10 @@ extension AddressUseDefWalker {
       return walkUp(address: sea.struct, path: path.push(.structField, index: sea.fieldIndex))
     case let tea as TupleElementAddrInst:
       return walkUp(address: tea.tuple, path: path.push(.tupleField, index: tea.fieldIndex))
-    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-      return walkUp(address: (def as! UnaryInstruction).operand.value,
-                    path: path.push(.enumCase, index: (def as! EnumInstruction).caseIndex))
+    case let ida as InitEnumDataAddrInst:
+      return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
+    case let uteda as UncheckedTakeEnumDataAddrInst:
+      return walkUp(address: uteda.operand.value, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
     case is BeginAccessInst, is MarkUnresolvedNonCopyableValueInst:
