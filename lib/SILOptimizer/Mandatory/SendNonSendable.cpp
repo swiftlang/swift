@@ -87,6 +87,20 @@ static SILValue getUnderlyingTrackedValue(SILValue value) {
   return value;
 }
 
+namespace {
+
+struct TermArgSources {
+  SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
+
+  template <typename ValueRangeTy = ArrayRef<SILValue>>
+  void addValues(ValueRangeTy valueRange, SILBasicBlock *destBlock) {
+    for (auto pair : llvm::enumerate(valueRange))
+      argSources.insert(destBlock->getArgument(pair.index()), pair.value());
+  }
+};
+
+} // namespace
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Main Computation
 //===----------------------------------------------------------------------===//
@@ -475,7 +489,7 @@ private:
           self->neverConsumedValueIDs.push_back(state->getID());
           self->argIDs.push_back(state->getID());
         }
-      }      
+      }
     }
 
     return argIDs;
@@ -505,7 +519,8 @@ public:
   // get the results of an apply instruction. This is the single result value
   // for most apply instructions, but for try apply it is the two arguments
   // to each succ block
-  void getApplyResults(const SILInstruction *inst, SmallVectorImpl<SILValue> &foundResults) {
+  void getApplyResults(const SILInstruction *inst,
+                       SmallVectorImpl<SILValue> &foundResults) {
     if (isa<ApplyInst, BeginApplyInst, BuiltinInst, PartialApplyInst>(inst)) {
       copy(inst->getResults(), std::back_inserter(foundResults));
       return;
@@ -723,7 +738,7 @@ public:
   }
 
   void translateSILSwitchEnum(SwitchEnumInst *switchEnumInst) {
-    std::vector<std::pair<std::vector<SILValue>, SILBasicBlock*>> branches;
+    TermArgSources argSources;
 
     // accumulate each switch case that branches to a basic block with an arg
     for (unsigned i = 0; i < switchEnumInst->getNumCases(); i++) {
@@ -731,11 +746,11 @@ public:
       if (dest->getNumArguments() > 0) {
         assert(dest->getNumArguments() == 1
                && "expected at most one bb arg in dest of enum switch");
-        branches.push_back({{switchEnumInst->getOperand()}, dest});
+        argSources.addValues({switchEnumInst->getOperand()}, dest);
       }
     }
 
-    translateSILPhi(branches);
+    translateSILPhi(argSources);
   }
 
   // translate a SIL instruction corresponding to possible branches with args
@@ -744,17 +759,9 @@ public:
   // and a pointer to the bb being branches to itself.
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
-  void translateSILPhi(
-      const std::vector<std::pair<std::vector<SILValue>, SILBasicBlock *>>
-          &branches) {
-    SmallFrozenMultiMap<SILValue, SILValue, 8> argSources;
-    for (const auto &[args, dest] : branches) {
-      assert(args.size() >= dest->getNumArguments());
-      for (unsigned i = 0; i < dest->getNumArguments(); i++)
-        argSources.insert(dest->getArgument(i), args[i]);
-    }
-    argSources.setFrozen();
-    for (auto pair : argSources.getRange()) {
+  void translateSILPhi(TermArgSources &argSources) {
+    argSources.argSources.setFrozen();
+    for (auto pair : argSources.argSources.getRange()) {
       translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second);
     }
   }
@@ -894,9 +901,9 @@ public:
     case SILInstructionKind::BranchInst: {
       auto *branchInst = cast<BranchInst>(inst);
       assert(branchInst->getNumArgs() == branchInst->getDestBB()->getNumArguments());
-      return translateSILPhi(
-          {{{branchInst->getArgs().begin(), branchInst->getArgs().end()},
-            branchInst->getDestBB()}});
+      TermArgSources argSources;
+      argSources.addValues(branchInst->getArgs(), branchInst->getDestBB());
+      return translateSILPhi(argSources);
     }
 
     case SILInstructionKind::CondBranchInst: {
@@ -905,14 +912,12 @@ public:
              condBranchInst->getTrueBB()->getNumArguments());
       assert(condBranchInst->getNumFalseArgs() ==
              condBranchInst->getFalseBB()->getNumArguments());
-      return translateSILPhi({{// true branch
-                               {condBranchInst->getTrueArgs().begin(),
-                                condBranchInst->getTrueArgs().end()},
-                               condBranchInst->getTrueBB()},
-                              {// false branch
-                               {condBranchInst->getFalseArgs().begin(),
-                                condBranchInst->getFalseArgs().end()},
-                               condBranchInst->getFalseBB()}});
+      TermArgSources argSources;
+      argSources.addValues(condBranchInst->getTrueArgs(),
+                           condBranchInst->getTrueBB());
+      argSources.addValues(condBranchInst->getFalseArgs(),
+                           condBranchInst->getFalseBB());
+      return translateSILPhi(argSources);
     }
 
     case SILInstructionKind::SwitchEnumInst:
@@ -921,22 +926,34 @@ public:
     case SILInstructionKind::DynamicMethodBranchInst: {
       auto *dmBranchInst = cast<DynamicMethodBranchInst>(inst);
       assert(dmBranchInst->getHasMethodBB()->getNumArguments() <= 1);
-      return translateSILPhi(
-          {{{dmBranchInst->getOperand()}, dmBranchInst->getHasMethodBB()}});
+      TermArgSources argSources;
+      argSources.addValues({dmBranchInst->getOperand()},
+                           dmBranchInst->getHasMethodBB());
+      return translateSILPhi(argSources);
     }
 
     case SILInstructionKind::CheckedCastBranchInst: {
       auto *ccBranchInst = cast<CheckedCastBranchInst>(inst);
       assert(ccBranchInst->getSuccessBB()->getNumArguments() <= 1);
-      return translateSILPhi(
-          {{{ccBranchInst->getOperand()}, ccBranchInst->getSuccessBB()}});
+      TermArgSources argSources;
+      argSources.addValues({ccBranchInst->getOperand()},
+                           ccBranchInst->getSuccessBB());
+      return translateSILPhi(argSources);
     }
 
     case SILInstructionKind::CheckedCastAddrBranchInst: {
       auto *ccAddrBranchInst = cast<CheckedCastAddrBranchInst>(inst);
       assert(ccAddrBranchInst->getSuccessBB()->getNumArguments() <= 1);
-      return translateSILPhi({{{ccAddrBranchInst->getOperand(0)},
-                               ccAddrBranchInst->getSuccessBB()}});
+
+      // checked_cast_addr_br does not have any arguments in its resulting
+      // block. We should just use a multi-assign on its operands.
+      //
+      // TODO: We should be smarter and treat the success/fail branches
+      // differently depending on what the result of checked_cast_addr_br
+      // is. For now just keep the current behavior. It is more conservative,
+      // but still correct.
+      return translateSILMultiAssign(ArrayRef<SILValue>(),
+                                     ccAddrBranchInst->getOperandValues());
     }
 
     // these instructions are ignored because they cannot affect the partition
