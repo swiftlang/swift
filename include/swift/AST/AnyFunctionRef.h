@@ -124,6 +124,24 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getType();
   }
 
+  Type getThrownErrorType() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      if (Type thrownError = AFD->getThrownInterfaceType())
+        return AFD->mapTypeIntoContext(thrownError);
+
+      return Type();
+    }
+
+    Type closureType = TheFunction.get<AbstractClosureExpr *>()->getType();
+    if (!closureType)
+      return Type();
+
+    if (auto closureFnType = closureType->getAs<AnyFunctionType>())
+      return closureFnType->getThrownError();
+
+    return Type();
+  }
+
   Type getBodyResultType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       if (auto *FD = dyn_cast<FuncDecl>(AFD))

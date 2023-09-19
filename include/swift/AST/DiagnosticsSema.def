@@ -336,7 +336,9 @@ ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
-      "thrown expression type %0 does not conform to 'Error'", (Type))
+      "thrown expression type %0 %select{cannot be converted to error type %1|"
+      "does not conform to 'Error'}2",
+      (Type, Type, bool))
 ERROR(cannot_throw_error_code,none,
       "thrown error code type %0 does not conform to 'Error'; construct an %1 "
       "instance", (Type, Type))
