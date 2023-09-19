@@ -5,7 +5,6 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -I %S/Inputs/imports-clang-modules/ -I %t
 // RUN: %FileCheck -implicit-check-not BAD %s < %t.swiftinterface
 
-
 @_exported import empty // expected-warning {{module 'empty' was not compiled with library evolution support; using it means binary compatibility for 'imports' can't be guaranteed}}
 @_exported import emptyButWithLibraryEvolution
 import B.B2
