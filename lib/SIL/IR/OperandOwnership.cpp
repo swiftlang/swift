@@ -219,7 +219,6 @@ OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
-OPERAND_OWNERSHIP(InstantaneousUse, SetDeallocating)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 #define REF_STORAGE(Name, ...)                                                 \
@@ -294,6 +293,7 @@ OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
+OPERAND_OWNERSHIP(DestroyingConsume, EndInitLetRef)
 // The move_value instruction creates a distinct lifetime.
 OPERAND_OWNERSHIP(DestroyingConsume, MoveValue)
 
@@ -659,6 +659,14 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // a borrow of the base (mark_dependence %base -> end_dependence is analogous
   // to a borrow scope).
   return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitBeginDeallocRefInst(BeginDeallocRefInst *bdr) {
+  if (getOperandIndex() == 0) {
+    return OperandOwnership::DestroyingConsume;
+  }
+  return OperandOwnership::NonUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitKeyPathInst(KeyPathInst *I) {

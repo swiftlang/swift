@@ -355,6 +355,8 @@ IRGEN_PASS(PackMetadataMarkerInserter, "pack-metadata-marker-inserter",
      "Insert markers where pack metadata might be de/allocated.")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
+SWIFT_FUNCTION_PASS(LetPropertyLowering, "let-property-lowering",
+     "Lowers accesses to let properties of classes")
 PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
 PASS(TempLValueOpt, "temp-lvalue-opt",

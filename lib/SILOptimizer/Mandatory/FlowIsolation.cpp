@@ -546,6 +546,30 @@ static bool diagnoseNonSendableFromDeinit(ModuleDecl *module,
   return true;
 }
 
+class OperandWorklist {
+  SmallVector<Operand *, 32> worklist;
+  SmallPtrSet<Operand *, 16> visited;
+
+public:
+  Operand *pop() {
+    if (worklist.empty())
+      return nullptr;
+    return worklist.pop_back_val();
+  }
+
+  void pushIfNotVisited(Operand *op) {
+    if (visited.insert(op).second) {
+      worklist.push_back(op);
+    }
+  }
+
+  void pushUsesOfValueIfNotVisited(SILValue value) {
+    for (Operand *use : value->getUses()) {
+      pushIfNotVisited(use);
+    }
+  }
+};
+
 /// Analyzes a function for uses of `self` and records the kinds of isolation
 /// required.
 /// \param selfParam the parameter of \c getFunction() that should be
@@ -556,13 +580,12 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
   ModuleDecl *module = getFunction()->getModule().getSwiftModule();
 
   // Use a worklist to track the uses left to be searched.
-  SmallVector<Operand *, 32> worklist;
+  OperandWorklist worklist;
 
   // Seed with direct users of `self`
-  worklist.append(selfParam->use_begin(), selfParam->use_end());
+  worklist.pushUsesOfValueIfNotVisited(selfParam);
 
-  while (!worklist.empty()) {
-    Operand *operand = worklist.pop_back_val();
+  while (Operand *operand = worklist.pop()) {
     SILInstruction *user = operand->getUser();
 
     // First, check if this is an apply that involves `self`
@@ -651,11 +674,19 @@ void AnalysisInfo::analyze(const SILArgument *selfParam) {
         break;
 
       case SILInstructionKind::BeginAccessInst:
-      case SILInstructionKind::BeginBorrowInst: {
+      case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::EndInitLetRefInst: {
         auto *svi = cast<SingleValueInstruction>(user);
-        worklist.append(svi->use_begin(), svi->use_end());
+        worklist.pushUsesOfValueIfNotVisited(svi);
         break;
       }
+
+      case SILInstructionKind::BranchInst: {
+        auto *arg = cast<BranchInst>(user)->getArgForOperand(operand);
+        worklist.pushUsesOfValueIfNotVisited(arg);
+        break;
+      }
+
 
       default:
         // don't follow this instruction.

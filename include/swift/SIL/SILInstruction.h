@@ -4931,6 +4931,8 @@ class MarkUninitializedInst
 
 public:
   /// This enum captures what the mark_uninitialized instruction is designating.
+  ///
+  /// Warning: this enum must be in sync with the swift `MarkUninitializedInst.Kind`
   enum Kind {
     /// Var designates the start of a normal variable live range.
     Var,
@@ -6149,20 +6151,42 @@ class AutoreleaseValueInst
   }
 };
 
-/// SetDeallocatingInst - Sets the operand in deallocating state.
+/// BeginDeallocRefInst - Sets the operand in deallocating state.
 ///
 /// This is the same operation what's done by a strong_release immediately
 /// before it calls the deallocator of the object.
-class SetDeallocatingInst
-    : public UnaryInstructionBase<SILInstructionKind::SetDeallocatingInst,
-                                  RefCountingInst> {
+class BeginDeallocRefInst
+    : public InstructionBase<SILInstructionKind::BeginDeallocRefInst,
+                             SingleValueInstruction> {
   friend SILBuilder;
 
-  SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand,
-                      Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
+  FixedOperandList<2> Operands;
+
+  BeginDeallocRefInst(SILDebugLocation DebugLoc, SILValue reference, SILValue allocation)
+      : InstructionBase(DebugLoc, reference->getType()),
+        Operands(this, reference, allocation) {}
+public:
+  SILValue getReference() const { return Operands[0].get(); }
+
+  AllocRefInstBase *getAllocation() const {
+    return cast<AllocRefInstBase>(Operands[1].get());
   }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+};
+
+/// EndInitLetRefInst - Marks the end of a class initialization.
+///
+/// After this instruction all let-fields of the initialized class can be
+/// treated as immutable.
+class EndInitLetRefInst
+    : public UnaryInstructionBase<SILInstructionKind::EndInitLetRefInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  EndInitLetRefInst(SILDebugLocation DebugLoc, SILValue operand)
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
 /// ObjectInst - Represents a object value type.

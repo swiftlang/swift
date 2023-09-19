@@ -60,6 +60,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
 
+  public var isMoveOnly: Bool { bridged.isMoveOnly() }
+
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
     NominalTypeDecl(_bridged: BridgedNominalTypeDecl(decl: bridged.getNominalOrBoundGenericNominal()))

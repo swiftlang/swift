@@ -395,7 +395,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     case is StrongRetainInst, is RetainValueInst, is DebugValueInst, is ValueMetatypeInst,
       is InitExistentialMetatypeInst, is OpenExistentialMetatypeInst,
-      is ExistentialMetatypeInst, is DeallocRefInst, is SetDeallocatingInst, is FixLifetimeInst,
+      is ExistentialMetatypeInst, is DeallocRefInst, is FixLifetimeInst,
       is ClassifyBridgeObjectInst, is BridgeObjectToWordInst, is EndBorrowInst,
       is StrongRetainInst, is RetainValueInst,
       is ClassMethodInst, is SuperMethodInst, is ObjCMethodInst,

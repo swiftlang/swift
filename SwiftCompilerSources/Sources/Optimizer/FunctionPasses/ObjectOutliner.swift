@@ -63,7 +63,7 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     return nil
   }
 
-  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef, ignore: endCOW) else {
+  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef) else {
     return nil
   }
 
@@ -75,7 +75,7 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
   context.erase(instructions: storesToClassFields)
   context.erase(instructions: storesToTailElements)
 
-  return replace(object: allocRef, with: outlinedGlobal, endCOW, context)
+  return replace(object: allocRef, with: outlinedGlobal, context)
 }
 
 private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
@@ -98,9 +98,8 @@ private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
   return nil
 }
 
-private func getInitialization(of allocRef: AllocRefInstBase,
-                               ignore endCOW: EndCOWMutationInst) -> (storesToClassFields: [StoreInst],
-                                                                      storesToTailElements: [StoreInst])? {
+private func getInitialization(of allocRef: AllocRefInstBase) -> (storesToClassFields: [StoreInst],
+                                                                  storesToTailElements: [StoreInst])? {
   guard let numTailElements = allocRef.numTailElements else {
     return nil
   }
@@ -115,7 +114,7 @@ private func getInitialization(of allocRef: AllocRefInstBase,
   //   store %1 to %4
   var tailStores = Array<StoreInst?>(repeating: nil, count: numTailElements * allocRef.numStoresPerTailElement)
 
-  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: endCOW) {
+  if !findInitStores(of: allocRef, &fieldStores, &tailStores) {
     return nil
   }
 
@@ -128,16 +127,15 @@ private func getInitialization(of allocRef: AllocRefInstBase,
 
 private func findInitStores(of object: Value,
                             _ fieldStores: inout [StoreInst?],
-                            _ tailStores: inout [StoreInst?],
-                            ignore endCOW: EndCOWMutationInst) -> Bool {
+                            _ tailStores: inout [StoreInst?]) -> Bool {
   for use in object.uses {
     switch use.instruction {
     case let uci as UpcastInst:
-      if !findInitStores(of: uci, &fieldStores, &tailStores, ignore: endCOW) {
+      if !findInitStores(of: uci, &fieldStores, &tailStores) {
         return false
       }
     case let mvi as MoveValueInst:
-      if !findInitStores(of: mvi, &fieldStores, &tailStores, ignore: endCOW) {
+      if !findInitStores(of: mvi, &fieldStores, &tailStores) {
         return false
       }
     case let rea as RefElementAddrInst:
@@ -149,7 +147,7 @@ private func findInitStores(of object: Value,
         return false
       }
     default:
-      if !isValidUseOfObject(use.instruction, ignore: endCOW) {
+      if !isValidUseOfObject(use.instruction) {
         return false
       }
     }
@@ -216,11 +214,7 @@ private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreIns
   return false
 }
 
-private func isValidUseOfObject(_ inst: Instruction, ignore endCOW: EndCOWMutationInst? = nil) -> Bool {
-  if inst == endCOW {
-    return true
-  }
-
+private func isValidUseOfObject(_ inst: Instruction) -> Bool {
   switch inst {
   case is DebugValueInst,
        is LoadInst,
@@ -229,7 +223,7 @@ private func isValidUseOfObject(_ inst: Instruction, ignore endCOW: EndCOWMutati
        is StrongRetainInst,
        is StrongReleaseInst,
        is FixLifetimeInst,
-       is SetDeallocatingInst:
+       is EndCOWMutationInst:
     return true
 
   case is StructElementAddrInst,
@@ -240,9 +234,12 @@ private func isValidUseOfObject(_ inst: Instruction, ignore endCOW: EndCOWMutati
        is EnumInst,
        is StructExtractInst,
        is UncheckedRefCastInst,
-       is UpcastInst:
+       is UpcastInst,
+       is BeginDeallocRefInst,
+       is RefTailAddrInst,
+       is RefElementAddrInst:
     for use in (inst as! SingleValueInstruction).uses {
-      if !isValidUseOfObject(use.instruction, ignore: endCOW) {
+      if !isValidUseOfObject(use.instruction) {
         return false
       }
     }
@@ -312,31 +309,52 @@ private func constructObject(of allocRef: AllocRefInstBase,
 
 private func replace(object allocRef: AllocRefInstBase,
                      with global: GlobalVariable,
-                     _ endCOW: EndCOWMutationInst, _ context: FunctionPassContext) -> GlobalValueInst {
+                     _ context: FunctionPassContext) -> GlobalValueInst {
 
   // Replace the alloc_ref by global_value + strong_retain instructions.
   let builder = Builder(before: allocRef, context)
   let globalValue = builder.createGlobalValue(global: global, isBare: false)
   builder.createStrongRetain(operand: globalValue)
 
-  endCOW.uses.replaceAll(with: endCOW.instance, context)
-  context.erase(instruction: endCOW)
-
-  for use in allocRef.uses {
-    let user = use.instruction
-    switch user {
-    case is SetDeallocatingInst:
-      let builder = Builder(before: user, context)
-      builder.createStrongRelease(operand: globalValue)
-      context.erase(instruction: user)
-    case is DeallocRefInst, is DeallocStackRefInst:
-      context.erase(instruction: user)
-    default:
-      use.set(to: globalValue, context)
-    }
-  }
+  rewriteUses(of: allocRef, context)
+  allocRef.uses.replaceAll(with: globalValue, context)
   context.erase(instruction: allocRef)
   return globalValue
+}
+
+private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
+  var worklist = InstructionWorklist(context)
+  defer { worklist.deinitialize() }
+  worklist.pushIfNotVisited(usersOf: startValue)
+
+  while let inst = worklist.pop() {
+    switch inst {
+    case let beginDealloc as BeginDeallocRefInst:
+      worklist.pushIfNotVisited(usersOf: beginDealloc)
+      let builder = Builder(before: beginDealloc, context)
+      builder.createStrongRelease(operand: beginDealloc.reference)
+      beginDealloc.uses.replaceAll(with: beginDealloc.reference, context)
+      context.erase(instruction: beginDealloc)
+    case let endMutation as EndCOWMutationInst:
+      worklist.pushIfNotVisited(usersOf: endMutation)
+      endMutation.uses.replaceAll(with: endMutation.instance, context)
+      context.erase(instruction: endMutation)
+    case let upCast as UpcastInst:
+      worklist.pushIfNotVisited(usersOf: upCast)
+    case let moveValue as MoveValueInst:
+      worklist.pushIfNotVisited(usersOf: moveValue)
+    case is DeallocRefInst, is DeallocStackRefInst:
+      context.erase(instruction: inst)
+    default:
+      break
+    }
+  }
+}
+
+private extension InstructionWorklist {
+  mutating func pushIfNotVisited(usersOf value: Value) {
+    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+  }
 }
 
 private extension Value {

@@ -37,13 +37,15 @@ let stripObjectHeadersPass = FunctionPass(name: "strip-object-headers") {
 
 private extension Value {
   func needObjectHeader() -> Bool {
-    var walker = IsBareObjectWalker()
+    var walker = IsBareObjectWalker(rootDef: self)
     return walker.walkDownUses(ofValue: self, path: SmallProjectionPath()) == .abortWalk
   }
 }
 
-private struct IsBareObjectWalker : ValueDefUseWalker {
+private struct IsBareObjectWalker : ValueDefUseWalker, ValueUseDefWalker {
+  var walkUpCache = WalkerCache<SmallProjectionPath>()
   var walkDownCache = WalkerCache<SmallProjectionPath>()
+  let rootDef: Value
 
   mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
     switch operand.instruction {
@@ -54,6 +56,8 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
          is BeginBorrowInst, is MarkDependenceInst,
          is BranchInst, is CondBranchInst, is SwitchEnumInst,
          is UpcastInst, is UncheckedRefCastInst,
+         is BeginDeallocRefInst,
+         is EndInitLetRefInst,
          is EndCOWMutationInst:
       return walkDownDefault(value: operand, path: path)
     default:
@@ -65,11 +69,20 @@ private struct IsBareObjectWalker : ValueDefUseWalker {
     switch operand.instruction {
     // White-list all instructions which don't use the object header.
     case is RefElementAddrInst, is RefTailAddrInst,
-         is DeallocRefInst, is DeallocStackRefInst, is SetDeallocatingInst,
+         is DeallocStackRefInst,
          is DebugValueInst, is FixLifetimeInst:
       return .continueWalk
+    case let deallocRef as DeallocRefInst:
+      // Check if the final dealloc_ref comes from the single `rootDef`.
+      // In case of phi-arguments it might come from multiple root definitions.
+      return walkUp(value: deallocRef.operand.value, path: path)
     default:
       return .abortWalk
     }
   }
+
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    return value == rootDef ? .continueWalk : .abortWalk
+  }
+
 }

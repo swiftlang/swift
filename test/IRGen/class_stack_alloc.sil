@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
+// REQUIRES: swift_in_compiler
+
 import Builtin
 import Swift
 
@@ -89,9 +91,9 @@ bb0:
 sil @promoted_with_devirtualized_release : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $TestClass
-  set_deallocating %o1 : $TestClass
+  %d = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
   %f = function_ref @not_inlined_destructor :  $@convention(thin) (TestClass) -> ()
-  %a = apply %f(%o1) : $@convention(thin) (TestClass) -> ()
+  %a = apply %f(%d) : $@convention(thin) (TestClass) -> ()
   dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
@@ -105,7 +107,7 @@ bb0:
 sil @bare_alloc_ref : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [bare] [stack] $TestClass
-  set_deallocating %o1 : $TestClass
+  %d = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
   dealloc_stack_ref %o1 : $TestClass
   %r = tuple()
   return %r : $()
@@ -122,8 +124,8 @@ bb0:
 sil @promoted_with_inlined_devirtualized_release : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $TestClass
-  set_deallocating %o1 : $TestClass
-  dealloc_ref %o1 : $TestClass
+  %d = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  dealloc_ref %d : $TestClass
   dealloc_stack_ref %o1 : $TestClass
 
   %r = tuple()
@@ -138,8 +140,8 @@ bb0:
 sil @not_promoted_with_inlined_devirtualized_release : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $BigClass
-  set_deallocating %o1 : $BigClass
-  dealloc_ref %o1 : $BigClass
+  %d = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
+  dealloc_ref %d : $BigClass
   dealloc_stack_ref %o1 : $BigClass
 
   %r = tuple()

@@ -883,8 +883,8 @@ bb0(%0 : @owned $Klass):
   store %0 to [init] %4 : $*Klass
   %5 = load [copy] %4 : $*Klass
   end_borrow %borrow1 : $AX
-  set_deallocating %1 : $AX
-  dealloc_ref %1 : $AX
+  %6 = begin_dealloc_ref %1 : $AX of %1 : $AX
+  dealloc_ref %6 : $AX
   dealloc_stack_ref %1 : $AX
   return %5 : $Klass
 }

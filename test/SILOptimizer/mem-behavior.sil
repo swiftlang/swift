@@ -805,12 +805,43 @@ bb0(%0 : $*C, %1 : $*C):
   return %2 : $C
 }
 
+sil_global hidden [let] @globalC : $C
+sil_global hidden @globalCVar : $C
+
+// CHECK-LABEL: @testGlobalLet
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %0 = global_addr @globalC : $*C
+// CHECK-NEXT:   r=1,w=0
+sil hidden @testGlobalLet : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = load %0 : $*C
+  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testGlobalVar
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %0 = global_addr @globalCVar : $*C
+// CHECK-NEXT:   r=1,w=1
+sil hidden @testGlobalVar : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalCVar : $*C
+  %1 = load %0 : $*C
+  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
 // ===-----------------------------------------------------------------------===
 // Test the effect of a [deinit] access on a global 'let'
 //
 // Test <rdar://60046018> Assert: (v->getType().isAddress()), getAccessedAddress
-
-sil_global hidden [let] @globalC : $C
 
 // CHECK-LABEL: @testDeinitInstVsNonAddressValue
 // CHECK:      PAIR #3.

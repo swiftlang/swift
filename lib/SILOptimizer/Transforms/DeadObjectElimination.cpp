@@ -263,8 +263,9 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
       isa<MoveValueInst>(Inst)) {
     return true;
   }
-  if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst) ||
-      isa<EndBorrowInst>(Inst))
+  if (isa<EndInitLetRefInst>(Inst) || isa<BeginDeallocRefInst>(Inst) ||
+      isa<FixLifetimeInst>(Inst) || isa<EndBorrowInst>(Inst) ||
+      isa<UpcastInst>(Inst) || isa<UncheckedRefCastInst>(Inst))
     return true;
 
   // It is ok to eliminate various retains/releases. We are either removing
@@ -336,6 +337,14 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
 
   // Check if the destroyArray destroys the tail elements of allocRef.
   auto destroyPath = AccessPath::compute(destroyArray->getArguments()[1]);
+  AccessStorage storage = destroyPath.getStorage();
+  if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(storage.getRoot())) {
+    destroyPath = AccessPath(
+                   storage.transformReference(beginDealloc->getAllocation()),
+                   destroyPath.getPathNode(),
+                   destroyPath.getOffset());
+  }
+
   if (destroyPath != AccessPath::forTailStorage(allocRef))
     return false;
 
