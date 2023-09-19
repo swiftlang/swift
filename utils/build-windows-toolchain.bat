@@ -866,7 +866,7 @@ endlocal
 :FetchX64Toolchain
 setlocal enableextensions enabledelayedexpansion
 
-curl.exe -k -sOL "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a-windows10.exe" || (exit /b)
+curl.exe -k -sOL "https://github.com/thebrowsercompany/swift-build/releases/download/20230919.2/installer-amd64.exe" || (exit /b)
 "WiX-4.0.1\tools\net6.0\any\wix.exe" burn extract swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a-windows10.exe -o %BuildRoot%\toolchains || (exit /b)
 msiexec.exe /qn /a "%BuildRoot%\toolchains\a0" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Runtimes\0.0.0\usr\bin\" || (exit /b)
 msiexec.exe /qn /a "%BuildRoot%\toolchains\a1" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\" || (exit /b)
