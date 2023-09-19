@@ -715,8 +715,12 @@ private func _wideDivide32<F: FixedWidthInteger & UnsignedInteger>(
 ) -> (quotient: F, remainder: _Wide2<F>) {
   // The following invariants are guaranteed to hold by dividingFullWidth or
   // quotientAndRemainder before this function is invoked:
+  #if !$Embedded
+  // TODO: Investigate why this fails to compile in embedded Swift with
+  // assertions off
   _internalInvariant(lhs.high != F.zero)
   _internalInvariant(rhs.high.leadingZeroBitCount == 0)
+  #endif
   _internalInvariant((high: lhs.high, low: lhs.mid) < rhs)
 
   // Estimate the quotient with a 2/1 division using just the top digits.
