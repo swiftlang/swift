@@ -879,6 +879,7 @@ static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
 static void addAccessorKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "get", CodeCompletionKeywordKind::None);
   addKeyword(Sink, "set", CodeCompletionKeywordKind::None);
+  addKeyword(Sink, "init", CodeCompletionKeywordKind::None);
 }
 
 static void addObserverKeywords(CodeCompletionResultSink &Sink) {
