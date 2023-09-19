@@ -446,6 +446,7 @@ public:
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
+  llvm::Optional<StringRef> getSingleModuleName() const;
 };
 
 class SDKNodeType: public SDKNode {
