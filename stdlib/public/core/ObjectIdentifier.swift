@@ -50,18 +50,31 @@ public struct ObjectIdentifier: Sendable {
   ///     // Prints "false"
   ///
   /// - Parameter x: An instance of a class.
+#if $Embedded
+  @inlinable // trivial-implementation
+  public init<Object: AnyObject>(_ x: Object) {
+    self._value = Builtin.bridgeToRawPointer(x)
+  }
+#else
   @inlinable // trivial-implementation
   public init(_ x: AnyObject) {
     self._value = Builtin.bridgeToRawPointer(x)
   }
-
+#endif
   /// Creates an instance that uniquely identifies the given metatype.
   ///
   /// - Parameter: A metatype.
+#if $Embedded
+  @inlinable // trivial-implementation
+  public init<Object>(_ x: Object.Type) {
+    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
+#else
   @inlinable // trivial-implementation
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
+#endif
 }
 
 @_unavailableInEmbedded
