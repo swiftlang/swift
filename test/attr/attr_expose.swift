@@ -33,6 +33,9 @@ struct ExposedStruct {
     @_expose(Cxx, "initWith")
     init(with y: Int) {}
 }
+@_expose(Cxx)
+@_expose(Cxx) // expected-error {{duplicate attribute}}
+func exposeToCxxCxx() {}
 
 @_expose(wasm) func exposeToWasm() {}
 @_expose(wasm, "with_name") func wasmName() {}
@@ -47,3 +50,14 @@ func wasmNested() {
   func errorOnInnerExpose() {}
 }
 
+@_expose(Cxx)
+@_expose(wasm)
+func exposeToCxxWasm() {}
+
+@_expose(wasm)
+@_expose(Cxx)
+func exposeToWasmCxx() {}
+
+@_expose(wasm)
+@_expose(wasm) // expected-error {{duplicate attribute}}
+func exposeToWasmWasm() {}

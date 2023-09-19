@@ -218,7 +218,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
-  if (auto *EA = Attrs.getAttribute<ExposeAttr>()) {
+  for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;
     if (Attrs.hasAttribute<CDeclAttr>()) {
       // If the function is marked with @cdecl, expose only C compatible

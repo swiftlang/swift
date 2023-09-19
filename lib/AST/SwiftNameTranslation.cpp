@@ -158,9 +158,9 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
                                       CustomNamesOnly_t customNamesOnly) {
   ASTContext& ctx = VD->getASTContext();
 
-  if (const auto *Expose = VD->getAttrs().getAttribute<ExposeAttr>()) {
-    if (Expose->getExposureKind() == ExposureKind::Cxx && !Expose->Name.empty())
-      return Expose->Name;
+  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
+    if (EA->getExposureKind() == ExposureKind::Cxx && !EA->Name.empty())
+      return EA->Name;
   }
 
   if (customNamesOnly)

@@ -2825,7 +2825,7 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   // Clang decls don't need to be explicitly exposed.
   if (VD->hasClangNode())
     return true;
-  if (auto *EA = VD->getAttrs().getAttribute<ExposeAttr>()) {
+  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
     if (EA->getExposureKind() == ExposureKind::Cxx)
       return true;
   }
