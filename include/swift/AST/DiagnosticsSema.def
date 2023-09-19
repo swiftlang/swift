@@ -5331,6 +5331,9 @@ NOTE(protocol_isolated_to_global_actor_here,none,
 
 ERROR(isolated_parameter_not_actor,none,
       "'isolated' parameter has non-actor type %0", (Type))
+ERROR(isolated_parameter_no_actor_conformance,none,
+      "'isolated' parameter %0 must conform to 'Actor' "
+      "or 'DistributedActor' protocol", (Type))
 ERROR(isolated_parameter_duplicate,none,
       "cannot have more than one 'isolated' parameter", ())
 ERROR(isolated_parameter_duplicate_type,none,
