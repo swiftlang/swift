@@ -254,6 +254,8 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE
   OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
 
+  bool specializeVTables(BridgedFunction function) const;
+
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
 
   std::string mangleOutlinedVariable(BridgedFunction function) const;

@@ -49,7 +49,17 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
       if !context.loadFunction(function: f, loadCalleesRecursively: true) {
         return
       }
+
+      let vTablesFunctionsBefore = Set(moduleContext.vTables.flatMap { $0.entries.map { $0.function } })
+
       optimize(function: f, context)
+
+      let vTablesFunctionsAfter = Set(moduleContext.vTables.flatMap { $0.entries.map { $0.function } })
+      // Optimizing can trigger vtable specialization, add new vtable entries to the worklist
+      for f in vTablesFunctionsAfter.subtracting(vTablesFunctionsBefore) {
+        worklist.pushIfNotVisited(f)
+      }
+
       worklist.add(calleesOf: f)
     }
   }
@@ -81,6 +91,8 @@ private func optimize(function: Function, _ context: FunctionPassContext) {
     }
 
     _ = context.specializeApplies(in: function, isMandatory: true)
+
+    changed = context.specializeVTables(in: function) || changed
 
     removeUnusedMetatypeInstructions(in: function, context)
 

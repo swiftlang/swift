@@ -267,6 +267,14 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
+  func specializeVTables(in function: Function) -> Bool {
+    if _bridged.specializeVTables(function.bridged) {
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
+  }
+
   func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
     if _bridged.specializeAppliesInFunction(function.bridged, isMandatory) {
       notifyInstructionsChanged()
