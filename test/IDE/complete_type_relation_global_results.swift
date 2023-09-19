@@ -216,5 +216,5 @@ struct TestPropertyWrapper {
   @#^PROPERTY_WRAPPER^# var foo: String
 }
 
-// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#];
+// PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#];
 // PROPERTY_WRAPPER-DAG: Decl[Struct]/OtherModule[Lib]: StructWithAssocType[#StructWithAssocType#];

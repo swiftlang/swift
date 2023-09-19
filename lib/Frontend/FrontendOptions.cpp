@@ -928,3 +928,8 @@ bool FrontendOptions::shouldTrackSystemDependencies() const {
   return IntermoduleDependencyTracking ==
          IntermoduleDepTrackingMode::IncludeSystem;
 }
+
+bool FrontendOptions::isTypeCheckAction() const {
+  return RequestedAction == FrontendOptions::ActionType::Typecheck ||
+  RequestedAction == FrontendOptions::ActionType::TypecheckModuleFromInterface;
+}

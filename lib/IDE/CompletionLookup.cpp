@@ -1669,6 +1669,27 @@ void CompletionLookup::addSubscriptCall(const SubscriptDecl *SD,
   addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
 }
 
+static StringRef getTypeAnnotationString(const NominalTypeDecl *NTD,
+                                         SmallVectorImpl<char> &stash) {
+  SmallVector<StringRef, 1> attrRoleStrs;
+  if (NTD->getAttrs().hasAttribute<PropertyWrapperAttr>())
+    attrRoleStrs.push_back("Property Wrapper");
+  if (NTD->getAttrs().hasAttribute<ResultBuilderAttr>())
+    attrRoleStrs.push_back("Result Builder");
+  if (NTD->isGlobalActor())
+    attrRoleStrs.push_back("Global Actor");
+
+  if (attrRoleStrs.empty())
+    return StringRef();
+  if (attrRoleStrs.size() == 1)
+    return attrRoleStrs[0];
+
+  assert(stash.empty());
+  llvm::raw_svector_ostream OS(stash);
+  llvm::interleave(attrRoleStrs, OS, ", ");
+  return {stash.data(), stash.size()};
+}
+
 void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
                                          DeclVisibilityKind Reason,
                                          DynamicLookupInfo dynamicLookupInfo) {
@@ -1679,7 +1700,14 @@ void CompletionLookup::addNominalTypeRef(const NominalTypeDecl *NTD,
   addLeadingDot(Builder);
   Builder.addBaseName(NTD->getName().str());
 
-  addTypeAnnotation(Builder, NTD->getDeclaredType());
+  // "Fake" annotation for custom attribute types.
+  SmallVector<char, 0> stash;
+  StringRef customAttributeAnnotation = getTypeAnnotationString(NTD, stash);
+  if (!customAttributeAnnotation.empty()) {
+    Builder.addTypeAnnotation(customAttributeAnnotation);
+  } else {
+    addTypeAnnotation(Builder, NTD->getDeclaredType());
+  }
 
   // Override the type relation for NominalTypes. Use the better relation
   // for the metatypes and the instance type. For example,
@@ -1790,6 +1818,56 @@ void CompletionLookup::addEnumElementRef(const EnumElementDecl *EED,
     Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
 }
 
+static StringRef getTypeAnnotationString(const MacroDecl *MD,
+                                         SmallVectorImpl<char> &stash) {
+  auto roles = MD->getMacroRoles();
+  SmallVector<StringRef, 1> roleStrs;
+  for (auto role : getAllMacroRoles()) {
+    if (!roles.contains(role))
+      continue;
+
+    switch (role) {
+    case MacroRole::Accessor:
+      roleStrs.push_back("Accessor Macro");
+      break;
+    case MacroRole::CodeItem:
+      roleStrs.push_back("Code Item Macro");
+      break;
+    case MacroRole::Conformance:
+      roleStrs.push_back("Conformance Macro");
+      break;
+    case MacroRole::Declaration:
+      roleStrs.push_back("Declaration Macro");
+      break;
+    case MacroRole::Expression:
+      roleStrs.push_back("Expression Macro");
+      break;
+    case MacroRole::Extension:
+      roleStrs.push_back("Extension Macro");
+      break;
+    case MacroRole::Member:
+      roleStrs.push_back("Member Macro");
+      break;
+    case MacroRole::MemberAttribute:
+      roleStrs.push_back("Member Attribute Macro");
+      break;
+    case MacroRole::Peer:
+      roleStrs.push_back("Peer Macro");
+      break;
+    }
+  }
+
+  if (roleStrs.empty())
+    return "Macro";
+  if (roleStrs.size() == 1)
+    return roleStrs[0];
+
+  assert(stash.empty());
+  llvm::raw_svector_ostream OS(stash);
+  llvm::interleave(roleStrs, OS, ", ");
+  return {stash.data(), stash.size()};
+}
+
 void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
                                          DeclVisibilityKind Reason) {
   if (!MD->hasName() || !MD->isAccessibleFrom(CurrDeclContext) ||
@@ -1822,9 +1900,13 @@ void CompletionLookup::addMacroExpansion(const MacroDecl *MD,
     Builder.addRightParen();
   }
 
-  if (!MD->getResultInterfaceType()->isVoid()) {
+  auto roles = MD->getMacroRoles();
+  if (roles.containsOnly(MacroRole::Expression)) {
     addTypeAnnotation(Builder, MD->getResultInterfaceType(),
                       MD->getGenericSignature());
+  } else {
+    llvm::SmallVector<char, 0> stash;
+    Builder.addTypeAnnotation(getTypeAnnotationString(MD, stash));
   }
 }
 

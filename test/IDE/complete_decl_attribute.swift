@@ -111,9 +111,9 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 
 @#^KEYWORD3^# class C {}
 
@@ -183,12 +183,12 @@ actor MyGenericGlobalActor<T> {
 // ON_GLOBALVAR-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#MyGenericPropertyWrapper#]; name=MyGenericPropertyWrapper
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
-// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 
 struct _S {
   @#^ON_INIT^# init()
@@ -220,12 +220,12 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#MyGenericPropertyWrapper#]; name=MyGenericPropertyWrapper
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
-// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // ON_PROPERTY-NOT: Decl[PrecedenceGroup]
 
   @#^ON_METHOD^# private
@@ -250,21 +250,21 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyGenericPropertyWrapper[#MyGenericPropertyWrapper#]; name=MyGenericPropertyWrapper
-// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
-// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
+// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 
 
 
   func bar(@#^ON_PARAM_1^#)
 // ON_PARAM-NOT: Keyword
 // ON_PARAM-DAG: Decl[Struct]/CurrModule:             MyStruct[#MyStruct#]; name=MyStruct
-// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_PARAM-DAG: Decl[Actor]/CurrModule:              MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_PARAM-DAG: Decl[Actor]/CurrModule:              MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 // ON_PARAM-NOT: Keyword
 
   func bar(
@@ -323,12 +323,12 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#MyGenericPropertyWrapper#]; name=MyGenericPropertyWrapper
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
-// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
 }
 
@@ -339,9 +339,9 @@ func takeClosure(_: () -> Void) {
 }
 // FIXME: We should mark MyPropertyWrapper and MyResultBuilder as Unrelated
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
-// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 
 
 @#^KEYWORD_INDEPENDENT_1^#
@@ -394,9 +394,9 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#MyGenericPropertyWrapper#]; name=MyGenericPropertyWrapper
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#MyGenericResultBuilder#]; name=MyGenericResultBuilder
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#MyGenericGlobalActor#]; name=MyGenericGlobalActor
-// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
+// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
