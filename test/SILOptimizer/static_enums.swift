@@ -224,6 +224,18 @@ enum SingleCaseEnum {
   static var x = Self.a(b:true, i: 42)
 }
 
+enum SingleCaseEnumWithoutPayload {
+  case a
+  static var x = Self.a
+}
+
+enum NestedSingleCaseEnum {
+  case u
+  case v(SingleCaseEnumWithoutPayload)
+
+  static var x = Self.v(.a)
+}
+
 @main
 struct Main {
   static func main() {
@@ -301,6 +313,10 @@ struct Main {
     printFunctionEnum()
     // CHECK-OUTPUT: SingleCaseEnum: a(b: true, i: 42)
     print("SingleCaseEnum:", SingleCaseEnum.x)
+    // CHECK-OUTPUT: SingleCaseEnumWithoutPayload: a
+    print("SingleCaseEnumWithoutPayload:", SingleCaseEnumWithoutPayload.x)
+    // CHECK-OUTPUT: NestedSingleCaseEnum: v(test.SingleCaseEnumWithoutPayload.a)
+    print("NestedSingleCaseEnum:", NestedSingleCaseEnum.x)
   }
 }
 

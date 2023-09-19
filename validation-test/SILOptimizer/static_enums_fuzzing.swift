@@ -12,7 +12,7 @@
 createTestfile()
 
 func createTestfile() {
-  let globals = createGlobals(count: 500)
+  let globals = createGlobals(count: 1000)
 
   print(typeDefinitions)
 
@@ -75,6 +75,10 @@ var typeDefinitions: String {
 
     public enum SPSCE<T> {
       case A(T)
+    }
+
+    public enum SCEWP {
+      case A
     }
 
     public enum SPE<T> {
@@ -322,6 +326,33 @@ struct SinglePayloadSingleCaseEnum : Value {
   var containsEnum: Bool { true }
 }
 
+struct SingleCaseEnumWithoutPayload : Value {
+  
+  init(generator: inout RandomGenerator, depth: Int) {
+  }
+  
+  func getType() -> String {
+    "SCEWP"
+  }
+
+  func getInitValue() -> String  {
+    return "SCEWP.A"
+  }
+
+  func getExpectedOutput(topLevel: Bool) -> String  {
+    let prefix = topLevel ? "" : "\(getRuntimeTypeName(topLevel: topLevel))."
+    return "\(prefix)A"
+  }
+
+  func getRuntimeTypeName(topLevel: Bool) -> String {
+    let prefix = topLevel ? "" : "test."
+    return "\(prefix)SCEWP"
+  }
+
+  var containsEnum: Bool { true }
+}
+
+
 struct SinglePayloadEnum : Value {
   let payload: any Value
   let caseIdx: Int
@@ -477,7 +508,8 @@ struct RandomGenerator : RandomNumberGenerator {
     LargeString.self,
     Function.self,
     Enum.self,
-    Size24Enum.self
+    Size24Enum.self,
+    SingleCaseEnumWithoutPayload.self
   ]
   private static let allValueTypes: [any Value.Type] = allTerminalTypes + [
     OptionalValue.self,
