@@ -26,3 +26,16 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
 
 print("Hello, Embedded Swift!")
 // CHECK: Hello, Embedded Swift!
+
+@_silgen_name("vprintf")
+func vprintf(_: UnsafePointer<UInt8>, _: UnsafeRawPointer)
+
+public func print(_ n: Int) {
+    let f: StaticString = "%d\n"
+    withUnsafePointer(to: n) { p in
+      vprintf(f.utf8Start, p)
+    }
+}
+
+print(42)
+// CHECK: 42
