@@ -34,6 +34,7 @@ extension BridgedSourceLoc {
   ) {
     if let start = buffer.baseAddress,
       position.utf8Offset >= 0 && position.utf8Offset < buffer.count {
+      assert(position.utf8Offset >= 0 && position.utf8Offset < buffer.count)
       self = SourceLoc_advanced(BridgedSourceLoc(raw: start), SwiftInt(position.utf8Offset))
     } else {
       self = nil
