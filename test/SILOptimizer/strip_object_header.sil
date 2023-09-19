@@ -30,12 +30,12 @@ bb0:
   %3 = unchecked_ref_cast %2 : $B to $C
   %4 = ref_element_addr %3 : $C, #C.a
   %5 = ref_tail_addr %3 : $C, $Int
-  set_deallocating %0 : $C
-  fix_lifetime %0 : $C
-  dealloc_ref %0 : $C
+  %6 = begin_dealloc_ref %0 : $C of %0 : $C
+  fix_lifetime %6 : $C
+  dealloc_ref %6 : $C
   dealloc_stack_ref %0 : $C
-  %6 = tuple ()
-  return %6 : $()
+  %7 = tuple ()
+  return %7 : $()
 }
 
 // CHECK-LABEL: sil @test_global_value :

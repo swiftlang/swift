@@ -259,6 +259,17 @@ final public class StoreInst : Instruction, StoringInstruction {
 final public class StoreWeakInst : Instruction, StoringInstruction { }
 final public class StoreUnownedInst : Instruction, StoringInstruction { }
 
+final public class AssignInst : Instruction, StoringInstruction {
+  // must match with enum class swift::AssignOwnershipQualifier
+  public enum AssignOwnership: Int {
+    case unknown = 0, reassign = 1, reinitialize = 2, initialize = 3
+  }
+
+  public var assignOwnership: AssignOwnership {
+    AssignOwnership(rawValue: bridged.AssignInst_getAssignOwnership())!
+  }
+}
+
 final public class CopyAddrInst : Instruction {
   public var sourceOperand: Operand { return operands[0] }
   public var destinationOperand: Operand { return operands[1] }
@@ -282,6 +293,42 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
 final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
+
+  /// This enum captures what the mark_uninitialized instruction is designating.
+  ///
+  // Warning: this enum must be in sync with MarkUninitializedInst::Kind
+  public enum Kind: Int {
+    /// The start of a normal variable live range.
+    case variable = 0
+
+    /// "self" in a struct, enum, or root class.
+    case rootSelf = 1
+
+    /// The same as "RootSelf", but in a case where it's not really safe to treat 'self' as root
+    /// because the original module might add more stored properties.
+    ///
+    /// This is only used for Swift 4 compatibility. In Swift 5, cross-module initializers are always delegatingSelf.
+    case crossModuleRootSelf = 2
+
+    /// "self" in a derived (non-root) class.
+    case derivedSelf = 3
+
+    /// "self" in a derived (non-root) class whose stored properties have already been initialized.
+    case derivedSelfOnly = 4
+
+    /// "self" on a struct, enum, or class in a delegating constructor (one that calls self.init).
+    case delegatingSelf = 5
+
+    /// "self" in a delegating class initializer where memory has already been allocated.
+    case delegatingSelfAllocated = 6
+
+    /// An indirectly returned result which has to be checked for initialization.
+    case indirectResult = 7
+  }
+
+  public var kind: Kind { Kind(rawValue: bridged.MarkUninitializedInst_getKind())! }
+
+  public var canForwardGuaranteedValues: Bool { false }
 }
 
 final public class CondFailInst : Instruction, UnaryInstruction {
@@ -304,7 +351,12 @@ final public class UnconditionalCheckedCastAddrInst : Instruction {
 final public class EndApplyInst : Instruction, UnaryInstruction {}
 final public class AbortApplyInst : Instruction, UnaryInstruction {}
 
-final public class SetDeallocatingInst : Instruction, UnaryInstruction {}
+final public class BeginDeallocRefInst : SingleValueInstruction {
+  public var reference: Value { operands[0].value }
+  public var allocation: AllocRefInstBase { operands[1].value as! AllocRefInstBase }
+}
+
+final public class EndInitLetRefInst : SingleValueInstruction, UnaryInstruction {}
 
 public class RefCountingInst : Instruction, UnaryInstruction {
   public var isAtomic: Bool { bridged.RefCountingInst_getIsAtomic() }
@@ -391,9 +443,13 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 final public class UnimplementedSingleValueInst : SingleValueInstruction {
 }
 
-final public class LoadInst : SingleValueInstruction, UnaryInstruction {
-  public var address: Value { operand.value }
+public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
 
+extension LoadInstruction {
+  public var address: Value { operand.value }
+}
+
+final public class LoadInst : SingleValueInstruction, LoadInstruction {
   // must match with enum class LoadOwnershipQualifier
   public enum LoadOwnership: Int {
     case unqualified = 0, take = 1, copy = 2, trivial = 3
@@ -403,9 +459,9 @@ final public class LoadInst : SingleValueInstruction, UnaryInstruction {
   }
 }
 
-final public class LoadWeakInst : SingleValueInstruction, UnaryInstruction {}
-final public class LoadUnownedInst : SingleValueInstruction, UnaryInstruction {}
-final public class LoadBorrowInst : SingleValueInstruction, UnaryInstruction {}
+final public class LoadWeakInst : SingleValueInstruction, LoadInstruction {}
+final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
+final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
   public typealias ID = swift.BuiltinValueKind
@@ -638,6 +694,8 @@ final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
   public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
+
+  public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -737,6 +795,13 @@ extension BeginAccessInst : ScopedInstruction {
 
 final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
   public var borrowedValue: Value { operand.value }
+
+  public typealias EndBorrowSequence = LazyMapSequence<LazyFilterSequence<LazyMapSequence<UseList, EndBorrowInst?>>,
+                                                       EndBorrowInst>
+
+  public var endBorrows: EndBorrowSequence {
+    uses.lazy.compactMap({ $0.instruction as? EndBorrowInst })
+  }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {

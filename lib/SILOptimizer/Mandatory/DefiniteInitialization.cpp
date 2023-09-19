@@ -3702,25 +3702,14 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   BlockStates blockStates(&Fn);
 
   for (auto &BB : Fn) {
-    for (auto I = BB.begin(), E = BB.end(); I != E;) {
-      SILInstruction *Inst = &*I;
-
-      auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
-      if (!MUI) {
-        ++I;
-        continue;
+    for (SILInstruction &inst : BB) {
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(&inst)) {
+        processMemoryObject(MUI, blockStates);
+        Changed = true;
+        // mark_uninitialized needs to remain in SIL for mandatory passes which
+        // follow DI, like LetPropertyLowering.
+        // It will be eventually removed by RawSILInstLowering.
       }
-
-      // Then process the memory object.
-      processMemoryObject(MUI, blockStates);
-
-      // Move off of the MUI only after we have processed memory objects. The
-      // lifetime checker may rewrite instructions, so it is important to not
-      // move onto the next element until after it runs.
-      ++I;
-      MUI->replaceAllUsesWith(MUI->getOperand());
-      MUI->eraseFromParent();
-      Changed = true;
     }
   }
 

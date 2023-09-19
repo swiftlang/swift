@@ -448,6 +448,14 @@ bool ValueToDeclInferrer::infer(
       foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
     });
 
+    for (Operand *use : value->getUses()) {
+      if (auto *eir = dyn_cast<EndInitLetRefInst>(use->getUser())) {
+        rcfi.visitRCUses(eir, [&](Operand *use) {
+          foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
+        });
+      }
+    }
+
     // At this point, we could not infer any argument. See if we can look up the
     // def-use graph and come up with a good location after looking through
     // loads and projections.

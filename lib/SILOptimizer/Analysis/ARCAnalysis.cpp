@@ -176,6 +176,8 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::EndInitLetRefInst:
+  case SILInstructionKind::BeginDeallocRefInst:
     return false;
 
   // If we have a trivial bit cast between trivial types, it is not something

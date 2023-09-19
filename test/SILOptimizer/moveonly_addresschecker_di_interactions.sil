@@ -24,7 +24,8 @@ struct ListEntry<T> : ~Copyable {
 }
 
 // CHECK-LABEL: sil private [ossa] @boxInit : $@convention(method) <T> (@in _Node<T>, @owned _Box<T>) -> @owned _Box<T> {
-// CHECK: bb0([[INPUT:%.*]] : $*_Node<T>, [[SELF:%.*]] : @owned
+// CHECK: bb0([[INPUT:%.*]] : $*_Node<T>, %1 : @owned
+// CHECK:   [[SELF:%.*]] = mark_uninitialized [rootself] %1
 // CHECK:   [[BORROW_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_SELF]]
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[REF]]

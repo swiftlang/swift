@@ -3057,14 +3057,27 @@ public:
     require(I->getOperand()->getType().hasRetainablePointerRepresentation(),
             "Source value must be a reference type or optional thereof");
   }
+
+  void checkBeginDeallocRefInst(BeginDeallocRefInst *I) {
+    require(I->getReference()->getType().isObject(),
+            "Source value should be an object value");
+    require(I->getReference()->getType().hasRetainablePointerRepresentation(),
+            "Source value must be a reference type");
+    require(isa<AllocRefInstBase>(I->getOperand(1)),
+            "allocation must be an alloc_ref or alloc_ref_dynamic");
+    requireSameType(I->getReference()->getType(), I->getType(),
+                    "result of begin_dealloc_ref should be same type as operand");
+  }
   
-  void checkSetDeallocatingInst(SetDeallocatingInst *I) {
+  void checkEndInitLetRefInst(EndInitLetRefInst *I) {
     require(I->getOperand()->getType().isObject(),
             "Source value should be an object value");
     require(I->getOperand()->getType().hasRetainablePointerRepresentation(),
             "Source value must be a reference type");
+    requireSameType(I->getOperand()->getType(), I->getType(),
+                    "result of end_init_let_ref should be same type as operand");
   }
-  
+
   void checkCopyBlockInst(CopyBlockInst *I) {
     require(I->getOperand()->getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");

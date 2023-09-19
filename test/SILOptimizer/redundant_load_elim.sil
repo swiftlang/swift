@@ -1229,8 +1229,8 @@ bb0:
   %4 = ref_element_addr %1 : $AX, #AX.current
   store %3 to %4 : $*Int32
   %5 = load %4 : $*Int32
-  set_deallocating %1 : $AX
-  dealloc_ref %1 : $AX
+  %6 = begin_dealloc_ref %1 : $AX of %1 : $AX
+  dealloc_ref %6 : $AX
   dealloc_stack_ref %1 : $AX
   return %5 : $Int32
 }

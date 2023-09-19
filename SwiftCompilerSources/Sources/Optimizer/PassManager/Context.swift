@@ -27,6 +27,17 @@ extension Context {
     let bridgeCA = _bridged.getCalleeAnalysis()
     return CalleeAnalysis(bridged: bridgeCA)
   }
+
+  var hadError: Bool { _bridged.hadError() }
+
+  var silStage: SILStage {
+    switch _bridged.getSILStage() {
+      case .Raw:       return .raw
+      case .Canonical: return .canonical
+      case .Lowered:   return .lowered
+      default:         fatalError("unhandled SILStage case")
+    }
+  }
 }
 
 /// A context which allows mutation of a function's SIL.
@@ -458,6 +469,14 @@ extension AllocRefInst {
   func setIsBare(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.AllocRefInst_setIsBare()
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension RefElementAddrInst {
+  func set(isImmutable: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.RefElementAddrInst_setImmutable(isImmutable)
     context.notifyInstructionChanged(self)
   }
 }

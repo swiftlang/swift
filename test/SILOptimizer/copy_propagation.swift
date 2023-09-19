@@ -14,9 +14,10 @@ func borrow(_ c: C)
 
 // CHECK-LABEL: sil {{.*}}@test_hoist_over_non_barrier : {{.*}} {
 // CHECK:         [[INSTANCE:%[^,]+]] = alloc_ref
+// CHECK:         [[EI:%.*]] = end_init_let_ref [[INSTANCE]]
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrow
-// CHECK:         apply [[BORROW]]([[INSTANCE]])
-// CHECK:         strong_release [[INSTANCE]]
+// CHECK:         apply [[BORROW]]([[EI]])
+// CHECK:         strong_release [[EI]]
 // CHECK:         [[NON_BARRIER:%[^,]+]] = function_ref @non_barrier
 // CHECK:         apply [[NON_BARRIER]]()
 // CHECK-LABEL: } // end sil function 'test_hoist_over_non_barrier'

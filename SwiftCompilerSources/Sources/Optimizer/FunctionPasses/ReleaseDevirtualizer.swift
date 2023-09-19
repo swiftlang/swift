@@ -39,126 +39,150 @@ let releaseDevirtualizerPass = FunctionPass(name: "release-devirtualizer") {
     var lastRelease: RefCountingInst?
 
     for instruction in block.instructions {
-      if let release = lastRelease {
-        // We only do the optimization for stack promoted object, because for
-        // these we know that they don't have associated objects, which are
-        // _not_ released by the deinit method.
-        if let deallocStackRef = instruction as? DeallocStackRefInst {
-          if !context.continueWithNextSubpassRun(for: release) {
+      switch instruction {
+      case let dealloc as DeallocStackRefInst:
+        if let lastRel = lastRelease {
+          // We only do the optimization for stack promoted object, because for
+          // these we know that they don't have associated objects, which are
+          // _not_ released by the deinit method.
+          if !context.continueWithNextSubpassRun(for: lastRel) {
             return
           }
-          tryDevirtualizeReleaseOfObject(context, release, deallocStackRef)
+          tryDevirtualizeRelease(of: dealloc.allocRef, lastRelease: lastRel, context)
           lastRelease = nil
-          continue
         }
-      }
-
-      switch instruction {
-        case is ReleaseValueInst, is StrongReleaseInst:
-          lastRelease = instruction as? RefCountingInst
-        case is DeallocRefInst, is SetDeallocatingInst:
+      case let strongRelease as StrongReleaseInst:
+        lastRelease = strongRelease
+      case let releaseValue as ReleaseValueInst where releaseValue.value.type.containsSingleReference(in: function):
+        lastRelease = releaseValue
+      case is DeallocRefInst, is BeginDeallocRefInst:
+        lastRelease = nil
+      default:
+        if instruction.mayRelease {
           lastRelease = nil
-        default:
-          if instruction.mayRelease {
-            lastRelease = nil
-          }
+        }
       }
     }
   }
 }
 
 /// Tries to de-virtualize the final release of a stack-promoted object.
-private func tryDevirtualizeReleaseOfObject(
-  _ context: FunctionPassContext,
-  _ release: RefCountingInst,
-  _ deallocStackRef: DeallocStackRefInst
+private func tryDevirtualizeRelease(
+  of allocRef: AllocRefInstBase,
+  lastRelease: RefCountingInst,
+  _ context: FunctionPassContext
 ) {
-  let allocRefInstruction = deallocStackRef.allocRef
-
-  // Check if the release instruction right before the `dealloc_stack_ref` really releases
-  // the allocated object (and not something else).
-  var finder = FindAllocationOfRelease(allocation: allocRefInstruction)
-  if !finder.allocationIsRoot(of: release.operand.value) {
+  var downWalker = FindReleaseWalker(release: lastRelease)
+  guard let pathToRelease = downWalker.getPathToRelease(from: allocRef) else {
     return
   }
 
-  let type = allocRefInstruction.type
+  if !pathToRelease.isMaterializable {
+    return
+  }
+
+  var upWalker = FindAllocationWalker(allocation: allocRef)
+  if upWalker.walkUp(value: lastRelease.operand.value, path: pathToRelease) == .abortWalk {
+    return
+  }
+
+  let type = allocRef.type
 
   guard let dealloc = context.calleeAnalysis.getDestructor(ofExactType: type) else {
     return
   }
 
-  let builder = Builder(before: release, location: release.location, context)
+  let builder = Builder(before: lastRelease, location: lastRelease.location, context)
 
-  var object: Value = allocRefInstruction
+  var object = lastRelease.operand.value.createProjection(path: pathToRelease, builder: builder)
   if object.type != type {
     object = builder.createUncheckedRefCast(from: object, to: type)
   }
 
   // Do what a release would do before calling the deallocator: set the object
   // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
-  builder.createSetDeallocating(operand: object, isAtomic: release.isAtomic)
+  let beginDealloc = builder.createBeginDeallocRef(reference: object, allocation: allocRef)
 
   // Create the call to the destructor with the allocated object as self
   // argument.
   let functionRef = builder.createFunctionRef(dealloc)
 
   let substitutionMap = context.getContextSubstitutionMap(for: type)
-  builder.createApply(function: functionRef, substitutionMap, arguments: [object])
-  context.erase(instruction: release)
+  builder.createApply(function: functionRef, substitutionMap, arguments: [beginDealloc])
+  context.erase(instruction: lastRelease)
 }
 
-// Up-walker to find the root of a release instruction.
-private struct FindAllocationOfRelease : ValueUseDefWalker {
-  private let allocInst: AllocRefInstBase
-  private var allocFound = false
+private struct FindReleaseWalker : ValueDefUseWalker {
+  private let release: RefCountingInst
+  private var result: SmallProjectionPath? = nil
 
-  var walkUpCache = WalkerCache<UnusedWalkingPath>()
+  var walkDownCache = WalkerCache<SmallProjectionPath>()
 
-  init(allocation: AllocRefInstBase) { allocInst = allocation }
-
-  /// The top-level entry point: returns true if the root of `value` is the `allocInst`.
-  mutating func allocationIsRoot(of value: Value) -> Bool {
-    return walkUp(value: value, path: UnusedWalkingPath()) != .abortWalk &&
-           allocFound
+  init(release: RefCountingInst) {
+    self.release = release
   }
 
-  mutating func rootDef(value: Value, path: UnusedWalkingPath) -> WalkResult {
-    if value == allocInst {
-      allocFound = true
-      return .continueWalk
+  mutating func getPathToRelease(from allocRef: AllocRefInstBase) -> SmallProjectionPath? {
+    if walkDownUses(ofValue: allocRef, path: SmallProjectionPath()) == .continueWalk {
+      return result
     }
-    return .abortWalk
+    return nil
   }
 
-  // This function is called for `struct` and `tuple` instructions in case the `path` doesn't select
-  // a specific operand but all operands.
-  mutating func walkUpAllOperands(of def: Instruction, path: UnusedWalkingPath) -> WalkResult {
-  
-    // Instead of walking up _all_ operands (which would be the default behavior), require that only a
-    // _single_ operand is not trivial and walk up that operand.
-    // We need to check this because the released value must not contain multiple copies of the
-    // allocated object. We can only replace a _single_ release with the destructor call and not
-    // multiple releases of the same object. E.g.
-    //
-    //    %x = alloc_ref [stack] $X
-    //    strong_retain %x
-    //    %t = tuple (%x, %x)
-    //    release_value %t       // -> releases %x two times!
-    //    dealloc_stack_ref %x
-    //
-    var nonTrivialOperandFound = false
-    for operand in def.operands {
-      if !operand.value.hasTrivialType {
-        if nonTrivialOperandFound {
-          return .abortWalk
-        }
-        nonTrivialOperandFound = true
-        if walkUp(value: operand.value, path: path) == .abortWalk {
-          return .abortWalk
-        }
+  mutating func leafUse(value: Operand, path: SmallProjectionPath) -> WalkResult {
+    if value.instruction == release {
+      if let existingResult = result {
+        result = existingResult.merge(with: path)
+      } else {
+        result = path
       }
     }
     return .continueWalk
+  }
+}
+
+// Up-walker to find the root of a release instruction.
+private struct FindAllocationWalker : ValueUseDefWalker {
+  private let allocInst: AllocRefInstBase
+
+  var walkUpCache = WalkerCache<SmallProjectionPath>()
+
+  init(allocation: AllocRefInstBase) { allocInst = allocation }
+
+  mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
+    return value == allocInst && path.isEmpty ? .continueWalk : .abortWalk
+  }
+}
+
+private extension Type {
+  func containsSingleReference(in function: Function) -> Bool {
+    if isClass {
+      return true
+    }
+    if isStruct {
+      return getNominalFields(in: function).containsSingleReference(in: function)
+    } else if isTuple {
+      return tupleElements.containsSingleReference(in: function)
+    } else {
+      return false
+    }
+  }
+}
+
+private extension Collection where Element == Type {
+  func containsSingleReference(in function: Function) -> Bool {
+    var nonTrivialFieldFound = false
+    for elementTy in self {
+      if !elementTy.isTrivial(in: function) {
+        if nonTrivialFieldFound {
+          return false
+        }
+        if !elementTy.containsSingleReference(in: function) {
+          return false
+        }
+        nonTrivialFieldFound = true
+      }
+    }
+    return nonTrivialFieldFound
   }
 }

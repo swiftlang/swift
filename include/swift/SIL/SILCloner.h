@@ -2122,12 +2122,21 @@ void SILCloner<ImplClass>::visitUnmanagedAutoreleaseValueInst(
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitSetDeallocatingInst(SetDeallocatingInst *Inst) {
+SILCloner<ImplClass>::visitBeginDeallocRefInst(BeginDeallocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createSetDeallocating(getOpLocation(Inst->getLoc()),
-                                               getOpValue(Inst->getOperand()),
-                                               Inst->getAtomicity()));
+      Inst, getBuilder().createBeginDeallocRef(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getReference()),
+                                               getOpValue(Inst->getAllocation())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitEndInitLetRefInst(EndInitLetRefInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createEndInitLetRef(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

@@ -54,6 +54,60 @@ extension Value {
     }
     return true
   }
+
+  func createProjection(path: SmallProjectionPath, builder: Builder) -> Value {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return self
+    case .structField:
+      let structExtract = builder.createStructExtract(struct: self, fieldIndex: index)
+      return structExtract.createProjection(path: subPath, builder: builder)
+    case .tupleField:
+      let tupleExtract = builder.createTupleExtract(tuple: self, elementIndex: index)
+      return tupleExtract.createProjection(path: subPath, builder: builder)
+    default:
+      fatalError("path is not materializable")
+    }
+  }
+
+  func createAddressProjection(path: SmallProjectionPath, builder: Builder) -> Value {
+    let (kind, index, subPath) = path.pop()
+    switch kind {
+    case .root:
+      return self
+    case .structField:
+      let structExtract = builder.createStructElementAddr(structAddress: self, fieldIndex: index)
+      return structExtract.createAddressProjection(path: subPath, builder: builder)
+    case .tupleField:
+      let tupleExtract = builder.createTupleElementAddr(tupleAddress: self, elementIndex: index)
+      return tupleExtract.createAddressProjection(path: subPath, builder: builder)
+    default:
+      fatalError("path is not materializable")
+    }
+  }
+
+  func createProjectionAndCopy(path: SmallProjectionPath, builder: Builder) -> Value {
+    if path.isEmpty {
+      return self.copyIfNotTrivial(builder)
+    }
+    if self.ownership == .owned {
+      let borrow = builder.createBeginBorrow(of: self)
+      let projectedValue = borrow.createProjection(path: path, builder: builder)
+      let result = projectedValue.copyIfNotTrivial(builder)
+      builder.createEndBorrow(of: borrow)
+      return result
+    }
+    let projectedValue = self.createProjection(path: path, builder: builder)
+    return projectedValue.copyIfNotTrivial(builder)
+  }
+
+  func copyIfNotTrivial(_ builder: Builder) -> Value {
+    if type.isTrivial(in: parentFunction) {
+      return self
+    }
+    return builder.createCopyValue(operand: self)
+  }
 }
 
 extension Builder {
@@ -262,6 +316,22 @@ extension UseList {
       }
     }
     return true
+  }
+}
+
+extension SmallProjectionPath {
+  /// Returns true if the path only contains projections which can be materialized as
+  /// SIL struct or tuple projection instructions - for values or addresses.
+  var isMaterializable: Bool {
+    let (kind, _, subPath) = pop()
+    switch kind {
+    case .root:
+      return true
+    case .structField, .tupleField:
+      return subPath.isMaterializable
+    default:
+      return false
+    }
   }
 }
 

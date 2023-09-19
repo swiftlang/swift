@@ -723,8 +723,9 @@ class FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC28failBeforeFullInitializationACSgyt_tcfc
 // CHECK:       bb0(%0 : $FailableBaseClass):
+// CHECK:         [[EI:%.*]] = end_init_let_ref %0
 // CHECK:         [[METATYPE:%.*]] = metatype $@thick FailableBaseClass.Type
-// CHECK:         dealloc_partial_ref %0 : $FailableBaseClass, [[METATYPE]]
+// CHECK:         dealloc_partial_ref [[EI]] : $FailableBaseClass, [[METATYPE]]
 // CHECK:         [[RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
 // CHECK:         return [[RESULT]]
   init?(failBeforeFullInitialization: ()) {
@@ -733,12 +734,13 @@ class FailableBaseClass {
 
 // CHECK-LABEL: sil hidden @$s35definite_init_failable_initializers17FailableBaseClassC27failAfterFullInitializationACSgyt_tcfc
 // CHECK:       bb0(%0 : $FailableBaseClass):
+// CHECK:         [[EI:%.*]] = end_init_let_ref %0
 // CHECK:         [[CANARY:%.*]] = apply
-// CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr %0
+// CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr [[EI]]
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [init] [static] [[MEMBER_ADDR]] : $*Canary
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*Canary
-// CHECK-NEXT:    strong_release %0
+// CHECK-NEXT:    strong_release [[EI]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
 // CHECK-NEXT:    return [[NEW_SELF]]
   init?(failAfterFullInitialization: ()) {
