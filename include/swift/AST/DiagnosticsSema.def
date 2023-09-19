@@ -1935,10 +1935,7 @@ WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
 ERROR(access_control_requires_package_name, none,
-      "%0 has a package access level but no -package-name was specified: %1",
-      (Identifier, StringRef))
-ERROR(access_control_requires_package_name_import, none,
-      "package import can only be used from a module with a package name; "
+      "the package access level requires a package name; "
       "set it with the compiler flag -package-name",
       ())
 ERROR(invalid_decl_attribute,none,
