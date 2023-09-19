@@ -275,7 +275,10 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
   } else if (auto *ei = dyn_cast<EnumInst>(operand)) {
     auto &strategy = getEnumImplStrategy(IGM, ei->getType());
     if (strategy.emitPayloadDirectlyIntoConstant()) {
-      return emitConstantValue(IGM, ei->getOperand(), flatten);
+      if (ei->hasOperand()) {
+        return emitConstantValue(IGM, ei->getOperand(), flatten);
+      }
+      return Explosion();
     }
 
     Explosion data;
