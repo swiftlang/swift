@@ -518,6 +518,9 @@ public:
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
   
+  /// Whether we are configured with -typecheck or -typecheck-module-from-interface actuin
+  bool isTypeCheckAction() const;
+
   /// Whether to emit symbol graphs for the output module.
   bool EmitSymbolGraph = false;
 

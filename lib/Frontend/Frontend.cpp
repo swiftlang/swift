@@ -1130,6 +1130,18 @@ bool CompilerInstance::supportCaching() const {
       Invocation.getFrontendOptions().RequestedAction);
 }
 
+bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
+  auto &FrontendOpts = Invocation.getFrontendOptions();
+  if (Context->blockListConfig.hasBlockListAction(FrontendOpts.ModuleName,
+                                             BlockListKeyKind::ModuleName,
+                        BlockListAction::DowngradeInterfaceVerificationFailure)) {
+    Context->Diags.diagnose(SourceLoc(), diag::interface_block_listed_broken,
+                            FrontendOpts.ModuleName);
+    return true;
+  }
+  return FrontendOpts.DowngradeInterfaceVerificationError;
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
