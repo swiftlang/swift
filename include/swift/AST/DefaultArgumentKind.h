@@ -51,6 +51,8 @@ enum class DefaultArgumentKind : uint8_t {
   // Magic identifier literals expanded at the call site:
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) NAME,
 #include "swift/AST/MagicIdentifierKinds.def"
+  /// An expression macro.
+  ExpressionMacro
 };
 enum { NumDefaultArgumentKindBits = 4 };
 

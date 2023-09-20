@@ -106,6 +106,7 @@ enum class SourceFileKind {
   SIL,      ///< Came from a .sil file.
   Interface, ///< Came from a .swiftinterface file, representing another module.
   MacroExpansion, ///< Came from a macro expansion.
+  DefaultArgument, ///< Came from default argument at caller side
 };
 
 /// Contains information about where a particular path is used in

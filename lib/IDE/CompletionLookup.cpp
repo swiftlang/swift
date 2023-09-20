@@ -1006,6 +1006,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
 #define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::ExpressionMacro:
     return false;
   }
 }

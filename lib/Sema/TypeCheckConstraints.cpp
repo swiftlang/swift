@@ -545,7 +545,8 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
-                                            bool isAutoClosure) {
+                                            bool isAutoClosure,
+                                            bool atCallerSide) {
   // During normal type checking we don't type check the parameter default if
   // the param has an error type. For code completion, we also type check the
   // parameter default because it might contain the code completion token.
@@ -569,10 +570,16 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     // different contextual type, see below.
     DiagnosticTransaction diagnostics(ctx.Diags);
 
+    TypeCheckExprOptions options;
+    // Expand macro expansion expression at caller side only
+    if (!atCallerSide && isa<MacroExpansionExpr>(defaultValue)) {
+      options |= TypeCheckExprFlags::DisableMacroExpansions;
+    }
+
     // First, let's try to type-check default expression using
     // archetypes, which guarantees that it would work for any
     // substitution of the generic parameter (if they are involved).
-    if (auto result = typeCheckExpression(defaultExprTarget)) {
+    if (auto result = typeCheckExpression(defaultExprTarget, options)) {
       defaultValue = result->getAsExpr();
       return defaultValue->getType();
     }

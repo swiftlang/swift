@@ -372,6 +372,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   FrontendStatsTracer tracer(Ctx.Stats,
                              "perform-whole-module-type-checking");
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
@@ -418,6 +419,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   };
 
   switch (SF.Kind) {
+  case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {

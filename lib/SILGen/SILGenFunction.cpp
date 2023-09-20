@@ -344,6 +344,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   }
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
+  case GeneratedSourceInfo::DefaultArgument:
     break;
   }
   return Result;

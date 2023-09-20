@@ -615,6 +615,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       case DefaultArgumentKind::EmptyArray:
       case DefaultArgumentKind::EmptyDictionary:
       case DefaultArgumentKind::StoredProperty:
+      case DefaultArgumentKind::ExpressionMacro:
         return llvm::None;
       }
 

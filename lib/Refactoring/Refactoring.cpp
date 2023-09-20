@@ -155,7 +155,8 @@ swift::ide::collectRefactorings(SourceFile *SF, RangeConfig Range,
                                        DiagConsumers);
 
   // No refactorings are available within generated buffers
-  if (SF->Kind == SourceFileKind::MacroExpansion)
+  if (SF->Kind == SourceFileKind::MacroExpansion ||
+      SF->Kind == SourceFileKind::DefaultArgument)
     return {};
 
   // Prepare the tool box.

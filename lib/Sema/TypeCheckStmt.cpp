@@ -119,7 +119,12 @@ namespace {
 
       // Caller-side default arguments need their @autoclosures checked.
       if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
-        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+        if (DAE->isCallerSide() &&
+            (DAE->getParamDecl()->isAutoClosure() ||
+             (DAE->getParamDecl()->getDefaultArgumentKind() ==
+                  DefaultArgumentKind::ExpressionMacro &&
+              ParentDC->getASTContext().LangOpts.hasFeature(
+                  Feature::ExpressionMacroDefaultArguments))))
           DAE->getCallerSideDefaultExpr()->walk(*this);
 
       // Macro expansion expressions require a DeclContext as well.
@@ -202,6 +207,12 @@ namespace {
 } // end anonymous namespace
 
 void TypeChecker::contextualizeInitializer(Initializer *DC, Expr *E) {
+  ContextualizeClosuresAndMacros CC(DC);
+  E->walk(CC);
+}
+
+void TypeChecker::contextualizeCallSideDefaultArgument(DeclContext *DC,
+                                                       Expr *E) {
   ContextualizeClosuresAndMacros CC(DC);
   E->walk(CC);
 }

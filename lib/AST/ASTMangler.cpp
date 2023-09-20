@@ -3877,6 +3877,8 @@ void ASTMangler::appendMacroExpansionContext(
 
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
+  // TODO: ApolloZhu check if this correct?
+  case GeneratedSourceInfo::DefaultArgument:
     return appendContext(origDC, StringRef());
   }
   

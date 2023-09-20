@@ -325,6 +325,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::Library:
     case swift::SourceFileKind::Main:
     case swift::SourceFileKind::MacroExpansion:
+    case swift::SourceFileKind::DefaultArgument:
       return LexerMode::Swift;
   }
   llvm_unreachable("covered switch");

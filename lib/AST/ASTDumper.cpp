@@ -309,6 +309,8 @@ static StringRef getDumpString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
     case DefaultArgumentKind::StoredProperty: return "stored property";
+    case DefaultArgumentKind::ExpressionMacro:
+    return "expression macro";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");

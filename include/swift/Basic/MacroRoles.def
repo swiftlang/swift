@@ -70,6 +70,9 @@ ATTACHED_MACRO_ROLE(Conformance, "conformance", "c")
 /// declarations in a code block.
 EXPERIMENTAL_FREESTANDING_MACRO_ROLE(CodeItem, "codeItem", CodeItemMacros)
 
+/// A freestanding macro that is used as the default argument
+EXPERIMENTAL_FREESTANDING_MACRO_ROLE(DefaultArgument, "defaultArgument", ExpressionMacroDefaultArguments)
+
 /// An attached macro that adds extensions to the declaration the
 /// macro is attached to.
 ATTACHED_MACRO_ROLE(Extension, "extension", "e")

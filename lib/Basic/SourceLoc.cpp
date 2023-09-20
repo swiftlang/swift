@@ -289,7 +289,8 @@ StringRef SourceManager::getIdentifierForBuffer(
     if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
       // We only care about macros, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
-          generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted)
+          generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
+          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument)
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
@@ -382,6 +383,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::Name##MacroExpansion:
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::DefaultArgument:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:

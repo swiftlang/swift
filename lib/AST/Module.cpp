@@ -1214,6 +1214,7 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
+  case GeneratedSourceInfo::DefaultArgument:
     return llvm::None;
   }
 }
@@ -3308,7 +3309,8 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     (void)problem;
   }
 
-  if (Kind == SourceFileKind::MacroExpansion)
+  if (Kind == SourceFileKind::MacroExpansion ||
+      Kind == SourceFileKind::DefaultArgument)
     M.addAuxiliaryFile(*this);
 }
 

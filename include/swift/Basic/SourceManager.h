@@ -43,6 +43,9 @@ public:
 
     /// Pretty-printed declarations that have no source location.
     PrettyPrinted,
+
+    /// The expansion of default argument at caller side
+    DefaultArgument,
   } kind;
 
   /// The source range in the enclosing buffer where this source was generated.

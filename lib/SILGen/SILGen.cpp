@@ -1617,6 +1617,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::NilLiteral:
   case DefaultArgumentKind::EmptyArray:
   case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
     break;
   }
 }

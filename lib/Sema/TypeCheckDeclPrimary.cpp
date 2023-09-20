@@ -1132,8 +1132,11 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
-  // Prohibit default argument that is a non-built-in macro to avoid confusion.
-  if (isa<MacroExpansionExpr>(initExpr)) {
+  // Prohibit default argument that is a non-built-in macro to avoid confusion,
+  // unless the experimental feature flag is set.
+  auto isMacroExpansionExpr = isa<MacroExpansionExpr>(initExpr);
+  if (isMacroExpansionExpr &&
+      !ctx.LangOpts.hasFeature(Feature::ExpressionMacroDefaultArguments)) {
     ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
@@ -1148,9 +1151,14 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   assert(dc);
 
   if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
-                                              param->isAutoClosure())) {
+                                              param->isAutoClosure(),
+                                              /*atCallerSide=*/false)) {
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
   }
+
+  // Expression macro default arguments are checked at caller side
+  if (isMacroExpansionExpr)
+    return initExpr;
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
@@ -1545,6 +1553,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
       return;
+    case SourceFileKind::DefaultArgument:
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
@@ -2608,6 +2617,7 @@ public:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
+          case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
@@ -2630,6 +2640,7 @@ public:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
             return;
+          case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
             break;

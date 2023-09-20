@@ -2196,6 +2196,10 @@ public:
     return getContextForPatternBinding(binding);
   }
 
+  static Context forDefaultArgument(DeclContext *dc) {
+    return Context(Kind::DefaultArgument, dc);
+  }
+
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
     return Context(Kind::EnumElementInitializer, elt);
   }
@@ -3693,6 +3697,14 @@ void TypeChecker::checkInitializerEffects(Initializer *initCtx,
                                                 Expr *init) {
   auto &ctx = initCtx->getASTContext();
   CheckEffectsCoverage checker(ctx, Context::forInitializer(initCtx));
+  init->walk(checker);
+  init->walk(LocalFunctionEffectsChecker());
+}
+
+void TypeChecker::checkCallerSideDefaultArgumentEffects(DeclContext *initCtx,
+                                                        Expr *init) {
+  auto &ctx = initCtx->getASTContext();
+  CheckEffectsCoverage checker(ctx, Context::forDefaultArgument(initCtx));
   init->walk(checker);
   init->walk(LocalFunctionEffectsChecker());
 }
