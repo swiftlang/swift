@@ -160,8 +160,7 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = (MO(), MO()) // expected-error {{noncopyable type '(MO, MO)' cannot be erased to copyable existential type 'any Sendable'}}
   let _: Sendable = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any Sendable'}}
-  let _: _Copyable = mo // expected-error {{'_Copyable' is unavailable}}
-                        // expected-error@-1 {{noncopyable type 'MO' cannot be erased to copyable existential type 'any _Copyable'}}
+  let _: Copyable = mo // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'any Copyable'}}
   let _: AnyObject = MO() // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'AnyObject'}}
   let _: Any = mo // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
 
@@ -260,11 +259,11 @@ protocol HasType<Ty> {
 }
 
 class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to protocol 'HasType'}}
-  typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'SomeGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
 }
 
 struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
-  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to '_Copyable'}}
+  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
 protocol Gives: HasType {
@@ -272,7 +271,7 @@ protocol Gives: HasType {
 }
 
 struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conform to protocol 'HasType'}}
-  typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to '_Copyable'}}
+  typealias Ty = MO // expected-note {{possibly intended match 'GenerousGuy.Ty' (aka 'MO') does not conform to 'Copyable'}}
   func give() -> Ty {}
 }
 

@@ -10,7 +10,7 @@ precedencegroup AssignmentPrecedence { assignment: true }
 precedencegroup CastingPrecedence {}
 
 public protocol _ObjectiveCBridgeable {}
-@_marker public protocol _Copyable {}
+@_marker public protocol Copyable {}
 
 public protocol _ExpressibleByBuiltinBooleanLiteral {
   init(_builtinBooleanLiteral value: Builtin.Int1)
