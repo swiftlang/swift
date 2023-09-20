@@ -872,8 +872,6 @@ msiexec.exe /qn /a "%BuildRoot%\toolchains\a0" TARGETDIR="%BuildRoot%\toolchains
 msiexec.exe /qn /a "%BuildRoot%\toolchains\a1" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
 msiexec.exe /qn /a "%BuildRoot%\toolchains\a2" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
 msiexec.exe /qn /a "%BuildRoot%\toolchains\a3" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a4" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a5" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
 
 goto :eof
 endlocal
