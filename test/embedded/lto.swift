@@ -1,12 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -target arm64-apple-none-macho -Xcc -D__MACH__ -Xcc -D__arm64__ -Xcc -D__APPLE__ \
-// RUN:   -lto=llvm-full %s -enable-experimental-feature Embedded -emit-bc -o %t/a.o
+// RUN: %target-swift-frontend -lto=llvm-full %s -enable-experimental-feature Embedded -emit-bc -o %t/a.o
 // RUN: %target-clang %t/a.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: VENDOR=apple
-// REQUIRES: CPU=arm64
+// REQUIRES: OS=macosx
 
 @_silgen_name("putchar")
 func putchar(_: UInt8)
