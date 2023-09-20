@@ -446,7 +446,7 @@ case false:
 }
 
 let e = "\(switch Bool.random() { case true: 1 case false: 2 })"
-// expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-1 2{{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
 let f = { switch Bool.random() { case true: 1 case false: 2 } }
 

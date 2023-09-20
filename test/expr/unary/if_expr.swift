@@ -371,7 +371,7 @@ var d = if .random() { if .random() { 1 } else { 2 } } else { 3 }
 
 d = if .random() { 0 } else { 1 }
 
-let e = "\(if .random() { 1 } else { 2 })" // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+let e = "\(if .random() { 1 } else { 2 })" // expected-error 2{{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 let f = { if .random() { 1 } else { 2 } }
 
