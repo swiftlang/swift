@@ -1162,23 +1162,6 @@ endif()
 swift_get_host_triple(SWIFT_HOST_TRIPLE)
 set(SWIFT_HOST_MODULE_TRIPLE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE}")
 set(SWIFT_HOST_LIBRARIES_DEST_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
-set(SWIFT_HOST_RUNTIME_DEST_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
-  set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-endif()
-if(SWIFT_BUILD_SWIFT_SYNTAX)
-  if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
-    message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
-  endif()
-
-  set(BUILD_SHARED_LIBS_OLD "${BUILD_SHARED_LIBS}")
-  set(BUILD_SHARED_LIBS ON)
-  FetchContent_Declare(SwiftSyntax
-    SOURCE_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}"
-  )
-  FetchContent_MakeAvailable(SwiftSyntax)
-  set(BUILD_SHARED_LIBS "${BUILD_SHARED_LIBS_OLD}")
-endif()
 
 if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
@@ -1332,6 +1315,33 @@ endif()
 add_subdirectory(include)
 
 if(SWIFT_INCLUDE_TOOLS)
+  # Include 'swift-syntax'.
+  # This is a function because we want to set some 'CMAKE_*' variables temporarily.'
+  # TODO: Replace this with 'block()' after CMake 3.25
+  function(include_swift_syntax)
+    if(NOT SWIFT_BUILD_SWIFT_SYNTAX)
+      return()
+    endif()
+    if(NOT EXISTS "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}")
+      message(SEND_ERROR "swift-syntax is required to build the Swift compiler. Please run update-checkout or specify SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE")
+      return()
+    endif()
+
+    set(BUILD_SHARED_LIBS ON)
+    # All libraries in 'swift-syntax' goes to 'lib/swift/host'.
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+      set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
+
+    FetchContent_Declare(SwiftSyntax
+      SOURCE_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}"
+    )
+    FetchContent_MakeAvailable(SwiftSyntax)
+  endfunction()
+  include_swift_syntax()
+
   add_subdirectory(lib)
 
   # SwiftCompilerSources must come before "tools".
