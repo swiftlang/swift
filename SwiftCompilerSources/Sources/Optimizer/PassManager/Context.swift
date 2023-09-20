@@ -271,7 +271,6 @@ struct FunctionPassContext : MutatingContext {
     guard let vtablePtr = _bridged.specializeVTableForType(type.bridged, function.bridged) else {
       return nil
     }
-    notifyInstructionsChanged()
     return VTable(bridged: BridgedVTable(vTable: vtablePtr))
   }
 
