@@ -4091,21 +4091,6 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   case AccessLevel::Package: {
     auto pkg = resultDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     if (!pkg) {
-      auto srcFile = resultDC->getOutermostParentSourceFile();
-      // Check if the file containing package decls is an interface file; if an
-      // interface file contains package decls, they must be usableFromInline or
-      // inlinable and are accessed within the defining module, so package-name
-      // is not needed; do not show diagnostics in such case.
-      auto shouldSkipDiag = srcFile && srcFile->Kind == SourceFileKind::Interface;
-      if (!shouldSkipDiag) {
-        // No package context was found; show diagnostics
-        auto &d = VD->getASTContext().Diags;
-        auto filename = srcFile ? srcFile->getFilename() : resultDC->getParentModule()->getBaseIdentifier().str();
-        d.diagnose(VD->getLoc(),
-                   diag::access_control_requires_package_name,
-                   VD->getBaseIdentifier(),
-                   filename);
-      }
       // Instead of reporting and failing early, return the scope of resultDC to
       // allow continuation (should still non-zero exit later if in script mode)
       return AccessScope(resultDC);
