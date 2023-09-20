@@ -3,11 +3,11 @@
 // Package name should not be empty
 // RUN: not %target-swift-frontend -typecheck %s -package-name "" 2>&1 | %FileCheck %s -check-prefix CHECK-EMPTY
 // CHECK-EMPTY: error: package-name is empty
-// CHECK-EMPTY: error: 'log' has a package access level but no -package-name was specified: {{.*}}.swift
+// CHECK-EMPTY: error: the package access level used on 'log()' requires a package name; set it with the compiler flag -package-name
 
 // If package access level is used but no package-name is passed, it should error
 // RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck %s -check-prefix CHECK-MISSING
-// CHECK-MISSING: error: 'log' has a package access level but no -package-name was specified: {{.*}}.swift
+// CHECK-MISSING: error: the package access level used on 'log()' requires a package name; set it with the compiler flag -package-name
 
 // Package name can be same as the module name
 // RUN: %target-swift-frontend -module-name Logging -package-name Logging %s -emit-module -emit-module-path %t/Logging.swiftmodule
