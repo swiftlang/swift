@@ -320,6 +320,9 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Implicitly imports an Objective-C header file">;
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  Alias<import_objc_header>;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
