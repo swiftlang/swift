@@ -559,6 +559,7 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
     ArrayRef<Term> substitutions,
     SmallVectorImpl<Term> &result) {
   assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+  assert(!concreteType->is<PackExpansionType>());
 
   if (!concreteType->hasTypeParameter())
     return concreteType;
@@ -604,6 +605,7 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
                                               const ProtocolDecl *proto,
                                               SmallVectorImpl<Term> &result) {
   assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+  assert(!concreteType->is<PackExpansionType>());
 
   if (!concreteType->hasTypeParameter())
     return concreteType;
