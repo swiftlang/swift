@@ -70,7 +70,7 @@ The generic nominal type \texttt{Array<Int>} points at the \texttt{Array} type d
 
 Types are categorized by \IndexDefinition{type kind}\emph{kind}, just like type representations. Each kind has a constructor operation to form a new type from \IndexDefinition{structural components}\emph{structural components}, and corresponding operations to take an existing type apart.
 
-\paragraph{Categorization by kind}
+\paragraph{Categorization by kind.}
 Type representation kinds are given by various productions in the grammar, such as identifiers, function type representations ``\texttt{(Int) -> ()}'', tuple type representations ``\texttt{(Bool, String)}'', and so on. The latter two correspond directly to function types and tuple types, but type kinds are more fine-grained in general, as we can see if we consider identifier type representations. An identifier type representation ``\texttt{Element}'' can resolve to one of several kinds of types; we consider a few now.
 
 \begin{wrapfigure}[6]{r}{4cm}
@@ -146,13 +146,13 @@ var x: Element
 
 Outside of type resolution, type representations do not play a big role in the compiler, so we punt on the topic of type representations until Chapter~\ref{typeresolution} and just focus on types for now. For our current purposes, it suffices to say that type resolution is really just one possible mechanism by which types are constructed. The expression checker builds types by solving a constraint system, and the generics system builds types via substitution, to give two examples.
 
-\paragraph{Structural components} A type is constructed from structural components, which may either be other types, or non-type information. Common examples include: nominal types, which consist of a pointer to a declaration, together with a list of \index{generic argument}generic argument types; \index{tuple type}tuple types, which have element types and labels; and \index{function type}function types, which contain parameter types, return types, and various additional bits like \texttt{@escaping} and \texttt{inout}.  We will give a full accounting of all type kinds and their structural components in the second half of this chapter.
+\paragraph{Structural components.} A type is constructed from structural components, which may either be other types, or non-type information. Common examples include: nominal types, which consist of a pointer to a declaration, together with a list of \index{generic argument}generic argument types; \index{tuple type}tuple types, which have element types and labels; and \index{function type}function types, which contain parameter types, return types, and various additional bits like \texttt{@escaping} and \texttt{inout}.  We will give a full accounting of all type kinds and their structural components in the second half of this chapter.
 
 Once created, types are immutable. To say that a type \emph{contains} another type means that the latter appears as a structural component of the former, perhaps nested several levels deep.  We will often talk about \emph{replacing} a type contained by another type. This is understood as constructing a new type with the same kind as the original type, preserving all structural components except for the one being replaced. The original type is never mutated directly.
 
 More generally, types can be transformed by taking the type apart by kind, recursively transforming each structural component, and forming a new type of the same kind from the new components. To preview Chapter~\ref{substmaps}, if \texttt{Element} is a generic parameter type, the type \texttt{Array<Int>} can be formed from \texttt{Array<Element>} by replacing \texttt{Element} with \texttt{Int}; this is called \emph{type substitution}. The compiler provides various utilities to simplify the task of implementing recursive walks and transformations over kinds of types; type substitution is one example of such a transformation.
 
-\paragraph{Canonical types} It is possible for two types to differ by their spelling, and yet be equivalent semantically:
+\paragraph{Canonical types.} It is possible for two types to differ by their spelling, and yet be equivalent semantically:
 \begin{itemize}
 \item The Swift language defines some shorthands for common types, such as \texttt{T?} for \texttt{Optional<T>}, \texttt{[T]} for \texttt{Array<T>}, and \texttt{[K:\ V]} for \texttt{Dictionary<K, V>}.
 \item \index{type alias declaration}Type alias declarations introduce a new name for some existing underlying type, equivalent to writing out the \index{underlying type}underlying type in place of the type alias. The standard library, for example, declares a type alias \IndexDefinition{Void type@\texttt{Void} type}\texttt{Void} with underlying type \texttt{()}.
@@ -175,7 +175,7 @@ print(y)  // error: use of uninitialized variable `y'
 
 Another exception is \index{requirement inference}requirement inference with a \index{generic type alias}generic type alias (Section~\ref{requirementinference}).
  
-\paragraph{Type equality} Types are uniquely allocated, which is made possible by them being immutable. A type \texttt{(Int) -> ()} has a unique pointer identity within a compilation; inside the tuple type \texttt{((Int) -> (), (Int) -> ())}, the two element types have the same pointer value in memory. From this, three levels of equality are defined on types:
+\paragraph{Type equality.} Types are uniquely allocated, which is made possible by them being immutable. A type \texttt{(Int) -> ()} has a unique pointer identity within a compilation; inside the tuple type \texttt{((Int) -> (), (Int) -> ())}, the two element types have the same pointer value in memory. From this, three levels of equality are defined on types:
 \begin{enumerate}
 \item \IndexDefinition{type pointer equality}\textbf{Type pointer equality} checks if two types are exactly equal as trees.
 \item \IndexDefinition{canonical type equality}\textbf{Canonical type equality} checks if two types are equal after sugar is removed.
@@ -234,7 +234,7 @@ Intuitively, reduced type equality means ``equivalent as a consequence of one or
 
 We've looked at some behaviors of types in general, and informally introduced a few kinds. We now give a full accounting of all kinds of types, starting from those most important from the point of view of the generics implementation.
 
-\paragraph{Nominal types}
+\paragraph{Nominal types.}
 A \IndexDefinition{nominal type}\emph{nominal type} is declared by a non-generic \IndexDefinition{struct type}struct, \IndexDefinition{enum type}enum or \IndexDefinition{class type}class declaration, such as \texttt{Int}. A \IndexDefinition{generic nominal type}\emph{generic nominal type} is declared by a generic struct, enum or class declaration. They have these structural components:
 \begin{itemize}
 \item A pointer to the \index{nominal type declaration}nominal type declaration.
@@ -345,9 +345,9 @@ The parent type contains the generic arguments for the parent type declaration. 
 \end{center}
 \end{figure}
 
-\paragraph{Generic parameter types} Conceptually, a \IndexDefinition{generic parameter type}generic parameter type abstracts over a generic argument provided by the caller. Generic parameter types are declared by \index{generic parameter declaration}generic parameter declarations. The sugared form references the declaration, and prints as the declaration's name; the canonical form only stores a depth and an index. Care must be taken not to print canonical generic parameter types in diagnostics, to avoid surfacing the ``\ttgp{1}{2}'' notation to the user. (Section~\ref{genericsigsourceref} shows a trick to transform a canonical generic parameter type back into its sugared form using a generic signature.)
+\paragraph{Generic parameter types.} Conceptually, a \IndexDefinition{generic parameter type}generic parameter type abstracts over a generic argument provided by the caller. Generic parameter types are declared by \index{generic parameter declaration}generic parameter declarations. The sugared form references the declaration, and prints as the declaration's name; the canonical form only stores a depth and an index. Care must be taken not to print canonical generic parameter types in diagnostics, to avoid surfacing the ``\ttgp{1}{2}'' notation to the user. (Section~\ref{genericsigsourceref} shows a trick to transform a canonical generic parameter type back into its sugared form using a generic signature.)
 
-\paragraph{Dependent member types}
+\paragraph{Dependent member types.}
 A \IndexDefinition{dependent member type}dependent member type abstracts over a concrete type that fulfills an associated type requirement. There are two structural components:
 \begin{itemize}
 \item A base type, which is a generic parameter type or another dependent member type.
@@ -366,7 +366,7 @@ Note that a dependent member type is ``dependent'' in the C++ sense, \emph{not} 
 \item Type resolution with bound and unbound type parameters (Section~\ref{typeresolution}).
 \end{itemize}
 
-\paragraph{Archetype types}
+\paragraph{Archetype types.}
 Type parameters derive their meaning from the requirements of a generic signature; they are only ``names'' of external entities, in a sense. \IndexDefinition{archetype type}Archetypes are an alternate ``self-describing'' representation. Archetypes are instantiated from a \emph{generic environment}, which stores a generic signature together with other information (Chapter~\ref{genericenv}).
 
 Archetypes appear in place of type parameters inside the types of \index{expression}expressions and \index{SIL}SIL instructions. Archetypes also represent references to opaque return types (Section~\ref{opaquearchetype}) and the type of the payload inside of an existential (Section~\ref{open existential archetypes}). In diagnostics, an archetype is printed as the type parameter it represents. To distinguish an archetype from its type parameter \texttt{T}, we use the notation $\archetype{T}$ for the archetype. A type that might contain archetypes but is not necessarily an archetype itself is called a \index{contextual type}\emph{contextual type}.
@@ -375,12 +375,12 @@ Archetypes appear in place of type parameters inside the types of \index{express
 
 The fundamental type kinds we surveyed above---nominal types, type parameters, and archetypes---can also be characterized as  \emph{the Swift types that can conform to protocols}. In other words, they can satisfy the left-hand side of a \index{conformance requirement}confomance requirement. (How conformance lookup behaves on each kind of type is explained in Section~\ref{conformance lookup}.) Also important are the types appearing on the \emph{right hand side} of a conformance requirement. These are called \index{constraint type}\emph{constraint types}.
 
-\paragraph{Protocol types}
+\paragraph{Protocol types.}
 A \IndexDefinition{protocol type}protocol type represents a conformance requirement to its protocol declaration. Protocols are the most fundamental of the constraint types; a conformance requirement involving any other kind of constraint type can always be split up into a series of simpler requirements (Section~\ref{requirement desugaring}).
 
 Protocol types are nominal types, but they never have generic arguments or parent types, and so there is exactly one protocol type for a given protocol declaration. They also differ from other nominal types in that a protocol type is never directly the type of a value in Swift; the concept of a type-erased container is represented by wrapping the protocol type inside of an existential type, to be described shortly.
 
-\paragraph{Protocol composition types}
+\paragraph{Protocol composition types.}
 A \IndexDefinition{protocol composition type}protocol composition type is a constraint type with a list of members. On the right hand side of a conformance requirement, protocol compositions \emph{expand} into a series of requirements for each member of the composition (Section~\ref{requirement desugaring}). The members can include protocol types, a class type (at most one), and the \Index{AnyObject@\texttt{AnyObject}}\texttt{AnyObject} layout constraint:
 \begin{quote}
 \begin{verbatim}
@@ -390,7 +390,7 @@ SomeClass<Int> & P
 \end{verbatim}
 \end{quote}
 
-\paragraph{Parameterized protocol types}
+\paragraph{Parameterized protocol types.}
 A \index{constrained protocol type|see{parameterized protocol type}}\IndexDefinition{parameterized protocol type}parameterized protocol type stores a protocol type together with a list of generic arguments. As a constraint type, it expands into a conformance requirement together with one or more same-type requirements, for each of the protocol's \emph{primary associated types} (Section~\ref{protocols}). The written representation looks just like a generic nominal type, except the named declaration is a protocol, for example, \texttt{Sequence<Int>}. Parameterized protocol types were introduced in Swift 5.7 \cite{se0346} (the evolution proposal calls them ``constrained protocol types'').
 
 \section{More Types}\label{more types}
@@ -412,10 +412,10 @@ Now we will look at the various \IndexDefinition{structural type}\emph{structura
 \end{center}
 \end{wrapfigure}
 
-\paragraph{Existential types}
-An \index{existential type}existential type has a single structural component, the constraint type. An existential value is a container for a value with some unknown dynamic type that is known to satisfy the constraint; to the right we show the existential type \verb|any (P & Q)|, which stores a value conforming to both \texttt{P} and \texttt{Q}.
+\paragraph{Existential types.}
+An \index{existential type}existential type has one structural component, the \emph{constraint type}. An existential value is a container for a value with some unknown dynamic type that is known to satisfy the constraint; to the right we show the existential type \verb|any (P & Q)|, which stores a value conforming to both \texttt{P} and \texttt{Q}.
 
-The \texttt{any} keyword was added in Swift~5.6~\cite{se0355}; in Swift releases prior, existential types and constraint types were the same concept in the language and implementation. (For the sake of source compatibility, a constraint type without the \texttt{any} keyword still resolves to an existential type except when it appears on the right-hand side of a conformance requirement.)
+The \texttt{any} keyword was added in Swift~5.6~\cite{se0355}; in \index{history}Swift releases prior, existential types and constraint types were the same concept in the language and implementation. (For the sake of source compatibility, a constraint type without the \texttt{any} keyword still resolves to an existential type except when it appears on the right-hand side of a conformance requirement.)
 
 Existential types are covered in Chapter~\ref{existentialtypes}.
 
@@ -428,7 +428,7 @@ Existential types are covered in Chapter~\ref{existentialtypes}.
 \end{tikzpicture}
 \end{wrapfigure}
 
-\paragraph{Metatype types} Types can be used as callees in \index{call expression}call expressions, \texttt{\textbf{T}(...)}; this is shorthand for a constructor invocation \texttt{\textbf{T}.init(...)}. They can serve as the base of a static method call, \texttt{\textbf{T}.foo(...)}, where the type is passed as the \texttt{self} parameter. Finally, types can be directly referenced by the expression \texttt{\textbf{T}.self}. In all cases, the type becomes a \emph{value}, and this value must itself be assigned a type; this type is called a \emph{metatype}. The metatype of a type \ttbf{T} is written as \texttt{\ttbf{T}.Type}. The type \ttbf{T} is the \IndexDefinition{instance type}\emph{instance type} of the metatype. For example, the type of the expression ``\verb|Int.self|'' is the metatype \texttt{Int.Type}, whose instance type is \verb|Int|.
+\paragraph{Metatype types.} Types can be used as callees in \index{call expression}call expressions, \texttt{\textbf{T}(...)}; this is shorthand for a constructor invocation \texttt{\textbf{T}.init(...)}. They can serve as the base of a static method call, \texttt{\textbf{T}.foo(...)}, where the type is passed as the \texttt{self} parameter. Finally, types can be directly referenced by the expression \texttt{\textbf{T}.self}. In all cases, the type becomes a \emph{value}, and this value must itself be assigned a type; this type is called a \emph{metatype}. The metatype of a type \ttbf{T} is written as \texttt{\ttbf{T}.Type}. The type \ttbf{T} is the \IndexDefinition{instance type}\emph{instance type} of the metatype. For example, the type of the expression ``\verb|Int.self|'' is the metatype \texttt{Int.Type}, whose instance type is \verb|Int|.
 
 Metatypes are sometimes referred to as \IndexDefinition{concrete metatype type}\emph{concrete metatypes}, to distinguish them from existential metatypes, which we introduce below. Most concrete metatypes are singleton types with one value, the instance type itself. One exception is that the class metatype for a non-final class also has all subclasses of the class as values.
 
@@ -453,7 +453,7 @@ Metatypes are sometimes referred to as \IndexDefinition{concrete metatype type}\
 \end{center}
 \end{figure}
 
-\paragraph{Existential metatype types}
+\paragraph{Existential metatype types.}
 An \index{existential metatype type}existential metatype is a container for an unknown concrete metatype, whose instance type is known to satisfy the constraint type.
 
 Existential metatypes are not the same as metatypes whose instance type is existential, as we can demonstrate by considering language semantics. If \texttt{P} is a protocol and \texttt{S} is a type conforming to \texttt{P}, then the existential metatype \texttt{any P.Type} can store the value \texttt{S.self}. As the existential type \texttt{any P} does not conform to \texttt{P}, the value \texttt{(any P).self} cannot be stored inside of the existential metatype \texttt{any P.Type}. In fact, the type of this value is the \emph{concrete} metatype \texttt{(any P).Type}. Figure~\ref{existential metatype fig} compares the recursive structure of \texttt{any P.Type} against \texttt{(any P).Type}.
@@ -486,12 +486,12 @@ Prior to the introduction of the \texttt{any} keyword, existential metatypes wer
 \end{center}
 \end{wrapfigure}
 
-\paragraph{Tuple types}
+\paragraph{Tuple types.}
 A \IndexDefinition{tuple type}tuple type is a list of element types together with optional labels. If the list of element types is empty, we get the unique empty tuple type \texttt{()}.
 
 An unlabeled one-element tuple type cannot be formed at all; \texttt{(\textbf{T})} resolves to the same type as \ttbf{T}. Labeled one-element tuple types \texttt{(foo:\ \textbf{T})} are valid in the grammar, but are rejected by type resolution. \index{SILGen}SILGen creates them internally when it materializes the payload of an enum case (for instance, ``\texttt{case person(name:\ String)}''), but they do not appear as the types of expressions.
 
-\paragraph{Function types} A \IndexDefinition{function type}function type is the type of the callee in a \index{call expression}call expression. Consists of a parameter list, a return type, and non-type attributes. The latter includes the function's effect, lifetime, and calling convention. The effects are \texttt{throws} and \texttt{async} (part of the Swift~5.5 concurrency model \cite{se0296}). Function values with non-escaping lifetime are second-class; they can only be passed to another function, captured by a non-escaping closure, or called. Only escaping functions can be returned or stored inside other values. The four calling conventions are:
+\paragraph{Function types.} A \IndexDefinition{function type}function type is the type of the callee in a \index{call expression}call expression. Consists of a parameter list, a return type, and non-type attributes. The latter includes the function's effect, lifetime, and calling convention. The effects are \texttt{throws} and \texttt{async} (part of the Swift~5.5 concurrency model \cite{se0296}). Function values with non-escaping lifetime are second-class; they can only be passed to another function, captured by a non-escaping closure, or called. Only escaping functions can be returned or stored inside other values. The four calling conventions are:
 \begin{itemize}
 \item The default ``thick'' convention, where the function is passed as a function pointer together with a reference-counted closure context.
 \item \texttt{@convention(thin)}: the function is passed as a single function pointer, without a closure context. Thin functions cannot capture values from outer scopes.
@@ -573,7 +573,7 @@ print(fn2(3, 1))  // prints 2
 
 The history of Swift function types is an interesting case study in language evolution. Originally, Swift followed the classical functional language model, where a function type always had a \emph{single} parameter type, which could be a tuple type to simulate a function of multiple parameters. Tuple types used to be able to contain \texttt{inout} and variadic elements, and furthermore, the argument labels of a function declaration were part of the function declaration's type. The existence of such ``non-materializable'' tuple types introduced complications throughout the type system, and argument labels had inconsistent behavior in different contexts.
 
-The syntax for referencing a declaration name with argument labels was adopted in Swift~2.2~\cite{se0021}. Subsequently, argument labels were dropped from function types in Swift~3~\cite{se0111}. The distinction between a function taking multiple arguments and a function taking a single tuple argument was first hinted at in Swift~3 with \cite{se0029} and \cite{se0066}, and became explicit in Swift~4 \cite{se0110}. At the same time, Swift~4 also introduced the ``tuple splat'' function conversion which simulated the Swift~3 model in a limited way for the cases where the old behavior was convenient. For example, the element type of \texttt{Dictionary} is a key/value tuple, but often it is more convenient to call the \texttt{Collection.map()} method with a closure taking two arguments, and not a closure with a single tuple argument. Even after the above proposals were implemented, the compiler continued to model a function type as having a single input type for quite some time, despite this being completely hidden from the user. After Swift~5, the function type representation fully converged with the semantic model of the language.
+The syntax for referencing a declaration name with argument labels was adopted in \index{history}Swift~2.2~\cite{se0021}. Subsequently, argument labels were dropped from function types in Swift~3~\cite{se0111}. The distinction between a function taking multiple arguments and a function taking a single tuple argument was first hinted at in Swift~3 with \cite{se0029} and \cite{se0066}, and became explicit in Swift~4 \cite{se0110}. At the same time, Swift~4 also introduced the ``tuple splat'' function conversion which simulated the Swift~3 model in a limited way for the cases where the old behavior was convenient. For example, the element type of \texttt{Dictionary} is a key/value tuple, but often it is more convenient to call the \texttt{Collection.map()} method with a closure taking two arguments, and not a closure with a single tuple argument. Even after the above proposals were implemented, the compiler continued to model a function type as having a single input type for quite some time, despite this being completely hidden from the user. After Swift~5, the function type representation fully converged with the semantic model of the language.
 
 \medskip
 
@@ -583,19 +583,19 @@ It is worth noting that metatypes, tuple types and function types play an import
 
 We finish this section by turning to sugared types. Sugared generic parameter types were already described in Section~\ref{fundamental types}. Of the remaining kinds of \index{sugared type}sugared types, type alias types are defined by the user, and the other three are built-in to the language.
 
-\paragraph{Type alias types} A \IndexDefinition{type alias type}type alias type represents a reference to a type alias declaration. It contains an optional parent type, a substitution map, and the substituted \IndexDefinition{underlying type}underlying type. The canonical type of a type alias type is the substituted underlying type. The substitution map is formed in type resolution, from any generic arguments applied to the type alias type declaration itself, together with the generic arguments of the parent type (Section~\ref{identtyperepr}). Type resolution applies this substitution map to the original underlying type of the type alias declaration to compute the substituted underlying type. The substitution map is preserved for printing, and for requirement inference (Section~\ref{requirementinference}).
+\paragraph{Type alias types.} A \IndexDefinition{type alias type}type alias type represents a reference to a type alias declaration. It contains an optional parent type, a substitution map, and the substituted \IndexDefinition{underlying type}underlying type. The canonical type of a type alias type is the substituted underlying type. The substitution map is formed in type resolution, from any generic arguments applied to the type alias type declaration itself, together with the generic arguments of the parent type (Section~\ref{identtyperepr}). Type resolution applies this substitution map to the original underlying type of the type alias declaration to compute the substituted underlying type. The substitution map is preserved for printing, and for requirement inference (Section~\ref{requirementinference}).
 
-\paragraph{Optional types} The \IndexDefinition{optional sugared type}optional type is written as \texttt{\textbf{T}?} for some object type \T; its canonical type is \texttt{Optional<\textbf{T}>}.
+\paragraph{Optional types.} The \IndexDefinition{optional sugared type}optional type is written as \texttt{\textbf{T}?} for some object type \T; its canonical type is \texttt{Optional<\textbf{T}>}.
 
-\paragraph{Array types} The \IndexDefinition{array sugared type}array type is written as \texttt{[\textbf{E}]} for some element type \ttbf{E}; its canonical type is \texttt{Array<\textbf{E}>}.
+\paragraph{Array types.} The \IndexDefinition{array sugared type}array type is written as \texttt{[\textbf{E}]} for some element type \ttbf{E}; its canonical type is \texttt{Array<\textbf{E}>}.
 
-\paragraph{Dictionary types} The \IndexDefinition{dictionary sugared type}dictionary type is written as \texttt{[\textbf{K}: \textbf{V}]} for some key type \ttbf{K} and value type \ttbf{V}; its canonical type is \texttt{Dictionary<\textbf{K}, \textbf{V}>}.
+\paragraph{Dictionary types.} The \IndexDefinition{dictionary sugared type}dictionary type is written as \texttt{[\textbf{K}: \textbf{V}]} for some key type \ttbf{K} and value type \ttbf{V}; its canonical type is \texttt{Dictionary<\textbf{K}, \textbf{V}>}.
 
 \section{Sporadic Types}\label{misc types}
 
 Each of the sporadic types (this is not a technical term) is weird in its own unique way. They tend to only be valid in specific contexts, and some do not represent actual types of values at all. Their unexpected appearance can be a source of counter-examples and failed assertions. They all play important roles in the expression type checker, but again, do not really give us anything new if we consider the generics model from a purely formal viewpoint.
 
-\paragraph{Generic function types}
+\paragraph{Generic function types.}
 A \IndexDefinition{generic function type}generic function type has the same structural components as a function type, except it also stores a generic signature:
 \begin{quote}
 \begin{verbatim}
@@ -607,17 +607,17 @@ Generic function types are the \index{interface type}interface types of generic 
 
 Generic function types have a special behavior when their canonical type is computed. Since generic function types carry a generic signature, the parameter types and return type of a \emph{canonical} generic function type are actually \emph{reduced} types with respect to this generic signature (Section~\ref{reducedtypes}).
 
-\paragraph{Reference storage types}
+\paragraph{Reference storage types.}
 A \IndexDefinition{reference storage type}reference storage type is the type of a variable declaration adorned with the \IndexDefinition{weak reference type}\texttt{weak}, \IndexDefinition{unowned reference type}\texttt{unowned} or \texttt{unowned(unsafe)} attribute. The wrapped type must be a class type, a class-constrained archetype, or class-constrained existential type. Reference storage types arise as the interface types of variable declarations, and as the types of SIL instructions. The types of \index{expression}expressions never contain reference storage types.
 
-\paragraph{Placeholder types}
+\paragraph{Placeholder types.}
 A \IndexDefinition{placeholder type}placeholder type represents a generic argument to be inferred by the type checker. The written representation is the underscore ``\texttt{\_}''. They can only appear in a handful of restricted contexts and do not remain after type checking. The expression type checker replaces placeholder types with type variables, solves the constraint system, and finally replaces the type variables with their fixed concrete types. For example, here the interface type of the \texttt{myPets} local variable is inferred as \texttt{Array<String>}:
 \begin{Verbatim}
 let myPets: Array<_> = ["Zelda", "Giblet"]
 \end{Verbatim}
 Placeholder types were introduced in Swift 5.6~\cite{se0315}.
 
-\paragraph{Unbound generic types}
+\paragraph{Unbound generic types.}
 \IndexDefinition{unbound generic type}Unbound generic types predate placeholder types, and can be seen as a special case. An unbound generic type is written as a named reference to a generic type declaration, without generic arguments applied. An unbound generic type behaves like a generic nominal type where all generic arguments are placeholder types. In the example above, the generic nominal type \texttt{Array<\_>} contains a placeholder type. The unbound generic type \texttt{Array} could have been used instead:
 \begin{Verbatim}
 let myPets: Array = ["Zelda", "Giblet"]
@@ -653,12 +653,12 @@ let z = Derived().clone()  // z has type `Derived'
 \end{Verbatim}
 \end{listing}
 
-\paragraph{Dynamic Self types}
-The \IndexDefinition{dynamic Self type@dynamic \texttt{Self} type}dynamic Self type appears when a class method declares a return type of \texttt{Self}. In this case, the object is known to have the same dynamic type as the base of the method call, which might be a subclass of the method's class. The dynamic Self type wraps a class type, which is the static upper bound for the type. This concept comes from \index{Objective-C}Objective-C, where it is called \texttt{instancetype}. The dynamic Self type in many ways behaves like a generic parameter, but it is not represented as one; the type checker and \index{SILGen}SILGen implement support for it directly. Note that \texttt{Self} only has this interpretation inside a class declaration. In a protocol declaration, \texttt{Self} is the implicit generic parameter (Section~\ref{protocols}). In a struct or enum declaration, \texttt{Self} is the declared interface type (Section~\ref{identtyperepr}).
+\paragraph{Dynamic Self types.}
+The \IndexDefinition{dynamic Self type@dynamic \texttt{Self} type}dynamic Self type appears when a class method declares a return type of \texttt{Self}. In this case, the object is known to have the same dynamic type as the base of the method call, which might be a subclass of the method's class. The dynamic Self type has one structural component, a class type, which is the static upper bound for the type. This concept comes from \index{Objective-C}Objective-C, where it is called \texttt{instancetype}. The dynamic Self type in many ways behaves like a generic parameter, but it is not represented as one; the type checker and \index{SILGen}SILGen implement support for it directly. Note that \texttt{Self} only has this interpretation inside a class declaration. In a protocol declaration, \texttt{Self} is the implicit generic parameter (Section~\ref{protocols}). In a struct or enum declaration, \texttt{Self} is the declared interface type (Section~\ref{identtyperepr}).
 
 Listing~\ref{dynamic self example} demonstrates some of the behaviors of the dynamic Self type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \texttt{Self} appears in contravariant position.
 
-\paragraph{Type variable types}
+\paragraph{Type variable types.}
 A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression in the expression type checker's constraint system. The expression type checker builds the constraint system by walking an expression recursively, assigning new type variables to the types of sub-expressions and recording constraints between these type variables. Solving the constraint system can have three possible outcomes:
 \begin{itemize}
 \item \textbf{One solution}---every type variable has exactly one fixed type assignment; the expression is well-typed.
@@ -673,19 +673,19 @@ The utmost care must be taken when working with type variables because unlike al
 \IndexFlag{debug-constraints}
 The printed representation of a type variable is \texttt{\$Tn}, where \texttt{n} is an incrementing integer local to the constraint system. One way to see type variables in action is to pass the \texttt{-Xfrontend~-debug-constraints} compiler flag.
 
-\paragraph{L-value types}
+\paragraph{L-value types.}
 An \IndexDefinition{l-value type}l-value type represents the type of an \index{expression}expression appearing on the left hand side of an assignment operator (hence the ``l'' in l-value), or as an argument to an \texttt{inout} parameter in a function call. L-value types wrap an \IndexDefinition{object type}\emph{object type} which is the type of the stored value; they print out as \texttt{@lvalue~\textbf{T}} where \ttbf{T} is the object type, but this is not valid syntax in the language.
 
 L-value types appear in type-checked expressions. The reader familiar with C++ might think of an l-value type as somewhat analogous to a C++ mutable reference type ``\texttt{\textbf{T}~\&}''---unlike C++ though, they are not directly visible in the source language. L-value types do not appear in the types of SIL instructions; \index{SILGen}SILGen lowers l-value accesses into accessor calls or direct manipulation of memory.
 
-\paragraph{Error types}
+\paragraph{Error types.}
 \IndexDefinition{error type}
 \index{expression}
 Error types are returned when type substitution encounters an invalid or missing conformance (Chapter~\ref{substmaps}). In this case, the error type wraps the original type, and prints as the original type to make types coming from malformed conformances more readable in diagnostics.
 
 The expression type checker also assigns error types to invalid declaration references. This uses the singleton form of the error type, which prints as \texttt{<<error~type>>}. To avoid user confusion, diagnostics containing the singleton error type should not be emitted. Generally, any expression whose type contains an error type does not need to be diagnosed, because a diagnostic should have been emitted elsewhere.
 
-\paragraph{Built-in types}
+\paragraph{Built-in types.}
 \IndexDefinition{compiler intrinsic}
 \IndexDefinition{built-in type}
 What users think of as fundamental types, such as \texttt{Int} and \texttt{Bool}, are defined as structs in the standard library. These structs wrap the various \emph{built-in types} which are understood directly by the compiler. Built-in types are not nominal types, so they cannot contain members, cannot have new members added via extensions, and cannot conform to protocols. Values of built-in types are manipulated using special \emph{compiler intrinsics}. The standard library wraps built-in types in nominal types, and defines methods and operators on those nominal types which call the intrinsic functions, thereby presenting the actual interface expected by users.
@@ -807,7 +807,7 @@ The root of the type kind hierarchy. Its instances are always uniqued and alloca
 \end{itemize}
 Each concrete subclass defines some set of static factory methods, usually named \texttt{get()} or similar, which take the structural components and construct a new, uniqued type of this kind. There are also getter methods, prefixed with \texttt{get}, which project the structural components of each kind of type. It would be needlessly duplicative to list all of the getter methods for each subclass of \texttt{TypeBase}; they can all be found in \SourceFile{include/swift/AST/Types.h}.
 
-\paragraph{Dynamic casts}
+\paragraph{Dynamic casts.}
 Subclasses of \texttt{TypeBase *} are identifiable at runtime via the \verb|is<>|, \verb|castTo<>| and \verb|getAs<>| template methods. To check if a type has a specific kind, use \verb|is<>|:
 \begin{Verbatim}
 Type type = ...;
@@ -834,7 +834,7 @@ if (isa<OptionalType>(type.getPointer()))
   ...;
 \end{Verbatim}
 
-\paragraph{Visitors}
+\paragraph{Visitors.}
 The simplest way to \index{exhaustive switch}exhaustively handle each kind of type is to switch over the \IndexSource{type kind}kind, which is an instance of the \texttt{TypeKind} enum, like this:
 \begin{Verbatim}
 Type ty = ...;
@@ -867,10 +867,10 @@ The \texttt{TypeVisitor} also defines various methods corresponding to abstract 
 
 The \texttt{TypeVisitor} preserves information if it receives a sugared type; for example, visiting \texttt{Int?}\ will call \texttt{visitOptionalType()}, while visiting \texttt{Optional<Int>} will call \texttt{visitBoundGenericEnumType()}. In the common situation where the semantics of your operation do not depend on type sugar, you can use the \texttt{CanTypeVisitor} template class instead. Here, the \texttt{visit()} method takes a \texttt{CanType}, so \texttt{Int?}\ will need to be canonicalized to \texttt{Optional<Int>} before being passed in.
 
-\paragraph{Canonical types}
+\paragraph{Canonical types.}
 The \texttt{getCanonicalType()} method outputs a \texttt{CanType} wrapping the \IndexSource{canonical type}canonical form of this \texttt{TypeBase *}. The \texttt{isCanonical()} method checks if a type is canonical.
 
-\paragraph{Nominal types} A handful of methods on \texttt{TypeBase} exist which perform a desugaring cast to a nominal type (so they will also accept a type alias type or other sugared type), and return the nominal type declaration, or \texttt{nullptr} if the type isn't of a nominal kind:
+\paragraph{Nominal types.} A handful of methods on \texttt{TypeBase} exist which perform a desugaring cast to a nominal type (so they will also accept a type alias type or other sugared type), and return the nominal type declaration, or \texttt{nullptr} if the type isn't of a nominal kind:
 \begin{itemize}
 \item \texttt{getAnyNominal()} returns the nominal type declaration of \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}.
 \item \texttt{getNominalOrBoundGenericNominal()} returns the nominal type declaration of a \texttt{NominalType} or \texttt{BoundGenericNominalType}.
@@ -880,24 +880,23 @@ The \texttt{getCanonicalType()} method outputs a \texttt{CanType} wrapping the \
 \item \texttt{getNominalParent()} returns the parent type stored by an \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}.
 \end{itemize}
 
-\IndexSource{constraint solver arena}
-\paragraph{Recursive properties} Various predicates are computed when a type is constructed and are therefore cheap to check:
+\paragraph{Recursive properties.} Various predicates are computed when a type is constructed and are therefore cheap to check:
 \begin{itemize}
-\item \texttt{hasTypeVariable()} determines whether the type was allocated in the permanent arena or the constraint solver arena.
+\item \texttt{hasTypeVariable()} determines whether the type was allocated in the permanent arena or the \IndexSource{constraint solver arena}constraint solver arena.
 \item \texttt{hasArchetype()}, \texttt{hasOpaqueArchetype()}, \texttt{hasOpenedExistential()}.
 \item \texttt{hasTypeParameter()}.
 \item \texttt{hasUnboundGenericType()}, \texttt{hasDynamicSelf()}, \texttt{hasPlaceholder()}.
 \item \texttt{isLValue()}---despite the ``\texttt{is}'' in the name, this is a recursive property and not the same as \verb|ty->is<LValueType>()|.
 \end{itemize}
 
-\paragraph{Utility operations} These encapsulate frequently-useful patterns.
+\paragraph{Utility operations.} These encapsulate frequently-useful patterns.
 \begin{itemize}
 \item \texttt{getOptionalObjectType()} returns the type \texttt{T} if the type is some \texttt{Optional<T>}, otherwise it returns the null type.
 \item \texttt{getMetatypeInstanceType()} returns the type \texttt{T} if the type is some \texttt{T.Type}, otherwise it returns \texttt{T}.
 \item \texttt{mayHaveMembers()} answers if this is a nominal type, archetype, existential type or dynamic Self type.
 \end{itemize}
 
-\paragraph{Recovering the AST context} All non-canonical types point at their canonical type, and canonical types point at the AST context.
+\paragraph{Recovering the AST context.} All non-canonical types point at their canonical type, and canonical types point at the AST context.
 \begin{itemize}
 \item \texttt{getASTContext()} returns the singleton AST context from a type.
 \end{itemize}

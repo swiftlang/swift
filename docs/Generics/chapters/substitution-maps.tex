@@ -8,7 +8,7 @@
 \IndexDefinition{input generic signature}
 \IndexDefinition{replacement type}
 \index{conformance}
-\lettrine{S}{ubstitution maps arise} when the type checker needs to compute the type of a reference to a generic declaration, specialized with list of generic arguments. You can think of a substitution map as describing a mapping from type parameters of a generic signature to some replacement types which satisfy the requirements of this generic signature; thus, applying a substitution map to the interface type of a generic declaration produces the type of the appropriate specialization.
+\lettrine{S}{ubstitution maps arise} when the type checker needs to reason about a reference to a generic declaration, specialized with list of generic arguments. Abstractly, a substitution map defines a replacement type corresponding to each type parameter of a generic signature; applying a substitution map to the interface type of a generic declaration recursively replaces the type parameters therein, producing the type of the specialized reference.
 
 The generic signature of a substitution map is called the \emph{input generic signature}. A substitution map stores its input generic signature, and the generic signature's list of generic parameters and conformance requirements determine the substitution map's shape:
 \begin{quote}
@@ -470,7 +470,7 @@ One final rule here is that substitution map composition is \emph{associative}. 
 \[
 (\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3=\Sigma_1\otimes(\Sigma_2\otimes\Sigma_3)
 \]
-Putting everything together, all of the following are equivalent when defined (and by our compatibility conditions, if one is defined, all are):
+Putting everything together, if \texttt{T} is some type, all of the following are equivalent when defined (and by our compatibility conditions, if one is defined, all are):
 \begin{gather*}
 ((\texttt{T}\otimes\Sigma_1)\otimes\Sigma_2)\otimes\Sigma_3\\
 (\texttt{T}\otimes\Sigma_1)\otimes(\Sigma_2\otimes\Sigma_3)\\
