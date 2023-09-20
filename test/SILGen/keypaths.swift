@@ -78,8 +78,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.nonfinal!getter : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.nonfinal
 
@@ -87,7 +87,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: gettable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.computed!getter : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$s8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
+  // CHECK-SAME:   getter @$s8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \C<T>.computed
 
@@ -95,8 +95,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.observed!getter : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.observed
 
@@ -111,15 +111,15 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $() -> (), 
   // CHECK-SAME:   id ##C.reabstracted,
-  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
-  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
+  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.reabstracted
 
   // CHECK: keypath $KeyPath<S<T>, C<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $S<τ_0_0>; gettable_property $C<τ_0_0>,
   // CHECK-SAME: id @$s8keypaths1SV8computedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$s8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>
+  // CHECK-SAME:   getter @$s8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \S<T>.computed
 
@@ -127,8 +127,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $S<τ_0_0>;
   // CHECK-SAME: settable_property $C<τ_0_0>,
   // CHECK-SAME:   id @$s8keypaths1SV8observedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>,
-  // CHECK-SAME:   setter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>, @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>, @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.observed
   _ = \S<T>.z.nonfinal
@@ -140,8 +140,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:  root $S<τ_0_0>;
   // CHECK-SAME:  settable_property $() -> (),
   // CHECK-SAME:    id ##S.reabstracted,
-  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
-  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>,
+  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>, @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.reabstracted
 
@@ -149,15 +149,15 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $Int, 
   // CHECK-SAME:   id #P.x!getter : <Self where Self : P> (Self) -> () -> Int,
-  // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
+  // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>
   _ = \T.x
   // CHECK: keypath $WritableKeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: settable_property $String,
   // CHECK-SAME:   id #P.y!getter : <Self where Self : P> (Self) -> () -> String,
-  // CHECK-SAME:   getter @$s8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
-  // CHECK-SAME:   setter @$s8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1PP1ySSvpAaBRzlxTK : $@convention(keypath_accessor_getter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
+  // CHECK-SAME:   setter @$s8keypaths1PP1ySSvpAaBRzlxTk : $@convention(keypath_accessor_setter) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
   // CHECK-SAME: ) <T>
   _ = \T.y
 
@@ -178,7 +178,7 @@ func keyPathsWithSpecificGenericInstance() {
   // CHECK: keypath $KeyPath<Concrete, String>, (
   // CHECK-SAME: gettable_property $String,
   // CHECK-SAME:   id @$s8keypaths1PPAAE1zSSvg
-  // CHECK-SAME:   getter @$s8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(thin) (@in_guaranteed Concrete) -> @out String
+  // CHECK-SAME:   getter @$s8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(keypath_accessor_getter) (@in_guaranteed Concrete) -> @out String
   _ = \Concrete.z
   _ = \S<Concrete>.computed
 }
@@ -425,7 +425,7 @@ func check_default_subscripts() {
   // CHECK: [[IX:%[0-9]+]] = apply %{{[0-9]+}}([[INTX]], {{.*}}
   // CHECK: [[INTY:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
   // CHECK: [[IY:%[0-9]+]] = apply %{{[0-9]+}}([[INTY]], {{.*}}
-  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(thin) (@in_guaranteed SubscriptDefaults4, UnsafeRawPointer) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(thin) (@in_guaranteed Int, @inout SubscriptDefaults4, UnsafeRawPointer) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2iTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[IX]], [[IY]])
+  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults4, @in_guaranteed (Int, Int)) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout SubscriptDefaults4, @in_guaranteed (Int, Int)) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(keypath_accessor_equals) (@in_guaranteed (Int, Int), @in_guaranteed (Int, Int)) -> Bool, indices_hash @$sS2iTh : $@convention(keypath_accessor_hash) (@in_guaranteed (Int, Int)) -> Int) ([[IX]], [[IY]])
   _ = \SubscriptDefaults4.[x: 0, y: 0]
 
   // CHECK: [[INTINIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
@@ -434,21 +434,21 @@ func check_default_subscripts() {
   // CHECK: [[ALLOC:%[0-9]+]] = alloc_stack $Int
   // CHECK: apply [[DFN]]<Int>([[ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> () -> @out τ_0_0
   // CHECK: [[LOAD:%[0-9]+]] = load [trivial] [[ALLOC]] : $*Int
-  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(thin) (@in_guaranteed SubscriptDefaults4, UnsafeRawPointer) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(thin) (@in_guaranteed Int, @inout SubscriptDefaults4, UnsafeRawPointer) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2iTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[I]], [[LOAD]])
+  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults4, @in_guaranteed (Int, Int)) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout SubscriptDefaults4, @in_guaranteed (Int, Int)) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(keypath_accessor_equals) (@in_guaranteed (Int, Int), @in_guaranteed (Int, Int)) -> Bool, indices_hash @$sS2iTh : $@convention(keypath_accessor_hash) (@in_guaranteed (Int, Int)) -> Int) ([[I]], [[LOAD]])
   _ = \SubscriptDefaults4.[x: 0]
   
   // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
   // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
   // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 "check_default_subscripts()"
   // CHECK: [[DEF_ARG:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
-  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptDefaults5, UnsafeRawPointer) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(thin) (@in_guaranteed String, @inout SubscriptDefaults5, UnsafeRawPointer) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2STh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[STRX]], [[DEF_ARG]])
+  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults5, @in_guaranteed (String, String)) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(keypath_accessor_setter) (@in_guaranteed String, @inout SubscriptDefaults5, @in_guaranteed (String, String)) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(keypath_accessor_equals) (@in_guaranteed (String, String), @in_guaranteed (String, String)) -> Bool, indices_hash @$sS2STh : $@convention(keypath_accessor_hash) (@in_guaranteed (String, String)) -> Int) ([[STRX]], [[DEF_ARG]])
   _ = \SubscriptDefaults5.[x: ""]
   
   // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
   // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
   // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 ""
   // CHECK: [[STRY:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
-  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptDefaults5, UnsafeRawPointer) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(thin) (@in_guaranteed String, @inout SubscriptDefaults5, UnsafeRawPointer) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2STh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[STRX]], [[STRY]])
+  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptDefaults5, @in_guaranteed (String, String)) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(keypath_accessor_setter) (@in_guaranteed String, @inout SubscriptDefaults5, @in_guaranteed (String, String)) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(keypath_accessor_equals) (@in_guaranteed (String, String), @in_guaranteed (String, String)) -> Bool, indices_hash @$sS2STh : $@convention(keypath_accessor_hash) (@in_guaranteed (String, String)) -> Int) ([[STRX]], [[STRY]])
   _ = \SubscriptDefaults5.[x: "", y: ""]
 }
 
@@ -472,7 +472,7 @@ func test_variadics() {
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
   // CHECK: [[FIN_REF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
   // CHECK: [[FIN_ARR:%[0-9]+]] = apply [[FIN_REF]]<Int>([[ARR]])
-  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[FIN_ARR]])
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic1, @in_guaranteed Array<Int>) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<Int>, @in_guaranteed Array<Int>) -> Bool, indices_hash @$sSaySiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<Int>) -> Int) ([[FIN_ARR]])
   _ = \SubscriptVariadic1.[1, 2, 3]
   // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 1
   // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
@@ -480,13 +480,13 @@ func test_variadics() {
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
   // CHECK: [[FIN_REF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
   // CHECK: [[FIN_ARR:%[0-9]+]] = apply [[FIN_REF]]<Int>([[ARR]])
-  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[FIN_ARR]])
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic1, @in_guaranteed Array<Int>) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<Int>, @in_guaranteed Array<Int>) -> Bool, indices_hash @$sSaySiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<Int>) -> Int) ([[FIN_ARR]])
   _ = \SubscriptVariadic1.[1]
   // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 0
   // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
   // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<Int>([[ARR_COUNT]])
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
-  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic1, @in_guaranteed Array<Int>) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<Int>, @in_guaranteed Array<Int>) -> Bool, indices_hash @$sSaySiGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<Int>) -> Int) ([[ARR]])
   _ = \SubscriptVariadic1.[]
   
   _ = \SubscriptVariadic2.["", "1"]
@@ -497,7 +497,7 @@ func test_variadics() {
   // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<String>, Builtin.RawPointer)
   // CHECK: [[FIN_REF:%[0-9]+]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
   // CHECK: [[FIN_ARR:%[0-9]+]] = apply [[FIN_REF]]<String>([[ARR]])
-  // CHECK: keypath $KeyPath<SubscriptVariadic2, String>, (root $SubscriptVariadic2; gettable_property $String,  id @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@guaranteed Array<τ_0_0>, SubscriptVariadic2) -> @out τ_0_0, getter @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptVariadic2, UnsafeRawPointer) -> @out String, indices [%$0 : $Array<String> : $Array<String>], indices_equals @$sSaySSGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySSGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[FIN_ARR]])
+  // CHECK: keypath $KeyPath<SubscriptVariadic2, String>, (root $SubscriptVariadic2; gettable_property $String,  id @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@guaranteed Array<τ_0_0>, SubscriptVariadic2) -> @out τ_0_0, getter @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(keypath_accessor_getter) (@in_guaranteed SubscriptVariadic2, @in_guaranteed Array<String>) -> @out String, indices [%$0 : $Array<String> : $Array<String>], indices_equals @$sSaySSGTH : $@convention(keypath_accessor_equals) (@in_guaranteed Array<String>, @in_guaranteed Array<String>) -> Bool, indices_hash @$sSaySSGTh : $@convention(keypath_accessor_hash) (@in_guaranteed Array<String>) -> Int) ([[FIN_ARR]])
   _ = \SubscriptVariadic2.["", #function]
   
   _ = \SubscriptVariadic3<String>.[""]

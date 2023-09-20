@@ -17,8 +17,9 @@
 #ifndef SWIFT_IRGEN_CALLEMISSION_H
 #define SWIFT_IRGEN_CALLEMISSION_H
 
-#include "Temporary.h"
+#include "Address.h"
 #include "Callee.h"
+#include "Temporary.h"
 
 namespace llvm {
   class CallSite;
@@ -49,6 +50,10 @@ protected:
   /// Temporaries required by the call.
   TemporarySet Temporaries;
 
+  /// Temporaries required by the call that are not mapped to any
+  /// SIL value.
+  SmallVector<StackAddress, 8> RawTempraries;
+
   /// The function we're going to call.
   Callee CurCallee;
 
@@ -78,6 +83,8 @@ protected:
   virtual void emitCallToUnmappedExplosion(llvm::CallBase *call,
                                            Explosion &out) = 0;
   void emitYieldsToExplosion(Explosion &out);
+  void setKeyPathAccessorArguments(Explosion &in, bool isOutlined,
+                                   Explosion &out);
   virtual FunctionPointer getCalleeFunctionPointer() = 0;
   llvm::CallBase *emitCallSite();
 

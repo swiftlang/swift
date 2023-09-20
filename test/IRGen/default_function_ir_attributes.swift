@@ -118,14 +118,6 @@ func test_computed_key_path_sil_thunks() -> KeyPath<S, Int> {
   \S.computed
 }
 
-//   helper function: IR-generated key path getter
-// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get(
-// CHECK-SAME: [[ATTRS_SIMPLE]]
-
-//   helper function: IR-generated key path setter
-// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_set(
-// CHECK-SAME: [[ATTRS_SIMPLE]]
-
 //   helper function: IR-generated key path arg layout accessor
 // CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_get_arg_layout(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
@@ -136,14 +128,6 @@ func test_computed_key_path_sil_thunks() -> KeyPath<S, Int> {
 
 //   helper function: IR-generated key path copy function
 // CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_copy(
-// CHECK-SAME: [[ATTRS_SIMPLE]]
-
-//   helper function: IR-generated key path equals function
-// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_equals(
-// CHECK-SAME: [[ATTRS_SIMPLE]]
-
-//   helper function: IR-generated key path hash function
-// CHECK-LABEL: define {{.*}} swiftcc {{.*}} @keypath_hash(
 // CHECK-SAME: [[ATTRS_SIMPLE]]
 
 //   helper function: IR-generated key path argument initializer

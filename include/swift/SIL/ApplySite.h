@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_APPLYSITE_H
 #define SWIFT_SIL_APPLYSITE_H
 
+#include "swift/AST/ExtInfo.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -259,6 +260,10 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::WitnessMethod:
     case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
       return true;
     case SILFunctionTypeRepresentation::Block:
     case SILFunctionTypeRepresentation::Thick:

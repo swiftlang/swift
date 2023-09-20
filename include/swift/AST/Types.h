@@ -380,7 +380,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 11 };
-  enum { NumSILExtInfoBits = 12 };
+  enum { NumSILExtInfoBits = 13 };
 
   // clang-format off
   union { uint64_t OpaqueBits;

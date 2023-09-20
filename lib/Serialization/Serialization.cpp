@@ -4914,6 +4914,10 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   SIMPLE_CASE(SILFunctionTypeRepresentation, WitnessMethod)
   SIMPLE_CASE(SILFunctionTypeRepresentation, Closure)
   SIMPLE_CASE(SILFunctionTypeRepresentation, CXXMethod)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorGetter)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorSetter)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorEquals)
+  SIMPLE_CASE(SILFunctionTypeRepresentation, KeyPathAccessorHash)
   }
   llvm_unreachable("bad calling convention");
 }

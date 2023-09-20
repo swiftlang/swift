@@ -918,6 +918,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:
     case SILFunctionTypeRepresentation::Thick:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
       break;
     }
 

@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "GenKeyPath.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -2189,6 +2191,75 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     llvm::Value *contextPtr = emission->getContext();
     (void)contextPtr;
     assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
+  } else if (isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
+    auto genericEnv = IGF.CurSILFn->getGenericEnvironment();
+    SmallVector<GenericRequirement, 4> requirements;
+    CanGenericSignature genericSig;
+    if (genericEnv) {
+      genericSig = IGF.CurSILFn->getGenericSignature().getCanonicalSignature();
+      enumerateGenericSignatureRequirements(genericSig,
+        [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+    }
+
+    unsigned baseIndexOfIndicesArguments;
+    unsigned numberOfIndicesArguments;
+    switch (funcTy->getRepresentation()) {
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+      baseIndexOfIndicesArguments = 1;
+      numberOfIndicesArguments = 1;
+      break;
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+      baseIndexOfIndicesArguments = 2;
+      numberOfIndicesArguments = 1;
+      break;
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+      baseIndexOfIndicesArguments = 0;
+      numberOfIndicesArguments = 2;
+      break;
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
+      baseIndexOfIndicesArguments = 0;
+      numberOfIndicesArguments = 1;
+      break;
+    default:
+      llvm_unreachable("unhandled keypath accessor representation");
+    }
+
+    llvm::Value *componentArgsBufSize = allParamValues.takeLast();
+    llvm::Value *componentArgsBuf;
+    bool hasSubscriptIndices = params.size() > baseIndexOfIndicesArguments;
+
+    // Bind the indices arguments if present.
+    if (hasSubscriptIndices) {
+      assert(baseIndexOfIndicesArguments + numberOfIndicesArguments == params.size());
+
+      for (unsigned i = 0; i < numberOfIndicesArguments; ++i) {
+        SILArgument *indicesArg = params[baseIndexOfIndicesArguments + i];
+        componentArgsBuf = allParamValues.takeLast();
+        bindParameter(
+            IGF, *emission, baseIndexOfIndicesArguments + i, indicesArg,
+            conv.getSILArgumentType(baseIndexOfIndicesArguments + i,
+                                    IGF.IGM.getMaximalTypeExpansionContext()),
+            [&](unsigned startIndex, unsigned size) {
+              assert(size == 1);
+              Explosion indicesTemp;
+              auto castedIndices = IGF.Builder.CreateBitCast(
+                  componentArgsBuf, IGF.getTypeInfo(indicesArg->getType())
+                                        .getStorageType()
+                                        ->getPointerTo());
+              indicesTemp.add(castedIndices);
+              return indicesTemp;
+            });
+      }
+      params = params.drop_back(numberOfIndicesArguments);
+    } else {
+      // Discard the trailing unbound LLVM IR arguments.
+      for (unsigned i = 0; i < numberOfIndicesArguments; ++i) {
+        componentArgsBuf = allParamValues.takeLast();
+      }
+    }
+    bindPolymorphicArgumentsFromComponentIndices(
+        IGF, genericEnv, requirements, componentArgsBuf, componentArgsBufSize,
+        hasSubscriptIndices);
   }
 
   // Map the remaining SIL parameters to LLVM parameters.
@@ -2206,7 +2277,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
 
   // Bind polymorphic arguments.  This can only be done after binding
   // all the value parameters.
-  if (hasPolymorphicParameters(funcTy)) {
+  // Polymorphic parameters in KeyPath accessors are already bound above
+  if (hasPolymorphicParameters(funcTy) &&
+      !isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
     emitPolymorphicParameters(
         IGF, *IGF.CurSILFn, *emission, &witnessMetadata,
         [&](unsigned paramIndex) -> llvm::Value * {
@@ -2877,6 +2950,10 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::DistributedExecuteTarget;
   }
 
+  if (isKeyPathAccessorRepresentation(fn->getRepresentation())) {
+    return SpecialKind::KeyPathAccessor;
+  }
+
   return fn->getLoweredFunctionType();
 }
 // Async functions that end up with weak_odr or linkonce_odr linkage may not be
@@ -3274,6 +3351,10 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::Thin:
     case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::KeyPathAccessorGetter:
+    case SILFunctionType::Representation::KeyPathAccessorSetter:
+    case SILFunctionType::Representation::KeyPathAccessorEquals:
+    case SILFunctionType::Representation::KeyPathAccessorHash:
       return getSwiftFunctionPointerCallee(IGF, functionValue, selfValue,
                                            std::move(calleeInfo), false, false);
     case SILFunctionType::Representation::Closure:
@@ -3338,6 +3419,10 @@ static std::unique_ptr<CallEmission> getCallEmissionForLoweredValue(
   case SILFunctionType::Representation::CFunctionPointer:
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::Closure:
+  case SILFunctionType::Representation::KeyPathAccessorGetter:
+  case SILFunctionType::Representation::KeyPathAccessorSetter:
+  case SILFunctionType::Representation::KeyPathAccessorEquals:
+  case SILFunctionType::Representation::KeyPathAccessorHash:
     break;
   }
 
@@ -3717,6 +3802,10 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     case SILFunctionTypeRepresentation::Thin:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::Closure:
+    case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
+    case SILFunctionTypeRepresentation::KeyPathAccessorEquals:
+    case SILFunctionTypeRepresentation::KeyPathAccessorHash:
       break;
     }
 

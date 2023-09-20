@@ -186,6 +186,7 @@ namespace irgen {
       TaskGroupWaitNext,
       TaskGroupWaitAll,
       DistributedExecuteTarget,
+      KeyPathAccessor,
     };
 
   private:
@@ -260,6 +261,7 @@ namespace irgen {
       case SpecialKind::TaskGroupWaitAll:
         return true;
       case SpecialKind::DistributedExecuteTarget:
+      case SpecialKind::KeyPathAccessor:
         return false;
       }
       llvm_unreachable("covered switch");
@@ -289,6 +291,9 @@ namespace irgen {
       case SpecialKind::AsyncLetFinish:
       case SpecialKind::TaskGroupWaitNext:
       case SpecialKind::TaskGroupWaitAll:
+      // KeyPath accessor functions receive their generic arguments
+      // as part of indices buffer.
+      case SpecialKind::KeyPathAccessor:
         return true;
       case SpecialKind::DistributedExecuteTarget:
         return false;
