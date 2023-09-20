@@ -4,7 +4,6 @@
 
 // RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_SingleCaseCFPayload | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
-// REQUIRES: objc_interop
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
