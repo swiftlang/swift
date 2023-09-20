@@ -63,7 +63,7 @@ sil_property #ExternalGeneric.rw <T: Comparable> (
 sil_property #ExternalGeneric.computedRO <T: Comparable> (
   gettable_property $T,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T)
+    getter @get_computed_generic : $@convention(keypath_accessor_getter) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T)
 
 // CHECK: @"$s19property_descriptor15ExternalGenericV10computedRWxvpMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
@@ -77,8 +77,8 @@ sil_property #ExternalGeneric.computedRO <T: Comparable> (
 sil_property #ExternalGeneric.computedRW <T: Comparable> (
   settable_property $T,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T,
-    setter @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ())
+    getter @get_computed_generic : $@convention(keypath_accessor_getter) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T,
+    setter @set_computed_generic : $@convention(keypath_accessor_setter) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ())
 
 // CHECK: @"$s19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" =
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
@@ -92,8 +92,8 @@ sil_property #ExternalGeneric.computedRW <T: Comparable> (
 sil_property #ExternalGeneric.subscript <T: Comparable><U: Hashable> (
   settable_property $T,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, UnsafeRawPointer) -> @out T,
-    setter @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ())
+    getter @get_computed_generic_subscript : $@convention(keypath_accessor_getter) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, @in_guaranteed U) -> @out T,
+    setter @set_computed_generic_subscript : $@convention(keypath_accessor_setter) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, @in_guaranteed U) -> ())
 
 // CHECK: @"$s19property_descriptor8ExternalV2roSivpMV" =
 // CHECK-64: @"$s19property_descriptor8ExternalV2rwSivpMV" =
@@ -103,17 +103,17 @@ sil_property #External.rw (stored_property #External.rw : $Int)
 sil_property #External.computedRO (
   gettable_property $Int,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int)
+    getter @get_computed : $@convention(keypath_accessor_getter) (@in_guaranteed External) -> @out Int)
 sil_property #External.computedRW (
   settable_property $Int,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int,
-    setter @set_computed : $@convention(thin) (@in_guaranteed Int, @inout External) -> ())
+    getter @get_computed : $@convention(keypath_accessor_getter) (@in_guaranteed External) -> @out Int,
+    setter @set_computed : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout External) -> ())
 sil_property #External.subscript (
   settable_property $Int,
     id @id_computed : $@convention(thin) () -> (),
-    getter @get_computed_subscript : $@convention(thin) (@in_guaranteed External, UnsafeRawPointer) -> @out Int,
-    setter @set_computed_subscript : $@convention(thin) (@in_guaranteed Int, @inout External, UnsafeRawPointer) -> ())
+    getter @get_computed_subscript : $@convention(keypath_accessor_getter) (@in_guaranteed External, @in_guaranteed String) -> @out Int,
+    setter @set_computed_subscript : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout External, @in_guaranteed String) -> ())
 
 sil_property #ExternalReabstractions.ro <T> (
   stored_property #ExternalReabstractions.ro : $T)
@@ -121,8 +121,8 @@ sil_property #ExternalReabstractions.ro <T> (
 sil_property #ExternalReabstractions.reabstracted <T> (
   settable_property $() -> (),
     id ##ExternalReabstractions.reabstracted,
-    getter @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>,
-    setter @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ())
+    getter @get_reabstracted : $@convention(keypath_accessor_getter) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>,
+    setter @set_reabstracted : $@convention(keypath_accessor_setter) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ())
 
 // All trivial descriptors should share a definition by aliasing to the common
 // definition
@@ -136,17 +136,17 @@ sil_property #ExternalGeneric.computedWithTrivialDescriptor <T: Comparable> ()
 sil_property #External.computedWithTrivialDescriptor ()
 
 sil @id_computed : $@convention(thin) () -> ()
-sil @get_computed : $@convention(thin) (@in_guaranteed External) -> @out Int
-sil @set_computed : $@convention(thin) (@in_guaranteed Int, @inout External) -> ()
+sil @get_computed : $@convention(keypath_accessor_getter) (@in_guaranteed External) -> @out Int
+sil @set_computed : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout External) -> ()
 
-sil @get_computed_subscript : $@convention(thin) (@in_guaranteed External, UnsafeRawPointer) -> @out Int
-sil @set_computed_subscript : $@convention(thin) (@in_guaranteed Int, @inout External, UnsafeRawPointer) -> ()
+sil @get_computed_subscript : $@convention(keypath_accessor_getter) (@in_guaranteed External, @in_guaranteed String) -> @out Int
+sil @set_computed_subscript : $@convention(keypath_accessor_setter) (@in_guaranteed Int, @inout External, @in_guaranteed String) -> ()
 
-sil @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T
-sil @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ()
+sil @get_computed_generic : $@convention(keypath_accessor_getter) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T
+sil @set_computed_generic : $@convention(keypath_accessor_setter) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ()
 
-sil @get_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, UnsafeRawPointer) -> @out T
-sil @set_computed_generic_subscript : $@convention(thin) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, UnsafeRawPointer) -> ()
+sil @get_computed_generic_subscript : $@convention(keypath_accessor_getter) <T: Comparable><U: Hashable> (@in_guaranteed ExternalGeneric<T>, @in_guaranteed U) -> @out T
+sil @set_computed_generic_subscript : $@convention(keypath_accessor_setter) <T: Comparable><U: Hashable> (@in_guaranteed T, @inout ExternalGeneric<T>, @in_guaranteed U) -> ()
 
-sil @get_reabstracted : $@convention(thin) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>
-sil @set_reabstracted : $@convention(thin) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ()
+sil @get_reabstracted : $@convention(keypath_accessor_getter) <T> (@in_guaranteed ExternalReabstractions<T>) -> @out @callee_guaranteed @substituted <U> () -> @out U for <()>
+sil @set_reabstracted : $@convention(keypath_accessor_setter) <T> (@in_guaranteed @callee_guaranteed @substituted <U> () -> @out U for <()>, @inout ExternalReabstractions<T>) -> ()

@@ -3049,6 +3049,14 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                       SILFunctionType::Representation::ObjCMethod)
                 .Case("witness_method",
                       SILFunctionType::Representation::WitnessMethod)
+                .Case("keypath_accessor_getter",
+                      SILFunctionType::Representation::KeyPathAccessorGetter)
+                .Case("keypath_accessor_setter",
+                      SILFunctionType::Representation::KeyPathAccessorSetter)
+                .Case("keypath_accessor_equals",
+                      SILFunctionType::Representation::KeyPathAccessorEquals)
+                .Case("keypath_accessor_hash",
+                      SILFunctionType::Representation::KeyPathAccessorHash)
                 .Default(llvm::None);
         if (!parsedRep) {
           diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
