@@ -1,5 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test -enable-experimental-feature TypedThrows
 
+// expected-note@+1{{type declared here}}
 enum MyError: Error {
   case fail
 }
@@ -60,3 +61,6 @@ func testThrowingInFunction(cond: Bool, cond2: Bool) throws(MyError) {
     // expected-error@-1{{thrown expression type 'MyBadError' cannot be converted to error type 'MyError'}}
   }
 }
+
+public func testThrowingInternal() throws(MyError) { }
+// expected-error@-1{{function cannot be declared public because its thrown error uses an internal type}}

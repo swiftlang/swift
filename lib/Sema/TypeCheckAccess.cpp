@@ -1040,10 +1040,18 @@ public:
       FK_Initializer
     };
 
+    // This must stay in sync with diag::function_type_access
+    enum {
+      EK_Parameter = 0,
+      EK_ThrownError,
+      EK_Result
+    };
+
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
     ImportAccessLevel minImportLimit = llvm::None;
+    unsigned entityKind = EK_Parameter;
 
     bool hasInaccessibleParameterWrapper = false;
     for (auto *P : *fn->getParameters()) {
@@ -1085,7 +1093,25 @@ public:
           });
     }
 
-    bool problemIsResult = false;
+    if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
+      checkTypeAccess(
+        fn->getThrownInterfaceType(), thrownTypeRepr, fn,
+        /*mayBeInferred*/ false,
+        [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+            DowngradeToWarning downgradeDiag, ImportAccessLevel importLimit) {
+          if (typeAccessScope.isChildOf(minAccessScope) ||
+              (!complainRepr &&
+               typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+            minAccessScope = typeAccessScope;
+            complainRepr = thisComplainRepr;
+            downgradeToWarning = downgradeDiag;
+            minImportLimit = importLimit;
+            entityKind = EK_ThrownError;
+          }
+      });
+    }
+
+
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getResultInterfaceType(), FD->getResultTypeRepr(),
                       FD, /*mayBeInferred*/false,
@@ -1100,7 +1126,7 @@ public:
           complainRepr = thisComplainRepr;
           downgradeToWarning = downgradeDiag;
           minImportLimit = importLimit;
-          problemIsResult = true;
+          entityKind = EK_Result;
         }
       });
     }
@@ -1122,7 +1148,7 @@ public:
         diagID = diag::function_type_access_warn;
       auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
                                isa<FileUnit>(fn->getDeclContext()), minAccess,
-                               functionKind, problemIsResult,
+                               functionKind, entityKind,
                                hasInaccessibleParameterWrapper);
       highlightOffendingType(diag, complainRepr);
       noteLimitingImport(fn->getASTContext(), minImportLimit, complainRepr);
@@ -2180,6 +2206,10 @@ public:
         checkType(P->getResultBuilderType(), attr->getTypeRepr(), fn);
 
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
+    }
+
+    if (auto thrownTypeRepr = fn->getThrownTypeRepr()) {
+      checkType(fn->getThrownInterfaceType(), thrownTypeRepr, fn);
     }
   }
 

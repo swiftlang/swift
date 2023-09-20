@@ -2267,10 +2267,10 @@ ERROR(function_type_access,none,
       "%select{private|fileprivate|internal|package|%error|%error}1|private or fileprivate}2"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|package|public|open}1}0 "
-      "because its %select{parameter|result}5 uses "
+      "because its %select{parameter|thrown error|result}5 uses "
       "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3"
       "%select{| API wrapper}6 type",
-      (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
+      (bool, AccessLevel, bool, AccessLevel, unsigned, unsigned, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
@@ -2282,10 +2282,10 @@ WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|package|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|package|public|open}1}0 "
-        "because its %select{parameter|result}5 uses "
+        "because its %select{parameter|thrown error|result}5 uses "
         "%select{a private|a fileprivate|an internal|a package|%error|%error}3 "
         "%select{|API wrapper}6 type",
-        (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
+        (bool, AccessLevel, bool, AccessLevel, unsigned, unsigned, bool))
 ERROR(function_type_usable_from_inline,none,
       "the %select{parameter|result}1%select{| API wrapper}2 of a "
       "'@usableFromInline' %select{function|method|initializer}0 "
