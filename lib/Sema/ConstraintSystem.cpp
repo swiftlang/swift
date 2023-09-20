@@ -5809,6 +5809,16 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
       break;
 
+    case ConstraintLocator::ClosureThrownError:
+      if (auto CE = getAsExpr<ClosureExpr>(anchor)) {
+        if (auto thrownTypeRepr = CE->getExplicitThrownTypeRepr()) {
+          anchor = thrownTypeRepr;
+          path = path.slice(1);
+          break;
+        }
+      }
+      break;
+
     case ConstraintLocator::CoercionOperand: {
       auto *CE = castToExpr<CoerceExpr>(anchor);
       anchor = CE->getSubExpr()->getValueProvidingExpr();

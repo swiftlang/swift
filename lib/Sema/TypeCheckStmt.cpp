@@ -1195,8 +1195,6 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-
-
     Type errorType;
     if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
       errorType = TheFunc->getThrownErrorType();

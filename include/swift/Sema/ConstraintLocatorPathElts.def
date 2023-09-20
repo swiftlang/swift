@@ -54,6 +54,9 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// The thrown error of a closure.
+SIMPLE_LOCATOR_PATH_ELT(ClosureThrownError)
+
 /// FIXME: Misleading name: this locator is used only for single-expression
 /// closure returns.
 ///
