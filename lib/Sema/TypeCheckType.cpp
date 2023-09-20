@@ -5046,14 +5046,14 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
-  // TODO: more user-friendly verification
-
   if (auto protoTy = ty->getAs<ProtocolType>())
     if (auto protoDecl = protoTy->getDecl())
-      if (protoDecl->isSpecificProtocol(KnownProtocolKind::Copyable))
-        return ty;
+      if (auto kp = protoDecl->getKnownProtocolKind())
+        if (getInvertableProtocols().contains(*kp))
+          return ty;
 
-  llvm_unreachable("todo: verification");
+  diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertable, ty);
+  return ErrorType::get(getASTContext());
 }
 
 NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,

@@ -102,6 +102,10 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   llvm_unreachable("bad KnownProtocolKind");
 }
 
+KnownProtocolSet swift::getInvertableProtocols() {
+  return { KnownProtocolKind::Copyable };
+}
+
 namespace {
 enum class SearchPathKind : uint8_t {
   Import = 1 << 0,

@@ -2349,6 +2349,10 @@ ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
 
+// Inverse Constraints
+ERROR(inverse_type_not_invertable,none,
+      "type %0 is not invertable", (Type))
+
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))

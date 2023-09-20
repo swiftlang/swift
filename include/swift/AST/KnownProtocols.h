@@ -14,6 +14,7 @@
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Config.h"
 
 namespace llvm {
@@ -40,6 +41,12 @@ enum : uint8_t {
 
 enum : unsigned { NumKnownProtocolKindBits =
   countBitsUsed(static_cast<unsigned>(NumKnownProtocols - 1)) };
+
+using KnownProtocolSet = FixedBitSet<NumKnownProtocols, KnownProtocolKind>;
+
+/// Produces a set of all protocols that have an inverse, i.e., for every
+/// known protocol KP in the set, ~KP exists.
+KnownProtocolSet getInvertableProtocols();
 
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);
