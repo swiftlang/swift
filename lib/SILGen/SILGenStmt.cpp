@@ -761,6 +761,13 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
 }
 
 void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
+  if (SGF.getASTContext().LangOpts.ThrowsAsTraps) {
+    SGF.B.createBuiltin(S, SGF.SGM.getASTContext().getIdentifier("int_trap"),
+                        SGF.SGM.Types.getEmptyTupleType(), {}, {});
+    SGF.B.createUnreachable(S);
+    return;
+  }
+
   ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
   SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
 }
@@ -1474,6 +1481,13 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
                                bool emitWillThrow) {
   assert(ThrowDest.isValid() &&
          "calling emitThrow with invalid throw destination!");
+
+  if (getASTContext().LangOpts.ThrowsAsTraps) {
+    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("int_trap"),
+                    SGM.Types.getEmptyTupleType(), {}, {});
+    B.createUnreachable(loc);
+    return;
+  }
 
   // Claim the exception value.  If we need to handle throwing
   // cleanups, the correct thing to do here is to recreate the
