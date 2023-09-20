@@ -1023,7 +1023,8 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
       D->getASTContext().LangOpts.PackageName.empty() &&
       File && File->Kind != SourceFileKind::Interface) {
     // `package` modifier used outside of a package.
-    diagnose(attr->getLocation(), diag::access_control_requires_package_name);
+    diagnose(attr->getLocation(), diag::access_control_requires_package_name,
+             isa<ValueDecl>(D), D);
     return true;
   }
 

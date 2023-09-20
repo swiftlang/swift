@@ -1935,9 +1935,9 @@ WARNING(access_control_non_objc_open_member,none,
       "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
       (DescriptiveDeclKind))
 ERROR(access_control_requires_package_name, none,
-      "the package access level requires a package name; "
-      "set it with the compiler flag -package-name",
-      ())
+      "the package access level %select{|used on %1 }0"
+      "requires a package name; set it with the compiler flag -package-name",
+      (bool, const Decl*))
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attr_invalid_on_decl_kind,none,
