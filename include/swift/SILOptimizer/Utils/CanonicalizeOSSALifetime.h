@@ -206,23 +206,32 @@ public:
     return v;
   }
 
+  enum class Flags {
+    None = 0x0,
+
+    /// If set, then debug_value instructions outside of non-debug
+    /// liveness may be pruned during canonicalization.
+    PruneDebugMode = 0x1,
+
+    /// If set, lifetimes will not be shortened except when necessary to avoid
+    /// copies.
+    MaximizeLifetime = 0x2,
+  };
+  using Options = OptionSet<Flags>;
+
 private:
-  /// If true, then debug_value instructions outside of non-debug
-  /// liveness may be pruned during canonicalization.
-  bool pruneDebugMode;
+  /// For option values see \p Flags.
+  Options options;
 
-  /// If true, lifetimes will not be shortened except when necessary to avoid
-  /// copies.
-  bool maximizeLifetime;
-
-  // If present, will be used to ensure that the lifetime is not shortened to
-  // end inside an access scope which it previously enclosed.  (Note that ending
-  // before such an access scope is fine regardless.)
-  //
-  // For details, see extendLivenessThroughOverlappingAccess.
+  /// If present, will be used to ensure that the lifetime is not shortened to
+  /// end inside an access scope which it previously enclosed.  (Note that
+  /// ending before such an access scope is fine regardless.)
+  ///
+  /// For details, see extendLivenessThroughOverlappingAccess.
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
-  // Lazily initialize accessBlocks only when
-  // extendLivenessThroughOverlappingAccess is invoked.
+
+  /// Lazily initialize accessBlocks only when
+  /// extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
   DominanceInfo *domTree = nullptr;
@@ -297,15 +306,13 @@ public:
     }
   };
 
-  CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
-                           SILFunction *function,
+  CanonicalizeOSSALifetime(Options options, SILFunction *function,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceInfo *domTree,
                            BasicCalleeAnalysis *calleeAnalysis,
                            InstructionDeleter &deleter)
-      : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
-        calleeAnalysis(calleeAnalysis), deleter(deleter) {}
+      : options(options), accessBlockAnalysis(accessBlockAnalysis),
+        domTree(domTree), calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
@@ -319,7 +326,7 @@ public:
 
     currentDef = def;
 
-    if (maximizeLifetime) {
+    if (options.contains(Flags::MaximizeLifetime)) {
       liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     }
     liveness->initializeDef(getCurrentDef());

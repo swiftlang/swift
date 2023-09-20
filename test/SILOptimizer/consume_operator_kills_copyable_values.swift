@@ -319,7 +319,7 @@ public func castTestSwitchInLoop(_ x : __owned Klass) { // expected-error {{'x' 
     let _ = consume x // expected-note {{consumed here}}
 
     for _ in 0..<1024 {
-        switch x {
+        switch x { // expected-note {{used here}}
         case let k as SubKlass1:
             print(k)
         default:

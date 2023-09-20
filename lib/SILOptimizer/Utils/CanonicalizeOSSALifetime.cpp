@@ -147,7 +147,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         continue;
       }
       // Handle debug_value instructions separately.
-      if (pruneDebugMode) {
+      if (options.contains(Flags::PruneDebugMode)) {
         if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
           // Only instructions potentially outside current pruned liveness are
           // interesting.
@@ -1018,7 +1018,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
         instsToDelete.insert(destroy);
         LLVM_DEBUG(llvm::dbgs() << "  Removing " << *destroy);
         ++NumDestroysEliminated;
-      } else if (pruneDebugMode) {
+      } else if (options.contains(Flags::PruneDebugMode)) {
         // If this destroy was marked as a final destroy, add it to liveness so
         // that we don't delete any debug instructions that occur before it.
         // (Only relevant in pruneDebugMode).
@@ -1078,7 +1078,7 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   }
   assert(!consumes.hasUnclaimedConsumes());
 
-  if (pruneDebugMode) {
+  if (options.contains(Flags::PruneDebugMode)) {
     for (auto *dvi : debugValues) {
       if (!liveness->isWithinBoundary(dvi)) {
         LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
@@ -1138,7 +1138,7 @@ void CanonicalizeOSSALifetime::rewriteLifetimes() {
   PrunedLivenessBoundary originalBoundary;
   findOriginalBoundary(originalBoundary);
   PrunedLivenessBoundary extendedBoundary;
-  if (maximizeLifetime) {
+  if (options.contains(Flags::MaximizeLifetime)) {
     // Step 3. (optional) maximize lifetimes
     extendUnconsumedLiveness(originalBoundary);
     originalBoundary.clear();
@@ -1205,9 +1205,14 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
       auto pruneDebug = arguments.takeBool();
       auto maximizeLifetimes = arguments.takeBool();
       auto respectAccessScopes = arguments.takeBool();
+      CanonicalizeOSSALifetime::Options options;
+      if (pruneDebug)
+        options |= CanonicalizeOSSALifetime::Flags::PruneDebugMode;
+      if (maximizeLifetimes)
+        options |= CanonicalizeOSSALifetime::Flags::MaximizeLifetime;
       InstructionDeleter deleter;
       CanonicalizeOSSALifetime canonicalizer(
-          pruneDebug, maximizeLifetimes, &function,
+          options, &function,
           respectAccessScopes ? accessBlockAnalysis : nullptr, domTree,
           calleeAnalysis, deleter);
       auto value = arguments.takeValue();
