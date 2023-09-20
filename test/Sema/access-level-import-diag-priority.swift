@@ -4,8 +4,10 @@
 // RUN: split-file --leading-lines %s %t
 
 /// Build the libraries.
-// RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t
-// RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t
+// RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t \
+// RUN:   -package-name pkg
+// RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t
 // RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t
@@ -14,15 +16,20 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
 // RUN:   -package-name pkg
+// RUN: %target-swift-frontend -typecheck %t/PackageTypeImportedAsPackageClient.swift -I %t \
+// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
+// RUN:   -package-name pkg
 // RUN: %target-swift-frontend -typecheck %t/LocalVsImportClient.swift -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
 // RUN:   -package-name pkg
 
 //--- PublicLib.swift
 public struct PublicImportType {}
+package struct PackageLevelPublicImportedType {}
 
 //--- PackageLib.swift
 public struct PackageImportType {}
+package struct PackageLevelPackageImportedType {}
 
 //--- InternalLib.swift
 public struct InternalImportType {}
@@ -60,6 +67,26 @@ public func publicFuncUsesPrivateScambled(_ a: PublicImportType, b: PackageImpor
 }
 public func publicFuncUsesPrivateScambled(_ a: PublicImportType, d: FileprivateImportType, b: PackageImportType, c: InternalImportType) { // expected-error {{function cannot be declared public because its parameter uses a fileprivate type}}
     var _: PrivateImportType
+}
+
+//--- PackageTypeImportedAsPackageClient.swift
+/// Report errors about using package decls in public but don't note the import
+/// as it doesn't affect the access level of the decls.
+
+public import PublicLib
+package import PackageLib
+
+public func publicFuncUsesPackageLevelPublicImportedType(_ a: PackageLevelPublicImportedType) {} // expected-error {{function cannot be declared public because its parameter uses a package type}}
+public func publicFuncUsesPackageLevelPackageImportedType(_ a: PackageLevelPackageImportedType) {} // expected-error {{function cannot be declared public because its parameter uses a package type}}
+
+@inlinable public func funcInlinableReferenceToPublicImportedType() {
+  var _: PackageLevelPublicImportedType // expected-error {{struct 'PackageLevelPublicImportedType' is package and cannot be referenced from an '@inlinable' function}}
+  var _: Array<PackageLevelPublicImportedType> // expected-error {{struct 'PackageLevelPublicImportedType' is package and cannot be referenced from an '@inlinable' function}}
+}
+
+@inlinable public func funcInlinableReferenceToPackageImportedType() {
+  var _: PackageLevelPackageImportedType // expected-error {{struct 'PackageLevelPackageImportedType' is package and cannot be referenced from an '@inlinable' function}}
+  var _: Array<PackageLevelPackageImportedType> // expected-error {{struct 'PackageLevelPackageImportedType' is package and cannot be referenced from an '@inlinable' function}}
 }
 
 /// Local vs imports

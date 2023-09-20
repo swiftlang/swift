@@ -917,11 +917,16 @@ function(_compile_swift_files
   # list in the Python script.
   string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
   string(SHA1 file_name "'${source_files_quoted}'")
+  set(file_path_target "filelist-${file_name}")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
-  add_custom_command(
-    OUTPUT "${file_path}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}")
+
+  if (NOT TARGET ${file_path_target})
+    file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+    add_custom_command_target(unused_var
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
+      CUSTOM_TARGET_NAME ${file_path_target}
+      OUTPUT "${file_path}")
+  endif()
 
   # If this platform/architecture combo supports backward deployment to old
   # Objective-C runtimes, we need to copy a YAML file with legacy type layout
@@ -950,7 +955,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         "${line_directive_tool}"
-        "${file_path}"
+        "${file_path_target}"
         ${swift_compiler_tool_dep}
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
@@ -993,7 +998,7 @@ function(_compile_swift_files
         OUTPUT ${module_outputs}
         DEPENDS
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
@@ -1022,7 +1027,7 @@ function(_compile_swift_files
         DEPENDS
           "${module_dependency_target}"
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
@@ -1063,7 +1068,7 @@ function(_compile_swift_files
           ${maccatalyst_module_outputs}
         DEPENDS
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files}
           ${SWIFTFILE_DEPENDS}
@@ -1093,7 +1098,7 @@ function(_compile_swift_files
         OUTPUT ${sib_outputs}
         DEPENDS
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}
@@ -1113,7 +1118,7 @@ function(_compile_swift_files
         OUTPUT ${sibopt_outputs}
         DEPENDS
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}
@@ -1134,7 +1139,7 @@ function(_compile_swift_files
         OUTPUT ${sibgen_outputs}
         DEPENDS
           "${line_directive_tool}"
-          "${file_path}"
+          "${file_path_target}"
           ${swift_compiler_tool_dep}
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${copy_legacy_layouts_dep}

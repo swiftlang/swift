@@ -996,8 +996,8 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
     return true;
   }
 
+  SourceFile *File = D->getDeclContext()->getParentSourceFile();
   if (auto importDecl = dyn_cast<ImportDecl>(D)) {
-    SourceFile *File = D->getDeclContext()->getParentSourceFile();
     if (!D->getASTContext().LangOpts.hasFeature(Feature::AccessLevelOnImport) &&
         File && File->Kind != SourceFileKind::Interface) {
       diagnoseAndRemoveAttr(attr, diag::access_level_on_import_not_enabled);
@@ -1017,6 +1017,15 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
         return true;
       }
     }
+  }
+
+  if (attr->getAccess() == AccessLevel::Package &&
+      D->getASTContext().LangOpts.PackageName.empty() &&
+      File && File->Kind != SourceFileKind::Interface) {
+    // `package` modifier used outside of a package.
+    diagnose(attr->getLocation(), diag::access_control_requires_package_name,
+             isa<ValueDecl>(D), D);
+    return true;
   }
 
   return false;

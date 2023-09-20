@@ -1965,14 +1965,6 @@ public:
                      target->getModuleFilename());
     }
 
-    // Report use of package import when no package name is set.
-    if (ID->getAccessLevel() == AccessLevel::Package &&
-        getASTContext().LangOpts.PackageName.empty()) {
-      auto &diags = ID->getASTContext().Diags;
-      diags.diagnose(ID->getLoc(),
-                     diag::access_control_requires_package_name_import);
-    }
-
     // Report the public import of a private module.
     if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
       auto importer = ID->getModuleContext();
