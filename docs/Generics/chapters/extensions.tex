@@ -27,7 +27,7 @@ If a third module subsequently imports both the first and second module, it will
 
 \index{interface type}
 \index{normal conformance}
-\paragraph{Extensions and generics}
+\paragraph{Extensions and generics.}
 Extensions have generic signatures, so the interface types of their members may involve the generic parameters of the extended type. The generic signature of an ``unconstrained'' extension is the same as that of the extended type. Extensions can impose additional requirements on their generic parameters via a \texttt{where} clause; this declares a \emph{constrained extension} with its own generic signature (Section~\ref{constrained extensions}). An extension can also state a conformance to a protocol, which is represented as normal conformance visible to global conformance lookup. If the extension is unconstrained, this is equivalent to a conformance on the extended type. If the extension is constrained, the conformance becomes a \emph{conditional conformance} (Section~\ref{conditional conformance}).
 
 \index{generic parameter list}
@@ -102,7 +102,7 @@ When an extension declares a nested generic type, the depth of the nested type's
 \end{tikzpicture}
 \end{quote}
 
-\paragraph{Other behaviors} Syntactically, the extended type is specified by a type representation following the \texttt{extension} keyword. As the extended type must ultimately resolve to a nominal type, this is typically an identifier type representation. Extension binding uses a more primitive form of type resolution, for reasons explained in Section~\ref{extension binding}.  Extension members generally behave as members of the extended type, with a few caveats:
+\paragraph{Other behaviors.} Syntactically, the extended type is written in a type representation following the \texttt{extension} keyword. As the extended type must ultimately resolve to a nominal type, this is typically an identifier type representation. Extension binding uses a more primitive form of type resolution, for reasons explained in Section~\ref{extension binding}.  Extension members generally behave as members of the extended type, with a few caveats:
 \begin{itemize}
 \item Members of \index{protocol extension}\emph{protocol extensions} are not requirements imposed on the concrete type in the way that members of a protocol declaration are; they actually have implementations.
 
@@ -173,10 +173,10 @@ Takes a list of all extensions in the main module as input, in any order.
 \index{primary file}
 Any extensions with an unresolvable extended type will simply remain on the delayed list when this algorithm returns; the algorithm does not actually emit diagnostics. Unresolvable extended types are diagnosed later, when the \textbf{type-check source file request} visits the declarations in each primary file. Upon encountering an extension which failed extension binding, the type-check source file request resolves the extended type using ordinary type resolution. If this fails, we simply diagnose the unknown type. Otherwise, we're in a more subtle situation where the extended type is resolvable by ordinary type resolution, but not the limited form of type resolution used by extension binding, which is described below.
 
-The worklist-driven extension binding algorithm was introduced in Swift~5.0. Older compiler releases attempted to bind extensions in a single pass, something that could either succeed or fail depending on declaration order. This incorrect behavior was one of the most frequently reported bugs of all time \cite{sr631}.
+The worklist-driven extension binding algorithm was introduced in \index{history}Swift~5.0. Older compiler releases attempted to bind extensions in a single pass, something that could either succeed or fail depending on declaration order. This incorrect behavior was one of the most frequently reported bugs of all time \cite{sr631}.
 
 \index{limitation}%
-\paragraph{Unsupported extensions}
+\paragraph{Unsupported extensions.}
 \index{synthesized declaration}%
 \index{identifier type representation}%
 \index{generic type alias}%
@@ -244,7 +244,7 @@ extension DoesNotExist {}  // remains on delayed list
 In the first pass, the extensions of \texttt{Outer.Middle.Inner} and \texttt{Outer.Middle} both fail, but we do successfully bind the extension of \texttt{Outer}. The second pass once again fails to bind the extension of \texttt{Outer.Middle.Inner}, but it does bind the extension of \texttt{Outer.Middle}. Finally, the third pass binds the extension of \texttt{Outer.Middle.Inner}. Notice how in each of the first three passes, we are able to bind at least one extension. The invalid extension of \texttt{DoesNotExist} remains on the delayed list after each of the first three passes. Since the fourth pass does not make any forward progress, the algorithm stops. Later we end up in the diagnostic path, which resolves \texttt{DoesNotExist} via ordinary type resolution, surfacing the ``unknown type'' error.
 \end{example}
 
-\paragraph{Local types}
+\paragraph{Local types.}
 \index{local type declaration}
 \index{limitation}
 Because extensions can only appear at the top level of a source file, the extended type must ultimately be visible from the top level. This allows extensions of types nested inside other top-level types, but precludes extensions of local types nested inside of functions or other local contexts, because there is ultimately no way to name a local type from the top level of a source file. (As a curious consequence, local types cannot conditionally conform to protocols, since the only way to declare a conditional conformance is with an extension!)
@@ -262,7 +262,7 @@ Nominal type declarations and extensions are \IndexDefinition{iterable declarati
 \item Iterable declaration contexts from binary and imported modules are equipped with a \IndexDefinition{lazy member loader}\emph{lazy member loader} which serves a similar purpose. Asking the lazy member loader to provide a list of members will build Swift declarations from deserialized records or imported Clang declarations. The lazy member loader can also find declarations with a specific name, as explained below.
 \end{itemize}
 
-\paragraph{Member lookup table}
+\paragraph{Member lookup table.}
 Every nominal type declaration has an associated \IndexDefinition{member lookup table}\emph{member lookup table}, which is used for direct lookup. This table maps each identifier to a list of value declarations with that name (multiple value declarations can share a name because Swift allows type-based overloading). The declarations in a member lookup table are understood to be members of one or more iterable declaration contexts, which are exactly the type declaration itself and all of its extensions. These iterable declaration contexts might originate from a mix of different module kinds. For example, the nominal type itself might be an Objective-C class from an imported Objective-C module, with one extension declared in a binary Swift module, and another extension defined in the main module, parsed from source. 
 
 The lookup table is populated lazily, in a manner resembling a state machine. The first direct lookup into a nominal type does populate the member lookup table with all members from any \emph{parsed} iterable declaration contexts, which might trigger delayed parsing. Each entry in the member lookup table stores a ``complete'' bit. Initially the ``complete'' bit of these entries is \emph{not} set, meaning that the entry only contains those members that were parsed from source. If any iterable declaration contexts originate from binary and imported modules, direct lookup then asks each lazy member loader to selectively load only those members with the given name. After the lazy member loaders do their work, the lookup table entry for this name is now complete, and the ``complete'' bit is set. Later when direct lookup finds a member lookup table entry with the ``complete'' bit set, it knows this entry is fully populated, and the stored list of declarations is returned immediately without querying the lazy member loaders.
@@ -402,7 +402,7 @@ Direct lookup now returns both overloads of \texttt{NSHorse.trot()} to the type 
 (\texttt{walk}) The third lookup finds that the corresponding member lookup table entry is already complete, so we immediately return the existing declaration stored there without consulting the lazy member loader. Notice that the \texttt{canter} method of \texttt{NSHorse} was never referenced, so it did not need to be imported at all.
 \end{example}
 
-\paragraph{History}
+\paragraph{History.}
 Lazy member loading was introduced in Swift~4.1 to avoid wasted work in deserializing or importing members that are never referenced. The speedup is most pronounced when multiple frontend jobs perform direct lookup into a common set of deserialized or imported nominal types. The overhead of loading all members of this common set of types was multiplied across frontend jobs prior to the introduction of lazy member loading.
 
 \section{Constrained Extensions}\label{constrained extensions}
@@ -427,7 +427,7 @@ This example demonstrates that while the requirements of the constrained extensi
 
 In the early days of Swift, this extension was not supported at all, because the compiler did not permit same-type requirements between generic parameters and concrete types; only dependent member types could be made concrete. This restriction was lifted in Swift~3, and many concepts described in this book, most importantly substitution maps and generic environments, were introduced as part of this effort.
 
-\paragraph{Extending a generic nominal type} An extension of a generic nominal type with generic arguments is shorthand for a \texttt{where} clause that constrains each generic parameter to a concrete type. The generic argument types must be fully concrete; they cannot reference the generic parameters of the extended type declaration. The previous example can be more concisely expressed using this syntax:
+\paragraph{Extending a generic nominal type.} An extension of a generic nominal type with generic arguments is shorthand for a \texttt{where} clause that constrains each generic parameter to a concrete type. The generic argument types must be fully concrete; they cannot reference the generic parameters of the extended type declaration. The previous example can be more concisely expressed using this syntax:
 \begin{Verbatim}
 extension Set<Int> {...}
 \end{Verbatim}
@@ -438,7 +438,7 @@ extension StringMap {...}
 \end{Verbatim}
 This shorthand was introduced in Swift 5.7 \cite{se0361}.
 
-\paragraph{Extending a generic type alias}
+\paragraph{Extending a generic type alias.}
 A \index{generic type alias}generic type alias is called a \IndexDefinition{pass-through type alias}``pass-through type alias'' if it satisfies the following three conditions:
 \begin{enumerate}
 \item the underlying type of the generic type alias must be a generic nominal type,
@@ -516,7 +516,7 @@ extension Array: Equatable where Element: Equatable {
 \end{Verbatim}
 %Conditional conformances of \texttt{Array} to \texttt{Hashable} and \texttt{Comparable} are defined similarly.
 
-\paragraph{Computing conditional requirements}
+\paragraph{Computing conditional requirements.}
 A \index{normal conformance}normal conformance stores a list of zero or more \IndexDefinition{conditional requirement}\emph{conditional requirements}; this is the ``difference'' between the requirements of the conforming context, and the requirements of the conforming type. A conditional conformance is a conformance with at least one conditional requirement; equivalently, it is a conformance declared on a constrained extension. Formally, this ``requirement difference'' operation takes two generic signatures, that of the conforming type, and the conforming context. We collect those requirements of the conforming context which are not already satisfied by the conforming type. 
 A simple example is the conditional conformance of \texttt{Dictionary} to \texttt{Equatable}:
 \begin{Verbatim}
@@ -546,7 +546,7 @@ As input, takes the generic signature of the conforming type, and the generic si
 \end{enumerate}
 \end{algorithm}
 
-\paragraph{Specialized conditional conformances}
+\paragraph{Specialized conditional conformances.}
 Applying a substitution map $\Sigma$ to a normal conformance $\ConfReq{$\texttt{T}_d$}{P}$ produces a \index{specialized conformance}specialized conformance $\ConfReq{$\texttt{T}_d$}{P}\otimes\Sigma$, which we denoted by $\ConfReq{T}{P}$, where $\texttt{T}=\texttt{T}_d\otimes\Sigma$, and $\texttt{T}_d$ is the declared interface type of the conforming nominal type declaration. If this underlying normal conformance is conditional, the conformance substitution map $\Sigma$ is the context substitution map of the conforming type \texttt{T} with respect to the constrained extension, and the input generic signature of $\Sigma$ is the generic signature of this extension. Thus, $\Sigma$ can be applied to the type parameters of the constrained extension, including the type parameters appearing in the constrained extension's requirements. The conditional requirements of a specialized conformance are then defined as the result of applying $\Sigma$ to the conditional requirements of the underlying normal conformance, making the following \index{commutative diagram}diagram commute:
 \begin{quote}
 \newcommand{\GetConditionalRequirements}{\def\arraystretch{0.65}\arraycolsep=0pt\begin{array}{c}\text{get conditional}\\\text{requirements}\end{array}}
@@ -567,7 +567,7 @@ The normal conformance has a single conditional requirement, \ConfReq{Element}{E
 \ConfReq{Element}{Equatable} \otimes \Sigma = \ConfReq{Int}{Equatable}
 \]
 
-\paragraph{Global conformance lookup}
+\paragraph{Global conformance lookup.}
 \index{global conformance lookup}
 Global conformance lookup purposely does not check conditional requirements, allowing callers to answer two different questions:
 \begin{enumerate}
@@ -644,9 +644,9 @@ So \texttt{G<S>} conditionally conforms to \texttt{P} if the conditional require
 Our example only encodes an infinite loop, but conditional conformances can actually express arbitrary computation. This is shown for the \index{Rust}Rust programming language, which also has conditional conformances, in \cite{rustturing}. We'll also see another example of non-terminating compile-time computation in Section~\ref{recursive conformances}.
 \end{example}
 
-\paragraph{Protocol inheritance}
+\paragraph{Protocol inheritance.}
 \index{inherited protocol}
-Protocol inheritance relationships are modeled as conformance requirements on \texttt{Self}, so for instance the requirement signature of \verb|P| has a conformance requirement $\ConfReq{Self}{Q}$:
+Protocol inheritance is modeled by conformance requirements on \texttt{Self}, so for instance the requirement signature of \verb|P| has a conformance requirement $\ConfReq{Self}{Q}$:
 \begin{Verbatim}
 protocol P {...}
 protocol Q: P {...}

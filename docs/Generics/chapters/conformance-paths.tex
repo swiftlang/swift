@@ -80,7 +80,7 @@ Having established the validity of the substitution map, we now attempt to deter
 \[\texttt{U.[Sequence]Iterator} \otimes \Sigma = \AssocType{[Sequence]Iterator} \otimes (\ConfReq{U}{Sequence} \otimes \Sigma)\]
 However, $\ConfReq{U}{Sequence}$ does not appear in our generic signature, thus the corresponding conformance is not directly stored inside $\Sigma$. To understand what happens next, we need some terminology. 
 
-\paragraph{Root conformances} The \IndexDefinition{root conformance}\emph{root conformances} of a substitution map are those directly stored in the substitution map. The \IndexDefinition{root abstract conformance}\emph{root abstract conformances} of a generic signature are those corresponding to the explicit conformance requirements of the generic signature. These two concepts are closely related via the \index{identity substitution map}identity substitution map $1_G$: the root conformances of $1_G$ are the root abstract conformances of its input generic signature $G$. In our example, $\ConfReq{T}{Collection}$ is a root abstract conformance of our generic signature, but $\ConfReq{U}{Sequence}$ is not, because the latter represents a derived conformance requirement, not explicitly stated in the generic signature (we will present a derivation later).
+\paragraph{Root conformances.} The \IndexDefinition{root conformance}\emph{root conformances} of a substitution map are those directly stored in the substitution map. The \IndexDefinition{root abstract conformance}\emph{root abstract conformances} of a generic signature are those corresponding to the explicit conformance requirements of the generic signature. These two concepts are closely related via the \index{identity substitution map}identity substitution map $1_G$: the root conformances of $1_G$ are the root abstract conformances of its input generic signature $G$. In our example, $\ConfReq{T}{Collection}$ is a root abstract conformance of our generic signature, but $\ConfReq{U}{Sequence}$ is not, because the latter represents a derived conformance requirement, not explicitly stated in the generic signature (we will present a derivation later).
 
 The general case of applying a substitution map to an abstract conformance is called \emph{local conformance lookup}. Without knowing anything about local conformance lookup, we can already deduce the result of $\ConfReq{U}{Sequence}\otimes \Sigma$ only using concepts introduced previously. We know the abstract conformance $\ConfReq{U}{Sequence}$ can be obtained by the \emph{global} conformance lookup $\protosym{Sequence}\otimes\texttt{U}$. We also know that $\texttt{U}\otimes \Sigma=\texttt{Substring}$. Therefore, from the \index{associative operation}associativity of ``$\otimes$'', we see that:
 \begin{gather*}
@@ -134,7 +134,7 @@ $\AssocType{[Sequence]Iterator}$&$\mapsto$&\texttt{IndexingIterator<Substring>}\
 \end{quote}
 \end{figure}
 
-\paragraph{Conformance paths} Our example is based on a handful of concrete conformances, simplified from their real definitions in the Swift standard library. Figure~\ref{associated conformance examples} lists the type witnesses and \index{associated conformance}associated conformances of each one:
+\paragraph{Conformance paths.} Our example is based on a handful of concrete conformances, simplified from their real definitions in the Swift standard library. Figure~\ref{associated conformance examples} lists the type witnesses and \index{associated conformance}associated conformances of each one:
 \begin{gather*}
 \ConfReq{String}{Collection}\\
 \ConfReq{Substring}{Collection}\\
@@ -224,7 +224,7 @@ Thus, just like the reduced type equality relation on type parameters (Section~\
 
 In our example, $\ConfReq{U}{Sequence}$ and $\ConfReq{T.SubSequence}{Sequence}$ are two abstract conformances that belong to the same equivalence class. The former is reduced, while the latter is not (and the former is the reduced abstract conformance of the latter).
 
-\paragraph{Validity} We've shown how to implement dependent member type substitution in terms of conformance paths, but so far, we've only established the legitimacy of one specific conformance path. Now, we ask three questions:
+\paragraph{Validity.} We've seen how to implement dependent member type substitution in terms of conformance paths, but so far, we've only established the legitimacy of one specific conformance path. Now, we ask three questions:
 \begin{enumerate}
 \item Does every conformance path simplify to a valid abstract conformance?
 \item Does every valid abstract conformance have at least one conformance path?
@@ -288,7 +288,7 @@ We saw that $\ConfReq{T.SubSequence}{Sequence}$ is equivalent to $\ConfReq{U}{Se
 (5),\,(6)\vdash\ConfReq{U}{Sequence}\tag{7}
 \end{gather*}
 
-\paragraph{Existence} The above procedure always works in general. If we receive a conformance path for $\ConfReq{T}{P}$, and the conformance path simplifies to $\ConfReq{$\texttt{T}^\prime$}{P}$ for a possibly different type parameter $\texttt{T}^\prime$,
+\paragraph{Existence.} The above procedure always works in general. If we receive a conformance path for $\ConfReq{T}{P}$, and the conformance path simplifies to $\ConfReq{$\texttt{T}^\prime$}{P}$ for a possibly different type parameter $\texttt{T}^\prime$,
 then we can construct a primitive derivation for $\ConfReq{$\texttt{T}^\prime$}{P}$. We also know that \texttt{T} and $\texttt{T}^\prime$ must be equivalent, so there exists a derivation for the same-type requirement $\FormalReq{T == $\texttt{T}^\prime$}$. From these two derivations, we get a derivation for $\ConfReq{T}{P}$.
 
 Now, we will go in the other direction. First, observe that a primitive derivation defines a conformance path, as follows: the initial \textsc{GenSig} derivation step becomes the root abstract conformance at the start of the path, and each subsequent \textsc{ReqSig} derivation step becomes an associated conformance projection. Then, the next theorem shows a derivation of a conformance requirement $\ConfReq{T}{P}$ always splits into two parts: a primitive derivation $\ConfReq{$\texttt{T}^\prime$}{P}$, together with a same-type requirement $\FormalReq{T == $\texttt{T}^\prime$}$. Since a derived conformance requirement defines an abstract conformance, and a primitive derivation defines a conformance path, we can conclude that every abstract conformance has a conformance path. 
@@ -436,7 +436,7 @@ Figure~\ref{conformance path graph example} shows the graph; notice how $\ConfRe
 \end{center}
 \end{figure}
 
-\paragraph{D\'ej\`a vu}
+\paragraph{D\'ej\`a vu.}
 If this looks familiar, recall that we already studied another directed graph associated with a generic signature, the \index{type parameter graph}type parameter graph of Section~\ref{type parameter graph}. Both graphs are generated by a generic signature, and describe equivalence classes of the reduced type equality relation. It is instructive to compare the two:
 \begin{quote}
 \begin{tabular}{lll}
@@ -450,7 +450,7 @@ If this looks familiar, recall that we already studied another directed graph as
 \end{tabular}
 \end{quote}
 
-\paragraph{Conformance path equivalence}
+\paragraph{Conformance path equivalence.}
 We saw that two distinct conformance paths can simplify to equivalent abstract conformances, in which case the corresponding paths through the graph end at the same vertex. We say two conformance paths are \emph{equivalent} in this case. This gives us an \index{equivalence relation}equivalence relation, defined in terms of the equivalence relation on abstract conformances (which in turn was defined in terms of the \index{reduced type equality}reduced type equality relation on type parameters.) Just as with type parameters and abstract conformances, we can define a \index{linear order}linear order on \index{conformance path order}conformance paths. A \IndexDefinition{reduced conformance path}\emph{reduced} conformance path is one that precedes all other conformance paths in its equivalence class.
 \begin{algorithm}[Conformance path order]\label{conformance path order alg}
 \IndexDefinition{conformance path order}Takes two conformance paths $x$ and $y$ as input, and returns one of ``$<$'', ``$>$'', or ``$=$'' as output.
@@ -466,7 +466,7 @@ We saw that two distinct conformance paths can simplify to equivalent abstract c
 \end{algorithm}
 Note that this is a linear order, because in Step~6, Algorithm~\ref{requirement order} cannot return ``$\bot$'', since protocol conformance requirements are always linearly ordered with respect to each other. Much like the type parameter order of Algorithm~\ref{type parameter order}, this is a special case of a shortlex order, which we generalize in Section~\ref{rewritesystemintro}.
 
-\paragraph{Enumeration} The conformance path graph from our previous example has a finite set of vertices, but this is not true in general. However, it is true that each vertex only has finitely many \index{successor}successors, as there can only be finitely many associated conformance requirements. (This is also true in the \index{type parameter graph}type parameter graph, where successors are given by associated \emph{type} declarations). A graph with this property is said to be \index{locally finite graph}\emph{locally finite}. A locally finite graph only has finitely many paths of any fixed length $n\in\mathbb{N}$ (this can be shown by induction on path length). This implies that the conformance path order is \index{well-founded order}well-founded (by the same argument as Proposition~\ref{well founded type order}). It follows that every equivalence class of conformance paths contains a reduced conformance path. Hence, enumerating conformance paths in increasing order performs a \index{breadth-first search}breadth-first search which visits every path, and always visits the reduced conformance paths first.
+\paragraph{Enumeration.} The conformance path graph from our previous example has a finite set of vertices, but this is not true in general. However, it is true that each vertex only has finitely many \index{successor}successors, as there can only be finitely many associated conformance requirements. (This is also true in the \index{type parameter graph}type parameter graph, where successors are given by associated \emph{type} declarations). A graph with this property is said to be \index{locally finite graph}\emph{locally finite}. A locally finite graph only has finitely many paths of any fixed length $n\in\mathbb{N}$ (this can be shown by induction on path length). This implies that the conformance path order is \index{well-founded order}well-founded (by the same argument as Proposition~\ref{well founded type order}). It follows that every equivalence class of conformance paths contains a reduced conformance path. Hence, enumerating conformance paths in increasing order performs a \index{breadth-first search}breadth-first search which visits every path, and always visits the reduced conformance paths first.
 
 Theorem~\ref{conformance paths theorem} provides a necessary termination condition for our search. This is actually also sufficient; the only other potential source of non-termination is the reduced type computation using the \IndexDefinition{getReducedType()@\texttt{getReducedType()}}\texttt{getReducedType()} generic signature query, but the theory of rewrite systems will give us that guarantee in Section~\ref{rewritesystemintro}. Thus, we can always find a conformance path in a finite number of steps. This exhaustive enumeration is relatively inefficient, but we can improve upon it with two modifications:
 \begin{enumerate}
@@ -514,7 +514,7 @@ Takes a generic signature $G$ and an abstract conformance $\ConfReq{T}{P}$ valid
 \end{enumerate}
 \end{algorithm}
 
-\paragraph{Algorithmic complexity}
+\paragraph{Algorithmic complexity.}
 Despite the memoization performed above, Algorithm~\ref{find conformance path algorithm} requires exponential time in the worst case. We can demonstrate this by constructing a generic signature with $2^{n-1}$ unique conformance paths of length $n$. Consider the protocol generic signature $G_\texttt{P}$ with the following protocol \texttt{P}:
 \begin{Verbatim}
 protocol P {
@@ -578,8 +578,8 @@ A \IndexDefinition{recursive conformance requirement}\emph{recursive conformance
 \begin{wrapfigure}[11]{l}{4.5cm}
 \begin{tikzpicture}[node distance=1.4cm]
 
-\node (N) [protocol] {$\protosym{N}$};
-\node (Q) [protocol, above left=of N] {$\protosym{Q}$};
+\node (N) [protocol] {$\texttt{N}$};
+\node (Q) [protocol, above left=of N] {$\texttt{Q}$};
 \node (R) [protocol, above right=of N] {$\protosym{R}$};
 \node (O) [protocol, below=of N] {$\protosym{O}$};
 \path [->] (Q) edge [left, bend left] (R)
@@ -598,8 +598,6 @@ The protocol dependency graph for Listing~\ref{protocol dependency graph listing
 Note that $\AssocConf{Self.[R]C}{N}$ is \emph{not} recursive, and $\protosym{O}$ is not connected with the other protocols at all; in fact, it does not declare any associated conformance requirements.
 
 \smallskip
-
-We encounter the protocol dependency graph again in Chapter~\ref{rqm basic operation}, when we describe the construction of the rewrite system for a generic signature.
 
 \begin{listing}\captionabove{Protocol dependency graph example}\label{protocol dependency graph listing}
 \begin{Verbatim}
@@ -629,6 +627,8 @@ Now consider the protocol generic signature $G_\texttt{Q}$ from Listing~\ref{pro
 Writing down the list of protocols from each step (remember that conformance paths are read from right to left!) we get a path in the protocol dependency graph; the path visits \texttt{Q} and \texttt{R} twice, exhibiting the existence of a cycle:
 \[\texttt{Q}\longrightarrow\texttt{R}\longrightarrow\texttt{Q}\longrightarrow\texttt{R}\longrightarrow\texttt{N}\]
 
+We encounter the protocol dependency graph again in Chapter~\ref{rqm basic operation}, when we describe the construction of the rewrite system for a generic signature.
+
 \begin{figure}\captionabove{Conformance path graph for $G_\texttt{Q}$ from Listing~\ref{protocol dependency graph listing}}\label{infinite tree graph}
 \begin{center}
 \begin{tikzpicture}[sibling distance=3.8cm, level distance=1.5cm, edge from parent path={[->] (\tikzparentnode) .. controls +(0,-1) and +(0,1) .. (\tikzchildnode.north)}]
@@ -657,7 +657,7 @@ Writing down the list of protocols from each step (remember that conformance pat
 \end{center}
 \end{figure}
 
-We know that infinite generic signatures have conformance paths of arbitrary length; the same argument applies to type parameters as well. We will now strengthen this to show that there exists an infinite sequence of type parameters or conformance paths of increasing length, where each one is a proper prefix of the next. Recall that the type parameter graph and conformance path graph both have finitely many root vertices, and each vertex only has finitely many successors. This allows us to make use of the following classic result from graph theory (see \cite{konig}, or Section~2.3.4.3 of \cite{art1}).
+We know that infinite generic signatures have conformance paths of arbitrary length; the same argument applies to type parameters as well. We will now strengthen this to show that there exists an infinite sequence of type parameters or conformance paths of increasing length, where each one is a proper prefix of the next. Recall that the type parameter graph and conformance path graph both have finitely many root vertices, and each vertex only has finitely many successors. This allows us to make use of a classic theorem \index{Denes Konig@D\'enes K\H{o}nig}D\'enes K\H{o}nig proved in 1927 (see \cite{konig}, or Section~2.3.4.3 of \cite{art1}).
 \begin{theorem}[K\H{o}nig's infinity lemma]\index{Konig's infinity lemma@K\H{o}nig's infinity lemma}
 Assume an infinite directed graph satisfies two conditions:
 \begin{enumerate}
@@ -730,7 +730,7 @@ Let's now reconsider the application of a protocol substitution map $\Sigma_{\Co
 \end{enumerate}
 We will now construct an example of each of the three situations above, by defining different concrete types that conform to \texttt{N}.
 
-\paragraph{Recursive normal conformances} Consider a pair of types conforming to \texttt{N}:
+\paragraph{Recursive normal conformances.} Consider a pair of types conforming to \texttt{N}:
 \begin{Verbatim}
 struct X: N {
   typealias A = Y
@@ -768,7 +768,7 @@ The conformance evaluation graph of this substitution map only has two vertices,
 \end{tikzpicture}
 \end{quote}
 
-\paragraph{Recursive specialized conformances}
+\paragraph{Recursive specialized conformances.}
 When a recursive conformance requirement is witnessed by a specialized conformance, we can observe an infinite conformance evaluation graph:
 \begin{Verbatim}
 struct G<T>: N {
@@ -827,8 +827,8 @@ We've shown that this substitution map has an infinite conformance evaluation gr
 \end{tikzpicture}
 \end{quote}
 
-\paragraph{Recursive abstract conformances}
-We showed a recursive conformance requirement being fulfilled by a normal conformance, and then a specialized conformance. If the associated conformance is abstract, we can observe another interesting phenomenon:
+\paragraph{Recursive abstract conformances.}
+We saw a recursive conformance requirement being fulfilled by a normal conformance, and then a specialized conformance. The third possibility, where this conformance is abstract, reveals another interesting phenomenon:
 \begin{Verbatim}
 struct H<T: N>: N {
   typealias A = T
@@ -880,10 +880,10 @@ We see that at each step, the projection ``peels off'' an \texttt{H<>}, until we
 \begin{quote}
 \begin{tikzpicture}[node distance=1.5cm]
 
-\node (HH) [root] {\texttt{\vphantom{y}H<H<X>>:\ P}};
-\node (H) [interior, below of=HH] {\texttt{\vphantom{y}H<X>:\ P}};
-\node (X) [interior, below of=H] {\texttt{\vphantom{y}X:\ P}};
-\node (Y) [interior, below of=X] {\texttt{\vphantom{y}Y:\ P}};
+\node (HH) [root] {\ConfReq{H<H<X>>}{N}};
+\node (H) [interior, below of=HH] {\ConfReq{H<X>}{N}};
+\node (X) [interior, below of=H] {\ConfReq{X}{N}};
+\node (Y) [interior, below of=X] {\ConfReq{Y}{N}};
 
 \path [->] (HH)   edge [right] node {\scriptsize{$\SelfAToN$}} (H)
            (H)  edge [right] node {\scriptsize{$\SelfAToN$}} (X)
@@ -892,8 +892,8 @@ We see that at each step, the projection ``peels off'' an \texttt{H<>}, until we
 \end{tikzpicture}
 \end{quote}
 
-\paragraph{Non-terminating substitutions}
-Recall that we were able to give a termination proof for Algorithm~\ref{find conformance path algorithm}; we can always find a conformance path in a finite number of steps. However, we cannot make the same guarantee about Algorithm~\ref{dependent member type substitution} for evaluating of a conformance path. \index{limitation} We end this section with an example of \index{non-terminating computation}non-terminating substitution:
+\paragraph{Non-terminating substitutions.}
+We gave a termination proof for Algorithm~\ref{find conformance path algorithm}; we can always find a conformance path in a finite number of steps. However, we cannot make the same guarantee about Algorithm~\ref{dependent member type substitution} for evaluating of a conformance path. \index{limitation} This example demonstrates \index{non-terminating computation}non-terminating substitution:
 \begin{Verbatim}
 struct S: N {
   typealias A = F<S>
@@ -971,7 +971,7 @@ The first approach seems less elegant, because it also necessarily rejects \emph
 
 This section will show that the type substitution algebra can express any computable function, and explore the consequences of this fact. First, we will review some standard results in computability theory; details can be found in any book on the subject, such as \cite{cutland}.
 
-In 1937, Alan Turing published a paper where he set out to make precise what is meant by a \index{computable number}``computable number,'' in the intuitive sense that $2+\frac{3}{7}$, $\sqrt{5}$ and $\pi$ are all computable \cite{turing}. In Turing's view, for a number to be computable, one must be able to write down a finite series of steps which give an effective procedure for computing an approximate representation of this number to any arbitrary precision. Turing formalized these computational steps in the form of an abstract machine which reads and writes symbols on an infinite tape---a \index{Turing machine}\emph{Turing machine} (the precise definition can be found in the literature, but it doesn't matter for our purposes).
+In 1937, \index{Alan Turing}Alan Turing published a paper where he set out to make precise what is meant by a \index{computable number}``computable number,'' in the intuitive sense that $2+\frac{3}{7}$, $\sqrt{5}$ and $\pi$ are all computable \cite{turing}. In Turing's view, for a number to be computable, one must be able to write down a finite series of steps which give an effective procedure for computing an approximate representation of this number to any arbitrary precision. Turing formalized these computational steps in the form of an abstract machine which reads and writes symbols on an infinite tape---a \index{Turing machine}\emph{Turing machine} (the precise definition can be found in the literature, but it doesn't matter for our purposes).
 
 It suffices to only consider the base-2 representation of numbers, with the two symbols ``0'' and ``1''. Furthermore, an integer is always computable, since the effective procedure there is to list out the finite sequence of binary digits; thus, the problem reduces to defining a notion of computability for real numbers in the interval $[\,0, 1)$. For a rational number, the binary expansion always either terminates, or repeats; we can consider a terminating expansion as one that ends with an infinite repeating sequence of ``0''. With an irrational number, the sequence of digits carries on forever, without repetition.
 
@@ -989,7 +989,7 @@ Today, we formulate Turing's work in terms of the \IndexDefinition{halting probl
 \item Now, suppose we could determine if a Turing machine halts on every possible input. Then, we could determine if an arbitrary machine is circle-free, by constructing a new machine which simulates the execution of the original, taking an arbitrary initial state as input, halting as soon as it outputs a single digit. Then the modified machine always halts if and only if the original machine is circle-free.
 \end{itemize}
 
-Before we look at an informal proof of the undecidability of the halting problem, we make a philosophical remark. Turing's results have value because they are not narrowly just about the Turing machine formalism itself, but any form of computation capable of simulating a Turing machine. Concurrently with Turing's work, Alonzo Church invented a formal system called the \index{lambda calculus}\emph{lambda calculus}, and demonstrated a similar undecidability result \cite{church}; Turing actually went on to become Church's student. It was then shown that every lambda-computable function can be expressed by Turing machine and vice versa, showing the two formalisms have equal expressive power. Indeed, every computational formalism discovered since has been shown to be equivalent to the Turing machine. The \emph{Church-Turing thesis} is the statement that all forms of universal computation are equivalent in this sense.
+Before we look at an informal proof of the undecidability of the halting problem, we make a philosophical remark. Turing's results have value because they are not narrowly just about the Turing machine formalism itself, but any form of computation capable of simulating a Turing machine. Concurrently with Turing's work, \index{Alonzo Church}Alonzo Church invented a formal system called the \index{lambda calculus}\emph{lambda calculus}, and demonstrated a similar undecidability result \cite{church}; Turing actually went on to become Church's student. It was then shown that every lambda-computable function can be expressed by Turing machine and vice versa, showing the two formalisms have equal expressive power. Indeed, every computational formalism discovered since has been shown to be equivalent to the Turing machine. The \emph{Church-Turing thesis} is the statement that all forms of universal computation are equivalent in this sense.
 
 We know Swift is Turing-complete, so we can prove the halting problem with an imagined Swift dialect having an introspection facility for function values: either giving their source code, syntax tree, machine code, or anything else. (This is not a real requirement though; with a bit of setup, the function type \texttt{() -> ()} appearing below could be replaced with \texttt{String}, or \texttt{Array<Int>}, or any other possible representation of a computable function.) We also require our functions to be deterministic, in the sense that every execution carries out the same series of steps, and they do not depend on any external input or output, other than the arguments given to the function itself.
 
@@ -1025,9 +1025,9 @@ Note that while termination checking is undecidable in full generality, we can s
 \item Finally, we might let the input program run for a finite period of time, or a finite number of steps, and reject it if it does not halt before then. In this case, we might reject a valid terminating program if it still takes too long to run.
 \end{enumerate}
 
-\paragraph{Tag systems} To actually show that Swift type substitution has an undecidable halting problem, we need to show that one can encode an arbitrary Turing machine in terms of substitution maps and conformances, but we do this in a somewhat circuitous manner. We will define \emph{tag systems}, which are another universal computational formalism, and show how to encode one particular tag system in the type substitution algebra. The same encoding readily generalizes to any tag system, which establishes that type substitution has an undecidable halting problem.
+\paragraph{Tag systems.} To see that Swift type substitution has an undecidable halting problem, we must be able to encode an arbitrary Turing machine in terms of substitution maps and conformances, but we do this in a somewhat circuitous manner. We will define \emph{tag systems}, which are another universal computational formalism, and show how to encode one particular tag system in the type substitution algebra. The same encoding readily generalizes to any tag system, which establishes that type substitution has an undecidable halting problem.
 
-Emil~L.~Post introduced tag systems in a 1943 paper \cite{posttag}. A tag system consists of the following three parts:
+\index{Emil Post}Emil~L.~Post introduced tag systems in a 1943 paper \cite{posttag}. A tag system consists of the following three parts:
 \begin{itemize}
 \item A finite alphabet of symbols.
 \item A fixed $n\in\mathbb{N}$, called the \emph{deletion number}.
@@ -1044,7 +1044,7 @@ A tag system operates on an input string, also written with the symbols of the a
 
 It is not immediately apparent from the definition that tag systems are a universal form of computation in the Church-Turing sense. Post himself wondered if there is a computable algorithm to determine if, for an arbitrary input string, a given tag system will halt. This remained an open question until 1961, when it was discovered that indeed, it is possible to encode a Turing machine as a tag system, in such a manner that the tag system halts if and only if the Turing machine halts. Thus, tag systems have equal expressive power to Turing machines, the lambda calculus, and everything else, and furthermore, the halting problem for tag systems is also undecidable \cite{turingtag}. Tag systems constructed from Turing machines require a large alphabet, so we merely note that it is possible to do so, without showing an explicit example. Instead, we will focus on a much simpler tag system, which nonetheless demonstrates the expressivity of the formalism.
 
-\paragraph{The Collatz conjecture} The \index{Collatz conjecture}\emph{Collatz conjecture}, named after Lothar~Collatz, is a famous unsolved problem in number theory. Consider the following function, $f\colon\mathbb{N}\rightarrow\mathbb{N}$:
+\paragraph{The Collatz conjecture.} The \index{Collatz conjecture}\emph{Collatz conjecture}, named after \index{Lothar Collatz}Lothar~Collatz, is a famous unsolved problem in number theory. Consider the following function, $f\colon\mathbb{N}\rightarrow\mathbb{N}$:
 \[
 f(n) = \begin{cases}
 n/2 &\qquad \mbox{$n$ even}\\
@@ -1076,7 +1076,7 @@ To evaluate the Collatz sequence for $n\in\mathbb{N}$, we take the input string 
 \end{enumerate}
 Evaluation now stops; the length of ``$a$'' is smaller than the deletion number of 2. Now consider the evaluation steps where the input string consists entirely of ``$a$''; in order, we have ``$aaaa$'', ``$aa$'', and ``$a$''. This is the Collatz sequence for 4, which is 4, 2, 1. If we had instead started with the input string ``$aaaaa$'', we would get the Collatz sequence for 5, and so on.
 
-\paragraph{Swift type substitution}
+\paragraph{Swift type substitution.}
 To encode this tag system in Swift, we begin with a protocol declaration, together with the five concrete types conforming to \texttt{P} shown in Listing~\ref{collatz listing}:
 \begin{Verbatim}
 protocol P {
@@ -1342,7 +1342,7 @@ The substituted return type can be computed with our identities. The parentheses
 \end{gather*}
 We reach the halting state, because the Collatz sequence for $n=2$ reaches 1.
 
-\paragraph{Further discussion}
+\paragraph{Further discussion.}
 The discussion of generic function types in Section~\ref{misc types} alluded to the undecidability of type inference in the System~F formalism. In Section~\ref{conditional conformance}, we looked at an example of a non-terminating conditional conformance check in Swift, and cited a similar example in \index{Rust}Rust. Later, Section~\ref{word problem} will show that Swift reduced type equality is also undecidable in the general case, but we will provide a termination guarantee by restricting the problem. Countless other instances of undecidable type checking problems are described in the literature, exploiting clever and varied tricks to encode arbitrary computation in terms of types. We will cite just two more: \index{Java}Java generics were shown to be Turing-complete in \cite{java_undecidable}, and \index{TypeScript}TypeScript in \cite{tscollatz}; the latter example also encodes the Collatz sequence, but in a completely different manner than we did in this section. Finally, the Collatz conjecture, which fundamentally has no relation to type systems or programming languages, is discussed in \cite{collatzbook} and \cite{wolframtag}.
 
 \section{Source Code Reference}
