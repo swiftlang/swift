@@ -27,7 +27,7 @@ $ swiftc algorithm.swift utils.swift -module-name SudokuSolver
       -emit-library -emit-module
 \end{Verbatim}
 
-\paragraph{Frontend jobs}
+\paragraph{Frontend jobs.}
 The \IndexDefinition{Swift frontend}Swift frontend itself is single-threaded, but the driver can benefit from multi-core concurrency by running multiple \IndexDefinition{frontend job}frontend jobs in parallel. Each frontend job compiles one or more source files; these are the \IndexDefinition{primary file}\emph{primary source files} of the frontend job. All non-primary source files are the \IndexDefinition{secondary file}\emph{secondary source files} of the frontend job. The assignment of primary source files to each frontend job is determined by the \emph{compilation mode}:
 \begin{itemize}
 \item The \IndexFlag{wmo}\texttt{-wmo} driver flag selects \IndexDefinition{whole module optimization}\emph{whole module mode}, typically used for \index{release build}release builds. In this mode, the driver schedules a single frontend job. The primary files of this job are all the source files in the main module, and there are no secondary files. In whole module mode, the frontend is able to perform more aggressive optimization across source file boundaries, hence its usage for release builds.
@@ -37,7 +37,7 @@ Single file mode incurs inexorable overhead in the form of duplicated work betwe
 
 \item The \IndexFlag{enable-batch-mode}\texttt{-enable-batch-mode} driver flag selects \IndexDefinition{batch mode}\emph{batch mode}, which is a happy medium between whole module and single file mode. In batch mode, the list of source files is partitioned into fixed-size batches, up to the maximum batch size. The source files in each batch become the primary files of each frontend job.
 
-By compiling multiple primary files in a single frontend job, batch mode amortizes the cost of parsing and type checking work performed on secondary files. At the same time, it still schedules multiple frontend jobs for parallelism on multi-core systems. Batch mode was first introduced in Swift 4.2, and is now the default for debug builds.
+By compiling multiple primary files in a single frontend job, batch mode amortizes the cost of parsing and type checking work performed on secondary files. At the same time, it still schedules multiple frontend jobs for parallelism on multi-core systems. \index{history}Batch mode was first introduced in Swift 4.2, and is now the default for debug builds.
 \end{itemize}
 
 Note that each source file is a primary source file of exactly one frontend job, and within a single frontend job, the primary files and secondary files together form the full list of source files in the module. A single source file is therefore the minimum unit of parallelism. By default, the number of concurrent frontend jobs is determined by the number of CPU cores; this can be overridden with the \IndexFlag{j}\texttt{-j} driver flag. If there are more frontend jobs than can be run simultaneously, the driver queues them and kicks them off as other frontend jobs complete. In batch mode and single file mode, the driver can also perform an \index{incremental build}\emph{incremental build} by re-using the result of previous compilations, providing an additional compile-time speedup. Incremental builds are described in Section~\ref{request evaluator}.
@@ -51,7 +51,7 @@ swift-frontend -frontend -c m.swift v.swift -primary-file c.swift ...
 ld m.o v.o c.o -o main
 \end{Verbatim}
 
-\paragraph{Compilation pipeline}
+\paragraph{Compilation pipeline.}
 The Swift frontend implements a classic multi-stage compiler pipeline, shown in Figure~\ref{compilerpipeline}:
 \begin{itemize}
 \item \IndexDefinition{parser}\textbf{Parse:} First, all source files are parsed to form the \IndexDefinition{abstract syntax tree}\index{AST|see{abstract syntax tree}}\index{syntax tree|see{abstract syntax tree}}abstract syntax \index{tree}tree.
@@ -66,7 +66,7 @@ When the \IndexFlag{O}\texttt{-O} command line flag is specified, the canonical 
 
 \begin{figure}\captionabove{The compilation pipeline}\label{compilerpipeline}
 \begin{center}
-\begin{tikzpicture}[node distance=1.1cm]
+\begin{tikzpicture}[node distance=1.2cm]
 
 \node (Parse) [stage] {Parse};
 \node (Sema) [stage, below of=Parse] {Sema};
@@ -85,10 +85,10 @@ When the \IndexFlag{O}\texttt{-O} command line flag is specified, the canonical 
 \end{center}
 \end{figure}
 
-\paragraph{Debugging flags}
+\paragraph{Debugging flags.}
 Various command-line flags are provided to run the pipeline until a certain phase, and dump the output of that phase to the terminal (or some other file, in conjunction with the \IndexFlag{o}\texttt{-o} flag). These are useful for debugging the compiler:
 \begin{itemize}
-\item \IndexFlag{dump-parse}\texttt{-dump-parse} runs only the parser, and prints the parsed \index{abstract syntax tree}syntax tree as an \index{s-expression}s-expression.\footnote{The term comes from \index{Lisp}Lisp. An s-expression represents a tree structure as nested parenthesized lists; e.g.\ \texttt{(a (b c) d)} is a node with three children \texttt{a}, \texttt{(b c)} and \texttt{d}, and \texttt{(b c)} has two children \texttt{b} and \texttt{c}.}
+\item \IndexFlag{dump-parse}\texttt{-dump-parse} runs only the parser, and prints the \index{abstract syntax tree}syntax tree as an \index{s-expression}s-expression.\footnote{The term comes from \index{Lisp}Lisp. An s-expression represents a tree structure as nested parenthesized lists; e.g.\ \texttt{(a (b c) d)} is a node with three children \texttt{a}, \texttt{(b c)} and \texttt{d}, and \texttt{(b c)} has two children \texttt{b} and \texttt{c}.}
 \item \IndexFlag{dump-ast}\texttt{-dump-ast} runs only the parser and Sema, and prints the type-checked syntax tree as an s-expression.
 \item \IndexFlag{print-ast}\texttt{-print-ast} prints the type-checked syntax tree in a form that approximates what was written in source code. This is useful for getting a sense of what declarations the compiler \index{synthesized declaration}synthesized, for example for derived conformances to protocols like \texttt{Equatable}.
 \item \IndexFlag{emit-silgen}\texttt{-emit-silgen} runs only Sema and SILGen, and prints the raw SIL output by SILGen.
@@ -103,7 +103,7 @@ Each pipeline phase can emit \index{warning}warnings and \index{error}errors, co
 \index{textual interface}
 The compilation pipeline will vary slightly depending on what the driver and frontend were asked to produce. When the frontend is instructed to emit a serialized module file only, and not an object file, compilation stops after the SIL optimizer. When generating a textual interface file or TBD file, compilation stops after Sema. (Textual interfaces are discussed in Section~\ref{module system}. A TBD file is a list of symbols in a shared library, which can be consumed by the linker and is faster to generate than the shared library itself; we're not going to talk about them here.)
 
-\paragraph{Frontend flags}
+\paragraph{Frontend flags.}
 \index{frontend flag}
 The command line flags listed above are understood by both the driver and the frontend; the driver passes them down to the frontend. Various other flags used for compiler development and debugging and only known to the frontend. If the driver is invoked with the \IndexFlag{frontend}\texttt{-frontend} flag as the first command line flag, then instead of scheduling frontend jobs, the driver spawns a single frontend job, passing it the rest of the command line without further processing:
 \begin{Verbatim}
@@ -118,7 +118,7 @@ $ swiftc a.swift b.swift -Xfrontend -dump-requirement-machine
 
 \IndexDefinition{name lookup}Name lookup is the process of resolving identifiers to declarations. The Swift compiler does not have a distinct ``name binding'' phase; instead, name lookup is queried from various points in the frontend process. Broadly speaking, there are two kinds of name lookup: \IndexDefinition{unqualified lookup}\emph{unqualified lookup} and \IndexDefinition{qualified lookup}\emph{qualified lookup}. An unqualified lookup resolves a single \index{identifier}identifier ``\texttt{foo}'', while qualified lookup resolves an identifier ``\texttt{bar}'' relative to a base, such as a member reference expression ``\texttt{foo.bar}''. There are also three important variants of these two fundamental kinds, for looking up top-level declartions in other modules, resolving operators, and performing dynamic lookups of Objective-C methods.
 
-\paragraph{Unqualified lookup}
+\paragraph{Unqualified lookup.}
 An unqualified lookup is always performed relative to the \index{source location}source location where the \index{identifier}identifier actually appears. The source location may either be in a primary or secondary file.
 
 Unqualified lookup consults the source file's \index{tree}\IndexDefinition{scope tree}\emph{scope tree}, which is constructed by walking the source file's abstract syntax tree. The root scope is the source file itself. Each scope has an associated \index{source range}source range, and zero or more child scopes; each child scope's source range must be a subrange of the source range of its parent, and the source ranges of sibling scopes are disjoint. Each scope introduces zero or more \emph{variable bindings}.
@@ -145,20 +145,18 @@ ASTSourceFileScope 0x14c131908, [1:1 - 5:1] 'id.swift'
 \end{Verbatim}
 \end{listing}
 
-\paragraph{Qualified lookup}
-A qualified lookup looks inside a list of type declarations for members with a given name. Starting from an initial list of type declarations, qualified lookup also visits the superclass of a class declaration, and conformed protocols.
+\paragraph{Qualified lookup.}
+A qualified lookup looks within a list of type declarations for members with a given name. Starting from an initial list of type declarations, qualified lookup also visits the superclass of a class declaration, and conformed protocols. The more primitive operation performed at each step is called a \index{direct lookup}\emph{direct lookup}, which searches inside a single type declaration and its extensions only, by consulting the type declaration's \index{member lookup table}\emph{member lookup table}. Direct lookup is explained in detail in Section~\ref{extension binding}.
 
-The more primitive operation performed at each step is called a \index{direct lookup}\emph{direct lookup}, which searches inside a single type declaration and its extensions only, by consulting the type declaration's \index{member lookup table}\emph{member lookup table}. Direct lookup is explained in detail in Section~\ref{extension binding}.
+\paragraph{Module lookup.} \IndexDefinition{module lookup}A qualified lookup where the base is a module declaration searches for a top-level declaration in the given module and any other modules that it re-exports via \texttt{@\_exported import}.
 
-\paragraph{Module lookup} \IndexDefinition{module lookup}A qualified lookup where the base is a module declaration searches for a top-level declaration in the given module and any other modules that it re-exports via \texttt{@\_exported import}.
-
-\paragraph{Dynamic lookup} A qualified lookup whose base is the \texttt{AnyObject} type implements the legacy \index{Objective-C}Objective-C behavior of a message send to \texttt{id}, which can invoke any method defined in any Objective-C class or protocol. In Swift, the so-called \IndexDefinition{AnyObject lookup@\texttt{AnyObject} lookup|see{dynamic lookup}}\IndexDefinition{dynamic lookup}\emph{dynamic lookup} searches a global lookup table constructed to contain all \texttt{@objc} members of all classes and protocols:
+\paragraph{Dynamic lookup.} A qualified lookup whose base is the \texttt{AnyObject} type implements the legacy \index{Objective-C}Objective-C behavior of a message send to \texttt{id}, which can invoke any method defined in any Objective-C class or protocol. In Swift, the so-called \IndexDefinition{AnyObject lookup@\texttt{AnyObject} lookup|see{dynamic lookup}}\IndexDefinition{dynamic lookup}\emph{dynamic lookup} searches a global lookup table constructed to contain all \texttt{@objc} members of all classes and protocols:
 \begin{itemize}
 \item Any class can contain \texttt{@objc} members, and the attribute can either be explicitly stated, or inferred if the method overrides an \texttt{@objc} method from the superclass.
 \item Protocol members are \texttt{@objc} only if the protocol itself is \texttt{@objc}.
 \end{itemize}
 
-\paragraph{Operator lookup}
+\paragraph{Operator lookup.}
 Operator symbols are declared at the top level of a module by \IndexDefinition{operator declaration}\emph{operator declarations}. \IndexDefinition{operator symbol}Operator declarations have a fixity (\index{prefix operator}prefix, \index{infix operator}infix, or \index{postfix operator}postfix), and infix operators also have a \IndexDefinition{precedence group}\emph{precedence group}. Precedence groups are \index{partial order}partially ordered with respect to other precedence groups. Standard operators like \texttt{+} and \texttt{*} and their precedence groups are thus defined in the standard library, rather than being built-in to the language itself.
 
 \IndexDefinition{operator lookup}
@@ -200,7 +198,7 @@ let fn = { ($0 ++ $1) as Bool }
 \end{listing}
 Listing~\ref{customops} shows the definition of some custom operators and precedence groups. Note that the overload of \texttt{++} inside struct \texttt{Chicken} returns \texttt{Int}, and the overload of \texttt{++} inside struct \texttt{Sausage} returns \texttt{Bool}. The closure value stored in \texttt{fn} applies \texttt{++} to two anonymous closure parameters, \verb|$0| and \verb|$1|. While they do not have declared types, by simply coercing the \emph{return type} to \texttt{Bool}, we are able to unambiguously pick the overload of \texttt{++} declared in \texttt{Sausage}. (Whether this is good style is left to the reader to judge.)
 
-Initially, infix operators defined their precedence as an integer value; Swift 3 introduced named precedence groups \cite{se0077}. The global lookup for operator functions dates back to when all operator functions were declared at the top level. Swift~3 also introduced the ability to declare operator functions as members of types, but the global lookup behavior was retained \cite{se0091}.
+Initially, infix operators defined their precedence as an integer value; \index{history}Swift~3 introduced named precedence groups \cite{se0077}. The global lookup for operator functions dates back to when all operator functions were declared at the top level. Swift~3 also introduced the ability to declare operator functions as members of types, but the global lookup behavior was retained \cite{se0091}.
 
 \section{Delayed Parsing}\label{delayed parsing}
 
@@ -210,12 +208,12 @@ The \IndexDefinition{delayed parsing}\emph{delayed parsing} optimization solves 
 
 For delayed parsing to work, the skipped members of types and extensions must have no observable effect on compilation. This is always true with two exceptions: operator lookup, and dynamic lookup.
 
-\paragraph{Operator lookup}
+\paragraph{Operator lookup.}
 \index{operator lookup}
 \index{expression}
 As explained in the previous section, operator functions are visible globally, even when declared as a method of a type. To deal with this, the parser looks for the keyword ``\texttt{func}'' followed by an operator symbol when skipping a type or extension body in a secondary file. The first time an operator lookup is performed, the bodies of all types and extensions that contain operator functions are parsed again. Most types and extensions do not define operator functions, so this occurs rarely in practice.
 
-\paragraph{Dynamic  lookup}
+\paragraph{Dynamic  lookup.}
 \index{dynamic lookup}
 \index{Objective-C}
 The situation with dynamic lookup is similar, since a method call on a value of type \texttt{AnyObject} must consult a global lookup table constructed from \texttt{@objc} members of classes, and the (implicitly \texttt{@objc}) members of \texttt{@objc} protocols.  Unlike operator functions, classes and \texttt{@objc} protocols are quite common in Swift programs, so it would be unfortunate to penalize compile-time performance when \texttt{AnyObject} is a rarely-used feature. Instead, the solution is to eagerly parse classes and \texttt{@objc} protocols the first time a frontend job encounters a dynamic \texttt{AnyObject} method call.
@@ -334,14 +332,14 @@ struct Box {
 Our frontend job does not emit any diagnostics in the semantic analysis pass, because the \texttt{contents} stored property of \texttt{Box} is not actually referenced while type checking the primary file \texttt{a.swift}. However when SILGen runs, it needs to determine whether the parameter of type \texttt{Box} to the \texttt{open()} function needs to be passed directly in registers, or via an address by computing the \emph{type lowering} for the \texttt{Box} type. Type lowering recursively visits the stored properties of \texttt{Box} and computes their type lowering; this evaluates the \index{interface type request}\Request{interface type request} for the \texttt{contents} property of \texttt{Box}, which emits a diagnostic because the identifier \index{identifier}``\texttt{DoesNotExist}'' does not resolve to a valid type. This also means that SILGen must be prepared to deal with a potentially invalid abstract syntax tree.
 \end{example}
 
-The request evaluator framework was first introduced in Swift~4.2 \cite{reqeval}. In subsequent releases, various ad-hoc mechanisms were gradually converted into request evaluator requests, with resulting gains to compiler performance, stability, and implementation maintainability.
+The request evaluator framework was first introduced in \index{history}Swift~4.2 \cite{reqeval}. In subsequent releases, various ad-hoc mechanisms were gradually converted into request evaluator requests, with resulting gains to compiler performance, stability, and implementation maintainability.
 
-\paragraph{Cycles} In a language that supports \index{forward reference}forward references, it is possible to write a program that is syntactically well-formed, and where all identifiers resolve to valid declarations, but is nonetheless invalid because of circularity. The classic example of this is a pair of classes where each class \index{circular inheritance}inherits from the other:
+\paragraph{Cycles.} In a language supporting \index{forward reference}forward references, it is possible to write a program that is syntactically well-formed, and where all identifiers resolve to valid declarations, but is nonetheless invalid because of circularity. The classic example of this is a pair of classes where each class \index{circular inheritance}inherits from the other:
 \begin{Verbatim}
 class A: B {}
 class B: A {}
 \end{Verbatim}
-Implementing bespoke logic to detect circularity is error-prone and tedious, and a missing circularity check can result in a crash or infinite loop when the compiler encounters an invalid input program. The request evaluator centralizes \IndexDefinition{request cycle}cycle detection by maintaining a stack of \IndexDefinition{active request}\emph{active requests}. Before evaluating a request, the request evaluator first checks if the active request stack already contains an equal request. In this case, calling the evaluation function would result in infinite recursion, so instead the request evaluator diagnoses an error and returns a request-specific sentinel value.
+Implementing bespoke logic to detect circularity is error-prone and tedious, and a missing circularity check can result in a crash or infinite loop when the compiler encounters an invalid input program. The request evaluator centralizes \IndexDefinition{request cycle}cycle detection by maintaining a \index{stack}stack of \IndexDefinition{active request}\emph{active requests}. Before evaluating a request, the request evaluator first checks if the active request stack already contains an equal request. In this case, calling the evaluation function would result in infinite recursion, so instead the request evaluator diagnoses an error and returns a request-specific sentinel value.
 \begin{Verbatim}
 $ swiftc cycle.swift
 cycle.swift:1:7: error: `A' inherits from itself
@@ -363,7 +361,7 @@ $ swiftc cycle.swift -Xfrontend -debug-cycles
 \end{Verbatim}
 
 \IndexFlag{trace-stats-events}
-\paragraph{Debugging} A couple of command-line flags are handy for debugging compile-time performance issues. The \texttt{-stats-output-dir} flag is followed by the name of a directory, which must already exist. Each frontend job writes a new JSON file to this directory, with various counters and timers. For each kind of request, there is a counter for the number of unique requests of this kind that were evaluated, not counting requests whose results were cached. The timer records the time spent in the request's evaluation function.
+\paragraph{Debugging.} A couple of command-line flags are useful for debugging compile-time performance issues. The \texttt{-stats-output-dir} flag is followed by the name of a directory, which must already exist. Each frontend job writes a new JSON file to this directory, with various counters and timers. For each kind of request, there is a counter for the number of unique requests of this kind that were evaluated, not counting requests whose results were cached. The timer records the time spent in the request's evaluation function.
 
 The output can be sliced and diced in various ways; one can actually make pretty effective use of \Index{awk@\texttt{awk}}\texttt{awk}, despite the \index{JSON}JSON format:
 \begin{Verbatim}
@@ -404,7 +402,7 @@ func g() {
 \end{listing}
 
 \IndexDefinition{dependency file}
-The approach taken by the Swift compiler is to construct a \emph{dependency graph}. The frontend outputs a \emph{dependency file} for each source file, recording all names the source file \emph{provides}, and all names the type checker \emph{requires} while compiling the source file. Dependency files use a binary format with the ``\texttt{.swiftdeps}'' file name extension. The list of provided names in the dependency file is generated by walking the \index{abstract syntax tree}abstract syntax tree, collecting all visible declarations in each source file. The list of required names is generated by the request evaluator, using the stack of active requests. Every cached request has a list of required names, and a \index{request}request can optionally be either a dependency sink, or dependency source:
+The approach taken by the Swift compiler is to construct a \emph{dependency graph}. The frontend outputs a \emph{dependency file} for each source file, recording all names the source file \emph{provides}, and all names the type checker \emph{requires} while compiling the source file. Dependency files use a binary format with the ``\texttt{.swiftdeps}'' file name extension. The list of provided names in the dependency file is generated by walking the \index{abstract syntax tree}abstract syntax tree, collecting all visible declarations in each source file. The list of required names is generated by the request evaluator, using the \index{stack}stack of active requests. Every cached request has a list of required names, and a \index{request}request can optionally be either a dependency sink, or dependency source:
 \begin{itemize}
 \item A \IndexDefinition{dependency sink}\emph{dependency sink} is a name lookup request which records a required name. When a dependency sink request is evaluated, the request evaluator walks the stack of active requests, adding the identifier to each active request's list of required names. Thus, for every request, we track the name lookups that took place from the evaluation function.
 
@@ -480,7 +478,7 @@ The frontend represents a module by a \IndexDefinition{module declaration}\emph{
 \end{itemize}
 The main module depends on other modules via the \texttt{import} keyword, which parses as an \IndexDefinition{import declaration}\emph{import declaration}. After parsing, one of the first stages in semantic analysis loads all modules imported the main module. The standard library is defined in the \texttt{Swift} module, which is imported automatically unless the frontend was invoked with the \IndexFlag{parse-stdlib}\texttt{-parse-stdlib} flag, used when building the standard library itself. As for the builtin module, it is ordinarily not visible, but the \texttt{-parse-stdlib} flag also causes it to be implicitly imported (Section~\ref{misc types}).
 
-\paragraph{Serialized modules} Passing the \IndexFlag{emit-module}\texttt{-emit-module} flag instructs the compiler to generate a \index{binary module|see{serialized module}}\IndexDefinition{serialized module}serialized module. Serialized module files use the ``\texttt{.swiftmodule}'' file name extension. Serialized modules are stored in a binary format, closely tied to the specific version of the Swift compiler (when building a shared library for distribution, it is better to publish a textual interface instead, as described at the end of this section).
+\paragraph{Serialized modules.} The \IndexFlag{emit-module}\texttt{-emit-module} flag instructs the compiler to generate a \index{binary module|see{serialized module}}\IndexDefinition{serialized module}serialized module. Serialized module files use the ``\texttt{.swiftmodule}'' file name extension. Serialized modules are stored in a binary format, closely tied to the specific version of the Swift compiler (when building a shared library for distribution, it is better to publish a textual interface instead, as described at the end of this section).
 
 Name lookup into a serialized module lazily constructs declarations by deserializing records from this binary format as needed. Deserialized declarations generally look like parsed and fully type-checked declarations, but they sometimes contain less information. For example, in Chapter~\ref{generic declarations}, we will see various syntactic representations of generic parameter lists, \texttt{where} clauses, and so on. Since this information is only used when type checking the declaration, it is not serialized. Instead, deserialized declarations only need to store a generic signature, described in Chapter~\ref{genericsig}.
 
@@ -492,7 +490,7 @@ Another key difference between parsed declarations and deserialized declarations
 
 \IndexDefinition{imported module}
 \IndexDefinition{Clang importer}
-\paragraph{Imported modules} An imported module is implemented in \index{C}C, \index{Objective-C}Objective-C or \index{C++}C++. The Swift compiler embeds a copy of \index{Clang}Clang and uses it to parse module maps, header files, and binary precompiled headers. Name lookup into an imported module lazily constructs Swift declarations from their corresponding Clang declarations. The Swift compiler component responsible for this is known as the ``Clang importer.''
+\paragraph{Imported modules.} An imported module is implemented in \index{C}C, \index{Objective-C}Objective-C or \index{C++}C++. The Swift compiler embeds a copy of \index{Clang}Clang and uses it to parse module maps, header files, and binary precompiled headers. Name lookup into an imported module lazily constructs Swift declarations from their corresponding Clang declarations. The Swift compiler component responsible for this is known as the ``Clang importer.''
 
 Imported function declarations generally do not have bodies if the entry point was previously emitted by Clang and is available externally. Occasionally the Clang importer synthesizes accessor methods and other such trivia, which do have bodies represented as Swift statements and expressions. C functions not available externally, such as \texttt{static inline} functions declared in header files, are emitted by having Swift \index{IRGen}IRGen call into Clang.
 
@@ -500,7 +498,7 @@ Imported function declarations generally do not have bodies if the entry point w
 \IndexFlag{import-objc-header}
 Invoking the compiler with the \texttt{-import-objc-header} flag followed by a header file name specifies a \emph{bridging header}. This is a shortcut for making C declarations in the bridging header visible to all other source files in the main module, without having to define a separate Clang module first. This is implemented by adding a Clang file unit corresponding to the bridging header to the main module. For this reason, compiler code should not assume that all file units in the main module are necessarily source files.
 
-\paragraph{Textual interfaces} \IndexFlag{emit-module-interface}The Swift serialized module format depends on compiler internals and no attempt is made to preserve compatibility across compiler releases. When building a shared library for distribution, it is better to generate a \IndexDefinition{textual interface}\emph{textual interface}:\index{horse}
+\paragraph{Textual interfaces.} \IndexFlag{emit-module-interface}The binary module format depends on compiler internals and no attempt is made to preserve compatibility across compiler releases. When building a shared library for distribution, it is better to generate a \IndexDefinition{textual interface}\emph{textual interface}:\index{horse}
 \begin{Verbatim}
 $ swiftc Horse.swift -enable-library-evolution -emit-module-interface
 \end{Verbatim}

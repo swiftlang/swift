@@ -81,10 +81,6 @@ func add<T>(_ lhs: T, _ rhs: T) -> T where T == Int {
 \begin{figure}\captionabove{Overview of the inferred generic signature request}\label{inferred generic signature request figure}
 \begin{center}
 \begin{tikzpicture}[node distance=1.5cm]
-\tikzstyle{data} = [rounded corners, draw=black, text centered]
-\tikzstyle{stage} = [rectangle, draw=black, text centered]
-\tikzstyle{arrow} = [->,>=stealth]
-
 \node (SyntacticRepresentations) [data] {Syntactic representations};
 \node (RequirementResolution) [stage, below of=SyntacticRepresentations] {Requirement resolution};
 \node (RequirementInference) [stage, below of=RequirementResolution] {Requirement inference};
@@ -125,10 +121,6 @@ The inferred generic signature request emits diagnostics at the source location 
 \begin{figure}\captionabove{Overview of the abstract generic signature request}\label{abstract generic signature request figure}
 \begin{center}
 \begin{tikzpicture}[node distance=1.5cm]
-\tikzstyle{data} = [rounded corners, draw=black, text centered]
-\tikzstyle{stage} = [rectangle, draw=black, text centered]
-\tikzstyle{arrow} = [->,>=stealth]
-
 \node (Requirements) [data] {Requirements};
 \node (RequirementDesugaring) [stage, below of=Requirements] {Requirement desugaring};
 \node (RequirementMinimization) [stage, below of=RequirementDesugaring] {Requirement minimization};
