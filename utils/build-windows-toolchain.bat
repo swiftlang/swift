@@ -192,7 +192,7 @@ cmake ^
 cmake --build "%BuildRoot%\curl" || (exit /b)
 cmake --build "%BuildRoot%\curl" --target install || (exit /b)
 
-path %BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Runtimes\0.0.0\usr\bin;%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Toolchains\0.0.0+Asserts\usr\bin;%Path%
+path %BuildRoot%\toolchains\5.9.0\PFiles64\Swift\runtime-development\usr\bin;%BuildRoot%\toolchains\5.9.0\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin;%Path%
 
 :: Build Swift Syntax
 cmake ^
@@ -205,8 +205,8 @@ cmake ^
   -D CMAKE_CXX_COMPILER=cl ^
   -D CMAKE_CXX_FLAGS="/GS- /Oy /Gw /Gy" ^
   -D CMAKE_MT=mt ^
-  -D CMAKE_Swift_COMPILER=%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Toolchains/0.0.0+Asserts/usr/bin/swiftc.exe ^
-  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D CMAKE_Swift_COMPILER=%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe ^
+  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_Swift_FLAGS_RELEASE="-O" ^
@@ -236,8 +236,8 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
 
-  -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Toolchains/0.0.0+Asserts/usr/bin/swiftc.exe" ^
-  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe" ^
+  -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 
@@ -265,7 +265,7 @@ cmake ^
   -D SWIFT_PATH_TO_LIBDISPATCH_SOURCE="%SourceRoot%\swift-corelibs-libdispatch" ^
   -D SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE="%SourceRoot%\swift-syntax" ^
   -D SWIFT_PATH_TO_STRING_PROCESSING_SOURCE=%SourceRoot%\swift-experimental-string-processing ^
-  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a/PFiles64/Swift/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D SWIFT_PATH_TO_SWIFT_SDK="%BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
@@ -866,12 +866,14 @@ endlocal
 :FetchX64Toolchain
 setlocal enableextensions enabledelayedexpansion
 
-curl.exe -k -sOL "https://github.com/thebrowsercompany/swift-build/releases/download/20230919.2/installer-amd64.exe" || (exit /b)
-"WiX-4.0.1\tools\net6.0\any\wix.exe" burn extract installer-amd64.exe -o %BuildRoot%\toolchains || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a0" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\PFiles64\Swift\Runtimes\0.0.0\usr\bin\" || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a1" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\" || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a2" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\" || (exit /b)
-msiexec.exe /qn /a "%BuildRoot%\toolchains\a5" TARGETDIR="%BuildRoot%\toolchains\swift-DEVELOPMENT-SNAPSHOT-2023-08-12-a\" || (exit /b)
+curl.exe -k -sOL "https://download.swift.org/swift-5.9-release/windows10/swift-5.9-RELEASE/swift-5.9-RELEASE-windows10.exe" || (exit /b)
+"WiX-4.0.1\tools\net6.0\any\wix.exe" burn extract swift-5.9-RELEASE-windows10.exe -o %BuildRoot%\toolchains || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a0" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a1" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a2" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a3" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a4" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
+msiexec.exe /qn /a "%BuildRoot%\toolchains\a5" TARGETDIR="%BuildRoot%\toolchains\5.9.0\" || (exit /b)
 
 goto :eof
 endlocal
