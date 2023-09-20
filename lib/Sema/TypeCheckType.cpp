@@ -2130,6 +2130,8 @@ namespace {
                                          TypeResolutionOptions options);
     NeverNullType resolveMetatypeType(MetatypeTypeRepr *repr,
                                       TypeResolutionOptions options);
+    NeverNullType resolveInverseType(InverseTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveProtocolType(ProtocolTypeRepr *repr,
                                       TypeResolutionOptions options);
     NeverNullType resolveSILBoxType(SILBoxTypeRepr *repr,
@@ -2478,6 +2480,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
+
+  case TypeReprKind::Inverse:
+    return resolveInverseType(cast<InverseTypeRepr>(repr), options);
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
@@ -5035,6 +5040,22 @@ NeverNullType TypeResolver::buildMetatypeType(
   }
 }
 
+NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
+                                               TypeResolutionOptions options) {
+  auto ty = resolveType(repr->getConstraint(), options);
+  if (ty->hasError())
+    return ErrorType::get(getASTContext());
+
+  // TODO: more user-friendly verification
+
+  if (auto protoTy = ty->getAs<ProtocolType>())
+    if (auto protoDecl = protoTy->getDecl())
+      if (protoDecl->isSpecificProtocol(KnownProtocolKind::Copyable))
+        return ty;
+
+  llvm_unreachable("todo: verification");
+}
+
 NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
@@ -5248,6 +5269,7 @@ public:
     case TypeReprKind::Member:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
+    case TypeReprKind::Inverse:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
     case TypeReprKind::Self:
