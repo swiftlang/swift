@@ -29,5 +29,5 @@ public class Store {
 }
 
 // CHECK-LABEL: sil [ossa] @$s33property_wrapper_coroutine_public5StoreC5stateypvM : $@yield_once @convention(method) (@guaranteed Store) -> @yields @inout Any {
-// CHECK: keypath $ReferenceWritableKeyPath<Store, Any>, (root $Store; settable_property $Any,  id #Store.state!getter : (Store) -> () -> Any, getter @$s33property_wrapper_coroutine_public5StoreC5stateypvpACTK : $@convention(thin) (@in_guaranteed Store) -> @out Any, setter @$s33property_wrapper_coroutine_public5StoreC5stateypvpACTk : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Store) -> ())
+// CHECK: keypath $ReferenceWritableKeyPath<Store, Any>, (root $Store; settable_property $Any,  id #Store.state!getter : (Store) -> () -> Any, getter @$s33property_wrapper_coroutine_public5StoreC5stateypvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed Store) -> @out Any, setter @$s33property_wrapper_coroutine_public5StoreC5stateypvpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Any, @in_guaranteed Store) -> ())
 // CHECK: keypath $ReferenceWritableKeyPath<Store, Published<Any>>, (root $Store; stored_property #Store._state : $Published<Any>)

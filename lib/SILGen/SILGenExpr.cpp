@@ -38,6 +38,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -1785,6 +1786,10 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::CXXMethod:
+    case SILFunctionType::Representation::KeyPathAccessorGetter:
+    case SILFunctionType::Representation::KeyPathAccessorSetter:
+    case SILFunctionType::Representation::KeyPathAccessorEquals:
+    case SILFunctionType::Representation::KeyPathAccessorHash:
       llvm_unreachable("should not do function conversion from method rep");
     }
     llvm_unreachable("bad representation");
@@ -1815,6 +1820,10 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
     case SILFunctionType::Representation::CXXMethod:
+    case SILFunctionType::Representation::KeyPathAccessorGetter:
+    case SILFunctionType::Representation::KeyPathAccessorSetter:
+    case SILFunctionType::Representation::KeyPathAccessorEquals:
+    case SILFunctionType::Representation::KeyPathAccessorHash:
       llvm_unreachable("should not do function conversion from method rep");
     }
     llvm_unreachable("bad representation");
@@ -2971,15 +2980,8 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
     return indexValues;
   }
 
-  auto indexLoweredTy = SGF.getLoweredType(AnyFunctionType::composeTuple(
-      SGF.getASTContext(), indexParams, ParameterFlagHandling::AssertEmpty));
-
-  auto addr = SGF.B.createPointerToAddress(loc, pointer,
-                                           indexLoweredTy.getAddressType(),
-                                           /*isStrict*/ false);
-
   for (unsigned i : indices(indexes)) {
-    SILValue eltAddr = addr;
+    SILValue eltAddr = pointer;
     if (indexes.size() > 1) {
       eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
     }
@@ -3002,6 +3004,20 @@ getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
     return storage->getOpaqueAccessor(AccessorKind::Get);
   assert(storage->requiresOpaqueReadCoroutine());
   return storage->getOpaqueAccessor(AccessorKind::Read);
+}
+
+static CanType buildKeyPathIndicesTuple(ASTContext &C,
+                                        ArrayRef<KeyPathPatternComponent::Index> indexes) {
+
+  if (indexes.size() == 1) {
+    return indexes[0].FormalType;
+  }
+
+  SmallVector<TupleTypeElt, 8> indicesElements;
+  for (auto &elt : indexes) {
+    indicesElements.emplace_back(elt.FormalType);
+  }
+  return TupleType::get(indicesElements, C)->getCanonicalType();
 }
 
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
@@ -3052,14 +3068,26 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     SmallVector<SILParameterInfo, 2> params;
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
-    if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
-                        ParameterConvention::Direct_Unowned});
-    
+
+    if (!indexes.empty()) {
+      if (indexes.size() > 1) {
+        SmallVector<TupleTypeElt, 8> indicesElements;
+        for (auto &elt : indexes) {
+          indicesElements.emplace_back(elt.first);
+        }
+        auto indicesTupleTy = TupleType::get(indicesElements, C)->getCanonicalType();
+        params.push_back({indicesTupleTy, paramConvention});
+      } else {
+        params.push_back({indexes[0].first, paramConvention});
+      }
+    }
+
     SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
 
     return SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        genericSig, SILFunctionType::ExtInfo().withRepresentation(
+          SILFunctionType::Representation::KeyPathAccessorGetter),
+        SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, {}, result, llvm::None,
         SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
@@ -3116,6 +3144,8 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     auto indexArgTy =
         subSGF.silConv.getSILType(signature->getParameters()[1], signature,
                                   subSGF.F.getTypeExpansionContext());
+    if (genericEnv)
+      indexArgTy = genericEnv->mapTypeIntoContext(SGM.M, indexArgTy);
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
@@ -3235,12 +3265,23 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         ? ParameterConvention::Indirect_Inout
                         : paramConvention});
     // indexes
-    if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
-                        ParameterConvention::Direct_Unowned});
+    if (!indexes.empty()) {
+      if (indexes.size() > 1) {
+        SmallVector<TupleTypeElt, 8> indicesElements;
+        for (auto &elt : indexes) {
+          indicesElements.emplace_back(elt.first);
+        }
+        auto indicesTupleTy = TupleType::get(indicesElements, C)->getCanonicalType();
+        params.push_back({indicesTupleTy, paramConvention});
+      } else {
+        params.push_back({indexes[0].first, paramConvention});
+      }
+    }
 
     return SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        genericSig, SILFunctionType::ExtInfo().withRepresentation(
+          SILFunctionType::Representation::KeyPathAccessorSetter),
+        SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, {}, {}, llvm::None,
         SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
@@ -3289,20 +3330,22 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }
   auto valueArg = entry->createFunctionArgument(valueArgTy);
   auto baseArg = entry->createFunctionArgument(baseArgTy);
-  SILValue indexPtrArg;
+  SILValue indicesTupleArg;
   
   if (!indexes.empty()) {
     auto indexArgTy =
         subSGF.silConv.getSILType(signature->getParameters()[2], signature,
                                   subSGF.getTypeExpansionContext());
-    indexPtrArg = entry->createFunctionArgument(indexArgTy);
+    if (genericEnv)
+      indexArgTy = genericEnv->mapTypeIntoContext(SGM.M, indexArgTy);
+    indicesTupleArg = entry->createFunctionArgument(indexArgTy);
   }
 
   Scope scope(subSGF, loc);
 
   auto subscriptIndices =
     loadIndexValuesForKeyPathComponent(subSGF, loc, property,
-                                       indexes, indexPtrArg);
+                                       indexes, indicesTupleArg);
 
   auto valueOrig = valueArgTy.isTrivial(subSGF.F)
                        ? ManagedValue::forRValueWithoutOwnership(valueArg)
@@ -3394,9 +3437,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }
 
   auto &C = SGM.getASTContext();
-  auto unsafeRawPointerTy = C.getUnsafeRawPointerType()->getCanonicalType();
   auto boolTy = C.getBoolType()->getCanonicalType();
   auto intTy = C.getIntType()->getCanonicalType();
+  auto indicesTupleTy = buildKeyPathIndicesTuple(C, indexes);
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3422,25 +3465,23 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
   RValue indexValue(indexTupleTy);
 
-  auto indexLoweredTy =
-      SILType::getPrimitiveAddressType(SGM.Types.getLoweredRValueType(
-          TypeExpansionContext::minimal(), indexTupleTy));
-
   // Get or create the equals witness
-  [unsafeRawPointerTy, boolTy, genericSig, &C, &indexTypes, &equals, loc,
-   &SGM, genericEnv, expansion, indexLoweredTy, indexes]{
-    // (RawPointer, RawPointer) -> Bool
+  [boolTy, indicesTupleTy, genericSig, &C, &indexTypes, &equals, loc, &SGM,
+   genericEnv, expansion, indexes] {
+    // (lhs: (X, Y, ...), rhs: (X, Y, ...)) -> Bool
     SmallVector<SILParameterInfo, 2> params;
-    params.push_back({unsafeRawPointerTy,
-                      ParameterConvention::Direct_Unowned});
-    params.push_back({unsafeRawPointerTy,
-                      ParameterConvention::Direct_Unowned});
-    
+    params.push_back(
+        {indicesTupleTy, ParameterConvention::Indirect_In_Guaranteed});
+    params.push_back(
+        {indicesTupleTy, ParameterConvention::Indirect_In_Guaranteed});
+
     SmallVector<SILResultInfo, 1> results;
     results.push_back({boolTy, ResultConvention::Unowned});
 
     auto signature = SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        genericSig, SILFunctionType::ExtInfo().withRepresentation(
+          SILFunctionType::Representation::KeyPathAccessorEquals),
+        SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
         llvm::None, SubstitutionMap(), SubstitutionMap(), C);
 
@@ -3462,19 +3503,18 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
-    auto lhsPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
-        params[0], signature, subSGF.getTypeExpansionContext()));
-    auto rhsPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
-        params[1], signature, subSGF.getTypeExpansionContext()));
+    auto lhsArgTy = subSGF.silConv.getSILType(
+        params[0], signature, subSGF.getTypeExpansionContext());
+    auto rhsArgTy = subSGF.silConv.getSILType(
+        params[1], signature, subSGF.getTypeExpansionContext());
+    if (genericEnv) {
+      lhsArgTy = genericEnv->mapTypeIntoContext(SGM.M, lhsArgTy);
+      rhsArgTy = genericEnv->mapTypeIntoContext(SGM.M, rhsArgTy);
+    }
+    auto lhsAddr = entry->createFunctionArgument(lhsArgTy);
+    auto rhsAddr = entry->createFunctionArgument(rhsArgTy);
 
     Scope scope(subSGF, loc);
-
-    auto lhsAddr = subSGF.B.createPointerToAddress(loc, lhsPtr,
-                                             indexLoweredTy,
-                                             /*isStrict*/ false);
-    auto rhsAddr = subSGF.B.createPointerToAddress(loc, rhsPtr,
-                                             indexLoweredTy,
-                                             /*isStrict*/ false);
 
     // Compare each pair of index values using the == witness from the
     // conformance.
@@ -3525,12 +3565,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                          llvm::None, llvm::None, ImportAsMemberStatus());
 
       Scope branchScope(subSGF, loc);
-      
+
       SILValue lhsEltAddr = lhsAddr;
       SILValue rhsEltAddr = rhsAddr;
       if (indexes.size() > 1) {
-        lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsEltAddr, i);
-        rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsEltAddr, i);
+        lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
+        rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
       }
       auto lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
              subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
@@ -3603,18 +3643,20 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }();
 
   // Get or create the hash witness
-  [unsafeRawPointerTy, intTy, genericSig, &C, indexTypes, &hash, &loc,
-   &SGM, genericEnv, expansion, indexLoweredTy, hashableProto, indexes]{
-    // (RawPointer) -> Int
+  [intTy, indicesTupleTy, genericSig, &C, indexTypes, &hash, &loc, &SGM,
+   genericEnv, expansion, hashableProto, indexes] {
+    // (indices: (X, Y, ...)) -> Int
     SmallVector<SILParameterInfo, 1> params;
-    params.push_back({unsafeRawPointerTy,
-                      ParameterConvention::Direct_Unowned});
-    
+    params.push_back({indicesTupleTy,
+                      ParameterConvention::Indirect_In_Guaranteed});
+
     SmallVector<SILResultInfo, 1> results;
     results.push_back({intTy, ResultConvention::Unowned});
 
     auto signature = SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo::getThin(), SILCoroutineKind::None,
+        genericSig, SILFunctionType::ExtInfo().withRepresentation(
+          SILFunctionType::Representation::KeyPathAccessorHash),
+        SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
         llvm::None, SubstitutionMap(), SubstitutionMap(), C);
 
@@ -3638,8 +3680,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
-    auto indexPtr = entry->createFunctionArgument(subSGF.silConv.getSILType(
-        params[0], signature, subSGF.getTypeExpansionContext()));
+    auto indexArgTy = subSGF.silConv.getSILType(
+        params[0], signature, subSGF.getTypeExpansionContext());
+    if (genericEnv)
+      indexArgTy = genericEnv->mapTypeIntoContext(SGM.M, indexArgTy);
+    auto indexPtr = entry->createFunctionArgument(indexArgTy);
 
     SILValue hashCode;
 
@@ -3651,11 +3696,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       auto &index = indexes[0];
       
       // Extract the index value.
-      SILValue indexAddr = subSGF.B.createPointerToAddress(loc, indexPtr,
-                                             indexLoweredTy,
-                                             /*isStrict*/ false);
+      SILValue indexAddr = indexPtr;
       if (indexes.size() > 1) {
-        indexAddr = subSGF.B.createTupleElementAddr(loc, indexAddr, 0);
+        indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
       }
 
       VarDecl *hashValueVar =

@@ -202,6 +202,14 @@ static StringRef getDumpString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::ObjCMethod: return "objc_method";
   case SILFunctionType::Representation::WitnessMethod: return "witness_method";
   case SILFunctionType::Representation::Closure: return "closure";
+  case SILFunctionType::Representation::KeyPathAccessorGetter:
+    return "keypath_accessor_getter";
+  case SILFunctionType::Representation::KeyPathAccessorSetter:
+    return "keypath_accessor_setter";
+  case SILFunctionType::Representation::KeyPathAccessorEquals:
+    return "keypath_accessor_equals";
+  case SILFunctionType::Representation::KeyPathAccessorHash:
+    return "keypath_accessor_hash";
   }
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
