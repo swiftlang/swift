@@ -277,6 +277,7 @@ struct FunctionPassContext : MutatingContext {
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {
     if _bridged.specializeClassMethodInst(cm.bridged) {
       notifyInstructionsChanged()
+      notifyCallsChanged()
       return true
     }
     return false
