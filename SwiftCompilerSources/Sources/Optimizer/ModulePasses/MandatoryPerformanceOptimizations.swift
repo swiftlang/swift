@@ -50,7 +50,7 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
         return
       }
 
-      optimize(function: f, context, &worklist, isEmbeddedSwift: moduleContext.options.enableEmbeddedSwift)
+      optimize(function: f, context, &worklist)
     }
   }
 }
@@ -60,7 +60,7 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist, isEmbeddedSwift: Bool) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
   
   var changed = true
@@ -78,15 +78,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ work
 
       // Embedded Swift specific transformations
       case let alloc as AllocRefInst:
-        if isEmbeddedSwift {
+        if context.options.enableEmbeddedSwift {
           specializeVTableAndAddEntriesToWorklist(for: alloc.type, in: function, context, &worklist)
         }
       case let metatype as MetatypeInst:
-        if isEmbeddedSwift {
+        if context.options.enableEmbeddedSwift {
           specializeVTableAndAddEntriesToWorklist(for: metatype.type, in: function, context, &worklist)
         }
       case let classMethod as ClassMethodInst:
-        if isEmbeddedSwift {
+        if context.options.enableEmbeddedSwift {
           _ = context.specializeClassMethodInst(classMethod)
         }
 
