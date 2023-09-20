@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-size_t _swiftEmptyArrayStorage[] = { /*isa*/0, /*refcount*/0, /*count*/0, /*flags*/1 };
+size_t _swiftEmptyArrayStorage[] = { /*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1 };
 
 typedef struct HeapObject {
   void *metadata;
@@ -21,12 +21,12 @@ void *swift_allocObject(void *metadata, size_t requiredSize, size_t requiredAlig
 }
 
 void swift_deallocClassInstance(HeapObject *object, size_t allocatedSize, size_t allocatedAlignMask) {
-  // don't deallocate ¯\_(ツ)_/¯
+  free(object);
 }
 
 HeapObject *swift_initStackObject(void *metadata, HeapObject *object) {
   object->metadata = metadata;
-  object->refcount = 1;
+  object->refcount = -1;
   return object;
 }
 
@@ -35,17 +35,17 @@ bool swift_isUniquelyReferenced_nonNull_native(HeapObject *object) {
 }
 
 void swift_release(HeapObject *object) {
-  // don't release ¯\_(ツ)_/¯
+  if (object->refcount == -1) return;
+
+  object->refcount -= 1;
+  if (object->refcount == 0) {
+    free(object);
+  }
 }
 
 HeapObject *swift_retain(HeapObject *object) {
+  if (object->refcount == -1) return object;
+
   object->refcount += 1;
   return object;
 }
-
-void swift_setDeallocating(HeapObject *object) {
-  // don't deallocate ¯\_(ツ)_/¯
-}
-
-void swift_beginAccess(void *pointer, void *buffer, uintptr_t flags, void *pc) { }
-void swift_endAccess(void *buffer) { }
