@@ -1323,7 +1323,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
     Opts.DisableImplicitConcurrencyModuleImport = true;
-    Opts.EnableObjCInterop = false;
 
     if (FrontendOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::evolution_with_embedded);
