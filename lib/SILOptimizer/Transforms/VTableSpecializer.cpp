@@ -106,9 +106,6 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
 
 SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
                                 SILTransform *transform) {
-  if (!module.getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return nullptr;
-
   CanType astType = classTy.getASTType();
   BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
   if (!genClassTy) return nullptr;
@@ -192,9 +189,6 @@ static SILFunction *specializeVTableMethod(SILFunction *origMethod,
 bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILFunction *f = cm->getFunction();
   SILModule &m = f->getModule();
-
-  if (!m.getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return false;
 
   SILValue instance = cm->getOperand();
   SILType classTy = instance->getType();
