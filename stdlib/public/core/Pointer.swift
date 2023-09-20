@@ -415,12 +415,12 @@ func _convertInOutToPointerArgument<
   return ToPointer(from)
 }
 
-#if !$Embedded
 
 /// Derive a pointer argument from a value array parameter.
 ///
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
+#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
@@ -439,10 +439,31 @@ func _convertConstArrayToPointerArgument<
   }
   return (owner, validPointer)
 }
+#else
+@_transparent
+public // COMPILER_INTRINSIC
+func _convertConstArrayToPointerArgument<
+  FromElement,
+  ToPointer: _Pointer
+>(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
+  let (owner, opaquePointer) = arr._cPointerArgs()
+
+  let validPointer: ToPointer
+  if let addr = opaquePointer {
+    validPointer = ToPointer(addr._rawValue)
+  } else {
+    let lastAlignedValue = ~(MemoryLayout<FromElement>.alignment - 1)
+    let lastAlignedPointer = UnsafeRawPointer(bitPattern: lastAlignedValue)!
+    validPointer = ToPointer(lastAlignedPointer._rawValue)
+  }
+  return (owner, validPointer)
+}
+#endif
 
 /// Derive a pointer argument from an inout array parameter.
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
+#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
@@ -458,8 +479,26 @@ func _convertMutableArrayToPointerArgument<
 
   return _convertConstArrayToPointerArgument(a)
 }
+#else
+@_transparent
+public // COMPILER_INTRINSIC
+func _convertMutableArrayToPointerArgument<
+  FromElement,
+  ToPointer: _Pointer
+>(_ a: inout [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
+  // TODO: Putting a canary at the end of the array in checked builds might
+  // be a good idea
+
+  // Call reserve to force contiguous storage.
+  a.reserveCapacity(0)
+  _debugPrecondition(a._baseAddressIfContiguous != nil || a.isEmpty)
+
+  return _convertConstArrayToPointerArgument(a)
+}
+#endif
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
+#if !$Embedded
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
@@ -468,25 +507,12 @@ func _convertConstStringToUTF8PointerArgument<
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)
 }
-
 #else
-
-@_unavailableInEmbedded public
-func _convertConstArrayToPointerArgument<FromElement,ToPointer: _Pointer>(
-    _ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  fatalError("unreachable in embedded Swift (marked as unavailable)")
-}
-
-@_unavailableInEmbedded public
-func _convertMutableArrayToPointerArgument<FromElement, ToPointer: _Pointer>(
-    _ a: inout [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  fatalError("unreachable in embedded Swift (marked as unavailable)")
-}
-
-@_unavailableInEmbedded public
+@_transparent
+@_unavailableInEmbedded
+public
 func _convertConstStringToUTF8PointerArgument<ToPointer: _Pointer>(
     _ str: String) -> (Builtin.NativeObject?, ToPointer) {
   fatalError("unreachable in embedded Swift (marked as unavailable)")
 }
-
 #endif
