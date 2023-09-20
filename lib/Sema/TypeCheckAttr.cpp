@@ -6848,20 +6848,20 @@ void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
   if (visitLifetimeAttr(attr))
     return;
   if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (nominal->getDeclaredInterfaceType()->isPureMoveOnly()) {
+    if (nominal->getDeclaredInterfaceType()->isNoncopyable()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }
   }
   if (auto *func = dyn_cast<FuncDecl>(D)) {
     auto *self = func->getImplicitSelfDecl();
-    if (self && self->getTypeInContext()->isPureMoveOnly()) {
+    if (self && self->getTypeInContext()->isNoncopyable()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }
   }
   if (auto *pd = dyn_cast<ParamDecl>(D)) {
-    if (pd->getTypeInContext()->isPureMoveOnly()) {
+    if (pd->getTypeInContext()->isNoncopyable()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }

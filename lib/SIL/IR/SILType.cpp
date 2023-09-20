@@ -1036,7 +1036,7 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 
 bool SILType::isMoveOnly() const {
   // Nominal types are move-only if declared as such.
-  if (isPureMoveOnly())
+  if (getASTType()->isNoncopyable())
     return true;
 
 
@@ -1052,10 +1052,6 @@ bool SILType::isMoveOnly() const {
   }
    */
   return isMoveOnlyWrapped();
-}
-
-bool SILType::isPureMoveOnly() const {
-  return getASTType()->isPureMoveOnly();
 }
 
 
@@ -1186,7 +1182,7 @@ SILType SILType::addingMoveOnlyWrapperToBoxedType(const SILFunction *fn) {
   auto oldField = oldLayout->getFields()[0];
   if (oldField.getLoweredType()->is<SILMoveOnlyWrappedType>())
     return *this;
-  assert(!oldField.getLoweredType()->isPureMoveOnly() &&
+  assert(!oldField.getLoweredType()->isNoncopyable() &&
          "Cannot moveonlywrapped in a moveonly type");
   auto newField =
       SILField(SILMoveOnlyWrappedType::get(oldField.getLoweredType()),

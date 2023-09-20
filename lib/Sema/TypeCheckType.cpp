@@ -1021,7 +1021,7 @@ static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
 
   bool didEmitDiag = false;
   for (auto t: genericArgs) {
-    if (!t->isPureMoveOnly())
+    if (!t->isNoncopyable())
       continue;
 
     ctx.Diags.diagnose(loc, diag::noncopyable_generics_specific, t, unboundTy);
@@ -2303,7 +2303,7 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
   if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return false;
 
-  if (genericArgTy->isPureMoveOnly()) {
+  if (genericArgTy->isNoncopyable()) {
     if (unboundTy) {
       diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_specific,
                       genericArgTy, unboundTy);
@@ -4282,7 +4282,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   }
 
   // move-only types must have an ownership specifier when used as a parameter of a function.
-  if (result->isPureMoveOnly())
+  if (result->isNoncopyable())
     diagnoseMoveOnlyMissingOwnership(repr, options);
 
   // Hack to apply context-specific @escaping to a typealias with an underlying
@@ -4588,7 +4588,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
-  if (element->isPureMoveOnly()) {
+  if (element->isNoncopyable()) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
                     element);
     return ErrorType::get(getASTContext());
@@ -4767,7 +4767,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (ty->isPureMoveOnly() && !moveOnlyElementIndex.has_value()
+    if (ty->isNoncopyable() && !moveOnlyElementIndex.has_value()
         && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }

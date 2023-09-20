@@ -3865,7 +3865,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   // move-only types (and their metatypes) cannot match with existential types.
-  if (type1->getMetatypeInstanceType()->isPureMoveOnly()) {
+  if (type1->getMetatypeInstanceType()->isNoncopyable()) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this,
@@ -11842,7 +11842,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   // Move-only types can't be involved in a bridging conversion since a bridged
   // type assumes the ability to copy.
-  if (type1->isPureMoveOnly()) {
+  if (type1->isNoncopyable()) {
     return SolutionKind::Error;
   }
 

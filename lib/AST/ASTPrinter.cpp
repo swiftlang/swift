@@ -3337,7 +3337,7 @@ static bool usesFeatureMoveOnly(Decl *decl) {
     // Check for move-only types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasMoveOnly = type.findIf([](Type type) {
-        return type->isPureMoveOnly();
+        return type->isNoncopyable();
       });
 
       if (hasMoveOnly)

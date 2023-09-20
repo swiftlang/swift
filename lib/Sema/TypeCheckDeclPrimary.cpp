@@ -2499,7 +2499,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (var->getInterfaceType()->isPureMoveOnly()) {
+      if (var->getInterfaceType()->isNoncopyable()) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2587,7 +2587,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->getElementInterfaceType()->isPureMoveOnly()) {
+    if (SD->getElementInterfaceType()->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {

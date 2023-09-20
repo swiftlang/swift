@@ -3144,7 +3144,7 @@ Expr *ArgumentSource::findStorageReferenceExprForMoveOnly(
 
   SILType ty =
       SGF.getLoweredType(type->getWithoutSpecifierType()->getCanonicalType());
-  bool isMoveOnly = ty.isPureMoveOnly();
+  bool isMoveOnly = ty.getASTType()->isNoncopyable();
   if (auto *pd = dyn_cast<ParamDecl>(storage)) {
     isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Borrowing;
     isMoveOnly |= pd->getSpecifier() == ParamSpecifier::Consuming;

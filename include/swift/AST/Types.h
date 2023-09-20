@@ -634,8 +634,8 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this is a move-only type.
-  bool isPureMoveOnly();
+  /// Returns true if this is a noncopyable type.
+  bool isNoncopyable();
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -5351,7 +5351,7 @@ class SILMoveOnlyWrappedType final : public TypeBase,
       : TypeBase(TypeKind::SILMoveOnlyWrapped, &innerType->getASTContext(),
                  innerType->getRecursiveProperties()),
         innerType(innerType) {
-    assert(!innerType->isPureMoveOnly() && "Inner type must be copyable");
+    assert(!innerType->isNoncopyable() && "Inner type must be copyable");
   }
 
 public:
