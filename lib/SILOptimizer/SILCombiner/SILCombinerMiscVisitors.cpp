@@ -836,17 +836,47 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   if (!I->getValue().getBoolValue())
     return eraseInstFromFunction(*CFI);
 
-  // Remove any code that follows a (cond_fail 1) and set the block's
-  // terminator to unreachable.
+  // Remove non-lifetime-ending code that follows a (cond_fail 1) and set the
+  // block's terminator to unreachable.
 
-  // Nothing more to do here
+  // Are there instructions after this point to delete?
+
+  // First check if the next instruction is unreachable.
   if (isa<UnreachableInst>(std::next(SILBasicBlock::iterator(CFI))))
     return nullptr;
 
-  // Collect together all the instructions after this point
+  // Otherwise, check if the only instructions are unreachables and destroys of
+  // lexical values.
+
+  // Collect all instructions and, in OSSA, the values they define.
   llvm::SmallVector<SILInstruction *, 32> ToRemove;
-  for (auto Inst = CFI->getParent()->rbegin(); &*Inst != CFI; ++Inst)
-    ToRemove.push_back(&*Inst);
+  ValueSet DefinedValues(CFI->getFunction());
+  for (auto Iter = std::next(CFI->getIterator());
+       Iter != CFI->getParent()->end(); ++Iter) {
+    if (!CFI->getFunction()->hasOwnership()) {
+      ToRemove.push_back(&*Iter);
+      continue;
+    }
+
+    for (auto result : Iter->getResults()) {
+      DefinedValues.insert(result);
+    }
+    // Look for destroys of lexical values whose def isn't after the cond_fail.
+    if (auto *dvi = dyn_cast<DestroyValueInst>(&*Iter)) {
+      auto value = dvi->getOperand();
+      if (!DefinedValues.contains(value) && value->isLexical())
+        continue;
+    }
+    ToRemove.push_back(&*Iter);
+  }
+
+  unsigned instructionsToDelete = ToRemove.size();
+  // If the last instruction is an unreachable already, it needn't be deleted.
+  if (isa<UnreachableInst>(ToRemove.back())) {
+    --instructionsToDelete;
+  }
+  if (instructionsToDelete == 0)
+    return nullptr;
 
   for (auto *Inst : ToRemove) {
     // Replace any still-remaining uses with undef and erase.
