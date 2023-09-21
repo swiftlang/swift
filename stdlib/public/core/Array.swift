@@ -1486,7 +1486,6 @@ extension Array: CustomStringConvertible, CustomDebugStringConvertible {
 
 extension Array {
   @usableFromInline @_transparent
-  @_unavailableInEmbedded
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
