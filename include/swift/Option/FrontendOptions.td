@@ -802,6 +802,9 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def enable_throw_without_try : Flag<["-"], "enable-throw-without-try">,
   HelpText<"Allow throwing function calls without 'try'">;
 
+def throws_as_traps : Flag<["-"], "throws-as-traps">,
+  HelpText<"Turn all throw sites into immediate traps">;
+
 def import_module : Separate<["-"], "import-module">,
   HelpText<"Implicitly import the specified module">;
 
