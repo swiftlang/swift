@@ -77,6 +77,13 @@ import SomeExternalModule
 // CHECK-NEXT:    "-Xcc",
 // CHECK:         "-fapinotes-swift-version=4"
 
+/// --------Swift external module SomeExternalModule
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SomeExternalModule.swiftmodule",
+// CHECK-NEXT: "details": {
+// CHECK-NEXT: "swiftPlaceholder": {
+// CHECK-NEXT: "moduleDocPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
+// CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo"
+
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
 
@@ -93,9 +100,3 @@ import SomeExternalModule
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
 
-/// --------Swift external module SomeExternalModule
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SomeExternalModule.swiftmodule",
-// CHECK-NEXT: "details": {
-// CHECK-NEXT: "swiftPlaceholder": {
-// CHECK-NEXT: "moduleDocPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftdoc",
-// CHECK-NEXT: "moduleSourceInfoPath": "BUILD_DIR/{{.*}}/ScanDependencies/Output/module_deps_external.swift.tmp/inputs/SomeExternalModule.swiftsourceinfo"

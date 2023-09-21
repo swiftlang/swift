@@ -12,16 +12,9 @@
 import ImportsMacroSpecificClangModule
 
 // CHECK:      "directDependencies": [
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "ImportsMacroSpecificClangModule"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "Swift"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "SwiftOnoneSupport"
-// CHECK-NEXT:        }
-// CHECK-NEXT:      ],
 
 //CHECK:      "swift": "ImportsMacroSpecificClangModule"
 //CHECK-NEXT:    },
