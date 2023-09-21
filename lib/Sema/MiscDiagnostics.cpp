@@ -6250,7 +6250,7 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     NominalTypeDecl *copyableNominalType) {
   // If we already have a move only type, just bail, we have no further work to
   // do.
-  if (copyableNominalType->isMoveOnly())
+  if (copyableNominalType->isNoncopyable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "

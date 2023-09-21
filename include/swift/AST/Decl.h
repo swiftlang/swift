@@ -2606,12 +2606,6 @@ private:
     /// optional result.
     unsigned isIUO : 1;
 
-    /// Whether the "isMoveOnly" bit has been computed yet.
-    unsigned isMoveOnlyComputed : 1;
-
-    /// Whether this declaration can not be copied and thus is move only.
-    unsigned isMoveOnly : 1;
-
     /// Whether the "isEscapable" bit has been computed yet.
     unsigned isEscapable : 1;
 
@@ -2623,7 +2617,6 @@ private:
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsMoveOnlyRequest;
   friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
@@ -2927,9 +2920,6 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
-  /// Is this declaration 'moveOnly'?
-  bool isMoveOnly() const;
-
   /// Is this declaration escapable?
   bool isEscapable() const;
 
@@ -3105,7 +3095,17 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
+private:
   ArrayRef<InheritedEntry> Inherited;
+
+  struct {
+    /// Whether the "isNoncopyable" bit has been computed yet.
+    unsigned isNoncopyableComputed : 1;
+
+    /// Whether this declaration supports copying.
+    unsigned isNoncopyable : 1;
+  } LazySemanticInfo = { };
+  friend class IsNoncopyableRequest;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -3133,6 +3133,9 @@ public:
   InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
+
+  /// Is this declaration noncopyable?
+  bool isNoncopyable() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&

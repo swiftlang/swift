@@ -294,7 +294,7 @@ static void checkInheritanceClause(
       // Noncopyable types cannot have a raw type until there is support for
       // generics, since the raw type here is only useful if we'll generate
       // a conformance to RawRepresentable, which is currently disabled.
-      if (enumDecl->isMoveOnly()) {
+      if (enumDecl->isNoncopyable()) {
         // TODO: getRemovalRange is not yet aware of ~Copyable entries so it
         // will accidentally delete commas or colons that are needed.
         diags.diagnose(inherited.getSourceRange().Start,
@@ -2266,7 +2266,7 @@ public:
     // completely type checked at that point.
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -2769,7 +2769,7 @@ public:
     // NonCopyableChecks
     //
 
-    if (ED->isObjC() && ED->isMoveOnly()) {
+    if (ED->isObjC() && ED->isNoncopyable()) {
       ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
@@ -2784,7 +2784,7 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->isMoveOnly()) {
+    if (ED->isNoncopyable()) {
       if (ED->isIndirect())
         ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
@@ -2843,7 +2843,7 @@ public:
 
     if (!SD->getASTContext().LangOpts.hasFeature(
             Feature::MoveOnlyResilientTypes) &&
-        SD->isResilient() && SD->isMoveOnly()) {
+        SD->isResilient() && SD->isNoncopyable()) {
       SD->diagnose(diag::noncopyable_types_cannot_be_resilient, SD);
     }
   }
@@ -2953,7 +2953,7 @@ public:
                                                    NominalTypeDecl *moveonlyType,
                                                    Type type) {
     assert(type && "got an empty type?");
-    assert(moveonlyType->isMoveOnly());
+    assert(moveonlyType->isNoncopyable());
 
     // no need to emit a diagnostic if the type itself is already problematic.
     if (type->hasError())
@@ -2976,7 +2976,7 @@ public:
 
   static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
     if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
-      if (!nomDecl->isMoveOnly())
+      if (!nomDecl->isNoncopyable())
         return;
 
       // go over the all protocols directly conformed-to by this nominal
@@ -2986,7 +2986,7 @@ public:
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       if (auto *nomDecl = extension->getExtendedNominal()) {
-        if (!nomDecl->isMoveOnly())
+        if (!nomDecl->isNoncopyable())
           return;
 
         // go over the all types directly conformed-to by the extension
@@ -3868,7 +3868,7 @@ public:
     // that would require the ability to wrap one inside an optional
     if (CD->isFailable()) {
       if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           CD->diagnose(diag::noncopyable_failable_init);
         }
       }
@@ -3884,7 +3884,7 @@ public:
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
                              DD->getDeclContext()->getImplementedObjCContext());
-      if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
+      if (!nom || (!isa<ClassDecl>(nom) && !nom->isNoncopyable())) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 
@@ -3892,7 +3892,7 @@ public:
       // feature flag is set.
       if (!DD->getASTContext().LangOpts.hasFeature(
               Feature::MoveOnlyEnumDeinits) &&
-          nom->isMoveOnly() && isa<EnumDecl>(nom)) {
+          nom->isNoncopyable() && isa<EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
       }
 
@@ -4028,7 +4028,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
         }

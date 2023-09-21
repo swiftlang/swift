@@ -3556,12 +3556,6 @@ bool ValueDecl::isFinal() const {
                            getAttrs().hasAttribute<FinalAttr>());
 }
 
-bool ValueDecl::isMoveOnly() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsMoveOnlyRequest{const_cast<ValueDecl *>(this)},
-                           getAttrs().hasAttribute<MoveOnlyAttr>());
-}
-
 bool ValueDecl::isEscapable() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsEscapableRequest{const_cast<ValueDecl *>(this)},
@@ -4784,6 +4778,12 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   return findGenericParameterReferences(this, sig, genericParam,
                                         treatNonResultCovariantSelfAsInvariant,
                                         llvm::None);
+}
+
+bool TypeDecl::isNoncopyable() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsNoncopyableRequest{const_cast<TypeDecl *>(this)},
+                           getAttrs().hasAttribute<MoveOnlyAttr>());
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

@@ -407,9 +407,9 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration is 'moveOnly'.
-class IsMoveOnlyRequest
-    : public SimpleRequest<IsMoveOnlyRequest, bool(ValueDecl *),
+/// Determine whether the given declaration is noncopyable
+class IsNoncopyableRequest
+    : public SimpleRequest<IsNoncopyableRequest, bool(TypeDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -418,7 +418,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, TypeDecl *decl) const;
 
 public:
   // Separate caching.

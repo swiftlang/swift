@@ -913,8 +913,8 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
-  // TODO: isNoncopyable and isMoveOnly and other checks are all spread out
+bool IsNoncopyableRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
+  // TODO: isNoncopyable and isNoncopyable and other checks are all spread out
   // and need to be merged together.
   if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
       if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {

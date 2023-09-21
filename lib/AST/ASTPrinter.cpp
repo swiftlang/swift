@@ -3327,14 +3327,16 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 static bool usesFeatureMoveOnly(Decl *decl) {
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (nominal->isMoveOnly())
+      if (nominal->isNoncopyable())
         return true;
   }
 
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-      if (value->isMoveOnly())
-        return true;
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    if (typeDecl->isNoncopyable())
+      return true;
+  }
 
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
     // Check for move-only types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasMoveOnly = type.findIf([](Type type) {

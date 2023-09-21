@@ -159,7 +159,7 @@ bool TypeBase::isMarkerExistential() {
 
 bool TypeBase::isNoncopyable() {
   if (auto *nom = getAnyNominal())
-    return nom->isMoveOnly();
+    return nom->isNoncopyable();
 
   if (auto *expansion = getAs<PackExpansionType>()) {
     return expansion->getPatternType()->isNoncopyable();
