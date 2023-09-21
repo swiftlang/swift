@@ -845,10 +845,6 @@ public:
   /// current SILModule.
   bool isPossiblyUsedExternally() const;
 
-  /// Helper method which returns whether this function should be preserved so
-  /// it can potentially be used in the debugger.
-  bool shouldBePreservedForDebugger() const;
-
   /// In addition to isPossiblyUsedExternally() it returns also true if this
   /// is a (private or internal) vtable method which can be referenced by
   /// vtables of derived classes outside the compilation unit.
