@@ -306,9 +306,6 @@ public:
   virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
 
-  virtual const clang::TypedefType *
-  getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
-
   virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
 };
 
