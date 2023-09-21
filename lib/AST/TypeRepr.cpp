@@ -588,6 +588,12 @@ void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Base, Printer, Opts);
 }
 
+void InverseTypeRepr::printImpl(ASTPrinter &Printer,
+                                const PrintOptions &Opts) const {
+  Printer << "~";
+  printTypeRepr(Constraint, Printer, Opts);
+}
+
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {

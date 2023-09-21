@@ -1797,7 +1797,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
 
   // Only metatypes of Copyable types are Copyable.
   if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
-      !metatypeType->getInstanceType()->isPureMoveOnly()) {
+      !metatypeType->getInstanceType()->isNoncopyable()) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));

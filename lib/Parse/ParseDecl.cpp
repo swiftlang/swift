@@ -6142,6 +6142,9 @@ static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
   if (parsedTildeCopyable.isInvalid())
     return;
 
+  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    llvm_unreachable("unexpected use of legacy ~Copyable parsing");
+
   auto &attrs = decl->getAttrs();
 
   // Don't add if it's already explicitly written on the decl, but error about
@@ -6157,6 +6160,51 @@ static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
   }
 
   attrs.add(new(Context) MoveOnlyAttr(/*IsImplicit=*/true));
+}
+
+bool Parser::parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
+                                      ParserStatus &Status,
+                                      SourceLoc &TildeCopyableLoc) {
+  // Is suppression permitted?
+  if (parseTildeCopyable) {
+    // Try to find '~' 'Copyable'
+    //
+    // We do this knowing that Copyable is not a real type as of now, so we
+    // can't rely on parseType.
+    if (Tok.isTilde()) {
+      const auto &nextTok = peekToken(); // lookahead
+      if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
+        auto tildeLoc = consumeToken();
+        consumeToken(); // the 'Copyable' token
+
+        if (TildeCopyableLoc)
+          diagnose(tildeLoc, diag::already_suppressed, Context.Id_Copyable);
+        else
+          TildeCopyableLoc = tildeLoc;
+
+        return true;
+      } else if (nextTok.is(tok::code_complete)) {
+        consumeToken(); // consume '~'
+        Status.setHasCodeCompletionAndIsError();
+        if (CodeCompletionCallbacks) {
+          CodeCompletionCallbacks->completeWithoutConstraintType();
+        }
+        consumeToken(tok::code_complete);
+      }
+
+      // can't suppress whatever is between '~' and ',' or '{'.
+      diagnose(Tok, diag::only_suppress_copyable);
+      consumeToken();
+    }
+
+  } else if (Tok.isTilde()) {
+    // a suppression isn't allowed here, so emit an error eat the token to
+    // prevent further parsing errors.
+    diagnose(Tok, diag::cannot_suppress_here);
+    consumeToken();
+  }
+
+  return false;
 }
 
 /// Parse an inheritance clause.
@@ -6234,43 +6282,11 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    // Is suppression permitted?
-    if (parseTildeCopyable) {
-      // Try to find '~' 'Copyable'
-      //
-      // We do this knowing that Copyable is not a real type as of now, so we
-      // can't rely on parseType.
-      if (Tok.isTilde()) {
-        const auto &nextTok = peekToken(); // lookahead
-        if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
-          auto tildeLoc = consumeToken();
-          consumeToken(); // the 'Copyable' token
-
-          if (TildeCopyableLoc)
-            diagnose(tildeLoc, diag::already_suppressed, Context.Id_Copyable);
-          else
-            TildeCopyableLoc = tildeLoc;
-
-          continue;
-        } else if (nextTok.is(tok::code_complete)) {
-          consumeToken(); // consume '~'
-          Status.setHasCodeCompletionAndIsError();
-          if (CodeCompletionCallbacks) {
-            CodeCompletionCallbacks->completeWithoutConstraintType();
-          }
-          consumeToken(tok::code_complete);
-        }
-
-        // can't suppress whatever is between '~' and ',' or '{'.
-        diagnose(Tok, diag::only_suppress_copyable);
-        consumeToken();
-      }
-
-    } else if (Tok.isTilde()) {
-      // a suppression isn't allowed here, so emit an error eat the token to
-      // prevent further parsing errors.
-      diagnose(Tok, diag::cannot_suppress_here);
-      consumeToken();
+    if (!EnabledNoncopyableGenerics) {
+      if (parseLegacyTildeCopyable(parseTildeCopyable,
+                                   Status,
+                                   TildeCopyableLoc))
+        continue;
     }
 
     auto ParsedTypeResult = parseType();

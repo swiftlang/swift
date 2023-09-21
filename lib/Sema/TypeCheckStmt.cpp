@@ -1259,7 +1259,7 @@ public:
           fn->mapTypeIntoContext(nominalDecl->getDeclaredInterfaceType());
 
       // must be noncopyable
-      if (!nominalType->isPureMoveOnly()) {
+      if (!nominalType->isNoncopyable()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_copyable,
                            fn->getDescriptiveKind());

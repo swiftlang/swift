@@ -52,7 +52,7 @@ static bool shouldExpandShim(SILFunction *fn, SILType type) {
   // shouldExpand returns false for struct-with-deinit types, so bypassing it is
   // incorrect for move-only types
   if (EnableExpandAll) {
-    assert(!type.isPureMoveOnly()
+    assert(!type.getASTType()->isNoncopyable()
            && "sil-lower-agg-instrs-expand-all is incompatible with move-only "
               "types");
     return true;

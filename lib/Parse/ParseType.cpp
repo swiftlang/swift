@@ -158,7 +158,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Prevent the use of ~ as prefix for a type. We specially parse them
   // in inheritance clauses elsewhere.
-  if (Tok.isTilde()) {
+  if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
     auto tildeLoc = consumeToken();
     diagnose(tildeLoc, diag::cannot_suppress_here)
         .fixItRemoveChars(tildeLoc, tildeLoc);
@@ -639,9 +639,18 @@ ParserResult<TypeRepr> Parser::parseType(
         new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
   }
 
+  // Parse inverse '~'
+  SourceLoc tildeLoc;
+  if (EnabledNoncopyableGenerics && Tok.isTilde())
+    tildeLoc = consumeToken();
+
   auto ty = parseTypeScalar(MessageID, reason);
   if (ty.isNull())
     return ty;
+
+  // Attach `~` tightly to the parsed type.
+  if (tildeLoc)
+    ty = makeParserResult(ty, new(Context) InverseTypeRepr(tildeLoc, ty.get()));
 
   // Parse vararg type 'T...'.
   if (Tok.isEllipsis()) {

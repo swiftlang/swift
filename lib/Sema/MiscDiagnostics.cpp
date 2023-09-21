@@ -325,7 +325,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
                                 
         // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isPureMoveOnly()
+        if (E->getType()->isNoncopyable()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
           auto noncopyableTy = E->getType();
           assert(noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -388,7 +388,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isPureMoveOnly()) {
+      if (castType->isNoncopyable()) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -398,7 +398,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // as of now there is no type it could be cast to except itself, so
       // there's no reason for it to happen at runtime.
       if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isPureMoveOnly()) {
+        if (fromType->isNoncopyable()) {
           // can't cast move-only to anything.
           Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
@@ -436,7 +436,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     void checkCopyExpr(CopyExpr *copyExpr) {
       // Do not allow for copy_expr to be used with pure move only types. We
       // /do/ allow it to be used with no implicit copy types though.
-      if (copyExpr->getType()->isPureMoveOnly()) {
+      if (copyExpr->getType()->isNoncopyable()) {
         Ctx.Diags.diagnose(
             copyExpr->getLoc(),
             diag::copy_expression_cannot_be_used_with_noncopyable_types);
@@ -4093,7 +4093,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   auto subjectType = subjectExpr->getType();
   if (!subjectType
       || subjectType->hasError()
-      || !subjectType->isPureMoveOnly()) {
+      || !subjectType->isNoncopyable()) {
     return;
   }
 
@@ -6292,7 +6292,7 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     for (auto *fieldDecl : structDecl->getStoredProperties()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Visiting struct field: " << fieldDecl->getName() << '\n');
-      if (!fieldDecl->getInterfaceType()->isPureMoveOnly())
+      if (!fieldDecl->getInterfaceType()->isNoncopyable())
         continue;
       emitError(fieldDecl, structDecl->getBaseName(),
                 fieldDecl->getDescriptiveKind(), fieldDecl->getBaseName());
@@ -6322,7 +6322,7 @@ void swift::diagnoseCopyableTypeContainingMoveOnlyType(
       for (auto payloadParam : *enumEltDecl->getParameterList()) {
         LLVM_DEBUG(llvm::dbgs() << "Visiting payload param: "
                    << payloadParam->getName() << '\n');
-        if (payloadParam->getInterfaceType()->isPureMoveOnly()) {
+        if (payloadParam->getInterfaceType()->isNoncopyable()) {
             emitError(enumEltDecl, enumDecl->getBaseName(),
                       enumEltDecl->getDescriptiveKind(),
                       enumEltDecl->getBaseName());

@@ -123,8 +123,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
   // its boxed form so we can obey Swift's capture reference semantics.
-  if (!var->supportsMutation() && lowering.getLoweredType().isPureMoveOnly() &&
-      !capture.isNoEscape()) {
+  if (!var->supportsMutation()
+      && lowering.getLoweredType().getASTType()->isNoncopyable()
+      && !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
       if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
                      !param->isSelfParameter())) {

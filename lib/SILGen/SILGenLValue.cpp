@@ -2938,7 +2938,7 @@ public:
   /// Returns the subexpr
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
     if (auto *le = dyn_cast<LoadExpr>(e))
-      return le->getType()->isPureMoveOnly();
+      return le->getType()->isNoncopyable();
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
@@ -2946,11 +2946,11 @@ public:
       // DISCUSSION: We can have a noncopyable member_ref_expr with a copyable
       // base if the noncopyable member_ref_expr is from a computed method. In
       // such a case, we want to ensure that we wrap things the right way.
-      return m->getType()->isPureMoveOnly() ||
-             m->getBase()->getType()->isPureMoveOnly();
+      return m->getType()->isNoncopyable() ||
+          m->getBase()->getType()->isNoncopyable();
     }
     if (auto *d = dyn_cast<DeclRefExpr>(e))
-      return e->getType()->isPureMoveOnly();
+      return e->getType()->isNoncopyable();
     return false;
   }
 

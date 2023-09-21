@@ -2210,6 +2210,10 @@ bool Traversal::visitExistentialTypeRepr(ExistentialTypeRepr *T) {
   return doIt(T->getConstraint());
 }
 
+bool Traversal::visitInverseTypeRepr(InverseTypeRepr *T) {
+  return doIt(T->getConstraint());
+}
+
 bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
   return false;
 }

@@ -3229,6 +3229,12 @@ public:
     printFoot();
   }
 
+  void visitInverseTypeRepr(InverseTypeRepr *T, StringRef label) {
+    printCommon("inverse", label);
+    printRec(T->getConstraint());
+    printFoot();
+  }
+
   void visitArrayTypeRepr(ArrayTypeRepr *T, StringRef label) {
     printCommon("type_array", label);
     printRec(T->getBase());

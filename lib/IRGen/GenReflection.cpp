@@ -266,7 +266,7 @@ getTypeRefByFunction(IRGenModule &IGM,
 
         // If a type is noncopyable, lie about the resolved type unless the
         // runtime is sufficiently aware of noncopyable types.
-        if (substT->isPureMoveOnly()) {
+        if (substT->isNoncopyable()) {
           // Darwin-based platforms have ABI stability, and we want binaries
           // that use noncopyable types nongenerically today to be forward
           // compatible with a future OS runtime that supports noncopyable
@@ -391,7 +391,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // noncopyable, use a function to emit the type ref which will look for a
     // signal from future runtimes whether they support noncopyable types before
     // exposing their metadata to them.
-    if (type->isPureMoveOnly()) {
+    if (type->isNoncopyable()) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);
     }

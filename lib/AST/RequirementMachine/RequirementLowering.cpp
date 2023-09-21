@@ -732,6 +732,7 @@ void swift::rewriting::realizeInheritedRequirements(
   auto inheritedTypes = decl->getInherited();
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
+  auto defaults = getInvertableProtocols();
 
   for (auto index : inheritedTypes.getIndices()) {
     Type inheritedType =
@@ -749,12 +750,40 @@ void swift::rewriting::realizeInheritedRequirements(
 
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
+
+    // For any inverses, we only need to cancel out a default requirement.
+    if (dyn_cast_or_null<InverseTypeRepr>(typeRepr)) {
+      if (auto protoTy = inheritedType->getAs<ProtocolType>())
+        if (auto protoDecl = protoTy->getDecl())
+          if (auto kp = protoDecl->getKnownProtocolKind())
+            defaults.remove(*kp);
+
+      continue;
+    }
+
     if (shouldInferRequirements) {
       inferRequirements(inheritedType, loc, moduleForInference,
                         decl->getInnermostDeclContext(), result);
     }
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+  }
+
+  auto &ctx = dc->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Add the remaining default conformance requirements to this
+    // associated type or generic type param.
+    for (auto kp : defaults) {
+      ProtocolDecl *decl = ctx.getProtocol(kp);
+      assert(decl && "couldn't load protocol??");
+
+      SourceLoc loc = decl->getLoc();
+      Type protocolType = decl->getDeclaredInterfaceType();
+
+      // Add the protocol as an "inferred" requirement.
+      Requirement req(RequirementKind::Conformance, type, protocolType);
+      result.push_back({req, loc, /*wasInferred=*/true});
+    }
   }
 }
 
