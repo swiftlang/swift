@@ -69,7 +69,8 @@ enum class DestroyHoistingOption : uint8_t {
 enum class CrossModuleOptimizationMode : uint8_t {
   Off = 0,
   Default = 1,
-  Aggressive = 2
+  Aggressive = 2,
+  Everything = 3,
 };
 
 class SILModule;
