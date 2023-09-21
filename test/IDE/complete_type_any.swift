@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 func testAnyInParamList(a: #^ANY_IN_FUNC_PARAM^#
 // ANY_IN_FUNC_PARAM-DAG: Keyword/None: Any[#Any#]; name=Any
