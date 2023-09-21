@@ -4654,7 +4654,7 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
     return CheckTypeWitnessResult::forError();
 
   // No move-only type can witness an associatedtype requirement.
-  if (type->isPureMoveOnly()) {
+  if (type->isNoncopyable()) {
     // describe the failure reason as it not conforming to Copyable
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
     assert(copyable && "missing _Copyable protocol!");

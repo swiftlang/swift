@@ -1928,6 +1928,10 @@ TypeVariableType *ConstraintSystem::openGenericParameter(
   assert(result.second);
   (void)result;
 
+  if (Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    return typeVar;
+  }
+
   // Add a constraint that generic parameters conform to Copyable.
   // This lookup only can fail if the stdlib (i.e. the Swift module) has not
   // been loaded because you've passed `-parse-stdlib` and are not building the

@@ -616,6 +616,20 @@ bool MissingConformanceFailure::diagnoseAsError() {
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
+  // Use tailored diagnostics for failure to conform to Copyable.
+  if (auto asProtoType = protocolType->getAs<ProtocolType>()) {
+    if (auto *protoDecl = asProtoType->getDecl()) {
+      if (protoDecl->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+        NotCopyableFailure failure(getSolution(),
+                                   nonConformingType,
+                                   NoncopyableMatchFailure::forCopyableConstraint(),
+                                   getLocator());
+        if (failure.diagnoseAsError())
+          return true;
+      }
+    }
+  }
+
   if (nonConformingType->isObjCExistentialType()) {
     emitDiagnostic(diag::protocol_does_not_conform_static, nonConformingType,
                    protocolType);
@@ -6167,6 +6181,7 @@ bool NotCopyableFailure::diagnoseAsError() {
 
   case NoncopyableMatchFailure::CopyableConstraint: {
     auto *loc = getLocator();
+    auto path = loc->getPath();
 
     if (loc->isLastElement<LocatorPathElt::AnyTupleElement>()) {
       assert(!noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -6180,9 +6195,11 @@ bool NotCopyableFailure::diagnoseAsError() {
       return true;
     }
 
-    // a bit paranoid of nulls and such...
-    if (auto *genericParam = loc->getGenericParameter()) {
-      if (auto *paramDecl = genericParam->getDecl()) {
+    auto diagnoseGenericTypeParamType = [&](GenericTypeParamType *typeParam) {
+      if (!typeParam)
+        return false;
+
+      if (auto *paramDecl = typeParam->getDecl()) {
         if (auto *owningDecl =
             dyn_cast_or_null<ValueDecl>(paramDecl->getDeclContext()->getAsDecl())) {
 
@@ -6191,14 +6208,14 @@ bool NotCopyableFailure::diagnoseAsError() {
             emitDiagnostic(diag::noncopyable_generics_generic_param_metatype,
                            noncopyableTy->getMetatypeInstanceType(),
                            paramDecl->getDescriptiveKind(),
-                           genericParam,
+                           typeParam,
                            owningDecl->getName(),
                            noncopyableTy);
           else
             emitDiagnostic(diag::noncopyable_generics_generic_param,
                            noncopyableTy,
                            paramDecl->getDescriptiveKind(),
-                           genericParam,
+                           typeParam,
                            owningDecl->getName());
 
           // If we have a location for the parameter, point it out in a note.
@@ -6206,12 +6223,30 @@ bool NotCopyableFailure::diagnoseAsError() {
             emitDiagnosticAt(loc,
                              diag::noncopyable_generics_implicit_copyable,
                              paramDecl->getDescriptiveKind(),
-                             genericParam);
+                             typeParam);
           }
 
           return true;
         }
       }
+      return false;
+    };
+
+    // NOTE: a non-requirement constraint locator might now be impossible after
+    // having made Copyable a Requirement in Feature::NoncopyableGenerics
+    if (diagnoseGenericTypeParamType(loc->getGenericParameter()))
+      return true;
+
+    if (auto tpr =
+        loc->getLastElementAs<LocatorPathElt::TypeParameterRequirement>()) {
+      auto signature = path[path.size() - 2]
+          .castTo<LocatorPathElt::OpenedGeneric>()
+          .getSignature();
+      auto requirement = signature.getRequirements()[tpr->getIndex()];
+      auto subject = requirement.getFirstType();
+
+      if (diagnoseGenericTypeParamType(subject->getAs<GenericTypeParamType>()))
+        return true;
     }
     break;
   }

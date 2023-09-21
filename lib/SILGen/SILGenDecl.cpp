@@ -517,7 +517,7 @@ public:
 
     // If we have a no implicit copy param decl, make our instance type
     // @moveOnly.
-    if (!instanceType->isPureMoveOnly()) {
+    if (!instanceType->isNoncopyable()) {
       if (auto *pd = dyn_cast<ParamDecl>(decl)) {
         bool isNoImplicitCopy = pd->isNoImplicitCopy();
         isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
@@ -535,7 +535,7 @@ public:
 
     auto boxType = SGF.SGM.Types.getContextBoxTypeForCapture(
         decl, instanceType, SGF.F.getGenericEnvironment(),
-        /*mutable*/ !instanceType->isPureMoveOnly() || !decl->isLet());
+        /*mutable*/ !instanceType->isNoncopyable() || !decl->isLet());
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
@@ -689,7 +689,7 @@ public:
       // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
           (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
-        lowering->getLoweredType().isPureMoveOnly();
+              lowering->getLoweredType().getASTType()->isNoncopyable();
     }
 
     // Make sure that we have a non-address only type when binding a
@@ -774,7 +774,7 @@ public:
     if (value->getOwnershipKind() == OwnershipKind::None) {
       // Then check if we have a pure move only type. In that case, we need to
       // insert a no implicit copy
-      if (value->getType().isPureMoveOnly()) {
+      if (value->getType().getASTType()->isNoncopyable()) {
         value = SGF.B.createMoveValue(PrologueLoc, value, /*isLexical*/ true);
         return SGF.B.createMarkUnresolvedNonCopyableValueInst(
             PrologueLoc, value,
@@ -824,7 +824,7 @@ public:
     // We do this before the begin_borrow "normal" path below since move only
     // types do not have no implicit copy attr on them.
     if (value->getOwnershipKind() == OwnershipKind::Owned &&
-        value->getType().isPureMoveOnly()) {
+        value->getType().getASTType()->isNoncopyable()) {
       value = SGF.B.createMoveValue(PrologueLoc, value, true /*isLexical*/);
       return SGF.B.createMarkUnresolvedNonCopyableValueInst(
           PrologueLoc, value,
@@ -1455,7 +1455,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
   // If this is a 'let' initialization for a copyable non-global, set up a let
   // binding, which stores the initialization value into VarLocs directly.
   if (forceImmutable && vd->getDeclContext()->isLocalContext() &&
-      !isa<ReferenceStorageType>(varType) && !varType->isPureMoveOnly())
+      !isa<ReferenceStorageType>(varType) && !varType->isNoncopyable())
     return InitializationPtr(new LetValueInitialization(vd, *this));
 
   // If the variable has no initial value, emit a mark_uninitialized instruction

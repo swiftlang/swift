@@ -158,6 +158,11 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
+  // A cached answer to
+  //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
+  // to ensure there's no parsing performance regression.
+  bool EnabledNoncopyableGenerics;
+
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;
@@ -2058,6 +2063,11 @@ public:
 
   void performIDEInspectionSecondPassImpl(
       IDEInspectionDelayedDeclState &info);
+
+  /// Returns true if the caller should skip calling `parseType` afterwards.
+  bool parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
+                                ParserStatus &Status,
+                                SourceLoc &TildeCopyableLoc);
 };
 
 /// Describes a parsed declaration name.

@@ -705,7 +705,7 @@ private:
     // - @_eagerMove
     // - @_noEagerMove
     bool isNoImplicitCopy = pd->isNoImplicitCopy();
-    if (!argrv.getType().isPureMoveOnly()) {
+    if (!argrv.getType().getASTType()->isNoncopyable()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
       if (pd->isSelfParameter()) {
@@ -1168,7 +1168,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // in SIL since it is illegal to capture an inout value in an escaping
     // closure. The later code knows how to handle that we have the
     // mark_unresolved_non_copyable_value here.
-    if (isInOut && ty.isPureMoveOnly()) {
+    if (isInOut && ty.getASTType()->isNoncopyable()) {
       arg = SGF.B.createMarkUnresolvedNonCopyableValueInst(
           Loc, arg,
           MarkUnresolvedNonCopyableValueInst::CheckKind::

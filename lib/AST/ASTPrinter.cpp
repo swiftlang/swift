@@ -1,4 +1,3 @@
-//===--- ASTPrinter.cpp - Swift Language AST Printer ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -3338,7 +3337,7 @@ static bool usesFeatureMoveOnly(Decl *decl) {
     // Check for move-only types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasMoveOnly = type.findIf([](Type type) {
-        return type->isPureMoveOnly();
+        return type->isNoncopyable();
       });
 
       if (hasMoveOnly)
@@ -3382,6 +3381,12 @@ static bool usesFeatureMoveOnlyResilientTypes(Decl *decl) {
 
 static bool usesFeatureMoveOnlyPartialConsumption(Decl *decl) {
   // Partial consumption does not affect declarations directly.
+  return false;
+}
+
+static bool usesFeatureNoncopyableGenerics(Decl *decl) {
+  // FIXME: need to look for suppressed entries on generic parameters or
+  // inheritance clauses!
   return false;
 }
 
