@@ -882,6 +882,7 @@ setlocal enableextensions enabledelayedexpansion
 :: Test Swift
 :: TODO(compnerd) make lit adjust the path properly
 path %BuildRoot%\3;%BuildRoot%\1\bin;%PATH%;%SystemDrive%\Program Files\Git\usr\bin
+tree %BuildRoot%\1\tools\swift\unittests\SourceKit\SwiftLang\CMakeFiles\SourceKitSwiftLangTests.dir
 cmake --build %BuildRoot%\1 --target check-swift || (exit /b)
 
 goto :eof
