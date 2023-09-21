@@ -1,0 +1,5 @@
+module CxxLib {
+  header "CxxLib.h"
+
+  export *
+}
