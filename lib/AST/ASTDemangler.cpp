@@ -31,6 +31,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -731,23 +732,28 @@ Type ASTBuilder::createMetatypeType(
   return MetatypeType::get(instance, getMetatypeRepresentation(*repr));
 }
 
+void ASTBuilder::pushGenericParams(ArrayRef<std::pair<unsigned, unsigned>> parameterPacks) {
+  ParameterPackStack.push_back(ParameterPacks);
+  ParameterPacks.clear();
+  ParameterPacks.append(parameterPacks.begin(), parameterPacks.end());
+}
+
+void ASTBuilder::popGenericParams() {
+  ParameterPacks = ParameterPackStack.back();
+  ParameterPackStack.pop_back();
+}
+
 Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
                                                 unsigned index) {
-  // If we have a generic signature, find the parameter with the matching
-  // depth and index and return it, to get the correct value for the
-  // isParameterPack() bit.
-  if (GenericSig) {
-    for (auto paramTy : GenericSig.getGenericParams()) {
-      if (paramTy->getDepth() == depth && paramTy->getIndex() == index) {
-        return paramTy;
+  if (!ParameterPacks.empty()) {
+    for (auto pair : ParameterPacks) {
+      if (pair.first == depth && pair.second == index) {
+        return GenericTypeParamType::get(/*isParameterPack*/ true,
+                                         depth, index, Ctx);
       }
     }
-
-    return Type();
   }
 
-  // Otherwise, just assume we're not working with variadic generics.
-  // FIXME: Should we always require a generic signature in this case?
   return GenericTypeParamType::get(/*isParameterPack*/ false,
                                    depth, index, Ctx);
 }
@@ -1039,15 +1045,25 @@ LayoutConstraint ASTBuilder::getLayoutConstraintWithSizeAlign(
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
-  llvm::SaveAndRestore<GenericSignature> savedSignature(
-      GenericSig, nominalDecl->getGenericSignature());
+  auto baseGenericSig = nominalDecl->getGenericSignature();
 
+  // The generic signature is for a constrained extension of nominalDecl, so
+  // we introduce the parameter packs from the nominal's generic signature.
+  ParameterPackStack.push_back(ParameterPacks);
+  ParameterPacks.clear();
+  for (auto *paramTy : baseGenericSig.getGenericParams()) {
+    if (paramTy->isParameterPack())
+      ParameterPacks.emplace_back(paramTy->getDepth(), paramTy->getIndex());
+  }
+  SWIFT_DEFER { popGenericParams(); };
+
+  // Constrained extensions mangle the subset of requirements not satisfied
+  // by the nominal's generic signature.
   SmallVector<Requirement, 2> requirements;
-
   decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
                     ASTBuilder>(node, requirements, *this);
-  return buildGenericSignature(Ctx, nominalDecl->getGenericSignature(),
-                               {}, std::move(requirements))
+
+  return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements))
       .getCanonicalSignature();
 }
 
