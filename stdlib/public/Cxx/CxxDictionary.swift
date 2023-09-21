@@ -29,7 +29,6 @@ public protocol CxxDictionary<Key, Value> {
 
   /// Do not implement this function manually in Swift.
   func __findUnsafe(_ key: Key) -> RawIterator
-  
   /// Do not implement this function manually in Swift.
   mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator
 
@@ -77,7 +76,6 @@ extension CxxDictionary {
       }
     }
   }
-  
 public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
     var filteredDictionary = Self.init()
     var iterator = __beginUnsafe()
