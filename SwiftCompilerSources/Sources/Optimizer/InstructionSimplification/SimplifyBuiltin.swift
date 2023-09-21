@@ -40,8 +40,9 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayNoAlias,
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
-           .AssignTakeArray:
-        optimizeArrayBuiltin(context)
+           .AssignTakeArray,
+           .IsPOD:
+        optimizeFirstArgumentToThinMetatype(context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -173,7 +174,7 @@ private extension BuiltinInst {
     context.erase(instruction: self)
   }
   
-  func optimizeArrayBuiltin(_ context: SimplifyContext) {
+  func optimizeFirstArgumentToThinMetatype(_ context: SimplifyContext) {
     guard let metatypeInst = operands[0].value as? MetatypeInst,
           metatypeInst.type.representationOfMetatype(in: parentFunction) == .Thick else {
       return
