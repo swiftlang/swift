@@ -1545,6 +1545,14 @@ SwiftInt BridgedPassContext::getStaticStride(swift::SILType type) const {
   return integerValueFromConstant(c);
 }
 
+swift::SILVTable * BridgedPassContext::specializeVTableForType(swift::SILType type, BridgedFunction function) const {
+  return ::specializeVTableForType(type, function.getFunction()->getModule(), invocation->getTransform());
+}
+
+bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const {
+  return ::specializeClassMethodInst(cm.getAs<ClassMethodInst>());
+}
+
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }

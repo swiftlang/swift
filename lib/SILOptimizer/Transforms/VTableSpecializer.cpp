@@ -38,10 +38,6 @@ namespace {
 
 class VTableSpecializer : public SILModuleTransform {
   bool specializeVTables(SILModule &module);
-  bool specializeVTableFor(SILType classTy, SILModule &module);
-  SILFunction *specializeVTableMethod(SILFunction *origMethod,
-                                      SubstitutionMap subs, SILModule &module);
-  bool specializeClassMethodInst(ClassMethodInst *cm);
 
   /// The entry point to the transformation.
   void run() override {
@@ -57,23 +53,39 @@ class VTableSpecializer : public SILModuleTransform {
 
 }  // end anonymous namespace
 
+static SILFunction *specializeVTableMethod(SILFunction *origMethod,
+                                           SubstitutionMap subs,
+                                           SILModule &module,
+                                           SILTransform *transform);
+
+static bool specializeVTablesInFunction(SILFunction &func, SILModule &module,
+                                        SILTransform *transform) {
+  bool changed = false;
+  if (func.getLoweredFunctionType()->isPolymorphic())
+    return changed;
+
+  for (SILBasicBlock &block : func) {
+    for (SILInstruction &inst : block) {
+      if (auto *allocRef = dyn_cast<AllocRefInst>(&inst)) {
+        changed |= (specializeVTableForType(allocRef->getType(), module,
+                                            transform) != nullptr);
+      } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
+        changed |= (specializeVTableForType(
+                        metatype->getType().getInstanceTypeOfMetatype(&func),
+                        module, transform) != nullptr);
+      } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
+        changed |= specializeClassMethodInst(cm);
+      }
+    }
+  }
+
+  return changed;
+}
+
 bool VTableSpecializer::specializeVTables(SILModule &module) {
   bool changed = false;
   for (SILFunction &func : module) {
-    if (func.getLoweredFunctionType()->isPolymorphic()) continue;
-
-    for (SILBasicBlock &block : func) {
-      for (SILInstruction &inst : block) {
-        if (auto *allocRef = dyn_cast<AllocRefInst>(&inst)) {
-          changed |= specializeVTableFor(allocRef->getType(), module);
-        } else if (auto *metatype = dyn_cast<MetatypeInst>(&inst)) {
-          changed |= specializeVTableFor(
-              metatype->getType().getInstanceTypeOfMetatype(&func), module);
-        } else if (auto *cm = dyn_cast<ClassMethodInst>(&inst)) {
-          changed |= specializeClassMethodInst(cm);
-        }
-      }
-    }
+    specializeVTablesInFunction(func, module, this);
   }
 
   for (SILVTable *vtable : module.getVTables()) {
@@ -92,13 +104,13 @@ bool VTableSpecializer::specializeVTables(SILModule &module) {
   return changed;
 }
 
-bool VTableSpecializer::specializeVTableFor(SILType classTy,
-                                            SILModule &module) {
+SILVTable *swift::specializeVTableForType(SILType classTy, SILModule &module,
+                                SILTransform *transform) {
   CanType astType = classTy.getASTType();
   BoundGenericClassType *genClassTy = dyn_cast<BoundGenericClassType>(astType);
-  if (!genClassTy) return false;
+  if (!genClassTy) return nullptr;
 
-  if (module.lookUpSpecializedVTable(classTy)) return false;
+  if (module.lookUpSpecializedVTable(classTy)) return nullptr;
 
   LLVM_DEBUG(llvm::errs() << "specializeVTableFor "
                           << genClassTy->getDecl()->getName() << ' '
@@ -120,19 +132,21 @@ bool VTableSpecializer::specializeVTableFor(SILType classTy,
   for (const SILVTableEntry &entry : origVtable->getEntries()) {
     SILFunction *origMethod = entry.getImplementation();
     SILFunction *specializedMethod =
-        specializeVTableMethod(origMethod, subs, module);
+        specializeVTableMethod(origMethod, subs, module, transform);
     newEntries.push_back(SILVTableEntry(entry.getMethod(), specializedMethod,
                                         entry.getKind(),
                                         entry.isNonOverridden()));
   }
 
-  SILVTable::create(module, classDecl, classTy, IsNotSerialized, newEntries);
-  return true;
+  SILVTable *vtable = SILVTable::create(module, classDecl, classTy,
+                                        IsNotSerialized, newEntries);
+  return vtable;
 }
 
-SILFunction *VTableSpecializer::specializeVTableMethod(SILFunction *origMethod,
-                                                       SubstitutionMap subs,
-                                                       SILModule &module) {
+static SILFunction *specializeVTableMethod(SILFunction *origMethod,
+                                           SubstitutionMap subs,
+                                           SILModule &module,
+                                           SILTransform *transform) {
   LLVM_DEBUG(llvm::errs() << "specializeVTableMethod " << origMethod->getName()
                           << '\n');
 
@@ -149,7 +163,7 @@ SILFunction *VTableSpecializer::specializeVTableMethod(SILFunction *origMethod,
     llvm::report_fatal_error("cannot specialize vtable method");
   }
 
-  SILOptFunctionBuilder FunctionBuilder(*this);
+  SILOptFunctionBuilder FunctionBuilder(*transform);
 
   GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origMethod, subs,
                                          ReInfo, /*isMandatory=*/true);
@@ -172,7 +186,10 @@ SILFunction *VTableSpecializer::specializeVTableMethod(SILFunction *origMethod,
   return SpecializedF;
 }
 
-bool VTableSpecializer::specializeClassMethodInst(ClassMethodInst *cm) {
+bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
+  SILFunction *f = cm->getFunction();
+  SILModule &m = f->getModule();
+
   SILValue instance = cm->getOperand();
   SILType classTy = instance->getType();
   CanType astType = classTy.getASTType();
@@ -184,9 +201,6 @@ bool VTableSpecializer::specializeClassMethodInst(ClassMethodInst *cm) {
       classDecl->getParentModule(), classDecl);
 
   SILType funcTy = cm->getType();
-
-  SILFunction *f = cm->getFunction();
-  SILModule &m = f->getModule();
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
