@@ -329,7 +329,13 @@ struct AccessPath : CustomStringConvertible {
     if !base.isEqual(to: other.base) {
       return nil
     }
-    return projectionPath.subtract(from: other.projectionPath)
+    if let resultPath = projectionPath.subtract(from: other.projectionPath),
+       // Indexing is not a projection where the base overlaps the projected address.
+       !resultPath.pop().kind.isIndexedElement
+    {
+      return resultPath
+    }
+    return nil
   }
 
   /// Like `getProjection`, but also requires that the resulting projection path is materializable.
