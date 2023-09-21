@@ -1811,11 +1811,22 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
       proto->getSelfInterfaceType());
+  const bool enabledNoncopyableGenerics =
+      proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   for (auto *otherProto : requiredProtos) {
     // Every protocol 'P' has an implied requirement 'Self : P'; skip it.
     if (otherProto == proto)
       continue;
+
+    if (enabledNoncopyableGenerics) {
+      // For any protocol 'P', there is an implied requirement 'Self: Copyable',
+      // unless it was suppressed via `Self: ~Copyable`; so skip if present.
+      if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
+        continue;
+
+      // TODO: report that something implied Copyable despite writing ~Copyable
+    }
 
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol
     // list by dropping protocols that are inherited by other protocols in
@@ -2480,7 +2491,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (var->getInterfaceType()->isPureMoveOnly()) {
+      if (var->getInterfaceType()->isNoncopyable()) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2568,7 +2579,7 @@ public:
 
     // Reject noncopyable typed subscripts with read/set accessors since we
     // cannot define modify operations upon them without copying the read.
-    if (SD->getElementInterfaceType()->isPureMoveOnly()) {
+    if (SD->getElementInterfaceType()->isNoncopyable()) {
       if (auto *read = SD->getAccessor(AccessorKind::Read)) {
         if (!read->isImplicit()) {
           if (auto *set = SD->getAccessor(AccessorKind::Set)) {

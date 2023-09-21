@@ -1015,9 +1015,13 @@ static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
                                          SourceLoc loc,
                                          Type unboundTy,
                                          ArrayRef<Type> genericArgs) {
+
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
   bool didEmitDiag = false;
   for (auto t: genericArgs) {
-    if (!t->isPureMoveOnly())
+    if (!t->isNoncopyable())
       continue;
 
     ctx.Diags.diagnose(loc, diag::noncopyable_generics_specific, t, unboundTy);
@@ -2126,6 +2130,8 @@ namespace {
                                          TypeResolutionOptions options);
     NeverNullType resolveMetatypeType(MetatypeTypeRepr *repr,
                                       TypeResolutionOptions options);
+    NeverNullType resolveInverseType(InverseTypeRepr *repr,
+                                     TypeResolutionOptions options);
     NeverNullType resolveProtocolType(ProtocolTypeRepr *repr,
                                       TypeResolutionOptions options);
     NeverNullType resolveSILBoxType(SILBoxTypeRepr *repr,
@@ -2294,7 +2300,10 @@ bool TypeResolver::diagnoseInvalidPlaceHolder(OpaqueReturnTypeRepr *repr) {
 bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                            Type unboundTy,
                                            Type genericArgTy) {
-  if (genericArgTy->isPureMoveOnly()) {
+  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
+  if (genericArgTy->isNoncopyable()) {
     if (unboundTy) {
       diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_specific,
                       genericArgTy, unboundTy);
@@ -2471,6 +2480,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
+
+  case TypeReprKind::Inverse:
+    return resolveInverseType(cast<InverseTypeRepr>(repr), options);
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
@@ -4278,7 +4290,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   }
 
   // move-only types must have an ownership specifier when used as a parameter of a function.
-  if (result->isPureMoveOnly())
+  if (result->isNoncopyable())
     diagnoseMoveOnlyMissingOwnership(repr, options);
 
   // Hack to apply context-specific @escaping to a typealias with an underlying
@@ -4584,7 +4596,7 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
-  if (element->isPureMoveOnly()) {
+  if (element->isNoncopyable()) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
                     element);
     return ErrorType::get(getASTContext());
@@ -4763,7 +4775,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (ty->isPureMoveOnly() && !moveOnlyElementIndex.has_value()
+    if (ty->isNoncopyable() && !moveOnlyElementIndex.has_value()
         && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }
@@ -5036,6 +5048,22 @@ NeverNullType TypeResolver::buildMetatypeType(
   }
 }
 
+NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
+                                               TypeResolutionOptions options) {
+  auto ty = resolveType(repr->getConstraint(), options);
+  if (ty->hasError())
+    return ErrorType::get(getASTContext());
+
+  if (auto protoTy = ty->getAs<ProtocolType>())
+    if (auto protoDecl = protoTy->getDecl())
+      if (auto kp = protoDecl->getKnownProtocolKind())
+        if (getInvertableProtocols().contains(*kp))
+          return ty;
+
+  diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertable, ty);
+  return ErrorType::get(getASTContext());
+}
+
 NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
@@ -5249,6 +5277,7 @@ public:
     case TypeReprKind::Member:
     case TypeReprKind::Dictionary:
     case TypeReprKind::ImplicitlyUnwrappedOptional:
+    case TypeReprKind::Inverse:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
     case TypeReprKind::Self:

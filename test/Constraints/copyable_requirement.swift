@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
 // a concrete move-only type
 @_moveOnly struct MO {
@@ -20,13 +20,13 @@ protocol Box<T> {
   func get() -> T
 }
 
-class RefBox<T>: Box { // expected-note@:14 6{{generic parameter 'T' has an implicit Copyable requirement}}
+class RefBox<T>: Box { // expected-note@:14 2{{generic parameter 'T' has an implicit Copyable requirement}}
   var val: T
   init(_ t: T) { val = t }
   func get() -> T { return val }
 }
 
-struct ValBox<T>: Box { // expected-note@:15 6{{generic parameter 'T' has an implicit Copyable requirement}}
+struct ValBox<T>: Box { // expected-note@:15 2{{generic parameter 'T' has an implicit Copyable requirement}}
   var val: T
   init(_ t: T) { val = t }
   func get() -> T { return val }
@@ -37,7 +37,7 @@ class NotStoredGenerically<T> {
   func give() -> T { fatalError("todo") }
 }
 
-enum Maybe<T> { // expected-note@:12 3{{generic parameter 'T' has an implicit Copyable requirement}}
+enum Maybe<T> { // expected-note@:12 {{generic parameter 'T' has an implicit Copyable requirement}}
   case none
   case just(T)
 }
@@ -81,8 +81,6 @@ func testBasic(_ mo: borrowing MO) {
 
   takeAny(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
   print(mo) // expected-error {{noncopyable type 'MO' cannot be erased to copyable existential type 'Any'}}
-  _ = "\(mo)" // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
-  let _: String = String(describing: mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Subject' in 'init(describing:)'}}
 
   takeGeneric { () -> Int? in mo.x }
   genericVarArg(5)
@@ -102,52 +100,51 @@ func testBasic(_ mo: borrowing MO) {
 func checkBasicBoxes() {
   let mo = MO()
 
-  let vb = ValBox(consume mo) // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
+  let vb = ValBox(consume mo) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
   _ = vb.get()
   _ = vb.val
 
-  let rb = RefBox(MO())  // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
+  let rb = RefBox(MO())  // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
   _ = rb.get()
   _ = rb.val
 
-  let vb2: ValBox<MO> = .init(MO())  // expected-error {{noncopyable type 'MO' cannot be used with generic type 'ValBox<T>' yet}}
+  let vb2: ValBox<MO> = .init(MO())  // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
 }
 
 func checkExistential() {
   takeAnyBox( // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeAnyBox'}}
-      RefBox(MO())) // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
+      RefBox(MO()))
 
   takeAnyBox( // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeAnyBox'}}
-      ValBox(globalMO)) // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
+      ValBox(globalMO))
 
   takeAnyBoxErased(
-      RefBox(MO())) // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
+      RefBox(MO())) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'RefBox'}}
 
   takeAnyBoxErased(
-      ValBox(globalMO)) // expected-error 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
+      ValBox(globalMO)) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'ValBox'}}
 }
 
 func checkMethodCalls() {
-  let tg: NotStoredGenerically<MO> = NotStoredGenerically() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'NotStoredGenerically<T>' yet}}
+  let tg: NotStoredGenerically<MO> = NotStoredGenerically() // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   tg.take(MO())
   tg.give()
 
-  let _: Maybe<MO> = .none // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
-  let _ = Maybe<MO>.just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
-  let _: Maybe<MO> = .just(MO()) // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Maybe<T>' yet}}
+  let _ = Maybe.just(MO()) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'Maybe'}}
 
-  // FIXME: MO isn't logically being substituted into takeMaybe. seems like nonsense duplication?
-  takeMaybe(.just(MO())) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'Maybe'}}
-                         // expected-error@-1 {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeMaybe'}}
+  let _: Maybe<MO> = .none // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _ = Maybe<MO>.just(MO()) // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+  let _: Maybe<MO> = .just(MO()) // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
+
+  takeMaybe(.just(MO())) // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeMaybe'}}
   takeMaybe(true ? .none : .just(MO()))
   // expected-error@-1 {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'takeMaybe'}}
-  // expected-error@-2 2{{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'Maybe'}}
 }
 
 func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
   // casting dynamically is allowed, but should always fail since you can't
   // construct such a type.
-  let box = b as! ValBox<MO> // expected-error {{noncopyable type 'MO' cannot be used with generic type 'ValBox<T>' yet}}
+  let box = b as! ValBox<MO> // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
   let dup = box
 
   let _: MO = dup.get()
@@ -229,20 +226,25 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
 }
 
+// FIXME: rdar://115752211 (deal with existing Swift modules that lack Copyable requirements)
+// the stdlib right now is not yet being compiled with NoncopyableGenerics
 func checkStdlibTypes(_ mo: borrowing MO) {
-  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  _ = "\(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
+  let _: String = String(describing: mo) // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Subject' in 'init(describing:)'}}
+
+  let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       [MO(), MO()]
-  let _: [MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: [MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
       []
-  let _: [String: MO] = // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
+  let _: [String: MO] = // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Dictionary<Key, Value>' yet}}
       ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
 
-  _ = [MO()] // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
+  _ = [MO()] // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'Element' in 'Array'}}
 
-  let _: Array<MO> = .init() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
-  _ = [MO]() // expected-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  let _: Array<MO> = .init() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
+  _ = [MO]() // MISSING-error {{noncopyable type 'MO' cannot be used with generic type 'Array<Element>' yet}}
 
-  let s: String = "hello \(mo)" // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
+  let _: String = "hello \(mo)" // MISSING-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'appendInterpolation'}}
 }
 
 func copyableExistentials(_ a: Any, _ e1: Error, _ e2: any Error, _ ah: AnyHashable) {
@@ -286,7 +288,7 @@ func tryToDoBadMetatypeStuff() {
   doBadMetatypeStuff(MO.self) // expected-error {{metatype 'MO.Type' of noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'doBadMetatypeStuff'}}
 }
 
-func packingHeat<each T>(_ t: repeat each T) {}
+func packingHeat<each T>(_ t: repeat each T) {} // expected-note {{generic parameter 'each T' has an implicit Copyable requirement}}
 func packIt() {
-  packingHeat(MO())  // expected-error {{parameter pack containing noncopyable element 'MO' is not supported}}
+  packingHeat(MO())  // expected-error {{noncopyable type 'MO' cannot be substituted for copyable generic parameter 'each T' in 'packingHeat'}}
 }

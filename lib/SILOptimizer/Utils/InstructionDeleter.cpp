@@ -70,7 +70,7 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
   // move_value instructions.  And `move_value %moveOnlyValue` must not be
   // deleted.
   for (auto result : inst->getResults()) {
-    if (result->getType().isPureMoveOnly() &&
+    if (result->getType().getASTType()->isNoncopyable() &&
         result->getOwnershipKind() == OwnershipKind::Owned) {
       return false;
     }

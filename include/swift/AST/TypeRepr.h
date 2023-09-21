@@ -1321,6 +1321,34 @@ private:
   friend class TypeRepr;
 };
 
+/// A type repr represeting the inverse of some constraint. For example,
+///    ~Copyable
+/// where `Copyable` is the constraint type.
+class InverseTypeRepr : public TypeRepr {
+  TypeRepr *Constraint;
+  SourceLoc TildeLoc;
+
+public:
+  InverseTypeRepr(SourceLoc tildeLoc, TypeRepr *constraint)
+      : TypeRepr(TypeReprKind::Inverse), Constraint(constraint),
+        TildeLoc(tildeLoc) {}
+
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getTildeLoc() const { return TildeLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Inverse;
+  }
+  static bool classof(const InverseTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return TildeLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return TildeLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// TypeRepr for a user-specified placeholder (essentially, a user-facing
 /// representation of an anonymous type variable.
 ///
@@ -1459,6 +1487,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::Inverse:
   case TypeReprKind::Vararg:
   case TypeReprKind::PackExpansion:
   case TypeReprKind::Pack:

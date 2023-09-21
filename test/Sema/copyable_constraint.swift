@@ -5,7 +5,7 @@
 // FIXME: Now demonstrate that plain -parse-stdlib, such as in some arbitrary test, doesn't get the Copyable constraint :(
 // RUN: not %target-swift-frontend -typecheck -verify -parse-stdlib %s
 
-@_marker public protocol _Copyable {}
+@_marker public protocol Copyable {}
 
 func nextTime<T>(_ t: T) {} // expected-note {{generic parameter 'T' has an implicit Copyable requirement}}
 

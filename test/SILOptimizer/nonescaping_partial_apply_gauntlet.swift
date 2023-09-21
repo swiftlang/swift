@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -emit-sil -parse-stdlib -module-name Swift %s
 // RUN: %target-swift-frontend -emit-sil -O -parse-stdlib -module-name Swift %s
 
-@_marker protocol _Copyable {}
+@_marker protocol Copyable {}
 precedencegroup CastingPrecedence {}
 precedencegroup AssignmentPrecedence {}
 

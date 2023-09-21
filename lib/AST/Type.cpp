@@ -157,18 +157,18 @@ bool TypeBase::isMarkerExistential() {
   return true;
 }
 
-bool TypeBase::isPureMoveOnly() {
+bool TypeBase::isNoncopyable() {
   if (auto *nom = getAnyNominal())
     return nom->isMoveOnly();
 
   if (auto *expansion = getAs<PackExpansionType>()) {
-    return expansion->getPatternType()->isPureMoveOnly();
+    return expansion->getPatternType()->isNoncopyable();
   }
 
   // if any components of the tuple are move-only, then the tuple is move-only.
   if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
     for (auto eltTy : tupl->getElementTypes())
-      if (eltTy->isPureMoveOnly())
+      if (eltTy->isNoncopyable())
         return true;
   }
 

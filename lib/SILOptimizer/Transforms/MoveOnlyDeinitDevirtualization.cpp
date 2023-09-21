@@ -69,7 +69,7 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
         auto destroyType = dvi->getOperand()->getType();
-        if (destroyType.isPureMoveOnly() &&
+        if (destroyType.getASTType()->isNoncopyable() &&
             !isa<DropDeinitInst>(lookThroughOwnershipInsts(dvi->getOperand()))) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dvi);
           auto *nom = destroyType.getNominalOrBoundGenericNominal();
@@ -112,7 +112,8 @@ static bool performTransform(SILFunction &fn) {
 
       if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
         auto destroyType = dai->getOperand()->getType();
-        if (destroyType.isLoadable(fn) && destroyType.isPureMoveOnly() &&
+        if (destroyType.isLoadable(fn)
+            && destroyType.getASTType()->isNoncopyable() &&
             !isa<DropDeinitInst>(dai->getOperand())) {
           LLVM_DEBUG(llvm::dbgs() << "Handling: " << *dai);
           auto *nom = destroyType.getNominalOrBoundGenericNominal();

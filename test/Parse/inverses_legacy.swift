@@ -21,22 +21,18 @@ struct U: // expected-error {{noncopyable struct 'U' cannot conform to 'Sando'}}
 
 class C: // expected-error {{type 'C' does not conform to protocol 'Sando'}}
          ~Copyable, // expected-error {{cannot suppress conformances here}}
-                    // expected-error@-1 {{cannot find type 'Copyable' in scope}}
          ~Sando // expected-error {{cannot suppress conformances here}}
          {}
 
 protocol Rope<Element>: ~Copyable { // expected-error {{cannot suppress conformances here}}
-                                    // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 
   associatedtype Element: ~Copyable // expected-error {{cannot suppress conformances here}}
-                                    // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 }
 
 extension S: ~Copyable {} // expected-error {{cannot suppress conformances here}}
-                          // expected-error@-1 {{cannot find type 'Copyable' in scope}}
+                          // expected-error@-1 {{noncopyable struct 'S' cannot conform to 'Copyable'}}
 
 func takeNoncopyableGeneric<T: ~Copyable>(_ t: T) {} // expected-error {{cannot suppress conformances here}}
-                                                     // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 
 @_moveOnly struct ExtraNonCopyable:         // expected-error {{duplicate attribute}}{{1-12=}}
                                   ~Copyable // expected-note {{attribute already specified here}}
@@ -48,6 +44,7 @@ struct HasADeinit: ~Copyable { deinit {} }
 
 public struct MoveOnlyS1<T> : ~Copyable { deinit {} }
 public struct MoveOnlyS2<T: Equatable> : ~Copyable { deinit {} }
+public struct MoveOnlyS3<T: ~Copyable> : ~Copyable { deinit {} } // expected-error {{cannot suppress conformances here}}
 
 public enum MoveOnlyE1<T> : ~Copyable { 
   case holding(s: MoveOnlyS1<T>)
@@ -60,22 +57,17 @@ public enum MoveOnlyE2<T: Equatable> : ~Copyable {
 }
 
 func more() {
-  let foo: any ~Copyable = 19  // expected-error@:16 {{cannot suppress conformances here}}
-                               // expected-error@-1 {{cannot find type 'Copyable' in scope}}
+  let _: any ~Copyable = 19  // expected-error@:14 {{cannot suppress conformances here}}
 
-  let foo: any ~Equatable = 19  // expected-error@:16 {{cannot suppress conformances here}}
+  let _: any ~Equatable = 19  // expected-error@:14 {{cannot suppress conformances here}}
 }
 
 func blah<T>(_ t: T) where T: ~Copyable,    // expected-error@:31 {{cannot suppress conformances here}}
-                                            // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 
                            T: ~Hashable {}  // expected-error@:31 {{cannot suppress conformances here}}
 
 func foo<T: ~Copyable>(x: T) {} // expected-error {{cannot suppress conformances here}}
-                                // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 
 struct Buurap<T: ~Copyable> {} // expected-error {{cannot suppress conformances here}}
-                               // expected-error@-1 {{cannot find type 'Copyable' in scope}}
 
 protocol Foo where Self: ~Copyable {} // expected-error {{cannot suppress conformances here}}
-                                      // expected-error@-1 {{cannot find type 'Copyable' in scope}}
