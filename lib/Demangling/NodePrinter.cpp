@@ -353,6 +353,7 @@ private:
     case Node::Kind::AssociatedTypeDescriptor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
+    case Node::Kind::AsyncRemoved:
     case Node::Kind::AutoClosureType:
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
@@ -1305,6 +1306,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   switch (auto kind = Node->getKind()) {
   case Node::Kind::Static:
     Printer << "static ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::AsyncRemoved:
+    Printer << "async demotion of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CurryThunk:

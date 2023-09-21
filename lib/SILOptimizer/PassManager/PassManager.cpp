@@ -38,6 +38,7 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
@@ -1585,6 +1586,18 @@ std::string BridgedPassContext::mangleOutlinedVariable(BridgedFunction function)
       return name;
     idx++;
   }
+}
+
+std::string BridgedPassContext::mangleAsyncRemoved(BridgedFunction function) const {
+  SILFunction *F = function.getFunction();
+
+  // FIXME: hard assumption on what pass is requesting this.
+  auto P = Demangle::SpecializationPass::AsyncDemotion;
+
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, F->isSerialized(),
+                                                         F);
+  Mangler.setRemovedEffect(EffectKind::Async);
+  return Mangler.mangle();
 }
 
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(StringRef name, SILType type, bool isPrivate) const {

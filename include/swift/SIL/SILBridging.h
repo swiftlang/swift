@@ -512,6 +512,10 @@ struct BridgedInstruction {
     return getInst()->mayHaveSideEffects();
   }
 
+  bool maySuspend() const {
+    return getInst()->maySuspend();
+  }
+
   bool mayAccessPointer() const;
   bool mayLoadWeakOrUnowned() const;
   bool maySynchronizeNotConsideringSideEffects() const;
@@ -883,6 +887,11 @@ struct BridgedArgument {
   BridgedArgumentConvention getConvention() const {
     auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
     return castToArgumentConvention(fArg->getArgumentConvention());
+  }
+
+  bool isSelf() const {
+    auto *fArg = llvm::cast<swift::SILFunctionArgument>(getArgument());
+    return fArg->isSelf();
   }
 };
 
@@ -1407,6 +1416,8 @@ struct BridgedNominalTypeDecl {
   }
 
   bool isStructWithUnreferenceableStorage() const;
+
+  bool isGlobalActor() const { return decl->isGlobalActor(); }
 };
 
 // Passmanager and Context

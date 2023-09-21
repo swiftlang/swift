@@ -123,6 +123,11 @@ struct ModulePassContext : Context, CustomStringConvertible {
     runOnFunction(FunctionPassContext(_bridged: _bridged))
     _bridged.endTransformFunction();
   }
+
+  func mangleAsyncRemoved(from function: Function) -> String {
+    let stdString = _bridged.mangleAsyncRemoved(function.bridged)
+    return String(_cxxString: stdString)
+  }
 }
 
 extension GlobalVariable {

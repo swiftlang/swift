@@ -21,8 +21,13 @@ using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
   ASTMangler::beginManglingWithoutPrefix();
+
   if (Serialized)
     ArgOpBuffer << 'q';
+
+  if (RemovedEffects.contains(EffectKind::Async))
+    ArgOpBuffer << 'a';
+
   ArgOpBuffer << char(uint8_t(Pass) + '0');
 }
 

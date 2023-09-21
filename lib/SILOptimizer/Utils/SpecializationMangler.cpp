@@ -124,6 +124,13 @@ setReturnValueOwnedToUnowned() {
 }
 
 void
+FunctionSignatureSpecializationMangler::
+setRemovedEffect(EffectKind effect) {
+  assert(effect == EffectKind::Async && "unimplemented effect kind!");
+  RemovedEffects |= effect;
+}
+
+void
 FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *constInst) {
   // Append the prefix for constant propagation 'p'.
   ArgOpBuffer << 'p';

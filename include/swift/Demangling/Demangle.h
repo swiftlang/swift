@@ -139,15 +139,23 @@ enum class MangledDifferentiabilityKind : char {
 /// that two passes that generate similar changes do not yield the same
 /// mangling. This currently cannot happen, so this is just a safety measure
 /// that creates separate name spaces.
+///
+/// The number of entries is limited! See `Demangler::demangleSpecAttributes`.
+/// If you exceed the max, you'll need to upgrade the mangling.
 enum class SpecializationPass : uint8_t {
-  AllocBoxToStack,
+  AllocBoxToStack = 0,
   ClosureSpecializer,
   CapturePromotion,
   CapturePropagation,
   FunctionSignatureOpts,
   GenericSpecializer,
   MoveDiagnosticInOutToOut,
+  AsyncDemotion,
+  LAST = AsyncDemotion
 };
+
+constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;
+static_assert((uint8_t)SpecializationPass::LAST < MAX_SPECIALIZATION_PASS);
 
 static inline char encodeSpecializationPass(SpecializationPass Pass) {
   return char(uint8_t(Pass)) + '0';

@@ -522,6 +522,13 @@ public:
     return false;
   }
 
+  bool isAsyncFunction() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->isAsync();
+    }
+    return false;
+  }
+
   /// True if the type involves any archetypes.
   bool hasArchetype() const { return getASTType()->hasArchetype(); }
 

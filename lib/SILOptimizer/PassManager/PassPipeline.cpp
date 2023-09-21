@@ -664,6 +664,9 @@ static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
+  if (P.getOptions().EnableAsyncDemotion)
+    P.addAsyncDemotion();
+
   // Do the first stack promotion on high-level SIL before serialization.
   //
   // FIXME: why does StackPromotion need to run in the module pipeline?
@@ -692,7 +695,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.addLoopUnroll();
 }
 
-static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
+  static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
   P.addDeadFunctionAndGlobalElimination();
   P.addReadOnlyGlobalVariablesPass();
