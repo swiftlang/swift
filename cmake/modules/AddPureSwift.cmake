@@ -2,17 +2,15 @@ include(macCatalystUtils)
 
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_target_link_libraries TARGET)
-  cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
+  target_link_libraries(${TARGET} ${ARGN})
 
-  foreach(DEPENDENCY ${ARGS_PUBLIC})
-    target_link_libraries(${TARGET} PRIVATE ${DEPENDENCY})
-    add_dependencies(${TARGET} ${DEPENDENCY})
-
+  cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
+  foreach(DEPENDENCY ${ARGS_UNPARSED_ARGUMENTS})
     string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       DEPENDS ${DEPENDENCY}
-      )
+    )
     target_sources(${TARGET} PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
     )
