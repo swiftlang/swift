@@ -127,6 +127,7 @@ public:
   void visitAllocRefInst(AllocRefInst *ARI);
   void visitAllocRefDynamicInst(AllocRefDynamicInst *ARI);
   void visitMetatypeInst(MetatypeInst *MI);
+  void visitGlobalAddrInst(GlobalAddrInst *i);
 
 private:
   /// Cause a function to be deserialized, and visit all other functions
