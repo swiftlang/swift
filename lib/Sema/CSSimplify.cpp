@@ -2955,51 +2955,6 @@ static bool isPreconcurrency(ConstraintSystem &cs, DeclContext *dc) {
   llvm_unreachable("unhandled DeclContext kind in isPreconcurrency");
 }
 
-/// A thin wrapper around \c swift::safeToDropGlobalActor that provides the
-/// ability to infer the isolation of a closure. Not perfect but mostly works.
-static bool okToRemoveGlobalActor(ConstraintSystem &cs,
-                                  DeclContext *dc,
-                                  Type globalActor, Type ty) {
-  auto findGlobalActorForClosure = [&](AbstractClosureExpr *ace) -> ActorIsolation {
-    // FIXME: Because the actor isolation checking happens after constraint
-    // solving, the closure expression does not yet have its actor isolation
-    // set, i.e., the code that would call
-    // `AbstractClosureExpr::setActorIsolation` hasn't run yet.
-    // So, I expect the existing isolation to always be set to the default.
-    // If the assertion below starts tripping, then this ad-hoc inference
-    // is no longer needed!
-    auto existingIso = ace->getActorIsolation();
-    if (existingIso != ActorIsolation::forUnspecified()) {
-      assert(false && "somebody set the closure's isolation already?");
-      return existingIso;
-    }
-
-    // Otherwise, do an ad-hoc inference of the closure's isolation.
-
-    // see if the closure's type has isolation.
-    if (auto closType = GetClosureType{cs}(ace)) {
-      if (auto fnTy = closType->getAs<AnyFunctionType>()) {
-        if (auto globActor = fnTy->getGlobalActor()) {
-          return ActorIsolation::forGlobalActor(globActor, /*unsafe=*/false)
-              .withPreconcurrency(isPreconcurrency(cs, ace));
-        }
-      }
-    }
-
-    // otherwise, check for an explicit annotation
-    if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
-      if (auto globActor = getExplicitGlobalActor(ce)) {
-        return ActorIsolation::forGlobalActor(globActor, /*unsafe=*/false)
-            .withPreconcurrency(isPreconcurrency(cs, ace));
-      }
-    }
-
-    return existingIso;
-  };
-
-  return safeToDropGlobalActor(dc, globalActor, ty, findGlobalActorForClosure);
-}
-
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
@@ -3067,7 +3022,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
-  // A global actor can be added or can match, but cannot be removed.
+  // Check the global-actor isolation on each of the function types. Two
+  // different global-actor attributes never match, but function conversions
+  // that add or remove global-actor attributes are okay.
+  //
+  // Some function conversions that erase global-actor isolation can admit
+  // data races; such violations are diagnosed by the actor isolation checker.
+  // We deliberately do not allow actor isolation violations to influence
+  // overload resolution to preserve the property that an expression can be
+  // re-checked against a different isolation context for isolation violations.
   if (func1->getGlobalActor() || func2->getGlobalActor()) {
     if (func1->getGlobalActor() && func2->getGlobalActor()) {
       // If both have a global actor, match them.
@@ -3078,29 +3041,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           locator.withPathElement(LocatorPathElt::GlobalActorType()));
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
-
-    } else if (func1->getGlobalActor() && !func2->isAsync()) {
-      // Cannot remove a global actor from a synchronous function in mismatched
-      // DeclContext.
-      //
-      // FIXME: the ConstraintSystem's DeclContext is not always precise enough
-      // to give an accurate answer. We want the innermost DeclContext that
-      // contains the expression associated with the constraint locator.
-      // Sometimes the ConstraintSystem only has the enclosing function, and not
-      // the inner closure containing the expression. To workaround this,
-      // `ActorIsolationChecker::checkFunctionConversion`, has extra checking of
-      // function conversions specifically to account for this false positive.
-      // This means we may have duplicate diagnostics emitted.
-      if (okToRemoveGlobalActor(*this, DC, func1->getGlobalActor(), func2)) {
-        // FIXME: this is a bit of a hack to workaround multiple solutions
-        // because in these contexts it's valid to both add or remove the actor
-        // from these function types. At least with the score increases, we
-        // can bias the solver to pick the solution with fewer conversions.
-        increaseScore(SK_FunctionConversion, locator);
-
-      } else if (MarkGlobalActorFunction::attempt(*this, kind, func1, func2, locator)) {
-        return getTypeMatchFailure(locator);
-      }
 
     } else if (kind < ConstraintKind::Subtype) {
       return getTypeMatchFailure(locator);
