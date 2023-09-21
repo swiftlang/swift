@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 private enum GlobalPrivateE {
     case foo, bar
