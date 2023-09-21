@@ -1827,6 +1827,19 @@ swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
   return dest;
 }
 
+void swift::swift_generic_arrayAssignWithCopy(swift::OpaqueValue *dest,
+                                              swift::OpaqueValue *src,
+                                              size_t count, size_t stride,
+                                              const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  for (size_t i = 0; i < count; i++) {
+    LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+    uintptr_t addrOffset = i * stride;
+    handleRefCountsAssignWithCopy(metadata, reader, addrOffset, (uint8_t *)dest,
+                                  (uint8_t *)src);
+  }
+}
+
 extern "C" swift::OpaqueValue *
 swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {

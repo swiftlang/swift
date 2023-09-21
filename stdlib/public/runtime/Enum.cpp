@@ -81,7 +81,7 @@ void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
 
   auto refCountBytes = _swift_refCountBytesForMetatype(payloadType);
   const size_t fixedLayoutStringSize =
-      layoutStringHeaderSize + sizeof(uint64_t) * 2;
+      layoutStringHeaderSize + sizeof(uint64_t);
 
   uint8_t *layoutStr =
       (uint8_t *)MetadataAllocator(LayoutStringTag)
@@ -99,7 +99,6 @@ void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
                                       previousFieldOffset);
 
   writer.writeBytes((uint64_t)previousFieldOffset);
-  writer.writeBytes((uint64_t)0);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
@@ -270,8 +269,7 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
                          sizeof(size_t);     // bytes to skip if no payload case
 
   const size_t fixedLayoutStringSize =
-      layoutStringHeaderSize +
-      sizeof(uint64_t) * 2; // Last skip bytes + NUL terminator
+      layoutStringHeaderSize + sizeof(uint64_t); // Last skip bytes
 
   uint8_t *layoutStr =
       (uint8_t *)MetadataAllocator(LayoutStringTag)
@@ -308,7 +306,6 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
                                       previousFieldOffset);
 
   writer.writeBytes((uint64_t)previousFieldOffset);
-  writer.writeBytes((uint64_t)0);
 
   writer.offset = skipBytesOffset;
   writer.writeBytes(size - previousFieldOffset);
@@ -488,10 +485,10 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
                                          sizeof(size_t) +           // Extra tag byte count
                                          sizeof(size_t) * 3;        // Payload count, ref count bytes, enum size
 
-    const size_t allocationSize = fixedLayoutHeaderSize +
-                                  (numPayloads * sizeof(size_t)) +  // Payload ref count offsets
-                                  payloadRefCountBytes +
-                                  sizeof(uint64_t) * 2;             // Last skip bytes + NUL terminator
+    const size_t allocationSize =
+        fixedLayoutHeaderSize +
+        (numPayloads * sizeof(size_t)) +         // Payload ref count offsets
+        payloadRefCountBytes + sizeof(uint64_t); // Last skip bytes
 
     uint8_t *layoutStr =
         (uint8_t *)MetadataAllocator(LayoutStringTag)
@@ -503,8 +500,8 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
     uint64_t tagAndOffset = ((uint64_t)RefCountingKind::MultiPayloadEnumGeneric)
                             << 56;
 
-    size_t refCountBytes = allocationSize - layoutStringHeaderSize -
-                           (sizeof(uint64_t) * 2);
+    size_t refCountBytes =
+        allocationSize - layoutStringHeaderSize - (sizeof(uint64_t));
     writer.writeBytes(refCountBytes);
     writer.writeBytes(tagAndOffset);
     writer.writeBytes(size_t(tagCounts.numTagBytes));
@@ -537,8 +534,6 @@ void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
     }
 
     // Last skip bytes (always 0 for enums)
-    writer.writeBytes<uint64_t>(0);
-    // NUL terminator
     writer.writeBytes<uint64_t>(0);
 
     // we mask out HasRelativePointers, because at this point they have all been
