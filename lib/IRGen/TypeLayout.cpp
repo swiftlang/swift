@@ -396,9 +396,6 @@ public:
     B.fillPlaceholderWithInt(sizePlaceholder, IGM.SizeTy, refCountBytes);
 
     B.addInt64(skip);
-
-    // NUL terminator
-    B.addInt64(0);
   }
 };
 }

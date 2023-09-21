@@ -2711,8 +2711,8 @@ void swift::swift_initStructMetadataWithLayoutString(
     refCountBytes += _swift_refCountBytesForMetatype(fieldType);
   }
 
-  const size_t fixedLayoutStringSize = layoutStringHeaderSize +
-                                       sizeof(uint64_t) * 2;
+  const size_t fixedLayoutStringSize =
+      layoutStringHeaderSize + sizeof(uint64_t);
 
   uint8_t *layoutStr =
       (uint8_t *)MetadataAllocator(LayoutStringTag)
@@ -2758,7 +2758,6 @@ void swift::swift_initStructMetadataWithLayoutString(
   }
 
   writer.writeBytes((uint64_t)previousFieldOffset);
-  writer.writeBytes((uint64_t)0);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
