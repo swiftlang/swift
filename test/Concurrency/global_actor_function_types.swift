@@ -22,7 +22,7 @@ struct OtherGlobalActor {
 func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (Int) -> Void) {
   let _: Int = f // expected-error{{cannot convert value of type '@SomeGlobalActor (Int) -> Void' to specified type 'Int'}}
 
-  let _: (Int) -> Void = f // expected-warning 2{{converting function value of type '@SomeGlobalActor (Int) -> Void' to '(Int) -> Void' loses global actor 'SomeGlobalActor'}}
+  let _: (Int) -> Void = f // expected-warning {{converting function value of type '@SomeGlobalActor (Int) -> Void' to '(Int) -> Void' loses global actor 'SomeGlobalActor'}}
   let _: @SomeGlobalActor (Int) -> Void = g // okay
   let _: @OtherGlobalActor (Int) -> Void = f // expected-error{{cannot convert value actor-isolated to 'SomeGlobalActor' to specified type actor-isolated to 'OtherGlobalActor'}}
 }
@@ -105,6 +105,8 @@ func testClosuresOld() {
 
 // Test conversions that happen in various structural positions.
 struct X<T> { } // expected-note{{arguments to generic parameter 'T' ('() -> Void' and '@SomeGlobalActor () -> Void') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('@SomeGlobalActor () -> Void' and '() -> Void') are expected to be equal}}
+
 
 func f(_: (@SomeGlobalActor () -> Void)?) { }
 
@@ -113,7 +115,7 @@ func g(fn: (() -> Void)?) {
 }
 
 func f2(_ x: X<@SomeGlobalActor () -> Void>) {
-  g2(x) // expected-error{{converting function value of type '@SomeGlobalActor () -> Void' to '() -> Void' loses global actor 'SomeGlobalActor'}}
+  g2(x) // expected-error{{cannot convert value of type 'X<@SomeGlobalActor () -> Void>' to expected argument type 'X<() -> Void>'}}
 }
 func g2(_ x: X<() -> Void>) {
   f2(x) // expected-error{{cannot convert value of type 'X<() -> Void>' to expected argument type 'X<@SomeGlobalActor () -> Void>'}}
@@ -125,14 +127,12 @@ func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor'
   let f1 = onSomeGlobalActor // expected-note{{calls to let 'f1' from outside of its actor context are implicitly asynchronous}}
   let f2 = onSomeGlobalActorUnsafe // expected-complete-sns-note {{calls to let 'f2' from outside of its actor context are implicitly asynchronous}}
 
-  let _: () -> Int = f1 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   let _: () -> Int = f2 // expected-complete-sns-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-  // expected-complete-sns-warning @-1 {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
 
   _ = {
-    let _: () -> Int = f1 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
     let _: () -> Int = f2 // expected-complete-sns-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-    // expected-complete-sns-warning @-1 {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   }
 
   @SomeGlobalActor func isolated() {
@@ -148,20 +148,21 @@ func testTypesConcurrencyContext() async {
   let f1 = onSomeGlobalActor
   let f2 = onSomeGlobalActorUnsafe
 
-  let _: () -> Int = f1 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-  let _: () -> Int = f2 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
 
   _ = {
-    let _: () -> Int = f1 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-    let _: () -> Int = f2 // expected-warning 2{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    let _: () -> Int = f2 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   }
 
   let _: @SomeGlobalActor () -> () = {
     someGlobalActorFn()
 
-    // NOTE: false warnings. this closure has the correct isolation.
-    let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-    let _: () -> Int = f2 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    // The enclosing closure is SomeGlobalActor-isolated, and these local variables
+    // are not Sendable, so they are implicitly isolated to SomeGlobalActor.
+    let _: () -> Int = f1
+    let _: () -> Int = f2
   }
 
   _ = { @SomeGlobalActor in
@@ -212,39 +213,38 @@ func noActor(_ unit: () -> ()) { unit() }
   // ok if you drop both sendable and the actor
   noActor(sendable)
   let _: () -> () = sendable
-  let _: @Sendable () -> () = sendable // expected-warning 2{{converting function value of type '@SomeGlobalActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'SomeGlobalActor'}}
+  let _: @Sendable () -> () = sendable // expected-warning {{converting function value of type '@SomeGlobalActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'SomeGlobalActor'}}
 
   _ = {
     someGlobalActorFn()
 
-    // FIXME: false warnings. this closure is not @Sendable so it has matching isolation.
-    let _: () -> Int = f1 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
-    let _: () -> Int = f2 // expected-warning {{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    // This closure is not @Sendable so it has matching isolation.
+    let _: () -> Int = f1
+    let _: () -> Int = f2
   }
 
   _ = { @Sendable in
-    let _: () -> Int = sendable // expected-warning 2{{converting function value of type '@SomeGlobalActor @Sendable () -> ()' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+    let _: () -> Int = sendable // expected-error {{cannot convert value of type '@SomeGlobalActor @Sendable () -> ()' to specified type '() -> Int'}}
   }
 }
 
 actor A {
   func illegal(_ stillIllegal: @MainActor () -> ()) {
-    noActor(stillIllegal) // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+    noActor(stillIllegal) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   }
 
   func sendAndDrop(_ g: @escaping @Sendable @MainActor () -> ()) async {
     _ = Task.detached { @MainActor in
-      // FIXME: this is a false warning, probably from the constraint solver.
-      noActor(g) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      // 'noActor' takes a non-Sendable closure, so 'g' cannot escape the MainActor.
+      noActor(g)
     }
 
     _ = Task {
-      // FIXME: this and many other warnings like this are emitted more than once, but are true warnings.
-      noActor(g) // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      noActor(g) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
     }
 
     _ = Task.detached {
-      noActor(g) // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      noActor(g) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
     }
   }
 }
@@ -252,7 +252,7 @@ actor A {
 @MainActor func uhoh(_ f: @escaping @MainActor () -> (), _ sendableF: @escaping @Sendable @MainActor () -> ()) {
 
   let _: () async -> () = f
-  let _: @Sendable () -> () = sendableF // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
+  let _: @Sendable () -> () = sendableF // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
 
   let _: () -> () = {
     noActor(f)
@@ -266,15 +266,15 @@ actor A {
     noActor(f)
     noActor(sendableF)
     let _: () -> () = mainActorFn
-    let _: @Sendable () -> () = sendableF // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
+    let _: @Sendable () -> () = sendableF // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
   }
 
   _ = {
     func localNested() {
-      noActor(f) // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-      noActor(sendableF) // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-      let _: () -> () = mainActorFn // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-      let _: @Sendable () -> () = sendableF // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
+      noActor(f) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      noActor(sendableF) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      let _: () -> () = mainActorFn // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+      let _: @Sendable () -> () = sendableF // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
     }
   }
 
@@ -282,34 +282,32 @@ actor A {
     noActor(f)
     noActor(sendableF)
     let _: () -> () = mainActorFn
-    let _: @Sendable () -> () = sendableF // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
+    let _: @Sendable () -> () = sendableF // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '@Sendable () -> ()' loses global actor 'MainActor'}}
   }
 
   @Sendable func localSendable() {
-    noActor(sendableF) // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-    let _: () -> () = mainActorFn // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-  }
-
-  let _: () -> () = {
-    mainActorFn()  // FIXME: odd how this line alone causes the false warning below to be emitted.
-    noActor(f)  // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-  }
-
-  _ = {
-    // FIXME: more false warnings
-    noActor(f)  // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
     noActor(sendableF) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-  }
-
-  let _: () -> () = {
-    // FIXME: these are false warnings too.
-    noActor(f) // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
     let _: () -> () = mainActorFn // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   }
 
+  let _: () -> () = {
+    mainActorFn()
+    noActor(f)
+  }
+
+  _ = {
+    noActor(f)
+    noActor(sendableF)
+  }
+
+  let _: () -> () = {
+    noActor(f)
+    let _: () -> () = mainActorFn
+  }
+
   let _: @SomeGlobalActor () -> () = {
-    noActor(sendableF) // expected-warning 2{{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
-    let _: () -> () = mainActorFn // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+    noActor(sendableF) // expected-warning {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+    let _: () -> () = mainActorFn // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   }
 }
 
@@ -336,7 +334,7 @@ class SubClass: MAIsolatedParent {
   }
 
   nonisolated func exemptMethod() {
-    let _: () -> () = mainActorFn // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
+    let _: () -> () = mainActorFn // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> ()' loses global actor 'MainActor'}}
   }
 }
 
