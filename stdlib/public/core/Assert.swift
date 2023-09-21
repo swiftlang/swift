@@ -53,6 +53,23 @@ public func assert(
   }
 }
 
+#if $Embedded
+@_transparent
+public func assert(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+  // Only assert in debug mode.
+  if _isDebugAssertConfiguration() {
+    if !_fastPath(condition()) {
+      _assertionFailure("Assertion failed", message(), file: file, line: line,
+        flags: _fatalErrorFlags())
+    }
+  }
+}
+#endif
+
 /// Checks a necessary condition for making forward progress.
 ///
 /// Use this function to detect conditions that must prevent the program from
@@ -100,6 +117,27 @@ public func precondition(
   }
 }
 
+#if $Embedded
+@_transparent
+public func precondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+  // Only check in debug and release mode. In release mode just trap.
+  if _isDebugAssertConfiguration() {
+    if !_fastPath(condition()) {
+      _assertionFailure("Precondition failed", message(), file: file, line: line,
+        flags: _fatalErrorFlags())
+    }
+  } else if _isReleaseAssertConfiguration() {
+    let error = !condition()
+    Builtin.condfail_message(error._value,
+      StaticString("precondition failure").unsafeRawPointer)
+  }
+}
+#endif
+
 /// Indicates that an internal sanity check failed.
 ///
 /// This function's effect varies depending on the build flag used:
@@ -137,6 +175,23 @@ public func assertionFailure(
   }
 }
 
+#if $Embedded
+@inlinable
+@inline(__always)
+public func assertionFailure(
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+  if _isDebugAssertConfiguration() {
+    _assertionFailure("Fatal error", message(), file: file, line: line,
+      flags: _fatalErrorFlags())
+  }
+  else if _isFastAssertConfiguration() {
+    _conditionallyUnreachable()
+  }
+}
+#endif
+
 /// Indicates that a precondition was violated.
 ///
 /// Use this function to stop the program when control flow can only reach the
@@ -164,7 +219,6 @@ public func assertionFailure(
 ///     where `preconditionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `preconditionFailure(_:file:line:)` is called.
-#if !$Embedded
 @_transparent
 @_unavailableInEmbedded
 public func preconditionFailure(
@@ -181,7 +235,8 @@ public func preconditionFailure(
   }
   _conditionallyUnreachable()
 }
-#else
+
+#if $Embedded
 @_transparent
 public func preconditionFailure(
   _ message: @autoclosure () -> StaticString = StaticString(),
@@ -207,7 +262,6 @@ public func preconditionFailure(
 ///     where `fatalError(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `fatalError(_:file:line:)` is called.
-#if !$Embedded
 @_transparent
 @_unavailableInEmbedded
 public func fatalError(
@@ -217,7 +271,8 @@ public func fatalError(
   _assertionFailure("Fatal error", message(), file: file, line: line,
     flags: _fatalErrorFlags())
 }
-#else
+
+#if $Embedded
 @_transparent
 public func fatalError(
   _ message: @autoclosure () -> StaticString = StaticString(),
