@@ -6,6 +6,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
