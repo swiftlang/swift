@@ -1,6 +1,5 @@
 // REQUIRES: swift_swift_parser
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 let globalVar = 1
 macro expect(file: Int = #^DEFAULT_ARG^#) = #externalMacro(module: "MyModule", type: "MyMacro")
