@@ -23,6 +23,18 @@ public func staticstring() -> StaticString {
   return "hello"
 }
 
+public func checks(n: Int) {
+  precondition(n > 0)
+  precondition(n > 0, "message")
+  assert(n > 0, "message")
+  if n < 0 { fatalError() }
+  if n < 0 { fatalError("with message") }
+  if n < 0 { preconditionFailure() }
+  if n < 0 { preconditionFailure("with message") }
+  if n < 0 { assertionFailure() }
+  if n < 0 { assertionFailure("with message") }
+}
+
 // CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
 // CHECK: define {{.*}}i1 @"$s4main4boolSbyF"()
 // CHECK: define {{.*}}i1 @"$sSb22_builtinBooleanLiteralSbBi1__tcfC"(i1 %0)
@@ -33,3 +45,4 @@ public func staticstring() -> StaticString {
 // CHECK: define {{.*}}{ {{i32|i64}}, i8 } @"$s4main8optionalSiSgyF"()
 // CHECK: define {{.*}}{ {{i32|i64}}, {{i32|i64}}, i8 } @"$s4main12staticstrings12StaticStringVyF"()
 // CHECK: define {{.*}}{ {{i32|i64}}, {{i32|i64}}, i8 } @"$ss12StaticStringV08_builtinB7Literal17utf8CodeUnitCount7isASCIIABBp_BwBi1_tcfC"(ptr %0, {{i32|i64}} %1, i1 %2)
+// CHECK: define {{.*}}void @"$s4main6checks1nySi_tF"({{i32|i64}} %0)
