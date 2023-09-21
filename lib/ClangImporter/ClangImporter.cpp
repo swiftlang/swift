@@ -2060,14 +2060,16 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
         exportSourceLoc(component.Loc));
   }
 
-  auto &rawDiagClient = Instance->getDiagnosticClient();
+  auto &diagEngine = Instance->getDiagnostics();
+  auto &rawDiagClient = *diagEngine.getClient();
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
   auto loadModule = [&](clang::ModuleIdPath path,
                         clang::Module::NameVisibilityKind visibility)
       -> clang::ModuleLoadResult {
     auto importRAII =
-        diagClient.handleImport(clangPath.front().first, importLoc);
+        diagClient.handleImport(clangPath.front().first, diagEngine,
+                                importLoc);
 
     std::string preservedIndexStorePathOption;
     auto &clangFEOpts = Instance->getFrontendOpts();
@@ -2081,7 +2083,6 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     }
 
     clang::SourceLocation clangImportLoc = getNextIncludeLoc();
-
     clang::ModuleLoadResult result =
         Instance->loadModule(clangImportLoc, path, visibility,
                              /*IsInclusionDirective=*/false);
