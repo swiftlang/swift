@@ -21,6 +21,7 @@
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugVariable.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILInstruction.h"
@@ -43,6 +44,39 @@ struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
 
 void registerBridgedClass(llvm::StringRef className, SwiftMetatype metatype);
+
+// AST bridging
+
+struct BridgedNominalTypeDecl {
+  swift::NominalTypeDecl * _Nonnull decl;
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef getName() const {
+    return decl->getName().str();
+  }
+
+  bool isStructWithUnreferenceableStorage() const;
+
+  bool isGlobalActor() const { return decl->isGlobalActor(); }
+};
+
+struct BridgedVarDecl {
+  const swift::VarDecl * _Nonnull decl;
+
+  BridgedVarDecl(const swift::VarDecl * _Nonnull decl): decl(decl) {}
+
+  std::string getUserFacingName() const {
+    return std::string(decl->getBaseName().userFacingName());
+  }
+};
+
+struct OptionalBridgedVarDecl {
+  const swift::VarDecl * _Nullable decl;
+
+  OptionalBridgedVarDecl(const swift::VarDecl * _Nullable decl): decl(decl) {}
+};
+
+// SIL Bridging
 
 struct BridgedValue {
   SwiftObject obj;
@@ -446,6 +480,23 @@ struct BridgedSILTypeArray {
 
   SWIFT_IMPORT_UNSAFE
   swift::SILType getAt(SwiftInt index) const { return typeArray[index]; }
+};
+
+struct OptionalBridgedSILDebugVariable {
+  using OptionalSILDebugVariable = llvm::Optional<swift::SILDebugVariable>;
+  
+  OptionalSILDebugVariable debugVariable;
+  
+  OptionalBridgedSILDebugVariable(
+    OptionalSILDebugVariable &&debugVariable): debugVariable(debugVariable) {}
+
+  bool hasValue() const {
+    return debugVariable.has_value();
+  }
+  
+  swift::SILDebugVariable getValue() const && {
+    return std::move(debugVariable.value());
+  }
 };
 
 struct BridgedInstruction {
@@ -873,6 +924,38 @@ struct BridgedInstruction {
   SwiftInt FullApplySite_numIndirectResultArguments() const {
     auto fas = swift::FullApplySite(getInst());
     return fas.getNumIndirectSILResults();
+  }
+
+  OptionalBridgedSILDebugVariable DebugValue_getVarInfo() const {
+    return getAs<swift::DebugValueInst>()->getVarInfo();
+  }
+
+  OptionalBridgedSILDebugVariable AllocStack_getVarInfo() const {
+    return getAs<swift::AllocStackInst>()->getVarInfo();
+  }
+
+  OptionalBridgedSILDebugVariable AllocBox_getVarInfo() const {
+    return getAs<swift::AllocBoxInst>()->getVarInfo();
+  }
+
+  OptionalBridgedVarDecl DebugValue_getDecl() const {
+    return getAs<swift::DebugValueInst>()->getDecl();
+  }
+
+  OptionalBridgedVarDecl AllocStack_getDecl() const {
+    return getAs<swift::AllocStackInst>()->getDecl();
+  }
+
+  OptionalBridgedVarDecl AllocBox_getDecl() const {
+    return getAs<swift::AllocBoxInst>()->getDecl();
+  }
+
+  OptionalBridgedVarDecl GlobalAddr_getDecl() const {
+    return getAs<swift::DebugValueInst>()->getDecl();
+  }
+
+  OptionalBridgedVarDecl RefElementAddr_getDecl() const {
+    return getAs<swift::DebugValueInst>()->getDecl();
   }
 };
 
@@ -1405,21 +1488,6 @@ struct BridgedBuilder{
   BridgedInstruction createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
     return {builder().createEndCOWMutation(regularLoc(), instance.getSILValue(), keepUnique)};
   }
-};
-
-// AST bridging
-
-struct BridgedNominalTypeDecl {
-  swift::NominalTypeDecl * _Nonnull decl;
-
-  SWIFT_IMPORT_UNSAFE
-  llvm::StringRef getName() const {
-    return decl->getName().str();
-  }
-
-  bool isStructWithUnreferenceableStorage() const;
-
-  bool isGlobalActor() const { return decl->isGlobalActor(); }
 };
 
 // Passmanager and Context
