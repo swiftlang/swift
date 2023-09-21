@@ -558,6 +558,8 @@ ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
+ERROR(objc_with_embedded,none,
+      "Objective-C interoperability cannot be enabled with embedded Swift.", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
