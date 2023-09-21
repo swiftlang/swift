@@ -1660,3 +1660,35 @@ bb0(%0 : $*(Klass, Klass)):
   %7 = tuple ()
   return %7 : $()
 }
+
+// CHECK-LABEL: sil @indexing_is_not_overlapping :
+// CHECK:         store %0
+// CHECK:         store %0
+// CHECK:       end sil function 'indexing_is_not_overlapping'
+sil @indexing_is_not_overlapping : $@convention(thin) (Int, Builtin.RawPointer) -> () {
+bb0(%0 : $Int, %1 : $Builtin.RawPointer):
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = index_addr [stack_protection] %2 : $*Int, %3 : $Builtin.Word
+  store %0 to %4 : $*Int
+  store %0 to %2 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @indexing_is_not_overlapping2 :
+// CHECK:         store %1
+// CHECK:         store %0
+// CHECK:       end sil function 'indexing_is_not_overlapping2'
+sil @indexing_is_not_overlapping2 : $@convention(thin) (Int, Builtin.Int64, Builtin.RawPointer) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int64, %2 : $Builtin.RawPointer):
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int
+  %4 = integer_literal $Builtin.Word, 3
+  %5 = index_addr [stack_protection] %3 : $*Int, %4 : $Builtin.Word
+  %6 = struct_element_addr %5 : $*Int, #Int.value
+  store %1 to %6 : $*Builtin.Int64
+  store %0 to %3 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
