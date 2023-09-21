@@ -1327,6 +1327,7 @@ if(SWIFT_INCLUDE_TOOLS)
       return()
     endif()
 
+    set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
     set(BUILD_SHARED_LIBS ON)
     # All libraries in 'swift-syntax' goes to 'lib/swift/host'.
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
