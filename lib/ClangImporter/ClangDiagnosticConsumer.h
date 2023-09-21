@@ -56,7 +56,7 @@ class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
         // the module lookup errors have been emitted. While the ClangDiagnosticConsumer
         // takes care of filtering out the diagnostics from the output and from
         // being handled by Swift's DiagnosticEngine, we must ensure to also
-        // reset Clang's DiagnosticEngine because its state is queries in later
+        // reset Clang's DiagnosticEngine because its state is queried in later
         // stages of compilation and errors emitted on "module_not_found" should not
         // be counted.
         // FIXME: We must instead allow for module loading in Clang to fail without
