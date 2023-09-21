@@ -111,6 +111,16 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
 
   // Call the witness to do the copy.
   if (copyKind == ArrayCopy::NoAlias || copyKind == ArrayCopy::FrontToBack) {
+    if (self->hasLayoutString() && destOp == ArrayDest::Init &&
+        srcOp == ArraySource::Copy) {
+      return swift_generic_arrayInitWithCopy(dest, src, count, stride, self);
+    }
+
+    if (self->hasLayoutString() && destOp == ArrayDest::Assign &&
+        srcOp == ArraySource::Copy) {
+      return swift_generic_arrayAssignWithCopy(dest, src, count, stride, self);
+    }
+
     auto copy = get_witness_function<destOp, srcOp>(wtable);
     for (size_t i = 0; i < count; ++i) {
       auto offset = i * stride;
@@ -124,10 +134,6 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
   // Back-to-front copy.
   assert(copyKind == ArrayCopy::BackToFront);
   assert(count != 0);
-
-  if (self->hasLayoutString() && destOp == ArrayDest::Init && srcOp == ArraySource::Copy) {
-      return swift_generic_arrayInitWithCopy(dest, src, count, stride, self);
-  }
 
   auto copy = get_witness_function<destOp, srcOp>(wtable);
   size_t i = count;

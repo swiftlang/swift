@@ -245,6 +245,10 @@ void swift_generic_arrayInitWithCopy(swift::OpaqueValue *dest,
                                      size_t stride,
                                      const Metadata *metadata);
 
+void swift_generic_arrayAssignWithCopy(swift::OpaqueValue *dest,
+                                       swift::OpaqueValue *src, size_t count,
+                                       size_t stride, const Metadata *metadata);
+
 constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
 
 } // namespace swift
