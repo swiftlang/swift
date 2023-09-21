@@ -28,13 +28,15 @@ public func catching1() {
 // CHECK-TRAPS-SIL:      sil @$s4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK-TRAPS-SIL-NEXT: bb0:
 // CHECK-TRAPS-SIL-NEXT:   debug_value
-// CHECK-TRAPS-SIL-NEXT:   %1 = builtin "int_trap"
+// CHECK-TRAPS-SIL-NEXT:   %1 = integer_literal $Builtin.Int1, -1
+// CHECK-TRAPS-SIL-NEXT:   cond_fail %1 : $Builtin.Int1, "throw turned into a trap"
 // CHECK-TRAPS-SIL-NEXT:   unreachable
 // CHECK-TRAPS-SIL-NEXT: }
 
 
 // CHECK-TRAPS-IR:      define {{.*}}@"$s4main9throwing1SiyKF"{{.*}}{
 // CHECK-TRAPS-IR-NEXT: entry:
-// CHECK-TRAPS-IR-NEXT:   call void @llvm.trap()
+// CHECK-TRAPS-IR:        call void @llvm.trap()
 // CHECK-TRAPS-IR-NEXT:   unreachable
 // CHECK-TRAPS-IR-NEXT: }
+// CHECK-TRAPS-IR:      define {{.*}}@"$s4main9catching1yyF"{{.*}}{

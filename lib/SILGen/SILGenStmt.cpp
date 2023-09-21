@@ -762,8 +762,7 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
 
 void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
   if (SGF.getASTContext().LangOpts.ThrowsAsTraps) {
-    SGF.B.createBuiltin(S, SGF.SGM.getASTContext().getIdentifier("int_trap"),
-                        SGF.SGM.Types.getEmptyTupleType(), {}, {});
+    SGF.B.createUnconditionalFail(S, "throw turned into a trap");
     SGF.B.createUnreachable(S);
     return;
   }
@@ -1483,8 +1482,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
          "calling emitThrow with invalid throw destination!");
 
   if (getASTContext().LangOpts.ThrowsAsTraps) {
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("int_trap"),
-                    SGM.Types.getEmptyTupleType(), {}, {});
+    B.createUnconditionalFail(loc, "throw turned into a trap");
     B.createUnreachable(loc);
     return;
   }
