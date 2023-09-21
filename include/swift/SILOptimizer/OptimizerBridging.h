@@ -263,6 +263,8 @@ struct BridgedPassContext {
 
   std::string mangleOutlinedVariable(BridgedFunction function) const;
 
+  std::string mangleAsyncRemoved(BridgedFunction function) const;
+
   SWIFT_IMPORT_UNSAFE
   BridgedGlobalVar createGlobalVariable(llvm::StringRef name, swift::SILType type, bool isPrivate) const;
 

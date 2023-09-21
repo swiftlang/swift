@@ -2221,6 +2221,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSILOpaqueValues |= Args.hasArg(OPT_enable_sil_opaque_values);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
+  Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableActorDataRaceChecks |= Args.hasFlag(
       OPT_enable_actor_data_race_checks,
       OPT_disable_actor_data_race_checks, /*default=*/false);

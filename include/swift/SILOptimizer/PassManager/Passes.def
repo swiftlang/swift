@@ -122,6 +122,8 @@ PASS(ArrayElementPropagation, "array-element-propagation",
      "Array Element Propagation")
 SWIFT_FUNCTION_PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
+SWIFT_MODULE_PASS(AsyncDemotion, "async-demotion",
+     "Convert async functions to be synchronous")
 PASS(BasicInstructionPropertyDumper, "basic-instruction-property-dump",
      "Print SIL Instruction MemBehavior and ReleaseBehavior Information")
 PASS(BasicCalleePrinter, "basic-callee-printer",

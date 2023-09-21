@@ -67,6 +67,10 @@ public protocol ApplySite : Instruction {
 extension ApplySite {
   public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
 
+  public var isAsync: Bool {
+    return callee.type.isAsyncFunction
+  }
+
   /// Returns the subset of operands which are argument operands.
   ///
   /// This does not include the callee function operand.

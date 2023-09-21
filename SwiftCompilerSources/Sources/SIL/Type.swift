@@ -57,6 +57,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
+  public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
   public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
 
@@ -198,7 +199,7 @@ extension swift.SILType {
 }
 
 // TODO: use an AST type for this once we have it
-public struct NominalTypeDecl : Equatable {
+public struct NominalTypeDecl : Equatable, Hashable {
   private let bridged: BridgedNominalTypeDecl
 
   public init(_bridged: BridgedNominalTypeDecl) {
@@ -211,7 +212,15 @@ public struct NominalTypeDecl : Equatable {
     lhs.bridged.decl == rhs.bridged.decl
   }
 
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.decl)
+  }
+
   public var isStructWithUnreferenceableStorage: Bool {
     bridged.isStructWithUnreferenceableStorage()
+  }
+
+  public var isGlobalActor: Bool {
+    return bridged.isGlobalActor()
   }
 }

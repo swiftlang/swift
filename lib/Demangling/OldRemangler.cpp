@@ -446,6 +446,11 @@ ManglingError Remangler::mangleIsSerialized(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleAsyncRemoved(Node *node, unsigned depth) {
+  Buffer << "a";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleMetatypeParamsRemoved(Node *node, unsigned depth) {
   Buffer << "m";
   return ManglingError::Success;
