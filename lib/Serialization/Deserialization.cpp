@@ -7522,9 +7522,9 @@ ModuleFile::getClangType(ClangTypeID TID) {
   return clangType;
 }
 
-Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
-                                             llvm::Error &&error,
-                                             ClassDecl *containingClass) {
+Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
+    ASTContext &context, llvm::Error &&error,
+    ClassDecl *containingClass) const {
   Decl *suppliedMissingMember = nullptr;
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
@@ -7538,7 +7538,26 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
         error.getNumberOfVTableEntries(),
         error.needsFieldOffsetVectorEntry());
   };
-  llvm::handleAllErrors(std::move(error), handleMissingClassMember);
+
+  // Emit the diagnostics/remarks out of the ModularizationError
+  // wrapped in a TypeError (eg. coming from resolveCrossReference),
+  // which is otherwise just dropped but could help better understand
+  // C/C++ interop issues.
+  assert(context.LangOpts.EnableDeserializationRecovery);
+  auto handleModularizationError = [&](ModularizationError &error)
+      -> llvm::Error {
+    if (context.LangOpts.EnableModuleRecoveryRemarks)
+      error.diagnose(this, DiagnosticBehavior::Remark);
+    return llvm::Error::success();
+  };
+  auto handleTypeError = [&](TypeError &typeError) {
+    handleMissingClassMember(typeError);
+    typeError.diagnoseUnderlyingReason(handleModularizationError);
+    if (context.LangOpts.EnableModuleRecoveryRemarks)
+      typeError.diagnose(this);
+  };
+  llvm::handleAllErrors(std::move(error), handleTypeError,
+      handleMissingClassMember);
   return suppliedMissingMember;
 }
 
