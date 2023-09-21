@@ -43,6 +43,10 @@ final public class FunctionArgument : Argument {
     bridged.getConvention().convention
   }
 
+  public var isSelf: Bool {
+    return bridged.isSelf()
+  }
+
   public var isIndirectResult: Bool {
     return index < parentFunction.numIndirectResultArguments
   }

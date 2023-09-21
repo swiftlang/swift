@@ -631,6 +631,15 @@ extension ValueUseDefWalker {
       if let path = path.popIfMatches(.enumCase, index: e.caseIndex),
          let payload = e.payload {
         return walkUp(value: payload, path: path)
+
+      } else if path.popIfMatches(.anyValueFields, index: nil) != nil {
+        if let payload = e.payload {
+          return walkUp(value: payload, path: path)
+        } else {
+          // without a payload, this enum is itself a definition root.
+          return rootDef(value: e, path: path)
+        }
+
       } else {
         return unmatchedPath(value: e, path: path)
       }
