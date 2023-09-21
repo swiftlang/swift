@@ -272,6 +272,9 @@ namespace swift {
     /// Allow throwing call expressions without annotation with 'try'.
     bool EnableThrowWithoutTry = false;
 
+    /// Turn all throw sites into immediate traps.
+    bool ThrowsAsTraps = false;
+
     /// If set, inserts instrumentation useful for testing the debugger.
     bool DebuggerTestingTransform = false;
 

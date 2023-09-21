@@ -39,6 +39,15 @@ public struct Simple {
     }
 }
 
+public struct GenericStruct<T> {
+    let x: Int = 0
+    let y: T
+
+    public init(_ y: T) {
+        self.y = y
+    }
+}
+
 public class GenericClass<T> {
     let x: T
 
@@ -600,4 +609,19 @@ public func testGenericInit<T>(_ ptr: __owned UnsafeMutableRawPointer, to x: T) 
 public func testGenericDestroy<T>(_ ptr: __owned UnsafeMutableRawPointer, of tpe: T.Type) {
     let ptr = ptr.assumingMemoryBound(to: InternalGeneric<T>.self)
     testDestroy(ptr)
+}
+
+@inline(never)
+public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    buffer.deinitialize()
+}
+
+@inline(never)
+public func testGenericArrayInitWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
+    dest.initialize(fromContentsOf: src)
+}
+
+@inline(never)
+public func testGenericArrayAssignWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
+    dest.update(fromContentsOf: src)
 }

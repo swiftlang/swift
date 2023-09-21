@@ -1059,6 +1059,79 @@ func testSinglePayloadSimpleResolve() {
 
 testSinglePayloadSimpleResolve()
 
+func testArrayDestroy() {
+    let buffer = UnsafeMutableBufferPointer<GenericStruct<SimpleClass>>.allocate(capacity: 20)
+
+    defer {
+        buffer.deallocate()
+    }
+
+    buffer.initialize(repeating: GenericStruct(SimpleClass(x: 23)))
+
+    // CHECK: Before destroy
+    print("Before destroy")
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayDestroy(buffer)
+}
+
+testArrayDestroy()
+
+func testArrayInitWithCopy() {
+    let src = UnsafeMutableBufferPointer<GenericStruct<SimpleClass>>.allocate(capacity: 20)
+    let dest = UnsafeMutableBufferPointer<GenericStruct<SimpleClass>>.allocate(capacity: 20)
+
+    defer {
+        src.deallocate()
+        dest.deallocate()
+    }
+
+    src.initialize(repeating: GenericStruct(SimpleClass(x: 23)))
+
+    testGenericArrayInitWithCopy(dest: dest, src: src)
+
+    // CHECK: Before src deinit
+    print("Before src deinit")
+    src.deinitialize()
+
+    // CHECK-NEXT: Before dest deinit
+    print("Before dest deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    dest.deinitialize()
+}
+
+testArrayInitWithCopy()
+
+func testArrayAssignWithCopy() {
+    let src = UnsafeMutableBufferPointer<GenericStruct<SimpleClass>>.allocate(capacity: 20)
+    let dest = UnsafeMutableBufferPointer<GenericStruct<SimpleClass>>.allocate(capacity: 20)
+
+    defer {
+        src.deallocate()
+        dest.deallocate()
+    }
+
+    src.initialize(repeating: GenericStruct(SimpleClass(x: 23)))
+    dest.initialize(repeating: GenericStruct(SimpleClass(x: 32)))
+
+    // CHECK: Before assign
+    print("Before assign")
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testGenericArrayAssignWithCopy(dest: dest, src: src)
+
+    // CHECK: Before src deinit
+    print("Before src deinit")
+    src.deinitialize()
+
+    // CHECK-NEXT: Before dest deinit
+    print("Before dest deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    dest.deinitialize()
+}
+
+testArrayAssignWithCopy()
+
 #if os(macOS)
 
 import Foundation
