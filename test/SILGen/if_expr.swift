@@ -508,3 +508,8 @@ func testNever1() -> Never {
 func testNever2() -> Never {
   if .random() { fatalError() } else { fatalError() }
 }
+
+func testCaptureList() -> Int {
+  let fn = { [x = if .random() { 0 } else { 1 }] in x }
+  return fn()
+}
