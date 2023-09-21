@@ -15,10 +15,12 @@ path %PATH%;%PYTHON_HOME%
 set ProductVersion=5.9.0
 set ProductTag=
 
-:: Identify the SourceRoot
-:: Normalize the SourceRoot to make it easier to read the output.
+:: Identify the SourceRoot and use a substitute drive to shorten paths
 cd %~dp0\..\..
-set SourceRoot=%CD%
+subst S: /d
+subst S: . || (exit /b)
+set SourceRoot=S:
+cd /d %SourceRoot%
 
 :: Identify the BuildRoot
 set BuildRoot=%SourceRoot%\build
