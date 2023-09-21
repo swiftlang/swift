@@ -239,12 +239,12 @@ struct PartitionOpBuilder {
         lookupValueID(tgt), lookupValueID(src), currentInst));
   }
 
-  void addConsume(SILValue value, Expr *sourceExpr = nullptr) {
+  void addTransfer(SILValue value, Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
            "consumed value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
-        PartitionOp::Consume(lookupValueID(value), currentInst, sourceExpr));
+        PartitionOp::Transfer(lookupValueID(value), currentInst, sourceExpr));
   }
 
   void addMerge(SILValue fst, SILValue snd) {
@@ -655,14 +655,14 @@ public:
       int argNum = 0;
       for (auto arg : ops) {
         if (auto value = trackIfNonSendable(arg))
-          builder.addConsume(value->getRepresentative(), getSourceArg(argNum));
+          builder.addTransfer(value->getRepresentative(), getSourceArg(argNum));
         argNum++;
       }
     };
 
     auto handleSILSelf = [&](SILValue self) {
       if (auto value = trackIfNonSendable(self))
-        builder.addConsume(value->getRepresentative(), getSourceSelf());
+        builder.addTransfer(value->getRepresentative(), getSourceSelf());
     };
 
     if (applySite.hasSelfArgument()) {
@@ -1201,7 +1201,7 @@ struct LocalConsumedReason {
   std::optional<PartitionOp> localInst;
 
   static LocalConsumedReason ConsumeInst(PartitionOp localInst) {
-    assert(localInst.getKind() == PartitionOpKind::Consume);
+    assert(localInst.getKind() == PartitionOpKind::Transfer);
     return LocalConsumedReason(LocalConsumedReasonKind::LocalConsumeInst, localInst);
   }
 
@@ -1262,7 +1262,7 @@ public:
   }
 
   void addConsumeOp(PartitionOp consumeOp, unsigned distance) {
-    assert(consumeOp.getKind() == PartitionOpKind::Consume);
+    assert(consumeOp.getKind() == PartitionOpKind::Transfer);
     // duplicates should not arise
     if (!containsOp(consumeOp))
       consumeOps[distance].push_back(consumeOp);
@@ -1509,7 +1509,7 @@ class RaceTracer {
       workingPartition.apply(partitionOp);
       if (workingPartition.isConsumed(consumedVal) && !consumedReason) {
         // this partitionOp consumes the target value
-        if (partitionOp.getKind() == PartitionOpKind::Consume)
+        if (partitionOp.getKind() == PartitionOpKind::Transfer)
           consumedReason = LocalConsumedReason::ConsumeInst(partitionOp);
         else
           // a merge or assignment invalidated this, but that will be a separate
