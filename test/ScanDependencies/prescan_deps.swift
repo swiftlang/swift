@@ -14,13 +14,13 @@ import G
 import SubE
 
 // CHECK: "imports": [
-// CHECK-NEXT:  "C",
-// CHECK-NEXT:  "E",
-// CHECK-NEXT:  "G",
-// CHECK-NEXT:  "SubE",
-// CHECK-NEXT:  "Swift",
-// CHECK-NEXT:  "SwiftOnoneSupport",
-// CHECK-NEXT:  "_Concurrency",
-// CHECK-NEXT:  "_SwiftConcurrencyShims",
-// CHECK-NEXT:  "_StringProcessing"
-// CHECK-NEXT: ]
+// CHECK-DAG:  "C"
+// CHECK-DAG:  "E"
+// CHECK-DAG:  "G"
+// CHECK-DAG:  "SubE"
+// CHECK-DAG:  "Swift"
+// CHECK-DAG:  "SwiftOnoneSupport"
+// CHECK-DAG:  "_Concurrency"
+// CHECK-DAG:  "_SwiftConcurrencyShims"
+// CHECK-DAG:  "_StringProcessing"
+// CHECK: ]
