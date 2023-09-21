@@ -505,7 +505,7 @@ def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
 def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
   HelpText<"Enable speculative devirtualization pass.">;
 
-def enable_async_demotion : Flag<["-"], "enable-async-demotion">,
+def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,

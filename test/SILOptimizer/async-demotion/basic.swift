@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-async-demotion -disable-availability-checking -module-name main -O -emit-sil -primary-file %s | %FileCheck %s --implicit-check-not hop_to_executor
+// RUN: %target-swift-frontend -enable-experimental-async-demotion -disable-availability-checking -module-name main -O -emit-sil -primary-file %s | %FileCheck %s --implicit-check-not hop_to_executor
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: concurrency
