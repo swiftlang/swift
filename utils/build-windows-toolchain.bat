@@ -784,25 +784,25 @@ python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'D
 :: TODO(compnerd) match the XCTest installation name
 python -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development' } }), encoding='utf-8'))" > %PlatformRoot%\Info.plist
 
-IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain
+IF NOT "%SKIP_PACKAGING%"=="1" call :PackageToolchain || (exit /b)
 
 :: TODO(compnerd) test LLVM
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==swift SET SKIP_TEST=1)
-IF "%SKIP_TEST%"=="0" call :TestSwift
+IF "%SKIP_TEST%"=="0" call :TestSwift || (exit /b)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==dispatch SET SKIP_TEST=1)
-IF "%SKIP_TEST%"=="0" call :TestDispatch
+IF "%SKIP_TEST%"=="0" call :TestDispatch || (exit /b)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==foundation SET SKIP_TEST=1)
-IF "%SKIP_TEST%"=="0" call :TestFoundation
+IF "%SKIP_TEST%"=="0" call :TestFoundation || (exit /b)
 
 SET SKIP_TEST=0
 FOR %%T IN (%SKIP_TESTS%) DO (IF /I %%T==xctest SET SKIP_TEST=1)
-IF "%SKIP_TEST%"=="0" call :TestXCTest
+IF "%SKIP_TEST%"=="0" call :TestXCTest || (exit /b)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
