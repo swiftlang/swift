@@ -90,26 +90,34 @@ StdMapTestSuite.test("UnorderedMap.subscript") {
 
 StdMapTestSuite.test("Map.filter") {
   var m = initMap()
+  var n: [Int: Int] = [:]
 
   expectNotNil(m[1])
+  expectEqual(n.count, 0)
 
   m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in k != 1 }
 
   expectNil(m[1])
   expectEqual(m[2], 2)
   expectEqual(m[3], 3)
+  expectEqual(n.count, 0)
 }
 
 StdMapTestSuite.test("UnorderedMap.filter") {
   var m = initUnorderedMap()
+  var n: [Int: Int] = [:]
 
   expectNotNil(m[1])
+  expectEqual(n.count, 0)
 
   m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in k != 1 }
 
   expectNil(m[1])
   expectEqual(m[2], 2)
   expectEqual(m[3], 3)
+  expectEqual(n.count, 0)
 }
 
 StdMapTestSuite.test("Map.erase") {
