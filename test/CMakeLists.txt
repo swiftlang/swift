@@ -210,8 +210,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
-# Get 'SWIFT_HOST_TRIPLE' and 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
-swift_get_host_triple(SWIFT_HOST_TRIPLE)
+# Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
 set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 
 set(profdata_merge_worker

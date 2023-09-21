@@ -131,22 +131,20 @@ endfunction()
 # Usage:
 # _add_host_variant_c_compile_link_flags(name)
 function(_add_host_variant_c_compile_link_flags name)
-  swift_get_host_triple(target)
-
   # MSVC and gcc don't understand -target.
   # clang-cl understands --target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
     else()
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
     endif()
   endif()
 
   if (CMAKE_Swift_COMPILER)
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
 
    _add_host_variant_swift_sanitizer_flags(${name})
   endif()

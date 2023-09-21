@@ -46,8 +46,7 @@ function(_add_host_swift_compile_options name)
     $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
     $<$<COMPILE_LANGUAGE:Swift>:none>)
 
-  swift_get_host_triple(target)
-  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
   _add_host_variant_swift_sanitizer_flags(${name})
 endfunction()
 
