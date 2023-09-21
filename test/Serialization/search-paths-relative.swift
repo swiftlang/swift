@@ -1,3 +1,4 @@
+// REQUIRES: asserts
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/secret)
 // RUN: %target-swift-frontend -emit-module -o %t/secret %S/Inputs/struct_with_operators.swift
@@ -6,6 +7,11 @@
 
 // RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -ivfsoverlay -Xcc %S/../Inputs/unextended-module-overlay.yaml -Xcc -DDUMMY
 // RUN: %target-swift-frontend %s -typecheck -I %t
+
+// Ensure that in Swift 6 mode we do not read out search paths, thus are no longer able to
+// locate transitive dependencies with them
+// RUN: not %target-swift-frontend %s -typecheck -I %t -swift-version 6 &> %t/swift_6_output.txt
+// RUN: %FileCheck -check-prefix=SWIFT6 %s < %t/swift_6_output.txt
 
 // Check the actual serialized search paths.
 // RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule > %t/has_xref.swiftmodule.txt
@@ -31,3 +37,5 @@ numeric(42)
 // NEGATIVE-NOT: '../Frameworks'
 // This should be filtered out.
 // NEGATIVE-NOT: -ivfsoverlay{{.*}}unextended-module-overlay.yaml
+
+// SWIFT6: error: missing required modules: 'has_alias', 'struct_with_operators'
