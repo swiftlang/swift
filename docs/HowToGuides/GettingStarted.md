@@ -379,7 +379,7 @@ following steps assume that you have already [built the toolchain with Ninja](#t
   Generate the Xcode project with
 
   ```sh
-  utils/build-script --swift-darwin-supported-archs "$(uname -m)" --xcode --clean`.
+  utils/build-script --swift-darwin-supported-archs "$(uname -m)" --xcode --clean
   ```
 
   This can take a few minutes due to metaprogrammed sources that depend on LLVM
@@ -404,7 +404,7 @@ following steps assume that you have already [built the toolchain with Ninja](#t
 * In the _Info_ pane of the target settings, set
   * _Build Tool_ to the absolute path of the `ninja` executable (the output of
     `which ninja` on the command line)
-  * _Arguments_ to a Ninja target (e.g. `bin/swift-frontend`, the compiler)
+  * _Arguments_ to a Ninja target (e.g. `bin/swift-frontend` is the compiler)
   * _Directory_ to the absolute path of the `build/Ninja-*/swift-macosx-*`
     directory
 * Create a scheme in the workspace, making sure to select the target you just
