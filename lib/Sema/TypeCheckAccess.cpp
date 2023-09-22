@@ -339,13 +339,13 @@ static void noteLimitingImport(ASTContext &ctx,
 
   if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
     ValueDecl *VD = ITR->getBoundDecl();
-    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+    ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,
                        limitImport->accessLevel,
                        limitImport->module.importedModule);
   } else {
-    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
+    ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
                        limitImport->accessLevel);
   }

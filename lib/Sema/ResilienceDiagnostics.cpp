@@ -115,7 +115,7 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
-    Context.Diags.diagnose(problematicImport->accessLevelLoc,
+    Context.Diags.diagnose(problematicImport->importLoc,
                            diag::decl_import_via_here, D,
                            problematicImport->accessLevel,
                            problematicImport->module.importedModule);
