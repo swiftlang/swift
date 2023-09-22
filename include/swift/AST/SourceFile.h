@@ -115,6 +115,10 @@ private:
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
       PreconcurrencyImportsUsed;
 
+  /// The highest access level of declarations referencing each import.
+  llvm::DenseMap<AttributedImport<ImportedModule>, AccessLevel>
+      ImportsUseAccessLevel;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
@@ -364,6 +368,15 @@ public:
   /// Note that the given import has used @preconcurrency/
   void setImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import);
+
+  /// Return the highest access level of the declarations referencing
+  /// this import in signature or inlinable code.
+  AccessLevel
+  getMaxAccessLevelUsingImport(AttributedImport<ImportedModule> import) const;
+
+  /// Register the use of \p import from an API with \p accessLevel.
+  void registerAccessLevelUsingImport(AttributedImport<ImportedModule> import,
+                                      AccessLevel accessLevel);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.

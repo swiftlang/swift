@@ -119,10 +119,10 @@ public struct PrivateLibWrapper<T> {
 
 /// Short test mostly to count the notes.
 //--- MinimalClient.swift
-public import PublicLib
-package import PackageLib
-internal import InternalLib // expected-note@:1 {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
-fileprivate import FileprivateLib // expected-note@:1 {{class 'FileprivateImportClass' imported as 'fileprivate' from 'FileprivateLib' here}}
+public import PublicLib // expected-warning {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
+package import PackageLib // expected-warning {{package import of 'PackageLib' was not used in package declarations}}
+internal import InternalLib // expected-note {{struct 'InternalImportType' imported as 'internal' from 'InternalLib' here}}
+fileprivate import FileprivateLib // expected-note {{class 'FileprivateImportClass' imported as 'fileprivate' from 'FileprivateLib' here}}
 private import PrivateLib
 
 public func PublicFuncUsesInternal(_: InternalImportType) { // expected-error {{function cannot be declared public because its parameter uses an internal type}}

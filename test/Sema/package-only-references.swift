@@ -51,7 +51,7 @@ package struct PackageStruct : IndirectProtocol {
 }
 
 //--- Client.swift
-public import PackageLib
+import PackageLib
 
 let t = getIndirectType() // expected-error {{cannot find 'getIndirectType' in scope}}
 t.someMethod()

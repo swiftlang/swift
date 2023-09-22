@@ -32,7 +32,9 @@
 
 //--- ClientWithoutTheFlag.swift
 public import PublicLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
+// expected-warning @-1 {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
 package import PackageLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
+// expected-warning @-1 {{package import of 'PackageLib' was not used in package declarations}}
 internal import InternalLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
 fileprivate import FileprivateLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}
 private import PrivateLib // expected-error@:1 {{Access level on imports require '-enable-experimental-feature AccessLevelOnImport'}}

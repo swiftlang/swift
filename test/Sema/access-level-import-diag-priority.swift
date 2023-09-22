@@ -91,7 +91,6 @@ public func publicFuncUsesPackageLevelPackageImportedType(_ a: PackageLevelPacka
 
 /// Local vs imports
 //--- LocalVsImportClient.swift
-public import PublicLib
 internal import InternalLib
 fileprivate import FileprivateLib // expected-note {{struct 'FileprivateImportType' imported as 'fileprivate' from 'FileprivateLib' here}}
 

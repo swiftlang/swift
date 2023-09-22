@@ -2451,6 +2451,12 @@ REMARK(add_predates_concurrency_import,none,
      "%select{| as warnings}0", (bool, Identifier))
 REMARK(remove_predates_concurrency_import,none,
      "'@preconcurrency' attribute on module %0 is unused", (Identifier))
+WARNING(remove_public_import,none,
+        "public import of %0 was not used in public declarations or inlinable code",
+        (const ModuleDecl *))
+WARNING(remove_package_import,none,
+        "package import of %0 was not used in package declarations",
+        (const ModuleDecl *))
 WARNING(public_decl_needs_sendable,none,
         "public %kind0 does not specify whether it is 'Sendable' or not",
         (const ValueDecl *))
