@@ -453,6 +453,19 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
   return hasActiveResults && hasActiveArguments;
 }
 
+static bool shouldDifferentiateInjectEnumAddr(
+    const InjectEnumAddrInst &inject,
+    const DifferentiableActivityInfo &activityInfo,
+    const AutoDiffConfig &config) {
+  SILValue en = inject.getOperand();
+  for (auto use : en->getUses()) {
+    auto *init = dyn_cast<InitEnumDataAddrInst>(use->getUser());
+    if (init && activityInfo.isActive(init, config))
+      return true;
+  }
+  return false;
+}
+
 /// Returns a flag indicating whether the instruction should be differentiated,
 /// given the differentiation indices of the instruction's parent function.
 /// Whether the instruction should be differentiated is determined sequentially
@@ -506,6 +519,13 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
         isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
       return true;
   }
+
+  // Should differentiate `inject_enum_addr` if the corresponding
+  // `init_enum_addr` has an active operand.
+  if (auto inject = dyn_cast<InjectEnumAddrInst>(inst))
+    if (shouldDifferentiateInjectEnumAddr(*inject, activityInfo, config))
+      return true;
+
   return false;
 }
 
