@@ -102,7 +102,7 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   llvm_unreachable("bad KnownProtocolKind");
 }
 
-KnownProtocolSet swift::getInvertableProtocols() {
+KnownProtocolSet swift::getInvertibleProtocols() {
   return { KnownProtocolKind::Copyable };
 }
 

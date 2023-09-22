@@ -5057,10 +5057,10 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (auto protoTy = ty->getAs<ProtocolType>())
     if (auto protoDecl = protoTy->getDecl())
       if (auto kp = protoDecl->getKnownProtocolKind())
-        if (getInvertableProtocols().contains(*kp))
+        if (getInvertibleProtocols().contains(*kp))
           return ty;
 
-  diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertable, ty);
+  diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());
 }
 

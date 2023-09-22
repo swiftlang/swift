@@ -2347,8 +2347,8 @@ ERROR(inferred_opaque_type,none,
       "return type of another declaration", (Type))
 
 // Inverse Constraints
-ERROR(inverse_type_not_invertable,none,
-      "type %0 is not invertable", (Type))
+ERROR(inverse_type_not_invertible,none,
+      "type %0 is not invertible", (Type))
 
 // Extensions
 ERROR(non_nominal_extension,none,
