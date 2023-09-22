@@ -187,3 +187,21 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test {{.*}} on test_value_literal_parsing: test-specification-parsing with: VVVV, %0, %1, %2, %3
+// CHECK:       value: %0 = argument of bb0 : $Builtin.Int1
+// CHECK:       value:   %2 = integer_literal $Builtin.Int64, 1
+// CHECK:       value:   %1 = integer_literal $Builtin.Int64, 2          
+// CHECK:       value:   %3 = integer_literal $Builtin.Int64, 3          
+// CHECK-LABEL: end running test {{.*}} on test_value_literal_parsing: test-specification-parsing with: VVVV, %0, %1, %2, %3
+sil @test_value_literal_parsing : $(Builtin.Int1) -> () {
+entry(%0 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int64, 2
+  test_specification "test-specification-parsing VVVV %0 %1 %2 %3"
+  %1 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  apply undef(%2) : $@convention(thin) (Builtin.Int64) -> ()
+  apply undef(%3) : $@convention(thin) (Builtin.Int64) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
