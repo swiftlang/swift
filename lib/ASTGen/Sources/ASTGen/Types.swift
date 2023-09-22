@@ -2,6 +2,7 @@ import CASTBridging
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftDiagnostics
 
