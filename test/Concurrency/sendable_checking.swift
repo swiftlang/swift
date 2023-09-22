@@ -250,6 +250,7 @@ final class NonSendable {
   // expected-note @-1 3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // SendNonSendable emits 3 fewer errors here.
   // expected-targeted-and-complete-note @-3 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-complete-and-sns-note @-4 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -304,4 +305,14 @@ func callNonisolatedAsyncClosure(
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+}
+
+@available(SwiftStdlib 5.1, *)
+func testLocalCaptures() {
+  let ns = NonSendable()
+
+  @Sendable func a2() -> NonSendable {
+    return ns
+    // expected-complete-and-sns-warning@-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
+  }
 }
