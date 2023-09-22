@@ -1858,7 +1858,8 @@ right:
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[BB1:bb[0-9]+]], [[BB4:bb[0-9]+]]
 // CHECK:       [[BB1]]:
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[COPY]]
 // CHECK:         cond_br undef, [[BB2:bb[0-9]+]], [[BB3:bb[0-9]+]]
 // CHECK:       [[BB2]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
