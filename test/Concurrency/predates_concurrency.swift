@@ -100,7 +100,7 @@ func testCalls(x: X) {
   // expected-complete-sns-error @-1 {{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
   // Ok with minimal/targeted concurrency, Not ok with complete.
-  let _: () -> Void = onMainActorAlways // expected-complete-sns-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  let _: () -> Void = onMainActorAlways // expected-complete-sns-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   // both okay with minimal/targeted... an error with complete.
   let c = MyModelClass() // expected-complete-sns-error {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
@@ -111,7 +111,7 @@ func testCallsWithAsync() async {
   onMainActorAlways() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
 
-  let _: () -> Void = onMainActorAlways // expected-warning 2{{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass() // expected-error{{expression is 'async' but is not marked with 'await'}}
   // expected-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
