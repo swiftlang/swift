@@ -5237,8 +5237,9 @@ ERROR(concurrent_access_of_inout_param,none,
       "concurrently-executing code",
       (DeclName))
 ERROR(non_sendable_capture,none,
-      "capture of %1 with non-sendable type %0 in a `@Sendable` closure",
-      (Type, DeclName))
+      "capture of %1 with non-sendable type %0 in a `@Sendable` "
+      "%select{local function|closure}2",
+      (Type, DeclName, bool))
 ERROR(implicit_async_let_non_sendable_capture,none,
       "capture of %1 with non-sendable type %0 in 'async let' binding",
       (Type, DeclName))
