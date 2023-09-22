@@ -30,6 +30,7 @@
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -187,6 +188,8 @@ namespace swift {
 
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
+    llvm::StringMap<llvm::SmallVector<TestSpecificationInst *>>
+        TestSpecsWithRefs;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
     Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
@@ -799,12 +802,24 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
                  Value->getType().getRawASTType());
       HadError = true;
     } else {
+      if (TestSpecsWithRefs.find(Name) != TestSpecsWithRefs.end()) {
+        for (auto *tsi : TestSpecsWithRefs[Name]) {
+          tsi->setValueForName(Name, Value);
+        }
+      }
+
       // Forward references only live here if they have a single result.
       Entry->replaceAllUsesWith(Value);
       ::delete cast<PlaceholderValue>(Entry);
     }
     Entry = Value;
     return;
+  }
+
+  if (TestSpecsWithRefs.find(Name) != TestSpecsWithRefs.end()) {
+    for (auto *tsi : TestSpecsWithRefs[Name]) {
+      tsi->setValueForName(Name, Value);
+    }
   }
 
   // Otherwise, just store it in our map.
@@ -3770,7 +3785,33 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     auto ArgumentsSpecification =
       P.Tok.getText().drop_front(numQuotes).drop_back(numQuotes).trim();
     P.consumeToken(tok::string_literal);
-    ResultVal = B.createTestSpecificationInst(InstLoc, ArgumentsSpecification);
+    auto *tsi = B.createTestSpecificationInst(InstLoc, ArgumentsSpecification);
+    SmallVector<StringRef, 4> components;
+    test::getTestSpecificationComponents(ArgumentsSpecification, components);
+    for (auto component : components) {
+      auto offset = 0;
+      size_t nameStart = StringRef::npos;
+      while ((nameStart = component.find_if([](char c) { return c == '%'; },
+                                            offset)) != StringRef::npos) {
+        auto nameEnd = component.find_if_not(
+            [](char c) { return clang::isAsciiIdentifierContinue(c); },
+            nameStart + 1);
+        if (nameEnd == StringRef::npos)
+          nameEnd = component.size();
+        auto name = component.substr(nameStart, nameEnd);
+        component = component.drop_front(nameEnd);
+        if (nameStart + 1 == nameEnd) {
+          continue;
+        }
+        auto *&entry = LocalValues[name];
+        if (entry) {
+          tsi->setValueForName(name, entry);
+        } else {
+          TestSpecsWithRefs[name].push_back(tsi);
+        }
+      }
+    }
+    ResultVal = tsi;
     break;
   }
 

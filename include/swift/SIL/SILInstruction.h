@@ -44,6 +44,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -5162,6 +5163,7 @@ class TestSpecificationInst final
   friend TrailingObjects;
   friend SILBuilder;
 
+  llvm::StringMap<SILValue> values;
   unsigned ArgumentsSpecificationLength;
 
   TestSpecificationInst(SILDebugLocation Loc,
@@ -5173,6 +5175,8 @@ class TestSpecificationInst final
   create(SILDebugLocation Loc, StringRef argumentsSpecification, SILModule &M);
 
 public:
+  void setValueForName(StringRef name, SILValue value) { values[name] = value; }
+  llvm::StringMap<SILValue> const &getValues() { return values; }
   StringRef getArgumentsSpecification() const {
     return StringRef(getTrailingObjects<char>(), ArgumentsSpecificationLength);
   }
