@@ -32,8 +32,10 @@ struct BadBuffer: ~Copyable {
 // CHECK-SAME:  , {{i64|i32}} 8
 // stride
 // CHECK-SAME:  , {{i64|i32}} 8
-// flags: alignment 7, noncopyable
-// CHECK-SAME:  , <i32 0x800007>
+// flags-32: alignment 7, noncopyable, is not inline
+// CHECK-SAME-32:  , <i32 0x820007>
+// flags-64: alignment 7, noncopyable
+// CHECK-SAME-64:  , <i32 0x800007>
 struct Weird: ~Copyable {
   let value = UnsafeCell<Int64>()
 }
