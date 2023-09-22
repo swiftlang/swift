@@ -1703,22 +1703,13 @@ static llvm::ErrorOr<ModuleDependencyInfo> identifyMainModuleDependencies(
     rootID = root->getID().toString();
   }
 
-  auto mainDependencies =
+  auto mainModuleDependencyInfo =
       ModuleDependencyInfo::forSwiftSourceModule(rootID, {}, {}, ExtraPCMArgs);
 
+  llvm::StringSet<> alreadyAddedModules;
   // Compute Implicit dependencies of the main module
   {
-    llvm::StringSet<> alreadyAddedModules;
-    for (auto fileUnit : mainModule->getFiles()) {
-      auto sf = dyn_cast<SourceFile>(fileUnit);
-      if (!sf)
-        continue;
-
-      mainDependencies.addModuleImport(*sf, alreadyAddedModules);
-    }
-
     const auto &importInfo = mainModule->getImplicitImportInfo();
-
     // Swift standard library.
     switch (importInfo.StdlibKind) {
     case ImplicitStdlibKind::None:
@@ -1726,43 +1717,54 @@ static llvm::ErrorOr<ModuleDependencyInfo> identifyMainModuleDependencies(
       break;
 
     case ImplicitStdlibKind::Stdlib:
-      mainDependencies.addModuleImport("Swift", &alreadyAddedModules);
+      mainModuleDependencyInfo.addModuleImport("Swift", &alreadyAddedModules);
       break;
     }
 
     // Add any implicit module names.
     for (const auto &import : importInfo.AdditionalUnloadedImports) {
-      mainDependencies.addModuleImport(import.module.getModulePath(),
-                                           &alreadyAddedModules);
+      mainModuleDependencyInfo.addModuleImport(import.module.getModulePath(),
+                                               &alreadyAddedModules);
     }
 
     // Already-loaded, implicitly imported module names.
     for (const auto &import : importInfo.AdditionalImports) {
-      mainDependencies.addModuleImport(
+      mainModuleDependencyInfo.addModuleImport(
           import.module.importedModule->getNameStr(), &alreadyAddedModules);
     }
 
     // Add the bridging header.
     if (!importInfo.BridgingHeaderPath.empty()) {
-      mainDependencies.addBridgingHeader(importInfo.BridgingHeaderPath);
+      mainModuleDependencyInfo.addBridgingHeader(importInfo.BridgingHeaderPath);
     }
 
     // If we are to import the underlying Clang module of the same name,
     // add a dependency with the same name to trigger the search.
     if (importInfo.ShouldImportUnderlyingModule) {
-      mainDependencies.addModuleImport(mainModule->getName().str(),
-                                           &alreadyAddedModules);
+      mainModuleDependencyInfo.addModuleImport(mainModule->getName().str(),
+                                               &alreadyAddedModules);
     }
 
     // All modules specified with `-embed-tbd-for-module` are treated as implicit
     // dependnecies for this compilation since they are not guaranteed to be impored
     // in the source.
     for (const auto &tbdSymbolModule : instance.getInvocation().getTBDGenOptions().embedSymbolsFromModules) {
-      mainDependencies.addModuleImport(tbdSymbolModule, &alreadyAddedModules);
+      mainModuleDependencyInfo.addModuleImport(tbdSymbolModule, &alreadyAddedModules);
     }
   }
 
-  return mainDependencies;
+  // Add user-specified `import` dependencies
+  {
+    for (auto fileUnit : mainModule->getFiles()) {
+      auto sf = dyn_cast<SourceFile>(fileUnit);
+      if (!sf)
+        continue;
+
+      mainModuleDependencyInfo.addModuleImport(*sf, alreadyAddedModules);
+    }
+  }
+
+  return mainModuleDependencyInfo;
 }
 
 } // namespace

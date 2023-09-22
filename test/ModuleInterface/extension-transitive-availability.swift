@@ -13,17 +13,9 @@ func foo() {
 }
 
 // CHECK:      "directDependencies": [
-// CHECK-NEXT:        {
-// CHECK-NEXT:          "swift": "ExtensionAvailable"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
-// CHECK-NEXT:          "swift": "Swift"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
-// CHECK-NEXT:          "swift": "SwiftOnoneSupport"
-// CHECK-NEXT:        }
-// CHECK-NEXT:      ],
-
+// CHECK-DAG:          "swift": "ExtensionAvailable"
+// CHECK-DAG:          "swift": "Swift"
+// CHECK-DAG:          "swift": "SwiftOnoneSupport"
 
 // CHECK:      "swift": "ExtensionAvailable"
 // CHECK-NEXT:    },

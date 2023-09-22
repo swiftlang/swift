@@ -159,20 +159,6 @@ import SubE
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 
-/// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "SwiftShims"
-
-/// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm",
-// CHECK: "contextHash": "[[SHIMS_CONTEXT:.*]]",
-// CHECK: "-o"
-// CHECK-NEXT: SwiftShims-{{.*}}[[SHIMS_CONTEXT]].pcm
-// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
-
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}C-{{.*}}.pcm",
 
@@ -205,3 +191,17 @@ import SubE
 // CHECK-MAKE-DEPS-SAME: Bridging.h
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap
+
+/// --------Swift module Swift
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-NEXT: "clang": "SwiftShims"
+
+/// --------Clang module SwiftShims
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SwiftShims-{{.*}}.pcm",
+// CHECK: "contextHash": "[[SHIMS_CONTEXT:.*]]",
+// CHECK: "-o"
+// CHECK-NEXT: SwiftShims-{{.*}}[[SHIMS_CONTEXT]].pcm
+// CHECK-NO-SEARCH-PATHS-NOT: "-prebuilt-module-cache-path"
