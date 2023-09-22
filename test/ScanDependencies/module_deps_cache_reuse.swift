@@ -114,21 +114,10 @@ import SubE
 // CHECK-LABEL: modulePath": "{{.*}}{{/|\\}}E-{{.*}}.swiftmodule"
 // CHECK: "directDependencies"
 // CHECK-NEXT: {
-// CHECK-NEXT: "swift": "Swift"
+// CHECK: "swift": "Swift"
 
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
-
-/// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "SwiftShims"
-
-
-/// --------Clang module SwiftShims
-// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
 
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "{{.*}}/C-{{.*}}.pcm",
@@ -139,7 +128,7 @@ import SubE
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "B"
+// CHECK: "clang": "B"
 
 // CHECK: "moduleMapPath"
 // CHECK-SAME: module.modulemap
@@ -164,5 +153,16 @@ import SubE
 
 // CHECK: directDependencies
 // CHECK-NEXT: {
-// CHECK-NEXT: "clang": "A"
+// CHECK: "clang": "A"
 // CHECK-NEXT: }
+
+/// --------Swift module Swift
+// CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK: "clang": "SwiftShims"
+
+/// --------Clang module SwiftShims
+// CHECK-LABEL: "modulePath": "{{.*}}/SwiftShims-{{.*}}.pcm",
+
