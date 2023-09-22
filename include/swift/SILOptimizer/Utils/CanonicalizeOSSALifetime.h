@@ -319,7 +319,7 @@ public:
 
     currentDef = def;
 
-    if (maximizeLifetime) {
+    if (maximizeLifetime || respectsDeinitBarriers()) {
       liveness->initializeDiscoveredBlocks(&discoveredBlocks);
     }
     liveness->initializeDef(getCurrentDef());
@@ -396,10 +396,18 @@ public:
   UserRange getUsers() const { return liveness->getAllUsers(); }
 
 private:
+  bool respectsDeinitBarriers() const {
+    if (!currentDef->isLexical())
+      return false;
+    auto &module = currentDef->getFunction()->getModule();
+    return module.getASTContext().SILOpts.supportsLexicalLifetimes(module);
+  }
+
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
-  void recordConsumingUse(Operand *use) {
-    consumingBlocks.insert(use->getUser()->getParent());
+  void recordConsumingUse(Operand *use) { recordConsumingUser(use->getUser()); }
+  void recordConsumingUser(SILInstruction *user) {
+    consumingBlocks.insert(user->getParent());
   }
   bool computeCanonicalLiveness();
 

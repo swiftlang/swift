@@ -85,6 +85,10 @@ public:
                : LifetimeCompletion::AlreadyComplete;
   }
 
+  static void visitUnreachableLifetimeEnds(
+      SILValue value, const SSAPrunedLiveness &liveness,
+      llvm::function_ref<void(UnreachableInst *)> visit);
+
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, bool forceBoundaryCompletion);
 };
