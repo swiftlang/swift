@@ -1518,8 +1518,18 @@ function(add_swift_target_library_single target name)
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     target_link_directories(${target_static} PRIVATE
       ${library_search_directories})
+
+    set(target_private_libs)
+    foreach(library ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+      if(TARGET "${library}-static")
+        list(APPEND target_private_libs "${library}-static")
+      else()
+        list(APPEND target_private_libs "${library}")
+      endif()
+    endforeach()
+
     target_link_libraries("${target_static}" PRIVATE
-        ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+        ${target_private_libs})
 
     # Force executables linker language to be CXX so that we do not link using the
     # host toolchain swiftc.
@@ -2680,6 +2690,24 @@ function(_add_swift_target_executable_single name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
 
+# Conditionally append -static to a name, if that variant is a valid target
+function(append_static name result_var_name)
+  cmake_parse_arguments(APPEND_TARGET
+    "STATIC_SWIFT_STDLIB"
+    ""
+    ""
+    ${ARGN})
+  if(STATIC_SWIFT_STDLIB)
+    if(TARGET "${name}-static")
+      set("${result_var_name}" "${name}-static" PARENT_SCOPE)
+    else()
+      set("${result_var_name}" "${name}" PARENT_SCOPE)
+    endif()
+  else()
+    set("${result_var_name}" "${name}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Add an executable for each target variant. Executables are given suffixes
 # with the variant SDK and ARCH.
 #
@@ -2688,7 +2716,8 @@ function(add_swift_target_executable name)
   set(SWIFTEXE_options
     EXCLUDE_FROM_ALL
     BUILD_WITH_STDLIB
-    BUILD_WITH_LIBEXEC)
+    BUILD_WITH_LIBEXEC
+    PREFER_STATIC)
   set(SWIFTEXE_single_parameter_options
     INSTALL_IN_COMPONENT)
   set(SWIFTEXE_multiple_parameter_options
@@ -2874,8 +2903,12 @@ function(add_swift_target_executable name)
         list(APPEND swiftexe_module_dependency_targets
           "swift${mod}${MODULE_VARIANT_SUFFIX}")
 
-        list(APPEND swiftexe_link_libraries_targets
-          "swift${mod}${VARIANT_SUFFIX}")
+        set(library_target "swift${mod}${VARIANT_SUFFIX}")
+        if(SWIFTEXE_TARGET_PREFER_STATIC AND TARGET "${library_target}-static")
+          set(library_target "${library_target}-static")
+        endif()
+
+        list(APPEND swiftexe_link_libraries_targets "${library_target}")
       endforeach()
 
       # Don't add the ${arch} to the suffix.  We want to link against fat
