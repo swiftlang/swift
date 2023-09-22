@@ -210,7 +210,14 @@ struct UnparsedSpecification {
   /// (@{instruction|block|function}) can be parsed in terms of this
   /// anchor.
   SILInstruction *context;
+  /// Map from names used in the specification to the corresponding SILValues.
+  llvm::StringMap<SILValue> values;
 };
+
+/// Populates the array \p components with the elements of \p
+/// specificationString.
+void getTestSpecificationComponents(StringRef specificationString,
+                                    SmallVectorImpl<StringRef> &components);
 
 /// Finds and deletes each test_specification instruction in \p function and
 /// appends its string payload to the provided vector.
