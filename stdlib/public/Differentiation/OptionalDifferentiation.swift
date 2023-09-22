@@ -13,6 +13,7 @@
 import Swift
 
 extension Optional: Differentiable where Wrapped: Differentiable {
+  @frozen
   public struct TangentVector: Differentiable, AdditiveArithmetic {
     public typealias TangentVector = Self
 
