@@ -982,6 +982,16 @@ public:
   /// Returns the source range of the declaration including its attributes.
   SourceRange getSourceRangeIncludingAttrs() const;
 
+  using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
+
+  /// Returns the import that may restrict the access to this decl
+  /// from \p useDC.
+  ///
+  /// If this decl and \p useDC are from the same module it returns
+  /// \c llvm::None. If there are many imports, it returns the most
+  /// permissive one.
+  ImportAccessLevel getImportAccessFrom(const DeclContext *useDC) const;
+
   SourceLoc TrailingSemiLoc;
 
   /// Whether this declaration is within a macro expansion relative to
@@ -2793,15 +2803,6 @@ public:
                         bool forConformance = false,
                         bool allowUsableFromInline = false) const;
 
-  using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
-
-  /// Returns the import that may restrict the access to this decl
-  /// from \p useDC.
-  ///
-  /// If this decl and \p useDC are from the same module it returns
-  /// \c llvm::None. If there are many imports, it returns the most
-  /// permissive one.
-  ImportAccessLevel getImportAccessFrom(const DeclContext *useDC) const;
 
   /// Returns whether this declaration should be treated as \c open from
   /// \p useDC. This is very similar to #getFormalAccess, but takes
