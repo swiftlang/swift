@@ -3461,7 +3461,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "the conformance is declared as SPI|"
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
-      "C++ types from imported module %3 do not support library evolution}4",
+      "C++ types from imported module %3 do not support library evolution|"
+      "%3 was not imported publicly}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
