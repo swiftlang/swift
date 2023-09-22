@@ -708,6 +708,76 @@ extension Never {
   }
 }
 
+func testNever5() -> Int {
+  switch Bool.random() {
+  case true:
+    fatalError()
+  case false:
+    0
+  }
+}
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr10testNever5SiyF : $@convention(thin) () -> Int
+// CHECK:       [[RESULT_STORAGE:%[0-9]+]] = alloc_stack $Int
+// CHECK:       switch_value {{.*}}, case {{%[0-9]+}}: [[BB_TRUE:bb[0-9]+]], case {{%[0-9]+}}: [[BB_FALSE:bb[0-9]+]]
+//
+// CHECK:       [[BB_TRUE]]:
+// CHECK:       function_ref fatalError(_:file:line:)
+// CHECK:       unreachable
+//
+// CHECK:       [[BB_FALSE]]:
+// CHECK:       [[RESULT:%[0-9]+]] = mark_uninitialized [var] [[RESULT_STORAGE]] : $*Int
+// CHECK:       store {{%[0-9]+}} to [trivial] [[RESULT]] : $*Int
+// CHECK:       [[RET:%[0-9]+]] = load [trivial] [[RESULT_STORAGE]] : $*Int
+// CHECK:       dealloc_stack [[RESULT_STORAGE]] : $*Int
+// CHECK:       return [[RET]]
+
+func never() -> Never { fatalError() }
+
+func testNever6() -> Int {
+  switch Bool.random() {
+  case true:
+    never()
+  case false:
+    0
+  }
+}
+
+func neverTuple() -> (Never, Int) { fatalError() }
+
+func testNever7() -> (Never, Int) {
+  switch Bool.random() {
+  case true:
+    neverTuple()
+  case false:
+    (never(), 0)
+  }
+}
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr10testNever7s5NeverO_SityF : $@convention(thin) () -> (Never, Int)
+// CHECK:       [[RESULT_STORAGE:%[0-9]+]] = alloc_stack $(Never, Int)
+// CHECK:       switch_value {{.*}}, case {{%[0-9]+}}: [[BB_TRUE:bb[0-9]+]], case {{%[0-9]+}}: [[BB_FALSE:bb[0-9]+]]
+//
+// CHECK:       [[BB_TRUE]]:
+// CHECK:       [[RESULT:%[0-9]+]] = mark_uninitialized [var] [[RESULT_STORAGE]] : $*(Never, Int)
+// CHECK:       [[ELT_0:%[0-9]+]] = tuple_element_addr [[RESULT]] : $*(Never, Int), 0
+// CHECK:       [[ELT_1:%[0-9]+]] = tuple_element_addr [[RESULT]] : $*(Never, Int), 1
+// CHECK:       ([[RET_0:%[0-9]+]], [[RET_1:%[0-9]+]]) = destructure_tuple {{%[0-9]+}} : $(Never, Int)
+// CHECK:       store [[RET_0]] to [trivial] [[ELT_0]] : $*Never
+// CHECK:       store [[RET_1]] to [trivial] [[ELT_1]] : $*Int
+// CHECK:       br [[BB_EXIT:bb[0-9]+]]
+//
+// CHECK:       [[BB_FALSE]]:
+// CHECK:       [[RESULT:%[0-9]+]] = mark_uninitialized [var] [[RESULT_STORAGE]] : $*(Never, Int)
+// CHECK:       [[ELT_0:%[0-9]+]] = tuple_element_addr [[RESULT]] : $*(Never, Int), 0
+// CHECK:       [[ELT_1:%[0-9]+]] = tuple_element_addr [[RESULT]] : $*(Never, Int), 1
+// CHECK:       store {{%[0-9]+}} to [trivial] [[ELT_0]] : $*Never
+// CHECK:       store {{%[0-9]+}} to [trivial] [[ELT_1]] : $*Int
+// CHECK:       br [[BB_EXIT:bb[0-9]+]]
+//
+// CHECK:       [[BB_EXIT]]:
+// CHECK:       dealloc_stack [[RESULT_STORAGE]] : $*(Never, Int)
+// CHECK:       [[RET:%[0-9]+]] = tuple ({{%[0-9]+}} : $Never, {{%[0-9]+}} : $Int)
+// CHECK:       return [[RET]]
+
 func testCaptureList() -> Int {
   let fn = { [x = switch Bool.random() { case true: 0 case false: 1 }] in x }
   return fn()
