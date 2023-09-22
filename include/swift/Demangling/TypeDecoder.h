@@ -376,7 +376,8 @@ void decodeRequirement(NodePointer node,
                        llvm::SmallVectorImpl<BuiltRequirement> &requirements,
                        BuilderType &Builder) {
   for (auto &child : *node) {
-    if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount)
+    if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
       continue;
 
     if (child->getNumChildren() != 2)
@@ -1180,10 +1181,75 @@ protected:
       llvm::SmallVector<Field, 4> fields;
       llvm::SmallVector<BuiltSubstitution, 4> substitutions;
       llvm::SmallVector<BuiltRequirement, 4> requirements;
+      llvm::SmallVector<BuiltType, 4> genericParams;
 
       if (Node->getNumChildren() < 1)
         return MAKE_NODE_TYPE_ERROR0(Node, "no children");
 
+      bool pushedGenericParams = false;
+
+      if (Node->getNumChildren() > 1) {
+        auto *substNode = Node->getChild(2);
+        if (substNode->getKind() != NodeKind::TypeList)
+          return MAKE_NODE_TYPE_ERROR0(substNode, "expected type list");
+
+        auto *dependentGenericSignatureNode = Node->getChild(1);
+        if (dependentGenericSignatureNode->getKind() !=
+            NodeKind::DependentGenericSignature)
+          return MAKE_NODE_TYPE_ERROR0(dependentGenericSignatureNode,
+                                       "expected dependent generic signature");
+        if (dependentGenericSignatureNode->getNumChildren() < 1)
+          return MAKE_NODE_TYPE_ERROR(
+              dependentGenericSignatureNode,
+              "fewer children (%zu) than required (1)",
+              dependentGenericSignatureNode->getNumChildren());
+
+        // The number of generic parameters at each depth are in a mini
+        // state machine and come first.
+        llvm::SmallVector<unsigned, 4> genericParamsAtDepth;
+        for (auto *reqNode : *dependentGenericSignatureNode)
+          if (reqNode->getKind() == NodeKind::DependentGenericParamCount)
+            if (reqNode->hasIndex())
+              genericParamsAtDepth.push_back(reqNode->getIndex());
+
+        llvm::SmallVector<std::pair<unsigned, unsigned>> parameterPacks;
+        for (auto &child : *dependentGenericSignatureNode) {
+          if (child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker) {
+            auto *marker = child->getChild(0)->getChild(0);
+            parameterPacks.emplace_back(marker->getChild(0)->getIndex(),
+                                        marker->getChild(1)->getIndex());
+          }
+        }
+
+        Builder.pushGenericParams(parameterPacks);
+        pushedGenericParams = true;
+
+        // Decode generic parameter types.
+        for (unsigned d = 0; d < genericParamsAtDepth.size(); ++d) {
+          for (unsigned i = 0; i < genericParamsAtDepth[d]; ++i) {
+            auto paramTy = Builder.createGenericTypeParameterType(d, i);
+            genericParams.push_back(paramTy);
+          }
+        }
+
+        // Decode requirements.
+        decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
+                          BuilderType>(dependentGenericSignatureNode,
+                                       requirements,
+                                       Builder);
+
+        // Decode substitutions.
+        for (unsigned i = 0, e = substNode->getNumChildren(); i < e; ++i) {
+          auto *subst = substNode->getChild(i);
+          auto substTy = decodeMangledType(subst, depth + 1,
+                                           /*forRequirement=*/false);
+          if (substTy.isError())
+            return substTy;
+          substitutions.emplace_back(genericParams[i], substTy.getType());
+        }
+      }
+
+      // Decode field types.
       auto fieldsNode = Node->getChild(0);
       if (fieldsNode->getKind() != NodeKind::SILBoxLayout)
         return MAKE_NODE_TYPE_ERROR0(fieldsNode, "expected layout");
@@ -1203,60 +1269,8 @@ protected:
         fields.emplace_back(type.getType(), isMutable);
       }
 
-      if (Node->getNumChildren() > 1) {
-        auto *substNode = Node->getChild(2);
-        if (substNode->getKind() != NodeKind::TypeList)
-          return MAKE_NODE_TYPE_ERROR0(substNode, "expected type list");
-
-        auto *dependentGenericSignatureNode = Node->getChild(1);
-        if (dependentGenericSignatureNode->getKind() !=
-            NodeKind::DependentGenericSignature)
-          return MAKE_NODE_TYPE_ERROR0(dependentGenericSignatureNode,
-                                       "expected dependent generic signature");
-        if (dependentGenericSignatureNode->getNumChildren() < 1)
-          return MAKE_NODE_TYPE_ERROR(
-              dependentGenericSignatureNode,
-              "fewer children (%zu) than required (1)",
-              dependentGenericSignatureNode->getNumChildren());
-        decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                          BuilderType>(dependentGenericSignatureNode,
-                                       requirements,
-                                       Builder /*,
-[&](NodePointer Node) -> BuiltType {
-return decodeMangledType(Node, depth + 1).getType();
-},
-[&](LayoutConstraintKind Kind) -> BuiltLayoutConstraint {
-return {}; // Not implemented!
-},
-[&](LayoutConstraintKind Kind, unsigned SizeInBits,
-unsigned Alignment) -> BuiltLayoutConstraint {
-return {}; // Not Implemented!
-}*/);
-        // The number of generic parameters at each depth are in a mini
-        // state machine and come first.
-        llvm::SmallVector<unsigned, 4> genericParamsAtDepth;
-        for (auto *reqNode : *dependentGenericSignatureNode)
-          if (reqNode->getKind() == NodeKind::DependentGenericParamCount)
-            if (reqNode->hasIndex())
-              genericParamsAtDepth.push_back(reqNode->getIndex());
-        unsigned paramDepth = 0;
-        unsigned index = 0;
-        for (auto *subst : *substNode) {
-          if (paramDepth >= genericParamsAtDepth.size())
-            return MAKE_NODE_TYPE_ERROR0(
-                dependentGenericSignatureNode,
-                "more substitutions than generic params");
-          while (index >= genericParamsAtDepth[paramDepth])
-            ++paramDepth, index = 0;
-          auto substTy = decodeMangledType(subst, depth + 1,
-                                           /*forRequirement=*/false);
-          if (substTy.isError())
-            return substTy;
-          auto paramTy = Builder.createGenericTypeParameterType(
-              paramDepth, index);
-          substitutions.emplace_back(paramTy, substTy.getType());
-          ++index;
-        }
+      if (pushedGenericParams) {
+        Builder.popGenericParams();
       }
 
       return Builder.createSILBoxTypeWithLayout(fields, substitutions,
