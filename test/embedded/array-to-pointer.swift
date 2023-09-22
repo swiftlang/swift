@@ -6,6 +6,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
