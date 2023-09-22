@@ -99,8 +99,9 @@ static bool endLifetimeAtBoundary(SILValue value,
   return changed;
 }
 
-static bool endLifetimeAtUnreachableBlocks(SILValue value,
-                                           const SSAPrunedLiveness &liveness) {
+void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+    SILValue value, const SSAPrunedLiveness &liveness,
+    llvm::function_ref<void(UnreachableInst *)> visit) {
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
 
@@ -119,20 +120,28 @@ static bool endLifetimeAtUnreachableBlocks(SILValue value,
   }
   // Forward CFG walk from the non-lifetime-ending boundary to the unreachable
   // instructions.
-  bool changed = false;
   while (auto *block = deadEndBlocks.pop()) {
     if (block->succ_empty()) {
       // This assert will fail unless there are already lifetime-ending
       // instruction on all paths to normal function exits.
       auto *unreachable = cast<UnreachableInst>(block->getTerminator());
-      SILBuilderWithScope builder(unreachable);
-      endOSSALifetime(value, builder);
-      changed = true;
+      visit(unreachable);
     }
     for (auto *successor : block->getSuccessorBlocks()) {
       deadEndBlocks.pushIfNotVisited(successor);
     }
   }
+}
+
+static bool endLifetimeAtUnreachableBlocks(SILValue value,
+                                           const SSAPrunedLiveness &liveness) {
+  bool changed = false;
+  OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+      value, liveness, [&](auto *unreachable) {
+        SILBuilderWithScope builder(unreachable);
+        endOSSALifetime(value, builder);
+        changed = true;
+      });
   return changed;
 }
 
