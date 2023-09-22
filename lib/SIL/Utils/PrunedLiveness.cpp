@@ -85,10 +85,17 @@ void PrunedLiveBlocks::dump() const {
 void PrunedLiveness::print(llvm::raw_ostream &OS) const {
   liveBlocks.print(OS);
   for (auto &userAndIsLifetimeEnding : users) {
-    if (userAndIsLifetimeEnding.second)
+    switch (userAndIsLifetimeEnding.second) {
+    case LifetimeEnding::Value::NonUse:
+      OS << "non-user: ";
+      break;
+    case LifetimeEnding::Value::Ending:
       OS << "lifetime-ending user: ";
-    else
+      break;
+    case LifetimeEnding::Value::NonEnding:
       OS << "regular user: ";
+      break;
+    }
     userAndIsLifetimeEnding.first->print(OS);
   }
 }
@@ -185,8 +192,9 @@ static FunctionTest
 //===----------------------------------------------------------------------===//
 
 template <typename LivenessWithDefs>
-void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
-                                                     bool lifetimeEnding) {
+void PrunedLiveRange<LivenessWithDefs>::updateForUse(
+    SILInstruction *user,
+    PrunedLiveRange<LivenessWithDefs>::LifetimeEnding lifetimeEnding) {
   liveBlocks.updateForUse(user, asImpl().isUserBeforeDef(user));
 
   // Note that a user may use the current value from multiple operands. If any
@@ -202,7 +210,17 @@ void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
   // argument must be copied.
   auto iterAndSuccess = users.insert({user, lifetimeEnding});
   if (!iterAndSuccess.second)
-    iterAndSuccess.first->second &= lifetimeEnding;
+    iterAndSuccess.first->second.meetInPlace(lifetimeEnding);
+}
+template <typename LivenessWithDefs>
+void PrunedLiveRange<LivenessWithDefs>::updateForUse(SILInstruction *user,
+                                                     bool lifetimeEnding) {
+  updateForUse(user, LifetimeEnding(lifetimeEnding));
+}
+
+template <typename LivenessWithDefs>
+void PrunedLiveRange<LivenessWithDefs>::extendToNonUse(SILInstruction *inst) {
+  updateForUse(inst, LifetimeEnding::NonUse());
 }
 
 template <typename LivenessWithDefs>
@@ -257,7 +275,7 @@ template <typename LivenessWithDefs>
 void PrunedLiveRange<LivenessWithDefs>::extendAcrossLiveness(
     PrunedLiveness &otherLiveness) {
   // update this liveness for all the interesting users in otherLiveness.
-  for (std::pair<SILInstruction *, bool> userAndEnd :
+  for (std::pair<SILInstruction *, LifetimeEnding> userAndEnd :
        otherLiveness.getAllUsers()) {
     updateForUse(userAndEnd.first, userAndEnd.second);
   }
@@ -371,6 +389,64 @@ static FunctionTest SSALivenessTest("ssa_liveness", [](auto &function,
   liveness.computeBoundary(boundary);
   boundary.print(llvm::outs());
 });
+
+// Arguments:
+// - SILValue: def whose pruned liveness will be calculated
+// - the string "uses:"
+// - variadic list of live-range user instructions
+// Dumps:
+// -
+static FunctionTest SSAUseLivenessTest("ssa_use_liveness", [](auto &function,
+                                                              auto &arguments,
+                                                              auto &test) {
+  auto value = arguments.takeValue();
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+  SSAPrunedLiveness liveness(&function, &discoveredBlocks);
+  liveness.initializeDef(value);
+
+  auto argument = arguments.takeArgument();
+  if (cast<StringArgument>(argument).getValue() != "uses:") {
+    llvm::report_fatal_error("test specification expects the 'uses:' label\n");
+  }
+
+  while (arguments.hasUntaken()) {
+    auto *inst = arguments.takeInstruction();
+    auto kindString = arguments.takeString();
+    enum Kind {
+      NonUse,
+      Ending,
+      NonEnding,
+    };
+    auto kind = llvm::StringSwitch<llvm::Optional<Kind>>(kindString)
+                    .Case("non-use", Kind::NonUse)
+                    .Case("ending", Kind::Ending)
+                    .Case("non-ending", Kind::NonEnding)
+                    .Default(llvm::None);
+    if (!kind.has_value()) {
+      llvm::errs() << "Unknown kind: " << kindString << "\n";
+      llvm::report_fatal_error("Bad user kind.  Value must be one of "
+                               "'non-use', 'ending', 'non-ending'");
+    }
+    switch (kind.value()) {
+    case Kind::NonUse:
+      liveness.extendToNonUse(inst);
+      break;
+    case Kind::Ending:
+      liveness.updateForUse(inst, /*lifetimeEnding*/ true);
+      break;
+    case Kind::NonEnding:
+      liveness.updateForUse(inst, /*lifetimeEnding*/ false);
+      break;
+    }
+  }
+
+  liveness.print(llvm::outs());
+
+  PrunedLivenessBoundary boundary;
+  liveness.computeBoundary(boundary);
+  boundary.print(llvm::outs());
+});
+
 } // end namespace swift::test
 
 template <typename LivenessWithDefs>

@@ -262,21 +262,10 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       getCurrentDef(), completeLiveness, [&](auto *unreachable) {
         recordConsumingUser(unreachable);
-        if (auto *previous = unreachable->getPreviousInstruction()) {
-          if (liveness->isInterestingUser(previous) ==
-              PrunedLiveness::IsInterestingUser::NonUser) {
-            liveness->updateForUse(previous, /*lifetimeEnding=*/false);
-          }
-          return;
-        }
-        for (auto *predecessor :
-             unreachable->getParent()->getPredecessorBlocks()) {
-          auto *previous = &predecessor->back();
-          if (liveness->isInterestingUser(previous) ==
-              PrunedLiveness::IsInterestingUser::NonUser) {
-            liveness->updateForUse(previous, /*lifetimeEnding=*/false);
-          }
-        }
+        unreachable->visitPriorInstructions([&](auto *inst) {
+          liveness->extendToNonUse(inst);
+          return true;
+        });
       });
 
   auto *def = getCurrentDef()->getDefiningInstruction();
@@ -648,14 +637,10 @@ void CanonicalizeOSSALifetime::extendUnconsumedLiveness(
         continue;
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
-      if (auto *inst = predecessor->getTerminator()->getPreviousInstruction()) {
-        liveness->updateForUse(inst, /*lifetimeEnding*/ false);
-      } else {
-        for (auto *grandPredecessor : predecessor->getPredecessorBlocks()) {
-          liveness->updateForUse(grandPredecessor->getTerminator(),
-                                 /*lifetimeEnding*/ false);
-        }
-      }
+      predecessor->getTerminator()->visitPriorInstructions([&](auto *inst) {
+        liveness->extendToNonUse(inst);
+        return true;
+      });
     }
   }
 

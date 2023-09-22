@@ -353,6 +353,61 @@ struct LiveRangeSummary {
 /// necessarily include liveness up to destroy_value or end_borrow
 /// instructions.
 class PrunedLiveness {
+public:
+  /// A tristate describing how an instruction uses the value:
+  /// - non-ending: the value's lifetime does not end at the instruction;
+  ///               results from updateForUse(, lifetimeEnding: false)
+  /// - ending: the value's lifetime ends at the instruction; results from
+  ///           updateForUse(, lifetimeEnding: true)
+  /// - non-use: the instruction doesn't use the value but liveness was extended
+  ///            to it; results from extendToNonUse
+  ///
+  /// If an instruction is added to liveness with multiple LifetimeEnding
+  /// instances, the stored instance needs to be updated appropriately, taking
+  /// into account the instances that were already seen.
+  ///
+  /// For example, if Nonuse is seen after Ending, it is ignored: that the
+  /// instruction ends the lifetime takes priority: the instruction doesn't end
+  /// the lifetime of the value any less because liveness was extended to it.
+  ///
+  /// Similarly, if Ending is seen after NonEnding, it is ignored: that the
+  /// instruction ends the lifetime of a copy of the value can't change the fact
+  /// that liveness already extends _beyond_ the instruction because it was
+  /// already recognized as a non-ending use.
+  ///
+  /// This relationship of "overriding" is captured by the order of the cases in
+  /// LifetimeEnding::Value and which case overrides another is computed by
+  /// taking the meet--i.e. the lesser of the two cases overrides.
+  ///
+  /// Note: Taking the meet may not be appropriate for branch instructions
+  ///       which may need to be recognized as lifetime-ending when they have
+  ///       as uses both a reborrow and a guaranteed phi.
+  struct LifetimeEnding {
+    enum class Value {
+      // The instruction doesn't consume the value.
+      NonEnding,
+      // The instruction consumes the value.
+      Ending,
+      // The instruction doesn't use the value.
+      NonUse,
+    };
+    Value value;
+
+    LifetimeEnding(Value value) : value(value) {}
+    explicit LifetimeEnding(bool lifetimeEnding)
+        : value(lifetimeEnding ? Value::Ending : Value::NonEnding) {}
+    operator Value() const { return value; }
+    LifetimeEnding meet(LifetimeEnding const other) const {
+      return value < other.value ? *this : other;
+    }
+    void meetInPlace(LifetimeEnding const other) { *this = meet(other); }
+    bool isEnding() const { return value == Value::Ending; }
+
+    static LifetimeEnding NonUse() { return {Value::NonUse}; };
+    static LifetimeEnding Ending() { return {Value::Ending}; };
+    static LifetimeEnding NonEnding() { return {Value::NonEnding}; };
+  };
+
 protected:
   PrunedLiveBlocks liveBlocks;
 
@@ -365,7 +420,7 @@ protected:
   // they may be the last use in the block.
   //
   // Non-lifetime-ending within a LiveOut block are uninteresting.
-  llvm::SmallMapVector<SILInstruction *, bool, 8> users;
+  llvm::SmallMapVector<SILInstruction *, LifetimeEnding, 8> users;
 
 public:
   PrunedLiveness(SILFunction *function,
@@ -411,11 +466,12 @@ public:
     auto useIter = users.find(user);
     if (useIter == users.end())
       return NonUser;
-    return useIter->second ? LifetimeEndingUse : NonLifetimeEndingUse;
+    return useIter->second == LifetimeEnding::Ending() ? LifetimeEndingUse
+                                                       : NonLifetimeEndingUse;
   }
 
   using ConstUserRange =
-      iterator_range<const std::pair<SILInstruction *, bool> *>;
+      iterator_range<const std::pair<SILInstruction *, LifetimeEnding> *>;
   ConstUserRange getAllUsers() const {
     return llvm::make_range(users.begin(), users.end());
   }
@@ -425,41 +481,45 @@ public:
   /// IDE.
   struct RangeIterationHelpers {
     struct MapFunctor {
-      SILInstruction *
-      operator()(const std::pair<SILInstruction *, bool> &pair) const {
+      SILInstruction *operator()(
+          const std::pair<SILInstruction *, LifetimeEnding> &pair) const {
         // Strip off the const to ease use with other APIs.
         return const_cast<SILInstruction *>(pair.first);
       }
     };
 
-    struct LifetimeEnding {
+    struct IsLifetimeEnding {
       struct FilterFunctor {
-        bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
-          return pair.second;
+        bool operator()(
+            const std::pair<SILInstruction *, LifetimeEnding> &pair) const {
+          return pair.second.isEnding();
         }
       };
 
       using MapFilterIter = llvm::mapped_iterator<
-          llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
-                                FilterFunctor>,
+          llvm::filter_iterator<
+              const std::pair<SILInstruction *, LifetimeEnding> *,
+              FilterFunctor>,
           MapFunctor>;
     };
 
     struct NonLifetimeEnding {
       struct FilterFunctor {
-        bool operator()(const std::pair<SILInstruction *, bool> &pair) const {
-          return !pair.second;
+        bool operator()(
+            const std::pair<SILInstruction *, LifetimeEnding> &pair) const {
+          return !pair.second.isEnding();
         }
       };
 
       using MapFilterIter = llvm::mapped_iterator<
-          llvm::filter_iterator<const std::pair<SILInstruction *, bool> *,
-                                FilterFunctor>,
+          llvm::filter_iterator<
+              const std::pair<SILInstruction *, LifetimeEnding> *,
+              FilterFunctor>,
           MapFunctor>;
     };
   };
   using LifetimeEndingUserRange = llvm::iterator_range<
-      RangeIterationHelpers::LifetimeEnding::MapFilterIter>;
+      RangeIterationHelpers::IsLifetimeEnding::MapFilterIter>;
 
   /// Return a range consisting of the current set of consuming users fed into
   /// this PrunedLiveness instance.
@@ -467,7 +527,7 @@ public:
     return map_range(
         llvm::make_filter_range(
             getAllUsers(),
-            RangeIterationHelpers::LifetimeEnding::FilterFunctor()),
+            RangeIterationHelpers::IsLifetimeEnding::FilterFunctor()),
         RangeIterationHelpers::MapFunctor());
   }
 
@@ -552,6 +612,8 @@ protected:
                                            ValueSet &visited,
                                            SILValue value);
 
+  void updateForUse(SILInstruction *user, LifetimeEnding lifetimeEnding);
+
 public:
   /// For flexibility, \p lifetimeEnding is provided by the
   /// caller. PrunedLiveness makes no assumptions about the def-use
@@ -559,6 +621,12 @@ public:
   /// cannot distinguish the end of the borrow scope that defines this extended
   /// live range vs. a nested borrow scope within the extended live range.
   void updateForUse(SILInstruction *user, bool lifetimeEnding);
+
+  /// Adds \p inst which doesn't use the def to liveness.
+  ///
+  /// Different from calling updateForUse because it never overrides the value
+  /// \p lifetimeEnding stored for \p inst.
+  void extendToNonUse(SILInstruction *inst);
 
   /// Updates the liveness for a whole borrow scope, beginning at \p op.
   /// Returns false if this cannot be done. This assumes that nested OSSA
