@@ -21,7 +21,7 @@ extension BridgedSourceLoc {
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
-    self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), SwiftInt(position.utf8Offset))
+    self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), position.utf8Offset)
   }
 }
 
@@ -35,7 +35,7 @@ extension BridgedSourceRange {
 extension String {
   mutating func withBridgedString<R>(_ body: (BridgedString) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
-      try body(BridgedString(data: buffer.baseAddress, length: SwiftInt(buffer.count)))
+      try body(BridgedString(data: buffer.baseAddress, length: buffer.count))
     }
   }
 }

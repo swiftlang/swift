@@ -37,12 +37,12 @@ extern "C" void *swift_ASTGen_createQueuedDiagnostics();
 extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
 extern "C" void swift_ASTGen_addQueuedSourceFile(
       void *queuedDiagnostics,
-      SwiftInt bufferID,
+      ssize_t bufferID,
       void *sourceFile,
       const uint8_t *displayNamePtr,
       intptr_t displayNameLength,
-      SwiftInt parentID,
-      SwiftInt positionInParent);
+      ssize_t parentID,
+      ssize_t positionInParent);
 extern "C" void swift_ASTGen_addQueuedDiagnostic(
     void *queued,
     const char* text, ptrdiff_t textLength,
@@ -52,8 +52,8 @@ extern "C" void swift_ASTGen_addQueuedDiagnostic(
     ptrdiff_t numHighlightRanges
 );
 extern "C" void swift_ASTGen_renderQueuedDiagnostics(
-    void *queued, SwiftInt contextSize, SwiftInt colorize,
-    char **outBuffer, SwiftInt *outBufferLength);
+    void *queued, ssize_t contextSize, ssize_t colorize,
+    char **outBuffer, ssize_t *outBufferLength);
 extern "C" void swift_ASTGen_freeString(const char *str);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
@@ -497,7 +497,7 @@ void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
     char *renderedString = nullptr;
-    SwiftInt renderedStringLen = 0;
+    ssize_t renderedStringLen = 0;
     swift_ASTGen_renderQueuedDiagnostics(
         queuedDiagnostics, /*contextSize=*/2, ForceColors ? 1 : 0,
         &renderedString, &renderedStringLen);
