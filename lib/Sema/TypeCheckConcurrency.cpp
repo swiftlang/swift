@@ -2122,9 +2122,9 @@ namespace {
     }
 
     /// Check closure captures for Sendable violations.
-    void checkClosureCaptures(AbstractClosureExpr *closure) {
+    void checkLocalCaptures(AnyFunctionRef localFunc) {
       SmallVector<CapturedValue, 2> captures;
-      closure->getCaptureInfo().getLocalCaptures(captures);
+      localFunc.getCaptureInfo().getLocalCaptures(captures);
       for (const auto &capture : captures) {
         if (capture.isDynamicSelfMetadata())
           continue;
@@ -2134,14 +2134,19 @@ namespace {
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
-        if (!mayExecuteConcurrentlyWith(closure, decl->getDeclContext()))
+        auto *context = localFunc.getAsDeclContext();
+        if (!mayExecuteConcurrentlyWith(context, decl->getDeclContext()))
           continue;
 
         Type type = getDeclContext()
             ->mapTypeIntoContext(decl->getInterfaceType())
             ->getReferenceStorageReferent();
 
-        if (closure->isImplicit()) {
+        if (type->hasError())
+          continue;
+
+        auto *closure = localFunc.getAbstractClosureExpr();
+        if (closure && closure->isImplicit()) {
           auto *patternBindingDecl = getTopPatternBindingDecl();
           if (patternBindingDecl && patternBindingDecl->isAsyncLet()) {
             diagnoseNonSendableTypes(
@@ -2156,7 +2161,8 @@ namespace {
           }
         } else {
           diagnoseNonSendableTypes(type, getDeclContext(), capture.getLoc(),
-                                   diag::non_sendable_capture, decl->getName());
+                                   diag::non_sendable_capture, decl->getName(),
+                                   /*closure=*/closure != nullptr);
         }
       }
     }
@@ -2224,6 +2230,10 @@ namespace {
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (func->isLocalContext()) {
+          checkLocalCaptures(func);
+        }
+
         contextStack.push_back(func);
       }
 
@@ -2258,7 +2268,7 @@ namespace {
 
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
-        checkClosureCaptures(closure);
+        checkLocalCaptures(closure);
         contextStack.push_back(closure);
         return Action::Continue(expr);
       }
