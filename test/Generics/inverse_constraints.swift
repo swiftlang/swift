@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
+// REQUIRES: asserts
+
 // CHECK-LABEL: (file).genericFn@
 // CHECK: Generic signature: <T where T : Copyable>
 func genericFn<T>(_ t: T) {}
