@@ -910,8 +910,12 @@ public:
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
 
+  void pushGenericParams(llvm::ArrayRef<std::pair<unsigned, unsigned>> parameterPacks) {}
+  void popGenericParams() {}
+
   const GenericTypeParameterTypeRef *
   createGenericTypeParameterType(unsigned depth, unsigned index) {
+    // FIXME: variadic generics
     return GenericTypeParameterTypeRef::create(*this, depth, index);
   }
 

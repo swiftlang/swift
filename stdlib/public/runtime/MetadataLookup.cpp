@@ -1869,6 +1869,9 @@ public:
     return BuiltType();
   }
 
+  void pushGenericParams(llvm::ArrayRef<std::pair<unsigned, unsigned>> parameterPacks) {}
+  void popGenericParams() {}
+
   BuiltType
   createGenericTypeParameterType(unsigned depth, unsigned index) const {
     // Use the callback, when provided.
