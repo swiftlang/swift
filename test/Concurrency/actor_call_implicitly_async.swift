@@ -299,7 +299,7 @@ func blender(_ peeler : () -> Void) {
   await (((wisk)))((wisk)((wisk)(1)))
 
   blender((peelBanana))
-  // expected-warning@-1 2{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  // expected-warning@-1 {{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
 
   await wisk(peelBanana)
   // expected-complete-warning@-1{{passing argument of non-sendable type '() -> ()' into global actor 'BananaActor'-isolated context may introduce data races}}
@@ -314,7 +314,12 @@ func blender(_ peeler : () -> Void) {
 
   await {wisk}()(1)
 
+  // FIXME: Poor diagnostic. The issue is that the invalid function conversion
+  // to remove '@BananaActor' on 'wisk' cannot influence which solution is chosen.
+  // So, the constraint system cannot determine whether the type of this expression
+  // is '(Any) -> Void' or '@BananaActor (Any) -> Void'.
   await (true ? wisk : {n in return})(1)
+  // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
 }
 
 actor Chain {
