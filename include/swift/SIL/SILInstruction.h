@@ -517,6 +517,24 @@ public:
   /// instruction in its block.
   SILInstruction *getNextInstruction();
 
+  /// Calls \p visitor with each instruction that is immediately prior.  Returns
+  /// false and stops visiting if \p visitor returns false.
+  ///
+  /// If \p this is is the first instruction in a block, then \p visitor is
+  /// called with the back of each predecessor.  In particular if \p this is
+  /// the first instruction of the entry block, \p visitor is never called.
+  bool
+  visitPriorInstructions(llvm::function_ref<bool(SILInstruction *)> visitor);
+
+  /// Calls \p visitor with each instruction that is immediately subsequent.
+  /// Returns false and stops visiting if \p visitor returns false.
+  ///
+  /// If \p this is the last instruction in a block, then \p visitor is called
+  /// with the front of each successor.  In particular if \p this is the last
+  /// instruction of a block without successors, \p visitor is never called.
+  bool visitSubsequentInstructions(
+      llvm::function_ref<bool(SILInstruction *)> visitor);
+
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
 
