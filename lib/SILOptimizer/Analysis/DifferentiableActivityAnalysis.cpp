@@ -408,7 +408,7 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
-          isa<BeginBorrowInst>(res))
+          isa<BeginBorrowInst>(res) || isa<InitEnumDataAddrInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
