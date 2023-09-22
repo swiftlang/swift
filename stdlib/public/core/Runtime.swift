@@ -134,13 +134,16 @@ func _stdlib_atomicInitializeARCRef(
 ) -> Bool {
   // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
   // that simply points to the same memory.
-  var expected: UnsafeRawPointer?
+  var expected: UnsafeRawPointer? = nil
   let unmanaged = Unmanaged.passRetained(desired)
   let desiredPtr = unmanaged.toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let wonRace = _stdlib_atomicCompareExchangeStrongPtr(
-    object: rawTarget, expected: &expected, desired: desiredPtr)
+  let wonRace = withUnsafeMutablePointer(to: &expected) {
+    _stdlib_atomicCompareExchangeStrongPtr(
+      object: rawTarget, expected: $0, desired: desiredPtr
+    )
+  }
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
