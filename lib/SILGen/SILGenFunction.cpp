@@ -1693,15 +1693,8 @@ std::unique_ptr<Initialization> SILGenFunction::getSingleValueStmtInit(Expr *E) 
   // SingleValueStmtExpr initialization.
   if (!SingleValueStmtInitStack.back().Exprs.contains(E))
     return nullptr;
-
-  // This won't give us a useful diagnostic if the result doesn't end up
-  // initialized ("variable '<unknown>' used before being initialized"), but it
-  // will at least catch a potential miscompile when the SIL verifier is
-  // disabled.
+  
   auto resultAddr = SingleValueStmtInitStack.back().InitializationBuffer;
-  resultAddr = B.createMarkUninitialized(
-      E, resultAddr, MarkUninitializedInst::Kind::Var);
-      
   return std::make_unique<KnownAddressInitialization>(resultAddr);
 }
 
