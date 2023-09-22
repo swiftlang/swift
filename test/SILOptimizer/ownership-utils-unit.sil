@@ -42,7 +42,7 @@ exit(%instance : @owned $C):
 // CHECK:       %14 = argument of bb6 : $C
 // CHECK:       true
 // CHECK-LABEL: end running test {{[0-9]+}} of {{[0-9]+}} on test_escape_of_phi_transitive_incoming_value: has-pointer-escape with
-  test_specification "has-pointer-escape @block.argument"
+  specify_test "has-pointer-escape @block.argument"
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
@@ -54,7 +54,7 @@ entry:
   br loop_entry(%instance_1 : $FakeOptional<C>)
 
 loop_entry(%18 : @owned $FakeOptional<C>):
-  test_specification "has-pointer-escape @block.argument"
+  specify_test "has-pointer-escape @block.argument"
   br loop_body
 
 loop_body:

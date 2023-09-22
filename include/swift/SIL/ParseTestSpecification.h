@@ -219,13 +219,13 @@ struct UnparsedSpecification {
 void getTestSpecificationComponents(StringRef specificationString,
                                     SmallVectorImpl<StringRef> &components);
 
-/// Finds and deletes each test_specification instruction in \p function and
+/// Finds and deletes each specify_test instruction in \p function and
 /// appends its string payload to the provided vector.
 void getTestSpecifications(
     SILFunction *function,
     SmallVectorImpl<UnparsedSpecification> &specifications);
 
-/// Given the string \p specification operand of a test_specification
+/// Given the string \p specification operand of a specify_test
 /// instruction from \p function, parse the arguments which it refers to into
 /// \p arguments and the component strings into \p argumentStrings.
 void parseTestArgumentsFromSpecification(

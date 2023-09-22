@@ -4330,13 +4330,13 @@ It is code-generated to a NOP instruction.
 Testing
 ~~~~~~~
 
-test_specification
-``````````````````
+specify_test
+````````````
 ::
 
-  sil-instruction ::= 'test_specification' string-literal
+  sil-instruction ::= 'specify_test' string-literal
 
-  test_specification "parsing @trace[3] @function[other].block[2].instruction[1]"
+  specify_test "parsing @trace[3] @function[other].block[2].instruction[1]"
 
 Exists only for writing FileCheck tests.  Specifies a list of test arguments
 which should be used in order to run a particular test "in the context" of the
@@ -4349,10 +4349,11 @@ The following types of test arguments are supported:
 - boolean: true false
 - unsigned integer: 0...ULONG_MAX
 - string
+- value: %name
 - function: @function <-- the current function
             @function[uint] <-- function at index ``uint``
             @function[name] <-- function named ``name``
-- block: @block <-- the block containing the test_specification instruction
+- block: @block <-- the block containing the specify_test instruction
          @block[+uint] <-- the block ``uint`` blocks after the containing block
          @block[-uint] <-- the block ``uint`` blocks before the containing block
          @block[uint] <-- the block at index ``uint``
@@ -4366,9 +4367,9 @@ The following types of test arguments are supported:
             @argument[uint] <-- the argument at index ``uint`` of the current block
             @{block}.{argument} <-- the indicated argument in the indicated block
             @{function}.{argument} <-- the indicated argument in the entry block of the indicated function
-- instruction: @instruction <-- the instruction after* the test_specification instruction
-               @instruction[+uint] <-- the instruction ``uint`` instructions after* the test_specification instruction
-               @instruction[-uint] <-- the instruction ``uint`` instructions before* the test_specification instruction
+- instruction: @instruction <-- the instruction after* the specify_test instruction
+               @instruction[+uint] <-- the instruction ``uint`` instructions after* the specify_test instruction
+               @instruction[-uint] <-- the instruction ``uint`` instructions before* the specify_test instruction
                @instruction[uint] <-- the instruction at index ``uint``
                @{function}.{instruction} <-- the indicated instruction in the indicated function
                Example: @function[baz].instruction[19]
@@ -4383,7 +4384,7 @@ The following types of test arguments are supported:
 * Not counting instructions that are deleted when processing functions for tests.
   The following instructions currently are deleted:
 
-      test_specification
+      specify_test
       debug_value [trace]
 
 

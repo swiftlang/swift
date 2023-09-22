@@ -50,21 +50,21 @@ class D : C {}
 
 sil [ossa] @introducer_identity : $@convention(thin) (@guaranteed C, @in C) -> () {
 entry(%0 : @guaranteed $C, %1 : $*C):
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %0 : $C
   %borrow1 = begin_borrow %0 : $C
-  test_specification "find-borrow-introducers @trace[1]"
+  specify_test "find-borrow-introducers @trace[1]"
   debug_value [trace] %borrow1 : $C
 
   %borrow2 = load_borrow %1 : $*C
-  test_specification "find-borrow-introducers @trace[2]"
+  specify_test "find-borrow-introducers @trace[2]"
   debug_value [trace] %borrow2 : $C
   end_borrow %borrow2 : $C
 
   br exit(%borrow1 : $C)
 
 exit(%reborrow : @guaranteed $C):
-  test_specification "find-borrow-introducers @trace[3]"
+  specify_test "find-borrow-introducers @trace[3]"
   debug_value [trace] %reborrow : $C
   end_borrow %reborrow : $C
   destroy_addr %1 : $*C
@@ -86,7 +86,7 @@ entry:
   br none(%trivial : $FakeOptional<C>)
 
 none(%phi : @guaranteed $FakeOptional<C>):
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %phi : $FakeOptional<C>
   %retval = tuple ()
   return %retval : $()
@@ -108,7 +108,7 @@ entry:
   br exit
 
 unreachable_loop(%phiCycle : @guaranteed $C):
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %phiCycle : $C
   br unreachable_loop(%phiCycle : $C)
 
@@ -141,7 +141,7 @@ bb1(%payload : @guaranteed $D):
   %first = struct_extract %aggregate : $PairC, #PairC.first
   %second = struct_extract %aggregate : $PairC, #PairC.second
   %aggregate2 = struct $PairC(%first : $C, %second : $C)
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %aggregate2 : $PairC
   br exit
 
@@ -178,7 +178,7 @@ entry(%0 : @guaranteed $C):
 bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %aggregate2 : $PairC
   br exit
 
@@ -212,7 +212,7 @@ entry(%0 : @guaranteed $C):
 bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   debug_value [trace] %aggregate2 : $PairC
   br exit
 
@@ -229,7 +229,7 @@ exit:
 // CHECK-LABEL: end running test 1 of 1 on introducer_dependence: find-borrow-introducers with: @trace[0]
 sil [ossa] @introducer_dependence : $@convention(thin) (@guaranteed C, @guaranteed Builtin.NativeObject) -> () {
 entry(%0 : @guaranteed $C, %1 : @guaranteed $Builtin.NativeObject):
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   %dependent = mark_dependence %0 : $C on %1 : $Builtin.NativeObject
   debug_value [trace] %dependent : $C
   %retval = tuple ()
@@ -242,7 +242,7 @@ entry(%0 : @guaranteed $C, %1 : @guaranteed $Builtin.NativeObject):
 // CHECK-LABEL: end running test 1 of 1 on introducer_bridge: find-borrow-introducers with: @trace[0]
 sil [ossa] @introducer_bridge : $@convention(thin) (@guaranteed C, Builtin.Word) -> () {
 entry(%0 : @guaranteed $C, %1 : $Builtin.Word):
-  test_specification "find-borrow-introducers @trace[0]"
+  specify_test "find-borrow-introducers @trace[0]"
   %bridge = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
   debug_value [trace] %bridge : $Builtin.BridgeObject
   %retval = tuple ()

@@ -3777,7 +3777,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::TestSpecificationInst: {
     // Parse the specification string.
     if (P.Tok.getKind() != tok::string_literal) {
-      P.diagnose(P.Tok, diag::expected_sil_test_specification_body);
+      P.diagnose(P.Tok, diag::expected_sil_specify_test_body);
       return true;
     }
     // Drop the double quotes.
