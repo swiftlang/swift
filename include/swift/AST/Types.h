@@ -3386,6 +3386,13 @@ public:
   Type getGlobalActor() const;
   Type getThrownError() const;
 
+  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// this function cannot throw.
+  ///
+  /// Functions with untyped throws will produce "any Error", functions that
+  /// cannot throw or are specified to throw "Never" will return llvm::None.
+  llvm::Optional<Type> getEffectiveThrownInterfaceType() const;
+  
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
   /// the function type is not @convention(c) or @convention(block).
@@ -3612,7 +3619,8 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   }
 
   PROXY_CAN_TYPE_SIMPLE_GETTER(getResult)
-  
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getThrownError)
+
   CanAnyFunctionType withExtInfo(ExtInfo info) const {
     return CanAnyFunctionType(getPointer()->withExtInfo(info));
   }

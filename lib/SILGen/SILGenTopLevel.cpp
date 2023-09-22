@@ -41,7 +41,8 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
   TopLevelSGF.MagicFunctionName = SwiftModule->getName();
   auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 
-  TopLevelSGF.prepareEpilog(llvm::None, true, moduleCleanupLoc);
+  TopLevelSGF.prepareEpilog(
+      llvm::None, getASTContext().getErrorExistentialType(), moduleCleanupLoc);
 
   auto prologueLoc = RegularLocation::getModuleLocation();
   prologueLoc.markAsPrologue();

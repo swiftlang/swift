@@ -5419,6 +5419,24 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
+llvm::Optional<Type> AnyFunctionType::getEffectiveThrownInterfaceType() const {
+  // A non-throwing function... has no thrown interface type.
+  if (!isThrowing())
+    return llvm::None;
+
+  // If there is no specified thrown error type, it throws "any Error".
+  Type thrownError = getThrownError();
+  if (!thrownError)
+    return getASTContext().getErrorExistentialType();
+
+  // If the thrown interface type is "Never", this function does not throw.
+  if (thrownError->isEqual(getASTContext().getNeverType()))
+    return llvm::None;
+
+  // Otherwise, return the typed error.
+  return thrownError;
+}
+
 llvm::Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);

@@ -952,6 +952,18 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
       Type());
 }
 
+llvm::Optional<Type> 
+AbstractFunctionDecl::getEffectiveThrownInterfaceType() const {
+  Type interfaceType = getInterfaceType();
+  if (hasImplicitSelfDecl()) {
+    if (auto fnType = interfaceType->getAs<AnyFunctionType>())
+      interfaceType = fnType->getResult();
+  }
+
+  return interfaceType->castTo<AnyFunctionType>()
+      ->getEffectiveThrownInterfaceType();
+}
+
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
   auto braceStmt = getBody();

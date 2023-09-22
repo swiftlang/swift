@@ -2202,7 +2202,13 @@ static CanSILFunctionType getSILFunctionType(
       !foreignInfo.async) {
     assert(!origType.isForeign()
            && "using native Swift error convention for foreign type!");
-    SILType exnType = SILType::getExceptionType(TC.Context);
+    SILType exnType;
+    if (CanType thrownError = substFnInterfaceType.getThrownError()) {
+      exnType = TC.getLoweredType(thrownError, expansionContext);
+    } else {
+      // Untyped error throws the exception type.
+      exnType = SILType::getExceptionType(TC.Context);
+    }
     assert(exnType.isObject());
     errorResult = SILResultInfo(exnType.getASTType(),
                                 ResultConvention::Owned);

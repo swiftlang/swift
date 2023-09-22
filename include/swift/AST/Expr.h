@@ -3847,6 +3847,13 @@ public:
   /// Return whether this closure is throwing when fully applied.
   bool isBodyThrowing() const;
 
+  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// this closure cannot throw.
+  ///
+  /// Closures with untyped throws will produce "any Error", functions that
+  /// cannot throw or are specified to throw "Never" will return llvm::None.
+  llvm::Optional<Type> getEffectiveThrownType() const;
+
   /// \brief Return whether this closure is async when fully applied.
   bool isBodyAsync() const;
 

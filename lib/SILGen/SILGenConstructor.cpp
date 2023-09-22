@@ -666,7 +666,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(llvm::None, ctor->hasThrows(), CleanupLocation(ctor));
+  prepareEpilog(llvm::None, ctor->getEffectiveThrownInterfaceType(),
+                CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
   // failure.
@@ -1170,7 +1171,8 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(llvm::None, ctor->hasThrows(), CleanupLocation(endOfInitLoc));
+  prepareEpilog(llvm::None, ctor->getEffectiveThrownInterfaceType(),
+                CleanupLocation(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
 
@@ -1643,7 +1645,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation(loc);
-  prepareEpilog(llvm::None, false, cleanupLoc);
+  prepareEpilog(llvm::None, llvm::None, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd, selfDecl, cd);
@@ -1713,7 +1715,8 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
     }
   }
 
-  prepareEpilog(accessor->getResultInterfaceType(), accessor->hasThrows(),
+  prepareEpilog(accessor->getResultInterfaceType(),
+                accessor->getEffectiveThrownInterfaceType(),
                 CleanupLocation(accessor));
 
   emitProfilerIncrement(accessor->getTypecheckedBody());

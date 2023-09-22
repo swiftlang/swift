@@ -7066,6 +7066,13 @@ public:
   /// Retrieves the thrown interface type.
   Type getThrownInterfaceType() const;
 
+  /// Retrieve the "effective" thrown interface type, or llvm::None if
+  /// this function cannot throw.
+  ///
+  /// Functions with untyped throws will produce "any Error", functions that
+  /// cannot throw or are specified to throw "Never" will return llvm::None.
+  llvm::Optional<Type> getEffectiveThrownInterfaceType() const;
+
   /// Returns if the function throws or is async.
   bool hasEffect(EffectKind kind) const;
 

@@ -1930,6 +1930,11 @@ Type AbstractClosureExpr::getResultType(
   return T->castTo<FunctionType>()->getResult();
 }
 
+llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
+  return getType()->castTo<AnyFunctionType>()
+      ->getEffectiveThrownInterfaceType();
+}
+
 bool AbstractClosureExpr::isBodyThrowing() const {
   if (!getType() || getType()->hasError()) {
     // Scan the closure body to infer effects.
