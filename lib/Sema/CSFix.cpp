@@ -89,7 +89,7 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type fromType,
 
 bool ForceOptional::diagnose(const Solution &solution, bool asNote) const {
   MissingOptionalUnwrapFailure failure(solution, getFromType(), getToType(),
-                                       getLocator());
+                                       getUnwrapCount(), getLocator());
   return failure.diagnose(asNote);
 }
 

@@ -534,8 +534,7 @@ singleOptionalClosure()
 doubleOptionalClosure()
 // expected-error@-1 {{value of optional type}}
 // expected-note@-2 {{use optional chaining to call this value of function type when optional is non-'nil'}} {{22-22=??}}
-// expected-note@-3 {{coalesce}}
-// expected-note@-4 {{force-unwrap}}
+// expected-note@-3 {{force-unwrap}}
 
 doubleOptionalClosure?()
 // expected-error@-1 {{value of optional type}}
@@ -573,15 +572,13 @@ do {
   func passOptional(value: (any P)?) {
     takesP(value)
     // expected-error@-1 {{value of optional type '(any P)?' must be unwrapped to a value of type 'any P'}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{17-17= ?? <#default value#>}}
+    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{17-17=!}} 
   }
   func passLayersOfOptional(value: (any P)??) {
-    // FIXME(diagnostics): Consider recording multiple ForceUnwrap fixes based on number of optionals 
     takesP(value)
-    // expected-error@-1 {{value of optional type '(any P)??' must be unwrapped to a value of type '(any P)?}}
-    // expected-note@-2 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-    // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+    // expected-error@-1 {{value of optional type '(any P)??' must be unwrapped to a value of type 'any P'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{17-17=!!}} 
   }
   func passNonConformingValue(value: (any BinaryInteger)?){
     takesP(value)

@@ -1539,6 +1539,12 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
     DeclContext *DC, const Expr *expr) const {
   assert(expr);
 
+  // More than one level of optionality requires a default value 
+  // for each level which makes it complicated chain of defaults 
+  // to suggest, so we skip default note and fix-it.
+  if (UnwrapCount != 1) 
+    return;
+
   auto *anchor = getAsExpr(getAnchor());
   // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
@@ -1582,6 +1588,8 @@ void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(
     const Expr *expr) const {
   auto diag = emitDiagnosticAt(expr->getLoc(), diag::unwrap_with_force_value);
 
+  std::string forceUnwrapStr = getForceUnwrapString();
+
   // If expr is optional as the result of an optional chain and this last
   // dot isn't a member returning optional, then offer to force the last
   // link in the chain, rather than an ugly parenthesized postfix force.
@@ -1590,17 +1598,17 @@ void MissingOptionalUnwrapFailure::offerForceUnwrapFixIt(
         dyn_cast<UnresolvedDotExpr>(optionalChain->getSubExpr())) {
       auto bind = dyn_cast<BindOptionalExpr>(dotExpr->getBase());
       if (bind && !getType(dotExpr)->getOptionalObjectType()) {
-        diag.fixItReplace(SourceRange(bind->getLoc()), "!");
+        diag.fixItReplace(SourceRange(bind->getLoc()), forceUnwrapStr);
         return;
       }
     }
   }
 
   if (expr->canAppendPostfixExpression(true)) {
-    diag.fixItInsertAfter(expr->getEndLoc(), "!");
+    diag.fixItInsertAfter(expr->getEndLoc(), forceUnwrapStr);
   } else {
     diag.fixItInsert(expr->getStartLoc(), "(")
-        .fixItInsertAfter(expr->getEndLoc(), ")!");
+        .fixItInsertAfter(expr->getEndLoc(), ")" + forceUnwrapStr);
   }
 }
 
@@ -2610,7 +2618,7 @@ bool ContextualFailure::diagnoseAsError() {
       // it could assume a type from context.
       if (objectType && objectType->isEqual(toType)) {
         MissingOptionalUnwrapFailure failure(getSolution(), getType(anchor),
-                                             toType,
+                                             toType, /*unwrapCount=*/1,
                                              getConstraintLocator(anchor));
         if (failure.diagnoseAsError())
           return true;

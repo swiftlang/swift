@@ -3985,7 +3985,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (result == SolutionKind::Solved) {
                 auto fix = ForceOptional::create(*this, type1, proto,
                                                  getConstraintLocator(locator));
-                if (recordFix(fix))
+                if (recordFix(fix, /*impact=*/fix->getUnwrapCount()))
                   return getTypeMatchFailure(locator);
                 break;
               }
@@ -4594,21 +4594,26 @@ static std::pair<Type, unsigned> getObjectTypeAndNumUnwraps(Type type) {
   return std::make_pair(objType, optionals.size());
 }
 
-static bool
+static ConstraintSystem::TypeMatchResult
 repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
                         ConstraintKind matchKind,
                         SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                         ConstraintLocatorBuilder locator) {
   fromType = fromType->getWithoutSpecifierType();
 
+  {
+    fromType = cs.simplifyType(fromType);
+    toType = cs.simplifyType(toType);
+  }
+
   if (!fromType->getOptionalObjectType() || toType->is<TypeVariableType>())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If we have an optional type, try to force-unwrap it.
   // FIXME: Should we also try '?'?
   auto *anchor = locator.trySimplifyToExpr();
   if (!anchor)
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If this is a conversion to a non-optional contextual type e.g.
   // `let _: Bool = try? foo()` and `foo()` produces `Int`
@@ -4644,7 +4649,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // First, let's check whether it has been determined that
     // it was incorrect to use `?` in this position.
     if (cs.hasFixFor(cs.getConstraintLocator(subExpr), FixKind::RemoveUnwrap))
-      return true;
+      return cs.getTypeMatchSuccess();
 
     auto type = cs.getType(subExpr);
     // If the type of sub-expression is optional, type of the
@@ -4659,7 +4664,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
     // chain which is hard to diagnose.
     if (type->isTypeVariableOrMember() &&
         !isa<UnresolvedMemberChainResultExpr>(subExpr))
-      return false;
+      return cs.getTypeMatchFailure(locator);
 
     // If this is a conversion from optional chain to some
     // other type e.g. contextual type or a parameter type,
@@ -4679,7 +4684,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
       // The expression that provides the first type is implicit and never
       // spelled out in source code, e.g. $match in an expression pattern.
       // Thus we cannot force unwrap the first type
-      return false;
+      return cs.getTypeMatchFailure(locator);
     }
   }
 
@@ -4694,7 +4699,7 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
         // to 'try!'. If the sub-expression is optional, then a force-unwrap
         // won't change anything in Swift 5+ because 'try?' already avoids
         // adding an additional layer of Optional there.
-        return false;
+        return cs.getTypeMatchFailure(locator);
       }
     } else {
       // In cases when sub-expression isn't optional, 'try?'
@@ -4724,17 +4729,17 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // bound to `Int?` and there is no need to unwrap. Solver has to wait
   // until more information becomes available about what `T0` is expected
   // to be before taking action.
-  if (matchKind == ConstraintKind::Equal &&
-      (fromObjectType->is<TypeVariableType>() ||
-       toObjectType->is<TypeVariableType>())) {
-    return false;
+  if (fromObjectType->is<TypeVariableType>() ||
+      toObjectType->is<TypeVariableType>()) {
+    return matchKind == ConstraintKind::Equal ? cs.getTypeMatchFailure(locator)
+                                              : cs.getTypeMatchAmbiguous();
   }
 
   // If `from` is not less optional than `to`, force unwrap is
   // not going to help here. In case of object type of `from`
   // is a type variable, let's assume that it might be optional.
   if (fromUnwraps <= toUnwraps && !fromObjectType->is<TypeVariableType>())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   // If the result of optional chaining is converted to
   // an optional contextual type represented by a type
@@ -4743,18 +4748,18 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (isa<OptionalEvaluationExpr>(anchor) && toUnwraps > 0) {
     if (locator.endsWith<LocatorPathElt::ContextualType>() &&
         toObjectType->is<TypeVariableType>())
-      return false;
+      return cs.getTypeMatchFailure(locator);
   }
 
   auto result =
       cs.matchTypes(fromObjectType, toObjectType, matchKind,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
   if (!result.isSuccess())
-    return false;
+    return cs.getTypeMatchFailure(locator);
 
   conversionsOrFixes.push_back(ForceOptional::create(
       cs, fromType, toType, cs.getConstraintLocator(locator)));
-  return true;
+  return cs.getTypeMatchSuccess();
 }
 
 static bool repairArrayLiteralUsedAsDictionary(
@@ -4913,7 +4918,8 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
-bool ConstraintSystem::repairFailures(
+ConstraintSystem::TypeMatchResult
+ConstraintSystem::repairFailures(
     Type lhs, Type rhs, ConstraintKind matchKind, TypeMatchOptions flags,
     SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocatorBuilder locator) {
@@ -5143,18 +5149,18 @@ bool ConstraintSystem::repairFailures(
   if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
                                          conversionsOrFixes,
                                          getConstraintLocator(locator)))
-    return true;
+    return getTypeMatchSuccess();
 
   if (path.empty()) {
     if (!anchor)
-      return false;
+      return getTypeMatchFailure(locator);
 
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
     //   immutable or a subscript e.g. `foo["bar"]! = 42`.
     if (repairByTreatingRValueAsLValue(lhs, rhs))
-      return true;
+      return getTypeMatchSuccess();
 
     // If method reference forms a value type of the key path,
     // there is going to be a constraint to match result of the
@@ -5167,19 +5173,19 @@ bool ConstraintSystem::repairFailures(
         // If we have keypath capabilities for both sides and one of the bases
         // is unresolved, it is too early to record fix.
         if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
-          return false;
+          return getTypeMatchSuccess();
       }
 
       conversionsOrFixes.push_back(IgnoreContextualType::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
-      return true;
+      return getTypeMatchSuccess();
     }
 
     if (auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor)) {
       if (lhs->is<LValueType>()) {
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
     }
 
@@ -5197,13 +5203,13 @@ bool ConstraintSystem::repairFailures(
           contextualTy && !contextualTy->isTypeVariableOrMember()) {
         conversionsOrFixes.push_back(IgnoreContextualType::create(
             *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
-        return true;
+        return getTypeMatchSuccess();
       }
     }
 
     if (auto *AE = getAsExpr<AssignExpr>(anchor)) {
       if (repairByInsertingExplicitCall(lhs, rhs))
-        return true;
+        return getTypeMatchSuccess();
 
       if (auto *inoutExpr = dyn_cast<InOutExpr>(AE->getSrc())) {
         auto *loc = getConstraintLocator(inoutExpr);
@@ -5217,18 +5223,18 @@ bool ConstraintSystem::repairFailures(
             conversionsOrFixes.end());
 
         if (hasFixFor(loc, FixKind::RemoveAddressOf))
-          return true;
+          return getTypeMatchSuccess();
 
         conversionsOrFixes.push_back(
             RemoveAddressOf::create(*this, lhs, rhs, loc));
-        return true;
+        return getTypeMatchSuccess();
       }
 
       if (repairByAnyToAnyObjectCast(lhs, rhs))
-        return true;
+        return getTypeMatchSuccess();
 
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
-        return true;
+        return getTypeMatchSuccess();
 
       // If destination is `AnyObject` it means that source doesn't conform.
       if (rhs->getWithoutSpecifierType()
@@ -5236,21 +5242,21 @@ bool ConstraintSystem::repairFailures(
               ->isAnyObject()) {
         conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
 
       // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
       // give solver a chance to determine which generic parameters are
       // mismatched and produce a fix for that.
       if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
-        return false;
+        return getTypeMatchFailure(locator);
 
       // An attempt to assign `Int?` to `String?`.
       if (hasConversionOrRestriction(
               ConversionRestrictionKind::OptionalToOptional)) {
         conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
 
       // If the situation has to do with protocol composition types and
@@ -5258,7 +5264,7 @@ bool ConstraintSystem::repairFailures(
       // `X & Y` but destination is only `Y` or vice versa, there is a
       // tailored "missing conformance" fix for that.
       if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
-        return false;
+        return getTypeMatchFailure(locator);
 
       if (hasConversionOrRestriction(
               ConversionRestrictionKind::MetatypeToExistentialMetatype) ||
@@ -5267,7 +5273,7 @@ bool ConstraintSystem::repairFailures(
           hasConversionOrRestriction(ConversionRestrictionKind::Superclass)) {
         conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
 
       if (hasConversionOrRestriction(
@@ -5278,7 +5284,7 @@ bool ConstraintSystem::repairFailures(
         // If both object types are functions, let's allow the solver to
         // structurally compare them before trying to fix anything.
         if (lhs->is<FunctionType>() && rhs->is<FunctionType>())
-          return false;
+          return getTypeMatchFailure(locator);
 
         // If either object type is a generic, nominal or existential type
         // it means that follow-up to value-to-optional is going to be:
@@ -5290,7 +5296,7 @@ bool ConstraintSystem::repairFailures(
         if ((lhs->is<BoundGenericType>() && rhs->is<BoundGenericType>()) ||
             (lhs->is<NominalType>() && rhs->is<NominalType>()) ||
             rhs->isAnyExistentialType())
-          return false;
+          return getTypeMatchFailure(locator);
       }
 
       auto *destExpr = AE->getDest();
@@ -5299,7 +5305,7 @@ bool ConstraintSystem::repairFailures(
       if (isa<ApplyExpr>(destExpr) || isa<LiteralExpr>(destExpr)) {
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
 
       // If destination has a function type, it might either be
@@ -5314,19 +5320,22 @@ bool ConstraintSystem::repairFailures(
       if (!destIsOrCanBindToLValue && rhs->is<FunctionType>()) {
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-        return true;
+        return getTypeMatchSuccess();
       }
 
-      if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                  conversionsOrFixes, locator))
-        return true;
+      {
+        auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                              conversionsOrFixes, locator);
+        if (!result.isFailure())
+          return result;
+      }
 
       // `rhs` - is an assignment destination and `lhs` is its source.
       if (repairByConstructingRawRepresentableType(lhs, rhs))
-        return true;
+        return getTypeMatchSuccess();
 
       if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
-        return true;
+        return getTypeMatchSuccess();
 
       // If either side is a placeholder then let's consider this
       // assignment correctly typed.
@@ -5344,7 +5353,7 @@ bool ConstraintSystem::repairFailures(
         // Let this assignment failure be diagnosed by the
         // AllowTupleTypeMismatch fix already recorded.
         if (hasFixFor(loc, FixKind::AllowTupleTypeMismatch))
-          return true;
+          return getTypeMatchSuccess();
 
         conversionsOrFixes.push_back(
             IgnoreAssignmentDestinationType::create(*this, lhs, rhs, loc));
@@ -5352,10 +5361,10 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(TreatRValueAsLValue::create(*this, loc));
       }
 
-      return true;
+      return getTypeMatchSuccess();
     }
 
-    return false;
+    return getTypeMatchFailure(locator);
   }
 
   auto elt = path.back();
@@ -5410,16 +5419,16 @@ bool ConstraintSystem::repairFailures(
           auto overload = findSelectedOverloadFor(calleeLoc);
           // If this cannot be a default value matching, let's ignore.
           if (!(overload && overload->choice.isDecl()))
-            return true;
+            return getTypeMatchSuccess();
 
           // Ignore decls that don't have meaningful parameter lists - this
           // matches variables and parameters with function types.
           auto *paramList = getParameterList(overload->choice.getDecl());
           if (!paramList)
-            return true;
+            return getTypeMatchSuccess();
 
           if (!paramList->get(applyLoc->getParamIdx())->getTypeOfDefaultExpr())
-            return true;
+            return getTypeMatchSuccess();
         }
       }
     }
@@ -5431,7 +5440,7 @@ bool ConstraintSystem::repairFailures(
     if (auto *nominal = rhs->getAnyNominal()) {
       if (nominal->isStdlibDecl() &&
           nominal->getName() == getASTContext().Id_OptionalNilComparisonType) {
-        return false;
+        return getTypeMatchFailure(locator);
       }
     }
 
@@ -5448,7 +5457,7 @@ bool ConstraintSystem::repairFailures(
         if (!isSynthesizedArg && isForCodeCompletion() &&
             containsIDEInspectionTarget(arg) && !lhs->isVoid() &&
             !lhs->isUninhabited())
-          return true;
+          return getTypeMatchSuccess();
       }
     }
 
@@ -5637,7 +5646,7 @@ bool ConstraintSystem::repairFailures(
 
     // If either type has a placeholder, consider this fixed.
     if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     // `lhs` - is an argument and `rhs` is a parameter type.
     if (repairByConstructingRawRepresentableType(lhs, rhs))
@@ -5646,9 +5655,12 @@ bool ConstraintSystem::repairFailures(
     if (repairByUsingRawValueOfRawRepresentableType(lhs, rhs))
       break;
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      break;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (!result.isFailure())
+        return result;
+    }
 
     {
       auto *calleeLocator = getCalleeLocator(loc);
@@ -5667,7 +5679,7 @@ bool ConstraintSystem::repairFailures(
                   llvm::all_of(*paramList, [&](const ParamDecl *param) -> bool {
                     return param->getInterfaceType()->isEqual(firstParamType);
                   }))
-                return true;
+                return getTypeMatchSuccess();
             }
           }
         }
@@ -5676,12 +5688,12 @@ bool ConstraintSystem::repairFailures(
 
     if (repairOutOfOrderArgumentsInBinaryFunction(*this, conversionsOrFixes,
                                                   loc))
-      return true;
+      return getTypeMatchSuccess();
 
     // There is already a remove extraneous arguments fix recorded for this
     // apply arg to param locator, so let's skip the default argument mismatch.
     if (hasFixFor(loc, FixKind::RemoveExtraneousArguments))
-      return true;
+      return getTypeMatchSuccess();
 
     // If parameter is a pack, let's see if we have already recorded
     // either synthesized or extraneous argument fixes.
@@ -5692,13 +5704,13 @@ bool ConstraintSystem::repairFailures(
       // detected a tuple splat issue.
       if (hasFixFor(loc,
                     FixKind::DestructureTupleToMatchPackExpansionParameter))
-        return true;
+        return getTypeMatchSuccess();
 
       // Path would end with `ApplyArgument`.
       auto *argsLoc = getConstraintLocator(anchor, tmpPath.drop_back());
       if (hasFixFor(argsLoc, FixKind::RemoveExtraneousArguments) ||
           hasFixFor(argsLoc, FixKind::AddMissingArguments))
-        return true;
+        return getTypeMatchSuccess();
     }
 
     // If the argument couldn't be found, this could be a default value
@@ -5755,7 +5767,7 @@ bool ConstraintSystem::repairFailures(
     if (path.empty() ||
         !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
           path.back().getKind() == ConstraintLocator::ContextualType))
-      return false;
+      return getTypeMatchFailure(locator);
 
     if (auto argToParamElt =
             path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
@@ -5813,7 +5825,7 @@ bool ConstraintSystem::repairFailures(
       // a fix for the this conversion, we can just ignore individual function
       // argument in-out mismatch failure by considered this fixed.
       if (hasFixFor(parentLoc))
-        return true;
+        return getTypeMatchSuccess();
 
       // We want to call matchTypes with the default decomposition options
       // in case there are type variables that we couldn't bind due to the
@@ -5837,14 +5849,14 @@ bool ConstraintSystem::repairFailures(
         parentLoc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
       // If either type has a placeholder, consider this fixed.
       if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
-        return true;
+        return getTypeMatchSuccess();
 
       // If there is a fix associated with contextual conversion or
       // a function type itself, let's ignore argument failure but
       // increase a score.
       if (hasFixFor(parentLoc)) {
         increaseScore(SK_Fix, locator);
-        return true;
+        return getTypeMatchSuccess();
       }
 
       // Since there is only one parameter let's give it a chance to diagnose
@@ -5866,7 +5878,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::ConditionalRequirement: {
     // If either type has a placeholder, consider this fixed.
     if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     // If requirement is something like `T == [Int]` let's let
     // type matcher a chance to match generic parameters before
@@ -5878,7 +5890,7 @@ bool ConstraintSystem::repairFailures(
     auto *reqLoc = getConstraintLocator(locator);
 
     if (isFixedRequirement(reqLoc, rhs))
-      return true;
+      return getTypeMatchSuccess();
 
     // If this is a requirement on sequence of for-in statement where one
     // of the sides is a completely resolved dependent member, skip it
@@ -5889,7 +5901,7 @@ bool ConstraintSystem::repairFailures(
           getContextualTypePurpose(UDE->getBase()) == CTP_ForEachSequence) {
         if ((lhs->is<DependentMemberType>() && !lhs->hasTypeVariable()) ||
             (rhs->is<DependentMemberType>() && !rhs->hasTypeVariable()))
-          return true;
+          return getTypeMatchSuccess();
       }
     }
 
@@ -5905,9 +5917,12 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       break;
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (!result.isFailure())
+        return result;
+    }
 
     // If we could record a generic arguments mismatch instead of this fix,
     // don't record a contextual type mismatch here.
@@ -5923,7 +5938,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::ContextualType: {
     // If either type is a placeholder, consider this fixed
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     // If either side is not yet resolved, it's too early for this fix.
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
@@ -5932,14 +5947,14 @@ bool ConstraintSystem::repairFailures(
     // If there is already a fix for contextual failure, let's not
     // record a duplicate one.
     if (hasFixFor(getConstraintLocator(locator)))
-      return true;
+      return getTypeMatchSuccess();
 
     auto purpose = getContextualTypePurpose(anchor);
     if (rhs->isVoid() &&
         (purpose == CTP_ReturnStmt || purpose == CTP_ReturnSingleExpr)) {
       conversionsOrFixes.push_back(
           RemoveReturn::create(*this, lhs, getConstraintLocator(locator)));
-      return true;
+      return getTypeMatchSuccess();
     }
 
     if (repairByInsertingExplicitCall(lhs, rhs))
@@ -5982,9 +5997,12 @@ bool ConstraintSystem::repairFailures(
       break;
     }
 
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                            conversionsOrFixes, locator);
+      if (result.isSuccess())
+        return getTypeMatchSuccess();
+    }
 
     // Let's wait until both sides are of the same optionality before
     // attempting `.rawValue` fix.
@@ -6015,7 +6033,7 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-      return true;
+      return getTypeMatchSuccess();
     }
 
     auto *loc = getConstraintLocator(anchor, {path.begin(), path.end() - 1});
@@ -6029,9 +6047,12 @@ bool ConstraintSystem::repairFailures(
         auto *locator =
             getConstraintLocator(argument, ConstraintLocator::ClosureResult);
 
-        if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                    conversionsOrFixes, locator))
-          return true;
+        {
+          auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                              conversionsOrFixes, locator);
+          if (!result.isFailure())
+            return result;
+        }
 
         conversionsOrFixes.push_back(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
@@ -6063,14 +6084,14 @@ bool ConstraintSystem::repairFailures(
       const auto &elt = path[path.size() - 2];
       if (elt.getKind() == ConstraintLocator::AutoclosureResult &&
           repairByInsertingExplicitCall(lhs, rhs))
-        return true;
+        return getTypeMatchSuccess();
     }
     break;
   }
 
   case ConstraintLocator::AutoclosureResult: {
     if (repairByInsertingExplicitCall(lhs, rhs))
-      return true;
+      return getTypeMatchSuccess();
 
     auto isPointerType = [](Type type) -> bool {
       return bool(
@@ -6111,7 +6132,7 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-      return true;
+      return getTypeMatchSuccess();
     }
 
     if (isExpr<ArrayExpr>(anchor) || isExpr<DictionaryExpr>(anchor)) {
@@ -6128,7 +6149,7 @@ bool ConstraintSystem::repairFailures(
       auto loc = getConstraintLocator(anchor, path);
       if (hasFixFor(loc, FixKind::TreatArrayLiteralAsDictionary)) {
         increaseScore(SK_Fix, loc);
-        return true;
+        return getTypeMatchSuccess();
       }
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
@@ -6209,7 +6230,7 @@ bool ConstraintSystem::repairFailures(
     // add ShapeOf constraints. For now, skip fixing the nested ones to avoid
     // cascading diagnostics.
     if (!isExpr<PackExpansionExpr>(shapeLocator->getAnchor()))
-      return true;
+      return getTypeMatchSuccess();
 
     auto *fix = SkipSameShapeRequirement::create(*this, lhs, rhs, shapeLocator);
     conversionsOrFixes.push_back(fix);
@@ -6220,7 +6241,7 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isPlaceholder() || rhs->isPlaceholder()) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
-      return true;
+      return getTypeMatchSuccess();
     }
 
     // This is going to be diagnosed as `missing conformance`,
@@ -6247,9 +6268,10 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::Condition: {
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                          conversionsOrFixes, locator);
+    if (!result.isFailure())
+      return result;
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6259,11 +6281,11 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::UnresolvedMemberChainResult: {
     // Ignore this mismatch if base or result is already a hole.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+                                locator).isSuccess())
+      return getTypeMatchSuccess();
 
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;
@@ -6297,15 +6319,16 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::InstanceType: {
     if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     break;
   }
 
   case ConstraintLocator::OptionalPayload: {
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
-                                locator))
-      return true;
+    auto result = repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
+                                          conversionsOrFixes, locator);
+    if (!result.isFailure())
+      return result;
 
     break;
   }
@@ -6316,7 +6339,7 @@ bool ConstraintSystem::repairFailures(
     recordAnyTypeVarAsPotentialHole(rhs);
 
     if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     // If there's a contextual type, let's consider it the source of truth and
     // produce a contextual mismatch instead of  per-branch failure, because
@@ -6328,7 +6351,7 @@ bool ConstraintSystem::repairFailures(
         auto *loc = getConstraintLocator(
             anchor, LocatorPathElt::ContextualType(purpose));
         if (hasFixFor(loc, FixKind::IgnoreContextualType))
-          return true;
+          return getTypeMatchSuccess();
 
         if (contextualType->isVoid() && purpose == CTP_ReturnStmt) {
           conversionsOrFixes.push_back(RemoveReturn::create(*this, lhs, loc));
@@ -6351,7 +6374,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::EnumPatternImplicitCastMatch: {
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6369,12 +6392,12 @@ bool ConstraintSystem::repairFailures(
     // to have holes.
     if (rhs->isPlaceholder() && isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
-      return true;
+      return getTypeMatchSuccess();
     }
 
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
@@ -6412,7 +6435,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::GenericArgument: {
     // If any of the types is a placeholder, consider it fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     // Ignoring the generic argument because we may have a generic requirement
     // failure e.g. `String bind T.Element`, so let's drop the generic argument
@@ -6494,7 +6517,7 @@ bool ConstraintSystem::repairFailures(
       break;
 
     conversionsOrFixes.push_back(fix);
-    return true;
+    return getTypeMatchSuccess();
   }
 
   case ConstraintLocator::ResultBuilderBodyResult: {
@@ -6502,7 +6525,7 @@ bool ConstraintSystem::repairFailures(
     // there is going to be other fix available to diagnose
     // the underlying issue.
     if (lhs->isPlaceholder())
-      return true;
+      return getTypeMatchSuccess();
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -6524,18 +6547,21 @@ bool ConstraintSystem::repairFailures(
     // Coercion from T.Type to T.Protocol.
     if (hasConversionOrRestriction(
             ConversionRestrictionKind::MetatypeToExistentialMetatype))
-      return false;
+      return getTypeMatchFailure(locator);
 
     if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
-      return false;
+      return getTypeMatchFailure(locator);
 
     // Let's check whether the sub-expression is an optional type which
     // is possible to unwrap (either by force or `??`) to satisfy the cast,
     // otherwise we'd have to fallback to force downcast.
-    if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind,
-                                conversionsOrFixes,
-                                getConstraintLocator(coercion->getSubExpr())))
-      return true;
+    {
+      auto result = repairViaOptionalUnwrap(
+          *this, lhs, rhs, matchKind, conversionsOrFixes,
+          getConstraintLocator(coercion->getSubExpr()));
+      if (!result.isFailure())
+        return result;
+    }
 
     // If the result type of the coercion has an value to optional conversion
     // we can instead suggest the conditional downcast as it is safer in
@@ -6557,7 +6583,7 @@ bool ConstraintSystem::repairFailures(
             CoerceToCheckedCast::attempt(*this, lhs, rhs, useConditionalCast,
                                          getConstraintLocator(locator))) {
       conversionsOrFixes.push_back(coerceToCheckCastFix);
-      return true;
+      return getTypeMatchSuccess();
     }
 
     // If it has a deep equality restriction, defer the diagnostic to
@@ -6565,16 +6591,16 @@ bool ConstraintSystem::repairFailures(
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
         !hasConversionOrRestriction(
             ConversionRestrictionKind::OptionalToOptional)) {
-      return false;
+      return getTypeMatchFailure(locator);
     }
 
     if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
-      return false;
+      return getTypeMatchFailure(locator);
 
     auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                            getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
-    return true;
+    return getTypeMatchSuccess();
   }
   case ConstraintLocator::KeyPathValue: {
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
@@ -6597,7 +6623,8 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  return !conversionsOrFixes.empty();
+  return conversionsOrFixes.empty() ? getTypeMatchFailure(locator)
+                                    : getTypeMatchSuccess();
 }
 
 static bool isTupleWithUnresolvedPackExpansion(Type type) {
@@ -7825,8 +7852,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
-    if (repairFailures(type1, type2, kind, flags, conversionsOrFixes,
-                       locator)) {
+    auto result =
+        repairFailures(type1, type2, kind, flags, conversionsOrFixes, locator);
+
+    // If repair is confused it means that types are not sufficiently
+    // resolved yet. Let's re-introduce the constraint and let the
+    // solver to infer more type information.
+    if (result.isAmbiguous())
+      return formUnsolvedResult();
+
+    if (result.isSuccess()) {
       if (conversionsOrFixes.empty())
         return getTypeMatchSuccess();
     }
@@ -14797,16 +14832,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix->getKind()) {
   case FixKind::ForceOptional: {
-    SmallVector<Type, 4> unwraps1;
-    type1->lookThroughAllOptionalTypes(unwraps1);
-
-    SmallVector<Type, 4> unwraps2;
-    type2->lookThroughAllOptionalTypes(unwraps2);
-
-    auto impact = unwraps1.size() != unwraps2.size()
-                      ? unwraps1.size() - unwraps2.size()
-                      : 1;
-    return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
+    auto *theFix = static_cast<ForceOptional *>(fix);
+    return recordFix(fix, /*impact=*/theFix->getUnwrapCount())
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::UnwrapOptionalBase:
