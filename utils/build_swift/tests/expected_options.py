@@ -203,7 +203,7 @@ EXPECTED_DEFAULTS = {
     'zlib_build_variant': 'Debug',
     'curl_build_variant': 'Debug',
     'bootstrapping_mode': None,
-    'lit_args': '-sv',
+    'lit_args': '-sv --timeout=600',
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
