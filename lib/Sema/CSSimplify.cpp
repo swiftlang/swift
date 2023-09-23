@@ -2938,23 +2938,6 @@ bool ConstraintSystem::hasPreconcurrencyCallee(
   return calleeOverload->choice.getDecl()->preconcurrency();
 }
 
-/// Determines whether a DeclContext is preconcurrency, using information
-/// tracked by the solver to aid in answering that.
-static bool isPreconcurrency(ConstraintSystem &cs, DeclContext *dc) {
-  if (auto *decl = dc->getAsDecl())
-    return decl->preconcurrency();
-
-  if (auto *ce = dyn_cast<ClosureExpr>(dc)) {
-    return ClosureIsolatedByPreconcurrency{cs}(ce);
-  }
-
-  if (auto *autoClos = dyn_cast<AutoClosureExpr>(dc)) {
-    return isPreconcurrency(cs, autoClos->getParent());
-  }
-
-  llvm_unreachable("unhandled DeclContext kind in isPreconcurrency");
-}
-
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,

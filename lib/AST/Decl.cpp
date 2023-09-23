@@ -6755,8 +6755,8 @@ void AbstractStorageDecl::AccessorRecord::removeAccessor(
 ) {
   // Remove this accessor from the list of accessors.
   assert(getAccessor(accessor->getAccessorKind()) == accessor);
-  std::remove(getAccessorsBuffer().begin(), getAccessorsBuffer().end(),
-              accessor);
+  (void)std::remove(getAccessorsBuffer().begin(), getAccessorsBuffer().end(),
+                    accessor);
 
   // Clear out the accessor kind -> index mapping.
   std::memset(AccessorIndices, 0, sizeof(AccessorIndices));
