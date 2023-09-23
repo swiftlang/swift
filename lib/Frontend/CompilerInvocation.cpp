@@ -3120,7 +3120,6 @@ bool CompilerInvocation::parseArgs(
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;
-    SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
   }
 
   return false;
