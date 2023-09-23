@@ -147,6 +147,7 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-simple '.Protocol'
 ///     type-simple '?'
 ///     type-simple '!'
+///     '~' type-simple
 ///     type-collection
 ///     type-array
 ///     '_'
@@ -154,15 +155,6 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
-
-
-  // Prevent the use of ~ as prefix for a type. We specially parse them
-  // in inheritance clauses elsewhere.
-  if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
-    auto tildeLoc = consumeToken();
-    diagnose(tildeLoc, diag::cannot_suppress_here)
-        .fixItRemoveChars(tildeLoc, tildeLoc);
-  }
 
   if (Tok.is(tok::kw_inout)
       || (canHaveParameterSpecifierContextualKeyword()
@@ -174,6 +166,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
     consumeToken();
+  }
+
+  // Eat any '~' preceding the type.
+  SourceLoc tildeLoc;
+  if (Tok.isTilde() && !isInSILMode()) {
+    tildeLoc = consumeToken();
+    if (!EnabledNoncopyableGenerics)
+      diagnose(tildeLoc, diag::cannot_suppress_here)
+          .fixItRemoveChars(tildeLoc, tildeLoc);
   }
 
   switch (Tok.getKind()) {
@@ -306,6 +307,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       consumeToken(tok::code_complete);
     }
     break;
+  }
+
+  // Wrap in an InverseTypeRepr if needed.
+  if (EnabledNoncopyableGenerics && tildeLoc) {
+    ty = makeParserResult(ty,
+                          new(Context) InverseTypeRepr(tildeLoc, ty.get()));
   }
 
   return ty;
@@ -639,18 +646,9 @@ ParserResult<TypeRepr> Parser::parseType(
         new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
   }
 
-  // Parse inverse '~'
-  SourceLoc tildeLoc;
-  if (EnabledNoncopyableGenerics && Tok.isTilde())
-    tildeLoc = consumeToken();
-
   auto ty = parseTypeScalar(MessageID, reason);
   if (ty.isNull())
     return ty;
-
-  // Attach `~` tightly to the parsed type.
-  if (tildeLoc)
-    ty = makeParserResult(ty, new(Context) InverseTypeRepr(tildeLoc, ty.get()));
 
   // Parse vararg type 'T...'.
   if (Tok.isEllipsis()) {
