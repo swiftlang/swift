@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -target armv7-apple-none-macho -parse-stdlib -module-name Swift %s -enable-experimental-feature Embedded -wmo -parse-as-library | %FileCheck %s
+// RUN: %target-swift-emit-ir -target armv7-apple-none-macho -parse-stdlib -module-name Swift %s -enable-experimental-feature Embedded -wmo -parse-as-library | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-NONOPT
 // RUN: %target-swift-emit-ir -target armv7-apple-none-macho -parse-stdlib -module-name Swift %s -enable-experimental-feature Embedded -wmo -parse-as-library -O | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
@@ -98,19 +98,19 @@ extension MyPublicEnum {
   public static var static_mypublicstruct_4: MyPublicStruct = MyPublicStruct(x: 0, y: 0)
 }
 
-// CHECK-NOT: global_int_1
-// CHECK: @"$ss12global_int_2Sivp" = {{.*}}zeroinitializer
-// CHECK-NOT: global_int_3
-// CHECK: @"$ss12global_int_4Sivp" = {{.*}}zeroinitializer
-// CHECK-NOT: static_int_1
-// CHECK: @"$ss12MyPublicEnumO12static_int_2SivpZ" = {{.*}}zeroinitializer
-// CHECK-NOT: static_int_3
-// CHECK: @"$ss12MyPublicEnumO12static_int_4SivpZ" = {{.*}}zeroinitializer
-// CHECK-NOT: global_my_publicstruct_1
-// CHECK: @"$ss24global_my_publicstruct_2s14MyPublicStructVvp" = {{.*}}zeroinitializer
-// CHECK-NOT: global_my_publicstruct_3
-// CHECK: @"$ss24global_my_publicstruct_4s14MyPublicStructVvp" = {{.*}}zeroinitializer
-// CHECK-NOT: stati_my_publicstruct_1
-// CHECK: @"$ss12MyPublicEnumO23static_mypublicstruct_2s0aB6StructVvpZ" = {{.*}}zeroinitializer
-// CHECK-NOT: stati_my_publicstruct_3
-// CHECK: @"$ss12MyPublicEnumO23static_mypublicstruct_4s0aB6StructVvpZ" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss12global_int_133_056BEF60D619AD2945081A9CBFC2AAE9LLSivp" = {{.*}}zeroinitializer
+// CHECK:        @"$ss12global_int_2Sivp" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss12global_int_333_056BEF60D619AD2945081A9CBFC2AAE9LLSivp" = {{.*}}zeroinitializer
+// CHECK:        @"$ss12global_int_4Sivp" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss12MyPublicEnumO12static_int_133_056BEF60D619AD2945081A9CBFC2AAE9LLSivpZ" = {{.*}}zeroinitializer
+// CHECK:        @"$ss12MyPublicEnumO12static_int_2SivpZ" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss12MyPublicEnumO12static_int_333_056BEF60D619AD2945081A9CBFC2AAE9LLSivpZ" = {{.*}}zeroinitializer
+// CHECK:        @"$ss12MyPublicEnumO12static_int_4SivpZ" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss24global_my_publicstruct_133_056BEF60D619AD2945081A9CBFC2AAE9LLs14MyPublicStructVvp" = {{.*}}zeroinitializer
+// CHECK:        @"$ss24global_my_publicstruct_2s14MyPublicStructVvp" = {{.*}}zeroinitializer
+// CHECK-NONOPT: @"$ss24global_my_publicstruct_333_056BEF60D619AD2945081A9CBFC2AAE9LLs14MyPublicStructVvp" = {{.*}}zeroinitializer
+// CHECK:        @"$ss24global_my_publicstruct_4s14MyPublicStructVvp" = {{.*}}zeroinitializer
+// CHECK-NOT:    static_my_publicstruct_1
+// CHECK:        @"$ss12MyPublicEnumO23static_mypublicstruct_2s0aB6StructVvpZ" = {{.*}}zeroinitializer
+// CHECK-NOT:    static_my_publicstruct_3
+// CHECK:        @"$ss12MyPublicEnumO23static_mypublicstruct_4s0aB6StructVvpZ" = {{.*}}zeroinitializer
