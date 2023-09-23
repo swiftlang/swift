@@ -57,6 +57,14 @@ using namespace swift::hashable_support;
 
 @end
 
+struct EquatableWitnessTable;
+
+/// Calls `Equatable.==` through an `Equatable` witness table
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_stdlib_Equatable_isEqual_indirect(
+    const void *lhsValue, const void *rhsValue, const Metadata *type,
+    const EquatableWitnessTable *wt);
+
 /// The fixed-size ivars of `__SwiftValue`.  The actual boxed value is
 /// tail-allocated.
 struct SwiftValueHeader {
@@ -80,9 +88,17 @@ struct SwiftValueHeader {
   /// Returns NULL if the type does not conform.
   const Metadata *getHashableBaseType() const;
 
+  /// Get the base type that conforms to `Equatable`.
+  /// Returns NULL if the type does not conform.
+  const Metadata *getEquatableBaseType() const;
+
   /// Get the `Hashable` protocol witness table for the contained type.
   /// Returns NULL if the type does not conform.
   const hashable_support::HashableWitnessTable *getHashableConformance() const;
+
+  /// Get the `Equatable` protocol witness table for the contained type.
+  /// Returns NULL if the type does not conform.
+  const EquatableWitnessTable *getEquatableConformance() const;
 
   SwiftValueHeader()
       : hashableBaseType(nullptr), hashableConformance(nullptr) {}
@@ -105,6 +121,27 @@ const Metadata *SwiftValueHeader::getHashableBaseType() const {
   return type;
 }
 
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(SQ);
+static constexpr auto &EquatableProtocolDescriptor = PROTOCOL_DESCR_SYM(SQ);
+
+const Metadata *SwiftValueHeader::getEquatableBaseType() const {
+  auto witnessTable =
+    swift_conformsToProtocolCommon(type, &EquatableProtocolDescriptor);
+  if (!witnessTable) {
+    return nullptr;
+  }
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+  const auto *conformance = lookThroughOptionalConditionalWitnessTable(
+    reinterpret_cast<const RelativeWitnessTable*>(witnessTable))
+    ->getDescription();
+#else
+  const auto *conformance = witnessTable->getDescription();
+#endif
+  const Metadata *baseTypeThatConformsToEquatable =
+    findConformingSuperclass(type, conformance);
+  return baseTypeThatConformsToEquatable;
+}
+
 const hashable_support::HashableWitnessTable *
 SwiftValueHeader::getHashableConformance() const {
   if (auto wt = hashableConformance.load(std::memory_order_acquire)) {
@@ -121,6 +158,14 @@ SwiftValueHeader::getHashableConformance() const {
   hashableConformance.compare_exchange_strong(
       expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
       std::memory_order_acq_rel);
+  return wt;
+}
+
+const EquatableWitnessTable *
+SwiftValueHeader::getEquatableConformance() const {
+  const EquatableWitnessTable *wt =
+      reinterpret_cast<const EquatableWitnessTable *>(
+          swift_conformsToProtocolCommon(type, &EquatableProtocolDescriptor));
   return wt;
 }
 
@@ -300,6 +345,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     return NO;
   }
 
+  // `other` must also be a _SwiftValue box
   if (![other isKindOfClass:getSwiftValueClass()]) {
     return NO;
   }
@@ -307,23 +353,45 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   auto selfHeader = getSwiftValueHeader(self);
   auto otherHeader = getSwiftValueHeader(other);
 
-  auto hashableBaseType = selfHeader->getHashableBaseType();
-  if (!hashableBaseType ||
-      otherHeader->getHashableBaseType() != hashableBaseType) {
-    return NO;
+  // TODO: getHashableBaseType seems to always succeed,
+  // even if the type is in fact not Hashable.  Why?
+  // Maybe we should try getting the conformance first,
+  // since that seems to actually fail?
+  auto selfHashableBaseType = selfHeader->getHashableBaseType();
+  if (selfHashableBaseType) {
+    auto otherHashableBaseType = otherHeader->getHashableBaseType();
+    if (selfHashableBaseType == otherHashableBaseType) {
+      auto hashableConformance = selfHeader->getHashableConformance();
+      if (hashableConformance) {
+        return _swift_stdlib_Hashable_isEqual_indirect(
+          getSwiftValuePayload(self,
+                               getSwiftValuePayloadAlignMask(selfHeader->type)),
+          getSwiftValuePayload(other,
+                               getSwiftValuePayloadAlignMask(otherHeader->type)),
+          selfHashableBaseType, hashableConformance);
+      }
+    }
   }
 
-  auto hashableConformance = selfHeader->getHashableConformance();
-  if (!hashableConformance) {
-    return NO;
+  // TODO: As above, getEquatableBaseType seems to always succeed
+  // even if the type is not in fact Equatable.
+  auto selfEquatableBaseType = selfHeader->getEquatableBaseType();
+  if (selfEquatableBaseType) {
+    auto otherEquatableBaseType = otherHeader->getEquatableBaseType();
+    if (selfEquatableBaseType == otherEquatableBaseType) {
+      auto equatableConformance = selfHeader->getEquatableConformance();
+      if (equatableConformance) {
+        return _swift_stdlib_Equatable_isEqual_indirect(
+          getSwiftValuePayload(self,
+                               getSwiftValuePayloadAlignMask(selfHeader->type)),
+          getSwiftValuePayload(other,
+                               getSwiftValuePayloadAlignMask(otherHeader->type)),
+          selfEquatableBaseType, equatableConformance);
+      }
+    }
   }
 
-  return _swift_stdlib_Hashable_isEqual_indirect(
-      getSwiftValuePayload(self,
-                           getSwiftValuePayloadAlignMask(selfHeader->type)),
-      getSwiftValuePayload(other,
-                           getSwiftValuePayloadAlignMask(otherHeader->type)),
-      hashableBaseType, hashableConformance);
+  return NO;
 }
 
 - (NSUInteger)hash {
