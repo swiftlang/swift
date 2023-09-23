@@ -60,11 +60,15 @@ class CrossModuleOptimization {
   /// avoid code size increase.
   bool conservative;
 
+  /// True if CMO should serialize literally everything in the module,
+  /// regardless of linkage.
+  bool everything;
+
   typedef llvm::DenseMap<SILFunction *, bool> FunctionFlags;
 
 public:
-  CrossModuleOptimization(SILModule &M, bool conservative)
-    : M(M), conservative(conservative) { }
+  CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
+    : M(M), conservative(conservative), everything(everything) { }
 
   void serializeFunctionsInModule();
 
@@ -164,9 +168,10 @@ void CrossModuleOptimization::serializeFunctionsInModule() {
 
   // Start with public functions.
   for (SILFunction &F : M) {
-    if (F.getLinkage() == SILLinkage::Public) {
-      if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64))
+    if (F.getLinkage() == SILLinkage::Public || everything) {
+      if (canSerializeFunction(&F, canSerializeFlags, /*maxDepth*/ 64)) {
         serializeFunction(&F, canSerializeFlags);
+      }
     }
   }
 }
@@ -188,6 +193,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   // Temporarily set the flag to false (to avoid infinite recursion) until we set
   // it to true at the end of this function.
   canSerializeFlags[function] = false;
+
+  if (everything) {
+   canSerializeFlags[function] = true;
+   return true;
+  }
 
   if (DeclContext *funcCtxt = function->getDeclContext()) {
     if (!canUseFromInline(funcCtxt))
@@ -392,6 +402,9 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
 
 /// Returns true if the \p declCtxt can be used from a serialized function.
 bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
+  if (everything)
+    return true;
+
   if (!M.getSwiftModule()->canBeUsedForCrossModuleOptimization(declCtxt))
     return false;
 
@@ -410,6 +423,9 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
 
 /// Returns true if the function \p func can be used from a serialized function.
 bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
+  if (everything)
+    return true;
+
   if (DeclContext *funcCtxt = function->getDeclContext()) {
     if (!canUseFromInline(funcCtxt))
       return false;
@@ -439,13 +455,11 @@ bool CrossModuleOptimization::shouldSerialize(SILFunction *function) {
   if (function->isSerialized())
     return false;
 
+  if (everything)
+    return true;
+
   if (function->hasSemanticsAttr("optimize.no.crossmodule"))
     return false;
-
-  // In embedded Swift we serialize everything.
-  if (SerializeEverything ||
-      function->getASTContext().LangOpts.hasFeature(Feature::Embedded))
-    return true;
 
   if (!conservative) {
     // The basic heuristic: serialize all generic functions, because it makes a
@@ -652,23 +666,29 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
       return;
     if (!M.isWholeModule())
       return;
-      
+
     bool conservative = false;
-    // In embedded Swift we serialize everything.
-    if (!M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-      switch (M.getOptions().CMOMode) {
-        case swift::CrossModuleOptimizationMode::Off:
-          return;
-        case swift::CrossModuleOptimizationMode::Default:
-          conservative = true;
-          break;
-        case swift::CrossModuleOptimizationMode::Aggressive:
-          conservative = false;
-          break;
-      }
+    bool everything = SerializeEverything;
+    switch (M.getOptions().CMOMode) {
+      case swift::CrossModuleOptimizationMode::Off:
+        break;
+      case swift::CrossModuleOptimizationMode::Default:
+        conservative = true;
+        break;
+      case swift::CrossModuleOptimizationMode::Aggressive:
+        conservative = false;
+        break;
+      case swift::CrossModuleOptimizationMode::Everything:
+        everything = true;
+        break;
     }
 
-    CrossModuleOptimization CMO(M, conservative);
+    if (!everything &&
+        M.getOptions().CMOMode == swift::CrossModuleOptimizationMode::Off) {
+      return;
+    }
+
+    CrossModuleOptimization CMO(M, conservative, everything);
     CMO.serializeFunctionsInModule();
   }
 };
