@@ -1787,10 +1787,20 @@ bool swift::isAsyncDecl(ConcreteDeclRef declRef) {
   return false;
 }
 
-bool swift::safeToDropGlobalActor(
-    DeclContext *dc, Type globalActor, Type ty,
-    llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
-        getClosureActorIsolation) {
+/// Check if it is safe for the \c globalActor qualifier to be removed from
+/// \c ty, when the function value of that type is isolated to that actor.
+///
+/// In general this is safe in a narrow but common case: a global actor
+/// qualifier can be dropped from a function type while in a DeclContext
+/// isolated to that same actor, as long as the value is not Sendable.
+///
+/// \param dc the innermost context in which the cast to remove the global actor
+///           is happening.
+/// \param globalActor global actor that was dropped from \c ty.
+/// \param ty a function type where \c globalActor was removed from it.
+/// \return true if it is safe to drop the global-actor qualifier.
+static bool safeToDropGlobalActor(
+    DeclContext *dc, Type globalActor, Type ty) {
   auto funcTy = ty->getAs<AnyFunctionType>();
   if (!funcTy)
     return false;
@@ -1813,7 +1823,7 @@ bool swift::safeToDropGlobalActor(
     return false;
 
   // finally, must be in a context with matching isolation.
-  auto dcIsolation = getActorIsolationOfContext(dc, getClosureActorIsolation);
+  auto dcIsolation = getActorIsolationOfContext(dc);
   if (dcIsolation.isGlobalActor())
     if (dcIsolation.getGlobalActor()->getCanonicalType()
         == globalActor->getCanonicalType())
@@ -2100,21 +2110,13 @@ namespace {
 
             auto dc = const_cast<DeclContext*>(getDeclContext());
             if (!safeToDropGlobalActor(dc, fromActor, toType)) {
-            // FIXME: this diagnostic is sometimes a duplicate of one emitted
-            // by the constraint solver. Difference is the solver doesn't use
-            // warnUntilSwiftVersion, which appends extra text on the end.
-            // So, I'm making the messages exactly the same so IDEs will
-            // hopefully ignore the second diagnostic!
-
-            // otherwise, it's not a safe cast.
-            dc->getASTContext()
-                .Diags
-                .diagnose(funcConv->getLoc(),
-                          diag::converting_func_loses_global_actor, fromType,
-                          toType, fromActor)
-                .limitBehavior(dc->getASTContext().isSwiftVersionAtLeast(6)
-                                   ? DiagnosticBehavior::Error
-                                   : DiagnosticBehavior::Warning);
+              // otherwise, it's not a safe cast.
+              dc->getASTContext()
+                  .Diags
+                  .diagnose(funcConv->getLoc(),
+                            diag::converting_func_loses_global_actor, fromType,
+                            toType, fromActor)
+                  .warnUntilSwiftVersion(6);
             }
           }
         }
