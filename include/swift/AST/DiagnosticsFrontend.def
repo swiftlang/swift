@@ -36,10 +36,6 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
-ERROR(error_experimental_feature_not_available, none,
-      "experimental feature '%0' cannot be enabled in a production compiler",
-      (StringRef))
-
 ERROR(error_upcoming_feature_on_by_default, none,
       "upcoming feature '%0' is already enabled as of Swift version %1",
       (StringRef, unsigned))

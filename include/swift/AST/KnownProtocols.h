@@ -46,7 +46,7 @@ using KnownProtocolSet = FixedBitSet<NumKnownProtocols, KnownProtocolKind>;
 
 /// Produces a set of all protocols that have an inverse, i.e., for every
 /// known protocol KP in the set, ~KP exists.
-KnownProtocolSet getInvertableProtocols();
+KnownProtocolSet getInvertibleProtocols();
 
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);

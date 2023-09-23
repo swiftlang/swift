@@ -732,7 +732,7 @@ void swift::rewriting::realizeInheritedRequirements(
   auto inheritedTypes = decl->getInherited();
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
-  auto defaults = getInvertableProtocols();
+  auto defaults = getInvertibleProtocols();
 
   for (auto index : inheritedTypes.getIndices()) {
     Type inheritedType =
