@@ -2606,9 +2606,6 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       }
     }
     
-    // Parse the 'in' at the end.
-    if (Tok.isNot(tok::kw_in))
-      return makeParserSuccess();
 
     // Okay, we have a closure signature.
   } else {
