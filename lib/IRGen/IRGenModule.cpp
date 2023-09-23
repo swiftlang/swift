@@ -1483,6 +1483,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   // emit it into the IR of debugger expressions.
   if (Context.LangOpts.DebuggerSupport)
     return;
+
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
   
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
