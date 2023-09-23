@@ -103,7 +103,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       }
     }
 
-    var isIndexedElement: Bool {
+    public var isIndexedElement: Bool {
       switch self {
       case .anyIndexedElement, .indexedElement:
         return true
