@@ -20,7 +20,7 @@
 :: Practically, it is easier to be in the Administrators group to run the
 :: script, but it should be possible to execute as a normal user.
 :: The user will need permission to write files into the Windows SDK and the
-:: VisualC++ folder.
+:: Visual C++ folder.
 
 :: @echo off
 
