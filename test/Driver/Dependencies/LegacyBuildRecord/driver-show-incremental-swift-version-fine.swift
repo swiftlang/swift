@@ -1,6 +1,4 @@
-// rdar://103866776 (Swift CI: [main] 1. OSS - Swift ASAN - macOS: Multiple test failures after Swift driver change)
-// REQUIRES: rdar103866776
-
+// REQUIRES: use_legacy_driver
 // REQUIRES: shell
 // Test that when:
 //
@@ -14,15 +12,15 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-with-swiftdeps-fine/* %t
-// RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
+// RUN: %{python} %S/../Inputs/touch.py 443865900 %t/*
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json 2>&1 | %FileCheck --check-prefix CHECK-INCREMENTAL %s
+// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json 2>&1 | %FileCheck --check-prefix CHECK-INCREMENTAL %s
 // CHECK-INCREMENTAL-NOT: Incremental compilation has been enabled
 // CHECK-INCREMENTAL: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: echo '{version: "bogus", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0]}}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json 2>&1 | %FileCheck --check-prefix CHECK-VERSION-MISMATCH %s
+// RUN: cd %t && %swiftc_driver -driver-use-frontend-path "%{python.unquoted};%S/../Inputs/update-dependencies.py;%swift-dependency-tool" -c ./main.swift ./other.swift -module-name main -incremental -v -driver-show-incremental -output-file-map %t/output.json 2>&1 | %FileCheck --check-prefix CHECK-VERSION-MISMATCH %s
 // CHECK-VERSION-MISMATCH: Incremental compilation has been disabled{{.*}}compiler version mismatch
 // CHECK-VERSION-MISMATCH: Compiling with:
 // CHECK-VERSION-MISMATCH: Previously compiled with: bogus
