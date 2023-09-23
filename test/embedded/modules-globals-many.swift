@@ -8,6 +8,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 // Dependencies look like this:
 //

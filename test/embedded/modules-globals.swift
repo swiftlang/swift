@@ -6,6 +6,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 
 // BEGIN MyModule.swift
 
