@@ -57,11 +57,11 @@ public:
              .getTypeExpansionContext()
              .shouldLookThroughOpaqueTypeArchetypes())
       return ty;
-    // Remap types containing opaque result types in the current context.
-    return getBuilder()
-        .getTypeLowering(SILType::getPrimitiveObjectType(ty))
-        .getLoweredType()
-        .getASTType();
+
+    return substOpaqueTypesWithUnderlyingTypes(
+        ty,
+        TypeExpansionContext(getBuilder().getFunction()),
+        /*allowLoweredTypes=*/false);
   }
 
   ProtocolConformanceRef remapConformance(Type ty,

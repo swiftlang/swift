@@ -806,7 +806,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     if (options.is(TypeResolverContext::ExistentialConstraint))
       options |= TypeResolutionFlags::DisallowOpaqueTypes;
     auto argOptions = options.withoutContext().withContext(
-        TypeResolverContext::GenericArgument);
+        TypeResolverContext::ProtocolGenericArgument);
     auto genericResolution = resolution.withOptions(argOptions);
 
     SmallVector<Type, 2> argTys;
