@@ -1,12 +1,25 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s %S/Inputs/print.swift -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
+
+@_silgen_name("putchar")
+func putchar(_: UInt8)
+
+public func print(_ s: StaticString, terminator: StaticString = "\n") {
+  var p = s.utf8Start
+  while p.pointee != 0 {
+    putchar(p.pointee)
+    p += 1
+  }
+  p = terminator.utf8Start
+  while p.pointee != 0 {
+    putchar(p.pointee)
+    p += 1
+  }
+}
 
 class MyClass {
   init() { print("MyClass.init") }
