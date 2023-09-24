@@ -176,6 +176,10 @@ protected:
       kind : NumExposureKindBits
     );
 
+    SWIFT_INLINE_BITFIELD(ExternAttr, DeclAttribute, NumExternKindBits,
+      kind : NumExternKindBits
+    );
+
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
       isUnchecked : 1
     );
@@ -2339,18 +2343,33 @@ public:
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
 public:
-  ExternAttr(StringRef ModuleName, StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
-      ModuleName(ModuleName), Name(Name) {}
+  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+             SourceLoc AtLoc, SourceRange Range, ExternKind Kind, bool Implicit)
+      : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
+        ModuleName(ModuleName), Name(Name) {
+    Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
+  }
 
-  ExternAttr(StringRef ModuleName, StringRef Name, bool Implicit)
-    : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Implicit) {}
+  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+             ExternKind Kind, bool Implicit)
+      : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Kind,
+                   Implicit) {}
 
   /// The module name to import the named declaration in it
-  const StringRef ModuleName;
+  /// Used for Wasm import declaration.
+  const std::optional<StringRef> ModuleName;
 
   /// The declaration name to import
-  const StringRef Name;
+  /// std::nullopt if the declaration name is not specified with @_extern(c)
+  const std::optional<StringRef> Name;
+
+  /// Returns the kind of extern.
+  ExternKind getExternKind() const {
+    return static_cast<ExternKind>(Bits.ExternAttr.kind);
+  }
+
+  /// Find an ExternAttr with the given kind in the given DeclAttributes.
+  static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Extern;

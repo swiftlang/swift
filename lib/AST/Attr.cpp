@@ -1142,8 +1142,21 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Extern: {
     auto *Attr = cast<ExternAttr>(this);
     Printer.printAttrName("@_extern");
-    // For now, it accepts only "wasm" as its kind.
-    Printer << "(wasm, module: \"" << Attr->ModuleName << "\", name: \"" << Attr->Name << "\")";
+    Printer << "(";
+    switch (Attr->getExternKind()) {
+    case ExternKind::C:
+      Printer << "c";
+      // Symbol name can be omitted for C.
+      if (auto cName = Attr->Name)
+        Printer << ", \"" << *cName << "\"";
+      break;
+    case ExternKind::Wasm:
+      Printer << "wasm";
+      // @_extern(wasm) always has names.
+      Printer << ", module: \"" << *Attr->ModuleName << "\"";
+      Printer << ", name: \"" << *Attr->Name << "\")";
+      break;
+    }
     break;
   }
 
@@ -2636,6 +2649,16 @@ bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
   return llvm::find_if(getNames(), [kind](MacroIntroducedDeclName name) {
     return name.getKind() == kind;
   }) != getNames().end();
+}
+
+ExternAttr *ExternAttr::find(DeclAttributes &attrs, ExternKind kind) {
+  for (DeclAttribute *attr : attrs) {
+    if (auto *externAttr = dyn_cast<ExternAttr>(attr)) {
+      if (externAttr->getExternKind() == kind)
+        return externAttr;
+    }
+  }
+  return nullptr;
 }
 
 const DeclAttribute *

@@ -2068,10 +2068,82 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   }
 }
 
+bool IsCCompatibleFuncDeclRequest::evaluate(Evaluator &evaluator,
+                                            FuncDecl *FD) const {
+  if (FD->isInvalid())
+    return false;
+
+  bool foundError = false;
+
+  if (FD->hasAsync()) {
+    FD->diagnose(diag::c_func_async);
+    foundError = true;
+  }
+
+  if (FD->hasThrows()) {
+    FD->diagnose(diag::c_func_throws);
+    foundError = true;
+  }
+
+  // --- Check for unsupported result types.
+  Type resultTy = FD->getResultInterfaceType();
+  if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+    FD->diagnose(diag::c_func_unsupported_type, resultTy);
+    foundError = true;
+  }
+
+  for (auto *param : *FD->getParameters()) {
+    // --- Check for unsupported specifiers.
+    if (param->isVariadic()) {
+      FD->diagnose(diag::c_func_variadic, param->getName(), FD);
+      foundError = true;
+    }
+    if (param->getSpecifier() != ParamSpecifier::Default) {
+      param
+          ->diagnose(diag::c_func_unsupported_specifier,
+                     ParamDecl::getSpecifierSpelling(param->getSpecifier()),
+                     param->getName(), FD)
+          .fixItRemove(param->getSpecifierLoc());
+      foundError = true;
+    }
+
+    // --- Check for unsupported parameter types.
+    auto paramTy = param->getTypeInContext();
+    if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+      param->diagnose(diag::c_func_unsupported_type, paramTy);
+      foundError = true;
+    }
+  }
+  return !foundError;
+}
+
+static bool isCCompatibleFuncDecl(FuncDecl *FD) {
+  return evaluateOrDefault(FD->getASTContext().evaluator,
+                           IsCCompatibleFuncDeclRequest{FD}, {});
+}
+
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
-  // Only top-level func decls are currently supported.
-  if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext()) {
+  // Only top-level func or static func decls are currently supported.
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {
     diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
+  }
+
+  // C name must not be empty.
+  if (attr->getExternKind() == ExternKind::C) {
+    if (auto cName = attr->Name) {
+      if (cName->empty())
+        diagnose(attr->getLocation(), diag::extern_empty_c_name);
+    }
+  }
+
+  // @_cdecl cannot be mixed with @_extern since @_cdecl is for definitions
+  if (D->getAttrs().hasAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::extern_only_non_other_attr, "@_cdecl");
+
+  if (!isCCompatibleFuncDecl(FD)) {
+    attr->setInvalid();
+    FD->setInvalid();
   }
 }
 
