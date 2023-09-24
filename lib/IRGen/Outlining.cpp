@@ -214,6 +214,10 @@ static bool canUseValueWitnessForValueOp(IRGenModule &IGM, SILType T) {
   if (!IGM.getSILModule().isTypeMetadataForLayoutAccessible(T))
     return false;
 
+  // No value witness tables in embedded Swift.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
   // It is not a good code size trade-off to instantiate a metatype for
   // existentials, and also does not back-deploy gracefully in the case of
   // constrained protocols.
