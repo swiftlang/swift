@@ -1,4 +1,6 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -wmo -target arm64e-apple-none | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -wmo -target arm64e-apple-none -Osize | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -parse-stdlib -module-name Swift -enable-experimental-feature Embedded -wmo -target arm64e-apple-none -O | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
