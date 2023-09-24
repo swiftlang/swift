@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
 // RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
 
+// REQUIRES: asserts
+
 // REQUIRES: concurrency
 
 public protocol EventLoop: Sendable {}

@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-feature ImplicitSome
 
+// REQUIRES: asserts
+
 protocol Foo { }
 
 var x: any Foo
@@ -290,5 +292,3 @@ protocol PP {}
 struct A : PP {}
 let _: any PP = A() // Ok
 let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any (any PP)'}} {{8-12=}}
-
-

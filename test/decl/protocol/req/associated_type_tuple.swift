@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
+// REQUIRES: asserts
+
 typealias Tuple<each T> = (repeat each T)
 
 protocol P1 {

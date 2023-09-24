@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NoncopyableGenerics
 
+// REQUIRES: asserts
+
 // a concrete move-only type
 @_moveOnly struct MO {
   var x: Int?
