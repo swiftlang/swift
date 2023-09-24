@@ -6674,6 +6674,7 @@ public:
     verifySILFunctionType(FTy);
 
     SILModule &mod = F->getModule();
+    bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
     require(!F->isSerialized() || !mod.isSerialized() || mod.isParsedAsSerializedSIL(),
             "cannot have a serialized function after the module has been serialized");
@@ -6694,7 +6695,7 @@ public:
     case SILLinkage::Private:
       require(F->isDefinition() || F->hasForeignBody(),
               "internal/private function must have a body");
-      require(!F->isSerialized(),
+      require(!F->isSerialized() || embedded,
               "internal/private function cannot be serialized or serializable");
       break;
     case SILLinkage::PublicExternal:
