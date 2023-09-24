@@ -149,6 +149,35 @@ public:
     /// \endcode
     int parentIdx;
 
+    /// True if this location has a value deinit.
+    ///
+    /// SIL verification requires explicit deinitialization of the whole value,
+    /// but allows implicit initialization of its members. Allocation or field
+    /// initialization, therefore, initializes the aggregate's 'self' bit.
+    /// For example, this is correct because an empty struct with deinit
+    /// must be destroyed:
+    /// \code
+    ///     %addr = alloc_stack $EmptyDeinit
+    ///     destroy_addr %addr : $*EmptyDeinit
+    /// \endcode
+    ///
+    /// While a struct with a field and a deinit cannot be memberwise destroyed,
+    /// so this is invalid:
+    /// \code
+    ///     %addr = alloc_stack $StructFieldAndDeinit
+    ///     %f = struct_element_addr %addr : $*S, #S.f
+    ///     store %_ to [init] %f : $*F
+    ///     destroy_addr %f : $*F
+    /// \endcode
+    ///
+    /// TODO: This is only necessary because SIL currently has no explicit
+    /// initialization of move-only values. Adding that to SIL would simplify
+    /// and strengthen verification.
+    bool hasValueDeinit;
+
+    /// True if any parent has a value deinit. Caches the recursive lookup.
+    bool parentHasValueDeinit;
+
     /// Returns true if the location with index \p idx is this location or a
     /// sub location of this location.
     bool isSubLocation(unsigned idx) const {
@@ -169,7 +198,8 @@ public:
     /// -1 means: not yet initialized.
     int numNonTrivialFieldsNotCovered = -1;
 
-    Location(SILValue val, unsigned index, int parentIdx = -1);
+    Location(SILValue val, unsigned index, int parentIdx,
+             bool parentHasValueDeinit);
 
     void updateFieldCounters(SILType ty, int increment);
   };
@@ -233,6 +263,16 @@ public:
   /// Returns the root location of \p index.
   const Location *getRootLocation(unsigned index) const;
 
+  /// Create a root location.
+  unsigned createRootLocation(SILValue val) {
+    unsigned currentLocIdx = locations.size();
+    locations.push_back(Location(val, currentLocIdx, -1, false));
+    return currentLocIdx;
+  }
+
+  /// Create a location with a parent.
+  unsigned createChildLocation(SILValue val, unsigned parentLocIdx);
+
   /// Registers an address projection instruction for a location.
   void registerProjection(SILValue projection, unsigned locIdx) {
     addr2LocIdx[projection] = locIdx;
@@ -241,8 +281,18 @@ public:
   /// Sets the location bits of \p addr in \p bits, if \p addr is associated
   /// with a location.
   void setBits(Bits &bits, SILValue addr) const {
-    if (auto *loc = getLocation(addr))
+    if (auto *loc = getLocation(addr)) {
       bits |= loc->subLocations;
+      if (loc->parentHasValueDeinit) {
+        for (int idx = (int)loc->parentIdx; idx >= 0; idx = loc->parentIdx) {
+          loc = &locations[idx];
+          if (loc->hasValueDeinit) {
+            bits.set(idx);
+          }
+          idx = loc->parentIdx;
+        }
+      }
+    }
   }
 
   /// Clears the location bits of \p addr in \p bits, if \p addr is associated
@@ -256,6 +306,16 @@ public:
     if (auto *loc = getLocation(addr)) {
       killSet.reset(loc->subLocations);
       genSet |= loc->subLocations;
+      if (loc->parentHasValueDeinit) {
+        for (int idx = (int)loc->parentIdx; idx >= 0; idx = loc->parentIdx) {
+          loc = &locations[idx];
+          if (loc->hasValueDeinit) {
+            killSet.reset(idx);
+            genSet.set(idx);
+          }
+          idx = loc->parentIdx;
+        }
+      }
     }
   }
 
@@ -263,6 +323,23 @@ public:
     if (auto *loc = getLocation(addr)) {
       killSet |= loc->subLocations;
       genSet.reset(loc->subLocations);
+    }
+  }
+
+  /// Set the self bit of \p addr if it has a value deinit.
+  void setValueSelfBit(Bits &bits, SILValue addr) const {
+    int locIdx = getLocationIdx(addr);
+    if (locIdx >= 0 && locations[locIdx].hasValueDeinit) {
+      bits.set(locIdx);
+    }
+  }
+
+  /// Gen the self bit of \p addr if it has a value deinit.
+  void genValueSelfBit(Bits &genSet, Bits &killSet, SILValue addr) const {
+    int locIdx = getLocationIdx(addr);
+    if (locIdx >= 0 && locations[locIdx].hasValueDeinit) {
+      killSet.reset(locIdx);
+      genSet.set(locIdx);
     }
   }
 

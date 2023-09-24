@@ -1,0 +1,78 @@
+// RUN: %target-sil-opt -o /dev/null %s
+// REQUIRES: asserts
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A non-trivial type
+class T {
+  init()
+}
+
+struct EmptyDeinit : ~Copyable {
+  deinit
+}
+
+struct PairDeinit : ~Copyable {
+  var a: T
+  var b: T
+
+  deinit
+}
+
+// The allocation implicitly initializes the empty value.
+sil [ossa] @testEmptyInit : $() -> () {
+bb0:
+  %addr = alloc_stack $EmptyDeinit
+  destroy_addr %addr : $*EmptyDeinit
+  dealloc_stack %addr : $*EmptyDeinit
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The alloc_stack initialization implicitly initializes the aggregate.
+sil [ossa] @testPairInit : $(@owned T) -> () {
+bb0(%0 : @owned $T):
+  %addr = alloc_stack $PairDeinit
+  %2 = copy_value %0 : $T
+  %3 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.a
+  store %2 to [init] %3 : $*T
+  %5 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.b
+  store %0 to [init] %5 : $*T
+  destroy_addr %addr : $*PairDeinit
+  dealloc_stack %addr : $*PairDeinit
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The aggregate is implicitly reinitialized by setting its fields.
+// The verifier does not yet ensure that all fields are reinitialized;
+// instead, we should add a mark_initialized instruction to SIL
+// to handle reinitialization of values with deinits.
+sil [ossa] @testPairInit : $(@owned T) -> () {
+bb0(%0 : @owned $T):
+  %addr = alloc_stack $PairDeinit
+
+  %2 = copy_value %0 : $T
+  %3 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.a
+  store %2 to [init] %3 : $*T
+  %5 = copy_value %0 : $T
+  %6 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.b
+  store %5 to [init] %6 : $*T
+  destroy_addr %addr : $*PairDeinit
+
+  %9 = copy_value %0 : $T
+  %10 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.a
+  store %9 to [init] %10 : $*T
+  %12 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.b
+  store %0 to [init] %12 : $*T
+  destroy_addr %addr : $*PairDeinit
+
+  dealloc_stack %addr : $*PairDeinit
+  %retval = tuple ()
+  return %retval : $()
+}

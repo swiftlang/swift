@@ -1,0 +1,74 @@
+// RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A non-trivial type
+class T {
+  init()
+}
+
+struct EmptyDeinit : ~Copyable {
+  deinit
+}
+
+struct PairDeinit : ~Copyable {
+  var a: T
+  var b: T
+
+  deinit
+}
+
+// The allocation implicitly initializes the empty value which must be
+// destroyed.
+//
+// CHECK: SIL memory lifetime failure in @testEmptyInit: memory is initialized, but shouldn't be
+sil [ossa] @testEmptyInit : $() -> () {
+bb0:
+  %addr = alloc_stack $EmptyDeinit
+  dealloc_stack %addr : $*EmptyDeinit
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The field initialization implicitly initializes the aggregate,
+// which must be destroyed as a whole.
+//
+// CHECK: SIL memory lifetime failure in @testPairMemberDeinit: memory is initialized, but shouldn't be
+sil [ossa] @testPairMemberDeinit : $(@owned T) -> () {
+bb0(%0 : @owned $T):
+  %addr = alloc_stack $PairDeinit
+  %2 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.a
+  %3 = copy_value %0 : $T
+  store %3 to [init] %2 : $*T
+  %5 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.b
+  store %0 to [init] %5 : $*T
+  destroy_addr %2 : $*T
+  destroy_addr %5 : $*T
+  dealloc_stack %addr : $*PairDeinit
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The aggregate cannot be destroyed after one of its fields is destroyed.
+//
+// CHECK: SIL memory lifetime failure in @testPairDoubleDeinit: memory is not initialized, but should be
+sil [ossa] @testPairDoubleDeinit : $(@owned T) -> () {
+bb0(%0 : @owned $T):
+  %addr = alloc_stack $PairDeinit
+  %2 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.a
+  %3 = copy_value %0 : $T
+  store %3 to [init] %2 : $*T
+  %5 = struct_element_addr %addr : $*PairDeinit, #PairDeinit.b
+  store %0 to [init] %5 : $*T
+  destroy_addr %2 : $*T
+  destroy_addr %addr : $*PairDeinit
+  dealloc_stack %addr : $*PairDeinit
+  %retval = tuple ()
+  return %retval : $()
+}

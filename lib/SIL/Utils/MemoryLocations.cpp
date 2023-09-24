@@ -35,9 +35,6 @@ void swift::dumpBits(const SmallBitVector &bits) {
   llvm::dbgs() << bits << '\n';
 }
 
-namespace swift {
-namespace {
-
 //===----------------------------------------------------------------------===//
 //                            Utility functions
 //===----------------------------------------------------------------------===//
@@ -67,17 +64,24 @@ static bool allUsesInSameBlock(AllocStackInst *ASI) {
   return numDeallocStacks == 1;
 }
 
-} // anonymous namespace
-} // namespace swift
+static bool typeHasMemoryState(SILType type, SILFunction *function) {
+  if (!type.isEmpty(*function))
+    return true;
 
+  return type.isValueTypeWithDeinit();
+}
 
 //===----------------------------------------------------------------------===//
 //                     MemoryLocations members
 //===----------------------------------------------------------------------===//
 
-MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx) :
-      representativeValue(val),
-      parentIdx(parentIdx) {
+MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx,
+                                    bool parentHasValueDeinit)
+  : representativeValue(val),
+    parentIdx(parentIdx),
+    hasValueDeinit(val->getType().isValueTypeWithDeinit()),
+    parentHasValueDeinit(parentHasValueDeinit)
+{
   assert(((parentIdx >= 0) ==
     (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
      isa<InitEnumDataAddrInst>(val) || isa<UncheckedTakeEnumDataAddrInst>(val) ||
@@ -87,9 +91,43 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
   setBitAndResize(selfAndParents, index);
 }
 
+unsigned MemoryLocations::createChildLocation(SILValue val,
+                                              unsigned parentLocIdx) {
+  unsigned subLocIdx = locations.size();
+
+  Location &parentLoc = locations[parentLocIdx];
+  locations.back().selfAndParents |= parentLoc.selfAndParents;
+
+  bool parentHasValueDeinit = false;
+  int idx = (int)parentLocIdx;
+  do {
+    Location &loc = locations[idx];
+    setBitAndResize(loc.subLocations, subLocIdx);
+    parentHasValueDeinit |= loc.hasValueDeinit;
+    idx = loc.parentIdx;
+  } while (idx >= 0);
+
+  initFieldsCounter(parentLoc);
+  assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
+  parentLoc.updateFieldCounters(val->getType(), -1);
+
+  if (parentLoc.numFieldsNotCoveredBySubfields == 0) {
+    int idx = (int)parentLocIdx;
+    do {
+      Location &loc = locations[idx];
+      loc.subLocations.reset(parentLocIdx);
+      idx = loc.parentIdx;
+    } while (idx >= 0);
+  }
+
+  locations.push_back(
+    Location(val, subLocIdx, parentLocIdx, parentHasValueDeinit));
+  return subLocIdx;
+}
+
 void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
   SILFunction *function = representativeValue->getFunction();
-  if (!ty.isEmpty(*function)) {
+  if (typeHasMemoryState(ty, function)) {
     numFieldsNotCoveredBySubfields += increment;
     if (!ty.isTrivial(*function))
       numNonTrivialFieldsNotCovered += increment;
@@ -200,11 +238,10 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   ///
   /// Locations with empty types don't even need a store to count as
   /// "initialized". We don't handle such cases.
-  if (loc->getType().isEmpty(*function))
+  if (!typeHasMemoryState(loc->getType(), function)) {
     return;
-
-  unsigned currentLocIdx = locations.size();
-  locations.push_back(Location(loc, currentLocIdx));
+  }
+  unsigned currentLocIdx = createRootLocation(loc);
   SmallVector<SILValue, 8> collectedVals;
   SubLocationMap subLocationMap;
   if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
@@ -390,39 +427,15 @@ bool MemoryLocations::analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
 
-  if (projection->getType().isEmpty(*projection->getFunction()))
+  if (!typeHasMemoryState(projection->getType(), projection->getFunction()))
     return false;
 
   auto key = std::make_pair(parentLocIdx, fieldNr);
   unsigned subLocIdx = subLocationMap[key];
   if (subLocIdx == 0) {
-    subLocIdx = locations.size();
+    subLocIdx = createChildLocation(projection, parentLocIdx);
     assert(subLocIdx > 0);
     subLocationMap[key] = subLocIdx;
-    locations.push_back(Location(projection, subLocIdx, parentLocIdx));
-
-    Location &parentLoc = locations[parentLocIdx];
-    locations.back().selfAndParents |= parentLoc.selfAndParents;
-
-    int idx = (int)parentLocIdx;
-    do {
-      Location &loc = locations[idx];
-      setBitAndResize(loc.subLocations, subLocIdx);
-      idx = loc.parentIdx;
-    } while (idx >= 0);
-
-    initFieldsCounter(parentLoc);
-    assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
-    parentLoc.updateFieldCounters(projection->getType(), -1);
-
-    if (parentLoc.numFieldsNotCoveredBySubfields == 0) {
-      int idx = (int)parentLocIdx;
-      do {
-        Location &loc = locations[idx];
-        loc.subLocations.reset(parentLocIdx);
-        idx = loc.parentIdx;
-      } while (idx >= 0);
-    }
   } else if (!isa<OpenExistentialAddrInst>(projection)) {
     Location *loc = &locations[subLocIdx];
     if (loc->representativeValue->getType() != projection->getType()) {
@@ -453,6 +466,8 @@ bool MemoryLocations::analyzeAddrProjection(
 }
 
 void MemoryLocations::initFieldsCounter(Location &loc) {
+  // If this location was already initialized (because it had projections), then
+  // its numFieldsNotCoveredBySubfields is no longer an invaild value.
   if (loc.numFieldsNotCoveredBySubfields >= 0)
     return;
 
@@ -462,6 +477,12 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
   loc.numNonTrivialFieldsNotCovered = 0;
   SILFunction *function = loc.representativeValue->getFunction();
   SILType ty = loc.representativeValue->getType();
+
+  // A type with a value deinit has a nontrivial self location.
+  if (loc.hasValueDeinit) {
+    ++loc.numFieldsNotCoveredBySubfields;
+    ++loc.numNonTrivialFieldsNotCovered;
+  }
   if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
     if (decl->isResilient(function->getModule().getSwiftModule(),
                           function->getResilienceExpansion())) {
