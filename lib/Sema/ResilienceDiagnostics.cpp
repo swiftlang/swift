@@ -192,6 +192,10 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   if (originKind == DisallowedOriginKind::None)
     return false;
 
+  // Access levels from imports are reported with the others access levels.
+  if (originKind == DisallowedOriginKind::NonPublicImport)
+    return false;
+
   auto diagName = D->getName();
   if (auto accessor = dyn_cast<AccessorDecl>(D)) {
     // Only diagnose accessors if their disallowed origin kind differs from
