@@ -182,22 +182,22 @@ private:
       DeclContextStack.push_back(newDC);
     }
 
-    if (D->getLoc() != LocToResolve) {
+    auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
       return Action::Continue();
-    }
 
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      // FIXME: ParamDecls might be closure parameters that can have ambiguous
-      // types. The current infrastructure of just asking for the VD's type
-      // doesn't work here. We need to inspect the constraints system solution.
-      if (VD->hasName() && !isa<ParamDecl>(D)) {
-        assert(Result == nullptr);
-        Result = std::make_unique<NodeFinderDeclResult>(VD);
-        return Action::Stop();
-      }
-    }
+    // FIXME: ParamDecls might be closure parameters that can have ambiguous
+    // types. The current infrastructure of just asking for the VD's type
+    // doesn't work here. We need to inspect the constraints system solution.
+    if (isa<ParamDecl>(VD))
+      return Action::Continue();
 
-    return Action::Continue();
+    if (!VD->hasName() || VD->getNameLoc() != LocToResolve)
+      return Action::Continue();
+
+    assert(Result == nullptr);
+    Result = std::make_unique<NodeFinderDeclResult>(VD);
+    return Action::Stop();
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -206,6 +206,23 @@ private:
       DeclContextStack.pop_back();
     }
     return Action::Continue();
+  }
+
+  /// Retrieve the name location for an expression that supports cursor info.
+  DeclNameLoc getExprNameLoc(Expr *E) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+      return DRE->getNameLoc();
+    
+    if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+      return UDRE->getNameLoc();
+
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
+      return ODRE->getNameLoc();
+
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E))
+      return UDE->getNameLoc();
+
+    return DeclNameLoc();
   }
 
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -224,25 +241,13 @@ private:
       }
     }
 
-    if (E->getLoc() != LocToResolve) {
+    if (getExprNameLoc(E).getBaseNameLoc() != LocToResolve)
       return Action::Continue(E);
-    }
 
-    switch (E->getKind()) {
-    case ExprKind::DeclRef:
-    case ExprKind::UnresolvedDot:
-    case ExprKind::UnresolvedDeclRef:
-    case ExprKind::OverloadedDeclRef: {
-      assert(Result == nullptr);
-      Result =
-          std::make_unique<NodeFinderExprResult>(E, getCurrentDeclContext());
-      return Action::Stop();
-    }
-    default:
-      break;
-    }
-
-    return Action::Continue(E);
+    assert(Result == nullptr);
+    Result =
+        std::make_unique<NodeFinderExprResult>(E, getCurrentDeclContext());
+    return Action::Stop();
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
