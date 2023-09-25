@@ -22,11 +22,19 @@ typedef struct HeapObject {
   size_t refcount;
 } HeapObject;
 
-void *swift_allocObject(ClassMetadata *metadata, size_t requiredSize, size_t requiredAlignmentMask) {
+void *swift_slowAlloc(size_t bytes, size_t alignMask) {
   void *r = NULL;
-  posix_memalign(&r, requiredAlignmentMask + 1, requiredSize);
-  bzero(r, requiredSize);
-  HeapObject *object = r;
+  posix_memalign(&r, (alignMask == (size_t)-1) ? 16 : (alignMask + 1), bytes);
+  bzero(r, bytes);
+  return r;
+}
+
+void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
+  free(ptr);
+}
+
+void *swift_allocObject(ClassMetadata *metadata, size_t requiredSize, size_t requiredAlignmentMask) {
+  HeapObject *object = swift_slowAlloc(requiredSize, requiredAlignmentMask);
   object->metadata = metadata;
   object->refcount = 1;
   return object;
