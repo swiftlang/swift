@@ -69,6 +69,8 @@ struct LoadOperation {
 };
 
 /// A wrapper type for writing generic code against conversion instructions.
+///
+/// Forwards a single operand in first operand position to a single result. 
 struct ConversionOperation {
   SingleValueInstruction *inst = nullptr;
 
@@ -259,19 +261,33 @@ public:
     case SILInstructionKind::LinearFunctionInst:
     case SILInstructionKind::DifferentiableFunctionInst:
       return nullptr;
+    case SILInstructionKind::MarkDependenceInst:
+      return &forwardingInst->getOperandRef(MarkDependenceInst::Value);
+    case SILInstructionKind::RefToBridgeObjectInst:
+      return
+        &forwardingInst->getOperandRef(RefToBridgeObjectInst::ConvertedOperand);
+    case SILInstructionKind::TuplePackExtractInst:
+      return &forwardingInst->getOperandRef(TuplePackExtractInst::TupleOperand);
+    case SILInstructionKind::SelectEnumInst:
+      // ignore trailing case operands
+      return &forwardingInst->getOperandRef(0);
     default:
-      if (forwardingInst->getNumRealOperands() == 0) {
+      int numRealOperands = forwardingInst->getNumRealOperands();
+      if (numRealOperands == 0) {
         // This can happen with enum instructions that have no payload.
         return nullptr;
       }
+      assert(numRealOperands == 1);
       return &forwardingInst->getOperandRef(0);
     }
   }
 
   ArrayRef<Operand> getForwardedOperands() const {
+    // Some instructions have multiple real operands but only forward one.
     if (auto *singleForwardingOp = getSingleForwardingOperand()) {
       return *singleForwardingOp;
     }
+    // All others forward all operands (for enum, this may be zero operands).
     return forwardingInst->getAllOperands();
   }
 

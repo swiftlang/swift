@@ -5693,6 +5693,10 @@ class RefToBridgeObjectInst
                              OwnershipForwardingSingleValueInstruction> {
   friend SILBuilder;
 
+public:
+  enum { ConvertedOperand = 0, MaskOperand = 1 };
+
+private:
   FixedOperandList<2> Operands;
   RefToBridgeObjectInst(SILDebugLocation DebugLoc, SILValue ConvertedValue,
                         SILValue MaskValue, SILType BridgeObjectTy,
