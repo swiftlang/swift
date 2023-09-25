@@ -1163,8 +1163,8 @@ bool diagnoseIfDeprecated(SourceLoc loc,
                           const ExportContext &where);
 /// @}
 
-/// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
-/// name starts with that prefix, an llvm fatal_error is triggered.
+/// If `LangOptions::DebugForbidTypecheckPrefixes` is set and the given decl
+/// name starts with any of those prefixes, an llvm fatal error is triggered.
 /// This is for testing purposes.
 void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 

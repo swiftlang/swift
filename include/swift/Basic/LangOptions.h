@@ -780,10 +780,10 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
-    /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
-    /// identifier reference with the provided prefix name.
-    /// This is for testing purposes.
-    std::string DebugForbidTypecheckPrefix;
+    /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
+    /// or an identifier reference with any of the provided prefix names. This
+    /// is for testing purposes.
+    std::vector<std::string> DebugForbidTypecheckPrefixes;
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
