@@ -89,18 +89,6 @@ static llvm::Optional<Path> getInjectedModuleMapPath(
   return path;
 }
 
-/// Finds the glibc.modulemap file relative to the provided resource dir.
-///
-/// Note that the module map used for Glibc depends on the target we're
-/// compiling for, and is not included in the resource directory with the other
-/// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
-static llvm::Optional<Path> getGlibcModuleMapPath(
-    SearchPathOptions &Opts, const llvm::Triple &triple,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  return getActualModuleMapPath("glibc.modulemap", Opts, triple,
-                                /*isArchSpecific*/ true, vfs);
-}
-
 static llvm::Optional<Path> getLibStdCxxModuleMapPath(
     SearchPathOptions &opts, const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
@@ -190,19 +178,20 @@ createClangArgs(const ASTContext &ctx, clang::driver::Driver &clangDriver) {
   return clangDriverArgs;
 }
 
-static bool shouldInjectGlibcModulemap(const llvm::Triple &triple) {
+static bool shouldInjectLibcModulemap(const llvm::Triple &triple) {
   return triple.isOSGlibc() || triple.isOSOpenBSD() || triple.isOSFreeBSD() ||
-         triple.isAndroid();
+         triple.isAndroid() || triple.isOSWASI();
 }
 
-static SmallVector<std::pair<std::string, std::string>, 2> getGlibcFileMapping(
-    ASTContext &ctx,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+static SmallVector<std::pair<std::string, std::string>, 2>
+getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
+                   std::optional<StringRef> maybeHeaderFileName,
+                   const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-  if (!shouldInjectGlibcModulemap(triple))
+  if (!shouldInjectLibcModulemap(triple))
     return {};
 
-  // Extract the Glibc path from Clang driver.
+  // Extract the libc path from Clang driver.
   auto clangDriver = createClangDriver(ctx, vfs);
   auto clangDriverArgs = createClangArgs(ctx, clangDriver);
 
@@ -212,42 +201,47 @@ static SmallVector<std::pair<std::string, std::string>, 2> getGlibcFileMapping(
   clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
   auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
 
-  // Find the include path that contains Glibc headers. We use three arbitrarily
-  // chosen headers to determine if the include path actually contains Glibc.
+  // Find the include path that contains libc headers. We use three arbitrarily
+  // chosen headers to determine if the include path actually contains libc.
   // Ideally we would check that all of the headers referenced from the
   // modulemap are present.
-  Path glibcDir;
+  Path libcDir;
   if (auto dir = findFirstIncludeDir(
           parsedIncludeArgs, {"inttypes.h", "unistd.h", "stdint.h"}, vfs)) {
-    glibcDir = dir.value();
+    libcDir = dir.value();
   } else {
-    ctx.Diags.diagnose(SourceLoc(), diag::glibc_not_found, triple.str());
+    ctx.Diags.diagnose(SourceLoc(), diag::libc_not_found, triple.str());
     return {};
   }
 
   Path actualModuleMapPath;
-  if (auto path = getGlibcModuleMapPath(ctx.SearchPathOpts, triple, vfs))
+  if (auto path = getActualModuleMapPath(modulemapFileName, ctx.SearchPathOpts,
+                                         triple, /*isArchSpecific*/ true, vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
     return {};
 
-  // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
-  // directly from the modulemap.
-  Path actualHeaderPath = actualModuleMapPath;
-  llvm::sys::path::remove_filename(actualHeaderPath);
-  llvm::sys::path::append(actualHeaderPath, "SwiftGlibc.h");
-
-  Path injectedModuleMapPath(glibcDir);
+  Path injectedModuleMapPath(libcDir);
   llvm::sys::path::append(injectedModuleMapPath, "module.modulemap");
+  SmallVector<std::pair<std::string, std::string>, 2> vfsMappings{
+      {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)}};
 
-  Path injectedHeaderPath(glibcDir);
-  llvm::sys::path::append(injectedHeaderPath, "SwiftGlibc.h");
+  if (maybeHeaderFileName) {
+    // TODO: remove the SwiftGlibc.h header and reference all Glibc headers
+    // directly from the modulemap.
+    Path actualHeaderPath = actualModuleMapPath;
+    llvm::sys::path::remove_filename(actualHeaderPath);
+    llvm::sys::path::append(actualHeaderPath, maybeHeaderFileName.value());
 
-  return {
-      {std::string(injectedModuleMapPath), std::string(actualModuleMapPath)},
-      {std::string(injectedHeaderPath), std::string(actualHeaderPath)},
-  };
+    Path injectedHeaderPath(libcDir);
+    llvm::sys::path::append(injectedHeaderPath, maybeHeaderFileName.value());
+
+    vfsMappings.push_back(
+        {std::string(injectedHeaderPath), std::string(actualHeaderPath)});
+  }
+
+  return vfsMappings;
 }
 
 static void getLibStdCxxFileMapping(
@@ -518,8 +512,19 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   ClangInvocationFileMapping result;
   if (!vfs)
     vfs = llvm::vfs::getRealFileSystem();
-  // Android/BSD/Linux Mappings
-  result.redirectedFiles.append(getGlibcFileMapping(ctx, vfs));
+
+  const llvm::Triple &triple = ctx.LangOpts.Target;
+
+  if (triple.isOSWASI()) {
+    // WASI Mappings
+    result.redirectedFiles.append(
+        getLibcFileMapping(ctx, "wasi-libc.modulemap", std::nullopt, vfs));
+  } else {
+    // Android/BSD/Linux Mappings
+    result.redirectedFiles.append(getLibcFileMapping(
+        ctx, "glibc.modulemap", StringRef("SwiftGlibc.h"), vfs));
+  }
+
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs);
 
