@@ -667,9 +667,11 @@ public:
     assert(getCases().size() > 1); // At least 2 cases
     assert(Cases[0].TR != 0); // At least 2 payloads
     // assert(Cases[1].TR != 0);
-    // At least one payload is non-empty (otherwise this
-    // would get laid out as a non-payload enum)
-    assert(getNumNonEmptyPayloadCases() > 0);
+    // At least one payload is non-empty (otherwise this would get
+    // laid out as a non-payload enum). Commented out this assert
+    // because it doesn't hold when there are generic cases with
+    // zero-sized payload.
+    // assert(getNumNonEmptyPayloadCases() > 0);
     // There's a tag, so the total size must be bigger than any payload
     // assert(getSize() > getPayloadSize());
   }
