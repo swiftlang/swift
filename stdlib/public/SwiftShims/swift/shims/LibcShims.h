@@ -40,6 +40,7 @@ __swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
 
 // General utilities <stdlib.h>
 // Memory management functions
+extern int posix_memalign(void **memptr, __swift_size_t alignment, __swift_size_t size);
 static inline void _swift_stdlib_free(void *_Nullable ptr) {
   extern void free(void *_Nullable);
   free(ptr);

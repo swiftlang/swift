@@ -26,21 +26,18 @@ public struct HeapObject {
   var refcount: Int
 }
 
-@_silgen_name("posix_memalign")
-func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: UInt, _: UInt) -> CInt
-
-func alignedAlloc(size: UInt, alignment: UInt) -> UnsafeMutableRawPointer? {
-  let alignment = max(alignment, UInt(MemoryLayout<UnsafeRawPointer>.size))
+func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
+  let alignment = max(alignment, MemoryLayout<UnsafeRawPointer>.size)
   var r: UnsafeMutableRawPointer? = nil
   _ = posix_memalign(&r, alignment, size)
   return r
 }
 
 @_cdecl("swift_slowAlloc")
-public func swift_slowAlloc(_ size: UInt, _ alignMask: UInt) -> UnsafeMutableRawPointer? {
-  let alignment: UInt
-  if alignMask == UInt.max {
-    alignment = UInt(_swift_MinAllocationAlignment)
+public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPointer? {
+  let alignment: Int
+  if alignMask == -1 {
+    alignment = _swift_MinAllocationAlignment
   } else {
     alignment = alignMask + 1
   }
@@ -48,12 +45,12 @@ public func swift_slowAlloc(_ size: UInt, _ alignMask: UInt) -> UnsafeMutableRaw
 }
 
 @_cdecl("swift_slowDealloc")
-public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer?, _ size: UInt, _ alignMask: UInt) {
+public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer?, _ size: Int, _ alignMask: Int) {
   free(ptr)
 }
 
 @_silgen_name("swift_allocObject")
-public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: UInt, requiredAlignmentMask: UInt) -> UnsafeMutablePointer<HeapObject> {
+public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
   let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
   let object = p.assumingMemoryBound(to: HeapObject.self)
   object.pointee.metadata = metadata
@@ -62,7 +59,7 @@ public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, req
 }
 
 @_silgen_name("swift_deallocClassInstance")
-public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, allocatedSize: UInt, allocatedAlignMask: UInt) {
+public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
   free(object)
 }
 
