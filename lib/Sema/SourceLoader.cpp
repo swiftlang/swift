@@ -153,11 +153,14 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
   // nothing to do here.
 }
 
-llvm::Optional<const ModuleDependencyInfo *>
+ModuleDependencyVector
 SourceLoader::getModuleDependencies(StringRef moduleName,
-                                    ModuleDependenciesCache &cache,
+                                    StringRef moduleOutputPath,
+                                    llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                                    const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
+                                    clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                     InterfaceSubContextDelegate &delegate,
                                     bool isTestableImport) {
   // FIXME: Implement?
-  return llvm::None;
+  return {};
 }

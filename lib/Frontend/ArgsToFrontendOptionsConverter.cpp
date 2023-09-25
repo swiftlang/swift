@@ -138,6 +138,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
   Opts.EmitDependencyScannerCacheRemarks |= Args.hasArg(OPT_dependency_scan_cache_remarks);
+  Opts.ParallelDependencyScan |= Args.hasArg(OPT_parallel_scan);
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }

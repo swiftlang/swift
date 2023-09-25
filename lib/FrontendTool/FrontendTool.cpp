@@ -1261,10 +1261,7 @@ static bool performScanDependencies(CompilerInstance &Instance) {
     else
       return dependencies::scanDependencies(Instance);
   } else {
-    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
-      return dependencies::batchPrescanDependencies(Instance, batchScanInput);
-    else
-      return dependencies::batchScanDependencies(Instance, batchScanInput);
+    return dependencies::batchScanDependencies(Instance, batchScanInput);
   }
 }
 

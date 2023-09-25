@@ -29,6 +29,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/VersionTuple.h"
 #include <system_error>
 
@@ -37,10 +38,19 @@ class FileCollectorBase;
 namespace vfs {
 class OutputBackend;
 }
+namespace cas {
+class CachingOnDiskFileSystem;
+}
 }
 
 namespace clang {
 class DependencyCollector;
+namespace tooling {
+namespace dependencies {
+struct ModuleID;
+class DependencyScanningTool;
+}
+}
 }
 
 namespace swift {
@@ -52,6 +62,7 @@ class ClassDecl;
 class FileUnit;
 class ModuleDecl;
 class ModuleDependencyInfo;
+struct ModuleDependencyID;
 class ModuleDependenciesCache;
 class NominalTypeDecl;
 class SourceFile;
@@ -328,8 +339,12 @@ public:
 
   /// Retrieve the dependencies for the given, named module, or \c None
   /// if no such module exists.
-  virtual llvm::Optional<const ModuleDependencyInfo *>
-  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
+  virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  getModuleDependencies(StringRef moduleName,
+                        StringRef moduleOutputPath,
+                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
+                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
                         bool isTestableImport = false) = 0;
 };
