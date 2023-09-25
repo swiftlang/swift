@@ -20,6 +20,11 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
     self.bridged = bridged
   }
 
+  init?(bridged: OptionalBridgedOperand) {
+    guard let op = bridged.op else { return nil }
+    self.bridged = BridgedOperand(op: op)
+  }
+
   public var value: Value { bridged.getValue().value }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
@@ -241,6 +246,8 @@ extension Operand {
     case .GuaranteedForwarding: return .guaranteedForwarding
     case .EndBorrow: return .endBorrow
     case .Reborrow: return .reborrow
+    default:
+      fatalError("unsupported operand ownership")
     }
   }
 }

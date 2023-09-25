@@ -64,8 +64,8 @@ bool ForwardingOperation::isAddressOnly() const {
     return singleForwardingOp->get()->getType().isAddressOnly(
         *forwardingInst->getFunction());
   }
-  // All ForwardingInstructions that forward all operands are currently a
-  // single value instruction.
+  // All ForwardingInstructions that forward all operands or no operands are
+  // currently a single value instruction.
   auto *aggregate =
       cast<OwnershipForwardingSingleValueInstruction>(forwardingInst);
   // If any of the operands are address-only, then the aggregate must be.
