@@ -23,7 +23,12 @@ public struct ClassMetadata {
 
 public struct HeapObject {
   var metadata: UnsafeMutablePointer<ClassMetadata>
+
+  // TODO: This is just an initial support for strong refcounting only. We need
+  // to think about supporting (or banning) weak and/or unowned references.
   var refcount: Int
+
+  static let immortalRefCount = -1
 }
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
@@ -66,7 +71,9 @@ public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>,
 @_silgen_name("swift_initStackObject")
 public func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   object.pointee.metadata = metadata
-  object.pointee.refcount = -1
+
+  // TODO/FIXME: Making all stack promoted objects immortal is not correct.
+  object.pointee.refcount = HeapObject.immortalRefCount
   return object
 }
 
@@ -83,7 +90,7 @@ public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
   let o = UnsafeMutablePointer<HeapObject>(object)
   // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
-  if o.pointee.refcount == -1 { return o._rawValue }
+  if o.pointee.refcount == HeapObject.immortalRefCount { return o._rawValue }
   o.pointee.refcount += 1
   return o._rawValue
 }
@@ -93,7 +100,7 @@ public func swift_release(object: Builtin.RawPointer) {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
   let o = UnsafeMutablePointer<HeapObject>(object)
   // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
-  if o.pointee.refcount == -1 { return }
+  if o.pointee.refcount == HeapObject.immortalRefCount { return }
   o.pointee.refcount -= 1
   if o.pointee.refcount == 0 {
     _swift_runtime_invoke_heap_object_destroy(o.pointee.metadata.pointee.destroy, o)
@@ -102,10 +109,12 @@ public func swift_release(object: Builtin.RawPointer) {
 
 @_silgen_name("swift_beginAccess")
 public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
+  // TODO: Add actual exclusivity checking.
 }
 
 @_silgen_name("swift_endAccess")
 public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
+  // TODO: Add actual exclusivity checking.
 }
 
 @_silgen_name("swift_once")
