@@ -344,3 +344,33 @@ public func testNoDevirt() {
   p.assoc3 { _ in }
   p.assoc4 { _ in }
 }
+
+protocol MyProtocol {
+    associatedtype Element
+    var array: [Element] { get }
+    var foo: Bool { get }
+}
+
+extension Array {
+    var isThisACoolArray: Bool {
+        return true
+    }
+}
+
+extension MyProtocol {
+    var foo: Bool { array.isThisACoolArray }
+}
+
+public struct MyStruct {
+    var array: [Int] = []
+}
+
+extension MyStruct: MyProtocol {}
+
+// CHECK-LABEL: sil @$s34devirt_protocol_method_invocations15testArrayReturn1xSbAA8MyStructVz_tF :
+// CHECK-NOT:     witness_method
+// CHECK:       } // end sil function '$s34devirt_protocol_method_invocations15testArrayReturn1xSbAA8MyStructVz_tF'
+public func testArrayReturn(x: inout MyStruct) -> Bool {
+    return x.foo
+}
+

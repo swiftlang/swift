@@ -1210,6 +1210,17 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   if (!interfaceTy->hasTypeParameter())
     return true;
 
+  auto subs = getWitnessMethodSubstitutions(f->getModule(), applySite,
+                                            f, wmi->getConformance());
+  CanSILFunctionType substCalleTy = f->getLoweredFunctionType()->substGenericArgs(
+      f->getModule(), subs,
+      applySite.getFunction()->getTypeExpansionContext());
+  CanSILFunctionType applySubstCalleeTy = applySite.getSubstCalleeType();
+
+  // If the function types match, there is no problem.
+  if (substCalleTy == applySubstCalleeTy)
+    return true;
+
   auto selfGP = wmi->getLookupProtocol()->getSelfInterfaceType();
   auto isSelfRootedTypeParameter = [selfGP](Type T) -> bool {
     if (!T->hasTypeParameter())
