@@ -7460,11 +7460,6 @@ ERROR(noncopyable_parameter_subscript_unsupported, none,
       "subscripts cannot have noncopyable parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
-ERROR(ownership_specifier_copyable,none,
-      "copyable types cannot be 'consuming' or 'borrowing' yet", ())
-ERROR(self_ownership_specifier_copyable,none,
-      "%0 is not yet valid on %1s of a copyable type",
-      (SelfAccessKind, DescriptiveDeclKind))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
 ERROR(noncopyable_generics, none,
