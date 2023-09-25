@@ -101,7 +101,7 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   llvm::SmallSet<std::pair<ModuleSearchPathKind, unsigned>, 4> ResultIds;
 
   for (auto &Filename : Filenames) {
-    for (auto &Entry : LookupTable[Filename]) {
+    for (auto &Entry : LookupTable.lookup(Filename)) {
       if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
               .second) {
         Result.push_back(Entry.get());

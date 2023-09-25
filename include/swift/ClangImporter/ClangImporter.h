@@ -75,6 +75,7 @@ class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
 class ModuleDecl;
+struct ModuleDependencyID;
 class NominalTypeDecl;
 class StructDecl;
 class SwiftLookupTable;
@@ -433,32 +434,37 @@ public:
 
   void verifyAllModules() override;
 
-  void recordModuleDependencies(
-      ModuleDependenciesCache &cache,
-      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies);
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
+      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+      StringRef moduleOutputPath);
+
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
+                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
+                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
+                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                        InterfaceSubContextDelegate &delegate,
+                        bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  llvm::Optional<const ModuleDependencyInfo *>
-  getModuleDependencies(StringRef moduleName, ModuleDependenciesCache &cache,
-                        InterfaceSubContextDelegate &delegate,
-                        bool isTestableImport = false) override;
-
   /// Add dependency information for the bridging header.
   ///
-  /// \param moduleName the name of the Swift module whose dependency
+  /// \param moduleID the name of the Swift module whose dependency
   /// information will be augmented with information about the given
   /// bridging header.
+  ///
+  /// \param clangScanningTool The clang dependency scanner.
   ///
   /// \param cache The module dependencies cache to update, with information
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   bool addBridgingHeaderDependencies(
-      StringRef moduleName,
-      ModuleDependencyKind moduleKind,
+      ModuleDependencyID moduleID,
+      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache);
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;

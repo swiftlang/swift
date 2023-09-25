@@ -921,7 +921,7 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
 
   ModuleInfoLayout::emitRecord(
       Out, ScratchRecord, AbbrCodes[ModuleInfoLayout::Code],
-      getIdentifier(moduleID.first), contextHashStrID,
+      getIdentifier(moduleID.ModuleName), contextHashStrID,
       getArrayID(moduleID, ModuleIdentifierArrayKind::DependencyImports),
       getArrayID(moduleID, ModuleIdentifierArrayKind::OptionalDependencyImports),
       getArrayID(moduleID, ModuleIdentifierArrayKind::QualifiedModuleDependencyIDs));
@@ -1124,11 +1124,11 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     addIdentifier(contextHash);
     for (auto &moduleID : cache.getAllModules(contextHash)) {
       auto optionalDependencyInfo =
-          cache.findDependency(moduleID.first, moduleID.second, contextHash);
+          cache.findDependency(moduleID.ModuleName, moduleID.Kind, contextHash);
       assert(optionalDependencyInfo.has_value() && "Expected dependency info.");
       auto dependencyInfo = optionalDependencyInfo.value();
       // Add the module's name
-      addIdentifier(moduleID.first);
+      addIdentifier(moduleID.ModuleName);
       // Add the module's dependencies
       addStringArray(moduleID, ModuleIdentifierArrayKind::DependencyImports,
                      dependencyInfo->getModuleImports());
@@ -1283,8 +1283,8 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   // Write the core graph
   for (auto &contextHash : cache.getAllContextHashes()) {
     for (auto &moduleID : cache.getAllModules(contextHash)) {
-      auto dependencyInfo = cache.findDependency(moduleID.first,
-                                                 moduleID.second,
+      auto dependencyInfo = cache.findDependency(moduleID.ModuleName,
+                                                 moduleID.Kind,
                                                  contextHash);
       assert(dependencyInfo.has_value() && "Expected dependency info.");
       writeModuleInfo(moduleID, contextHash, **dependencyInfo);
