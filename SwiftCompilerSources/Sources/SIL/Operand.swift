@@ -20,6 +20,11 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
     self.bridged = bridged
   }
 
+  init?(bridged: OptionalBridgedOperand) {
+    guard let op = bridged.op else { return nil }
+    self.bridged = BridgedOperand(op: op)
+  }
+
   public var value: Value { bridged.getValue().value }
 
   public static func ==(lhs: Operand, rhs: Operand) -> Bool {
@@ -41,13 +46,17 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 
-
 public struct OperandArray : RandomAccessCollection, CustomReflectable {
   private let base: OptionalBridgedOperand
   public let count: Int
   
   init(base: OptionalBridgedOperand, count: Int) {
     self.base = base
+    self.count = count
+  }
+
+  init(base: Operand, count: Int) {
+    self.base = OptionalBridgedOperand(bridged: base.bridged)
     self.count = count
   }
 
@@ -135,6 +144,9 @@ public struct UseList : CollectionLikeSequence {
 }
 
 extension OptionalBridgedOperand {
+  init(bridged: BridgedOperand?) {
+    self = OptionalBridgedOperand(op: bridged?.op)
+  }
   var operand: BridgedOperand? {
     if let op = op {
       return BridgedOperand(op: op)
@@ -241,6 +253,8 @@ extension Operand {
     case .GuaranteedForwarding: return .guaranteedForwarding
     case .EndBorrow: return .endBorrow
     case .Reborrow: return .reborrow
+    default:
+      fatalError("unsupported operand ownership")
     }
   }
 }
