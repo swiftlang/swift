@@ -152,6 +152,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   auto definingModule = D->getModuleContext();
   auto fragileKind = where.getFragileFunctionKind();
+  bool warnPreSwift6 = originKind != DisallowedOriginKind::SPIOnly &&
+                       originKind != DisallowedOriginKind::NonPublicImport;
   if (fragileKind.kind == FragileFunctionKind::None) {
     auto reason = where.getExportabilityReason();
     ctx.Diags
@@ -159,8 +161,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
-                                 6);
+        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -168,8 +169,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
-                                 6);
+        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 

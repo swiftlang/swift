@@ -3450,7 +3450,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
-      "C++ types from imported module %4 do not support library evolution}5",
+      "C++ types from imported module %4 do not support library evolution|"
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -6586,7 +6587,8 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
-      "C++ types from imported module %4 do not support library evolution}5",
+      "C++ types from imported module %4 do not support library evolution|"
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,
