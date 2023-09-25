@@ -9,9 +9,9 @@ extension ASTGenVisitor {
   public func visit(_ node: ClosureExprSyntax) -> ASTNode {
     let body = BraceStmt_create(
       self.ctx,
-      self.bridgedSourceLoc(for: node.leftBrace),
+      node.leftBrace.bridgedSourceLoc(in: self),
       self.visit(node.statements),
-      self.bridgedSourceLoc(for: node.rightBrace)
+      node.rightBrace.bridgedSourceLoc(in: self)
     )
 
     // FIXME: Translate the signature, capture list, 'in' location, etc.
@@ -59,7 +59,7 @@ extension ASTGenVisitor {
   }
 
   public func visit(_ node: MemberAccessExprSyntax) -> ASTNode {
-    let loc = bridgedSourceLoc(for: node)
+    let loc = node.bridgedSourceLoc(in: self)
     let base = visit(node.base!).rawValue
     let name = node.declName.baseName.bridgedIdentifier(in: self)
 
@@ -91,20 +91,20 @@ extension ASTGenVisitor {
     }
     let labelLocations = node.lazy.map {
       if let label = $0.label {
-        return self.bridgedSourceLoc(for: label)
+        return label.bridgedSourceLoc(in: self)
       }
 
-      return self.bridgedSourceLoc(for: $0)
+      return $0.bridgedSourceLoc(in: self)
     }
 
     return .expr(
       TupleExpr_create(
         self.ctx,
-        self.bridgedSourceLoc(for: leftParen),
+        leftParen.bridgedSourceLoc(in: self),
         expressions.bridgedArray(in: self),
         labels.bridgedArray(in: self),
         labelLocations.bridgedArray(in: self),
-        self.bridgedSourceLoc(for: rightParen)
+        rightParen.bridgedSourceLoc(in: self)
       )
     )
   }

@@ -15,11 +15,11 @@ extension ASTGenVisitor {
       TypeAliasDecl_create(
         astContext: self.ctx,
         declContext: self.declContext,
-        typealiasKeywordLoc: self.bridgedSourceLoc(for: node.typealiasKeyword),
+        typealiasKeywordLoc: node.typealiasKeyword.bridgedSourceLoc(in: self),
         name: name,
         nameLoc: nameLoc,
         genericParamList: self.visit(node.genericParameterClause)?.rawValue,
-        equalLoc: self.bridgedSourceLoc(for: node.initializer.equal),
+        equalLoc: node.initializer.equal.bridgedSourceLoc(in: self),
         underlyingType: self.visit(node.initializer.value).rawValue,
         genericWhereClause: self.visit(node.genericWhereClause)?.rawValue
       )
@@ -32,7 +32,7 @@ extension ASTGenVisitor {
     let decl = EnumDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      enumKeywordLoc: self.bridgedSourceLoc(for: node.enumKeyword),
+      enumKeywordLoc: node.enumKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
@@ -54,7 +54,7 @@ extension ASTGenVisitor {
     let decl = StructDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      structKeywordLoc: self.bridgedSourceLoc(for: node.structKeyword),
+      structKeywordLoc: node.structKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
@@ -76,7 +76,7 @@ extension ASTGenVisitor {
     let decl = ClassDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      classKeywordLoc: self.bridgedSourceLoc(for: node.classKeyword),
+      classKeywordLoc: node.classKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
@@ -99,7 +99,7 @@ extension ASTGenVisitor {
     let decl = ClassDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      classKeywordLoc: self.bridgedSourceLoc(for: node.actorKeyword),
+      classKeywordLoc: node.actorKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
@@ -125,7 +125,7 @@ extension ASTGenVisitor {
     let decl = ProtocolDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      protocolKeywordLoc: self.bridgedSourceLoc(for: node.protocolKeyword),
+      protocolKeywordLoc: node.protocolKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
@@ -148,7 +148,7 @@ extension ASTGenVisitor {
       AssociatedTypeDecl_create(
         astContext: self.ctx,
         declContext: self.declContext,
-        associatedtypeKeywordLoc: self.bridgedSourceLoc(for: node.associatedtypeKeyword),
+        associatedtypeKeywordLoc: node.associatedtypeKeyword.bridgedSourceLoc(in: self),
         name: name,
         nameLoc: nameLoc,
         inheritedTypes: self.visit(node.inheritanceClause?.inheritedTypes),
@@ -166,7 +166,7 @@ extension ASTGenVisitor {
     let decl = ExtensionDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      extensionKeywordLoc: self.bridgedSourceLoc(for: node.extensionKeyword),
+      extensionKeywordLoc: node.extensionKeyword.bridgedSourceLoc(in: self),
       extendedType: self.visit(node.extendedType).rawValue,
       inheritedTypes: self.visit(node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.visit(node.genericWhereClause)?.rawValue,
@@ -194,7 +194,7 @@ extension ASTGenVisitor {
         name: name,
         nameLoc: nameLoc,
         parameterList: self.visit(node.parameterClause)?.rawValue,
-        equalsLoc: self.bridgedSourceLoc(for: node.rawValue?.equal),
+        equalsLoc: (node.rawValue?.equal).bridgedSourceLoc(in: self),
         rawValue: self.visit(node.rawValue?.value)?.rawValue
       )
     )
@@ -204,7 +204,7 @@ extension ASTGenVisitor {
     .decl(
       EnumCaseDecl_create(
         declContext: self.declContext,
-        caseKeywordLoc: self.bridgedSourceLoc(for: node.caseKeyword),
+        caseKeywordLoc: node.caseKeyword.bridgedSourceLoc(in: self),
         elements: node.elements.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self)
       )
     )
@@ -225,7 +225,7 @@ extension ASTGenVisitor {
       VarDecl_create(
         astContext: self.ctx,
         declContext: self.declContext,
-        bindingKeywordLoc: self.bridgedSourceLoc(for: node.bindingSpecifier),
+        bindingKeywordLoc: node.bindingSpecifier.bridgedSourceLoc(in: self),
         nameExpr: pattern,
         initializer: initializer,
         isStatic: isStatic,
@@ -248,13 +248,13 @@ extension ASTGenVisitor {
       astContext: self.ctx,
       declContext: self.declContext,
       staticLoc: staticLoc,
-      funcKeywordLoc: self.bridgedSourceLoc(for: node.funcKeyword),
+      funcKeywordLoc: node.funcKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
       parameterList: self.visit(node.signature.parameterClause).rawValue,
-      asyncSpecifierLoc: self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
+      asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
+      throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
       returnType: self.visit(node.signature.returnClause?.type)?.rawValue,
       genericWhereClause: self.visit(node.genericWhereClause)?.rawValue
     )
@@ -272,13 +272,13 @@ extension ASTGenVisitor {
     let decl = ConstructorDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      initKeywordLoc: self.bridgedSourceLoc(for: node.initKeyword),
-      failabilityMarkLoc: self.bridgedSourceLoc(for: node.optionalMark),
+      initKeywordLoc: node.initKeyword.bridgedSourceLoc(in: self),
+      failabilityMarkLoc: node.optionalMark.bridgedSourceLoc(in: self),
       isIUO: node.optionalMark?.tokenKind == .exclamationMark,
       genericParamList: self.visit(node.genericParameterClause)?.rawValue,
       parameterList: self.visit(node.signature.parameterClause).rawValue,
-      asyncSpecifierLoc: self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.bridgedSourceLoc(for: node.signature.effectSpecifiers?.throwsSpecifier),
+      asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
+      throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
       genericWhereClause: self.visit(node.genericWhereClause)?.rawValue
     )
 
@@ -295,7 +295,7 @@ extension ASTGenVisitor {
     let decl = DestructorDecl_create(
       astContext: self.ctx,
       declContext: self.declContext,
-      deinitKeywordLoc: self.bridgedSourceLoc(for: node.deinitKeyword)
+      deinitKeywordLoc: node.deinitKeyword.bridgedSourceLoc(in: self)
     )
 
     if let body = node.body {
@@ -339,10 +339,10 @@ extension ASTGenVisitor {
         astContext: self.ctx,
         declContext: self.declContext,
         fixity: fixity,
-        operatorKeywordLoc: self.bridgedSourceLoc(for: node.operatorKeyword),
+        operatorKeywordLoc: node.operatorKeyword.bridgedSourceLoc(in: self),
         name: name,
         nameLoc: nameLoc,
-        colonLoc: self.bridgedSourceLoc(for: node.operatorPrecedenceAndTypes?.colon),
+        colonLoc: (node.operatorPrecedenceAndTypes?.colon).bridgedSourceLoc(in: self),
         precedenceGroupName: precedenceGroupName,
         PrecedenceGroupLoc: precedenceGroupLoc
       )
@@ -440,21 +440,21 @@ extension ASTGenVisitor {
     return .decl(
       PrecedenceGroupDecl_create(
         declContext: self.declContext,
-        precedencegroupKeywordLoc: self.bridgedSourceLoc(for: node.precedencegroupKeyword),
+        precedencegroupKeywordLoc: node.precedencegroupKeyword.bridgedSourceLoc(in: self),
         name: name,
         nameLoc: nameLoc,
-        leftBraceLoc: self.bridgedSourceLoc(for: node.leftBrace),
-        associativityLabelLoc: self.bridgedSourceLoc(for: body.associativity?.associativityLabel),
-        associativityValueLoc: self.bridgedSourceLoc(for: body.associativity?.value),
+        leftBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
+        associativityLabelLoc: (body.associativity?.associativityLabel).bridgedSourceLoc(in: self),
+        associativityValueLoc: (body.associativity?.value).bridgedSourceLoc(in: self),
         associativity: associativityValue,
-        assignmentLabelLoc: self.bridgedSourceLoc(for: body.assignment?.assignmentLabel),
-        assignmentValueLoc: self.bridgedSourceLoc(for: body.assignment?.value),
+        assignmentLabelLoc: (body.assignment?.assignmentLabel).bridgedSourceLoc(in: self),
+        assignmentValueLoc: (body.assignment?.value).bridgedSourceLoc(in: self),
         isAssignment: assignmentValue,
-        higherThanKeywordLoc: self.bridgedSourceLoc(for: body.higherThanRelation?.higherThanOrLowerThanLabel),
+        higherThanKeywordLoc: (body.higherThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
         higherThanNames: self.visit(body.higherThanRelation?.precedenceGroups),
-        lowerThanKeywordLoc: self.bridgedSourceLoc(for: body.lowerThanRelation?.higherThanOrLowerThanLabel),
+        lowerThanKeywordLoc: (body.lowerThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
         lowerThanNames: self.visit(body.lowerThanRelation?.precedenceGroups),
-        rightBraceLoc: self.bridgedSourceLoc(for: node.rightBrace)
+        rightBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
       )
     )
   }
@@ -495,9 +495,9 @@ extension ASTGenVisitor {
       ImportDecl_create(
         astContext: self.ctx,
         declContext: self.declContext,
-        importKeywordLoc: self.bridgedSourceLoc(for: node.importKeyword),
+        importKeywordLoc: node.importKeyword.bridgedSourceLoc(in: self),
         importKind: importKind,
-        importKindLoc: self.bridgedSourceLoc(for: node.importKindSpecifier),
+        importKindLoc: node.importKindSpecifier.bridgedSourceLoc(in: self),
         path: node.path.lazy.map {
           $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
         }.bridgedArray(in: self)

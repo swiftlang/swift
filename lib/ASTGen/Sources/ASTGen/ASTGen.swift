@@ -105,7 +105,7 @@ struct ASTGenVisitor: SyntaxTransformVisitor {
     var out = [UnsafeMutableRawPointer]()
 
     for element in node.statements {
-      let loc = bridgedSourceLoc(for: element)
+      let loc = element.bridgedSourceLoc(in: self)
       let swiftASTNodes = visit(element)
       switch swiftASTNodes {
       case .decl(let d):
