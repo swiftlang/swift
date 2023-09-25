@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -914,17 +915,80 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 }
 
 bool IsNoncopyableRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
-  // TODO: isNoncopyable and isNoncopyable and other checks are all spread out
-  // and need to be merged together.
-  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-      if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
-        if (!decl->getASTContext().supportsMoveOnlyTypes())
-            decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+  assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
 
-        return true;
-      }
+  // The legacy check.
+  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
+    if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+      if (!decl->getASTContext().supportsMoveOnlyTypes())
+          decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+      return true;
+    }
   }
-  return false;
+
+  auto &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return false;
+
+  // For protocols, inspect its requirement signature for a Copyable requirement
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    auto reqs = proto->getRequirementSignature().getRequirements();
+    for (auto &req : reqs) {
+      if (req.getKind() == RequirementKind::Conformance)
+        if (auto kp = req.getSecondType()->getKnownProtocol())
+          if (*kp == KnownProtocolKind::Copyable)
+            return false; // found a Copyable requirement
+    }
+    return true;
+  }
+
+  // For all other nominals, we can simply check the inheritance clause.
+
+  // The set of defaults all types start with.
+  auto defaults = getInvertibleProtocols();
+  std::map<KnownProtocolKind, SourceLoc> lastInverse;
+
+  // Does correctness checking after inspecting the inheritance clause.
+  // TODO: we can probably move this to `checkInheritanceClause` instead.
+  auto foundInverse = [&](SourceLoc loc, KnownProtocolKind kind) {
+    // do we still have this default?
+    if (defaults.contains(kind)) {
+      defaults.remove(kind);
+      lastInverse.insert({kind, loc});
+
+      // Classes are always copyable.
+      if (isa<ClassDecl>(decl) && kind == KnownProtocolKind::Copyable) {
+        ctx.Diags.diagnose(loc, diag::noncopyable_class);
+        return;
+      }
+
+      return;
+    }
+
+    // diagnose duplicate inverses
+    ctx.Diags.diagnose(loc, diag::inverse_duplicate);
+    ctx.Diags.diagnose(lastInverse[kind], diag::inverse_duplicate_previous);
+  };
+
+  // Check the inheritance clause for inverses.
+  auto inherited = decl->getInherited();
+  for (size_t i = 0; i < inherited.size(); i++) {
+    auto *repr = inherited.getTypeRepr(i);
+
+    if (!dyn_cast_or_null<InverseTypeRepr>(repr)) {
+      continue;
+    }
+
+    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
+    auto kp = type->getKnownProtocol();
+    if (!kp)
+      continue; // diagnosed elsewhere.
+
+    foundInverse(repr->getLoc(), *kp);
+  }
+
+  return !defaults.contains(KnownProtocolKind::Copyable);
 }
 
 bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
@@ -3067,4 +3131,21 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   return extendedType;
+}
+
+//----------------------------------------------------------------------------//
+// ImplicitKnownProtocolConformanceRequest
+//----------------------------------------------------------------------------//
+ProtocolConformance *
+ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
+                                                  NominalTypeDecl *nominal,
+                                                  KnownProtocolKind kp) const {
+  switch (kp) {
+  case KnownProtocolKind::Sendable:
+    return deriveImplicitSendableConformance(evaluator, nominal);
+  case KnownProtocolKind::Copyable:
+    return deriveConformanceForInvertible(evaluator, nominal, kp);
+  default:
+    llvm_unreachable("non-implicitly derived KnownProtocol");
+  }
 }

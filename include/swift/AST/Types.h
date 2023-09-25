@@ -928,6 +928,9 @@ public:
     return getAnyBufferPointerElementType(Ignore);
   }
 
+  /// If this type is a known protocol, return its kind.
+  llvm::Optional<KnownProtocolKind> getKnownProtocol();
+
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
@@ -7332,6 +7335,10 @@ inline Type TypeBase::getNominalParent() {
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
+
+//inline TypeDecl *TypeBase::getAnyTypeDecl() {
+//  return getCanonicalType().getAnyTypeDecl();
+//}
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))

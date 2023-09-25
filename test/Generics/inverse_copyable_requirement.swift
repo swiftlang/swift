@@ -3,11 +3,11 @@
 // REQUIRES: asserts
 
 // a concrete move-only type
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct Container {
+struct Container: ~Copyable {
   var mo: MO = MO()
 }
 
@@ -267,7 +267,7 @@ class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to 
 }
 
 struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
-  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
+  struct Ty: ~Copyable {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
 protocol Gives: HasType {

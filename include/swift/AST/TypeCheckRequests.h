@@ -3779,11 +3779,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Retrieve the implicit conformance for the given nominal type to
-/// the Sendable protocol.
-class GetImplicitSendableRequest :
-    public SimpleRequest<GetImplicitSendableRequest,
-                         ProtocolConformance *(NominalTypeDecl *),
+/// Compute the implicit conformance for the given nominal type to
+/// an known protocol, if implicit conformances are permitted.
+class ImplicitKnownProtocolConformanceRequest :
+    public SimpleRequest<ImplicitKnownProtocolConformanceRequest,
+                         ProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3792,7 +3792,7 @@ private:
   friend SimpleRequest;
 
   ProtocolConformance *evaluate(
-      Evaluator &evaluator, NominalTypeDecl *nominal) const;
+      Evaluator &evaluator, NominalTypeDecl *nominal, KnownProtocolKind kp) const;
 
 public:
   // Caching

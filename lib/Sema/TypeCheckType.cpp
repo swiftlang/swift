@@ -21,6 +21,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
+#include "TypeCheckInvertible.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1045,7 +1046,7 @@ static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
 
   bool didEmitDiag = false;
   for (auto t: genericArgs) {
-    if (!t->isNoncopyable())
+    if (!canBeNoncopyable(t))
       continue;
 
     ctx.Diags.diagnose(loc, diag::noncopyable_generics_specific, t, unboundTy);
@@ -2079,8 +2080,8 @@ namespace {
 
     bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                  Type unboundTy, Type genericArgTy);
-    bool diagnoseMoveOnlyMissingOwnership(TypeRepr *repr,
-                                          TypeResolutionOptions options);
+    bool diagnoseMissingOwnership(TypeRepr *repr,
+                                  TypeResolutionOptions options);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2353,15 +2354,14 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
   return false;
 }
 
-/// Assuming this repr has resolved to a move-only / noncopyable type, checks
+/// Assuming this repr has resolved to a noncopyable type, checks
 /// to see if that resolution happened in a context requiring an ownership
 /// annotation. If it did and there was no ownership specified, emits a
 /// diagnostic.
 ///
 /// \returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
-                                              TypeRepr *repr,
-                                              TypeResolutionOptions options) {
+bool TypeResolver::diagnoseMissingOwnership(TypeRepr *repr,
+                                            TypeResolutionOptions options) {
   // Though this is only required on function inputs... we can ignore
   // InoutFunctionInput since it's already got ownership.
   if (!options.is(TypeResolverContext::FunctionInput))
@@ -4365,9 +4365,9 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
   }
 
-  // move-only types must have an ownership specifier when used as a parameter of a function.
-  if (result->isNoncopyable())
-    diagnoseMoveOnlyMissingOwnership(repr, options);
+  // Noncopyable types must have an ownership specifier when used as a parameter
+  if (canBeNoncopyable(result))
+    diagnoseMissingOwnership(repr, options);
 
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
@@ -5136,7 +5136,7 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
     if (auto protoDecl = protoTy->getDecl())
       if (auto kp = protoDecl->getKnownProtocolKind())
         if (getInvertibleProtocols().contains(*kp))
-          return ty;
+          return ty; // FIXME: this ought to be wrapped in an InverseType
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());

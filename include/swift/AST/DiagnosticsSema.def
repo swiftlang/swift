@@ -2392,6 +2392,10 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 is not invertible", (Type))
+ERROR(inverse_duplicate,none,
+      "duplicate inverse constraint", ())
+NOTE(inverse_duplicate_previous,none,
+      "previous inverse constraint here", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -7445,6 +7449,9 @@ ERROR(accessor_macro_not_single_var, none,
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(noncopyable_class, none,
+      "classes cannot be noncopyable",
+      ())
 ERROR(noncopyable_within_copyable, none,
       "%kind0 cannot contain a noncopyable type without also being noncopyable",
       (const ValueDecl *))

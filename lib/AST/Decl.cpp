@@ -4838,7 +4838,7 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
 bool TypeDecl::isNoncopyable() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsNoncopyableRequest{const_cast<TypeDecl *>(this)},
-                           getAttrs().hasAttribute<MoveOnlyAttr>());
+                           true); // default to true for safety
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

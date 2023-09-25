@@ -2937,6 +2937,9 @@ public:
   }
 
   static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
+    if (decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      return; // taken care of elsewhere.
+
     if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
       if (!nomDecl->isNoncopyable())
         return;

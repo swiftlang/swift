@@ -3145,7 +3145,8 @@ public:
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
 
-  /// Is this declaration noncopyable?
+  /// Is this type _always_ noncopyable? Will answer 'false' if the type is
+  /// conditionally copyable.
   bool isNoncopyable() const;
 
   static bool classof(const Decl *D) {

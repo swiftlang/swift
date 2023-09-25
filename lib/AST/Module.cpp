@@ -1681,12 +1681,12 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol,
                                                      bool allowMissing) {
   // If we are recursively checking for implicit conformance of a nominal
-  // type to Sendable, fail without evaluating this request. This
+  // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
   LookupConformanceInModuleRequest request{{this, type, protocol}};
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
-      GetImplicitSendableRequest icvRequest{nominal};
+      ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request))
         return ProtocolConformanceRef::forInvalid();
@@ -1972,7 +1972,8 @@ LookupConformanceInModuleRequest::evaluate(
   if (!nominal->lookupConformance(protocol, conformances)) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       // Try to infer Sendable conformance.
-      GetImplicitSendableRequest cvRequest{nominal};
+      ImplicitKnownProtocolConformanceRequest
+          cvRequest{nominal, KnownProtocolKind::Sendable};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
         conformances.clear();
@@ -2001,16 +2002,15 @@ LookupConformanceInModuleRequest::evaluate(
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
     } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      // Only move-only nominals are not Copyable
-      if (nominal->isNoncopyable()) {
-        return ProtocolConformanceRef::forInvalid();
+      // Try to infer Copyable conformance.
+      ImplicitKnownProtocolConformanceRequest
+          cvRequest{nominal, KnownProtocolKind::Copyable};
+      if (auto conformance = evaluateOrDefault(
+          ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
       } else {
-        // Specifically do not create a concrete conformance to Copyable. At
-        // this stage, we don't even want Copyable to appear in swiftinterface
-        // files, which will happen for a marker protocol that's registered
-        // in a nominal type's conformance table. We can reconsider this
-        // decision later once there's a clearer picture of noncopyable generics
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
     } else {
       // Was unable to infer the missing conformance.

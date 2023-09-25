@@ -5125,8 +5125,8 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
   ext->getAttrs().add(attr);
 }
 
-ProtocolConformance *GetImplicitSendableRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+ProtocolConformance *swift::deriveImplicitSendableConformance(
+    Evaluator &evaluator, NominalTypeDecl *nominal) {
   // Protocols never get implicit Sendable conformances.
   if (isa<ProtocolDecl>(nominal))
     return nullptr;

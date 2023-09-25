@@ -158,6 +158,7 @@ bool TypeBase::isMarkerExistential() {
 }
 
 bool TypeBase::isNoncopyable() {
+  // FIXME: we need to support the full spectrum of TypeDecls here.
   if (auto *nom = getAnyNominal())
     return nom->isNoncopyable();
 
@@ -469,6 +470,14 @@ bool TypeBase::isDistributedActor() {
   if (auto actor = getAnyActor())
     return actor->isDistributedActor();
   return false;
+}
+
+llvm::Optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
+  if (auto protoTy = this->castTo<ProtocolType>())
+    if (auto protoDecl = protoTy->getDecl())
+      return protoDecl->getKnownProtocolKind();
+
+  return llvm::None;
 }
 
 bool TypeBase::isSpecialized() {
