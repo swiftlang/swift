@@ -23,7 +23,7 @@ sil @get_klass : $@convention(thin) () -> @owned Klass
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading1'
 sil [ossa] @test_simplify_switch_enum_jump_threading1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-try-jump-threading @instruction[1]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb1(%1 : $FakeOptional<Klass>)
 
@@ -51,12 +51,12 @@ bb0(%0 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[2]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[2]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb3(%1 : $FakeOptional<Klass>)
 
 bb2:
-  test_specification "simplify-cfg-try-jump-threading @instruction[5]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[5]"
   destroy_value %0 : $Klass
   %2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
   br bb3(%2 : $FakeOptional<Klass>)
@@ -87,7 +87,7 @@ bb0(%0 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[4]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[4]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb3(%1 : $FakeOptional<Klass>)
 
@@ -107,7 +107,7 @@ bb4:
 
 sil [ossa] @test_jump_thread_ref_ele_loop : $@convention(thin) () -> () {
 bb0:
-  test_specification "simplify-cfg-try-jump-threading @instruction[3]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[3]"
   %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
   cond_br undef, bb1, bb2
 
@@ -149,7 +149,7 @@ bb0(%0 : @owned $AnyKlass, %1 : @owned $AnyKlass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[2]"
+  specify_test "simplify-cfg-try-jump-threading @instruction[2]"
   %2 = copy_value %0 : $AnyKlass
   br bb6(%2 : $AnyKlass)
 

@@ -545,7 +545,7 @@ ERROR(expected_sil_profiler_counter_total,none,
       "expected profiler counter total", ())
 ERROR(expected_sil_profiler_counter_hash,none,
       "expected profiler counter hash", ())
-ERROR(expected_sil_test_specification_body,none,
+ERROR(expected_sil_specify_test_body,none,
       "expected a string consisting of the space-separated test arguments", ())
 
 // SIL Values

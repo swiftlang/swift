@@ -21,7 +21,7 @@ sil [ossa] @dontDeleteDeadMoveOnlyValue : $() -> () {
   %get = function_ref @getMOS : $@convention(thin) () -> (@owned MOS)
   %barrier = function_ref @barrier : $@convention(thin) () -> ()
   %mos = apply %get() : $@convention(thin) () -> (@owned MOS)
-  test_specification "deleter-delete-if-dead @instruction"
+  specify_test "deleter-delete-if-dead @instruction"
   %mov = move_value %mos : $MOS
   apply %barrier() : $@convention(thin) () -> ()
   destroy_value %mov : $MOS

@@ -347,7 +347,7 @@ private:
     if (!consumePrefix("argument"))
       return nullptr;
     // If this is a bare @argument reference, it refers to the first argument
-    // of the block containing the test_specification.
+    // of the block containing the specify_test.
     if (!block) {
       block = context->getParent();
     }
@@ -385,7 +385,7 @@ private:
     if (empty() || peekPrefix(".")) {
       if (!within) {
         // If this is a bare @instruction reference, it refers to to the
-        // context of the test_specification.
+        // context of the specify_test.
         return context;
       }
       return getInstructionAtIndex(0, *within);
@@ -393,7 +393,7 @@ private:
     if (auto subscript = parseSubscript()) {
       // If this is a bare @instruction[...] reference, it can refer either to
       // an instruction counting from the beginning of the function or else to
-      // an instruction offset from the context of the test_specification.
+      // an instruction offset from the context of the specify_test.
       if (!within && subscript->isa<long long>()) {
         auto offset = subscript->get<long long>();
         return getInstructionOffsetFrom(context, offset);
@@ -422,7 +422,7 @@ private:
       return nullptr;
     if (empty() || peekPrefix(".")) {
       // If this is a bare @block reference, it refers to the block containing
-      // the test_specification instruction.
+      // the specify_test instruction.
       if (!within) {
         return context->getParent();
       }
@@ -432,7 +432,7 @@ private:
     if (auto subscript = parseSubscript()) {
       // If this is a bare @block[...] reference, it can refer either to a block
       // counting from the beginning of the function or else to a block offset
-      // from the block containing the context of the test_specification.
+      // from the block containing the context of the specify_test.
       if (!within && subscript->isa<long long>()) {
         return getBlockOffsetFrom(context->getParent(),
                                   subscript->get<long long>());
@@ -462,7 +462,7 @@ private:
       return nullptr;
     if (empty() || peekPrefix(".")) {
       // If this is a bare @function reference, it refers to the function
-      // containing the test_specification instruction.
+      // containing the specify_test instruction.
       if (!within) {
         return context->getFunction();
       }

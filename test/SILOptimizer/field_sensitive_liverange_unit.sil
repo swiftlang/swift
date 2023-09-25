@@ -21,7 +21,7 @@ sil @getC : $@convention(thin) () -> (@owned C)
 // CHECK-NEXT: at 1
 sil [ossa] @testReborrow : $@convention(thin) () -> () {
 bb0:
-  test_specification """
+  specify_test """
                      fieldsensitive-multidefuse-liverange
                      @instruction
                      defs: 
@@ -72,7 +72,7 @@ bb4:
 // CHECK-LABEL: end running test 1 of 1 on testMultiDefUseAddressReinit
 sil [ossa] @testMultiDefUseAddressReinit : $@convention(thin) (@owned C) -> () {
 bb0(%0: @owned $C):
-  test_specification """
+  specify_test """
                      fieldsensitive-multidefuse-liverange
                      @instruction
                      defs: 
@@ -120,7 +120,7 @@ bb0:
   br bb3
 
 bb1(%1 : @owned $C, %2 : @owned $C):
-  test_specification """
+  specify_test """
                      fieldsensitive-multidefuse-liverange
                      @instruction
                      defs: 
@@ -161,7 +161,7 @@ bb0:
   %stack = alloc_stack $C
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   store %c to [init] %stack : $*C
-  test_specification """
+  specify_test """
                      fieldsensitive-multidefuse-liverange
                      @instruction[-3]
                      defs: 

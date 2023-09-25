@@ -60,14 +60,14 @@ import Builtin
 // CHECK-LABEL: end running test 8 of {{[^,]+}} on test_arg_parsing: test-specification-parsing
 sil [ossa] @test_arg_parsing : $() -> () {
 entry:
-  test_specification "test-specification-parsing FFFbb @function[test_arg_parsing_reference] @function[2] @function true false"
-  test_specification "test-specification-parsing BuI @block[0] 42 @function[test_arg_parsing_callee].block[1].instruction[3]"
-  test_specification "test-specification-parsing FF @function @function[0]"
-  test_specification "test-specification-parsing BBBBB @block @function.block @function.block[0] @function[0].block @function[0].block[0]"
-  test_specification "test-specification-parsing IIIIIIII @function.block.instruction @function[0].block.instruction @function.block[0].instruction @function.block.instruction[0] @function[0].block[0].instruction @function[0].block.instruction[0] @function.block[0].instruction[0] @function[0].block[0].instruction[0]"
-  test_specification "test-specification-parsing OO @instruction[2].operand @function[test_arg_parsing_callee].trace.operand[1]"
-  test_specification "test-specification-parsing Vs @function[4].trace[0] howdy"
-  test_specification "test-specification-parsing V @instruction[0]"
+  specify_test "test-specification-parsing FFFbb @function[test_arg_parsing_reference] @function[2] @function true false"
+  specify_test "test-specification-parsing BuI @block[0] 42 @function[test_arg_parsing_callee].block[1].instruction[3]"
+  specify_test "test-specification-parsing FF @function @function[0]"
+  specify_test "test-specification-parsing BBBBB @block @function.block @function.block[0] @function[0].block @function[0].block[0]"
+  specify_test "test-specification-parsing IIIIIIII @function.block.instruction @function[0].block.instruction @function.block[0].instruction @function.block.instruction[0] @function[0].block[0].instruction @function[0].block.instruction[0] @function.block[0].instruction[0] @function[0].block[0].instruction[0]"
+  specify_test "test-specification-parsing OO @instruction[2].operand @function[test_arg_parsing_callee].trace.operand[1]"
+  specify_test "test-specification-parsing Vs @function[4].trace[0] howdy"
+  specify_test "test-specification-parsing V @instruction[0]"
   %something_remarkable = function_ref @something_remarkable : $@convention(thin) () -> ()
   %retval = tuple ()
   return %retval : $()
@@ -120,16 +120,16 @@ sil [ossa] @test_contextual_arg_parsing : $() -> () {
 entry:
   br one
 one:
-  test_specification "test-specification-parsing B @block"
+  specify_test "test-specification-parsing B @block"
   br two
 two:
-  test_specification "test-specification-parsing I @instruction"
-  test_specification "test-specification-parsing IIII @instruction[-1] @instruction[+0] @instruction[+1] @instruction[+2]"
-  test_specification "test-specification-parsing BBBB @block[-2] @block[-1] @block[+0] @block[+1]"
+  specify_test "test-specification-parsing I @instruction"
+  specify_test "test-specification-parsing IIII @instruction[-1] @instruction[+0] @instruction[+1] @instruction[+2]"
+  specify_test "test-specification-parsing BBBB @block[-2] @block[-1] @block[+0] @block[+1]"
   %retval = tuple ()
   br exit
 exit:
-  test_specification "test-specification-parsing F @function"
+  specify_test "test-specification-parsing F @function"
   return %retval : $()
 }
 
@@ -145,7 +145,7 @@ struct X {}
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_arg_parsing: test-specification-parsing
 sil [ossa] @test_arg_arg_parsing : $(X) -> () {
 entry(%instance : $X):
-  test_specification "test-specification-parsing AAA @argument @block.argument @function.argument[0]"
+  specify_test "test-specification-parsing AAA @argument @block.argument @function.argument[0]"
   %retval = tuple ()
   return %retval : $()
 }
@@ -160,7 +160,7 @@ sil [ossa] @takeC : $@convention(thin) (@owned C) -> ()
 // CHECK-LABEL: end running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, true, @trace
 sil [ossa] @fn : $@convention(thin) () -> () {
 entry:
-    test_specification "canonicalize-ossa-lifetime true true true @trace"
+    specify_test "canonicalize-ossa-lifetime true true true @trace"
     %getC = function_ref @getC : $@convention(thin) () -> @owned C
     %c = apply %getC() : $@convention(thin) () -> @owned C
     debug_value [trace] %c : $C
@@ -181,7 +181,7 @@ entry:
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_parsing_2
 sil @test_arg_parsing_2 : $() -> () {
 entry:
-  test_specification "test-specification-parsing Bu @block[1] 0"
+  specify_test "test-specification-parsing Bu @block[1] 0"
   br exit
 exit:
   %retval = tuple ()
@@ -197,7 +197,7 @@ exit:
 sil @test_value_literal_parsing : $(Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int64, 2
-  test_specification "test-specification-parsing VVVV %0 %1 %2 %3"
+  specify_test "test-specification-parsing VVVV %0 %1 %2 %3"
   %1 = integer_literal $Builtin.Int64, 1
   %3 = integer_literal $Builtin.Int64, 3
   apply undef(%2) : $@convention(thin) (Builtin.Int64) -> ()
