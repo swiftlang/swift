@@ -362,8 +362,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     MPM.addPass(InlineTreePrinterPass());
 
   // Add bitcode/ll output passes to pass manager.
-  ModulePassManager EmptyPassManager;
-  auto &PassManagerToRun = Opts.DisableLLVMOptzns ? EmptyPassManager : MPM;
 
   switch (Opts.OutputKind) {
   case IRGenOutputKind::LLVMAssemblyBeforeOptimization:
@@ -373,7 +371,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
-    PassManagerToRun.addPass(PrintModulePass(*out, "", false));
+    MPM.addPass(PrintModulePass(*out, "", false));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -382,7 +380,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-      PassManagerToRun.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
+      MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
         Module->addModuleFlag(llvm::Module::Error, "ThinLTO", uint32_t(0));
@@ -392,14 +390,14 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
       }
-      PassManagerToRun.addPass(BitcodeWriterPass(
+      MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
     }
     break;
   }
   }
 
-  PassManagerToRun.run(*Module, MAM);
+  MPM.run(*Module, MAM);
 
   if (AlignModuleToPageSize) {
     align(Module);
