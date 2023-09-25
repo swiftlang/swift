@@ -5680,6 +5680,10 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   emitNestedTypeDecls(ext->getMembers());
 
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return;
+  }
+
   addLazyConformances(ext);
 
   // Generate a category if the extension either introduces a
