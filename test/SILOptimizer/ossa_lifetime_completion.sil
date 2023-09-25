@@ -19,7 +19,7 @@ public enum FakeOptional<T> {
 // CHECK-LABEL: end running test 1 of 1 on eagerConsumneOwnedArg: ossa-lifetime-completion with: @argument
 sil [ossa] @eagerConsumneOwnedArg : $@convention(thin) (@owned C) -> () {
 entry(%0 : @_eagerMove @owned $C):
-  test_specification "ossa-lifetime-completion @argument"
+  specify_test "ossa-lifetime-completion @argument"
   br exit
 
 exit:
@@ -39,7 +39,7 @@ exit:
 // CHECK-LABEL: end running test 1 of 1 on lexicalOwnedArg: ossa-lifetime-completion with: @argument
 sil [ossa] @lexicalOwnedArg : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  test_specification "ossa-lifetime-completion @argument"
+  specify_test "ossa-lifetime-completion @argument"
   cond_br undef, bb1, bb2
 bb1:
   br bb3
@@ -58,7 +58,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'borrowTest'
 sil [ossa] @borrowTest : $@convention(method) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  test_specification "ossa-lifetime-completion @instruction[0]"
+  specify_test "ossa-lifetime-completion @instruction[0]"
   %borrow = begin_borrow %0 : $C
   cond_br undef, bb1, bb2
 
@@ -83,7 +83,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'enumTest'
 sil [ossa] @enumTest : $@convention(method) (@guaranteed FakeOptional<C>) -> () {
 bb0(%0 : @guaranteed $FakeOptional<C>):
-  test_specification "ossa-lifetime-completion @instruction[0]"
+  specify_test "ossa-lifetime-completion @instruction[0]"
   %copy = copy_value %0 : $FakeOptional<C>
   %borrow = begin_borrow %copy : $FakeOptional<C>
   switch_enum %borrow : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
@@ -106,7 +106,7 @@ sil @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
 
 sil [ossa] @argTest : $@convention(method) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  test_specification "ossa-lifetime-completion @argument"
+  specify_test "ossa-lifetime-completion @argument"
   debug_value %0 : $C
   cond_br undef, bb1, bb2
 
@@ -130,7 +130,7 @@ bb4:
 // Ensure no assert fires while inserting dead end blocks to the worklist
 sil [ossa] @testLexicalLifetimeCompletion : $@convention(thin) (@owned C) -> () {
 bb0(%0 : @owned $C):
-  test_specification "ossa-lifetime-completion @argument"
+  specify_test "ossa-lifetime-completion @argument"
   debug_value %0 : $C, let, name "newElements", argno 1
   cond_br undef, bb1, bb2
 
@@ -173,7 +173,7 @@ sil @foo : $@convention(thin) (@guaranteed C) -> ()
 // Ensure no assert fires while handling lifetime end of partial_apply
 sil [ossa] @testPartialApplyStack1 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ossa-lifetime-completion @instruction[0]"
+  specify_test "ossa-lifetime-completion @instruction[0]"
   %8 = copy_value %0 : $C
   %9 = begin_borrow %8 : $C
   %80 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
@@ -197,7 +197,7 @@ bb3:
 // Ensure no assert fires while handling lifetime end of partial_apply
 sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ossa-lifetime-completion @instruction[1]"
+  specify_test "ossa-lifetime-completion @instruction[1]"
   %2 = alloc_stack $C
   %3 = copy_value %0 : $C
   %4 = begin_borrow %3 : $C

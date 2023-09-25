@@ -31,7 +31,7 @@ bb0(%0 : @owned $FakeOptional<C>):
   switch_enum %0 : $FakeOptional<C>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%payload : @owned $C):
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %payload : $C
   unreachable
 
@@ -55,7 +55,7 @@ bb2:
   br bb3(%1 : $C)
 
 bb3(%2 : @owned $C):
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   unreachable
 }
@@ -67,7 +67,7 @@ bb3(%2 : @owned $C):
 sil [ossa] @testDeadInstruction : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %1 = copy_value %0 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %1 : $C
   unreachable
 }
@@ -89,7 +89,7 @@ bb0:
   br bb3
 
 bb1(%1 : @owned $C):
-  test_specification "multidef-liveness @trace[0] @trace[1]"
+  specify_test "multidef-liveness @trace[0] @trace[1]"
   debug_value [trace] %1 : $C
   %2 = move_value %1 : $C
   debug_value [trace] %2 : $C
@@ -115,7 +115,7 @@ sil shared [ossa] @testInnerUnreachable : $@convention(thin) (@guaranteed C, @th
 bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
   %2 = alloc_stack $C
   %3 = store_borrow %0 to %2 : $*C
-  test_specification "scoped-address-liveness @trace[0]"
+  specify_test "scoped-address-liveness @trace[0]"
   debug_value [trace] %3 : $*C
   %5 = load_borrow %3 : $*C
   %6 = function_ref @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed C) -> @out τ_0_0
@@ -140,7 +140,7 @@ bb0(%0 : @guaranteed $C, %1 : $@thick Never.Type):
 sil [ossa] @testMultiDefDeadDefBoundaryEdge : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0 = copy_value %0 : $C
-  test_specification "multidef-liveness @trace[0] @trace[1]"
+  specify_test "multidef-liveness @trace[0] @trace[1]"
   debug_value [trace] %copy0 : $C
   cond_br undef, bb1, bb3
 

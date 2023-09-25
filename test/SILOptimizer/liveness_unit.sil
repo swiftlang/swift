@@ -34,7 +34,7 @@ bb0(%0 : @guaranteed $C):
 bb1(%1 : @owned $C):
   destroy_value %1 : $C
   %2 = copy_value %0 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -59,7 +59,7 @@ bb0:
 
 bb1(%1 : @owned $C):
   %2 = move_value %1 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -97,7 +97,7 @@ bb1:
 
 bb2:
   %borrow2 = begin_borrow %0 : $C
-  test_specification "multidef-liveness @trace[0] @trace[1]"
+  specify_test "multidef-liveness @trace[0] @trace[1]"
   debug_value [trace] %borrow2 : $C
   br bb3(%borrow2 : $C)
 
@@ -121,7 +121,7 @@ sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
 bb0(%0 : @owned $D):
   %borrow0 = begin_borrow %0 : $D
   %c = unchecked_ref_cast %borrow0 : $D to $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %c : $C
   %d = unchecked_ref_cast %c : $C to $D
   %f = ref_element_addr %d : $D, #D.object
@@ -139,7 +139,7 @@ bb0(%0 : @owned $D):
 // CHECK: last user:   end_apply
 sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   end_apply %4
@@ -154,7 +154,7 @@ bb0(%0 : @guaranteed $D):
 sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   %f = ref_element_addr %0 : $D, #D.object
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %f : $*C
   %access = begin_access [read] [static] %f : $*C
   %o = load [copy] %access : $*C
@@ -170,7 +170,7 @@ bb0(%0 : @guaranteed $D):
 // CHECK: last user: %{{.*}} = ref_element_addr
 sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   %f = ref_element_addr %0 : $D, #D.object
   %99 = tuple()
   return %99 : $()
@@ -197,7 +197,7 @@ bb0(%0 : @guaranteed $D):
 sil [ossa] @testMultiDefLiveOutNoBoundary : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0 = copy_value %0 : $C
-  test_specification "multidef-liveness @trace[0] @trace[1] @trace[2] @trace[3]"
+  specify_test "multidef-liveness @trace[0] @trace[1] @trace[2] @trace[3]"
   debug_value [trace] %copy0 : $C
   cond_br undef, bb1, bb3
 
@@ -232,7 +232,7 @@ bb4(%phi : @owned $C):
 // CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
 sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -258,7 +258,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-NEXT: dead def: %0 = argument of bb0 : $C
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   %borrow0 = begin_borrow %0 : $C
   %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
   br bb1(%borrow0 : $C, %aggregate : $PairC)
@@ -292,7 +292,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // CHECK-NEXT: end running
 sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -325,7 +325,7 @@ bb3(%deadPhi : @guaranteed $D):
 // CHECK-NEXT: end running
 sil [ossa] @testSSADominatedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -354,7 +354,7 @@ bb3(%phi : @guaranteed $D):
 // CHECK-SAME: load
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   %borrow1 = begin_borrow %1 : $C
   %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
   br bb1(%borrow1 : $C, %aggregate : $PairC)
@@ -383,7 +383,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 sil [ossa] @testSSAReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa-liveness @trace[0]"
   debug_value [trace] %borrow : $C
   %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
   br bb1(%borrow : $C, %aggregate : $PairC)
@@ -403,7 +403,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 //
 sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa-liveness @argument[0]"
   %s0 = struct $PairC(%0 : $C, %0 : $C)
   %s0a = struct_extract %s0 : $PairC, #PairC.first
   %s0b = struct_extract %s0 : $PairC, #PairC.second
@@ -513,7 +513,7 @@ sil [ossa] @testMultiDefUseAddressReinit : $@convention(thin) (@owned C) -> () {
 bb0(%0: @owned $C):
   %1 = alloc_stack $C
   %2 = copy_value %0 : $C
-  test_specification """
+  specify_test """
                      multidefuse-liveness defs: @instruction @block[1].instruction[2]
                      uses: @block[1].instruction[0]
                      """
