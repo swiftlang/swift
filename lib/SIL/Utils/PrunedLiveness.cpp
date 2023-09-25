@@ -169,7 +169,7 @@ namespace swift::test {
 // - the insertion points
 static FunctionTest
     PrunedLivenessBoundaryWithListOfLastUsersInsertionPointsTest(
-        "pruned-liveness-boundary-with-list-of-last-users-insertion-points",
+        "pruned_liveness_boundary_with_list_of_last_users_insertion_points",
         [](auto &function, auto &arguments, auto &test) {
           PrunedLivenessBoundary boundary;
           while (arguments.hasUntaken()) {
@@ -346,7 +346,7 @@ namespace swift::test {
 // - SILValue: value to a analyze
 // Dumps:
 // - the liveness result and boundary
-static FunctionTest SSALivenessTest("ssa-liveness", [](auto &function,
+static FunctionTest SSALivenessTest("ssa_liveness", [](auto &function,
                                                        auto &arguments,
                                                        auto &test) {
   auto value = arguments.takeValue();
@@ -617,7 +617,7 @@ namespace swift::test {
 // locations. In that case, the def nodes may be stores and the uses may be
 // destroy_addrs.
 static FunctionTest MultiDefUseLivenessTest(
-    "multidefuse-liveness", [](auto &function, auto &arguments, auto &test) {
+    "multidefuse_liveness", [](auto &function, auto &arguments, auto &test) {
       SmallVector<SILBasicBlock *, 8> discoveredBlocks;
       MultiDefPrunedLiveness liveness(&function, &discoveredBlocks);
 
@@ -747,7 +747,7 @@ namespace swift::test {
 // Computes liveness for the specified def nodes by finding all their direct SSA
 // uses. If the def is an instruction, then all results are considered.
 static FunctionTest MultiDefLivenessTest(
-    "multidef-liveness", [](auto &function, auto &arguments, auto &test) {
+    "multidef_liveness", [](auto &function, auto &arguments, auto &test) {
       SmallVector<SILBasicBlock *, 8> discoveredBlocks;
       MultiDefPrunedLiveness liveness(&function, &discoveredBlocks);
 
