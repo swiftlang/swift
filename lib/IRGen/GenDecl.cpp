@@ -5678,7 +5678,7 @@ static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   emitNestedTypeDecls(ext->getMembers());
 
-  if (ext->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     return;
   }
 
