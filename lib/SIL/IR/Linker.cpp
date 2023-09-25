@@ -418,6 +418,15 @@ void SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
   linkInVTable(C);
 }
 
+void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
+  if (!Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  SILGlobalVariable *G = GAI->getReferencedGlobal();
+  G->setDeclaration(false);
+  G->setLinkage(stripExternalFromLinkage(G->getLinkage()));
+}
+
 //===----------------------------------------------------------------------===//
 //                             Top Level Routine
 //===----------------------------------------------------------------------===//
