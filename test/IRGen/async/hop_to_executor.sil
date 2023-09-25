@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s -check-prefix CHECK-%target-abi
+// RUN: %target-swift-frontend -primary-file %s -module-name=test -emit-irgen -sil-verify-all | %IRGenFileCheck %s -check-prefix CHECK-%target-abi
 
 // REQUIRES: concurrency
 

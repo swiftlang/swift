@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -g -emit-ir  -disable-availability-checking -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -g -emit-irgen  -disable-availability-checking | %FileCheck %s
 // REQUIRES: concurrency
 
 // CHECK: call i1 (ptr, i1, ...) @llvm.coro.end.async
