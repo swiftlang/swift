@@ -67,24 +67,24 @@ sil [ossa] @empty_fn_caller_caller : $@convention(thin) () -> () {
 // CHECK-LABEL: end running test 6 of {{[0-9]+}} on call_functions: is-deinit-barrier
 sil [ossa] @call_functions : $@convention(thin) () -> () {
 entry:
-  test_specification "dump-function"
-  test_specification "is-deinit-barrier @instruction[1]"
+  specify_test "dump-function"
+  specify_test "is-deinit-barrier @instruction[1]"
   %empty_fn = function_ref @empty_fn : $@convention(thin) () -> ()
   apply %empty_fn() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[3]"
+  specify_test "is-deinit-barrier @instruction[3]"
   %empty_fn_caller = function_ref @empty_fn_caller : $@convention(thin) () -> ()
   apply %empty_fn_caller() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[5]"
+  specify_test "is-deinit-barrier @instruction[5]"
   %empty_fn_caller_caller = function_ref @empty_fn_caller_caller : $@convention(thin) () -> ()
   apply %empty_fn_caller_caller() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[7]"
+  specify_test "is-deinit-barrier @instruction[7]"
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[9]"
+  specify_test "is-deinit-barrier @instruction[9]"
   %unknown_caller = function_ref @unknown_caller : $@convention(thin) () -> ()
   apply %unknown_caller() : $@convention(thin) () -> ()
 
@@ -104,7 +104,7 @@ sil @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
 sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
   %borrowA = function_ref @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
   (%a, %token) = begin_apply %borrowA() : $@yield_once @convention(thin) () -> @yields @guaranteed A
-  test_specification "is-deinit-barrier @instruction"
+  specify_test "is-deinit-barrier @instruction"
   hop_to_executor %a : $A
   end_apply %token
   %retval = tuple ()
@@ -125,15 +125,15 @@ sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
 // CHECK-LABEL: end running test 3 of {{[0-9]+}} on test_instructions_1: is-deinit-barrier
 sil [ossa] @test_instructions_1 : $@convention(thin) () -> () {
 entry:
-  test_specification "is-deinit-barrier @instruction"
+  specify_test "is-deinit-barrier @instruction"
   debug_step
 
   %my_errno = global_addr @my_errno : $*Builtin.Int32
-  test_specification "is-deinit-barrier @instruction"
+  specify_test "is-deinit-barrier @instruction"
   %my_errno_value = load [trivial] %my_errno : $*Int32
 
   %global_var = global_addr @global_var : $*Builtin.Int32
-  test_specification "is-deinit-barrier @instruction"
+  specify_test "is-deinit-barrier @instruction"
   %global_var_value = load [trivial] %global_var : $*Int32
 
   %retval = tuple ()

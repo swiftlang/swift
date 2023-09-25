@@ -36,10 +36,10 @@ class D : C {}
 
 sil [ossa] @enclosing_def_empty : $@convention(thin) (@guaranteed C, @in C) -> () {
 entry(%0 : @guaranteed $C, %1 : $*C):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %0 : $C
   %borrow1 = load_borrow %1 : $*C
-  test_specification "find-enclosing-defs @trace[1]"
+  specify_test "find-enclosing-defs @trace[1]"
   debug_value [trace] %borrow1 : $C
   end_borrow %borrow1 : $C
   destroy_addr %1 : $*C
@@ -61,7 +61,7 @@ entry:
   br none(%trivial : $FakeOptional<C>)
 
 none(%phi : @guaranteed $FakeOptional<C>):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %phi : $FakeOptional<C>
   %retval = tuple ()
   return %retval : $()
@@ -80,7 +80,7 @@ entry:
   br exit
 
 unreachable_loop(%phiCycle : @guaranteed $C):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %phiCycle : $C
   br unreachable_loop(%phiCycle : $C)
 
@@ -114,7 +114,7 @@ bb1(%payload : @guaranteed $D):
   %first = struct_extract %aggregate : $PairC, #PairC.first
   %second = struct_extract %aggregate : $PairC, #PairC.second
   %aggregate2 = struct $PairC(%first : $C, %second : $C)
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %aggregate2 : $PairC
   br exit
 
@@ -144,7 +144,7 @@ bb2(%reborrow2 : @guaranteed $C):
   br bb3(%reborrow2 : $C)
 
 bb3(%reborrow3 : @guaranteed $C):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %reborrow3 : $C
   end_borrow %reborrow3 : $C
   %retval = tuple ()
@@ -171,7 +171,7 @@ bb2(%reborrow_outer : @guaranteed $C, %reborrow_inner : @guaranteed $C):
   br bb3(%reborrow_inner : $C)
 
 bb3(%reborrow_inner3 : @guaranteed $C):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %reborrow_inner3 : $C
 
   end_borrow %reborrow_inner3 : $C
@@ -198,7 +198,7 @@ entry(%0 : @guaranteed $C):
   br bb2(%borrow : $C, %first1 : $C)
 
 bb2(%reborrow_outer : @guaranteed $C, %forward : @guaranteed $C):
-  test_specification "find-enclosing-defs @trace[0]"
+  specify_test "find-enclosing-defs @trace[0]"
   debug_value [trace] %forward : $C
 
   %aggregate2 = struct $PairC(%reborrow_outer : $C, %forward : $C)

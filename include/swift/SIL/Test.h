@@ -1,4 +1,4 @@
-//===---- Test.h - Testing based on test_specification insts -*- C++ ----*-===//
+//===---- Test.h - Testing based on specify_test insts -*- C++ ----*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,7 +26,7 @@
 // of a function.  The goal is to get the same effect as calling a function and
 // checking its output.
 //
-// This is done via the test_specification instruction.  Using one or more
+// This is done via the specify_test instruction.  Using one or more
 // instances of it in your test case's SIL function, you can specify which test
 // (instance of FunctionTest) should be run and what arguments should be
 // provided to it.  The test grabs the arguments it expects out of the
@@ -59,10 +59,10 @@
 //    TestRunner pass:
 //     // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 // 2) A function in interesting_functionality_unit.sil contains the
-//    test_specification instruction.
+//    specify_test instruction.
 //      sil @f : $() -> () {
 //      ...
-//      test_specification "my-neato-utility 43 @trace[2] @function[other_fun]"
+//      specify_test "my-neato-utility 43 @trace[2] @function[other_fun]"
 //      ...
 //      }
 // 3) TestRunner finds the FunctionTest instance MyNeatoUtilityTest registered
@@ -109,18 +109,18 @@ namespace test {
 struct Arguments;
 class TestRunner;
 
-/// A test that is run when the corresponding test_specification instruction is
+/// A test that is run when the corresponding specify_test instruction is
 /// processed by the TestRunner pass.
 ///
 /// Tests are instantiated once at program launch.  At that time, they are
-/// stored in a registry name -> test.  When an test_specification instruction
+/// stored in a registry name -> test.  When an specify_test instruction
 /// naming a particular test is processed, that test is run.
 class FunctionTest final {
 public:
   /// Wraps a test lambda.
   ///
   /// There are three arguments in order of priority:
-  /// - SILFunction & - the function with the test_specification instruction
+  /// - SILFunction & - the function with the specify_test instruction
   /// - Arguments & - the resolved list of args specified by the instruction
   /// - FunctionTest & - the test being run; used to find less commonly used
   ///                    values such as the results of analyses

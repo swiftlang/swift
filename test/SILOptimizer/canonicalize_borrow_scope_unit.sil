@@ -29,7 +29,7 @@ struct Unmanaged<Instance> where Instance : AnyObject {
 // CHECK-LABEL: end {{.*}} on copy_and_move_argument: canonicalize-borrow-scope
 sil [ossa] @copy_and_move_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
 bb0(%instance : @guaranteed $Instance):
-  test_specification "canonicalize-borrow-scope @argument"
+  specify_test "canonicalize-borrow-scope @argument"
   %copy_1 = copy_value %instance : $Instance
   %copy_2 = copy_value %copy_1 : $Instance
   %move = move_value %copy_2 : $Instance
@@ -54,7 +54,7 @@ bb0(%instance : @guaranteed $Instance):
 // CHECK-LABEL: end {{.*}} on copy_and_move_lexical_argument: canonicalize-borrow-scope
 sil [ossa] @copy_and_move_lexical_argument : $@convention(thin) <Instance where Instance : AnyObject> (@guaranteed Instance) -> Unmanaged<Instance> {
 bb0(%instance : @guaranteed $Instance):
-  test_specification "canonicalize-borrow-scope @argument"
+  specify_test "canonicalize-borrow-scope @argument"
   %copy_1 = copy_value %instance : $Instance
   %copy_2 = copy_value %copy_1 : $Instance
   %move = move_value [lexical] %copy_2 : $Instance
@@ -89,7 +89,7 @@ sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owne
     %getD = function_ref @getD : $@convention(thin) () -> (@owned D)
     %takeC = function_ref @takeC : $@convention(thin) (@owned C) -> ()
     %d = apply %getD() : $@convention(thin) () -> (@owned D)
-    test_specification "canonicalize-borrow-scope @instruction"
+    specify_test "canonicalize-borrow-scope @instruction"
     %b = begin_borrow %d : $D
     %c2 = copy_value %b : $D
     %u2 = upcast %c2 : $D to $C
@@ -126,7 +126,7 @@ sil [ossa] @dont_rewrite_inner_forwarding_user : $@convention(thin) () -> (@owne
 // CHECK-LABEL: end running test {{.*}} on dont_hoist_inner_destructure: canonicalize-borrow-scope
 sil [ossa] @dont_hoist_inner_destructure : $@convention(thin) (@owned S) -> () {
 entry(%s : @owned $S):
-  test_specification "canonicalize-borrow-scope @instruction"
+  specify_test "canonicalize-borrow-scope @instruction"
   %s_borrow = begin_borrow %s : $S
   %s_copy = copy_value %s_borrow : $S
   cond_br undef, left, right

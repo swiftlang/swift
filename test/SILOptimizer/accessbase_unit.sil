@@ -40,9 +40,9 @@ bb1(%box : $Box<C>):
   br exit(%value_ptr : $Builtin.RawPointer)               
 
 exit(%phi : $Builtin.RawPointer):                   
-  test_specification "get_access_base @argument"
-  test_specification "compute_access_storage @argument"
-  test_specification "accesspath-base @argument"
+  specify_test "get_access_base @argument"
+  specify_test "compute_access_storage @argument"
+  specify_test "accesspath-base @argument"
   %retval = tuple ()
   return %retval : $()
 } 
@@ -59,7 +59,7 @@ sil_global @global_c : $C
 // CHECK-LABEL: end running test {{.*}} on test_access_global
 sil @test_access_global : $@convention(thin) () -> () {
   %15 = global_addr @global_c : $*C
-  test_specification "get_typed_access_address @instruction"
+  specify_test "get_typed_access_address @instruction"
   %16 = begin_access [read] [dynamic] %15 : $*C
   end_access %16 : $*C
   %retval = tuple ()
