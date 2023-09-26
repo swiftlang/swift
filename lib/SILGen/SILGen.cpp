@@ -683,6 +683,10 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
+static bool shouldEmitFunctionBody(const AbstractFunctionDecl *AFD) {
+  return AFD->hasBody() && !AFD->isBodySkipped();
+}
+
 static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (!constant.hasDecl())
     return false;
@@ -696,7 +700,7 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   switch (constant.kind) {
   case SILDeclRef::Kind::Func: {
     auto *fd = cast<FuncDecl>(d);
-    if (!fd->hasBody())
+    if (!shouldEmitFunctionBody(fd))
       return false;
 
     if (isa<ClangModuleUnit>(dc->getModuleScopeContext()))
@@ -713,8 +717,7 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
     // foreign-to-native thunk is sufficient.
     if (isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
         !cd->isFactoryInit() &&
-        (dc->getSelfClassDecl() ||
-         cd->hasBody()))
+        (dc->getSelfClassDecl() || shouldEmitFunctionBody(cd)))
       return true;
 
     break;
@@ -1413,7 +1416,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   emitAbstractFuncDecl(fd);
 
-  if (fd->hasBody())
+  if (shouldEmitFunctionBody(fd))
     emitOrDelayFunction(SILDeclRef(decl));
 }
 
@@ -1441,7 +1444,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     if (decl->isDesignatedInit() || decl->isObjC()) {
       emitOrDelayFunction(constant);
 
-      if (decl->hasBody()) {
+      if (shouldEmitFunctionBody(decl)) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
         emitOrDelayFunction(initConstant);
       }
@@ -1452,7 +1455,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   // Struct and enum constructors do everything in a single function, as do
   // non-@objc convenience initializers for classes.
-  if (decl->hasBody()) {
+  if (shouldEmitFunctionBody(decl)) {
     emitOrDelayFunction(constant);
   }
 }
@@ -1523,15 +1526,15 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                                                DestructorDecl *dd) {
   // Emit the native deallocating destructor for -dealloc.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  if (dd->hasBody()) {
+  if (shouldEmitFunctionBody(dd)) {
     SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
     emitFunctionDefinition(dealloc, getFunction(dealloc, ForDefinition));
-  }
 
-  // Emit the Objective-C -dealloc entry point if it has
-  // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && !dd->getBody()->empty())
-    emitObjCDestructorThunk(dd);
+    // Emit the Objective-C -dealloc entry point if it has
+    // something to do beyond messaging the superclass's -dealloc.
+    if (!dd->getBody()->empty())
+      emitObjCDestructorThunk(dd);
+  }
 
   // Emit the ivar initializer, if needed.
   if (requiresIVarInitialization(*this, cd)) {
@@ -1568,7 +1571,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
   // Emit the destroying destructor.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  if (dd->hasBody()) {
+  if (shouldEmitFunctionBody(dd)) {
     SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
     emitFunctionDefinition(destroyer, getFunction(destroyer, ForDefinition));
   }
@@ -1588,7 +1591,7 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
   emitAbstractFuncDecl(dd);
 
   // Emit the deallocating destructor if we have a body.
-  if (dd->hasBody()) {
+  if (shouldEmitFunctionBody(dd)) {
     SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
     emitFunctionDefinition(deallocator,
                            getFunction(deallocator, ForDefinition));

@@ -1056,6 +1056,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
 
+    assert(!fd->isBodySkipped());
     emitProfilerIncrement(fd->getTypecheckedBody());
 
     // Emit the actual function body as usual

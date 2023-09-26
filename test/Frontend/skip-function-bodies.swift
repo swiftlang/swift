@@ -18,9 +18,8 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Skip.noninlinable.swiftinterface) -module-name Skip
 // RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.noninlinable.swiftinterface
 // RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -module-name Skip -experimental-skip-all-function-bodies
-// FIXME: The interface emitted with -experimental-skip-all-function-bodies is very broken.
-// %target-swift-typecheck-module-from-interface(%t/Skip.all.swiftinterface) -module-name Skip
-// %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.all.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t/Skip.all.swiftinterface) -module-name Skip
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.all.swiftinterface
 
 // Verify that the emitted interfaces match an interface emitted without any
 // body skipping flags.
@@ -213,9 +212,8 @@ public func funcPublicWithNestedTypeStructInNestedFunc() {
   _blackHole(INLINENOTYPECHECK_local)
 
   func noType() {
-    // FIXME: This should be NEVERTYPECHECK but there is overeager typechecking.
-    let INLINENOTYPECHECK_innerLocal = "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-    _blackHole(INLINENOTYPECHECK_innerLocal)
+    let NEVERTYPECHECK_innerLocal = "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
+    _blackHole(NEVERTYPECHECK_innerLocal)
   }
 
   func type() {
@@ -232,9 +230,7 @@ public func funcPublicWithNestedTypeStructInNestedFunc() {
 
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-// FIXME: This shouldn't need to be SILGen'd.
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
+// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
 
 // CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
 // CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
