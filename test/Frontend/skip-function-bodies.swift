@@ -1,545 +1,408 @@
 // RUN: %empty-directory(%t)
 
-// Check skipped function bodies are neither typechecked nor SILgen'd when the
-// -experimental-skip-*-function-bodies-* flags are specified.
-// RUN: %target-swift-frontend -emit-sil %s > %t/NoSkip.sil
-// RUN: grep -o "string_literal utf8 \".*\"" %t/NoSkip.sil | sort -f > %t/NoSkip.sil.strings
-// RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s > %t/Skip.noninlinable.sil
-// RUN: grep -o "string_literal utf8 \".*\"" %t/Skip.noninlinable.sil | sort -f > %t/Skip.noninlinable.sil.strings
-// RUN: %target-swift-frontend -emit-sil -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK %s > %t/Skip.withouttypes.sil
-// RUN: grep -o "string_literal utf8 \".*\"" %t/Skip.withouttypes.sil | sort -f > %t/Skip.withouttypes.sil.strings
+// Check skipped bodies are neither typechecked nor SILgen'd
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK %s -o %t/Skip.noninlinable.sil
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-non-inlinable-function-bodies-without-types -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix TYPESNOTYPECHECK %s -o %t/Skip.withouttypes.sil
+// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -experimental-skip-all-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix ALLNOTYPECHECK %s -o %t/Skip.all.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-SIL < %t/Skip.noninlinable.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-WITHOUTTYPES-ONLY,CHECK-NONINLINE-SIL < %t/Skip.withouttypes.sil
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY < %t/Skip.all.sil
 
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-NO-SKIP --input-file %t/NoSkip.sil.strings
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES,CHECK-SIL-SKIP-NONINLINE --input-file %t/Skip.noninlinable.sil.strings
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES,CHECK-SIL-SKIP-WITHOUTTYPES --input-file %t/Skip.withouttypes.sil.strings
+// Emit the module interface and check it against the same set of strings.
+// RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.noninlinable.swiftinterface -experimental-skip-non-inlinable-function-bodies
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.noninlinable.swiftinterface
+// RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.all.swiftinterface -experimental-skip-all-function-bodies
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-ALL-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.all.swiftinterface
 
-// RUN: %target-swift-frontend -emit-sil -experimental-skip-all-function-bodies -debug-forbid-typecheck-prefix NEVERTYPECHECK -debug-forbid-typecheck-prefix INLINENOTYPECHECK -debug-forbid-typecheck-prefix ALLNOTYPECHECK %s > %t/Skip.all.sil
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-SIL-SKIP-ALL --input-file %t/Skip.all.sil
-
-// Emit module interfaces and check their contents, too.
-// RUN: %target-swift-emit-module-interface(%t/Skip.noninlinable.swiftinterface) %s -module-name Skip -experimental-skip-non-inlinable-function-bodies
-// RUN: %target-swift-typecheck-module-from-interface(%t/Skip.noninlinable.swiftinterface) -module-name Skip
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.noninlinable.swiftinterface
-// RUN: %target-swift-emit-module-interface(%t/Skip.all.swiftinterface) %s -module-name Skip -experimental-skip-all-function-bodies
-// FIXME: The interface emitted with -experimental-skip-all-function-bodies is very broken.
-// %target-swift-typecheck-module-from-interface(%t/Skip.all.swiftinterface) -module-name Skip
-// %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/Skip.all.swiftinterface
-
-// Verify that the emitted interfaces match an interface emitted without any
-// body skipping flags.
-// RUN: %target-swift-emit-module-interface(%t/NoSkip.swiftinterface) %s  -module-name Skip
-// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-TEXTUAL --input-file %t/NoSkip.swiftinterface
-// RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/NoSkip.swiftinterface
-// FIXME: Skipping all function bodies causes the interfaces not to match.
-// diff -u %t/Skip.all.swiftinterface %t/NoSkip.swiftinterface
-
-// Skipping all function bodies should skip *all* SIL.
-// CHECK-SIL-SKIP-ALL: sil_stage canonical
-// CHECK-SIL-SKIP-ALL-NOT: string_literal utf8
-// CHECK-SIL-SKIP-ALL-NOT: sil_global
-// CHECK-SIL-SKIP-ALL-NOT: sil_vtable
-// CHECK-SIL-SKIP-ALL-NOT: sil_property
-
-// NOTE: The order of the declarations below is important. The string literals
-// in SIL are checked by extracting the literals into a separate file and then
-// sorting them. The declaration order should match that sort order so that both
-// the extracted strings and their appearance in a swiftinterface are in the
-// same order.
+// Emit the module interface normally, it should be the same as when skipping
+// non-inlinable.
+// RUN: %target-swift-frontend -typecheck %s -enable-library-evolution -emit-module-interface-path %t/Skip.swiftinterface
+// RUN: %FileCheck %s --check-prefixes CHECK,CHECK-NONINLINE-ONLY,CHECK-NONINLINE-TEXTUAL < %t/Skip.swiftinterface
+// RUN: diff -u %t/Skip.noninlinable.swiftinterface %t/Skip.swiftinterface
 
 @usableFromInline
 @inline(never)
 func _blackHole(_ s: String) {}
 
-@_fixed_layout
-public class DeinitAlwaysInline {
-  @inline(__always) deinit {
-    let NEVERTYPECHECK_local = "DeinitAlwaysInline.deinit()"
-    _blackHole(NEVERTYPECHECK_local)
-  }
+// NOTE: The order of the checks below is important. The checks try to be
+// logically grouped, but sometimes -emit-sorted-sil needs to break the logical
+// order.
+
+@inlinable public func inlinableFunc() {
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("@inlinable func body")
+  // CHECK-NONINLINE-ONLY "@inlinable func body"
+  // CHECK-ALL-ONLY-NOT: "@inlinable func body"
 }
-// CHECK-TEXTUAL-NOT: "DeinitAlwaysInline.deinit()"
-// CHECK-SIL-NO-SKIP: "DeinitAlwaysInline.deinit()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "DeinitAlwaysInline.deinit()"
 
 @_fixed_layout
-public class DeinitInlinable {
+public class InlinableDeinit {
   @inlinable deinit {
-    let ALLNOTYPECHECK_local = "DeinitInlinable.deinit()"
-    _blackHole(ALLNOTYPECHECK_local)
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@inlinable deinit body")
+    // CHECK-NONINLINE-ONLY: "@inlinable deinit body"
+    // CHECK-ALL-ONLY-NOT: "@inlinable deinit body"
   }
 }
-// CHECK-TEXTUAL: "DeinitInlinable.deinit()"
-// CHECK-SIL-NO-SKIP: "DeinitInlinable.deinit()"
-// CHECK-SIL-SKIP-NONINLINE: "DeinitInlinable.deinit()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "DeinitInlinable.deinit()"
 
-public class DeinitNormal {
+@_fixed_layout
+public class InlineAlwaysDeinit {
+  @inline(__always) deinit {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("@inline(__always) deinit body") // CHECK-NOT: "@inline(__always) deinit body"
+  }
+}
+
+public class NormalDeinit {
   deinit {
-    let NEVERTYPECHECK_local = "DeinitNormal.deinit()"
-    _blackHole(NEVERTYPECHECK_local)
+    let NEVERTYPECHECK_local = 1
+    _blackHole("regular deinit body") // CHECK-NOT: "regular deinit body"
   }
 }
-// CHECK-TEXTUAL-NOT: "DeinitNormal.deinit()"
-// CHECK-SIL-NO-SKIP: "DeinitNormal.deinit()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "DeinitNormal.deinit()"
 
-@inline(__always) public func funcAlwaysInline() {
-  let NEVERTYPECHECK_local = "funcAlwaysInline()"
-  _blackHole(NEVERTYPECHECK_local)
+@_transparent public func transparentFunc() {
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("@_transparent func body")
+  // CHECK-NONINLINE-ONLY: "@_transparent func body"
+  // CHECK-ALL-ONLY-NOT: "@_transparent func body"
 }
-// CHECK-TEXTUAL-NOT: "funcAlwaysInline()"
-// CHECK-SIL-NO-SKIP: "funcAlwaysInline()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcAlwaysInline()"
 
-@inlinable public func funcInlinable() {
-  let ALLNOTYPECHECK_local = "funcInlinable()"
-  _blackHole(ALLNOTYPECHECK_local)
+@inline(__always) public func inlineAlwaysFunc() {
+  let NEVERTYPECHECK_local = 1
+  _blackHole("@inline(__always) func body") // CHECK-NOT: "@inline(__always) func body"
 }
-// CHECK-TEXTUAL: "funcInlinable()"
-// CHECK-SIL-NO-SKIP: "funcInlinable()"
-// CHECK-SIL-SKIP-NONINLINE: "funcInlinable()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcInlinable()"
 
-@inlinable public func funcInlinableWithDefer() {
-  defer {
-    let ALLNOTYPECHECK_local = "funcInlinableWithDefer()"
-    _blackHole(ALLNOTYPECHECK_local)
+func internalFunc() {
+  let NEVERTYPECHECK_local = 1
+  _blackHole("internal func body") // CHECK-NOT: "internal func body"
+}
+
+public func publicFunc() {
+  let NEVERTYPECHECK_local = 1
+  _blackHole("public func body") // CHECK-NOT: "public func body"
+}
+
+private func privateFunc() {
+  let NEVERTYPECHECK_local = 1
+  _blackHole("private func body") // CHECK-NOT: "private func body"
+}
+
+@inline(__always) public func inlineAlwaysLocalTypeFunc() {
+  let NEVERTYPECHECK_outerLocal = 1
+
+  typealias InlineAlwaysLocalType = Int
+  _blackHole("@inline(__always) func body with local type") // CHECK-NOT: "@inline(__always) func body with local type"
+  func takesInlineAlwaysLocalType(_ x: InlineAlwaysLocalType) {
+    let NEVERTYPECHECK_innerLocal = 1
+    _blackHole("nested func body inside @inline(__always) func body taking local type") // CHECK-NOT: "nested func body inside @inline(__always) func body taking local type"
   }
-  _ = 1
+  takesInlineAlwaysLocalType(0)
 }
-// CHECK-TEXTUAL: "funcInlinableWithDefer()"
-// CHECK-SIL-NO-SKIP: "funcInlinableWithDefer()"
-// CHECK-SIL-SKIP-NONINLINE: "funcInlinableWithDefer()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcInlinableWithDefer()"
 
-@inlinable public func funcInlinableWithNestedFuncAndTypealias() {
-  let ALLNOTYPECHECK_outerLocal = "funcInlinableWithNestedFuncAndTypealias()"
-  _blackHole(ALLNOTYPECHECK_outerLocal)
+public func publicLocalTypeFunc() {
+  let NEVERTYPECHECK_outerLocal = 1
 
   typealias LocalType = Int
+  _blackHole("public func body with local type") // CHECK-NOT: "public func body with local type"
   func takesLocalType(_ x: LocalType) {
-    let ALLNOTYPECHECK_innerLocal = "funcInlinableWithNestedFuncAndTypealias()@takesLocalType(_:)"
-    _blackHole(ALLNOTYPECHECK_innerLocal)
+    let NEVERTYPECHECK_innerLocal = 1
+    _blackHole("nested func body inside public func body taking local type") // CHECK-NOT: "nested func body inside public func body taking local type"
   }
   takesLocalType(0)
 }
-// CHECK-TEXTUAL: "funcInlinableWithNestedFuncAndTypealias()"
-// CHECK-SIL-NO-SKIP: "funcInlinableWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-NONINLINE: "funcInlinableWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcInlinableWithNestedFuncAndTypealias()"
 
-// CHECK-TEXTUAL: "funcInlinableWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-NO-SKIP: "funcInlinableWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-SKIP-NONINLINE: "funcInlinableWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcInlinableWithNestedFuncAndTypealias()@takesLocalType(_:)"
+@inlinable
+public func inlinableLocalTypeFunc() {
+  let ALLNOTYPECHECK_outerLocal = 1
 
-func funcInternal() {
-  let NEVERTYPECHECK_local = "funcInternal()"
-  _blackHole(NEVERTYPECHECK_local)
-}
-// CHECK-TEXTUAL-NOT: "funcInternal()"
-// CHECK-SIL-NO-SKIP: "funcInternal()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcInternal()"
+  typealias InlinableLocalType = Int
+  _blackHole("@inlinable func body with local type")
+  // CHECK-NONINLINE-ONLY: "@inlinable func body with local type"
+  // CHECK-ALL-ONLY-NOT: "@inlinable func body with local type"
 
-func funcPrivate() {
-  let NEVERTYPECHECK_local = "funcPrivate()"
-  _blackHole(NEVERTYPECHECK_local)
-}
-// CHECK-TEXTUAL-NOT: "funcPrivate()"
-// CHECK-SIL-NO-SKIP: "funcPrivate()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPrivate()"
-
-func funcPublic() {
-  let NEVERTYPECHECK_local = "funcPublic()"
-  _blackHole(NEVERTYPECHECK_local)
-}
-// CHECK-TEXTUAL-NOT: "funcPublic()"
-// CHECK-SIL-NO-SKIP: "funcPublic()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublic()"
-
-func funcPublicWithDefer() {
-  defer {
-    let NEVERTYPECHECK_local = "funcPublicWithDefer()"
-    _blackHole(NEVERTYPECHECK_local)
+  func takesInlinableLocalType(_ x: InlinableLocalType) {
+    let ALLNOTYPECHECK_innerLocal = 1
+    _blackHole("nested func body inside @inlinable func body taking local type")
+    // CHECK-NONINLINE-ONLY: "nested func body inside @inlinable func body taking local type"
+    // CHECK-ALL-ONLY-NOT: "nested func body inside @inlinable func body taking local type"
   }
-  _ = 1
+  takesInlinableLocalType(0)
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithDefer()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithDefer()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithDefer()"
 
-public func funcPublicWithNestedFuncAndTypealias() {
-  let NEVERTYPECHECK_outerLocal = "funcPublicWithNestedFuncAndTypealias()"
-  _blackHole(NEVERTYPECHECK_outerLocal)
+@_transparent public func _transparentLocalTypeFunc() {
+  let ALLNOTYPECHECK_outerLocal = 1
 
-  typealias LocalType = Int
-  func takesLocalType(_ x: LocalType) {
-    let NEVERTYPECHECK_innerLocal = "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
-    _blackHole(NEVERTYPECHECK_innerLocal)
+  typealias TransparentLocalType = Int
+  _blackHole("@_transparent func body with local type")
+  // CHECK-NONINLINE-ONLY: "@_transparent func body with local type"
+  // CHECK-ALL-ONLY-NOT: "@_transparent func body with local type"
+
+  func takesTransparentLocalType(_ x: TransparentLocalType) {
+    let ALLNOTYPECHECK_innerLocal = 1
+    _blackHole("nested func body inside @_transparent func body taking local type")
+    // CHECK-NONINLINE-ONLY: "nested func body inside @_transparent func body taking local type"
+    // CHECK-ALL-ONLY-NOT: "nested func body inside @_transparent func body taking local type"
   }
-  takesLocalType(0)
+  takesTransparentLocalType(0)
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithNestedFuncAndTypealias()"
 
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "funcPublicWithNestedFuncAndTypealias()@takesLocalType(_:)"
+@inlinable
+public func inlinableNestedLocalTypeFunc() {
+  let ALLNOTYPECHECK_outerLocal = 1
 
-public func funcPublicWithNestedTypeClass() {
-  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeClass()"
-  _blackHole(INLINENOTYPECHECK_local)
-  class C {}
+  func nestedFunc() {
+    let ALLNOTYPECHECK_innerLocal = 1
+    _blackHole("nested func body inside @inlinable func body")
+    // CHECK-NONINLINE-ONLY: "nested func body inside @inlinable func body"
+    // CHECK-ALL-ONLY-NOT: "nested func body inside @inlinable func body"
+
+    typealias InlinableNestedLocalType = Int
+    func takesLocalType(_ x: InlinableNestedLocalType) {
+      let ALLNOTYPECHECK_innerLocal2 = 1
+      _blackHole("nested func body inside @inlinable func body taking local type")
+      // CHECK-NONINLINE-ONLY: "nested func body inside @inlinable func body taking local type"
+      // CHECK-ALL-ONLY-NOT: "nested func body inside @inlinable func body taking local type"
+    }
+    takesLocalType(0)
+  }
+  nestedFunc()
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeClass()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeClass()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeClass()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeClass()"
 
-public func funcPublicWithNestedTypeEnum() {
-  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeEnum()"
-  _blackHole(INLINENOTYPECHECK_local)
+public func funcWithEnum() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with enum body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with enum body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with enum body"
+  // CHECK-ALL-ONLY-NOT: "func with enum body"
   enum E {}
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeEnum()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeEnum()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeEnum()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeEnum()"
 
-public func funcPublicWithNestedTypeStruct() {
-  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeStruct()"
-  _blackHole(INLINENOTYPECHECK_local)
+public func funcWithClass() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with class body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with class body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with class body"
+  // CHECK-ALL-ONLY-NOT: "func with class body"
+  class C {}
+}
+
+public func funcWithStruct() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with struct body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with struct body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with struct body"
+  // CHECK-ALL-ONLY-NOT: "func with struct body"
   struct S {}
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStruct()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStruct()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeStruct()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeStruct()"
 
-public func funcPublicWithNestedTypeStructInNestedFunc() {
-  let INLINENOTYPECHECK_local = "funcPublicWithNestedTypeStructInNestedFunc()"
-  _blackHole(INLINENOTYPECHECK_local)
+public func funcWithNestedFuncs() {
+  let INLINENOTYPECHECK_local = 1
+  let ALLNOTYPECHECK_local = 1
+  _blackHole("func with nested funcs body")
+  // CHECK-WITHOUTTYPES-ONLY: "func with nested funcs body"
+  // CHECK-NONINLINE-ONLY-NOT: "func with nested funcs body"
+  // CHECK-ALL-ONLY-NOT: "func with nested funcs body"
 
-  func noType() {
-    // FIXME: This should be NEVERTYPECHECK but there is overeager typechecking.
-    let INLINENOTYPECHECK_innerLocal = "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-    _blackHole(INLINENOTYPECHECK_innerLocal)
+  func bar() {
+    _blackHole("nested func body")
+    // CHECK-WITHOUTTYPES-ONLY: "nested func body"
+    // FIXME: We could skip this nested function.
   }
 
-  func type() {
-    let INLINENOTYPECHECK_innerLocal = "funcPublicWithNestedTypeStructInNestedFunc()@type()"
-    _blackHole(INLINENOTYPECHECK_innerLocal)
+  func foo() {
+    _blackHole("nested func with type body")
+    // CHECK-WITHOUTTYPES-ONLY: "nested func with type body"
     struct S {}
   }
-
 }
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStructInNestedFunc()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStructInNestedFunc()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeStructInNestedFunc()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeStructInNestedFunc()"
-
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-// FIXME: This shouldn't need to be SILGen'd.
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeStructInNestedFunc()@noType()"
-
-// CHECK-TEXTUAL-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
-// CHECK-SIL-NO-SKIP: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
-// CHECK-SIL-SKIP-NONINLINE-NOT: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcPublicWithNestedTypeStructInNestedFunc()@type()"
-
-@_transparent public func funcTransparent() {
-  let ALLNOTYPECHECK_local = "funcTransparent()"
-  _blackHole(ALLNOTYPECHECK_local)
-}
-// CHECK-TEXTUAL: "funcTransparent()"
-// CHECK-SIL-NO-SKIP: "funcTransparent()"
-// CHECK-SIL-SKIP-NONINLINE: "funcTransparent()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcTransparent()"
-
-@_transparent public func funcTransparentWithNestedFuncAndTypealias() {
-  let ALLNOTYPECHECK_outerLocal = "funcTransparentWithNestedFuncAndTypealias()"
-  _blackHole(ALLNOTYPECHECK_outerLocal)
-
-  typealias LocalType = Int
-  func takesLocalType(_ x: LocalType) {
-    let ALLNOTYPECHECK_innerLocal = "funcTransparentWithNestedFuncAndTypealias()@takesLocalType(_:)"
-    _blackHole(ALLNOTYPECHECK_innerLocal)
-  }
-  takesLocalType(0)
-}
-// CHECK-TEXTUAL: "funcTransparentWithNestedFuncAndTypealias()"
-// CHECK-SIL-NO-SKIP: "funcTransparentWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-NONINLINE: "funcTransparentWithNestedFuncAndTypealias()"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcTransparentWithNestedFuncAndTypealias()"
-
-// CHECK-TEXTUAL: "funcTransparentWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-NO-SKIP: "funcTransparentWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-SKIP-NONINLINE: "funcTransparentWithNestedFuncAndTypealias()@takesLocalType(_:)"
-// CHECK-SIL-SKIP-WITHOUTTYPES: "funcTransparentWithNestedFuncAndTypealias()@takesLocalType(_:)"
 
 public struct Struct {
-  public var didSetVar: Int = 1 {
-    didSet {
-      // This body is always typechecked.
-      _blackHole("Struct.didSetVar.didSet")
-    }
+  @inlinable public var inlinableVar: Int {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@inlinable getter body")
+    // CHECK-NONINLINE-ONLY: "@inlinable getter body"
+    // CHECK-ALL-ONLY-NOT: "@inlinable getter body"
+    return 0
   }
-  // CHECK-TEXTUAL-NOT: "Struct.didSetVar.didSet"
-  // CHECK-SIL-NO-SKIP: "Struct.didSetVar.didSet"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.didSetVar.didSet"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.didSetVar.didSet"
-
-  @inlinable public init(inlinable: Int) {
-    let ALLNOTYPECHECK_local = "Struct.init(inlinable:)"
-    _blackHole(ALLNOTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL: "Struct.init(inlinable:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(inlinable:)"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.init(inlinable:)"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.init(inlinable:)"
-
-  @inline(__always) public init(inlineAlways: Int) {
-    let NEVERTYPECHECK_local = "Struct.init(inlineAlways:)"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.init(inlineAlways:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(inlineAlways:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.init(inlineAlways:)"
-
-  init(internal: Int) {
-    let NEVERTYPECHECK_local = "Struct.init(internal:)"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.init(internal:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(internal:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.init(internal:)"
-
-  private init(private: Int) {
-    let NEVERTYPECHECK_local = "Struct.init(private:)"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.init(private:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(private:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.init(private:)"
-
-  public init(public: Int) {
-    let NEVERTYPECHECK_local = "Struct.init(public:)"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.init(public:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(public:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.init(public:)"
-
-  @_transparent public init(transparent: Int) {
-    let ALLNOTYPECHECK_local = "Struct.init(transparent:)"
-    _blackHole(ALLNOTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL: "Struct.init(transparent:)"
-  // CHECK-SIL-NO-SKIP: "Struct.init(transparent:)"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.init(transparent:)"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.init(transparent:)"
 
   @inlinable public func inlinableFunc() {
-    let ALLNOTYPECHECK_local = "Struct.inlinableFunc()"
-    _blackHole(ALLNOTYPECHECK_local)
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@inlinable method body")
+    // CHECK-NONINLINE-ONLY: "@inlinable method body"
+    // CHECK-ALL-ONLY-NOT: "@inlinable method body"
   }
-  // CHECK-TEXTUAL: "Struct.inlinableFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.inlinableFunc()"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.inlinableFunc()"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.inlinableFunc()"
 
   @inline(__always)
   public func inlineAlwaysFunc() {
-    let NEVERTYPECHECK_local = "Struct.inlineAlwaysFunc()"
-    _blackHole(NEVERTYPECHECK_local)
+    let NEVERTYPECHECK_local = 1
+    _blackHole("@inline(__always) method body") // CHECK-NOT: "@inline(__always) method body"
   }
-  // CHECK-TEXTUAL-NOT: "Struct.inlineAlwaysFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.inlineAlwaysFunc()"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.inlineAlwaysFunc()"
+
+  @_transparent public var transparentVar: Int {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@_transparent getter body")
+    // CHECK-NONINLINE-ONLY: "@_transparent getter body"
+    // CHECK-ALL-ONLY-NOT: "@_transparent getter body"
+    return 0
+  }
+
+  public var inlinableSetter: Int {
+    get { 0 }
+    @inlinable set {
+      let ALLNOTYPECHECK_local = 1
+      _blackHole("@inlinable setter body")
+      // CHECK-NONINLINE-ONLY: "@inlinable setter body"
+      // CHECK-ALL-ONLY-NOT: "@inlinable setter body"
+    }
+  }
+
+  public var willSetVar: Int = 1 {
+    willSet {
+      let ALLNOTYPECHECK_local = 1
+      _blackHole("willSet body") // CHECK-NOT: "willSet body"
+    }
+  }
+
+  @_transparent
+  public func transparentFunc() {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@_transparent method body")
+    // CHECK-NONINLINE-ONLY: "@_transparent method body"
+    // CHECK-ALL-ONLY-NOT: "@_transparent method body"
+  }
+
+  func internalFunc() {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("internal method body") // CHECK-NOT: "internal method body"
+  }
+
+  public func publicFunc() {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("public method body") // CHECK-NOT: "public method body"
+  }
+
+  private func privateFunc() {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("private method body") // CHECK-NOT: "private method body"
+  }
+
+  @_transparent public init(b: Int) {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@_transparent init body")
+    // CHECK-NONINLINE-ONLY: "@_transparent init body"
+    // CHECK-ALL-ONLY-NOT: "@_transparent init body"
+  }
+
+  public var didSetVar: Int = 1 {
+    didSet {
+      // Body typechecked regardless
+      _blackHole("didSet body") // CHECK-NONINLINE-SIL: "didSet body"
+      // CHECK-NONINLINE-TEXTUAL-NOT: "didSet body"
+    }
+  }
+
+  @inlinable public init() {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@inlinable init body")
+    // CHECK-NONINLINE-ONLY: "@inlinable init body"
+    // CHECK-ALL-ONLY-NOT: "@inlinable init body"
+  }
+
+  @inline(__always) public init(a: Int) {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("@inline(__always) init body") // CHECK-NOT: "@inline(__always) init body"
+  }
+
+  init(c: Int) {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("internal init body") // CHECK-NOT: "internal init body"
+  }
+
+  public init(d: Int) {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("public init body") // CHECK-NOT: "public init body"
+  }
+
+  private init(e: Int) {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("private init body") // CHECK-NOT: "private init body"
+  }
+
+  @inlinable public subscript() -> Int {
+    let ALLNOTYPECHECK_local = 1
+    _blackHole("@inlinable subscript getter")
+    // CHECK-NONINLINE-ONLY: "@inlinable subscript getter"
+    // CHECK-ALL-ONLY-NOT: "@inlinable subscript getter"
+    return 0
+  }
+
+  @inline(__always) public subscript(a: Int, b: Int) -> Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("@inline(__always) subscript getter") // CHECK-NOT: "@inline(__always) subscript getter"
+    return 0
+  }
+
+  public subscript(a: Int, b: Int, c: Int) -> Int {
+    @_transparent get {
+      let ALLNOTYPECHECK_local = 1
+      _blackHole("@_transparent subscript getter")
+      // CHECK-NONINLINE-ONLY: "@_transparent subscript getter"
+      // CHECK-ALL-ONLY-NOT: "@_transparent subscript getter"
+      return 0
+    }
+  }
+
+  subscript(a: Int, b: Int, c: Int, d: Int) -> Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("internal subscript getter") // CHECK-NOT: "internal subscript getter"
+    return 0
+  }
+
+  public subscript(a: Int, b: Int, c: Int, d: Int, e: Int) -> Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("public subscript getter") // CHECK-NOT: "public subscript getter"
+    return 0
+  }
+
+  private subscript(e: Int) -> Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("private subscript getter") // CHECK-NOT: "private subscript getter"
+    return 0
+  }
+
+  @inline(__always) public var inlineAlwaysVar: Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("@inline(__always) getter body") // CHECK-NOT: "@inline(__always) getter body"
+    return 0
+  }
+
+  public var publicVar: Int {
+    let NEVERTYPECHECK_local = 1
+    _blackHole("public getter body") // CHECK-NOT: "public getter body"
+    return 0
+  }
 
   public var inlineAlwaysSetter: Int {
     get { 0 }
     @inline(__always) set {
-      let NEVERTYPECHECK_local = "Struct.inlineAlwaysSetter.setter"
-      _blackHole(NEVERTYPECHECK_local)
+      let NEVERTYPECHECK_local = 1
+      _blackHole("@inline(__always) setter body") // CHECK-NOT: "@inline(__always) setter body"
     }
   }
-  // CHECK-TEXTUAL-NOT: "Struct.inlineAlwaysSetter.setter"
-  // CHECK-SIL-NO-SKIP: "Struct.inlineAlwaysSetter.setter"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.inlineAlwaysSetter.setter"
 
-  @inline(__always) public var inlineAlwaysVar: Int {
-    let NEVERTYPECHECK_local = "Struct.inlineAlwaysVar.getter"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.inlineAlwaysVar.getter"
-  // CHECK-SIL-NO-SKIP: "Struct.inlineAlwaysVar.getter"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.inlineAlwaysVar.getter"
-
-  func internalFunc() {
-    let NEVERTYPECHECK_local = "Struct.internalFunc()"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.internalFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.internalFunc()"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.internalFunc()"
-
-  private func privateFunc() {
-    let NEVERTYPECHECK_local = "Struct.privateFunc()"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.privateFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.privateFunc()"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.privateFunc()"
-
-  public func publicFunc() {
-    let NEVERTYPECHECK_local = "Struct.publicFunc()"
-    _blackHole(NEVERTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.publicFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.publicFunc()"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.publicFunc()"
-
-  @inlinable public subscript(inlinable: Int) -> Int {
-    let ALLNOTYPECHECK_local = "Struct.subscript(inlinable:)"
-    _blackHole(ALLNOTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL: "Struct.subscript(inlinable:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(inlinable:)"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.subscript(inlinable:)"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.subscript(inlinable:)"
-
-  @inline(__always) public subscript(inlineAlways: Int, _ x: Int) -> Int {
-    let NEVERTYPECHECK_local = "Struct.subscript(inlineAlways:_:)"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.subscript(inlineAlways:_:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(inlineAlways:_:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.subscript(inlineAlways:_:)"
-
-  subscript(internal: Int, _ x: Int, _ y: Int, _ z: Int) -> Int {
-    let NEVERTYPECHECK_local = "Struct.subscript(internal:_:_:_:)"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.subscript(internal:_:_:_:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(internal:_:_:_:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.subscript(internal:_:_:_:)"
-
-  private subscript(private: Int, _ x: Int, _ y: Int, _ z: Int, _ zz: Int, _ zzz: Int) -> Int {
-    let NEVERTYPECHECK_local = "Struct.subscript(private:_:_:_:_:_:)"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.subscript(private:_:_:_:_:_:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(private:_:_:_:_:_:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.subscript(private:_:_:_:_:_:)"
-
-  public subscript(public: Int, _ x: Int, _ y: Int, _ z: Int, _ zz: Int) -> Int {
-    let NEVERTYPECHECK_local = "Struct.subscript(public:_:_:_:_:)"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.subscript(public:_:_:_:_:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(public:_:_:_:_:)"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.subscript(public:_:_:_:_:)"
-
-  public subscript(transparent: Int, _ x: Int, _ y: Int) -> Int {
-    @_transparent get {
-      let ALLNOTYPECHECK_local = "Struct.subscript(transparent:_:_:)"
-      _blackHole(ALLNOTYPECHECK_local)
-      return 0
-    }
-  }
-  // CHECK-TEXTUAL: "Struct.subscript(transparent:_:_:)"
-  // CHECK-SIL-NO-SKIP: "Struct.subscript(transparent:_:_:)"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.subscript(transparent:_:_:)"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.subscript(transparent:_:_:)"
-
-  @_transparent public func transparentFunc() {
-    let ALLNOTYPECHECK_local = "Struct.transparentFunc()"
-    _blackHole(ALLNOTYPECHECK_local)
-  }
-  // CHECK-TEXTUAL: "Struct.transparentFunc()"
-  // CHECK-SIL-NO-SKIP: "Struct.transparentFunc()"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.transparentFunc()"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.transparentFunc()"
-
-  @inlinable public var varWithInlinableGetter: Int {
-    let ALLNOTYPECHECK_local = "Struct.varWithInlinableGetter.getter"
-    _blackHole(ALLNOTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL: "Struct.varWithInlinableGetter.getter"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithInlinableGetter.getter"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.varWithInlinableGetter.getter"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.varWithInlinableGetter.getter"
-
-  public var varWithInlinableSetter: Int {
-    get { 0 }
-    @inlinable set {
-      let ALLNOTYPECHECK_local = "Struct.varWithInlinableSetter.setter"
-      _blackHole(ALLNOTYPECHECK_local)
-    }
-  }
-  // CHECK-TEXTUAL: "Struct.varWithInlinableSetter.setter"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithInlinableSetter.setter"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.varWithInlinableSetter.setter"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.varWithInlinableSetter.setter"
-
-  public var varWithObserverDidSet: Int = 1 {
-    didSet {
-      // Body typechecked regardless
-      _blackHole("Struct.varWithObserverDidSet.didSet")
-    }
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.varWithObserverDidSet.didSet"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithObserverDidSet.didSet"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES: "Struct.varWithObserverDidSet.didSet"
-
-  public var varWithObserverWillSet: Int = 1 {
-    willSet {
-      let ALLNOTYPECHECK_local = "Struct.varWithObserverWillSet.willSet"
-      _blackHole(ALLNOTYPECHECK_local)
-    }
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.varWithObserverWillSet.willSet"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithObserverWillSet.willSet"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.varWithObserverWillSet.willSet"
-
-  public var varWithPublicGetter: Int {
-    let NEVERTYPECHECK_local = "Struct.varWithPublicGetter.getter"
-    _blackHole(NEVERTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL-NOT: "Struct.varWithPublicGetter.getter"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithPublicGetter.getter"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.varWithPublicGetter.getter"
-
-  public var varWithSetter: Int {
+  public var regularSetter: Int {
     get { 0 }
     set {
-      let NEVERTYPECHECK_local = "Struct.varWithSetter.setter"
-      _blackHole(NEVERTYPECHECK_local)
+      let NEVERTYPECHECK_local = 1
+      _blackHole("@inline(__always) setter body") // CHECK-NOT: "regular setter body"
     }
   }
-  // CHECK-TEXTUAL-NOT: "Struct.varWithSetter.setter"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithSetter.setter"
-  // CHECK-SIL-SKIP-NONINLINE-OR-WITHOUTTYPES-NOT: "Struct.varWithSetter.setter"
-
-  @_transparent public var varWithTransparentGetter: Int {
-    let ALLNOTYPECHECK_local = "Struct.varWithTransparentGetter.getter"
-    _blackHole(ALLNOTYPECHECK_local)
-    return 0
-  }
-  // CHECK-TEXTUAL: "Struct.varWithTransparentGetter.getter"
-  // CHECK-SIL-NO-SKIP: "Struct.varWithTransparentGetter.getter"
-  // CHECK-SIL-SKIP-NONINLINE: "Struct.varWithTransparentGetter.getter"
-  // CHECK-SIL-SKIP-WITHOUTTYPES: "Struct.varWithTransparentGetter.getter"
 }
+
+// Skipping all function bodies should skip all SIL
+// CHECK-ALL-ONLY-NOT: sil_global
+// CHECK-ALL-ONLY-NOT: sil_vtable
+// CHECK-ALL-ONLY-NOT: sil_property
