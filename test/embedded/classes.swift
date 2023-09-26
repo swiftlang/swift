@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s %S/Inputs/print.swift -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang -x c -c %S/Inputs/tiny-runtime-dummy-refcounting.c -o %t/runtime.o
-// RUN: %target-clang %t/main.o %t/runtime.o -o %t/a.out -dead_strip
+// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
