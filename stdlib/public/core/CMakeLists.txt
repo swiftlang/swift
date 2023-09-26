@@ -396,11 +396,12 @@ endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
   set(EMBEDDED_STDLIB_TARGET_TRIPLES
-    # arch module_name            target triple
+    # arch    module_name               target triple
     "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
     "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
     "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
     "arm64    arm64-apple-macos         arm64-apple-macos10.13"
+    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
     )
 
   set(SWIFT_ENABLE_REFLECTION OFF)
