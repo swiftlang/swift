@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-size_t _swiftEmptyArrayStorage[] = { /*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1 };
-
 typedef struct ClassMetadata ClassMetadata;
 typedef struct HeapObject HeapObject;
 

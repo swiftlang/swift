@@ -63,6 +63,11 @@ internal final class __EmptyArrayStorage
   }
 }
 
+#if $Embedded
+public var _swiftEmptyArrayStorage: (Int, Int, Int, Int) =
+    (/*isa*/0, /*refcount*/-1, /*count*/0, /*flags*/1)
+#endif
+
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
 @inlinable
