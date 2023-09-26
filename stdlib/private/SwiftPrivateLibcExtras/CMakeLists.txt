@@ -36,6 +36,7 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WASI WASILibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
   INCORPORATE_OBJECT_LIBRARIES ${swift_private_libc_extras_incorporate_object_libraries}
   INSTALL_IN_COMPONENT stdlib-experimental
