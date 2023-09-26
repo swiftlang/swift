@@ -45,17 +45,20 @@ public:
   }
 
   void linkEmbeddedRuntimeFromStdlib() {
-    #define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT) \
-      linkEmbeddedRuntimeFunctionByName(#NAME);
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
+                 MEMORY_EFFECTS)                                               \
+  linkEmbeddedRuntimeFunctionByName(#NAME);
 
-    #define RETURNS(...)
-    #define ARGS(...)
-    #define NO_ARGS
-    #define ATTRS(...)
-    #define NO_ATTRS
-    #define EFFECT(...)
+#define RETURNS(...)
+#define ARGS(...)
+#define NO_ARGS
+#define ATTRS(...)
+#define NO_ATTRS
+#define EFFECT(...)
+#define MEMORY_EFFECTS(...)
+#define UNKNOWN_MEMEFFECTS
 
-    #include "swift/Runtime/RuntimeFunctions.def"
+#include "swift/Runtime/RuntimeFunctions.def"
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name) {
