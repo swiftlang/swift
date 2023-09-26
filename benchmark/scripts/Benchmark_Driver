@@ -226,6 +226,8 @@ class BenchmarkDriver(object):
             cmd.extend([str(self.test_number.get(name, name)) for name in self.tests])
         if num_samples > 0:
             cmd.append("--num-samples={0}".format(num_samples))
+        else:
+            cmd.append("--min-samples=2")
         if num_iters > 0:
             cmd.append("--num-iters={0}".format(num_iters))
         if sample_time > 0:
