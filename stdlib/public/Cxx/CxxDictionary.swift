@@ -76,7 +76,8 @@ extension CxxDictionary {
       }
     }
   }
-public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
+  
+  public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
     var filteredDictionary = Self.init()
     var iterator = __beginUnsafe()
     let endIterator = __endUnsafe()
