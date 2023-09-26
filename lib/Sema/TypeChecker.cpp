@@ -541,7 +541,7 @@ Expr *swift::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Contex
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
-  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
+  if (C.TypeCheckerOpts.DebugForbidTypecheckPrefixes.empty())
     return;
 
   // Don't touch special names or empty names.
@@ -549,8 +549,10 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
     return;
 
   StringRef Str = Name.getIdentifier().str();
-  if (Str.startswith(C.TypeCheckerOpts.DebugForbidTypecheckPrefix)) {
-    llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
+  for (auto forbiddenPrefix : C.TypeCheckerOpts.DebugForbidTypecheckPrefixes) {
+    if (Str.startswith(forbiddenPrefix)) {
+      llvm::report_fatal_error(Twine("forbidden typecheck occurred: ") + Str);
+    }
   }
 }
 
