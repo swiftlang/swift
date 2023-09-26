@@ -9,7 +9,7 @@ import Constructors
 import TypeClassification
 
 public func createHasVirtualBase() -> HasVirtualBase {
-  // ITANIUM_X64: define swiftcc void @"$s7MySwift20createHasVirtualBaseSo0deF0VyF"(ptr noalias nocapture sret({{.*}}) %0)
+  // ITANIUM_X64: define swiftcc void @"$s7MySwift20createHasVirtualBaseSo0deF0VyF"(ptr noalias sret({{.*}}) %0)
   // ITANIUM_X64-NOT: define
   // ITANIUM_X64: call void @_ZN14HasVirtualBaseC1E7ArgType(ptr %{{[0-9]+}}, i32 %{{[0-9]+}})
   return HasVirtualBase(ArgType())

@@ -6,7 +6,7 @@ public func has_metadata_pack<each T>(t: repeat each T) -> () -> () {
   return { _ = (repeat each T).self }
 }
 
-// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc { ptr, ptr } @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlF"(ptr noalias nocapture %0, i{{32|64}} %1, ptr %"each T") #0 {
+// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc { ptr, ptr } @"$s25variadic_generic_captures17has_metadata_pack1tyycxxQp_tRvzlF"(ptr noalias %0, i{{32|64}} %1, ptr %"each T") #0 {
 // CHECK: [[CONTEXT0:%.*]] = call noalias ptr @swift_allocObject(
 
 // CHECK: [[GENERIC_ARGS_ADDR:%.*]] = getelementptr inbounds {{.*}} [[CONTEXT0]], i32 0, i32 {{(1|2)}}
@@ -34,7 +34,7 @@ public func has_metadata_pack_noescape<each T>(t: repeat each T) {
   takesNoEscape { _ = (repeat each T).self }
 }
 
-// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlF"(ptr noalias nocapture %0, i{{32|64}} %1, ptr %"each T") #0 {
+// CHECK-LABEL: define{{( protected)?}}{{( dllexport)?}} swiftcc void @"$s25variadic_generic_captures26has_metadata_pack_noescape1tyxxQp_tRvzlF"(ptr noalias %0, i{{32|64}} %1, ptr %"each T") #0 {
 // CHECK: [[CONTEXT0:%.*]] = alloca i8, [[INT]]
 
 // CHECK: [[GENERIC_ARGS:%.*]] = getelementptr inbounds {{.*}} [[CONTEXT0]], i32 0, i32 {{(1|2)}}

@@ -28,7 +28,7 @@ struct Value<T> {
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 // CHECK:   [[TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5ValueVySo12NSDictionaryCGMD")
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:   ptr noalias nocapture {{%.*}}, 
+// CHECK-SAME:   ptr noalias {{%.*}}, 
 // CHECK-SAME:   ptr [[TYPE]])
 // CHECK: }
 func doit() {

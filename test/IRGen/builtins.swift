@@ -449,7 +449,7 @@ func destroyNonPODArray(_ array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
-// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins15destroyGenArray_5count_yBp_BwxtlF"(ptr %0, i64 %1, ptr noalias nocapture %2, ptr %T)
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins15destroyGenArray_5count_yBp_BwxtlF"(ptr %0, i64 %1, ptr noalias %2, ptr %T)
 // CHECK-NOT:   loop:
 // CHECK:         call void @swift_arrayDestroy
 func destroyGenArray<T>(_ array: Builtin.RawPointer, count: Builtin.Word, _: T) {
@@ -527,7 +527,7 @@ func copyNonPODArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count:
   Builtin.assignTakeArray(W.self, dest, src, count)
 }
 
-// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyGenArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2, ptr noalias nocapture %3, ptr %T)
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12copyGenArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2, ptr noalias %3, ptr %T)
 // CHECK-NOT:   loop:
 // CHECK:        call void @swift_arrayInitWithCopy
 // CHECK-NOT:   loop:

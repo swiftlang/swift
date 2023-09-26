@@ -66,7 +66,7 @@ public func f3_uses_f2() {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases10f3_uses_f2yyF"()
-// CHECK: call swiftcc void @"$s22big_types_corner_cases9BigStructVACycfC"(ptr noalias nocapture sret({{.*}}) 
+// CHECK: call swiftcc void @"$s22big_types_corner_cases9BigStructVACycfC"(ptr noalias nocapture sret({{.*}})
 // CHECK: call swiftcc { ptr, ptr } @"$s22big_types_corner_cases13f2_returns_f1AA9BigStructVADcyF"()
 // CHECK: call swiftcc void {{.*}}(ptr noalias nocapture sret({{.*}}) {{.*}}, ptr noalias nocapture dereferenceable({{.*}}) {{.*}}, ptr swiftself {{.*}})
 // CHECK: ret void
@@ -96,7 +96,7 @@ public class BigClass {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases8BigClassC03useE6Struct0aH0yAA0eH0V_tF"(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr swiftself %1)
-// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr swiftself 
+// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture dereferenceable({{.*}}) %0, ptr swiftself
 // CHECK: ret void
 
 public struct MyStruct {
@@ -178,8 +178,8 @@ public struct MUseStruct {
   internal let callInternalLet: () -> BigStruct?
 }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(ptr noalias nocapture sret({{.*}}) %0) #0 {
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(ptr noalias nocapture sret({{.*}}) %0) #0 {
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(ptr noalias sret({{.*}}) %0) #0 {
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(ptr noalias sret({{.*}}) %0) #0 {
 // CHECK: alloca %TSs
 // CHECK: alloca %TSs
 // CHECK: ret void
@@ -202,7 +202,7 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(ptr swiftself %0)
 // CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMD"
 // CHECK: [[CALL2:%.*]] = call ptr @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
-// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(ptr noalias nocapture sret({{.*}}) %{{[0-9]+}}, ptr @"$s22big_types_corner_cases7TestBig{{.*}}", ptr null, ptr %{{[0-9]+}}, ptr [[CALL2]]
+// CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(ptr noalias sret({{.*}}) %{{[0-9]+}}, ptr @"$s22big_types_corner_cases7TestBig{{.*}}", ptr null, ptr %{{[0-9]+}}, ptr [[CALL2]]
 class TestBig {
     typealias Handler = (BigStruct) -> Void
 
@@ -286,8 +286,8 @@ public protocol QueryHandler: ProtoQueryHandler {
 
 public extension QueryHandler {
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_15queryyqd___tAA0E0Rd__lF"(ptr noalias nocapture %0, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %1)
-// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture {{.*}}, ptr swiftself {{.*}})
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_15queryyqd___tAA0E0Rd__lF"(ptr noalias %0, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias swiftself %1)
+// CHECK: call swiftcc void {{.*}}(ptr noalias {{.*}}, ptr swiftself {{.*}})
 // CHECK: ret void
     func forceHandle_1<Q: Query>(query: Q) -> Void {
         guard let body = handle_1 as? (Q) -> Void else {
@@ -296,9 +296,9 @@ public extension QueryHandler {
         body(query)
     }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0E0Rd__lF"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr noalias nocapture %2, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_25query8ReturnedQyd___AA9BigStructVSgtqd___tAA0E0Rd__lF"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias %1, ptr noalias %2, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias swiftself %3)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture sret({{.*}}) [[ALLOC]], ptr noalias nocapture {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}})
+// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture sret({{.*}}) [[ALLOC]], ptr noalias {{.*}}, ptr noalias {{.*}}, ptr swiftself {{.*}})
 // CHECK: ret void
     func forceHandle_2<Q: Query>(query: Q) -> (Q.Returned, BigStruct?) {
         guard let body = handle_2 as? (Q) -> (Q.Returned, BigStruct?) else {
@@ -307,12 +307,12 @@ public extension QueryHandler {
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2)
-// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(ptr noalias nocapture {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}})
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(ptr noalias %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2)
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(ptr noalias {{.*}}, ptr noalias {{.*}}, ptr swiftself {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2)
-// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(ptr noalias nocapture {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}})
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_35query8ReturnedQyd___SbAA9BigStructVcSgtqd___tAA0E0Rd__lF"(ptr noalias %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2)
+// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(ptr noalias {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}})
 // CHECK-32: ret { i32, i32 }
     func forceHandle_3<Q: Query>(query: Q) -> (Q.Returned, Filter?) {
         guard let body = handle_3 as? (Q) -> (Q.Returned, Filter?) else {
@@ -321,12 +321,12 @@ public extension QueryHandler {
         return body(query)
     }
 
-// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2, ptr swifterror %3)
-// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(ptr noalias nocapture {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}}, ptr noalias nocapture swifterror {{.*}})
+// CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(ptr noalias %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2, ptr swifterror %3)
+// CHECK-64: {{.*}} = call swiftcc { i64, i64 } {{.*}}(ptr noalias {{.*}}, ptr noalias {{.*}}, ptr swiftself {{.*}}, ptr noalias nocapture swifterror {{.*}})
 // CHECK-64: ret { i64, i64 }
 
-// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(ptr noalias nocapture %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2, ptr swifterror %3)
-// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(ptr noalias nocapture {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}}, ptr noalias nocapture {{.*}})
+// CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32} @"$s22big_types_corner_cases12QueryHandlerPAAE13forceHandle_45query8ReturnedQyd___SbAA9BigStructVcSgtqd___tKAA0E0Rd__lF"(ptr noalias %0, ptr noalias nocapture %1, ptr{{.*}}, ptr{{.*}}, ptr {{.*}}.QueryHandler, ptr {{.*}}.Query, ptr noalias nocapture swiftself %2, ptr swifterror %3)
+// CHECK-32: {{.*}} = call swiftcc { i32, i32 } {{.*}}(ptr noalias {{.*}}, ptr noalias nocapture {{.*}}, ptr swiftself {{.*}}, ptr noalias nocapture {{.*}})
 // CHECK-32: ret { i32, i32 }
     func forceHandle_4<Q: Query>(query: Q) throws -> (Q.Returned, Filter?) {
         guard let body = handle_4 as? (Q) throws -> (Q.Returned, Filter?) else {

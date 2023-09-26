@@ -9,7 +9,7 @@ protocol DefCon {
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defcon(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %T, ptr %T.DefCon) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defcon(ptr noalias sret({{.*}}) %0, ptr %1, ptr %T, ptr %T.DefCon) {{.*}} {
 sil @defcon : $@convention(thin) <T: DefCon> (@thick T.Type) -> @out T {
 entry(%0: $*T, %1: $@thick T.Type):
 
@@ -60,7 +60,7 @@ struct SyncUp<Deliverable> : Synergy {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testGenericWitnessMethod(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testGenericWitnessMethod(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T)
 // CHECK: entry:
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14witness_method6SyncUpVMa"([[INT]] 255, ptr %T)
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -69,7 +69,7 @@ struct SyncUp<Deliverable> : Synergy {
 // CHECK:   [[WITNESS_FN:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @swift_checkMetadataState([[INT]] 0, ptr [[METADATA]])
 // CHECK:   [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:   call swiftcc void [[WITNESS_FN]](ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture swiftself %1, ptr [[METADATA]], ptr [[WTABLE]])
+// CHECK:   call swiftcc void [[WITNESS_FN]](ptr noalias sret({{.*}}) %0, ptr noalias swiftself %1, ptr [[METADATA]], ptr [[WTABLE]])
 // CHECK:   ret void
 
 sil @testGenericWitnessMethod : $@convention(thin) <T> (@in SyncUp<T>) -> @out T {
@@ -87,11 +87,11 @@ protocol Strategy {
   func disrupt() -> GrowthHack
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testArchetypeWitnessMethod(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T, ptr %T.Strategy)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testArchetypeWitnessMethod(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T, ptr %T.Strategy)
 // CHECK: entry:
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr %T.Strategy, i32 3
 // CHECK:   [[WITNESS_FN:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
-// CHECK:   call swiftcc void [[WITNESS_FN]](ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture swiftself %1, ptr %T, ptr %T.Strategy)
+// CHECK:   call swiftcc void [[WITNESS_FN]](ptr noalias sret({{.*}}) %0, ptr noalias swiftself %1, ptr %T, ptr %T.Strategy)
 // CHECK:   ret void
 
 sil @testArchetypeWitnessMethod : $@convention(thin) <T : Strategy> (@in T) -> @out T.GrowthHack {
@@ -121,7 +121,7 @@ entry(%self : $*T):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testClassArchetypeWitnessMethod(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{4|8}}) %1, ptr %T, ptr %CoverSheet)
 // CHECK: entry:
 // CHECK:  [[WITNESS_FN:%.*]] = load ptr, ptr getelementptr inbounds (ptr, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP", i32 3)
-// CHECK: call swiftcc void [[WITNESS_FN]](ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture swiftself %1, ptr %T, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP")
+// CHECK: call swiftcc void [[WITNESS_FN]](ptr noalias sret({{.*}}) %0, ptr noalias swiftself %1, ptr %T, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP")
 // CHECK: ret void
 
 sil @testClassArchetypeWitnessMethod : $@convention(thin) <T><CoverSheet where T : TPSReport<CoverSheet>> (@in_guaranteed T) -> (@out T.GrowthHack) {

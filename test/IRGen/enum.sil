@@ -198,7 +198,7 @@ enum DynamicSingleton<T> {
 }
 
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch(i64 %0, i64 %1) {{.*}} {
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch(ptr noalias nocapture dereferenceable(16) %0) {{.*}} {
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch(ptr noalias dereferenceable(16) %0) {{.*}} {
 sil @singleton_switch : $(Singleton) -> () {
 // CHECK-64: entry:
 // CHECK-32: entry:
@@ -217,7 +217,7 @@ dest:
 }
 
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch_arg(i64 %0, i64 %1) {{.*}} {
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch_arg(ptr noalias nocapture dereferenceable(16) %0) {{.*}} {
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_switch_arg(ptr noalias dereferenceable(16) %0) {{.*}} {
 sil @singleton_switch_arg : $(Singleton) -> () {
 // CHECK-64: entry:
 // CHECK-32: entry:
@@ -259,7 +259,7 @@ dest:
 // CHECK-64:   [[B:%.*]] = insertvalue { i64, i64 } [[A]], i64 %1, 1
 // CHECK-64:   ret { i64, i64 } [[B]]
 // CHECK-64: }
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_inject(ptr noalias nocapture sret({{.*}}) %0, i64 %1, i64 %2) {{.*}} {
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @singleton_inject(ptr noalias sret({{.*}}) %0, i64 %1, i64 %2) {{.*}} {
 // CHECK-32: entry:
 // CHECK-32:  [[GEP1:%.*]] = getelementptr inbounds <{ i64, i64 }>, ptr %0, i32 0, i32 0
 // CHECK-32:                 store i64 %1, ptr [[GEP1]]
@@ -752,7 +752,7 @@ enum AggregateSinglePayload2 {
 }
 
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @aggregate_single_payload_unpack_2([[WORD]] %0, [[WORD]] %1, [[WORD]] %2, [[WORD]] %3) {{.*}} {
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}}  swiftcc void @aggregate_single_payload_unpack_2(ptr noalias nocapture dereferenceable(16) %0) {{.*}} {
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}}  swiftcc void @aggregate_single_payload_unpack_2(ptr noalias dereferenceable(16) %0) {{.*}} {
 sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt: x_dest, default default_dest
@@ -783,7 +783,7 @@ end:
 // CHECK-64:  %9 = insertvalue { [[WORD]], [[WORD]], [[WORD]], [[WORD]] } %8, [[WORD]] %3, 3
 // CHECK-64:  ret { [[WORD]], [[WORD]], [[WORD]], [[WORD]] } %9
 
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @aggregate_single_payload_2_inject(ptr noalias nocapture sret({{.*}}) %0, i32 %1, i32 %2, i32 %3, i32 %4) {{.*}} {
+// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @aggregate_single_payload_2_inject(ptr noalias sret({{.*}}) %0, i32 %1, i32 %2, i32 %3, i32 %4) {{.*}} {
 // CHECK-32:  [[TRUNC:%.*]] = trunc i32 %1 to i21
 // CHECK-32:  [[ZEXT:%.*]] = zext i21 [[TRUNC]] to i32
 // CHECK-32:  [[GEP:%.*]] = getelementptr inbounds {{.*}} %0, i32 0, i32 0
@@ -1217,7 +1217,7 @@ enum DynamicSinglePayload<T> {
   case w
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_switch(ptr noalias nocapture %0, ptr %T) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_switch(ptr noalias %0, ptr %T) {{.*}} {
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds ptr, ptr %T, i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load ptr, ptr [[TMP2]]
 // CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 6
@@ -1245,7 +1245,7 @@ end:
   return %v : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_x(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture %1, ptr %T) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_x(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %T) {{.*}} {
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds ptr, ptr %T, i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load ptr, ptr [[TMP2]]
 // CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 7
@@ -1258,7 +1258,7 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   return %v : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_y(ptr noalias nocapture sret({{.*}}) %0, ptr %T) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_y(ptr noalias sret({{.*}}) %0, ptr %T) {{.*}} {
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds ptr, ptr %T, i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load ptr, ptr [[TMP2]]
 // CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 7
@@ -2345,7 +2345,7 @@ enum MultiPayloadAddressOnlySpareBits {
   case Y(AddressOnlySpareBitsPayload)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_address_only_spare_bits(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @multi_payload_address_only_spare_bits(ptr noalias dereferenceable({{.*}}) %0)
 sil @multi_payload_address_only_spare_bits : $@convention(thin) (@in MultiPayloadAddressOnlySpareBits) -> () {
 entry(%m : $*MultiPayloadAddressOnlySpareBits):
   destroy_addr %m : $*MultiPayloadAddressOnlySpareBits
@@ -2374,7 +2374,7 @@ typealias AllConcreteTestEnums = (
 
 sil_global @x : $AllConcreteTestEnums
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_singleton_switch_indirect(ptr noalias nocapture %0, ptr %T) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_singleton_switch_indirect(ptr noalias %0, ptr %T) {{.*}} {
 // CHECK:   ret void
 // CHECK: }
 sil @dynamic_singleton_switch_indirect : $<T> (@in DynamicSingleton<T>) -> () {
@@ -2480,7 +2480,7 @@ struct StructWithWeakVar {
 weak var delegate: delegateProtocol?
 }
 
-// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @weak_optional(ptr noalias dereferenceable({{.*}}) %0)
 sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0
