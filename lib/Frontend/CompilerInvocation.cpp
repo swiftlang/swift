@@ -1331,7 +1331,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       HadError = true;
     }
 
-    if (FrontendOpts.InputsAndOutputs.hasPrimaryInputs()) {
+    if (!FrontendOpts.InputsAndOutputs.isWholeModule()) {
       Diags.diagnose(SourceLoc(), diag::wmo_with_embedded);
       HadError = true;
     }
