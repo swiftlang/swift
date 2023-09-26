@@ -28,10 +28,8 @@
 extern "C" {
 #endif
 
-#define SWIFT_CC __attribute__((swiftcall))
-#define SWIFT_CONTEXT __attribute__((swift_context))
-
-typedef void SWIFT_CC (*HeapObjectDestroyer)(SWIFT_CONTEXT void *object);
+typedef void __attribute__((swiftcall)) (*HeapObjectDestroyer)(
+    __attribute__((swift_context)) void *object);
 
 static inline void _swift_embedded_invoke_heap_object_destroy(void *object) {
   void *metadata = *(void **)object;
