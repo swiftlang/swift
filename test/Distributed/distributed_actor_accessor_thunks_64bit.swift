@@ -94,7 +94,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTE"
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETF"(ptr swiftasync %0, ptr nocapture %1, ptr %2, ptr %3, {{.*}}, ptr [[ACTOR:%.*]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETF"(ptr swiftasync %0, ptr %1, ptr %2, ptr %3, {{.*}}, ptr [[ACTOR:%.*]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 /// Read the current offset and cast an element to `Int`
 
@@ -116,7 +116,7 @@ public distributed actor MyOtherActor {
 // CHECK: missing-witness1:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias nocapture sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
 
 // CHECK: store ptr null, ptr %swifterror
 // CHECK-NEXT: %._value = getelementptr inbounds %TSi, ptr [[ARG_0_VALUE_BUF]], i32 0, i32 0
@@ -192,7 +192,7 @@ public distributed actor MyOtherActor {
 // CHECK: define hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTE"
 
 /// !!! in `simple3` interesting bits are: argument value extraction (because string is exploded into N arguments) and call to distributed thunk
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETF"(ptr swiftasync %0, ptr nocapture [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETF"(ptr swiftasync %0, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 
 // CHECK: [[ARG_SIZE:%.*]] = and i64 {{.*}}, -16
@@ -232,7 +232,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTE"
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTETF"(ptr swiftasync %0, ptr nocapture [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTETF"(ptr swiftasync %0, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 /// Let's check that the call doesn't have any arguments and returns nothing.
 
@@ -272,7 +272,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: define hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTE"
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETF"(ptr swiftasync {{.*}}, ptr nocapture [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETF"(ptr swiftasync {{.*}}, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 /// First, let's check that all of the different argument types here are loaded correctly.
 
@@ -319,7 +319,7 @@ public distributed actor MyOtherActor {
 
 /// ---> Accessor for `genericArgs`
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC11genericArgsyyx_Sayq_GtYaKSeRzSERzSeR_SER_r0_lFTETF"(ptr swiftasync %0, ptr  nocapture [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUF:%.*]], ptr [[GENERIC_SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR:%.*]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors7MyActorC11genericArgsyyx_Sayq_GtYaKSeRzSERzSeR_SER_r0_lFTETF"(ptr swiftasync %0, ptr  [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUF:%.*]], ptr [[GENERIC_SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr [[ACTOR:%.*]], ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 
 /// ---> Load `T`
 
@@ -368,7 +368,7 @@ public distributed actor MyOtherActor {
 
 /// Let's check that there is argument decoding since parameter list is empty
 
-// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETF"(ptr swiftasync {{.*}}, ptr nocapture [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr {{.*}}, ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
+// CHECK: define linkonce_odr hidden swift{{(tail)?}}cc void @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETF"(ptr swiftasync {{.*}}, ptr [[ARG_DECODER:%.*]], ptr [[ARG_TYPES:%.*]], ptr [[RESULT_BUFF:%.*]], ptr [[SUBS:%.*]], ptr [[WITNESS_TABLES:%.*]], i64 [[NUM_WITNESS_TABLES:%.*]], ptr {{.*}}, ptr [[DECODER_TYPE:%.*]], ptr [[DECODER_PROTOCOL_WITNESS:%.*]])
 // CHECK-NEXT: entry:
 // CHECK-NEXT: {{.*}} = alloca ptr
 // CHECK-NEXT: %swifterror = alloca swifterror ptr

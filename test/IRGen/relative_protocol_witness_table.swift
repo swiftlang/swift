@@ -200,7 +200,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 
 // Simple witness entry access.
 
-// CHECK: define{{.*}} swiftcc void @"$s1A14requireWitnessyyxAA8FuncOnlyRzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[PWT:%.*]])
+// CHECK: define{{.*}} swiftcc void @"$s1A14requireWitnessyyxAA8FuncOnlyRzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[PWT:%.*]])
 // CHECK:[[ENTRY:.*]]:
 // CHECK:  [[T4:%.*]] = call ptr @"__swift_relative_protocol_witness_table_access_1_$s1A8FuncOnlyP1ayyFTq"(ptr [[PWT]])
 // CHECK:  call{{.*}} swiftcc void [[T4]]
@@ -232,7 +232,7 @@ func instantiate_conditional_conformance_2nd<T>(_ t : T)  where T: Sub, T.S == T
 
 // Parent witness entry access.
 
-// CHECK: define hidden swiftcc void @"$s1A15requireWitness2yyxAA9InheritedRzlF"(ptr noalias nocapture {{%.*}}, ptr {{%.*}}, ptr [[T_INHERITED:%.*]])
+// CHECK: define hidden swiftcc void @"$s1A15requireWitness2yyxAA9InheritedRzlF"(ptr noalias {{%.*}}, ptr {{%.*}}, ptr [[T_INHERITED:%.*]])
 // CHECK: [[T_FUNCONLY:%.*]] = call ptr @__swift_relative_protocol_witness_table_parent_1(ptr [[T_INHERITED]])
 // CHECK: call ptr @"__swift_relative_protocol_witness_table_access_1_$s1A8FuncOnlyP1ayyFTq"(ptr [[T_FUNCONLY]])
 

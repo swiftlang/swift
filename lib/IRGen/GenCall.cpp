@@ -269,7 +269,10 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   llvm::AttrBuilder b(IGM.getLLVMContext());
   // Value parameter pointers can't alias or be captured.
   b.addAttribute(llvm::Attribute::NoAlias);
-  b.addAttribute(llvm::Attribute::NoCapture);
+  // Bitwise takable value types are guaranteed not to capture
+  // a pointer into itself.
+  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+    b.addAttribute(llvm::Attribute::NoCapture);
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
@@ -281,9 +284,11 @@ static void addPackParameterAttributes(IRGenModule &IGM,
                                        llvm::AttributeList &attrs,
                                        unsigned argIndex) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
-  // Pack parameter pointers can't alias or be captured.
+  // Pack parameter pointers can't alias.
+  // Note: they are not marked `nocapture` as one
+  // pack parameter could be a value type (e.g. a C++ type)
+  // that captures its own pointer in itself.
   b.addAttribute(llvm::Attribute::NoAlias);
-  b.addAttribute(llvm::Attribute::NoCapture);
   // TODO: we could mark this dereferenceable when the pack has fixed
   // components.
   // TODO: add an alignment attribute
@@ -304,8 +309,10 @@ static void addInoutParameterAttributes(IRGenModule &IGM, SILType paramSILType,
     // attribute if it's a pointer being passed inout.
     b.addAttribute(llvm::Attribute::NoAlias);
   }
-  // Aliasing inouts can't be captured without doing unsafe stuff.
-  b.addAttribute(llvm::Attribute::NoCapture);
+  // Bitwise takable value types are guaranteed not to capture
+  // a pointer into itself.
+  if (ti.isBitwiseTakable(ResilienceExpansion::Maximal))
+    b.addAttribute(llvm::Attribute::NoCapture);
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
@@ -348,10 +355,14 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 static void addIndirectResultAttributes(IRGenModule &IGM,
                                         llvm::AttributeList &attrs,
                                         unsigned paramIndex, bool allowSRet,
-                                        llvm::Type *storageType) {
+                                        llvm::Type *storageType,
+                                        const TypeInfo &typeInfo) {
   llvm::AttrBuilder b(IGM.getLLVMContext());
   b.addAttribute(llvm::Attribute::NoAlias);
-  b.addAttribute(llvm::Attribute::NoCapture);
+  // Bitwise takable value types are guaranteed not to capture
+  // a pointer into itself.
+  if (typeInfo.isBitwiseTakable(ResilienceExpansion::Maximal))
+    b.addAttribute(llvm::Attribute::NoCapture);
   if (allowSRet) {
     assert(storageType);
     b.addStructRetAttr(storageType);
@@ -517,7 +528,7 @@ llvm::Type *SignatureExpansion::addIndirectResult() {
   const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
   auto storageTy = resultTI.getStorageType();
   addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(),
-                              storageTy);
+                              storageTy, resultTI);
   addPointerParameter(storageTy);
   return IGM.VoidTy;
 }
@@ -576,11 +587,12 @@ void SignatureExpansion::expandIndirectResults() {
     auto useSRet = claimSRet();
     // We need to use opaque types or non fixed size storage types because llvm
     // does type based analysis based on the type of sret arguments.
-    if (useSRet && !isa<FixedTypeInfo>(IGM.getTypeInfo(indirectResultType))) {
+    const TypeInfo &typeInfo = IGM.getTypeInfo(indirectResultType);
+    if (useSRet && !isa<FixedTypeInfo>(typeInfo)) {
       storageTy = IGM.OpaqueTy;
     }
     addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), useSRet,
-                                storageTy);
+                                storageTy, typeInfo);
     addPointerParameter(storageTy);
   }
 }
@@ -1471,7 +1483,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
             param, IGM.getMaximalTypeExpansionContext());
         auto &paramTI = cast<FixedTypeInfo>(IGM.getTypeInfo(paramTy));
         addIndirectResultAttributes(IGM, Attrs, getCurParamIndex(), claimSRet(),
-                                    paramTI.getStorageType());
+                                    paramTI.getStorageType(), paramTI);
         break;
       }
       }
