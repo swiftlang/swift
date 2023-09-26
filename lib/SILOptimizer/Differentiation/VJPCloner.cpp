@@ -438,8 +438,10 @@ public:
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *eai << '\n');
 
     FullApplySite fai(token->getDefiningInstruction());
-    auto vjpResult = getBuilder().createEndApply(loc, token, fai.getType());
+    auto vjpResult = builder.createEndApply(loc, token, fai.getType());
     LLVM_DEBUG(getADDebugStream() << "Created end_apply\n" << *vjpResult);
+
+    builder.emitDestroyValueOperation(loc, fai.getCallee());
 
     // Checkpoint the pullback.
     SmallVector<SILValue, 8> vjpDirectResults;
@@ -603,7 +605,7 @@ public:
     auto *vjpCall = getBuilder().createBeginApply(loc, vjpValue, SubstitutionMap(),
                                                   vjpArgs, bai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
-    builder.emitDestroyValueOperation(loc, vjpValue);
+    // Note that vjpValue is destroyed after end_apply
 
     // Store all the results (yields and token) to the value map.
     assert(bai->getNumResults() == vjpCall->getNumResults());
