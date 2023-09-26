@@ -1939,6 +1939,12 @@ namespace {
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation;
 
+    bool shouldRefineIsolation = false;
+
+    /// Used under the mode to compute required actor isolation for
+    /// an expression or function.
+    ActorIsolation requiredIsolation = ActorIsolation::forNonisolated();
+
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
@@ -2123,6 +2129,65 @@ namespace {
       }
     }
 
+    bool refineRequiredIsolation(ActorIsolation refinedIsolation) {
+      if (!shouldRefineIsolation)
+        return false;
+
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(getDeclContext())) {
+        // We cannot infer a more specific actor isolation for a @Sendable
+        // closure. It is an error to cast away actor isolation from a function
+        // type, but this is okay for non-Sendable closures because they cannot
+        // leave the isolation domain they're created in anyway.
+        if (closure->isSendable())
+          return false;
+
+        if (closure->getActorIsolation().isActorIsolated())
+          return false;
+      }
+
+      // To refine the required isolation, the existing requirement
+      // must either be 'nonisolated' or exactly the same as the
+      // new refinement.
+      if (requiredIsolation == ActorIsolation::Nonisolated ||
+          requiredIsolation == refinedIsolation) {
+        requiredIsolation = refinedIsolation;
+        return true;
+      }
+
+      return false;
+    }
+
+    void checkDefaultArgument(DefaultArgumentExpr *expr) {
+      // Check the context isolation against the required isolation for
+      // evaluating the default argument synchronously. If the default
+      // argument must be evaluated asynchronously, it must be written
+      // explicitly in the argument list with 'await'.
+      auto requiredIsolation = expr->getRequiredIsolation();
+      auto contextIsolation = getInnermostIsolatedContext(
+          getDeclContext(), getClosureActorIsolation);
+
+      if (requiredIsolation == contextIsolation)
+        return;
+
+      switch (requiredIsolation) {
+      // Nonisolated is okay from any caller isolation because
+      // default arguments cannot have any async calls.
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+        return;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+      case ActorIsolation::ActorInstance:
+        break;
+      }
+
+      auto &ctx = getDeclContext()->getASTContext();
+      ctx.Diags.diagnose(
+          expr->getLoc(), diag::isolated_default_argument,
+          requiredIsolation, contextIsolation);
+    }
+
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
       SmallVector<CapturedValue, 2> captures;
@@ -2178,6 +2243,16 @@ namespace {
         : ctx(dc->getASTContext()), getType(getType),
           getClosureActorIsolation(getClosureActorIsolation) {
       contextStack.push_back(dc);
+    }
+
+    ActorIsolation computeRequiredIsolation(Expr *expr) {
+      auto &ctx = getDeclContext()->getASTContext();
+
+      shouldRefineIsolation =
+          ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments);
+      expr->walk(*this);
+      shouldRefineIsolation = false;
+      return requiredIsolation;
     }
 
     /// Searches the applyStack from back to front for the inner-most CallExpr
@@ -2373,6 +2448,10 @@ namespace {
       // The constraint solver may not have chosen legal casts.
       if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
         checkFunctionConversion(funcConv);
+      }
+
+      if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(expr)) {
+        checkDefaultArgument(defaultArg);
       }
 
       return Action::Continue(expr);
@@ -2920,6 +2999,9 @@ namespace {
       if (!unsatisfiedIsolation)
         return false;
 
+      if (refineRequiredIsolation(*unsatisfiedIsolation))
+        return false;
+
       // At this point, we know a jump is made to the callee that yields
       // an isolation requirement unsatisfied by the calling context, so
       // set the unsatisfiedIsolationJump fields of the ApplyExpr appropriately
@@ -3255,6 +3337,14 @@ namespace {
 
       case AsyncMarkingResult::SyncContext:
       case AsyncMarkingResult::NotFound:
+        // If we found an implicitly async reference in a sync
+        // context and we're computing the required isolation for
+        // an expression, the calling context requires the isolation
+        // of the reference.
+        if (refineRequiredIsolation(result.isolation)) {
+          return false;
+        }
+
         // Complain about access outside of the isolation domain.
         auto useKind = static_cast<unsigned>(
             kindOfUsage(decl, context).value_or(VarRefUseEnv::Read));
@@ -3465,6 +3555,12 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
 void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
   ActorIsolationChecker checker(init);
   expr->walk(checker);
+}
+
+ActorIsolation 
+swift::computeRequiredIsolation(Initializer *init, Expr *expr) {
+  ActorIsolationChecker checker(init);
+  return checker.computeRequiredIsolation(expr);
 }
 
 void swift::checkEnumElementActorIsolation(

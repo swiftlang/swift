@@ -2934,6 +2934,24 @@ public:
   void cacheResult(Type type) const;
 };
 
+/// Compute the actor isolation needed to synchronously evaluate the
+/// default argument for the given parameter.
+class DefaultArgumentIsolation
+    : public SimpleRequest<DefaultArgumentIsolation,
+                           ActorIsolation(ParamDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ActorIsolation evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Computes the fully type-checked caller-side default argument within the
 /// context of the call site that it will be inserted into.
 class CallerSideDefaultArgExprRequest

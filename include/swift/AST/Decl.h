@@ -6415,6 +6415,11 @@ public:
   /// at the call site in order to have the correct context information.
   Expr *getTypeCheckedDefaultExpr() const;
 
+  /// The actor isolation required of the caller in order to use the
+  /// default argument for this parameter. If the required isolation is
+  /// not met, an argument must be written explicitly at the call-site.
+  ActorIsolation getDefaultArgumentIsolation() const;
+
   /// Retrieve the potentially un-type-checked default argument expression for
   /// this parameter, which can be queried for information such as its source
   /// range and textual representation. Returns \c nullptr if there is no

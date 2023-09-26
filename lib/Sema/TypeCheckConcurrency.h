@@ -60,6 +60,10 @@ void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(VarDecl *wrappedVar, Expr *expr);
 
+/// Compute the actor isolation required in order to evaluate the given
+/// initializer expression synchronously.
+ActorIsolation computeRequiredIsolation(Initializer *init, Expr *expr);
+
 /// States the reason for checking the Sendability of a given declaration.
 enum class SendableCheckReason {
   /// A reference to an actor from outside that actor.

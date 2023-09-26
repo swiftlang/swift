@@ -8263,6 +8263,14 @@ Type ParamDecl::getTypeOfDefaultExpr() const {
   return Type();
 }
 
+ActorIsolation ParamDecl::getDefaultArgumentIsolation() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      DefaultArgumentIsolation{const_cast<ParamDecl *>(this)},
+      ActorIsolation::forNonisolated());
+}
+
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
