@@ -191,33 +191,33 @@ typealias _stdlib_posix_spawn_file_actions_t = posix_spawn_file_actions_t?
 
 @_silgen_name("_stdlib_posix_spawn_file_actions_init")
 internal func _stdlib_posix_spawn_file_actions_init(
-  _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
+  @_forwardedToC _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
 ) -> CInt
 
 @_silgen_name("_stdlib_posix_spawn_file_actions_destroy")
 internal func _stdlib_posix_spawn_file_actions_destroy(
-  _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
+  @_forwardedToC _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>
 ) -> CInt
 
 @_silgen_name("_stdlib_posix_spawn_file_actions_addclose")
 internal func _stdlib_posix_spawn_file_actions_addclose(
-  _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
+  @_forwardedToC _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
   _ filedes: CInt) -> CInt
 
 @_silgen_name("_stdlib_posix_spawn_file_actions_adddup2")
 internal func _stdlib_posix_spawn_file_actions_adddup2(
-  _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
+  @_forwardedToC _ file_actions: UnsafeMutablePointer<_stdlib_posix_spawn_file_actions_t>,
   _ filedes: CInt,
   _ newfiledes: CInt) -> CInt
 
 @_silgen_name("_stdlib_posix_spawn")
 internal func _stdlib_posix_spawn(
-  _ pid: UnsafeMutablePointer<pid_t>?,
-  _ file: UnsafePointer<Int8>,
-  _ file_actions: UnsafePointer<_stdlib_posix_spawn_file_actions_t>?,
-  _ attrp: UnsafePointer<posix_spawnattr_t>?,
-  _ argv: UnsafePointer<UnsafeMutablePointer<Int8>?>,
-  _ envp: UnsafePointer<UnsafeMutablePointer<Int8>?>?) -> CInt
+  @_forwardedToC _ pid: UnsafeMutablePointer<pid_t>?,
+  @_forwardedToC _ file: UnsafePointer<Int8>,
+  @_forwardedToC _ file_actions: UnsafePointer<_stdlib_posix_spawn_file_actions_t>?,
+  @_forwardedToC _ attrp: UnsafePointer<posix_spawnattr_t>?,
+  @_forwardedToC _ argv: UnsafePointer<UnsafeMutablePointer<Int8>?>,
+  @_forwardedToC _ envp: UnsafePointer<UnsafeMutablePointer<Int8>?>?) -> CInt
 #endif
 
 /// Calls POSIX `pipe()`.

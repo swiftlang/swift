@@ -362,10 +362,11 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     for bucket in native.hashTable {
       let key = _key(at: bucket, bridgedKeys: bridgedKeys)
       let value = _value(at: bucket, bridgedValues: bridgedValues)
-      block(
-        Unmanaged.passUnretained(key),
-        Unmanaged.passUnretained(value),
-        &stop)
+      withUnsafeMutablePointer(to: &stop) {
+        block(
+          Unmanaged.passUnretained(key), Unmanaged.passUnretained(value), $0
+        )
+      }
       if stop != 0 { return }
     }
   }

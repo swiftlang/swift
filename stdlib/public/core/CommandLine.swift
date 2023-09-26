@@ -15,8 +15,9 @@ import SwiftShims
 #if SWIFT_STDLIB_HAS_COMMANDLINE
 
 @_silgen_name("_swift_stdlib_getUnsafeArgvArgc")
-internal func _swift_stdlib_getUnsafeArgvArgc(_: UnsafeMutablePointer<Int32>)
-  -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
+internal func _swift_stdlib_getUnsafeArgvArgc(
+  @_forwardedToC _: UnsafeMutablePointer<Int32>
+) -> UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
 
 /// Command-line arguments for the current process.
 @frozen // namespace

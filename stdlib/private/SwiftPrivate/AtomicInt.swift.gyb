@@ -49,10 +49,11 @@ public final class _stdlib_AtomicInt {
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
     var expectedVar = expected
-    let result = _swift_stdlib_atomicCompareExchangeStrongInt(
-      object: _valuePtr,
-      expected: &expectedVar,
-      desired: desired)
+    let result = withUnsafeMutablePointer(to: &expectedVar) {
+      _swift_stdlib_atomicCompareExchangeStrongInt(
+        object: _valuePtr, expected: $0, desired: desired
+      )
+    }
     expected = expectedVar
     return result
   }

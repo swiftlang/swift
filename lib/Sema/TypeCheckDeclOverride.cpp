@@ -1552,6 +1552,7 @@ namespace  {
     UNINTERESTING_ATTR(PrivateImport)
     UNINTERESTING_ATTR(MainType)
     UNINTERESTING_ATTR(Preconcurrency)
+    UNINTERESTING_ATTR(ForwardedToC)
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)

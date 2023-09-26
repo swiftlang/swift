@@ -14,7 +14,7 @@ import Swift
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_continuation_logFailedCheck")
-internal func logFailedCheck(_ message: UnsafeRawPointer)
+internal func logFailedCheck(@_forwardedToC _ message: UnsafeRawPointer)
 
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.

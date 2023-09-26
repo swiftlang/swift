@@ -203,15 +203,16 @@ private func fromCFString(_ cf: CFString) -> String {
                   as: UTF8.self)
   } else {
     var byteLen = CFIndex(0)
-
-    _ = CFStringGetBytes(cf,
-                         CFRangeMake(0, length),
-                         CFStringBuiltInEncodings.UTF8.rawValue,
-                         0,
-                         false,
-                         nil,
-                         0,
-                         &byteLen)
+    withUnsafeMutablePointer(to: &byteLen) {
+      _ = CFStringGetBytes(cf,
+                           CFRangeMake(0, length),
+                           CFStringBuiltInEncodings.UTF8.rawValue,
+                           0,
+                           false,
+                           nil,
+                           0,
+                           $0)
+    }
 
     let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteLen)
     defer {
