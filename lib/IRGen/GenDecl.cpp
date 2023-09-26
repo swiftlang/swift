@@ -1261,6 +1261,11 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   return true;
 }
 
+static bool loweredFunctionHasGenericArguments(SILFunction *f) {
+  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
+  return s && !s->areAllParamsConcrete();
+}
+
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
@@ -1294,6 +1299,19 @@ void IRGenerator::emitGlobalTopLevel(
   // Emit SIL functions.
   auto &m = PrimaryIGM->getSILModule();
   for (SILFunction &f : m) {
+    // Generic functions should not be present in embedded Swift.
+    //
+    // TODO: Cannot enable this check yet because we first need removal of
+    // unspecialized classes and class vtables in SIL.
+    //
+    // if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    //   bool isGeneric = loweredFunctionHasGenericArguments(&f);
+    //   if (isGeneric) {
+    //     llvm::errs() << "Unspecialized function: \n" << f << "\n";
+    //     assert(0 && "unspecialized function present in embedded Swift");
+    //   }
+    // }
+
     if (isLazilyEmittedFunction(f, m))
       continue;
 
@@ -1405,11 +1423,6 @@ deleteAndReenqueueForEmissionValuesDependentOnCanonicalPrespecializedMetadataRec
   //
   // here because we don't want to reemit metadata.
   emitLazyTypeContextDescriptor(IGM, &decl, RequireMetadata);
-}
-
-static bool loweredFunctionHasGenericArguments(SILFunction *f) {
-  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
-  return s && !s->areAllParamsConcrete();
 }
 
 /// Emit any lazy definitions (of globals or functions or whatever

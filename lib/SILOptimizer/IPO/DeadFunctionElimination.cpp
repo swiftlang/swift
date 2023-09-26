@@ -148,6 +148,7 @@ class DeadFunctionAndGlobalElimination {
 
   /// Marks a function as alive.
   void makeAlive(SILFunction *F) {
+    LLVM_DEBUG(llvm::dbgs() << "         makeAlive " << F->getName() << '\n');
     AliveFunctionsAndTables.insert(F);
     assert(F && "function does not exist");
     Worklist.insert(F);
@@ -431,7 +432,11 @@ class DeadFunctionAndGlobalElimination {
       F.forEachSpecializeAttrTargetFunction(
           [this](SILFunction *targetFun) { ensureAlive(targetFun); });
 
-      if (!F.shouldOptimize()) {
+      bool retainBecauseFunctionIsNoOpt = !F.shouldOptimize();
+      if (Module->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        retainBecauseFunctionIsNoOpt = false;
+
+      if (retainBecauseFunctionIsNoOpt) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor a no optimization function: "
                                 << F.getName() << "\n");
         ensureAlive(&F);
@@ -526,6 +531,8 @@ class DeadFunctionAndGlobalElimination {
 
     // Check vtable methods.
     for (auto &vTable : Module->getVTables()) {
+      LLVM_DEBUG(llvm::dbgs() << " processing vtable "
+                              << vTable->getClass()->getName() << '\n');
       for (const SILVTable::Entry &entry : vTable->getEntries()) {
         if (entry.getMethod().kind == SILDeclRef::Kind::Deallocator ||
             entry.getMethod().kind == SILDeclRef::Kind::IVarDestroyer) {
