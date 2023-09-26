@@ -28,6 +28,14 @@ public struct HeapObject {
   // to think about supporting (or banning) weak and/or unowned references.
   var refcount: Int
 
+#if _pointerBitWidth(_64)
+  static let doNotFreeBit = Int(bitPattern: 0x8000_0000_0000_0000)
+  static let refcountMask = Int(bitPattern: 0x7fff_ffff_ffff_ffff)
+#else
+  static let doNotFreeBit = Int(bitPattern: 0x8000_0000)
+  static let refcountMask = Int(bitPattern: 0x7fff_ffff)
+#endif
+
   static let immortalRefCount = -1
 }
 
@@ -65,16 +73,22 @@ public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, req
 
 @_silgen_name("swift_deallocClassInstance")
 public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
+  if (object.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
+    return
+  }
+
   free(object)
 }
 
 @_silgen_name("swift_initStackObject")
 public func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   object.pointee.metadata = metadata
-
-  // TODO/FIXME: Making all stack promoted objects immortal is not correct.
-  object.pointee.refcount = HeapObject.immortalRefCount
+  object.pointee.refcount = 1 | HeapObject.doNotFreeBit
   return object
+}
+
+@_silgen_name("swift_setDeallocating")
+public func swift_setDeallocating(object: UnsafeMutablePointer<HeapObject>) {
 }
 
 // TODO/FIXME: Refcounting and swift_once is not thread-safe, the following only works in single-threaded environments.
@@ -102,7 +116,7 @@ public func swift_release(object: Builtin.RawPointer) {
   // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
   if o.pointee.refcount == HeapObject.immortalRefCount { return }
   o.pointee.refcount -= 1
-  if o.pointee.refcount == 0 {
+  if (o.pointee.refcount & HeapObject.refcountMask) == 0 {
     _swift_runtime_invoke_heap_object_destroy(o.pointee.metadata.pointee.destroy, o)
   }
 }
