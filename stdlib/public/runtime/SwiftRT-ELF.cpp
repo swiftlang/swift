@@ -12,11 +12,17 @@
 
 #include "ImageInspectionCommon.h"
 #include "swift/shims/MetadataSections.h"
+#include "swift/Runtime/Backtrace.h"
 
 #include <cstddef>
 #include <new>
 
 extern "C" const char __dso_handle[];
+
+// Drag in a symbol from the backtracer, to force the static linker to include
+// the code.
+static const void *__backtraceRef __attribute__((used))
+  = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
