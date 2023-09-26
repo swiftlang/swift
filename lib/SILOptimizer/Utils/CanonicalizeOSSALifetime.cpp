@@ -504,7 +504,7 @@ void CanonicalizeOSSALifetime::extendLivenessThroughOverlappingAccess() {
           break;
         }
         if (endsAccessOverlappingPrunedBoundary(&inst)) {
-          liveness->updateForUse(&inst, /*lifetimeEnding*/ false);
+          liveness->extendToNonUse(&inst);
           changed = true;
           break;
         }
