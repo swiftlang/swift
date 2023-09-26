@@ -222,6 +222,9 @@ EXPERIMENTAL_FEATURE(SendNonSendable, false)
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
 
+/// Allow default arguments to require isolation at the call-site.
+EXPERIMENTAL_FEATURE(IsolatedDefaultArguments, false)
+
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
