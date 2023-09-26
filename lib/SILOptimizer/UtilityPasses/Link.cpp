@@ -39,8 +39,7 @@ public:
 
     // In embedded Swift, the stdlib contains all the runtime functions needed
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
-    if (M.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-        !M.isStdlibModule()) {
+    if (M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       linkEmbeddedRuntimeFromStdlib();
     }
   }
@@ -61,6 +60,10 @@ public:
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name) {
     SILModule &M = *getModule();
+
+    // Bail if runtime function is already loaded.
+    if (M.lookUpFunction(name)) return;
+
     SILFunction *Fn =
         M.getSILLoader()->lookupSILFunction(name, SILLinkage::PublicExternal);
     if (!Fn) return;
