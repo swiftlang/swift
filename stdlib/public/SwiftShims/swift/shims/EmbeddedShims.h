@@ -33,9 +33,14 @@ extern "C" {
 
 typedef void SWIFT_CC (*HeapObjectDestroyer)(SWIFT_CONTEXT void *object);
 
-static inline void _swift_runtime_invoke_heap_object_destroy(
-    const void *destroy, void *self) {
-  ((HeapObjectDestroyer)destroy)(self);
+static inline void _swift_embedded_invoke_heap_object_destroy(void *object) {
+  void *metadata = *(void **)object;
+  void **destroy_location = &((void **)metadata)[1];
+#if __has_feature(ptrauth_calls)
+  (*(__ptrauth(0,1,0xbbbf) HeapObjectDestroyer *)destroy_location)(object);
+#else
+  (*(HeapObjectDestroyer *)destroy_location)(object);
+#endif
 }
 
 #ifdef __cplusplus
