@@ -2,18 +2,6 @@ import CASTBridging
 import CBasicBridging
 import SwiftSyntax
 
-extension ASTGenVisitor {
-  /// Obtains the bridged start location of the given node in the current file, excluding leading trivia.
-  @inline(__always)
-  func bridgedSourceLoc(for node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
-    guard let node else {
-      return nil
-    }
-
-    return BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
-  }
-}
-
 extension BridgedSourceLoc: ExpressibleByNilLiteral {
   public init(nilLiteral: ()) {
     self.init(raw: nil)
@@ -32,19 +20,15 @@ extension BridgedSourceLoc {
     at position: AbsolutePosition,
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
-    if let start = buffer.baseAddress,
-      position.utf8Offset >= 0 && position.utf8Offset < buffer.count {
-      self = SourceLoc_advanced(BridgedSourceLoc(raw: start), SwiftInt(position.utf8Offset))
-    } else {
-      self = nil
-    }
+    precondition(position.utf8Offset >= 0 && position.utf8Offset < buffer.count)
+    self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), SwiftInt(position.utf8Offset))
   }
 }
 
 extension BridgedSourceRange {
   @inline(__always)
   init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
-    self.init(startLoc: astgen.bridgedSourceLoc(for: startToken), endLoc: astgen.bridgedSourceLoc(for: endToken))
+    self.init(startLoc: startToken.bridgedSourceLoc(in: astgen), endLoc: endToken.bridgedSourceLoc(in: astgen))
   }
 }
 
@@ -53,6 +37,30 @@ extension String {
     try withUTF8 { buffer in
       try body(BridgedString(data: buffer.baseAddress, length: SwiftInt(buffer.count)))
     }
+  }
+}
+
+extension SyntaxProtocol {
+  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
+  ///
+  /// - Parameter astgen: The visitor providing the source buffer.
+  @inline(__always)
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc { 
+    return BridgedSourceLoc(at: self.positionAfterSkippingLeadingTrivia, in: astgen.base)
+  }
+}
+
+extension Optional where Wrapped: SyntaxProtocol { 
+  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
+  ///
+  /// - Parameter astgen: The visitor providing the source buffer.
+  @inline(__always)
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc { 
+    guard let self else { 
+      return nil
+    }
+    
+    return self.bridgedSourceLoc(in: astgen)
   }
 }
 
@@ -74,7 +82,7 @@ extension TokenSyntax {
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @inline(__always)
   func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
-    return (self.bridgedIdentifier(in: astgen), astgen.bridgedSourceLoc(for: self))
+    return (self.bridgedIdentifier(in: astgen), self.bridgedSourceLoc(in: astgen))
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the

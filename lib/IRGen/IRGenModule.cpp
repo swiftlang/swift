@@ -194,6 +194,8 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
   // Only run the sanity check when we're building the real stdlib.
   if (!lookupSimple(IGM.getSwiftModule(), { "String" })) return;
 
+  if (!IGM.ObjCInterop) return;
+
   checkPointerAuthAssociatedTypeDiscriminator(IGM, { "_ObjectiveCBridgeable", "_ObjectiveCType" }, SpecialPointerAuthDiscriminators::ObjectiveCTypeDiscriminator);
   checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_bridgeToObjectiveC" }, SpecialPointerAuthDiscriminators::bridgeToObjectiveCDiscriminator);
   checkPointerAuthWitnessDiscriminator(IGM, { "_ObjectiveCBridgeable", "_forceBridgeFromObjectiveC" }, SpecialPointerAuthDiscriminators::forceBridgeFromObjectiveCDiscriminator);

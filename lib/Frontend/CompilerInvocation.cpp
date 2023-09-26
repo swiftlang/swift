@@ -1456,8 +1456,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   }
   llvm::sort(Opts.DebugConstraintSolverOnLines);
 
-  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
-    Opts.DebugForbidTypecheckPrefix = A->getValue();
+  for (auto A : Args.getAllArgValues(OPT_debug_forbid_typecheck_prefix)) {
+    Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
 
   if (Args.getLastArg(OPT_solver_disable_shrink))

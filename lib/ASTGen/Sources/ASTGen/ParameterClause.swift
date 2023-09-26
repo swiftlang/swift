@@ -85,7 +85,7 @@ extension ASTGenVisitor {
         declContext: self.declContext,
         specifierLoc: specifierLoc,
         firstName: firstName,
-        firstNameLoc: self.bridgedSourceLoc(for: node.optionalFirstName),
+        firstNameLoc: node.optionalFirstName.bridgedSourceLoc(in: self),
         secondName: secondName,
         secondNameLoc: secondNameLoc,
         type: self.visit(node.optionalType)?.rawValue,
@@ -102,9 +102,9 @@ extension ASTGenVisitor {
     .misc(
       ParameterList_create(
         astContext: self.ctx,
-        leftParenLoc: self.bridgedSourceLoc(for: node.leftParen),
+        leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
         parameters: self.visit(node.parameters),
-        rightParenLoc: self.bridgedSourceLoc(for: node.rightParen)
+        rightParenLoc: node.rightParen.bridgedSourceLoc(in: self)
       )
     )
   }
@@ -113,9 +113,9 @@ extension ASTGenVisitor {
     .misc(
       ParameterList_create(
         astContext: self.ctx,
-        leftParenLoc: self.bridgedSourceLoc(for: node.leftParen),
+        leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
         parameters: node.parameters.lazy.map { self.visit($0).rawValue }.bridgedArray(in: self),
-        rightParenLoc: self.bridgedSourceLoc(for: node.rightParen)
+        rightParenLoc: node.rightParen.bridgedSourceLoc(in: self)
       )
     )
   }

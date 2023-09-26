@@ -438,7 +438,7 @@ PrintStats("print-stats",
            llvm::cl::cat(Category),
            llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
 DebugForbidTypecheckPrefix("debug-forbid-typecheck-prefix",
   llvm::cl::desc("Triggers llvm fatal_error if typechecker tries to typecheck "
                  "a decl with the provided prefix name"),
@@ -4485,8 +4485,10 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-  InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
-    options::DebugForbidTypecheckPrefix;
+  for (auto prefix : options::DebugForbidTypecheckPrefix) {
+    InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefixes.push_back(
+        prefix);
+  }
   InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
 

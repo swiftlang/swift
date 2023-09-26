@@ -5,7 +5,6 @@
 // RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_MultiPayload_generic6 | tee /dev/stderr | %FileCheck %s --check-prefix=CHECK --check-prefix=X%target-ptrsize --dump-input=fail
 
 // REQUIRES: reflection_test_support
-// REQUIRES: objc_interop
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 
