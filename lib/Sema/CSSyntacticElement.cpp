@@ -629,6 +629,10 @@ private:
   ///
   /// - From sequence to pattern, when pattern has no type information.
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
+    // The `where` clause should be ignored because \c visitForEachStmt
+    // records it as a separate conjunction element to allow for a more
+    // granular control over what contextual information is brought into
+    // the scope during pattern + sequence and `where` clause solving.
     auto target = SyntacticElementTarget::forForEachStmt(
         forEachStmt, context.getAsDeclContext(),
         /*ignoreWhereClause=*/true);
@@ -955,9 +959,9 @@ private:
 
     // For-each pattern.
     //
-    // Note that we don't record a sequence or where clause here,
-    // they would be handled together with pattern because pattern can
-    // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
+    // Note that we don't record a sequence here, it would be handled
+    // together with pattern because pattern can inform a type of sequence
+    // element e.g. `for i: Int8 in 0 ..< 8`
     elements.push_back(makeElement(forEachStmt->getPattern(), stmtLoc));
 
     // Where clause if any.
