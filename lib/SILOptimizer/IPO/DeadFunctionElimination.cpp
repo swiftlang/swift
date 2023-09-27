@@ -95,8 +95,6 @@ class DeadFunctionAndGlobalElimination {
 
   bool keepExternalWitnessTablesAlive;
 
-  bool removeUnspecializedFunctionsInEmbeddedSwift;
-
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
 
@@ -433,8 +431,9 @@ class DeadFunctionAndGlobalElimination {
       // externally and are not anchors.
       bool embedded = Module->getOptions().EmbeddedSwift;
       bool generic = loweredFunctionHasGenericArguments(&F);
+      bool isSerialized = Module->isSerialized();
       bool ignoreAnchor =
-          embedded && generic && removeUnspecializedFunctionsInEmbeddedSwift;
+          embedded && generic && isSerialized;
 
       if (isAnchorFunction(&F) && !ignoreAnchor) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() <<"\n");
@@ -706,16 +705,13 @@ class DeadFunctionAndGlobalElimination {
   }
 
 public:
- DeadFunctionAndGlobalElimination(
-     SILModule *module, bool keepExternalWitnessTablesAlive,
-     bool removeUnspecializedFunctionsInEmbeddedSwift)
-     : Module(module),
-       keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
-       removeUnspecializedFunctionsInEmbeddedSwift(
-           removeUnspecializedFunctionsInEmbeddedSwift) {}
+  DeadFunctionAndGlobalElimination(SILModule *module,
+                                   bool keepExternalWitnessTablesAlive) :
+    Module(module),
+    keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive) {}
 
- /// The main entry point of the optimization.
- void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
+  /// The main entry point of the optimization.
+  void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
 
     LLVM_DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
@@ -796,10 +792,8 @@ public:
     // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionAndGlobalElimination deadFunctionElimination(
-        getModule(),
-        /*keepExternalWitnessTablesAlive*/ !isLateDFE,
-        /*removeUnspecializedFunctionsInEmbeddedSwift*/ isLateDFE);
+    DeadFunctionAndGlobalElimination deadFunctionElimination(getModule(),
+                                /*keepExternalWitnessTablesAlive*/ !isLateDFE);
     deadFunctionElimination.eliminateFunctionsAndGlobals(this);
   }
 };
