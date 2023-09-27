@@ -2251,7 +2251,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     return;
   case LookupKind::StoredProperty:
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (VD->getImplInfo().hasStorage()) {
+      if (VD->hasStorage()) {
         addVarDeclRef(VD, Reason, dynamicLookupInfo);
       }
       return;
