@@ -12,6 +12,7 @@
 
 #include "ImageInspectionCommon.h"
 #include "swift/shims/MetadataSections.h"
+#include "swift/Runtime/Backtrace.h"
 
 #include <cstddef>
 #include <new>
@@ -22,6 +23,13 @@ extern "C" const char __dso_handle[];
 // NOTE: Multi images in a single process is not yet
 // stabilized in WebAssembly toolchain outside of Emscripten.
 static constexpr const void *__dso_handle = nullptr;
+#endif
+
+#if SWIFT_ENABLE_BACKTRACING
+// Drag in a symbol from the backtracer, to force the static linker to include
+// the code.
+static const void *__backtraceRef __attribute__((used))
+  = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
 #endif
 
 // Create empty sections to ensure that the start/stop symbols are synthesized

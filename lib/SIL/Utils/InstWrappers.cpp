@@ -54,6 +54,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::StructExtractInst:
   case SILInstructionKind::TupleExtractInst:
+  case SILInstructionKind::TuplePackExtractInst:
     return true;
   }
 }

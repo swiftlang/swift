@@ -742,6 +742,29 @@ inline SILFunction *SILInstruction::getFunction() const {
   return getParent()->getParent();
 }
 
+inline bool SILInstruction::visitPriorInstructions(
+    llvm::function_ref<bool(SILInstruction *)> visitor) {
+  if (auto *previous = getPreviousInstruction()) {
+    return visitor(previous);
+  }
+  for (auto *predecessor : getParent()->getPredecessorBlocks()) {
+    if (!visitor(&predecessor->back()))
+      return false;
+  }
+  return true;
+}
+inline bool SILInstruction::visitSubsequentInstructions(
+    llvm::function_ref<bool(SILInstruction *)> visitor) {
+  if (auto *next = getNextInstruction()) {
+    return visitor(next);
+  }
+  for (auto *successor : getParent()->getSuccessorBlocks()) {
+    if (!visitor(&successor->front()))
+      return false;
+  }
+  return true;
+}
+
 inline SILInstruction *SILInstruction::getPreviousInstruction() {
   auto pos = getIterator();
   return pos == getParent()->begin() ? nullptr : &*std::prev(pos);

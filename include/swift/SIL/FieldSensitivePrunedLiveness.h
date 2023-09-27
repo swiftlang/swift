@@ -375,9 +375,12 @@ struct TypeTreeLeafTypeRange {
 
   /// Sets each bit in \p bits corresponding to an element of this range.
   void setBits(SmallBitVector &bits) const {
-    for (auto element : getRange()) {
-      bits.set(element);
-    }
+    bits.set(startEltOffset, endEltOffset);
+  }
+
+  /// Resets each bit in \p bits corresponding to an element of this range.
+  void resetBits(SmallBitVector &bits) const {
+    bits.reset(startEltOffset, endEltOffset);
   }
 
   IntRange<unsigned> getRange() const {
@@ -694,6 +697,15 @@ public:
   enum IsInterestingUser { NonUser, NonLifetimeEndingUse, LifetimeEndingUse };
 
   struct InterestingUser {
+    // Together these bit vectors encode four states per field:
+    //   +---------------+----------------+---------------+
+    // - | liveBits[bit] | consumingBits] |     state     |
+    //   +---------------+----------------+---------------+
+    //   |      0        |        0       | dead          |
+    //   |      0        |        1       | non-use       |
+    //   |      1        |        0       | non-consuming |
+    //   |      1        |        1       | consuming     |
+    //   +---------------+----------------+---------------+
     SmallBitVector liveBits;
     SmallBitVector consumingBits;
 
@@ -708,18 +720,33 @@ public:
 
     /// Record that the instruction uses the bits of the value in \p range.
     void addUses(TypeTreeLeafTypeRange range, bool lifetimeEnding) {
-      range.setBits(liveBits);
-      if (lifetimeEnding) {
-        range.setBits(consumingBits);
-      }
+      SmallBitVector bits(liveBits.size());
+      range.setBits(bits);
+      addUses(bits, lifetimeEnding);
     }
 
     /// Record that the instruction uses the bits in \p bits.
     void addUses(SmallBitVector const &bits, bool lifetimeEnding) {
-      liveBits |= bits;
       if (lifetimeEnding) {
-        consumingBits |= bits;
+        consumingBits |= bits & ~liveBits;
+      } else {
+        consumingBits &= ~bits;
       }
+      liveBits |= bits;
+    }
+
+    /// Extend liveness at the bits in the specified  \p range without
+    /// overriding whether the lifetimes of those bits end.
+    void extendToNonUse(TypeTreeLeafTypeRange range) {
+      SmallBitVector bits(liveBits.size());
+      range.setBits(bits);
+      extendToNonUse(bits);
+    }
+
+    /// Extend liveness at the specified \p bits without overriding whether the
+    /// lifetimes of those bits end.
+    void extendToNonUse(SmallBitVector const &bits) {
+      consumingBits |= bits & ~liveBits;
     }
 
     /// Populates the provided vector with contiguous ranges of bits which are
@@ -755,10 +782,18 @@ public:
     }
 
     IsInterestingUser isInterestingUser(unsigned element) const {
-      if (!liveBits.test(element))
+      auto isLive = liveBits.test(element);
+      auto isConsuming = consumingBits.test(element);
+      if (!isLive && !isConsuming) {
         return NonUser;
-      return consumingBits.test(element) ? LifetimeEndingUse
-                                         : NonLifetimeEndingUse;
+      } else if (!isLive && isConsuming) {
+        return NonLifetimeEndingUse;
+      } else if (isLive && isConsuming) {
+        return LifetimeEndingUse;
+      } else if (isLive && !isConsuming) {
+        return NonLifetimeEndingUse;
+      }
+      llvm_unreachable("covered conditions");
     }
   };
 
@@ -875,6 +910,16 @@ public:
                     bool lifetimeEnding,
                     SmallBitVector const &useBeforeDefBits);
 
+  /// Adds \p user which doesn't use the def to liveness.
+  ///
+  /// Different from calling updateForUse because it never overrides the value
+  /// \p lifetimeEnding stored for \p inst.
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange span,
+                      SmallBitVector const &useBeforeDefBits);
+
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits,
+                      SmallBitVector const &useBeforeDefBits);
+
   void getBlockLiveness(SILBasicBlock *bb, TypeTreeLeafTypeRange span,
                         SmallVectorImpl<FieldSensitivePrunedLiveBlocks::IsLive>
                             &resultingFoundLiveness) const {
@@ -943,7 +988,7 @@ public:
 
   unsigned getNumSubElements() const { return liveBlocks.getNumBitsToTrack(); }
 
-  void print(llvm::raw_ostream &os) const { liveBlocks.print(os); }
+  void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 protected:
@@ -970,6 +1015,14 @@ protected:
   void addInterestingUser(SILInstruction *user, SmallBitVector const &bits,
                           bool lifetimeEnding) {
     getOrCreateInterestingUser(user).addUses(bits, lifetimeEnding);
+  }
+
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange range) {
+    getOrCreateInterestingUser(user).extendToNonUse(range);
+  }
+
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits) {
+    getOrCreateInterestingUser(user).extendToNonUse(bits);
   }
 };
 
@@ -1088,6 +1141,14 @@ public:
   /// that we consider defs as stopping liveness from being propagated up.
   void updateForUse(SILInstruction *user, SmallBitVector const &bits,
                     bool lifetimeEnding);
+
+  /// Customize extendToNonUse for FieldSensitivePrunedLiveness to consider
+  /// defs as kills.
+  void extendToNonUse(SILInstruction *user, TypeTreeLeafTypeRange span);
+
+  /// Customize extendToNonUse for FieldSensitivePrunedLiveness to consider
+  /// defs as kills.
+  void extendToNonUse(SILInstruction *user, SmallBitVector const &bits);
 
   /// Compute the boundary from the blocks discovered during liveness analysis.
   ///

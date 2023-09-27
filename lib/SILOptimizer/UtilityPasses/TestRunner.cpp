@@ -165,7 +165,7 @@ static FunctionTest FunctionGetSelfArgumentIndex(
 //   - its type
 //   - something to identify the instance (mostly this means calling dump)
 static FunctionTest TestSpecificationTest(
-    "test-specification-parsing",
+    "test_specification_parsing",
     [](auto &function, auto &arguments, auto &test) {
       auto expectedFields = arguments.takeString();
       for (auto expectedField : expectedFields) {

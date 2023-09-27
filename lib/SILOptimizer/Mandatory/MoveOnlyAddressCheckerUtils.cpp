@@ -1433,8 +1433,7 @@ private:
                              BasicBlockSet const &consumedAtExitBlocks,
                              BasicBlockSetVector const &consumedAtEntryBlocks);
 
-  void addPreviousInstructionToLiveness(SILInstruction *inst, unsigned element,
-                                        bool lifetimeEnding);
+  void addPreviousInstructionToLiveness(SILInstruction *inst, unsigned element);
 };
 
 } // namespace
@@ -3361,8 +3360,7 @@ void ExtendUnconsumedLiveness::runOnField(
         continue;
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
-      addPreviousInstructionToLiveness(predecessor->getTerminator(), element,
-                                       /*lifetimeEnding*/ false);
+      addPreviousInstructionToLiveness(predecessor->getTerminator(), element);
     }
   }
 
@@ -3373,8 +3371,7 @@ void ExtendUnconsumedLiveness::runOnField(
     if (!shouldAddDestroyToLiveness(destroy, element, consumedAtExitBlocks,
                                     consumedAtEntryBlocks))
       continue;
-    addPreviousInstructionToLiveness(destroy, element,
-                                     /*lifetimeEnding*/ false);
+    addPreviousInstructionToLiveness(destroy, element);
   }
 }
 
@@ -3462,16 +3459,12 @@ bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
 }
 
 void ExtendUnconsumedLiveness::addPreviousInstructionToLiveness(
-    SILInstruction *inst, unsigned element, bool lifetimeEnding) {
+    SILInstruction *inst, unsigned element) {
   auto range = TypeTreeLeafTypeRange(element, element + 1);
-  if (auto *previous = inst->getPreviousInstruction()) {
-    liveness.updateForUse(previous, range, lifetimeEnding);
-  } else {
-    for (auto *predecessor : inst->getParent()->getPredecessorBlocks()) {
-      liveness.updateForUse(predecessor->getTerminator(), range,
-                            lifetimeEnding);
-    }
-  }
+  inst->visitPriorInstructions([&](auto *prior) {
+    liveness.extendToNonUse(prior, range);
+    return true;
+  });
 }
 
 bool MoveOnlyAddressCheckerPImpl::performSingleCheck(

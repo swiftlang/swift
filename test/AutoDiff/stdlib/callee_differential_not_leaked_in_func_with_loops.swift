@@ -44,14 +44,14 @@ extension LifetimeTracked {
 func f(ltti: LifetimeTracked) -> Float {
     for _ in 0..<1 {
     }
-    return ltti.callee(0xDEADBEEF)
+    return ltti.callee(0xDEADBEE)
 }
 
 var Tests = TestSuite("CalleeDifferentialLeakTest")
 
 Tests.test("dontLeakCalleeDifferential") {
   do {
-    let ltti = LifetimeTracked(0xDEADBEEF)
+    let ltti = LifetimeTracked(0xDEADBEE)
     let _ = valueWithPullback(at: ltti, of: f)
   }
   expectEqual(0, LifetimeTracked.instances)

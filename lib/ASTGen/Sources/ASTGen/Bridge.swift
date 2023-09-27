@@ -20,7 +20,7 @@ extension BridgedSourceLoc {
     at position: AbsolutePosition,
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
-    precondition(position.utf8Offset >= 0 && position.utf8Offset < buffer.count)
+    precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
     self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), SwiftInt(position.utf8Offset))
   }
 }

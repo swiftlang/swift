@@ -663,6 +663,114 @@ void FieldSensitivePrunedLiveness::updateForUse(
   addInterestingUser(user, bits, lifetimeEnding);
 }
 
+void FieldSensitivePrunedLiveness::extendToNonUse(
+    SILInstruction *user, TypeTreeLeafTypeRange range,
+    SmallBitVector const &useBeforeDefBits) {
+  SmallVector<FieldSensitivePrunedLiveBlocks::IsLive, 8> resultingLiveness;
+  liveBlocks.updateForUse(user, range.startEltOffset, range.endEltOffset,
+                          useBeforeDefBits, resultingLiveness);
+
+  extendToNonUse(user, range);
+}
+
+void FieldSensitivePrunedLiveness::extendToNonUse(
+    SILInstruction *user, SmallBitVector const &bits,
+    SmallBitVector const &useBeforeDefBits) {
+  for (auto bit : bits.set_bits()) {
+    liveBlocks.updateForUse(user, bit, useBeforeDefBits.test(bit));
+  }
+
+  extendToNonUse(user, bits);
+}
+
+void FieldSensitivePrunedLiveness::print(llvm::raw_ostream &os) const {
+  liveBlocks.print(os);
+  for (auto &userAndInterest : users) {
+    for (size_t bit = 0, size = userAndInterest.second.liveBits.size();
+         bit < size; ++bit) {
+      auto isLive = userAndInterest.second.liveBits.test(bit);
+      auto isConsuming = userAndInterest.second.consumingBits.test(bit);
+      if (!isLive && !isConsuming) {
+        continue;
+      } else if (!isLive && isConsuming) {
+        os << "non-user: ";
+      } else if (isLive && isConsuming) {
+        os << "lifetime-ending user: ";
+      } else if (isLive && !isConsuming) {
+        os << "regular user: ";
+      }
+      os << *userAndInterest.first << "\tat " << bit << "\n";
+    }
+  }
+}
+
+namespace swift::test {
+// Arguments:
+// - SILValue: def whose pruned liveness will be calculated
+// - the string "uses:"
+// - variadic list of live-range user instructions
+// Dumps:
+// -
+static FunctionTest FieldSensitiveSSAUseLivenessTest(
+    "fs_ssa_use_liveness", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      auto begin = (unsigned)arguments.takeUInt();
+      auto end = (unsigned)arguments.takeUInt();
+
+      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+      FieldSensitiveSSAPrunedLiveRange liveness(&function, &discoveredBlocks);
+      liveness.init(value);
+      liveness.initializeDef(value, TypeTreeLeafTypeRange(begin, end));
+
+      auto argument = arguments.takeArgument();
+      if (cast<StringArgument>(argument).getValue() != "uses:") {
+        llvm::report_fatal_error(
+            "test specification expects the 'uses:' label\n");
+      }
+      while (arguments.hasUntaken()) {
+        auto *inst = arguments.takeInstruction();
+        auto kindString = arguments.takeString();
+        enum Kind {
+          NonUse,
+          Ending,
+          NonEnding,
+        };
+        auto kind = llvm::StringSwitch<llvm::Optional<Kind>>(kindString)
+                        .Case("non-use", Kind::NonUse)
+                        .Case("ending", Kind::Ending)
+                        .Case("non-ending", Kind::NonEnding)
+                        .Default(llvm::None);
+        if (!kind.has_value()) {
+          llvm::errs() << "Unknown kind: " << kindString << "\n";
+          llvm::report_fatal_error("Bad user kind.  Value must be one of "
+                                   "'non-use', 'ending', 'non-ending'");
+        }
+        auto begin = (unsigned)arguments.takeUInt();
+        auto end = (unsigned)arguments.takeUInt();
+        switch (kind.value()) {
+        case Kind::NonUse:
+          liveness.extendToNonUse(inst, TypeTreeLeafTypeRange(begin, end));
+          break;
+        case Kind::Ending:
+          liveness.updateForUse(inst, TypeTreeLeafTypeRange(begin, end),
+                                /*lifetimeEnding*/ true);
+          break;
+        case Kind::NonEnding:
+          liveness.updateForUse(inst, TypeTreeLeafTypeRange(begin, end),
+                                /*lifetimeEnding*/ false);
+          break;
+        }
+      }
+
+      liveness.print(llvm::outs());
+
+      FieldSensitivePrunedLivenessBoundary boundary(1);
+      liveness.computeBoundary(boundary);
+      boundary.print(llvm::outs());
+    });
+
+} // end namespace swift::test
+
 //===----------------------------------------------------------------------===//
 //                    MARK: FieldSensitivePrunedLiveRange
 //===----------------------------------------------------------------------===//
@@ -965,6 +1073,22 @@ void FieldSensitivePrunedLiveRange<LivenessWithDefs>::updateForUse(
   asImpl().isUserBeforeDef(user, bits.set_bits(), useBeforeDefBits);
   FieldSensitivePrunedLiveness::updateForUse(user, bits, lifetimeEnding,
                                              useBeforeDefBits);
+}
+
+template <typename LivenessWithDefs>
+void FieldSensitivePrunedLiveRange<LivenessWithDefs>::extendToNonUse(
+    SILInstruction *user, TypeTreeLeafTypeRange range) {
+  SmallBitVector useBeforeDefBits(getNumSubElements());
+  asImpl().isUserBeforeDef(user, range.getRange(), useBeforeDefBits);
+  FieldSensitivePrunedLiveness::extendToNonUse(user, range, useBeforeDefBits);
+}
+
+template <typename LivenessWithDefs>
+void FieldSensitivePrunedLiveRange<LivenessWithDefs>::extendToNonUse(
+    SILInstruction *user, SmallBitVector const &bits) {
+  SmallBitVector useBeforeDefBits(getNumSubElements());
+  asImpl().isUserBeforeDef(user, bits.set_bits(), useBeforeDefBits);
+  FieldSensitivePrunedLiveness::extendToNonUse(user, bits, useBeforeDefBits);
 }
 
 //===----------------------------------------------------------------------===//

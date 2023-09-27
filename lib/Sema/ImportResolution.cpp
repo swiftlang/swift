@@ -770,7 +770,7 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   if (!topLevelModule->getPackageName().empty() &&
       topLevelModule->getPackageName().str() == ctx.LangOpts.PackageName &&
       topLevelModule->isBuiltFromInterface()) {
-      ctx.Diags.diagnose(SourceLoc(),
+      ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                          diag::in_package_module_not_compiled_from_source,
                          topLevelModule->getBaseIdentifier(),
                          ctx.LangOpts.PackageName,
