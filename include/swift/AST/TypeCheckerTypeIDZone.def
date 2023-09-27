@@ -501,5 +501,5 @@ SWIFT_REQUEST(TypeChecker, ExpandChildTypeRefinementContextsRequest,
               bool(Decl *, TypeRefinementContext *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
-              bool(Decl *, SpecializeAttr *),
-              Cached, NoLocationInfo)
+              GenericSignature(Decl *, SpecializeAttr *),
+              SeparatelyCached, NoLocationInfo)

@@ -7,4 +7,5 @@ add_swift_unittest(SwiftDriverTests
 target_link_libraries(SwiftDriverTests PRIVATE
    swiftAST
    swiftClangImporter
+   swiftSema
    swiftDriver)
