@@ -3,10 +3,28 @@
 class C {}
 sil @getOwned : $@convention(thin) () -> @owned C
 sil @barrier : $@convention(thin) () -> ()
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+sil [ossa] @borrowC : $@convention(thin) (@guaranteed C) -> ()
 struct S {}
 
 @_moveOnly struct MoS {}
 @_moveOnly struct MoE {}
+
+// CHECK-LABEL: begin running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, true, @trace
+// CHECK-LABEL: end running test 1 of 1 on fn: canonicalize-ossa-lifetime with: true, true, true, @trace
+sil [ossa] @fn : $@convention(thin) () -> () {
+entry:
+    specify_test "canonicalize-ossa-lifetime true true true @trace"
+    %getC = function_ref @getC : $@convention(thin) () -> @owned C
+    %c = apply %getC() : $@convention(thin) () -> @owned C
+    debug_value [trace] %c : $C
+    %borrowC = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+    apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> ()
+    debug_value %c : $C
+    destroy_value %c : $C
+    %retval = tuple ()
+    return %retval : $()
+}
 
 // When access scopes are respected, the lifetime which previously extended
 // beyond the access scope still extends beyond it.
