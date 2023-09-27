@@ -431,8 +431,7 @@ class DeadFunctionAndGlobalElimination {
     for (SILFunction &F : *Module) {
       // In embedded Swift, generic functions, even public ones cannot be used
       // externally and are not anchors.
-      bool embedded =
-          Module->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+      bool embedded = Module->getOptions().EmbeddedSwift;
       bool generic = loweredFunctionHasGenericArguments(&F);
       bool ignoreAnchor =
           embedded && generic && removeUnspecializedFunctionsInEmbeddedSwift;
