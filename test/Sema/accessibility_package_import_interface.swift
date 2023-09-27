@@ -20,8 +20,7 @@
 // CHECK-DEP-BC: <MODULE_PACKAGE_NAME abbrevid=6/> blob data = 'myPkg'
 
 // TEST Lib should load Dep.swiftmodule and access package decls if in the same package and error if not
-
-// RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t
 
 // RUN: not %target-swift-frontend -typecheck %t/Lib.swift -package-name otherPkg -I %t -Rmodule-loading 2> %t/result-binary-other-pkg.output
 // RUN: %FileCheck %s --check-prefix=CHECK-DIFF-PKG < %t/result-binary-other-pkg.output
@@ -45,11 +44,7 @@
 // CHECK-DEP-INTER-BC: <MODULE_PACKAGE_NAME abbrevid=7/> blob data = 'myPkg'
 
 // TEST Lib should error on loading Dep built from interface and accessing package symbols (unless usableFromInline or inlinable)
-// RUN: not %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t 2> %t/result-access.output
-// RUN: %FileCheck %s --check-prefix CHECK-LIB < %t/result-access.output
-// CHECK-LIB: error: module 'Dep' is in package 'myPkg' but was built from interface; modules of the same package can only be loaded if built from source
-// CHECK-LIB: error: cannot find 'packageFunc' in scope
-// CHECK-LIB: error: value of type 'PackageKlassUFI' has no member 'packageVar'
+// RUN: %target-swift-frontend -typecheck %t/Lib.swift -package-name myPkg -I %t -verify
 
 // TEST Remove and rebuild Dep from source
 // RUN: rm %t/Dep.swiftmodule
@@ -114,16 +109,16 @@ public func publicFuncInlinable() {
 }
 
 //--- Lib.swift
-import Dep
+import Dep // expected-error {{module 'Dep' is in package 'myPkg' but was built from interface; modules of the same package can only be loaded if built from source}}
 
 public func libFunc() {
   publicFuncInlinable()
   publicFunc()
   packageFuncInlinable()
-  packageFunc()
+  packageFunc() // expected-error {{cannot find 'packageFunc' in scope}}
   let x = PackageKlassUFI()
   let y = x.packageVarUFI
-  let z = x.packageVar
+  let z = x.packageVar // expected-error {{value of type 'PackageKlassUFI' has no member 'packageVar'}}
   print(x, y, z)
 }
 
