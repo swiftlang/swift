@@ -152,6 +152,8 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
 
   auto definingModule = D->getModuleContext();
   auto fragileKind = where.getFragileFunctionKind();
+  bool warnPreSwift6 = originKind != DisallowedOriginKind::SPIOnly &&
+                       originKind != DisallowedOriginKind::NonPublicImport;
   if (fragileKind.kind == FragileFunctionKind::None) {
     auto reason = where.getExportabilityReason();
     ctx.Diags
@@ -159,8 +161,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   static_cast<unsigned>(*reason), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
-                                 6);
+        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
   } else {
     ctx.Diags
         .diagnose(loc,
@@ -168,14 +169,26 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                   TAD, definingModule->getNameStr(), D->getNameStr(),
                   fragileKind.getSelector(), definingModule->getName(),
                   static_cast<unsigned>(originKind))
-        .warnUntilSwiftVersionIf(originKind != DisallowedOriginKind::SPIOnly,
-                                 6);
+        .warnUntilSwiftVersionIf(warnPreSwift6, 6);
   }
   D->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
 
   if (originKind == DisallowedOriginKind::MissingImport &&
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
     addMissingImport(loc, D, where);
+
+  // If limited by an import, note which one.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    const DeclContext *DC = where.getDeclContext();
+    ImportAccessLevel limitImport = D->getImportAccessFrom(DC);
+    assert(limitImport.has_value() &&
+           limitImport->accessLevel < AccessLevel::Public &&
+           "The import should still be non-public");
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here, D,
+                       limitImport->accessLevel,
+                       limitImport->module.importedModule);
+  }
 
   return true;
 }
@@ -190,6 +203,10 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   auto originKind = getDisallowedOriginKind(
       D, where, downgradeToWarning);
   if (originKind == DisallowedOriginKind::None)
+    return false;
+
+  // Access levels from imports are reported with the others access levels.
+  if (originKind == DisallowedOriginKind::NonPublicImport)
     return false;
 
   auto diagName = D->getName();
@@ -290,13 +307,27 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                      static_cast<unsigned>(originKind))
       .warnUntilSwiftVersionIf((useConformanceAvailabilityErrorsOption &&
                                 !ctx.LangOpts.EnableConformanceAvailabilityErrors &&
-                                originKind != DisallowedOriginKind::SPIOnly) ||
+                                originKind != DisallowedOriginKind::SPIOnly &&
+                                originKind != DisallowedOriginKind::NonPublicImport) ||
                                originKind == DisallowedOriginKind::MissingImport,
                                6);
 
   if (originKind == DisallowedOriginKind::MissingImport &&
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
     addMissingImport(loc, ext, where);
+
+  // If limited by an import, note which one.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    const DeclContext *DC = where.getDeclContext();
+    ImportAccessLevel limitImport = ext->getImportAccessFrom(DC);
+    assert(limitImport.has_value() &&
+           limitImport->accessLevel < AccessLevel::Public &&
+           "The import should still be non-public");
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here, ext,
+                       limitImport->accessLevel,
+                       limitImport->module.importedModule);
+  }
 
   return true;
 }

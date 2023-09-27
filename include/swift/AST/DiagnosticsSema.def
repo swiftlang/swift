@@ -2334,7 +2334,7 @@ NOTE(decl_import_via_here,none,
      "%kind0 imported as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
      "from %2 here",
-     (const ValueDecl *, AccessLevel, const ModuleDecl*))
+     (const Decl *, AccessLevel, const ModuleDecl*))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
@@ -3437,7 +3437,8 @@ ERROR(decl_from_hidden_module,none,
       "it is SPI|"
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
-      "C++ types from imported module %2 do not support library evolution}3",
+      "C++ types from imported module %2 do not support library evolution|"
+      "<<ERROR>>}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -3450,7 +3451,8 @@ ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
-      "C++ types from imported module %4 do not support library evolution}5",
+      "C++ types from imported module %4 do not support library evolution|"
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 ERROR(conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 %select{here|as property wrapper here|"
@@ -3462,7 +3464,8 @@ ERROR(conformance_from_implementation_only_module,none,
       "the conformance is declared as SPI|"
       "%3 was imported for SPI only|"
       "%3 was not imported by this file|"
-      "C++ types from imported module %3 do not support library evolution}4",
+      "C++ types from imported module %3 do not support library evolution|"
+      "%3 was not imported publicly}4",
       (Type, Identifier, unsigned, Identifier, unsigned))
 NOTE(assoc_conformance_from_implementation_only_module,none,
      "in associated type %0 (inferred as %1)", (Type, Type))
@@ -6568,7 +6571,8 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "it is SPI|"
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
-      "C++ APIs from imported module %2 do not support library evolution}3",
+      "C++ APIs from imported module %2 do not support library evolution|"
+      "<<ERROR>>}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,
@@ -6585,7 +6589,8 @@ ERROR(inlinable_typealias_desugars_to_type_from_hidden_module,
       "<<ERROR>>|"
       "%4 was imported for SPI only|"
       "%4 was not imported by this file|"
-      "C++ types from imported module %4 do not support library evolution}5",
+      "C++ types from imported module %4 do not support library evolution|"
+      "%4 was not imported publicly}5",
       (const TypeAliasDecl *, StringRef, StringRef, unsigned, Identifier, unsigned))
 
 NOTE(missing_import_inserted,

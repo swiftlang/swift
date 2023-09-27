@@ -1915,6 +1915,13 @@ swift::getDisallowedOriginKind(const Decl *decl,
       isFragileClangNode(decl->getClangNode()))
     return DisallowedOriginKind::FragileCxxAPI;
 
+  // Report non-public import last as it can be ignored by the caller.
+  // See \c diagnoseValueDeclRefExportability.
+  auto importSource = decl->getImportAccessFrom(where.getDeclContext());
+  if (importSource.has_value() &&
+      importSource->accessLevel < AccessLevel::Public)
+    return DisallowedOriginKind::NonPublicImport;
+
   return DisallowedOriginKind::None;
 }
 
