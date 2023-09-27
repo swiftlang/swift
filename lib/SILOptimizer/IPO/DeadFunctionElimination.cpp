@@ -31,11 +31,6 @@ STATISTIC(NumDeadGlobals, "Number of dead global variables eliminated");
 
 namespace {
 
-static bool loweredFunctionHasGenericArguments(const SILFunction *f) {
-  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
-  return s && !s->areAllParamsConcrete();
-}
-
 class DeadFunctionAndGlobalElimination {
   /// Represents a function which is implementing a vtable or witness table
   /// method.
@@ -100,7 +95,7 @@ class DeadFunctionAndGlobalElimination {
     // In embedded Swift, (even public) generic functions *after serialization*
     // cannot be used externally and are not anchors.
     bool embedded = Module->getOptions().EmbeddedSwift;
-    bool generic = loweredFunctionHasGenericArguments(F);
+    bool generic = F->isGeneric();
     bool isSerialized = Module->isSerialized();
     if (embedded && generic && isSerialized)
       return false;

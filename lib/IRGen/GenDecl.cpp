@@ -1261,11 +1261,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   return true;
 }
 
-static bool loweredFunctionHasGenericArguments(SILFunction *f) {
-  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
-  return s && !s->areAllParamsConcrete();
-}
-
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
@@ -1305,8 +1300,7 @@ void IRGenerator::emitGlobalTopLevel(
     // unspecialized classes and class vtables in SIL.
     //
     // if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    //   bool isGeneric = loweredFunctionHasGenericArguments(&f);
-    //   if (isGeneric) {
+    //   if (f.isGeneric()) {
     //     llvm::errs() << "Unspecialized function: \n" << f << "\n";
     //     llvm_unreachable("unspecialized function present in embedded Swift");
     //   }
@@ -1437,7 +1431,7 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyFieldDescriptors.empty());
     // LazyFunctionDefinitions are allowed, but they must not be generic
     for (SILFunction *f : LazyFunctionDefinitions) {
-      assert(!loweredFunctionHasGenericArguments(f));
+      assert(!f->isGeneric());
     }
     assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
@@ -1567,7 +1561,7 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
 
   // Embedded Swift doesn't expect any generic functions to be referenced.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    assert(!loweredFunctionHasGenericArguments(f));
+    assert(!f->isGeneric());
   }
 
   assert(!FinishedEmittingLazyDefinitions);

@@ -781,6 +781,12 @@ public:
     return getLoweredFunctionType()->hasIndirectFormalResults();
   }
 
+  // Returns true if the function has any generic arguments.
+  bool isGeneric() const {
+    auto s = getLoweredFunctionType()->getInvocationGenericSignature();
+    return s && !s->areAllParamsConcrete();
+  }
+
   /// Returns true if this function ie either a class method, or a
   /// closure that captures the 'self' value or its metatype.
   ///
