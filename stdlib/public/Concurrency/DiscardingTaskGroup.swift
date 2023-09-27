@@ -416,20 +416,20 @@ extension DiscardingTaskGroup: Sendable { }
 ///
 /// Generally, this suits the typical use-cases of a
 /// discarding task group well, however, if you wanted to prevent specific
-/// errors from cancelling the group one should catch them inside the child 
+/// errors from cancelling the group one should catch them inside the child
 /// task's body like this:
 ///
 /// ```
 /// try await withThrowingDiscardingTaskGroup { group in
-///   group.addTask { 
+///   group.addTask {
 ///     do {
 ///       try boom(1)
 ///     } catch is HarmlessError {
 ///       return
 ///     }
 ///   }
-///   group.addTask { 
-///     try boom(2, after: .seconds(5)) 
+///   group.addTask {
+///     try boom(2, after: .seconds(5))
 ///   }
 /// }
 /// ```
