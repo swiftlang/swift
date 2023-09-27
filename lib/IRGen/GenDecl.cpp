@@ -1308,7 +1308,7 @@ void IRGenerator::emitGlobalTopLevel(
     //   bool isGeneric = loweredFunctionHasGenericArguments(&f);
     //   if (isGeneric) {
     //     llvm::errs() << "Unspecialized function: \n" << f << "\n";
-    //     assert(0 && "unspecialized function present in embedded Swift");
+    //     llvm_unreachable("unspecialized function present in embedded Swift");
     //   }
     // }
 
