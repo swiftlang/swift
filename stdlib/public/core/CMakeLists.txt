@@ -419,6 +419,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 2 triple)
     
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     add_swift_target_library_single(
       embedded-stdlib-${triple}
       swiftCore
@@ -431,7 +432,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}
-      INSTALL_IN_COMPONENT "never_install"
+      INSTALL_IN_COMPONENT stdlib
       )
     add_dependencies(embedded-stdlib embedded-stdlib-${triple})
   endforeach()
