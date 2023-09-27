@@ -2798,6 +2798,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  ParserStatus Status;
+
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
@@ -3583,16 +3585,16 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_StorageRestrictions: {
     ParserResult<StorageRestrictionsAttr> Attr =
         parseStorageRestrictionsAttribute(AtLoc, Loc);
-    if (!Attr.isParseErrorOrHasCompletion()) {
+    Status |= Attr;
+    if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
-    } else {
-      return Attr;
     }
     break;
   }
 
   case DAK_Implements: {
     ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }
@@ -3601,6 +3603,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3612,6 +3615,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseDerivativeAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3623,6 +3627,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseTransposeAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3693,6 +3698,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DAK_Documentation: {
     auto Attr = parseDocumentationAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
@@ -3703,6 +3709,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
                                               : MacroSyntax::Attached);
     auto Attr = parseMacroRoleAttribute(syntax, AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
@@ -3861,7 +3868,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   if (AtLoc.isValid() && DeclAttribute::isDeclModifier(DK))
     diagnose(AtLoc, diag::cskeyword_not_attribute, AttrName).fixItRemove(AtLoc);
 
-  return makeParserSuccess();
+  return Status;
 }
 
 bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
