@@ -571,3 +571,12 @@ func testCaptureList() -> Int {
   let fn = { [x = if .random() { 0 } else { 1 }] in x }
   return fn()
 }
+
+// https://github.com/apple/swift/issues/68764
+func testConditionalCast<T>(_ x: Any) -> T? {
+  if .random() {
+    x as? T
+  } else {
+    nil
+  }
+}
