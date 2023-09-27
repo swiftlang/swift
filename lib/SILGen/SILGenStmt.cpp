@@ -827,9 +827,20 @@ void StmtEmitter::visitYieldStmt(YieldStmt *S) {
 
 void StmtEmitter::visitThenStmt(ThenStmt *S) {
   auto *E = S->getResult();
-  auto init = SGF.getSingleValueStmtInit(E);
 
-  if (init && !E->getType()->isStructurallyUninhabited()) {
+  // If we have an uninhabited type, we may not be able to use it for
+  // initialization, since we allow the conversion of Never to any other type.
+  // Instead, emit an ignored expression with an unreachable.
+  if (E->getType()->isUninhabited()) {
+    SGF.emitIgnoredExpr(E);
+    SGF.B.createUnreachable(E);
+    return;
+  }
+
+  // Retrieve the initialization for the parent SingleValueStmtExpr. If we don't
+  // have an init, we don't care about the result, emit an ignored expr. This is
+  // the case if e.g the result is being converted to Void.
+  if (auto init = SGF.getSingleValueStmtInit(E)) {
     SGF.emitExprInto(E, init.get());
   } else {
     SGF.emitIgnoredExpr(E);
