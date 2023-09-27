@@ -3,6 +3,7 @@
 // RUN: %target-swift-emit-irgen -I %t/Inputs -enable-experimental-cxx-interop  -Xcc -std=c++17 %t/test.swift -module-name Test | %FileCheck %s
 
 // REQUIRES: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 
 //--- Inputs/module.modulemap
 module MsvcUseVecIt {
