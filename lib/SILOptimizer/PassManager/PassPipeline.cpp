@@ -891,8 +891,12 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // boundaries as required by the ABI.
   P.addLoadableByAddress();
 
-  // For embedded Swift: Remove all unspecialized functions.
-  P.addLateDeadFunctionAndGlobalElimination();
+  if (Options.EmbeddedSwift) {
+    // For embedded Swift: Remove all unspecialized functions. This is important
+    // to avoid having debuginfo references to these functions that we don't
+    // want to emit in IRGen.
+    P.addLateDeadFunctionAndGlobalElimination();
+  }
 
   if (Options.EnablePackMetadataStackPromotion) {
     // Insert marker instructions indicating where on-stack pack metadata

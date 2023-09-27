@@ -3118,6 +3118,7 @@ bool CompilerInvocation::parseArgs(
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
+    SILOpts.EmbeddedSwift = true;
   }
 
   return false;
