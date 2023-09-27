@@ -117,7 +117,7 @@ public func swift_release(object: Builtin.RawPointer) {
   if o.pointee.refcount == HeapObject.immortalRefCount { return }
   o.pointee.refcount -= 1
   if (o.pointee.refcount & HeapObject.refcountMask) == 0 {
-    _swift_runtime_invoke_heap_object_destroy(o.pointee.metadata.pointee.destroy, o)
+    _swift_embedded_invoke_heap_object_destroy(o)
   }
 }
 
