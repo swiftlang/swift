@@ -244,6 +244,7 @@
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
+    "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift"
   ],
   "Result": [

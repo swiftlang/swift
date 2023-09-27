@@ -3959,10 +3959,18 @@ namespace {
 
     void addDestructorFunction() {
       if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-        auto dtorRef = SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
-        addReifiedVTableEntry(dtorRef);
+        auto dtorRef =
+            SILDeclRef(Target->getDestructor(), SILDeclRef::Kind::Deallocator);
+        auto entry = VTable->getEntry(IGM.getSILModule(), dtorRef);
+        if (llvm::Constant *ptr = IGM.getAddrOfSILFunction(
+                entry->getImplementation(), NotForDefinition)) {
+          B.addSignedPointer(ptr, IGM.getOptions().PointerAuth.HeapDestructors,
+                             PointerAuthEntity::Special::HeapDestructor);
+        } else {
+          B.addNullPointer(IGM.FunctionPtrTy);
+        }
         return;
-      }      
+      }
 
       if (asImpl().getFieldLayout().hasObjCImplementation())
         return;

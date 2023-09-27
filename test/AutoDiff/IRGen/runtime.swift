@@ -12,7 +12,7 @@ func test_context_builtins_with_type<T>(t: T) {
   UnsafeMutableRawPointer(newBuffer).storeBytes(of: t, as: T.self)
 }
 
-// CHECK-LABEL: define{{.*}}@test_context_builtins_with_type(ptr noalias nocapture %0, ptr %T)
+// CHECK-LABEL: define{{.*}}@test_context_builtins_with_type(ptr noalias %0, ptr %T)
 // CHECK: entry:
 // CHECK:   [[CTX:%.*]] = call swiftcc ptr @swift_autoDiffCreateLinearMapContextWithType(ptr %T)
 // CHECK:   call swiftcc ptr @swift_autoDiffProjectTopLevelSubcontext(ptr [[CTX]])

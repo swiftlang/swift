@@ -3,9 +3,8 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
-// RUN: %target-clang -x c -c %S/Inputs/tiny-runtime-dummy-refcounting.c -o %t/runtime.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-clang %t/a.o %t/print.o %t/runtime.o -o %t/a.out
+// RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

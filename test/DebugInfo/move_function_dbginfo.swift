@@ -211,7 +211,7 @@ public func copyableVarArgTest(_ k: inout Klass) {
     k.doSomething()
 }
 
-// CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo20addressOnlyValueTestyyxAA1PRzlF"(ptr noalias nocapture %0, ptr %T, ptr %T.P)
+// CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo20addressOnlyValueTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
 // CHECK: @llvm.dbg.value(metadata ptr %{{.*}}, metadata ![[K_ADDR_LET_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
 // CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDR_LET_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]
 // CHECK: ret void
@@ -299,7 +299,7 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
     m.doSomething()
 }
 
-// CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18addressOnlyVarTestyyxAA1PRzlF"(ptr noalias nocapture %0, ptr %T, ptr %T.P)
+// CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18addressOnlyVarTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
 // CHECK: @llvm.dbg.value(metadata ptr %{{.*}}, metadata ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], metadata !DIExpression(DW_OP_deref)), !dbg ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
 // CHECK: @llvm.dbg.value(metadata ptr undef, metadata ![[K_ADDRONLY_VAR_METADATA]], metadata !DIExpression()), !dbg ![[ADDR_LOC]]

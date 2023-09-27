@@ -117,7 +117,7 @@ func consume<T>(_ t: T) {
 // CHECK:   [[METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4:[0-9A-Z_]+]]CyAA6EitherACLLOySiGGMb"([[INT]] 0)
 // CHECK:   [[METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     ptr noalias nocapture {{%[0-9]+}}, 
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr [[METADATA]])
 // CHECK: }
 func doit() {

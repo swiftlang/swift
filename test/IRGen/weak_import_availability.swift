@@ -110,8 +110,8 @@ public func useConditionallyAvailableMethod(s: ConditionallyAvailableStruct) {
   s.conditionallyAvailableMethod()
 }
 
-// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias nocapture swiftself)
-// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias nocapture swiftself)
+// CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
+// CHECK-NEW-LABEL: declare swiftcc void @"$s31weak_import_availability_helper28ConditionallyAvailableStructV013conditionallyF6MethodyyF"(ptr noalias swiftself)
 
 @available(macOS, unavailable)
 public func useUnavailableStruct() {
@@ -125,4 +125,4 @@ public func useUnavailableMethod(s: UnvailableStruct) {
   s.unavailableMethod()
 }
 
-// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(ptr noalias nocapture swiftself)
+// CHECK-LABEL: declare extern_weak swiftcc void @"$s31weak_import_availability_helper16UnvailableStructV17unavailableMethodyyF"(ptr noalias swiftself)

@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 
 using namespace swift;
 
@@ -35,8 +36,44 @@ public:
     for (auto &Fn : M)
       if (M.linkFunction(&Fn, LinkMode))
         invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Everything);
+
+    // In embedded Swift, the stdlib contains all the runtime functions needed
+    // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
+    if (M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      linkEmbeddedRuntimeFromStdlib();
+    }
   }
 
+  void linkEmbeddedRuntimeFromStdlib() {
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
+                 MEMORY_EFFECTS)                                               \
+  linkEmbeddedRuntimeFunctionByName(#NAME);
+
+#define RETURNS(...)
+#define ARGS(...)
+#define NO_ARGS
+#define ATTRS(...)
+#define NO_ATTRS
+#define EFFECT(...)
+#define MEMORY_EFFECTS(...)
+#define UNKNOWN_MEMEFFECTS
+
+#include "swift/Runtime/RuntimeFunctions.def"
+  }
+
+  void linkEmbeddedRuntimeFunctionByName(StringRef name) {
+    SILModule &M = *getModule();
+
+    // Bail if runtime function is already loaded.
+    if (M.lookUpFunction(name)) return;
+
+    SILFunction *Fn =
+        M.getSILLoader()->lookupSILFunction(name, SILLinkage::PublicExternal);
+    if (!Fn) return;
+
+    if (M.linkFunction(Fn, LinkMode))
+      invalidateAnalysis(Fn, SILAnalysis::InvalidationKind::Everything);
+  }
 };
 } // end anonymous namespace
 
