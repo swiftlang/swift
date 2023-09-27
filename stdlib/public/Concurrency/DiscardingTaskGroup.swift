@@ -414,9 +414,9 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 ///
-/// Generally, this suits the typical use-cases of a
-/// discarding task group well, however, if you wanted to prevent specific
-/// errors from cancelling the group one should catch them inside the child
+/// Generally, this suits the typical use cases of a
+/// discarding task group well, however, if you want to prevent specific
+/// errors from canceling the group you can catch them inside the child
 /// task's body like this:
 ///
 /// ```
