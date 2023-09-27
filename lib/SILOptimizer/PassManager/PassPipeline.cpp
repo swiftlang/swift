@@ -891,13 +891,6 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // boundaries as required by the ABI.
   P.addLoadableByAddress();
 
-  if (Options.EmbeddedSwift) {
-    // For embedded Swift: Remove all unspecialized functions. This is important
-    // to avoid having debuginfo references to these functions that we don't
-    // want to emit in IRGen.
-    P.addLateDeadFunctionAndGlobalElimination();
-  }
-
   if (Options.EnablePackMetadataStackPromotion) {
     // Insert marker instructions indicating where on-stack pack metadata
     // deallocation must occur.
@@ -1050,6 +1043,13 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // This is mainly there to optimize `Builtin.isConcrete`, which must not be
   // constant folded before any generic specialization.
   P.addLateOnoneSimplification();
+
+  if (Options.EmbeddedSwift) {
+    // For embedded Swift: Remove all unspecialized functions. This is important
+    // to avoid having debuginfo references to these functions that we don't
+    // want to emit in IRGen.
+    P.addLateDeadFunctionAndGlobalElimination();
+  }
 
   P.addCleanupDebugSteps();
 
