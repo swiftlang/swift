@@ -13,10 +13,10 @@ actor SomeGlobalActor {
   static let shared = SomeGlobalActor()
 }
 
+// expected-note@+2 2 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
 @MainActor
 func requiresMainActor() -> Int { 0 }
 
-// expected-note@+2 2 {{calls to global function 'requiresSomeGlobalActor()' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor
 func requiresSomeGlobalActor() -> Int { 0 }
 
@@ -77,7 +77,7 @@ func nonisolatedAsyncCaller() async {
 }
 
 func conflictingIsolationDefaultArg(
-  // expected-error@+1 {{call to global actor 'SomeGlobalActor'-isolated global function 'requiresSomeGlobalActor()' in a synchronous nonisolated context}}
+  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
   value: (Int, Int) = (requiresMainActor(), requiresSomeGlobalActor())
 ) {}
 
@@ -100,9 +100,27 @@ func closureIsolationMismatch(
 ) {}
 
 func conflictingClosureIsolation(
+  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
   closure: () -> Void = {
     _ = requiresMainActor()
-    // expected-error@+1 {{call to global actor 'SomeGlobalActor'-isolated global function 'requiresSomeGlobalActor()' in a synchronous nonisolated context}}
     _ = requiresSomeGlobalActor()
+  }
+) {}
+
+func isolationInLocalFunction(
+  closure: () -> Void = {
+    nonisolated func local() -> Int {
+      // expected-error@+1 {{call to main actor-isolated global function 'requiresMainActor()' in a synchronous nonisolated context}}
+      requiresMainActor()
+    }
+  }
+) {}
+
+actor A {}
+
+func closureWithIsolatedParam(
+  closure: (isolated A) -> Void = { _ in
+    // expected-error@+1 {{call to main actor-isolated global function 'requiresMainActor()' in a synchronous actor-isolated context}}
+    _ = requiresMainActor()
   }
 ) {}

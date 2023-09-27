@@ -1939,11 +1939,11 @@ namespace {
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation;
 
-    bool shouldRefineIsolation = false;
+    SourceLoc requiredIsolationLoc;
 
     /// Used under the mode to compute required actor isolation for
     /// an expression or function.
-    ActorIsolation requiredIsolation = ActorIsolation::forNonisolated();
+    llvm::SmallDenseMap<const DeclContext *, ActorIsolation> requiredIsolation;
 
     /// Keeps track of the capture context of variables that have been
     /// explicitly captured in closures.
@@ -2130,31 +2130,60 @@ namespace {
     }
 
     bool refineRequiredIsolation(ActorIsolation refinedIsolation) {
-      if (!shouldRefineIsolation)
+      if (requiredIsolationLoc.isInvalid())
         return false;
 
-      if (auto *closure = dyn_cast<AbstractClosureExpr>(getDeclContext())) {
-        // We cannot infer a more specific actor isolation for a @Sendable
-        // closure. It is an error to cast away actor isolation from a function
-        // type, but this is okay for non-Sendable closures because they cannot
-        // leave the isolation domain they're created in anyway.
-        if (closure->isSendable())
+      auto infersIsolationFromContext =
+          [](const DeclContext *dc) -> bool {
+            // Isolation for declarations is based solely on explicit 
+            // annotations; only infer isolation for initializer expressions
+            // and closures.
+            if (dc->getAsDecl())
+              return false;
+
+            if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+              // We cannot infer a more specific actor isolation for a Sendable
+              // closure. It is an error to cast away actor isolation from a
+              // function type, but this is okay for non-Sendable closures
+              // because they cannot leave the isolation domain they're created
+              // in anyway.
+              if (closure->isSendable())
+                return false;
+
+              if (closure->getActorIsolation().isActorIsolated())
+                return false;
+            }
+
+            return true;
+          };
+
+      // For the call to require the given actor isolation, every DeclContext
+      // in the current context stack must require the same isolation. If
+      // along the way to the innermost context, we find a DeclContext that
+      // has a different isolation (e.g. it's a local function that does not
+      // recieve isolation from its decl context), then the expression cannot
+      // require a different isolation.
+      for (auto *dc : contextStack) {
+        if (!infersIsolationFromContext(dc))
           return false;
 
-        if (closure->getActorIsolation().isActorIsolated())
-          return false;
+        // To refine the required isolation, the existing requirement
+        // must either be 'nonisolated' or exactly the same as the
+        // new refinement.
+        auto isolation = requiredIsolation.find(dc);
+        if (isolation == requiredIsolation.end() ||
+            isolation->second == ActorIsolation::Nonisolated) {
+          requiredIsolation[dc] = refinedIsolation;
+        } else if (isolation->second != refinedIsolation) {
+          dc->getASTContext().Diags.diagnose(
+              requiredIsolationLoc,
+              diag::conflicting_default_argument_isolation,
+              isolation->second, refinedIsolation);
+          return true;
+        }
       }
 
-      // To refine the required isolation, the existing requirement
-      // must either be 'nonisolated' or exactly the same as the
-      // new refinement.
-      if (requiredIsolation == ActorIsolation::Nonisolated ||
-          requiredIsolation == refinedIsolation) {
-        requiredIsolation = refinedIsolation;
-        return true;
-      }
-
-      return false;
+      return true;
     }
 
     void checkDefaultArgument(DefaultArgumentExpr *expr) {
@@ -2248,11 +2277,12 @@ namespace {
     ActorIsolation computeRequiredIsolation(Expr *expr) {
       auto &ctx = getDeclContext()->getASTContext();
 
-      shouldRefineIsolation =
-          ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments);
+      if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments))
+        requiredIsolationLoc = expr->getLoc();
+
       expr->walk(*this);
-      shouldRefineIsolation = false;
-      return requiredIsolation;
+      requiredIsolationLoc = SourceLoc();
+      return requiredIsolation[getDeclContext()];
     }
 
     /// Searches the applyStack from back to front for the inner-most CallExpr
