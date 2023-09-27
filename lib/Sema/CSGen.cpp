@@ -4546,12 +4546,9 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
   }
 
   // Generate constraints for the "where" expression, if there is one.
-  if (auto *whereExpr = stmt->getWhere()) {
-    auto *boolDecl = dc->getASTContext().getBoolDecl();
-    if (!boolDecl)
-      return llvm::None;
-
-    Type boolType = boolDecl->getDeclaredInterfaceType();
+  auto *whereExpr = stmt->getWhere();
+  if (whereExpr && !target.ignoreForEachWhereClause()) {
+    Type boolType = dc->getASTContext().getBoolType();
     if (!boolType)
       return llvm::None;
 

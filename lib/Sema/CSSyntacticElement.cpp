@@ -631,7 +631,7 @@ private:
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
     auto target = SyntacticElementTarget::forForEachStmt(
         forEachStmt, context.getAsDeclContext(),
-        /*bindTypeVarsOneWay=*/false);
+        /*ignoreWhereClause=*/true);
 
     if (cs.generateConstraints(target)) {
       hadError = true;
@@ -959,6 +959,20 @@ private:
     // they would be handled together with pattern because pattern can
     // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
     elements.push_back(makeElement(forEachStmt->getPattern(), stmtLoc));
+
+    // Where clause if any.
+    if (auto *where = forEachStmt->getWhere()) {
+      Type boolType = cs.getASTContext().getBoolType();
+      if (!boolType) {
+        hadError = true;
+        return;
+      }
+
+      ContextualTypeInfo context(boolType, CTP_Condition);
+      elements.push_back(
+          makeElement(where, stmtLoc, context, /*isDiscarded=*/false));
+    }
+
     // Body of the `for-in` loop.
     elements.push_back(makeElement(forEachStmt->getBody(), stmtLoc));
 
