@@ -4330,7 +4330,7 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                      [&]() { return getFormalAccess(); });
 }
 
-ImportAccessLevel ValueDecl::getImportAccessFrom(const DeclContext *useDC) const {
+ImportAccessLevel Decl::getImportAccessFrom(const DeclContext *useDC) const {
   ModuleDecl *Mod = getModuleContext();
   if (useDC && useDC->getParentModule() != Mod) {
     if (auto useSF = useDC->getParentSourceFile()) {
