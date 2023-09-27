@@ -97,6 +97,13 @@ class DeadFunctionAndGlobalElimination {
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
+    // In embedded Swift, (even public) generic functions *after serialization*
+    // cannot be used externally and are not anchors.
+    bool embedded = Module->getOptions().EmbeddedSwift;
+    bool generic = loweredFunctionHasGenericArguments(F);
+    bool isSerialized = Module->isSerialized();
+    if (embedded && generic && isSerialized)
+      return false;
 
     // Functions that may be used externally cannot be removed.
     if (F->isPossiblyUsedExternally())
@@ -427,15 +434,7 @@ class DeadFunctionAndGlobalElimination {
     findAnchorsInTables();
 
     for (SILFunction &F : *Module) {
-      // In embedded Swift, generic functions, even public ones cannot be used
-      // externally and are not anchors.
-      bool embedded = Module->getOptions().EmbeddedSwift;
-      bool generic = loweredFunctionHasGenericArguments(&F);
-      bool isSerialized = Module->isSerialized();
-      bool ignoreAnchor =
-          embedded && generic && isSerialized;
-
-      if (isAnchorFunction(&F) && !ignoreAnchor) {
+      if (isAnchorFunction(&F)) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() <<"\n");
         ensureAlive(&F);
       }
@@ -446,7 +445,7 @@ class DeadFunctionAndGlobalElimination {
           [this](SILFunction *targetFun) { ensureAlive(targetFun); });
 
       bool retainBecauseFunctionIsNoOpt = !F.shouldOptimize();
-      if (embedded)
+      if (Module->getOptions().EmbeddedSwift)
         retainBecauseFunctionIsNoOpt = false;
 
       if (retainBecauseFunctionIsNoOpt) {
