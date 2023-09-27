@@ -691,8 +691,8 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependencies(
 
     auto moduleDependencies = withDependencyScanningWorker(
         [&cache, moduleName](ModuleDependencyScanningWorker *ScanningWorker) {
-          return ScanningWorker->scanFilesystemForModuleDependency(moduleName,
-                                                                   cache);
+          return ScanningWorker->scanFilesystemForSwiftModuleDependency(moduleName,
+									cache);
         });
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };
