@@ -120,7 +120,8 @@ private:
       const ModuleDependencyID &moduleID,
       const std::vector<std::string> &clangDependencies,
       ModuleDependenciesCache &cache,
-      ModuleDependencyIDSetVector &swiftOverlayDependencies);
+      ModuleDependencyIDSetVector &swiftOverlayDependencies,
+      ModuleDependencyIDSetVector &directDependencies);
 
   /// Identify all cross-import overlay modules of the specified
   /// dependency set and apply an action for each.
