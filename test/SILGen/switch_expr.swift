@@ -767,3 +767,11 @@ func testCaptureList() -> Int {
   let fn = { [x = switch Bool.random() { case true: 0 case false: 1 }] in x }
   return fn()
 }
+
+// https://github.com/apple/swift/issues/68764
+func testConditionalCast<T>(_ x: Any, _ y: Int) -> T? {
+  switch y {
+  default:
+    x as? T
+  }
+}
