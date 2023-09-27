@@ -20,7 +20,7 @@ public typealias ClazzAlias = Clazz
 
 //--- UsesAliasesNoImport.swift
 public import Aliases
-internal import Original
+internal import Original // expected-note 2 {{class 'Clazz' imported as 'internal' from 'Original' here}}
 
 // expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported publicly}}
 public class InheritsFromClazzAlias: ClazzAlias {}

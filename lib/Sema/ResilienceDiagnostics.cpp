@@ -177,6 +177,19 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
     addMissingImport(loc, D, where);
 
+  // If limited by an import, note which one.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    const DeclContext *DC = where.getDeclContext();
+    ImportAccessLevel limitImport = D->getImportAccessFrom(DC);
+    assert(limitImport.has_value() &&
+           limitImport->accessLevel < AccessLevel::Public &&
+           "The import should still be non-public");
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here, D,
+                       limitImport->accessLevel,
+                       limitImport->module.importedModule);
+  }
+
   return true;
 }
 
@@ -302,6 +315,19 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
   if (originKind == DisallowedOriginKind::MissingImport &&
       !ctx.LangOpts.isSwiftVersionAtLeast(6))
     addMissingImport(loc, ext, where);
+
+  // If limited by an import, note which one.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    const DeclContext *DC = where.getDeclContext();
+    ImportAccessLevel limitImport = ext->getImportAccessFrom(DC);
+    assert(limitImport.has_value() &&
+           limitImport->accessLevel < AccessLevel::Public &&
+           "The import should still be non-public");
+    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+                       diag::decl_import_via_here, ext,
+                       limitImport->accessLevel,
+                       limitImport->module.importedModule);
+  }
 
   return true;
 }

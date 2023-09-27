@@ -2337,7 +2337,7 @@ NOTE(decl_import_via_here,none,
      "%kind0 imported as "
      "'%select{private|fileprivate|internal|package|%ERROR|%ERROR}1' "
      "from %2 here",
-     (const ValueDecl *, AccessLevel, const ModuleDecl*))
+     (const Decl *, AccessLevel, const ModuleDecl*))
 
 // Opaque return types
 ERROR(opaque_type_invalid_constraint,none,
