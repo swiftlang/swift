@@ -717,8 +717,10 @@ extension ${Self}: BinaryFloatingPoint {
       _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
       _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    #if !$Embedded
     @unknown default:
       self._roundSlowPath(rule)
+    #endif
     }
   }
   
