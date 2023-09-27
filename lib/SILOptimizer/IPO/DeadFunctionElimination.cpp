@@ -31,6 +31,11 @@ STATISTIC(NumDeadGlobals, "Number of dead global variables eliminated");
 
 namespace {
 
+static bool loweredFunctionHasGenericArguments(const SILFunction *f) {
+  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
+  return s && !s->areAllParamsConcrete();
+}
+
 class DeadFunctionAndGlobalElimination {
   /// Represents a function which is implementing a vtable or witness table
   /// method.
@@ -89,6 +94,8 @@ class DeadFunctionAndGlobalElimination {
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
 
   bool keepExternalWitnessTablesAlive;
+
+  bool removeUnspecializedFunctionsInEmbeddedSwift;
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
@@ -422,7 +429,15 @@ class DeadFunctionAndGlobalElimination {
     findAnchorsInTables();
 
     for (SILFunction &F : *Module) {
-      if (isAnchorFunction(&F)) {
+      // In embedded Swift, generic functions, even public ones cannot be used
+      // externally and are not anchors.
+      bool embedded =
+          Module->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+      bool generic = loweredFunctionHasGenericArguments(&F);
+      bool ignoreAnchor =
+          embedded && generic && removeUnspecializedFunctionsInEmbeddedSwift;
+
+      if (isAnchorFunction(&F) && !ignoreAnchor) {
         LLVM_DEBUG(llvm::dbgs() << "  anchor function: " << F.getName() <<"\n");
         ensureAlive(&F);
       }
@@ -433,7 +448,7 @@ class DeadFunctionAndGlobalElimination {
           [this](SILFunction *targetFun) { ensureAlive(targetFun); });
 
       bool retainBecauseFunctionIsNoOpt = !F.shouldOptimize();
-      if (Module->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      if (embedded)
         retainBecauseFunctionIsNoOpt = false;
 
       if (retainBecauseFunctionIsNoOpt) {
@@ -692,13 +707,16 @@ class DeadFunctionAndGlobalElimination {
   }
 
 public:
-  DeadFunctionAndGlobalElimination(SILModule *module,
-                                   bool keepExternalWitnessTablesAlive) :
-    Module(module),
-    keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive) {}
+ DeadFunctionAndGlobalElimination(
+     SILModule *module, bool keepExternalWitnessTablesAlive,
+     bool removeUnspecializedFunctionsInEmbeddedSwift)
+     : Module(module),
+       keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
+       removeUnspecializedFunctionsInEmbeddedSwift(
+           removeUnspecializedFunctionsInEmbeddedSwift) {}
 
-  /// The main entry point of the optimization.
-  void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
+ /// The main entry point of the optimization.
+ void eliminateFunctionsAndGlobals(SILModuleTransform *DFEPass) {
 
     LLVM_DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
@@ -779,8 +797,10 @@ public:
     // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionAndGlobalElimination deadFunctionElimination(getModule(),
-                                /*keepExternalWitnessTablesAlive*/ !isLateDFE);
+    DeadFunctionAndGlobalElimination deadFunctionElimination(
+        getModule(),
+        /*keepExternalWitnessTablesAlive*/ !isLateDFE,
+        /*removeUnspecializedFunctionsInEmbeddedSwift*/ isLateDFE);
     deadFunctionElimination.eliminateFunctionsAndGlobals(this);
   }
 };

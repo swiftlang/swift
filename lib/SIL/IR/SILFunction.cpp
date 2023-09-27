@@ -842,11 +842,6 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   return hasPublicVisibility(getLinkage());
 }
 
-static bool loweredFunctionHasGenericArguments(const SILFunction *f) {
-  auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
-  return s && !s->areAllParamsConcrete();
-}
-
 bool
 SILFunction::isPossiblyUsedExternally() const {
   auto linkage = getLinkage();
@@ -873,13 +868,6 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsAlwaysEmitIntoClient() &&
       hasOpaqueResultTypeWithAvailabilityConditions())
     return true;
-
-  // In embedded Swift, generic functions, even public ones cannot be used
-  // externally.
-  bool embedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
-  bool generic = loweredFunctionHasGenericArguments(this);
-  if (embedded && generic)
-    return false;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
