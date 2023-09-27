@@ -203,6 +203,17 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
                                                         : AccessLevel::Package;
           SF->registerAccessLevelUsingImport(import.value(), useLevel);
         }
+
+        if (Context.LangOpts.EnableModuleApiImportRemarks) {
+          SourceLoc diagLoc = typeRepr? typeRepr->getLoc()
+                                      : extractNearestSourceLoc(useDC);
+          ModuleDecl *importedVia = import->module.importedModule,
+                     *sourceModule = VD->getModuleContext();
+          Context.Diags.diagnose(diagLoc, diag::module_api_import,
+                                 VD, importedVia, sourceModule,
+                                 importedVia == sourceModule,
+                                 /*isImplicit*/!typeRepr);
+        }
       }
     };
 

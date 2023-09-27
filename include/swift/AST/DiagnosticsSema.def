@@ -1126,6 +1126,20 @@ REMARK(module_loaded,none,
        "; source: '%2', loaded: '%3'",
        (Identifier, unsigned, StringRef, StringRef))
 
+REMARK(module_api_import,none,
+       "%select{|implicitly used }4"
+       "%kind0 is imported via %1"
+       "%select{, which reexports definition from %2|}3",
+       (const Decl *, ModuleDecl *, ModuleDecl *, bool, bool))
+REMARK(module_api_import_conformance,none,
+       "conformance of %0 to %kind1 used here is imported via %2"
+       "%select{ which reexports the definition from %3|}4",
+       (const Type, const Decl *, ModuleDecl *, ModuleDecl *, bool))
+REMARK(module_api_import_aliases,none,
+       "typealias underlying type %kind0 is imported via %1"
+       "%select{, which reexports definition from %2|}3",
+       (const Decl *, ModuleDecl *, ModuleDecl *, bool))
+
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
        "%select{shared library '%2'|executable '%2'|"

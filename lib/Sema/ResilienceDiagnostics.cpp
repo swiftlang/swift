@@ -69,6 +69,15 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     if (SF)
       SF->registerAccessLevelUsingImport(problematicImport.value(),
                                          AccessLevel::Public);
+
+    if (Context.LangOpts.EnableModuleApiImportRemarks) {
+      ModuleDecl *importedVia = problematicImport->module.importedModule,
+                 *sourceModule = D->getModuleContext();
+      Context.Diags.diagnose(loc, diag::module_api_import,
+                             D, importedVia, sourceModule,
+                             importedVia == sourceModule,
+                             /*isImplicit*/false);
+    }
   }
 
   // General check on access-level of the decl.
@@ -150,6 +159,14 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
     if (SF)
       SF->registerAccessLevelUsingImport(problematicImport.value(),
                                          AccessLevel::Public);
+
+    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
+      ModuleDecl *importedVia = problematicImport->module.importedModule,
+                 *sourceModule = D->getModuleContext();
+      ctx.Diags.diagnose(loc, diag::module_api_import_aliases,
+                             D, importedVia, sourceModule,
+                             importedVia == sourceModule);
+    }
   }
 
   auto ignoredDowngradeToWarning = DowngradeToWarning::No;
@@ -313,6 +330,15 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
     if (SF)
       SF->registerAccessLevelUsingImport(problematicImport.value(),
                                          AccessLevel::Public);
+
+    if (ctx.LangOpts.EnableModuleApiImportRemarks) {
+      ModuleDecl *importedVia = problematicImport->module.importedModule,
+                 *sourceModule = ext->getModuleContext();
+      ctx.Diags.diagnose(loc, diag::module_api_import_conformance,
+                         rootConf->getType(), rootConf->getProtocol(),
+                         importedVia, sourceModule,
+                         importedVia == sourceModule);
+    }
   }
 
   auto originKind = getDisallowedOriginKind(ext, where);
