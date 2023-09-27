@@ -448,6 +448,8 @@ public:
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
     } else if (auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(E)) {
       recurse = ShouldRecurse;
+    } else if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
+      recurse = asImpl().checkSingleValueStmtExpr(SVE);
     }
     // Error handling validation (via checkTopLevelEffects) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -1076,6 +1078,10 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -1193,6 +1199,10 @@ private:
         AsyncKind = std::max(AsyncKind, ConditionalEffectKind::Always);
       }
 
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
       return ShouldRecurse;
     }
 
@@ -2211,6 +2221,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       // 'async'.
     }
 
+    void preserveCoverageFromSingleValueStmtExpr() {
+      // We need to preserve whether we saw any throwing sites, to avoid warning
+      // on 'do { let x = if .random() { try ... } else { ... } } catch { ... }'
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+
+      // We need to preserve the throwing kind to correctly handle rethrows.
+      OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
+    }
+
     void preserveCoverageFromNonExhaustiveCatch() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldMaxThrowingKind = std::max(OldMaxThrowingKind, Self.MaxThrowingKind);
@@ -2351,6 +2370,17 @@ private:
     if (shouldPreserveCoverage)
       scope.preserveCoverageFromAutoclosureBody();
 
+    return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t
+  checkSingleValueStmtExpr(SingleValueStmtExpr *SVE) {
+    // For an if/switch expression, we reset coverage such that a 'try'/'await'
+    // does not cover the branches.
+    ContextScope scope(*this, /*newContext*/ llvm::None);
+    scope.resetCoverage();
+    SVE->getStmt()->walk(*this);
+    scope.preserveCoverageFromSingleValueStmtExpr();
     return ShouldNotRecurse;
   }
 
