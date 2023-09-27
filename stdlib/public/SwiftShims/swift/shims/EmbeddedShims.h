@@ -35,7 +35,7 @@ static inline void _swift_embedded_invoke_heap_object_destroy(void *object) {
   void *metadata = *(void **)object;
   void **destroy_location = &((void **)metadata)[1];
 #if __has_feature(ptrauth_calls)
-  (*(__ptrauth(0,1,0xbbbf) HeapObjectDestroyer *)destroy_location)(object);
+  (*(HeapObjectDestroyer __ptrauth(0,1,0xbbbf) *)destroy_location)(object);
 #else
   (*(HeapObjectDestroyer *)destroy_location)(object);
 #endif
