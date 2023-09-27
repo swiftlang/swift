@@ -627,6 +627,10 @@ resolveDependencies(CompilerInstance &instance, ModuleDependencyID moduleID,
               ctx.getSwiftModuleDependencies(clangDep, cache, ASTDelegate)) {
         if (clangDep != moduleID.first) {
           swiftOverlayDependencies.insert({clangDep, found.value()->getKind()});
+	  // FIXME: Once all clients know to fetch these dependencies from
+          // `swiftOverlayDependencies`, the goal is to no longer have them in
+          // `directDependencies` so the following will need to go away.
+          directDependencies.insert({clangDep, found.value()->getKind()});
         }
       }
     }
