@@ -9,6 +9,8 @@ public macro fixedAttributes(_ attrs: String...) = #externalMacro(module: "Swift
 @fixedAttributes("@available(macOS 99, *)") func fn1() {}
 
 fn1()
+// expected-error@-1 {{'fn1()' is only available in macOS 99 or newer}}
+// expected-note@-2 {{add 'if #available' version check}}
 
 @attached(attribute)
 macro futureDecl() = #fixedAttributes("@available(macOS 99, *)")

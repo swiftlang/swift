@@ -135,6 +135,13 @@ public:
   DoneParsingCallback *DoneParsingCallback = nullptr;
   std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
+  llvm::Optional<MacroRoles> CurMacroRoles;
+  MacroRoles getCurMacroRoles() const {
+    return CurMacroRoles.value_or(
+      CurDeclContext->isTypeContext() ? MacroRole::Declaration
+                                      : getFreestandingMacroRoles());
+  }
+
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
   llvm::Optional<StableHasher> CurrentTokenHash;

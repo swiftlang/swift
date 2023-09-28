@@ -10203,6 +10203,14 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
   // Parse '=' <expression>
   Expr *definition = nullptr;
   if (consumeIf(tok::equal)) {
+    // If we parse a MacroExpansionExpr (which we should), we want it to have
+    // the same roles as this macro.
+    MacroRoles expectedRoles = llvm::None;
+    for (auto attr : attributes.getAttributes<MacroRoleAttr>())
+      expectedRoles |= attr->getMacroRole();
+    llvm::SaveAndRestore<llvm::Optional<MacroRoles>>
+      save(CurMacroRoles, expectedRoles);
+
     ParserResult<Expr> parsedDefinition =
         parseExpr(diag::macro_decl_expected_macro_definition);
     status |= parsedDefinition;
