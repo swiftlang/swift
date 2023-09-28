@@ -62,6 +62,8 @@ package import Lib // expected-note {{imported 'package' here}} @:1
 
 // RUN: %target-swift-frontend -typecheck %t/ManyFiles_AmbiguitySwift6_File?.swift -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify -swift-version 6
+// RUN: %target-swift-frontend -typecheck %t/ManyFiles_AmbiguitySwift6_File?.swift -I %t \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 //--- ManyFiles_AmbiguitySwift6_FileA.swift
 import Lib
 //--- ManyFiles_AmbiguitySwift6_FileB.swift

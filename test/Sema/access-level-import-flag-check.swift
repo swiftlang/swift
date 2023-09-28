@@ -19,6 +19,9 @@
 // RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t \
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -package-name package
+// RUN: %target-swift-frontend -typecheck %t/ClientWithoutTheFlag.swift -I %t \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -package-name package
 // REQUIRES: asserts
 
 /// swiftinterfaces don't need the flag.

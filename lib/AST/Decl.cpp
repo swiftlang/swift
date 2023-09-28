@@ -1506,9 +1506,8 @@ AccessLevel ImportDecl::getAccessLevel() const {
   }
 
   auto &LangOpts = getASTContext().LangOpts;
-  if (LangOpts.isSwiftVersionAtLeast(6) &&
-      LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
-    // Tentative Swift 6 mode where the default import is internal.
+  if (LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
+    // Swift 6 mode where the default import is internal.
     return AccessLevel::Internal;
   } else {
     return AccessLevel::Public;
