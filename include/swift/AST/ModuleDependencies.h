@@ -699,7 +699,7 @@ public:
       // Special case: a submodule named "Foo.Private" can be moved to a top-level
       // module named "Foo_Private". ClangImporter has special support for this.
       if (submoduleComponent.Item.str() == "Private")
-        ImportedModuleName = ImportedModuleName + "_Private";
+        addOptionalModuleImport(ImportedModuleName + "_Private", alreadyAddedModules);
     }
 
     addModuleImport(ImportedModuleName, alreadyAddedModules);

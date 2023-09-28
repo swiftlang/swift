@@ -46,3 +46,10 @@ module X_Private {
   header "X_Private.h"
   export *
 }
+module Y {
+  header "Y.h"
+  export *
+  explicit module Private {
+    header "Y_Private.h"
+  }
+}
