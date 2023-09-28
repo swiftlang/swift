@@ -1122,14 +1122,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "@_cdecl(\"" << cast<CDeclAttr>(this)->Name << "\")";
     break;
 
-  case DAK_Expose:
+  case DAK_Expose: {
     Printer.printAttrName("@_expose");
-    Printer << "(Cxx";
+    auto Attr = cast<ExposeAttr>(this);
+    switch (Attr->getExposureKind()) {
+    case ExposureKind::Wasm:
+      Printer << "(wasm";
+      break;
+    case ExposureKind::Cxx:
+      Printer << "(Cxx";
+      break;
+    }
     if (!cast<ExposeAttr>(this)->Name.empty())
       Printer << ", \"" << cast<ExposeAttr>(this)->Name << "\"";
     Printer << ")";
     break;
-
+  }
   case DAK_Section:
     Printer.printAttrName("@_section");
     Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";

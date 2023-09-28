@@ -2825,8 +2825,10 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   // Clang decls don't need to be explicitly exposed.
   if (VD->hasClangNode())
     return true;
-  if (VD->getAttrs().hasAttribute<ExposeAttr>())
-    return true;
+  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
+    if (EA->getExposureKind() == ExposureKind::Cxx)
+      return true;
+  }
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {

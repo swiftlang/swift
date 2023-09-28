@@ -3563,6 +3563,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     addUsedGlobal(fn);
   if (!f->section().empty())
     fn->setSection(f->section());
+  if (!f->wasmExportName().empty()) {
+    llvm::AttrBuilder attrBuilder(getLLVMContext());
+    attrBuilder.addAttribute("wasm-export-name", f->wasmExportName());
+    fn->addFnAttrs(attrBuilder);
+  }
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition

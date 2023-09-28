@@ -33,3 +33,31 @@ struct ExposedStruct {
     @_expose(Cxx, "initWith")
     init(with y: Int) {}
 }
+@_expose(Cxx)
+@_expose(Cxx) // expected-error {{duplicate attribute}}
+func exposeToCxxCxx() {}
+
+@_expose(wasm) func exposeToWasm() {}
+@_expose(wasm, "with_name") func wasmName() {}
+@_expose(wasm, "") func wasmEmptyNameOk() {}
+
+@_expose(wasm) struct WasmErrorOnStruct { // expected-error {{@_expose attribute with 'wasm' can only be applied to global functions}}
+  @_expose(wasm) func errorOnMethod() {} // expected-error {{@_expose attribute with 'wasm' can only be applied to global functions}}
+}
+
+func wasmNested() {
+  @_expose(wasm) // expected-error {{attribute '_expose' can only be used in a non-local scope}}
+  func errorOnInnerExpose() {}
+}
+
+@_expose(Cxx)
+@_expose(wasm)
+func exposeToCxxWasm() {}
+
+@_expose(wasm)
+@_expose(Cxx)
+func exposeToWasmCxx() {}
+
+@_expose(wasm)
+@_expose(wasm) // expected-error {{duplicate attribute}}
+func exposeToWasmWasm() {}

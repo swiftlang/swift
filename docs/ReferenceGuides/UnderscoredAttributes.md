@@ -427,6 +427,16 @@ in the generated C++ binding header.
 The optional "cxxName" string will be used as the name of
 the generated C++ declaration.
 
+### `_expose(wasm[, <"wasmExportName">])`
+
+Indicates that a particular function declaration should be
+exported from the linked WebAssembly.
+
+The optional "wasmExportName" string will be used as the
+the export name.
+
+It's the equivalent of clang's `__attribute__((export_name))`.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.
