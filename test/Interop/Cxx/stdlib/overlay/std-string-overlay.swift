@@ -1,5 +1,3 @@
-// REQUIRES: rdar115062687
-
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
