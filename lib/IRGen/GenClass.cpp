@@ -1664,11 +1664,9 @@ namespace {
       
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
       
-      // The rodata is constant if the object layout is known entirely
-      // statically. Otherwise, the ObjC runtime may slide the InstanceSize
-      // based on changing base class layout.
+      // Otherwise, the Swift runtime currently unconditionally touches the ivar variable.
       return buildGlobalVariable(fields, dataSuffix,
-                               /*const*/ forMeta || FieldLayout->isFixedSize(),
+                               /*const*/ forMeta,
                                llvm::GlobalVariable::InternalLinkage);
     }
 

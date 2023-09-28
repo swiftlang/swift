@@ -7,13 +7,13 @@
 import ResilientBaseClasses
 
 // CHECK: @_METACLASS_DATA_{{.*}}9PureSwift = {{.*}} constant {{.*}} section "__DATA, __objc_const"
-// CHECK: @_DATA_{{.*}}9PureSwift = {{.*}} constant {{.*}} section "__DATA, __objc_const"
+// CHECK: @_DATA_{{.*}}9PureSwift = {{.*}} constant {{.*}} section "__DATA, __objc_data"
 class PureSwift {
     var x: Int = 0
 }
 
 // CHECK: @_METACLASS_DATA_{{.*}}12PureSwiftSub = {{.*}} constant {{.*}} section "__DATA, __objc_const"
-// CHECK: @_DATA_{{.*}}12PureSwiftSub = {{.*}} constant {{.*}} section "__DATA, __objc_const"
+// CHECK: @_DATA_{{.*}}12PureSwiftSub = {{.*}} constant {{.*}} section "__DATA, __objc_data"
 class PureSwiftSub: PureSwift {
     var y: Int = 0
 }
