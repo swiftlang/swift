@@ -162,7 +162,7 @@ extern "C" void parseTopLevelSwift(const char *buffer,
                                    void *outputContext,
                                    void (*)(void *, void *));
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 static void appendToVector(void *declPtr, void *vecPtr) {
   auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
   auto decl = static_cast<Decl *>(declPtr);
@@ -207,7 +207,7 @@ extern "C" void swift_ASTGen_buildTopLevelASTNodes(void *sourceFile,
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
 void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   llvm::Optional<DiagnosticTransaction> existingParsingTransaction;
   parseSourceFileViaASTGen(items, existingParsingTransaction);
 #endif
@@ -258,7 +258,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
     }
   }
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   if (existingParsingTransaction)
     existingParsingTransaction->abort();
 
@@ -310,7 +310,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
 void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,
                                           const SourceFile *SF) const {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   // The SwiftSyntax parser doesn't (yet?) handle SIL.
   if (SF->Kind == SourceFileKind::SIL)
     return nullptr;
@@ -343,7 +343,7 @@ void Parser::parseSourceFileViaASTGen(
     SmallVectorImpl<ASTNode> &items,
     llvm::Optional<DiagnosticTransaction> &transaction,
     bool suppressDiagnostics) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   const auto &langOpts = Context.LangOpts;
 
   // We only need to do parsing if we either have ASTGen enabled, or want the

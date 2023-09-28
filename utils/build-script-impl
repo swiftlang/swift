@@ -836,16 +836,6 @@ function set_build_options_for_host() {
     swift_cmake_options+=(
         -DCOVERAGE_DB="${COVERAGE_DB}"
     )
-
-    if [[ "$(true_false ${SWIFT_EARLYSWIFTSYNTAX})" == "TRUE" ]]; then
-        early_swiftsyntax_build_dir="$(build_directory ${host} earlyswiftsyntax)"
-        swift_cmake_options+=(
-            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
-        )
-        lldb_cmake_options+=(
-            -DSWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR:PATH="${early_swiftsyntax_build_dir}"
-        )
-    fi
 }
 
 function configure_default_options() {

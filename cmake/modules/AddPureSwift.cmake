@@ -2,17 +2,15 @@ include(macCatalystUtils)
 
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_target_link_libraries TARGET)
-  cmake_parse_arguments(ARGS "" "" "PUBLIC" ${ARGN})
+  target_link_libraries(${TARGET} ${ARGN})
 
-  foreach(DEPENDENCY ${ARGS_PUBLIC})
-    target_link_libraries(${TARGET} PRIVATE ${DEPENDENCY})
-    add_dependencies(${TARGET} ${DEPENDENCY})
-
+  cmake_parse_arguments(ARGS "PUBLIC;PRIVATE;INTERFACE" "" "" ${ARGN})
+  foreach(DEPENDENCY ${ARGS_UNPARSED_ARGUMENTS})
     string(REGEX REPLACE [<>:\"/\\|?*] _ sanitized ${DEPENDENCY})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
       DEPENDS ${DEPENDENCY}
-      )
+    )
     target_sources(${TARGET} PRIVATE
       ${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift
     )
@@ -46,21 +44,7 @@ function(_add_host_swift_compile_options name)
     $<$<COMPILE_LANGUAGE:Swift>:-runtime-compatibility-version>
     $<$<COMPILE_LANGUAGE:Swift>:none>)
 
-  # Set the appropriate target triple.
-  # FIXME: This should be set by CMake.
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
-  endif()
-
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
-    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
-  endif()
-
-  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-    MACCATALYST_BUILD_FLAVOR ""
-    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-
-  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
   _add_host_variant_swift_sanitizer_flags(${name})
 endfunction()
 
@@ -121,7 +105,7 @@ endfunction()
 # source1 ...
 #   Sources to add into this library.
 function(add_pure_swift_host_library name)
-  if (NOT SWIFT_SWIFT_PARSER)
+  if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     message(STATUS "Not building ${name} because swift-syntax is not available")
     return()
   endif()
@@ -196,13 +180,15 @@ function(add_pure_swift_host_library name)
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+  target_link_directories(${name} PUBLIC
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
 
   if(APSHL_EMIT_MODULE)
     # Determine where Swift modules will be built and installed.
 
-    set(module_triple ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE})
-    set(module_dir ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    set(module_triple "${SWIFT_HOST_MODULE_TRIPLE}")
+    set(module_dir "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
     set(module_base "${module_dir}/${name}.swiftmodule")
     set(module_file "${module_base}/${module_triple}.swiftmodule")
     set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
@@ -234,6 +220,12 @@ function(add_pure_swift_host_library name)
         >)
   endif()
 
+  if(LLVM_USE_LINKER)
+    target_link_options(${name} PRIVATE
+      "-use-ld=${LLVM_USE_LINKER}"
+    )
+  endif()
+
   # Export this target.
   set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
 endfunction()
@@ -241,7 +233,7 @@ endfunction()
 # Add a new "pure" Swift host tool.
 #
 # "Pure" Swift host tools can only contain Swift code, and will be built
-# with the host compiler. 
+# with the host compiler.
 #
 # Usage:
 #   add_pure_swift_host_tool(name
@@ -262,7 +254,7 @@ endfunction()
 # source1 ...
 #   Sources to add into this tool.
 function(add_pure_swift_host_tool name)
-  if (NOT SWIFT_SWIFT_PARSER)
+  if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     message(STATUS "Not building ${name} because swift-syntax is not available")
     return()
   endif()
@@ -322,7 +314,15 @@ function(add_pure_swift_host_tool name)
 
   # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    ${SWIFT_HOST_LIBRARIES_DEST_DIR})
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+  target_link_directories(${name} PUBLIC
+    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+
+  if(LLVM_USE_LINKER)
+    target_link_options(${name} PRIVATE
+      "-use-ld=${LLVM_USE_LINKER}"
+    )
+  endif()
 
   if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
     add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})

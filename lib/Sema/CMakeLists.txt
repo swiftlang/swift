@@ -87,10 +87,10 @@ target_link_libraries(swiftSema PRIVATE
   swiftParse
   swiftSerialization)
 
-if (SWIFT_SWIFT_PARSER)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_compile_definitions(swiftSema
     PRIVATE
-    SWIFT_SWIFT_PARSER
+    SWIFT_BUILD_SWIFT_SYNTAX
   )
   target_link_libraries(swiftSema PRIVATE
     swiftASTGen)

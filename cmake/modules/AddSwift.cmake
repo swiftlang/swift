@@ -113,9 +113,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
   endif()
 endfunction()
 
-# Usage:
-# _add_host_variant_c_compile_link_flags(name)
-function(_add_host_variant_c_compile_link_flags name)
+function(swift_get_host_triple out_var)
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
@@ -124,26 +122,30 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
   endif()
 
+  get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+    MACCATALYST_BUILD_FLAVOR ""
+    DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+
+  set(${out_var} "${target}" PARENT_SCOPE)
+endfunction()
+
+# Usage:
+# _add_host_variant_c_compile_link_flags(name)
+function(_add_host_variant_c_compile_link_flags name)
   # MSVC and gcc don't understand -target.
   # clang-cl understands --target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
     else()
-      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
-      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
     endif()
   endif()
 
   if (CMAKE_Swift_COMPILER)
-    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
-      MACCATALYST_BUILD_FLAVOR ""
-      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${SWIFT_HOST_TRIPLE}>)
 
    _add_host_variant_swift_sanitizer_flags(${name})
   endif()
@@ -439,7 +441,7 @@ endfunction()
 
 function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
   if(NOT BOOTSTRAPPING_MODE)
-    if (SWIFT_SWIFT_PARSER)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
       set(ASRLF_BOOTSTRAPPING_MODE "HOSTTOOLS")
     else()
       return()
@@ -576,7 +578,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
       ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     # For the "end step" of bootstrapping configurations, we need to be
     # able to fall back to the SDK directory for libswiftCore et al.
     if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
@@ -654,7 +656,7 @@ function(add_swift_host_library name)
   translate_flags(ASHL "${options}")
 
   # Once the new Swift parser is linked, everything has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND ASHL_SHARED)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND ASHL_SHARED)
     set(ASHL_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -700,7 +702,7 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
 
-  target_link_directories(${name} PUBLIC ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+  target_link_directories(${name} PUBLIC "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
   # Respect LLVM_COMMON_DEPENDS if it is set.
   #
@@ -922,7 +924,7 @@ function(add_swift_host_tool executable)
   endif()
 
   # Once the new Swift parser is linked in, every host tool has Swift modules.
-  if (SWIFT_SWIFT_PARSER AND NOT ASHT_DOES_NOT_USE_SWIFT)
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND NOT ASHT_DOES_NOT_USE_SWIFT)
     set(ASHT_HAS_SWIFT_MODULES ON)
   endif()
 
@@ -961,7 +963,7 @@ function(add_swift_host_tool executable)
     endif()
   endif()
 
-  if(SWIFT_SWIFT_PARSER)
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
     set(extra_relative_rpath "")
     if(NOT "${ASHT_BOOTSTRAPPING}" STREQUAL "")
       if(executable MATCHES "-bootstrapping")
