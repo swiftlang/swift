@@ -101,21 +101,31 @@ public func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePoint
 
 @_silgen_name("swift_retain")
 public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
+  return swift_retain_n(object: object, n: 1)
+}
+
+@_silgen_name("swift_retain_n")
+public func swift_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
   let o = UnsafeMutablePointer<HeapObject>(object)
   // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
   if o.pointee.refcount == HeapObject.immortalRefCount { return o._rawValue }
-  o.pointee.refcount += 1
+  o.pointee.refcount += Int(n)
   return o._rawValue
 }
 
 @_silgen_name("swift_release")
 public func swift_release(object: Builtin.RawPointer) {
+  swift_release_n(object: object, n: 1)
+}
+
+@_silgen_name("swift_release_n")
+public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
   let o = UnsafeMutablePointer<HeapObject>(object)
   // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
   if o.pointee.refcount == HeapObject.immortalRefCount { return }
-  o.pointee.refcount -= 1
+  o.pointee.refcount -= Int(n)
   if (o.pointee.refcount & HeapObject.refcountMask) == 0 {
     _swift_embedded_invoke_heap_object_destroy(o)
   }
