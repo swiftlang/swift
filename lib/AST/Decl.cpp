@@ -4836,6 +4836,9 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
 }
 
 bool TypeDecl::isNoncopyable() const {
+  assert(!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)
+  && "TypeDecl::isNoncopyable() is not compatible with NoncopyableGenerics");
+
   return evaluateOrDefault(getASTContext().evaluator,
                            IsNoncopyableRequest{const_cast<TypeDecl *>(this)},
                            true); // default to true for safety

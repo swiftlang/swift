@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/Strings.h"
@@ -1113,10 +1114,6 @@ void swift::diagnoseMissingSendableConformance(
 }
 
 namespace {
-  template<typename Visitor>
-  bool visitInstanceStorage(
-      NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor);
-
   /// Infer Sendable from the instance storage of the given nominal type.
   /// \returns \c llvm::None if there is no way to make the type \c Sendable,
   /// \c true if \c Sendable needs to be @unchecked, \c false if it can be
@@ -1131,7 +1128,8 @@ namespace {
       }
     }
       
-    struct Visitor {
+    class Visitor: public StorageVisitor {
+    public:
       NominalTypeDecl *nominal;
       SmallVectorImpl<Requirement> &requirements;
       bool isUnchecked = false;
@@ -1139,12 +1137,13 @@ namespace {
 
       Visitor(
           NominalTypeDecl *nominal, SmallVectorImpl<Requirement> &requirements
-      ) : nominal(nominal), requirements(requirements) {
+      ) : StorageVisitor(),
+        nominal(nominal), requirements(requirements) {
         ASTContext &ctx = nominal->getASTContext();
         sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
       }
 
-      bool operator()(VarDecl *var, Type propertyType) {
+      bool operator()(VarDecl *var, Type propertyType) override {
         // If we have a class with mutable state, only an @unchecked
         // conformance will work.
         if (isa<ClassDecl>(nominal) && var->supportsMutation())
@@ -1153,7 +1152,7 @@ namespace {
         return checkType(propertyType);
       }
 
-      bool operator()(EnumElementDecl *element, Type elementType) {
+      bool operator()(EnumElementDecl *element, Type elementType) override {
         return checkType(elementType);
       }
 
@@ -1195,7 +1194,7 @@ namespace {
       }
     } visitor(nominal, requirements);
 
-    return visitInstanceStorage(nominal, nominal, visitor);
+    return visitor.visit(nominal, nominal);
   }
 }
 
@@ -4823,53 +4822,6 @@ bool swift::contextRequiresStrictConcurrencyChecking(
   return false;
 }
 
-namespace {
-  /// Visit the instance storage of the given nominal type as seen through
-  /// the given declaration context.
-  ///
-  /// \param visitor Called with each (stored property, property type) pair
-  /// for classes/structs and with each (enum element, associated value type)
-  /// pair for enums.
-  ///
-  /// \returns \c true if any call to the \c visitor returns \c true, and
-  /// \c false otherwise.
-  template<typename Visitor>
-  bool visitInstanceStorage(
-      NominalTypeDecl *nominal, DeclContext *dc, Visitor &visitor) {
-    // Walk the stored properties of classes and structs.
-    if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
-      for (auto property : nominal->getStoredProperties()) {
-        auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
-            ->getRValueType()->getReferenceStorageReferent();
-        if (visitor(property, propertyType))
-          return true;
-      }
-
-      return false;
-    }
-
-    // Walk the enum elements that have associated values.
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-      for (auto caseDecl : enumDecl->getAllCases()) {
-        for (auto element : caseDecl->getElements()) {
-          if (!element->hasAssociatedValues())
-            continue;
-
-          // Check that the associated value type is Sendable.
-          auto elementType = dc->mapTypeIntoContext(
-              element->getArgumentInterfaceType());
-          if (visitor(element, elementType))
-            return true;
-        }
-      }
-
-      return false;
-    }
-
-    return false;
-  }
-}
-
 /// Check the instance storage of the given nominal type to verify whether
 /// it is comprised only of Sendable instance storage.
 static bool checkSendableInstanceStorage(
@@ -4891,7 +4843,8 @@ static bool checkSendableInstanceStorage(
 
   // Stored properties of structs and classes must have
   // Sendable-conforming types.
-  struct Visitor {
+  class Visitor: public StorageVisitor {
+  public:
     bool invalid = false;
     NominalTypeDecl *nominal;
     DeclContext *dc;
@@ -4899,11 +4852,11 @@ static bool checkSendableInstanceStorage(
     const LangOptions &langOpts;
 
     Visitor(NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check)
-      : nominal(nominal), dc(dc), check(check),
+      : StorageVisitor(), nominal(nominal), dc(dc), check(check),
         langOpts(nominal->getASTContext().LangOpts) { }
 
     /// Handle a stored property.
-    bool operator()(VarDecl *property, Type propertyType) {
+    bool operator()(VarDecl *property, Type propertyType) override {
       // Classes with mutable properties are not Sendable.
       if (property->supportsMutation() && isa<ClassDecl>(nominal)) {
         if (isImplicitSendableCheck(check)) {
@@ -4958,7 +4911,7 @@ static bool checkSendableInstanceStorage(
     }
 
     /// Handle an enum associated value.
-    bool operator()(EnumElementDecl *element, Type elementType) {
+    bool operator()(EnumElementDecl *element, Type elementType) override {
       diagnoseNonSendableTypes(
           elementType, SendableCheckContext(dc, check), element->getLoc(),
           [&](Type type, DiagnosticBehavior behavior) {
@@ -4993,7 +4946,7 @@ static bool checkSendableInstanceStorage(
     }
   } visitor(nominal, dc, check);
 
-  return visitInstanceStorage(nominal, dc, visitor) || visitor.invalid;
+  return visitor.visit(nominal, dc) || visitor.invalid;
 }
 
 bool swift::checkSendableConformance(

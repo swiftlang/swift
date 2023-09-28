@@ -158,7 +158,9 @@ bool TypeBase::isMarkerExistential() {
 }
 
 bool TypeBase::isNoncopyable() {
-  // FIXME: we need to support the full spectrum of TypeDecls here.
+  assert(!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)
+  && "TypeBase::isNoncopyable() is not compatible with NoncopyableGenerics");
+
   if (auto *nom = getAnyNominal())
     return nom->isNoncopyable();
 

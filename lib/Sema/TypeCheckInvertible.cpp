@@ -23,26 +23,42 @@
 
 namespace swift {
 
-//static bool hasConformanceRequirement(ArrayRef<Requirement> reqs,
-//                                      KnownProtocolKind query) {
-//  for (auto req : reqs) {
-//    if (req.getKind() == RequirementKind::Conformance)
-//      if (auto kp = req.getSecondType()->getKnownProtocol())
-//        if (*kp == query)
-//          return true;
-//  }
-//  return false;
-//}
 
-//static const GenericContext *findGenericContext(DeclContext *dc) {
-//  do {
-//    if (auto decl = dc->getAsDecl())
-//      if (auto GC = decl->getAsGenericContext())
-//        return GC;
-//  } while ((dc = dc->getParent()));
-//
-//  return nullptr;
-//}
+/// Visit the instance storage of the given nominal type as seen through
+/// the given declaration context.
+bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
+  // Walk the stored properties of classes and structs.
+  if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+    for (auto property : nominal->getStoredProperties()) {
+      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType())
+          ->getRValueType()->getReferenceStorageReferent();
+      if ((*this)(property, propertyType))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Walk the enum elements that have associated values.
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    for (auto caseDecl : enumDecl->getAllCases()) {
+      for (auto element : caseDecl->getElements()) {
+        if (!element->hasAssociatedValues())
+          continue;
+
+        // Check that the associated value type is Sendable.
+        auto elementType = dc->mapTypeIntoContext(
+            element->getArgumentInterfaceType());
+        if ((*this)(element, elementType))
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  return false;
+}
 
 bool canBeNoncopyable(Type type) {
   auto &ctx = type->getASTContext();
@@ -75,6 +91,29 @@ bool isCopyable(Type type, DeclContext *dc) {
                                               module, false);
 }
 
+/// \returns true iff the given nominal meets the requirements of Copyable>
+bool checkCopyableConformance(Evaluator &evaluator,
+                              NominalTypeDecl *nom) {
+  // All classes can store noncopyable values.
+  if (isa<ClassDecl>(nom))
+    return true;
+
+  // Protocols do not directly define any storage.
+  if (isa<ProtocolDecl>(nom))
+    return true;
+
+  if (isa<BuiltinTupleDecl>(nom))
+    llvm_unreachable("unexpected BuiltinTupleDecl");
+
+  if (auto strct = dyn_cast<StructDecl>(nom)) {
+    for (auto stored : strct->getStoredProperties()) {
+//      stored->getInterfaceType()
+//      ImplicitKnownProtocolConformanceRequest
+    }
+  }
+
+}
+
 ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
                                                     NominalTypeDecl *nominal,
                                                     KnownProtocolKind kp) {
@@ -85,6 +124,10 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
   case KnownProtocolKind::Copyable: {
     if (evaluateOrDefault(evaluator, IsNoncopyableRequest{nominal}, false))
       return nullptr; // it's not Copyable.
+
+    // Otherwise, verify Copyable conformance.
+
+
 
     // form a full unconditional conformance to Copyable.
     auto conformance = ctx.getNormalConformance(
