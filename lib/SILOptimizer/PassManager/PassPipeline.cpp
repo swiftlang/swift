@@ -376,6 +376,146 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSwiftArrayPropertyOpt();
 }
 
+void addHighLevelOSSAFunctionPasses(SILPassPipelinePlan &P) {
+  // Promote box allocations to stack allocations.
+  P.addAllocBoxToStack();
+
+  if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
+    P.addDestroyAddrHoisting();
+  }
+
+  // Propagate copies through stack locations.  Should run after
+  // box-to-stack promotion since it is limited to propagating through
+  // stack locations. Should run before aggregate lowering since that
+  // splits up copy_addr.
+  P.addCopyForwarding();
+
+  // This DCE pass is the only DCE on ownership SIL. It can cleanup OSSA related
+  // dead code, e.g. left behind by the ObjCBridgingOptimization.
+  P.addDCE();
+
+  // Optimize copies from a temporary (an "l-value") to a destination.
+  P.addTempLValueOpt();
+
+  // Split up opaque operations (copy_addr, retain_value, etc.).
+  P.addLowerAggregateInstrs();
+
+  // Split up operations on stack-allocated aggregates (struct, tuple).
+  P.addEarlySROA();
+
+  // Promote stack allocations to values.
+  P.addMem2Reg();
+
+  // Run the existential specializer Pass.
+  P.addExistentialSpecializer();
+
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+
+  if (P.getOptions().EnableOSSAModules) {
+    return;
+  }
+  if (SILPrintFinalOSSAModule) {
+    addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+  }
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+}
+
+void addHighLevelNonOSSAFunctionPasses(SILPassPipelinePlan &P) {
+  addSimplifyCFGSILCombinePasses(P);
+
+  P.addArrayElementPropagation();
+
+  // Run the devirtualizer, specializer, and inliner. If any of these
+  // makes a change we'll end up restarting the function passes on the
+  // current function (after optimizing any new callees).
+  P.addDevirtualizer();
+  P.addGenericSpecializer();
+  // Run devirtualizer after the specializer, because many
+  // class_method/witness_method instructions may use concrete types now.
+  P.addDevirtualizer();
+  P.addARCSequenceOpts();
+
+  if (P.getOptions().EnableOSSAModules) {
+    // We earlier eliminated ownership if we are not compiling the stdlib. Now
+    // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
+
+  // Does not inline functions with defined semantics or effects.
+  P.addEarlyPerfInliner();
+
+  // Clean up Semantic ARC before we perform additional post-inliner opts.
+  if (P.getOptions().EnableOSSAModules) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
+
+  // Promote stack allocations to values and eliminate redundant
+  // loads.
+  P.addMem2Reg();
+  P.addPerformanceConstantPropagation();
+  //  Do a round of CFG simplification, followed by peepholes, then
+  //  more CFG simplification.
+
+  // Jump threading can expose opportunity for SILCombine (enum -> is_enum_tag->
+  // cond_br).
+  P.addJumpThreadSimplifyCFG();
+  P.addPhiExpansion();
+  P.addSILCombine();
+  // SILCombine can expose further opportunities for SimplifyCFG.
+  P.addSimplifyCFG();
+
+  P.addCSE();
+  // Early RLE does not touch loads from Arrays. This is important because
+  // later array optimizations, like ABCOpt, get confused if an array load in
+  // a loop is converted to a pattern with a phi argument.
+  P.addEarlyRedundantLoadElimination();
+
+  // Optimize copies created during RLE.
+  P.addSemanticARCOpts();
+
+  P.addCOWOpts();
+  P.addPerformanceConstantPropagation();
+  // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
+  // can cleanup redundant and dead instructions.
+  P.addRedundantPhiElimination();
+  P.addCSE();
+  P.addDCE();
+
+  // Perform retain/release code motion and run the first ARC optimizer.
+  P.addEarlyCodeMotion();
+  P.addReleaseHoisting();
+  P.addARCSequenceOpts();
+  P.addTempRValueOpt();
+
+  P.addSimplifyCFG();
+
+  P.addEarlyCodeMotion();
+
+  P.addRetainSinking();
+  // Retain sinking does not sink all retains in one round.
+  // Let it run one more time time, because it can be beneficial.
+  // FIXME: Improve the RetainSinking pass to sink more/all
+  // retains in one go.
+  P.addRetainSinking();
+  P.addReleaseHoisting();
+  P.addARCSequenceOpts();
+
+  // Run a final round of ARC opts when ownership is enabled.
+  if (P.getOptions().EnableOSSAModules) {
+    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
+}
+
 // Primary FunctionPass pipeline.
 //
 // Inserting a module passes within this pipeline would break the pipeline
@@ -420,16 +560,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
-
-  if (!P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
-      return;
-
-    if (SILPrintFinalOSSAModule) {
-      addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-    }
-    P.addNonTransparentFunctionOwnershipModelEliminator();
-  }
 
   addSimplifyCFGSILCombinePasses(P);
 
@@ -625,12 +755,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 // callees. This provides more precise escape analysis and side effect analysis
 // of callee arguments.
 static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("HighLevel,Function+EarlyLoopOpt",
-                  true /*isFunctionPassPipeline*/);
+  P.startPipeline("HighLevel,Function+EarlyLoopOpt");
   P.addEagerSpecializer();
   P.addObjCBridgingOptimization();
 
-  addFunctionPasses(P, OptimizationLevelKind::HighLevel);
+  addHighLevelOSSAFunctionPasses(P);
+  addHighLevelNonOSSAFunctionPasses(P);
 
   addHighLevelLoopOptPasses(P);
   
