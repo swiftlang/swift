@@ -19,10 +19,12 @@
 
 extern "C" const char __dso_handle[];
 
+#if SWIFT_ENABLE_BACKTRACING
 // Drag in a symbol from the backtracer, to force the static linker to include
 // the code.
 static const void *__backtraceRef __attribute__((used))
   = (const void *)swift::runtime::backtrace::_swift_backtrace_isThunkFunction;
+#endif
 
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
