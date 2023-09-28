@@ -358,6 +358,7 @@ protocol P { }
 struct PArray<T> { }
 
 extension PArray : ExpressibleByArrayLiteral where T: P {
+  // expected-note@-1 {{requirement from conditional conformance of 'PArray<String>' to 'ExpressibleByArrayLiteral'}}
   typealias ArrayLiteralElement = T
 
   init(arrayLiteral elements: T...) { }
@@ -367,7 +368,7 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
+  let _: PArray<String> = [s, s, s] // expected-error{{generic struct 'PArray' requires that 'String' conform to 'P'}}
 }
 
 

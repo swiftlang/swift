@@ -425,8 +425,7 @@ namespace {
       // the literal.
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
-            TypeChecker::conformsToProtocol(
-                otherArgTy, literalProto, CS.DC->getParentModule())) {
+            CS.lookupConformance(otherArgTy, literalProto)) {
           return true;
         }
       } else if (Type defaultType =
