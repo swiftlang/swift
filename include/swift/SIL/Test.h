@@ -15,7 +15,7 @@
 // - #include "swift/SIL/Test.h"
 // - namespace swift::test {
 //   static FunctionTest MyNewTest(
-//     "my-new-test",
+//     "my_new_test",
 //     [](auto &function, auto &arguments, auto &test) {
 //   });
 //   } // end namespace swift::test
@@ -43,8 +43,8 @@
 //    and
 //
 //    static FunctionTest MyNeatoUtilityTest(
-//      "my-neato-utility",
-//      [](auto *test, auto *function, auto &arguments) {
+//      "my_neato_utility",
+//      [](auto &function, auto &arguments, auto &test) {
 //         // The code here is described in detail below.
 //         // See 4).
 //         auto count = arguments.takeUInt();
@@ -53,7 +53,7 @@
 //         // See 5)
 //         myNeatoUtility(count, target, callee);
 //         // See 6)
-//         getFunction()->dump();
+//         function.dump();
 //      });
 // 1) A test test/SILOptimizer/interesting_functionality_unit.sil runs the
 //    TestRunner pass:
@@ -62,13 +62,14 @@
 //    specify_test instruction.
 //      sil @f : $() -> () {
 //      ...
-//      specify_test "my-neato-utility 43 @trace[2] @function[other_fun]"
+//      specify_test "my_neato_utility 43 %2 @function[other_fun]"
 //      ...
 //      }
 // 3) TestRunner finds the FunctionTest instance MyNeatoUtilityTest registered
-//    under the name "my-neato-utility", and calls ::run() on it, passing an
-//    the pass, the function AND most importantly an test::Arguments instance
-//    that contains
+//    under the name "my_neato_utility", and calls ::run() on it, passing first
+//    the function, last the test::FunctionTest instance, AND in the middle,
+//    most importantly a test::Arguments instance that contains
+//
 //      (43 : unsigned long, someValue : SILValue, other_fun : SILFunction *)
 //
 // 4) MyNeatoUtilityTest calls takeUInt(), takeValue(), and takeFunction() on
@@ -84,7 +85,7 @@
 //      myNeatoUtility(count, target, callee);
 // 6) MyNeatoUtilityTest then dumps out the current function, which was modified
 //    in the process.
-//      getFunction()->dump();
+//      function.dump()
 // 7) The test file test/SILOptimizer/interesting_functionality_unit.sil matches
 // the
 //    expected contents of the modified function:
