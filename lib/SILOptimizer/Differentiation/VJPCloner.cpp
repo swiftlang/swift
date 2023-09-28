@@ -305,6 +305,33 @@ public:
                          joinElements(directResults, Builder, loc));
   }
 
+  void visitUnwindInst(UnwindInst *ui) {
+    Builder.setCurrentDebugScope(getOpScope(ui->getDebugScope()));
+    auto loc = ui->getLoc();
+    auto *origExit = ui->getParent();
+
+    // Consume unused pullback values
+    if (borrowedPullbackContextValue) {
+      auto *pbTupleVal = buildPullbackValueTupleValue(ui);
+      // Initialize the top-level subcontext buffer with the top-level pullback
+      // tuple.
+      auto addr = emitProjectTopLevelSubcontext(
+          Builder, loc, borrowedPullbackContextValue, pbTupleVal->getType());
+      Builder.createStore(
+          loc, pbTupleVal, addr,
+          pbTupleVal->getType().isTrivial(*pullback) ?
+              StoreOwnershipQualifier::Trivial : StoreOwnershipQualifier::Init);
+
+      Builder.createEndBorrow(loc, borrowedPullbackContextValue);
+      Builder.emitDestroyValueOperation(loc, pullbackContextValue);
+    } else {
+      for (SILValue val : getPullbackValues(origExit))
+        Builder.emitDestroyValueOperation(loc, val);
+    }
+
+    Builder.createUnwind(loc);
+  }
+
   void visitBranchInst(BranchInst *bi) {
     Builder.setCurrentDebugScope(getOpScope(bi->getDebugScope()));
     // Build pullback struct value for original block.
