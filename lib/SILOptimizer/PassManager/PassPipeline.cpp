@@ -469,10 +469,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
   P.addDevirtualizer();
-  P.addGenericSpecializer();
-  // Run devirtualizer after the specializer, because many
-  // class_method/witness_method instructions may use concrete types now.
-  P.addDevirtualizer();
+  // MandatoryPerformanceOptimizations already took care of all specializations
+  // in embedded Swift mode, running the generic specializer might introduce
+  // more generic calls from non-generic functions, which breaks the assumptions
+  // of embedded Swift.
+  if (!P.getOptions().EmbeddedSwift) {
+    P.addGenericSpecializer();
+    // Run devirtualizer after the specializer, because many
+    // class_method/witness_method instructions may use concrete types now.
+    P.addDevirtualizer();
+  }
   P.addARCSequenceOpts();
 
   if (P.getOptions().EnableOSSAModules) {
@@ -754,8 +760,14 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
-  // Should be after FunctionSignatureOpts and before the last inliner.
-  P.addReleaseDevirtualizer();
+  // MandatoryPerformanceOptimizations already took care of all specializations
+  // in embedded Swift mode, running the release devirtualizer might introduce
+  // more generic calls from non-generic functions, which breaks the assumptions
+  // of embedded Swift.
+  if (!P.getOptions().EmbeddedSwift) {
+    // Should be after FunctionSignatureOpts and before the last inliner.
+    P.addReleaseDevirtualizer();
+  }
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
@@ -966,13 +978,6 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
-
-  // For embedded Swift: We need to re-run VTableSpecializer in case the
-  // performance inliner and specializer ended up discovering new generic
-  // classes.
-  if (Options.EmbeddedSwift) {
-    P.addVTableSpecializer();
-  }
 
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures
