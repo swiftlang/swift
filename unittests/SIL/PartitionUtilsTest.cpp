@@ -194,9 +194,9 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   //expected: p: ((0 1 2) (3 4 5) (6 7) (8 9) (Element(10)) (Element(11)))
 
-  p.apply(PartitionOp::Consume(Element(2)));
-  p.apply(PartitionOp::Consume(Element(7)));
-  p.apply(PartitionOp::Consume(Element(10)));
+  p.apply(PartitionOp::Transfer(Element(2)));
+  p.apply(PartitionOp::Transfer(Element(7)));
+  p.apply(PartitionOp::Transfer(Element(10)));
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
@@ -236,7 +236,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   Partition p1;
   p1.apply(PartitionOp::AssignFresh(Element(0)));
   Partition p2 = p1;
-  p1.apply(PartitionOp::Consume(Element(0)));
+  p1.apply(PartitionOp::Transfer(Element(0)));
   bool failure = false;
   p1.apply(PartitionOp::Require(Element(0)), [&](const PartitionOp &, unsigned) {
       failure = true;

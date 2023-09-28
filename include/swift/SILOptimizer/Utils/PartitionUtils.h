@@ -44,25 +44,25 @@ struct Region {
 
 using namespace PartitionPrimitives;
 
-// PartitionOpKind represents the different kinds of PartitionOps that
-// SILInstructions can be translated to
+/// PartitionOpKind represents the different kinds of PartitionOps that
+/// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
-  // Assign one value to the region of another, takes two args, second arg
-  // must already be tracked with a non-consumed region
+  /// Assign one value to the region of another, takes two args, second arg
+  /// must already be tracked with a non-consumed region
   Assign,
 
-  // Assign one value to a fresh region, takes one arg.
+  /// Assign one value to a fresh region, takes one arg.
   AssignFresh,
 
-  // Consume the region of a value if not already consumed, takes one arg.
-  Consume,
-
-  // Merge the regions of two values, takes two args, both must be from
-  // non-consumed regions.
+  /// Merge the regions of two values, takes two args, both must be from
+  /// non-consumed regions.
   Merge,
 
-  // Require the region of a value to be non-consumed, takes one arg.
-  Require
+  /// Consume the region of a value if not already consumed, takes one arg.
+  Transfer,
+
+  /// Require the region of a value to be non-consumed, takes one arg.
+  Require,
 };
 
 // PartitionOp represents a primitive operation that can be performed on
@@ -108,11 +108,9 @@ public:
     return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
   }
 
-  static PartitionOp Consume(Element tgt,
-                             SILInstruction *sourceInst = nullptr,
-                             Expr *sourceExpr = nullptr) {
-    return PartitionOp(PartitionOpKind::Consume, tgt,
-                       sourceInst, sourceExpr);
+  static PartitionOp Transfer(Element tgt, SILInstruction *sourceInst = nullptr,
+                              Expr *sourceExpr = nullptr) {
+    return PartitionOp(PartitionOpKind::Transfer, tgt, sourceInst, sourceExpr);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -164,7 +162,7 @@ public:
     case PartitionOpKind::AssignFresh:
       os << "assign_fresh %%" << OpArgs[0] << "\n";
       break;
-    case PartitionOpKind::Consume:
+    case PartitionOpKind::Transfer:
       os << "consume %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
@@ -425,7 +423,7 @@ public:
       fresh_label = Region(fresh_label + 1);
       canonical = false;
       break;
-    case PartitionOpKind::Consume:
+    case PartitionOpKind::Transfer:
       assert(op.OpArgs.size() == 1 &&
              "Consume PartitionOp should be passed 1 argument");
       assert(labels.count(op.OpArgs[0]) &&
