@@ -82,4 +82,26 @@ FunctionsTestSuite.test("non-empty derived from empty class") {
   expectEqual(derived.b, 42)
 }
 
+FunctionsTestSuite.test("base member calls do not require copying") {
+  let derived = CopyTrackedDerivedClass(42)
+  var copyCounter = getCopyCounter().pointee
+  expectEqual(derived.getX(), 42)
+  expectEqual(copyCounter, getCopyCounter().pointee)
+  expectEqual(derived.getDerivedX(), 42)
+  expectEqual(copyCounter, getCopyCounter().pointee)
+
+  let derivedDerived = CopyTrackedDerivedDerivedClass(-5)
+  copyCounter = getCopyCounter().pointee
+  expectEqual(derivedDerived.getX(), -5)
+  expectEqual(derivedDerived.getY(), 11)
+  expectEqual(copyCounter, getCopyCounter().pointee)
+}
+
+FunctionsTestSuite.test("mutating base member calls do not require copying") {
+  var derived = CopyTrackedDerivedClass(42)
+  var copyCounter = getCopyCounter().pointee
+  expectEqual(derived.getXMut(), 42)
+  expectEqual(copyCounter, getCopyCounter().pointee)
+}
+
 runAllTests()

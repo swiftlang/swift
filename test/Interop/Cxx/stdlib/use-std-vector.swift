@@ -119,4 +119,16 @@ StdVectorTestSuite.test("VectorOfString.map") {
     expectEqual(a, [3, 1, 2])
 }
 
+StdVectorTestSuite.test("VectorOfInt subclass for loop") {
+    var v = VectorSubclass()
+    v.push_back(1)
+
+    var count: CInt = 1
+    for e in v {
+        expectEqual(e, count)
+        count += 1
+    }
+    expectEqual(count, 2)
+}
+
 runAllTests()
