@@ -5795,10 +5795,11 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Expose_DECL_ATTR: {
+        unsigned kind;
         bool isImplicit;
         serialization::decls_block::ExposeDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) ExposeAttr(blobData, isImplicit);
+            scratch, kind, isImplicit);
+        Attr = new (ctx) ExposeAttr(blobData, (ExposureKind)kind, isImplicit);
         break;
       }
 

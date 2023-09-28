@@ -172,6 +172,10 @@ protected:
       kind : 1
     );
 
+    SWIFT_INLINE_BITFIELD(ExposeAttr, DeclAttribute, NumExposureKindBits,
+      kind : NumExposureKindBits
+    );
+
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
       isUnchecked : 1
     );
@@ -2309,14 +2313,22 @@ public:
 /// header used by C/C++ to interoperate with Swift.
 class ExposeAttr : public DeclAttribute {
 public:
-  ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {}
+  ExposeAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range,
+             ExposureKind Kind, bool Implicit)
+      : DeclAttribute(DAK_Expose, AtLoc, Range, Implicit), Name(Name) {
+    Bits.ExposeAttr.kind = static_cast<unsigned>(Kind);
+  }
 
-  ExposeAttr(StringRef Name, bool Implicit)
-      : ExposeAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+  ExposeAttr(StringRef Name, ExposureKind Kind, bool Implicit)
+      : ExposeAttr(Name, SourceLoc(), SourceRange(), Kind, Implicit) {}
 
   /// The exposed declaration name.
   const StringRef Name;
+
+  /// Returns the kind of exposure.
+  ExposureKind getExposureKind() const {
+    return static_cast<ExposureKind>(Bits.ExposeAttr.kind);
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Expose;
