@@ -2332,6 +2332,7 @@ llvm::Optional<MacroRole> getMacroRole(StringRef roleName) {
       .Case("peer", MacroRole::Peer)
       .Case("conformance", MacroRole::Conformance)
       .Case("extension", MacroRole::Extension)
+      .Case("attribute", MacroRole::Attribute)
       .Default(llvm::None);
 }
 

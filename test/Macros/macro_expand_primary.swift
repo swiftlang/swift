@@ -94,6 +94,10 @@ class Person {
 // CHECK-DUMP: extension Person: Observable {
 // CHECK-DUMP: }
 
+@standardAvailability
+struct FutureType {}
+// CHECK-DUMP: @available(macOS 99, iOS 99, tvOS 99, watchOS 99, *)
+
 
 @freestanding(declaration, names: named(Foo)) macro useIdentifier(_ value: String) = #externalMacro(module: "MacroDefinition", type: "UseIdentifierMacro")
 

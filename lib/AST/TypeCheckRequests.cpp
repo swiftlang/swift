@@ -1920,6 +1920,34 @@ void ExpandMemberAttributeMacros::noteCycleStep(DiagnosticEngine &diags) const {
   }
 }
 
+void ExpandAttributeMacros::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity,
+                   "attribute",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed,
+                   "attribute");
+  }
+}
+
+void ExpandAttributeMacros::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_entity_through,
+                   "attribute",
+                   value->getName());
+  } else {
+    diags.diagnose(decl->getLoc(),
+                   diag::macro_expand_circular_reference_unnamed_through,
+                   "attribute");
+  }
+}
+
 void ExpandSynthesizedMemberMacroRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
   if (auto value = dyn_cast<ValueDecl>(decl)) {

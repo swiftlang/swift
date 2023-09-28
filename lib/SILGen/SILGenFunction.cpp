@@ -323,6 +323,7 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
   }
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:

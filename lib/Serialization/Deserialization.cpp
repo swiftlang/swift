@@ -2971,6 +2971,7 @@ static llvm::Optional<swift::MacroRole> getActualMacroRole(uint8_t context) {
   CASE(Conformance)
   CASE(CodeItem)
   CASE(Extension)
+  CASE(Attribute)
 #undef CASE
   }
   return llvm::None;

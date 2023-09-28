@@ -1353,6 +1353,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
       case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
       case GeneratedSourceInfo::AccessorMacroExpansion:
       case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+      case GeneratedSourceInfo::AttributeMacroExpansion:
       case GeneratedSourceInfo::MemberMacroExpansion:
       case GeneratedSourceInfo::PeerMacroExpansion:
       case GeneratedSourceInfo::ConformanceMacroExpansion:
@@ -1402,6 +1403,7 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
     case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
     case GeneratedSourceInfo::AccessorMacroExpansion:
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::AttributeMacroExpansion:
     case GeneratedSourceInfo::MemberMacroExpansion:
     case GeneratedSourceInfo::PeerMacroExpansion:
     case GeneratedSourceInfo::ConformanceMacroExpansion:
@@ -1599,6 +1601,7 @@ swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:

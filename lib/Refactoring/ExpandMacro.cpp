@@ -62,6 +62,12 @@ getMacroExpansionBuffers(MacroDecl *macro, const CustomAttr *attr, Decl *decl) {
     }
   }
 
+  if (roles.contains(MacroRole::Attribute)) {
+    auto bufferIDs = evaluateOrDefault(
+        ctx.evaluator, ExpandAttributeMacros{decl}, { });
+    allBufferIDs.append(bufferIDs.begin(), bufferIDs.end());
+  }
+
   if (roles.contains(MacroRole::Member)) {
     auto bufferIDs = evaluateOrDefault(
         ctx.evaluator, ExpandSynthesizedMemberMacroRequest{decl}, {});

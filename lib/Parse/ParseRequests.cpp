@@ -201,7 +201,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       break;
     }
 
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion: {
+    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::AttributeMacroExpansion: {
       parser.parseExpandedAttributeList(items);
       break;
     }

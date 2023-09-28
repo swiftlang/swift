@@ -45,6 +45,9 @@ public:
     /// The expansion of a member attribute attached macro.
     MemberAttributeMacroExpansion,
 
+    /// The expansion of an attribute attached macro.
+    AttributeMacroExpansion,
+
     /// The expansion of an attached member macro.
     MemberMacroExpansion,
 

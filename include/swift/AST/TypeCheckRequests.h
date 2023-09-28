@@ -4140,6 +4140,28 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Expand all attribute macros attached to the given
+/// declaration.
+///
+/// Produces the set of macro expansion buffer IDs.
+class ExpandAttributeMacros
+    : public SimpleRequest<ExpandAttributeMacros,
+                           ArrayRef<unsigned>(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<unsigned> evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 /// Expand synthesized member macros attached to the given declaration.
 ///
 /// Produces the set of macro expansion buffer IDs.

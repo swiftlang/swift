@@ -377,6 +377,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:

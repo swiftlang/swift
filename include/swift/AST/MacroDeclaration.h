@@ -61,6 +61,9 @@ enum class MacroRole: uint32_t {
   /// An attached macro that adds extensions to the declaration the
   /// macro is attached to.
   Extension = 0x100,
+  /// An attached macro that adds attributes to the declaration the
+  /// macro is attached to.
+  Attribute = 0x200,
 
   // NOTE: When adding a new macro role, also add it to `getAllMacroRoles`.
 };

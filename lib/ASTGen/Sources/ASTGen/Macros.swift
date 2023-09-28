@@ -73,6 +73,7 @@ extension MacroRole {
     case 6: self = .conformance
     case 7: self = .codeItem
     case 8: self = .`extension`
+    case 9: self = .attribute
 
     default: fatalError("unknown macro role")
     }
@@ -545,7 +546,7 @@ func expandFreestandingMacroIPC(
   // Map the macro role.
   let pluginMacroRole: PluginMessage.MacroRole
   switch macroRole {
-  case .accessor, .member, .memberAttribute, .peer, .conformance, .extension:
+  case .accessor, .member, .memberAttribute, .attribute, .peer, .conformance, .extension:
     preconditionFailure("unhandled macro role for freestanding macro")
 
   case .expression: pluginMacroRole = .expression
@@ -853,6 +854,7 @@ func expandAttachedMacroIPC(
   case .accessor: macroRole = .accessor
   case .member: macroRole = .member
   case .memberAttribute: macroRole = .memberAttribute
+  case .attribute: macroRole = .attribute
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
   case .extension: macroRole = .`extension`

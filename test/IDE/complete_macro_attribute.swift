@@ -10,13 +10,14 @@ macro FreestandingMacro
 @attached(#^ATTACHED_ROLE^#)
 macro AttachedMacro
 
-// ATTACHED_ROLE: Begin completions, 6 items
+// ATTACHED_ROLE: Begin completions, 7 items
 // ATTACHED_ROLE-DAG: Keyword/None:                       accessor; name=accessor
 // ATTACHED_ROLE-DAG: Keyword/None:                       memberAttribute; name=memberAttribute
 // ATTACHED_ROLE-DAG: Keyword/None:                       member; name=member
 // ATTACHED_ROLE-DAG: Keyword/None:                       peer; name=peer
 // ATTACHED_ROLE-DAG: Keyword/None:                       conformance; name=conformance
 // ATTACHED_ROLE-DAG: Keyword/None:                       extension; name=extension
+// ATTACHED_ROLE-DAG: Keyword/None:                       attribute; name=attribute
 
 @freestanding(declaration, #^NAMES_POSITION^#)
 macro FreestandingDeclarationMacro

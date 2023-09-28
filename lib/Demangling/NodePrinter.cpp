@@ -454,6 +454,7 @@ private:
     case Node::Kind::MacroExpansionUniqueName:
     case Node::Kind::MaterializeForSet:
     case Node::Kind::MemberAttributeAttachedMacroExpansion:
+    case Node::Kind::AttributeAttachedMacroExpansion:
     case Node::Kind::MemberAttachedMacroExpansion:
     case Node::Kind::MergedFunction:
     case Node::Kind::Metaclass:
@@ -1454,6 +1455,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/true,
                        ("member attribute macro @" +
+                        nodeToString(Node->getChild(2)) + " expansion #"),
+                       (int)Node->getChild(3)->getIndex() + 1);
+  case Node::Kind::AttributeAttachedMacroExpansion:
+    return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/true,
+                       ("attribute macro @" +
                         nodeToString(Node->getChild(2)) + " expansion #"),
                        (int)Node->getChild(3)->getIndex() + 1);
   case Node::Kind::MemberAttachedMacroExpansion:

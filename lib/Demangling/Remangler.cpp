@@ -2948,6 +2948,15 @@ ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
   return mangleChildNode(node, 3, depth + 1);
 }
 
+ManglingError Remangler::mangleAttributeAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 1, depth + 1));
+  RETURN_IF_ERROR(mangleChildNode(node, 2, depth + 1));
+  Buffer << "fMR";
+  return mangleChildNode(node, 3, depth + 1);
+}
+
 ManglingError Remangler::mangleMemberAttachedMacroExpansion(
     Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNode(node, 0, depth + 1));

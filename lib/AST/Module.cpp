@@ -910,6 +910,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
     case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
     case GeneratedSourceInfo::AccessorMacroExpansion:
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+    case GeneratedSourceInfo::AttributeMacroExpansion:
     case GeneratedSourceInfo::MemberMacroExpansion:
     case GeneratedSourceInfo::PeerMacroExpansion:
     case GeneratedSourceInfo::ConformanceMacroExpansion:
@@ -1213,6 +1214,9 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
     return MacroRole::MemberAttribute;
+
+  case GeneratedSourceInfo::AttributeMacroExpansion:
+    return MacroRole::Attribute;
 
   case GeneratedSourceInfo::MemberMacroExpansion:
     return MacroRole::Member;

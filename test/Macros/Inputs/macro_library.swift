@@ -42,3 +42,6 @@ public macro AddClassReferencingSelf() = #externalMacro(module: "MacroDefinition
 
 @attached(peer, names: named(value))
 public macro declareVarValuePeer() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+@attached(attribute)
+public macro standardAvailability() = #externalMacro(module: "MacroDefinition", type: "StandardAvailabilityMacro")

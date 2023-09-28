@@ -49,12 +49,12 @@ llvm::Optional<unsigned> expandFreestandingMacro(MacroExpansionDecl *med);
 llvm::Optional<unsigned> expandAccessors(AbstractStorageDecl *storage,
                                          CustomAttr *attr, MacroDecl *macro);
 
-/// Expand the attributes for the given member declaration based
+/// Expand the attributes for the given declaration based
 /// on the custom attribute that references the given macro.
 ///
 /// If expansion occurred, returns the macro expansion buffer ID.
 llvm::Optional<unsigned> expandAttributes(CustomAttr *attr, MacroDecl *macro,
-                                          Decl *member);
+                                          Decl *member, bool isMemberAttribute);
 
 /// Expand the synthesized members for the given declaration based on
 /// the custom attribute that references the given macro.

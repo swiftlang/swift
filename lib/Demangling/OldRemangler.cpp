@@ -1089,6 +1089,14 @@ ManglingError Remangler::mangleMemberAttributeAttachedMacroExpansion(
   return mangleChildNodes(node, depth + 1);
 }
 
+ManglingError Remangler::mangleAttributeAttachedMacroExpansion(
+    Node *node, unsigned depth) {
+  // FIXME: is this right???
+  Buffer << "fMR";
+  RETURN_IF_ERROR(mangleIndex(node, depth + 1));
+  return mangleChildNodes(node, depth + 1);
+}
+
 ManglingError Remangler::mangleMemberAttachedMacroExpansion(
     Node *node, unsigned depth) {
   Buffer << "fMm";

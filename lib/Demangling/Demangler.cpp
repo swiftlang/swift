@@ -4100,6 +4100,12 @@ NodePointer Demangler::demangleMacroExpansion() {
     isFreestanding = false;
     break;
 
+  case 'R':
+    kind = Node::Kind::AttributeAttachedMacroExpansion;
+    isAttached = true;
+    isFreestanding = false;
+    break;
+
   case 'f':
     kind = Node::Kind::FreestandingMacroExpansion;
     isAttached = false;

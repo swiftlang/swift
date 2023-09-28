@@ -1814,6 +1814,18 @@ public struct VarValueMacro: DeclarationMacro, PeerMacro {
   }
 }
 
+public struct StandardAvailabilityMacro: AttributeMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    return [
+      "@available(macOS 99, iOS 99, tvOS 99, watchOS 99, *)"
+    ]
+  }
+}
+
 public struct SingleMemberMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,

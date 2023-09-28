@@ -519,12 +519,38 @@ ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
   SmallVector<unsigned, 2> bufferIDs;
   parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        if (auto bufferID = expandAttributes(attr, macro, decl))
+        if (auto bufferID = expandAttributes(attr, macro, decl,
+                                             /*isMemberAttribute=*/true))
           bufferIDs.push_back(*bufferID);
       });
 
   return parentDecl->getASTContext().AllocateCopy(bufferIDs);
 }
+
+ArrayRef<unsigned> ExpandAttributeMacros::evaluate(Evaluator &evaluator,
+                                                   Decl *decl) const {
+  if (decl->isImplicit())
+    return { };
+
+//  // Attribute macros do not apply to macro-expanded members.
+//  if (decl->isInMacroExpansionInContext())
+//    return { };
+//
+//  if (isa<PatternBindingDecl>(decl))
+//    return { };
+
+  SmallVector<unsigned, 2> bufferIDs;
+  decl->forEachAttachedMacro(MacroRole::Attribute,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        if (auto bufferID = expandAttributes(attr, macro, decl,
+                                             /*isMemberAttribute=*/false))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return decl->getASTContext().AllocateCopy(bufferIDs);
+}
+
+
 
 ArrayRef<unsigned> ExpandSynthesizedMemberMacroRequest::evaluate(
     Evaluator &evaluator, Decl *decl
@@ -585,6 +611,14 @@ bool swift::isInvalidAttachedMacro(MacroRole role,
   case MacroRole::Peer:
     // Peer macros are allowed on everything except parameters.
     if (!isa<ParamDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Attribute:
+    // FIXME: Do we need all of these? Are there any others?
+    if (!(isa<ImportDecl>(attachedTo) || isa<MacroDecl>(attachedTo) ||
+          isa<MacroExpansionDecl>(attachedTo) || isa<IfConfigDecl>(attachedTo)))
       return false;
 
     break;
@@ -787,6 +821,8 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
     return GeneratedSourceInfo::AccessorMacroExpansion;
   case MacroRole::MemberAttribute:
     return GeneratedSourceInfo::MemberAttributeMacroExpansion;
+  case MacroRole::Attribute:
+    return GeneratedSourceInfo::AttributeMacroExpansion;
   case MacroRole::Member:
     return GeneratedSourceInfo::MemberMacroExpansion;
   case MacroRole::Peer:
@@ -848,7 +884,8 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
       return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, endLoc), 0);
     }
   }
-  case MacroRole::MemberAttribute: {
+  case MacroRole::MemberAttribute:
+  case MacroRole::Attribute: {
     SourceLoc startLoc;
     if (auto valueDecl = dyn_cast<ValueDecl>(target.get<Decl *>()))
       startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -950,6 +987,7 @@ static uint8_t getRawMacroRole(MacroRole role) {
   // in ASTGen.
   case MacroRole::Conformance:
   case MacroRole::Extension: return 8;
+  case MacroRole::Attribute: return 9;
   }
 }
 
@@ -1524,11 +1562,14 @@ ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
 }
 
 llvm::Optional<unsigned>
-swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
+swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member,
+                        bool isMemberAttribute) {
   // Evaluate the macro.
   auto macroSourceFile = ::evaluateAttachedMacro(macro, member, attr,
-                                                 /*passParentContext=*/true,
-                                                 MacroRole::MemberAttribute);
+                                                 /*passParentContext=*/isMemberAttribute,
+                                                 isMemberAttribute ?
+                                                    MacroRole::MemberAttribute :
+                                                    MacroRole::Attribute);
   if (!macroSourceFile)
     return llvm::None;
 

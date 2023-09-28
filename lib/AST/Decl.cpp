@@ -381,6 +381,9 @@ DeclAttributes Decl::getSemanticAttrs() const {
   (void)evaluateOrDefault(getASTContext().evaluator,
                           ExpandMemberAttributeMacros{mutableThis},
                           { });
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ExpandAttributeMacros{mutableThis},
+                          { });
 
   return getAttrs();
 }
@@ -442,7 +445,11 @@ void Decl::visitAuxiliaryDecls(
 
 void Decl::forEachAttachedMacro(MacroRole role,
                                 MacroCallback macroCallback) const {
-  for (auto customAttrConst : getSemanticAttrs().getAttributes<CustomAttr>()) {
+  // Don't just cycle trying to expand the attributes so we can determine which
+  // attributes to expand.
+  const auto &attrs = role == MacroRole::Attribute ? getAttrs() : getSemanticAttrs();
+
+  for (auto customAttrConst : attrs.getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto *macroDecl = getResolvedMacro(customAttr);
 
@@ -10633,6 +10640,7 @@ std::vector<MacroRole> swift::getAllMacroRoles() {
       MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
       MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
       MacroRole::Conformance,     MacroRole::CodeItem,    MacroRole::Extension,
+      MacroRole::Attribute,
   };
 }
 
@@ -10664,6 +10672,9 @@ StringRef swift::getMacroRoleString(MacroRole role) {
 
   case MacroRole::Extension:
     return "extension";
+
+  case MacroRole::Attribute:
+    return "attribute";
   }
 }
 
@@ -10724,7 +10735,8 @@ static MacroRoles attachedMacroRoles = (MacroRoles() |
                                         MacroRole::Member |
                                         MacroRole::Peer |
                                         MacroRole::Conformance |
-                                        MacroRole::Extension);
+                                        MacroRole::Extension |
+                                        MacroRole::Attribute);
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -10752,6 +10764,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   case MacroRole::Peer:
   case MacroRole::Conformance:
   case MacroRole::Extension:
+  case MacroRole::Attribute:
     return true;
   case MacroRole::CodeItem:
     return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
@@ -10993,6 +11006,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
   case MacroRole::Accessor:
   case MacroRole::Conformance:
   case MacroRole::MemberAttribute:
+  case MacroRole::Attribute:
     break;
   }
 }
@@ -11201,6 +11215,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:

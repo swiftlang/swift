@@ -3901,6 +3901,7 @@ void ASTMangler::appendMacroExpansionContext(
 
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:
   case GeneratedSourceInfo::PeerMacroExpansion:
   case GeneratedSourceInfo::ConformanceMacroExpansion:
@@ -3916,6 +3917,10 @@ void ASTMangler::appendMacroExpansionContext(
 
     case GeneratedSourceInfo::MemberAttributeMacroExpansion:
       role = MacroRole::MemberAttribute;
+      break;
+
+    case GeneratedSourceInfo::AttributeMacroExpansion:
+      role = MacroRole::Attribute;
       break;
 
     case GeneratedSourceInfo::MemberMacroExpansion:
@@ -3985,6 +3990,11 @@ void ASTMangler::appendMacroExpansionOperator(
 
   case MacroRole::MemberAttribute:
     appendOperator("fMr", Index(discriminator));
+    break;
+
+  case MacroRole::Attribute:
+    // FIXME: Is this actually okay?
+    appendOperator("fMR", Index(discriminator));
     break;
 
   case MacroRole::Member:

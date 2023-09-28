@@ -633,6 +633,7 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
 
   switch (kind) {
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+  case GeneratedSourceInfo::AttributeMacroExpansion:
     // Attributes are added to the beginning, add a space to separate from
     // any existing.
     scratch += expandedCode;
