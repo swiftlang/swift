@@ -33,9 +33,9 @@ public class AddressOnlySetter {
 
     // CHECK: [[E2:%.*]] = alloc_stack $AddressOnlyEnum
     // CHECK-NEXT: inject_enum_addr [[E2]] : $*AddressOnlyEnum, #AddressOnlyEnum.some!enumelt
-    // CHECK: [[S:%.*]] = partial_apply [callee_guaranteed] {{%.*}}({{%.*}}) : $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
+    // CHECK: [[S:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}({{%.*}}) : $@convention(method) (@in AddressOnlyEnum, @guaranteed AddressOnlySetter) -> ()
     // CHECK: assign_by_wrapper [[E2]] : $*AddressOnlyEnum
-    // CHECK-SAME: set [[S]] : $@callee_guaranteed (@in AddressOnlyEnum) -> ()
+    // CHECK-SAME: set [[S]] : $@noescape @callee_guaranteed (@in AddressOnlyEnum) -> ()
     self.value = .some
   }
 
@@ -60,7 +60,7 @@ extension SubstitutedSetter where T == Bool {
     // CHECK: [[B:%.*]] = alloc_stack $Bool
     // CHECK: assign_by_wrapper [[B]] : $*Bool to [[W]] : $*WrapGod<Bool>
     // CHECK-SAME: init {{%.*}} : $@callee_guaranteed (@in Bool) -> @out WrapGod<Bool>
-    // CHECK-SAME: set {{%.*}} : $@callee_guaranteed (@in Bool) -> ()
+    // CHECK-SAME: set {{%.*}} : $@noescape @callee_guaranteed (@in Bool) -> ()
     self.value = true
   }
 }
@@ -96,7 +96,7 @@ extension ObjectifiedSetter where T == SomeObject {
     // CHECK: [[STORAGE:%.*]] = struct_element_addr {{%.*}} : $*ObjectifiedSetter<SomeObject>, #ObjectifiedSetter._value
     // CHECK: assign_by_wrapper [[OBJ]] : $SomeObject to [[STORAGE]] : $*WrapGod<SomeObject>
     // CHECK-SAME: init {{%.*}} : $@callee_guaranteed (@owned SomeObject) -> @out WrapGod<SomeObject>
-    // CHECK-SAME: set {{%.*}} : $@callee_guaranteed (@owned SomeObject) -> ()
+    // CHECK-SAME: set {{%.*}} : $@noescape @callee_guaranteed (@owned SomeObject) -> ()
     self.value = SomeObject()
   }
 }
