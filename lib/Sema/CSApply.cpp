@@ -881,7 +881,7 @@ namespace {
       resultTy = cs.getType(result);
       if (resultTy->hasOpenedExistentialWithRoot(record.Archetype)) {
         Type erasedTy = resultTy->typeEraseOpenedArchetypesWithRoot(
-            record.Archetype, dc);
+            record.Archetype, dc)->getRValueType();
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
