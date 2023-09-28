@@ -548,8 +548,8 @@ void ModuleDependencyScanner::resolveImportDependencies(
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
   auto scanForModuleDependency = [this, &cache, &moduleLookupResult](
-                                     StringRef moduleName, bool onlyClangModule,
-                                     bool isTestable) {
+                                  StringRef moduleName, bool onlyClangModule,
+                                  bool isTestable) {
     // If this is already in the cache, no work to do here
     if (onlyClangModule) {
       if (cache.hasDependency(moduleName, ModuleDependencyKind::Clang))
@@ -587,9 +587,10 @@ void ModuleDependencyScanner::resolveImportDependencies(
   }
   ScanningThreadPool.wait();
 
+  std::vector<std::string> unresolvedImports;
   // Aggregate both previously-cached and freshly-scanned module results
   auto recordResolvedModuleImport =
-      [this, &cache, &moduleLookupResult, &directDependencies,
+      [&cache, &moduleLookupResult, &unresolvedImports, &directDependencies,
        moduleID](const std::string &moduleName, bool optionalImport) {
         bool underlyingClangModule = moduleID.ModuleName == moduleName;
         auto lookupResult = moduleLookupResult[moduleName];
@@ -606,19 +607,56 @@ void ModuleDependencyScanner::resolveImportDependencies(
           directDependencies.insert({moduleName, cachedInfo->getKind()});
         } else {
           // Cache discovered module dependencies.
-          cache.recordDependencies(lookupResult.value());
-          if (!lookupResult.value().empty())
+          if (!lookupResult.value().empty()) {
+            cache.recordDependencies(lookupResult.value());
             directDependencies.insert(
                 {moduleName, lookupResult.value()[0].first.Kind});
-          else if (!optionalImport)
-            diagnoseScannerFailure(moduleName, Diagnostics, cache, moduleID);
+          } else if (!optionalImport) {
+            // Otherwise, we failed to resolve this dependency. We will try
+            // again using the cache after all other imports have been resolved.
+            // If that fails too, a scanning failure will be diagnosed.
+            unresolvedImports.push_back(moduleName);
+          }
         }
       };
-  for (const auto &dependsOn : moduleDependencyInfo->getModuleImports())
-    recordResolvedModuleImport(dependsOn, false);
-  for (const auto &optionallyDependsOn :
-       moduleDependencyInfo->getOptionalModuleImports())
-    recordResolvedModuleImport(optionallyDependsOn, true);
+  for (const auto &import : moduleDependencyInfo->getModuleImports())
+    recordResolvedModuleImport(import, /* optionalImport */ false);
+  for (const auto &import : moduleDependencyInfo->getOptionalModuleImports())
+    recordResolvedModuleImport(import, /* optionalImport */ true);
+
+  // It is possible that import resolution failed because we are attempting to
+  // resolve a module which can only be brought in via a modulemap of a
+  // different Clang module dependency which is not otherwise on the current
+  // search paths. For example, suppose we are scanning a `.swiftinterface` for
+  // module `Foo`, which contains:
+  // -----
+  // @_exported import Foo
+  // import Bar
+  // ...
+  // -----
+  // Where `Foo` is the underlying Framework clang module whose .modulemap
+  // defines an auxiliary module `Bar`. Because Foo is a framework, its
+  // modulemap is under
+  // `<some_framework_search_path>/Foo.framework/Modules/module.modulemap`.
+  // Which means that lookup of `Bar` alone from Swift will not be able to
+  // locate the module in it. However, the lookup of Foo will itself bring in
+  // the auxiliary module becuase the Clang scanner instance scanning for clang
+  // module Foo will be able to find it in the corresponding framework module's
+  // modulemap and register it as a dependency which means it will be registered
+  // with the scanner's cache in the step above. To handle such cases, we
+  // first add all successfully-resolved modules and (for Clang modules) their
+  // transitive dependencies to the cache, and then attempt to re-query imports
+  // for which resolution originally failed from the cache. If this fails, then
+  // the scanner genuinely failed to resolve this dependency.
+  for (const auto &moduleName : unresolvedImports) {
+    auto optionalCachedModuleInfo =
+      cache.findDependency({moduleName, ModuleDependencyKind::Clang});
+    if (optionalCachedModuleInfo.has_value())
+      directDependencies.insert(
+          {moduleName, optionalCachedModuleInfo.value()->getKind()});
+    else
+      diagnoseScannerFailure(moduleName, Diagnostics, cache, moduleID);
+  }
 }
 
 void ModuleDependencyScanner::resolveBridgingHeaderDependencies(
