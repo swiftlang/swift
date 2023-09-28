@@ -60,12 +60,14 @@ class TestRunner : public SILFunctionTransform {
       : public test::FunctionTest::Dependencies {
     TestRunner *pass;
     SILFunction *function;
+    SwiftPassInvocation invocation;
     FunctionTestDependenciesImpl(TestRunner *pass, SILFunction *function)
-        : pass(pass), function(function) {}
+        : pass(pass), function(function), invocation(pass->getPassManager()) {}
     DominanceInfo *getDominanceInfo() override {
       auto *dominanceAnalysis = pass->getAnalysis<DominanceAnalysis>();
       return dominanceAnalysis->get(function);
     }
+    SwiftPassInvocation *getInvocation() override { return &invocation; }
     SILPassManager *getPassManager() override { return pass->getPassManager(); }
     ~FunctionTestDependenciesImpl() {}
   };

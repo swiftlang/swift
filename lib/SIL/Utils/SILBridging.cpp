@@ -10,15 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/BridgingUtils.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/SIL/SILNode.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILBridging.h"
-#include "swift/SIL/SILGlobalVariable.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/ParseTestSpecification.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILNode.h"
+#include "swift/SIL/Test.h"
 #include <string>
 
 using namespace swift;
@@ -125,6 +127,56 @@ void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
     abort();
   }
   nodeMetatypes[(unsigned)kind] = metatype;
+}
+
+//===----------------------------------------------------------------------===//
+//                                Test
+//===----------------------------------------------------------------------===//
+
+void registerFunctionTest(llvm::StringRef name,
+                          BridgedFunctionTestThunk thunk) {
+  new swift::test::FunctionTest(
+      name, reinterpret_cast<void *>(thunk),
+      [](auto &function, auto &args, auto &test, void *ctx) {
+        auto thunk = reinterpret_cast<BridgedFunctionTestThunk>(ctx);
+        thunk({&function}, {&args}, test.getContext());
+      });
+}
+
+bool BridgedTestArguments::hasUntaken() const {
+  return arguments->hasUntaken();
+}
+
+llvm::StringRef BridgedTestArguments::takeString() const {
+  return arguments->takeString();
+}
+
+bool BridgedTestArguments::takeBool() const { return arguments->takeBool(); }
+
+SwiftInt BridgedTestArguments::takeInt() const { return arguments->takeUInt(); }
+
+BridgedOperand BridgedTestArguments::takeOperand() const {
+  return {arguments->takeOperand()};
+}
+
+BridgedValue BridgedTestArguments::takeValue() const {
+  return {arguments->takeValue()};
+}
+
+BridgedInstruction BridgedTestArguments::takeInstruction() const {
+  return {arguments->takeInstruction()->asSILNode()};
+}
+
+BridgedArgument BridgedTestArguments::takeArgument() const {
+  return {arguments->takeBlockArgument()};
+}
+
+BridgedBasicBlock BridgedTestArguments::takeBlock() const {
+  return {arguments->takeBlock()};
+}
+
+BridgedFunction BridgedTestArguments::takeFunction() const {
+  return {arguments->takeFunction()};
 }
 
 //===----------------------------------------------------------------------===//

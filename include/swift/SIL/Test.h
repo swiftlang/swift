@@ -98,6 +98,7 @@
 #define SWIFT_SIL_TEST_H
 
 #include "swift/SIL/ParseTestSpecification.h"
+#include "swift/SIL/SILBridging.h"
 
 namespace swift {
 
@@ -129,9 +130,12 @@ public:
   ///                    values such as the results of analyses
   using Invocation = void (*)(SILFunction &, Arguments &, FunctionTest &);
 
+  using InvocationWithContext = void (*)(SILFunction &, Arguments &,
+                                         FunctionTest &, void *);
+
 private:
   /// The lambda to be run.
-  Invocation invocation;
+  TaggedUnion<Invocation, std::pair<InvocationWithContext, void *>> invocation;
 
 public:
   /// Creates a test that will run \p invocation and stores it in the global
@@ -147,6 +151,8 @@ public:
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
+  FunctionTest(StringRef name, void *context, InvocationWithContext invocation);
+
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
 
@@ -160,6 +166,8 @@ public:
   ///       depend on it.  See `Layering` below for more details.
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
+
+  BridgedTestContext getContext();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -239,6 +247,7 @@ private:
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual SILPassManager *getPassManager() = 0;
+    virtual SwiftPassInvocation *getInvocation() = 0;
     virtual ~Dependencies(){};
   };
 
