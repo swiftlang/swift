@@ -4,7 +4,7 @@ import CBasicBridging
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
 // Needed to use BumpPtrAllocator
-@_spi(RawSyntax)
+@_spi(BumpPtrAllocator) // Update the import statement here
 import SwiftSyntax
 import struct SwiftDiagnostics.Diagnostic
 
