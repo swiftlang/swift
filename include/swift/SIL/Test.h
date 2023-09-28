@@ -98,7 +98,6 @@
 #define SWIFT_SIL_TEST_H
 
 #include "swift/SIL/ParseTestSpecification.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
 
 namespace swift {
 
@@ -128,8 +127,7 @@ public:
   /// - Arguments & - the resolved list of args specified by the instruction
   /// - FunctionTest & - the test being run; used to find less commonly used
   ///                    values such as the results of analyses
-  using Invocation =
-      llvm::function_ref<void(SILFunction &, Arguments &, FunctionTest &)>;
+  using Invocation = void (*)(SILFunction &, Arguments &, FunctionTest &);
 
 private:
   /// The lambda to be run.
