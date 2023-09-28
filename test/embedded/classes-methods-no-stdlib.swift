@@ -9,7 +9,7 @@ public class MySubClass: MyClass {
   override func foo() { }
 }
 
-// CHECK: @"$s4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfD", ptr @"$s4main7MyClassC3fooyyF", ptr @"$s4main7MyClassC3baryyF", ptr @"$s4main7MyClassCACycfC" }>
+// CHECK: @"$s4main7MyClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr }> <{ ptr null, ptr @"$s4main7MyClassCfD", ptr @"$s4main7MyClassC3fooyyF", ptr @"$s4main7MyClassC3baryyF", ptr @swift_deletedMethodError }>
 // CHECK: @"$s4main10MySubClassCN" = {{.*}}<{ ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$s4main7MyClassCN", ptr @"$s4main10MySubClassCfD", ptr @"$s4main10MySubClassC3fooyyF", ptr @"$s4main7MyClassC3baryyF", ptr @"$s4main10MySubClassCACycfC" }>
 
 // CHECK: define {{.*}}void @"$s4main4test1xyAA7MyClassC_tF"(ptr %0)

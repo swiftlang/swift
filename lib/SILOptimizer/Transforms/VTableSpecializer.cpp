@@ -43,7 +43,7 @@ class VTableSpecializer : public SILModuleTransform {
   void run() override {
     SILModule &module = *getModule();
 
-    if (!module.getASTContext().LangOpts.hasFeature(Feature::Embedded)) return;
+    if (!module.getOptions().EmbeddedSwift) return;
 
     LLVM_DEBUG(llvm::dbgs() << "***** VTableSpecializer\n");
 

@@ -1044,6 +1044,13 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // constant folded before any generic specialization.
   P.addLateOnoneSimplification();
 
+  if (Options.EmbeddedSwift) {
+    // For embedded Swift: Remove all unspecialized functions. This is important
+    // to avoid having debuginfo references to these functions that we don't
+    // want to emit in IRGen.
+    P.addLateDeadFunctionAndGlobalElimination();
+  }
+
   P.addCleanupDebugSteps();
 
   // Has only an effect if the -sil-based-debuginfo option is specified.
