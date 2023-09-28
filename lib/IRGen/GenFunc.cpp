@@ -1118,6 +1118,10 @@ public:
   void forwardErrorResult() override {
     llvm::Value *errorResultPtr = origParams.claimNext();
     args.add(errorResultPtr);
+    if (origConv.isTypedError()) {
+      auto *typedErrorResultPtr = origParams.claimNext();
+      args.add(typedErrorResultPtr);
+    }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
     return subIGF.Builder.CreateCall(fnPtr, args.claimAll());
@@ -1289,8 +1293,12 @@ public:
   }
 
   void forwardErrorResult() override {
-    // Nothing to do here.  The error result pointer is already in the
-    // appropriate position.
+    // The error result pointer is already in the appropriate position but the
+    // type error address is not.
+    if (origConv.isTypedError()) {
+      auto *typedErrorResultPtr = origParams.claimNext();
+      args.add(typedErrorResultPtr);
+    }
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
     PointerAuthInfo newAuthInfo =

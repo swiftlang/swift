@@ -90,7 +90,7 @@ public:
 
   friend class Scope;
 
-  Address createErrorResultSlot(SILType errorType, bool isAsync);
+  Address createErrorResultSlot(SILType errorType, bool isAsync, bool setSwiftErrorFlag = true, bool isTypedError = false);
 
   //--- Function prologue and epilogue
   //-------------------------------------------
@@ -122,14 +122,19 @@ public:
   ///
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
-  Address getCalleeErrorResultSlot(SILType errorType);
-  Address getAsyncCalleeErrorResultSlot(SILType errorType);
+  Address getCalleeErrorResultSlot(SILType errorType,
+                                   bool isTypedError);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
 
   /// Set the error result slot for the current function.
   void setCallerErrorResultSlot(Address address);
+  /// Set the error result slot for a typed throw for the current function.
+  void setCallerTypedErrorResultSlot(Address address);
+
+  Address getCallerTypedErrorResultSlot();
+  Address getCalleeTypedErrorResultSlot(SILType errorType);
 
   /// Are we currently emitting a coroutine?
   bool isCoroutine() {
@@ -198,6 +203,8 @@ private:
   Address CalleeErrorResultSlot;
   Address AsyncCalleeErrorResultSlot;
   Address CallerErrorResultSlot;
+  Address CallerTypedErrorResultSlot;
+  Address CalleeTypedErrorResultSlot;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
