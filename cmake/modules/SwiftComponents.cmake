@@ -65,11 +65,12 @@
 # * toolchain-tools -- a subset of tools that we will install to the OSS toolchain.
 # * testsuite-tools -- extra tools required to run the Swift testsuite.
 # * static-mirror-lib -- Build the static mirror library used by SwiftStaticMirror.
+# * swift-syntax-lib -- install swift-syntax libraries
 # * toolchain-dev-tools -- install development tools useful in a shared toolchain
 # * llvm-toolchain-dev-tools -- install LLVM development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;swift-syntax-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -95,6 +96,12 @@ macro(swift_configure_components)
   # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
   set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFAULT_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
+
+  # 'compiler' depends on 'swift-syntax-lib' component.
+  if ("compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
+      NOT "swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
+    list(APPEND SWIFT_INSTALL_COMPONENTS "swift-syntax-lib")
+  endif()
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
     add_custom_target(${component})
