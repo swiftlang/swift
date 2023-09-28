@@ -2368,7 +2368,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x3);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x07);
     bool noNestedConflict = (Attr >> 4) & 0x01;
     bool fromBuiltin = (Attr >> 5) & 0x01;
     ResultInst = Builder.createBeginAccess(Loc, op, accessKind, enforcement,
@@ -2410,7 +2410,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID2, getSILType(MF->getType(TyID2),
                                          (SILValueCategory)TyCategory2, Fn));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x03);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x07);
     bool noNestedConflict = (Attr >> 4) & 0x01;
     bool fromBuiltin = (Attr >> 5) & 0x01;
     ResultInst = Builder.createBeginUnpairedAccess(
@@ -2422,7 +2422,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
     bool aborted = Attr & 0x1;
-    auto enforcement = SILAccessEnforcement((Attr >> 1) & 0x03);
+    auto enforcement = SILAccessEnforcement((Attr >> 1) & 0x07);
     bool fromBuiltin = (Attr >> 3) & 0x01;
     ResultInst = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                  fromBuiltin);
