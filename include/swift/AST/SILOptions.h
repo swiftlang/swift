@@ -276,6 +276,9 @@ public:
   /// is a single SILModule in a single thread.
   bool checkSILModuleLeaks = false;
 
+  /// Are we building in embedded Swift mode?
+  bool EmbeddedSwift = false;
+
   /// The name of the file to which the backend should save optimization
   /// records.
   std::string OptRecordFile;

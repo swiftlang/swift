@@ -354,7 +354,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
-  if (module.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+  if (module.getOptions().EmbeddedSwift &&
       impact & RuntimeEffect::Existential) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     diagnose(loc, diag::performance_metadata, "existential");
@@ -507,7 +507,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
 void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
-      if (function->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+      if (function->getModule().getOptions().EmbeddedSwift) {
         auto loc = LocWithParent(inst.getLoc().getSourceLoc(), nullptr);
         visitInst(&inst, PerformanceConstraints::None, &loc);
       }
@@ -607,8 +607,7 @@ private:
       }
     }
 
-    if (!annotatedFunctionsFound &&
-        !getModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    if (!annotatedFunctionsFound && !getModule()->getOptions().EmbeddedSwift)
       return;
 
     for (SILFunction &function : *module) {
@@ -616,8 +615,9 @@ private:
       if (function.wasDeserializedCanonical())
         continue;
 
-      // Don't check generic functions, they're about to be removed anyway.
-      if (getModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      // Don't check generic functions in embedded Swift, they're about to be
+      // removed anyway.
+      if (getModule()->getOptions().EmbeddedSwift &&
           function.getLoweredFunctionType()->getSubstGenericSignature())
         continue;
 

@@ -39,7 +39,7 @@ public:
 
     // In embedded Swift, the stdlib contains all the runtime functions needed
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
-    if (M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (M.getOptions().EmbeddedSwift) {
       linkEmbeddedRuntimeFromStdlib();
     }
   }
