@@ -80,6 +80,13 @@ public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>,
   free(object)
 }
 
+@_silgen_name("swift_initStaticObject")
+public func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
+  object.pointee.metadata = metadata
+  object.pointee.refcount = HeapObject.immortalRefCount
+  return object
+}
+
 @_silgen_name("swift_initStackObject")
 public func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   object.pointee.metadata = metadata
