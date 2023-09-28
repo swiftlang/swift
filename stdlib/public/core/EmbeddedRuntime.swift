@@ -128,6 +128,8 @@ public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
   o.pointee.refcount -= Int(n)
   if (o.pointee.refcount & HeapObject.refcountMask) == 0 {
     _swift_embedded_invoke_heap_object_destroy(o)
+  } else if (o.pointee.refcount & HeapObject.refcountMask) < 0 {
+    fatalError("negative refcount")
   }
 }
 
