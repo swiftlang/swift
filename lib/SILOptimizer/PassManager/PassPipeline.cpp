@@ -967,6 +967,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
 
+  // For embedded Swift: We need to re-run VTableSpecializer in case the
+  // performance inliner and specializer ended up discovering new generic
+  // classes.
+  if (Options.EmbeddedSwift) {
+    P.addVTableSpecializer();
+  }
+
   // Run another iteration of the SSA optimizations to optimize the
   // devirtualized inline caches and constants propagated into closures
   // (CapturePropagation).
