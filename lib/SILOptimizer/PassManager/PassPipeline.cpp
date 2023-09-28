@@ -412,16 +412,6 @@ void addHighLevelOSSAFunctionPasses(SILPassPipelinePlan &P) {
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
 
-  if (P.getOptions().EnableOSSAModules) {
-    return;
-  }
-  if (SILPrintFinalOSSAModule) {
-    addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
-  }
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-}
-
-void addHighLevelNonOSSAFunctionPasses(SILPassPipelinePlan &P) {
   addSimplifyCFGSILCombinePasses(P);
 
   P.addArrayElementPropagation();
@@ -434,28 +424,33 @@ void addHighLevelNonOSSAFunctionPasses(SILPassPipelinePlan &P) {
   // Run devirtualizer after the specializer, because many
   // class_method/witness_method instructions may use concrete types now.
   P.addDevirtualizer();
-  P.addARCSequenceOpts();
 
-  if (P.getOptions().EnableOSSAModules) {
-    // We earlier eliminated ownership if we are not compiling the stdlib. Now
-    // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
-    }
-    P.addSemanticARCOpts();
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
   }
+  P.addSemanticARCOpts();
 
   // Does not inline functions with defined semantics or effects.
   P.addEarlyPerfInliner();
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
-  if (P.getOptions().EnableOSSAModules) {
-    if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
-      P.addCopyPropagation();
-    }
-    P.addSemanticARCOpts();
+  if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
+    P.addCopyPropagation();
   }
+  P.addSemanticARCOpts();
 
+  if (P.getOptions().EnableOSSAModules) {
+    return;
+  }
+  if (SILPrintFinalOSSAModule) {
+    addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+  }
+  P.addNonTransparentFunctionOwnershipModelEliminator();
+}
+
+void addHighLevelNonOSSAFunctionPasses(SILPassPipelinePlan &P) {
   // Promote stack allocations to values and eliminate redundant
   // loads.
   P.addMem2Reg();
