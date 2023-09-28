@@ -148,4 +148,72 @@ private func registerFunctionTest(
 }
 
 public func registerSILTests() {
+  registerFunctionTest(parseTestSpecificationTest, implementation: { parseTestSpecificationTest.run($0, $1, $2) })
 }
+
+// Arguments:
+// - string: list of characters, each of which specifies subsequent arguments
+//           - A: (block) argument
+//           - F: function
+//           - B: block
+//           - I: instruction
+//           - V: value
+//           - O: operand
+//           - b: boolean
+//           - u: unsigned
+//           - s: string
+// - ...
+// - an argument of the type specified in the initial string
+// - ...
+// Dumps:
+// - for each argument (after the initial string)
+//   - its type
+//   - something to identify the instance (mostly this means calling dump)
+let parseTestSpecificationTest = 
+FunctionTest(name: "test_specification_parsing") { function, arguments, context in 
+  struct _Stderr : TextOutputStream {
+    public init() {}
+
+    public mutating func write(_ string: String) {
+      for c in string.utf8 {
+        _swift_stdlib_putc_stderr(CInt(c))
+      }
+    }
+  }
+  var stderr = _Stderr()
+  let expectedFields = arguments.takeString()
+  for expectedField in expectedFields.string {
+    switch expectedField {
+    case "A":
+      let argument = arguments.takeArgument()
+      print("argument:\n\(argument)", to: &stderr)
+    case "F":
+      let function = arguments.takeFunction()
+      print("function: \(function.name)", to: &stderr)
+    case "B":
+      let block = arguments.takeBlock()
+      print("block:\n\(block)", to: &stderr)
+    case "I":
+      let instruction = arguments.takeInstruction()
+      print("instruction: \(instruction)", to: &stderr)
+    case "V":
+      let value = arguments.takeValue()
+      print("value: \(value)", to: &stderr)
+    case "O":
+      let operand = arguments.takeOperand()
+      print("operand: \(operand)", to: &stderr)
+    case "u":
+      let u = arguments.takeInt()
+      print("uint: \(u)", to: &stderr)
+    case "b":
+      let b = arguments.takeBool()
+      print("bool: \(b)", to: &stderr)
+    case "s":
+      let s = arguments.takeString()
+      print("string: \(s)", to: &stderr)
+    default:
+      fatalError("unknown field type was expected?!");
+    }
+  }
+}
+
