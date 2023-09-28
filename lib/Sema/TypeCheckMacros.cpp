@@ -540,12 +540,23 @@ ArrayRef<unsigned> ExpandAttributeMacros::evaluate(Evaluator &evaluator,
 //    return { };
 
   SmallVector<unsigned, 2> bufferIDs;
-  decl->forEachAttachedMacro(MacroRole::Attribute,
-      [&](CustomAttr *attr, MacroDecl *macro) {
-        if (auto bufferID = expandAttributes(attr, macro, decl,
-                                             /*isMemberAttribute=*/false))
-          bufferIDs.push_back(*bufferID);
-      });
+
+  // Repeatedly expand attributes so that Expanded (i.e. non-External) macros
+  // are processed correctly.
+  SmallSetVector<CustomAttr *, 4> seenAttrs;
+  size_t prevSeenAttrsCount = 0;
+  do {
+    prevSeenAttrsCount = seenAttrs.size();
+    decl->forEachAttachedMacro(MacroRole::Attribute,
+        [&](CustomAttr *attr, MacroDecl *macro) {
+          if (!seenAttrs.insert(attr))
+            return;
+
+          if (auto bufferID = expandAttributes(attr, macro, decl,
+                                               /*isMemberAttribute=*/false))
+            bufferIDs.push_back(*bufferID);
+        });
+  } while (prevSeenAttrsCount < seenAttrs.size());
 
   return decl->getASTContext().AllocateCopy(bufferIDs);
 }
@@ -779,13 +790,23 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
 
 /// Expand a macro definition.
 static std::string expandMacroDefinition(
-    ExpandedMacroDefinition def, MacroDecl *macro, ArgumentList *args) {
+    ExpandedMacroDefinition def, MacroDecl *macro, ArgumentList *args,
+    MacroRole role) {
   ASTContext &ctx = macro->getASTContext();
 
   std::string expandedResult;
 
   StringRef originalText = def.getExpansionText();
   unsigned startIdx = 0;
+
+  // The definition of an attached macro uses # even though it actually ought
+  // to expand with @.
+  if (isAttachedMacro(role)) {
+    assert(originalText.startswith("#"));
+    expandedResult.push_back('@');
+    startIdx = 1;
+  }
+
   for (const auto replacement: def.getReplacements()) {
     // Add the original text up to the first replacement.
     expandedResult.append(
@@ -1057,7 +1078,7 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(macroDef.getExpanded(), macro,
-                                        expansion->getArgs());
+                                        expansion->getArgs(), macroRole);
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
     break;
@@ -1319,7 +1340,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
-        macroDef.getExpanded(), macro, attr->getArgs());
+        macroDef.getExpanded(), macro, attr->getArgs(), role);
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
         result, adjustMacroExpansionBufferName(*discriminator));
     break;

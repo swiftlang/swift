@@ -12,6 +12,7 @@
 
 add_swift_macro_library(SwiftMacros
   OptionSetMacro.swift
+  FixedAttributesMacro.swift
   SWIFT_DEPENDENCIES
     SwiftSyntax::SwiftDiagnostics
     SwiftSyntax::SwiftSyntax
