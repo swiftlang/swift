@@ -93,6 +93,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SIL_TEST_H
+#define SWIFT_SIL_TEST_H
+
 #include "swift/SIL/ParseTestSpecification.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 
@@ -282,3 +285,5 @@ Analysis *FunctionTest::getAnalysis() {
 }
 } // namespace test
 } // namespace swift
+
+#endif
