@@ -64,6 +64,7 @@
 #include "clang/Parse/Parser.h"
 #include "clang/Rewrite/Frontend/FrontendActions.h"
 #include "clang/Rewrite/Frontend/Rewriters.h"
+#include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
@@ -4762,26 +4763,164 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   return pointeePropertyRefExpr;
 }
 
-// For const methods generate the following:
-//   %0 = __swift_interopStaticCast<Base>(self)
-//   return %0.fn(args...)
-// For mutating methods we have to pass self as a pointer:
-//   %0 = Builtin.addressof(&self)
-//   %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
-//   %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
-//   %3 = %2!
-//   %4 = %3.pointee
-//   return %4.fn(args...)
+// Synthesize a C++ method that invokes the method from the base
+// class. This lets Clang take care of the cast from the derived class
+// to the base class during the invocation of the method.
+static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
+    ClangImporter &impl, const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method) {
+  auto &clangCtx = impl.getClangASTContext();
+  auto &clangSema = impl.getClangSema();
+
+  // Create a new method in the derived class that calls the base method.
+  auto name = method->getNameInfo().getName();
+  if (name.isIdentifier()) {
+    std::string newName;
+    llvm::raw_string_ostream os(newName);
+    os << "__synthesizedBaseCall_" << name.getAsIdentifierInfo()->getName();
+    name = clang::DeclarationName(
+        &impl.getClangPreprocessor().getIdentifierTable().get(os.str()));
+  }
+  auto newMethod = clang::CXXMethodDecl::Create(
+      clangCtx, const_cast<clang::CXXRecordDecl *>(derivedClass),
+      method->getSourceRange().getBegin(),
+      clang::DeclarationNameInfo(name, clang::SourceLocation()),
+      method->getType(), method->getTypeSourceInfo(), method->getStorageClass(),
+      method->UsesFPIntrin(), /*isInline=*/true, method->getConstexprKind(),
+      method->getSourceRange().getEnd());
+  newMethod->setImplicit();
+  newMethod->setImplicitlyInline();
+  newMethod->setAccess(clang::AccessSpecifier::AS_public);
+
+  llvm::SmallVector<clang::ParmVarDecl *, 4> params;
+  for (size_t i = 0; i < method->getNumParams(); ++i) {
+    const auto &param = *method->getParamDecl(i);
+    params.push_back(clang::ParmVarDecl::Create(
+        clangCtx, newMethod, param.getSourceRange().getBegin(),
+        param.getLocation(), param.getIdentifier(), param.getType(),
+        param.getTypeSourceInfo(), param.getStorageClass(),
+        /*DefExpr=*/nullptr));
+  }
+  newMethod->setParams(params);
+
+  // Create a new Clang diagnostic pool to capture any diagnostics
+  // emitted during the construction of the method.
+  clang::sema::DelayedDiagnosticPool diagPool{
+      clangSema.DelayedDiagnostics.getCurrentPool()};
+  auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
+
+  // Construct the method's body.
+  auto *thisExpr = new (clangCtx) clang::CXXThisExpr(
+      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
+  auto memberExpr = clangSema.BuildMemberExpr(
+      thisExpr, /*isArrow=*/true, clang::SourceLocation(),
+      clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+      const_cast<clang::CXXMethodDecl *>(method),
+      clang::DeclAccessPair::make(const_cast<clang::CXXMethodDecl *>(method),
+                                  clang::AS_public),
+      /*HadMultipleCandidates=*/false, method->getNameInfo(),
+      clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+  llvm::SmallVector<clang::Expr *, 4> args;
+  for (size_t i = 0; i < newMethod->getNumParams(); ++i) {
+    auto *param = newMethod->getParamDecl(i);
+    auto type = param->getType();
+    if (type->isReferenceType())
+      type = type->getPointeeType();
+    args.push_back(new (clangCtx) clang::DeclRefExpr(
+        clangCtx, param, false, type, clang::ExprValueKind::VK_LValue,
+        clang::SourceLocation()));
+  }
+  auto memberCall = clangSema.BuildCallToMemberFunction(
+      nullptr, memberExpr, clang::SourceLocation(), args,
+      clang::SourceLocation());
+  if (!memberCall.isUsable())
+    return nullptr;
+  auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
+                                              memberCall.get(), nullptr);
+
+  // Check if there were any Clang errors during the construction
+  // of the method body.
+  clangSema.DelayedDiagnostics.popWithoutEmitting(diagState);
+  if (!diagPool.empty())
+    return nullptr;
+
+  newMethod->setBody(returnStmt);
+  return newMethod;
+}
+
+// Find the base C++ method called by the base function we want to synthesize
+// the derived thunk for.
+// The base C++ method is either the original C++ method that corresponds
+// to the imported base member, or it's the synthesized C++ method thunk
+// used in another synthesized derived thunk that acts as a base member here.
+const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
+  if (baseMember->getClangDecl())
+    return dyn_cast<clang::CXXMethodDecl>(baseMember->getClangDecl());
+  // Another synthesized derived thunk is used as a base member here,
+  // so extract its synthesized C++ method.
+  auto body = baseMember->getBody();
+  if (body->getElements().empty())
+    return nullptr;
+  ReturnStmt *returnStmt = dyn_cast_or_null<ReturnStmt>(
+      body->getElements().front().dyn_cast<Stmt *>());
+  if (!returnStmt)
+    return nullptr;
+  auto *callExpr = dyn_cast<CallExpr>(returnStmt->getResult());
+  if (!callExpr)
+    return nullptr;
+  auto *cv = callExpr->getCalledValue();
+  if (!cv)
+    return nullptr;
+  if (!cv->getClangDecl())
+    return nullptr;
+  return dyn_cast<clang::CXXMethodDecl>(cv->getClangDecl());
+}
+
+// Construct a Swift method that represents the synthesized C++ method
+// that invokes the base C++ method.
+FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl, ASTContext &ctx,
+                                         NominalTypeDecl *derivedStruct,
+                                         NominalTypeDecl *baseStruct,
+                                         FuncDecl *baseMember) {
+  auto *cxxMethod = getCalledBaseCxxMethod(baseMember);
+  if (!cxxMethod)
+    return nullptr;
+  auto *newClangMethod = synthesizeCxxBaseMethod(
+      impl, cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
+      cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), cxxMethod);
+  if (!newClangMethod)
+    return nullptr;
+  return cast<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(newClangMethod));
+}
+
+// Generates the body of a derived method, that invokes the base
+// method.
+// The method's body takes the following form:
+//   return self.__synthesizedBaseCall_fn(args...)
 static std::pair<BraceStmt *, bool>
 synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
+
   ASTContext &ctx = afd->getASTContext();
 
   auto funcDecl = cast<FuncDecl>(afd);
   auto derivedStruct =
       cast<NominalTypeDecl>(funcDecl->getDeclContext()->getAsDecl());
   auto baseMember = static_cast<FuncDecl *>(context);
-  auto baseStruct = cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
+  auto baseStruct =
+      cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
   auto baseType = baseStruct->getDeclaredType();
+
+  auto forwardedFunc = synthesizeBaseFunctionDeclCall(
+      *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), ctx,
+      derivedStruct, baseStruct, baseMember);
+  if (!forwardedFunc) {
+    ctx.Diags.diagnose(SourceLoc(), diag::failed_base_method_call_synthesis,
+                         funcDecl, baseStruct);
+    auto body = BraceStmt::create(ctx, SourceLoc(), {}, SourceLoc(),
+                                  /*implicit=*/true);
+    return {body, /*isTypeChecked=*/true};
+  }
 
   SmallVector<Expr *, 8> forwardingParams;
   for (auto param : *funcDecl->getParameters()) {
@@ -4791,34 +4930,25 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
     forwardingParams.push_back(paramRefExpr);
   }
 
-  Argument casted = [&]() {
-    if (funcDecl->isMutating()) {
-      return Argument::implicitInOut(
-          ctx, getSelfInteropStaticCast(funcDecl, baseStruct, derivedStruct));
-    }
+  Argument selfArg = [&]() {
     auto *selfDecl = funcDecl->getImplicitSelfDecl();
     auto selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                           /*implicit*/ true);
+    if (funcDecl->isMutating()) {
+      selfExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+      return Argument::implicitInOut(ctx, selfExpr);
+    }
     selfExpr->setType(selfDecl->getTypeInContext());
-
-    auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
-        ctx, baseStruct->getClangDecl()->getOwningModule(), baseType,
-        derivedStruct->getDeclaredType());
-
-    auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfExpr});
-    auto castedCall = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
-    castedCall->setType(baseType);
-    castedCall->setThrows(false);
-    return Argument::unlabeled(castedCall);
+    return Argument::unlabeled(selfExpr);
   }();
 
   auto *baseMemberExpr =
-      new (ctx) DeclRefExpr(ConcreteDeclRef(baseMember), DeclNameLoc(),
+      new (ctx) DeclRefExpr(ConcreteDeclRef(forwardedFunc), DeclNameLoc(),
                             /*Implicit=*/true);
-  baseMemberExpr->setType(baseMember->getInterfaceType());
+  baseMemberExpr->setType(forwardedFunc->getInterfaceType());
 
   auto baseMemberDotCallExpr =
-      DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), casted);
+      DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), selfArg);
   baseMemberDotCallExpr->setType(baseMember->getMethodInterfaceType());
   baseMemberDotCallExpr->setThrows(false);
 
