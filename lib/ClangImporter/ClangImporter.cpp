@@ -7025,23 +7025,26 @@ void ClangImporter::withSymbolicFeatureEnabled(
       oldImportSymbolicCXXDecls.get());
 }
 
-const clang::TypedefType *ClangImporter::getTypedefForCXXCFOptionsDefinition(
-    const clang::Decl *candidateDecl, const ASTContext &ctx) {
-  if (!ctx.LangOpts.EnableCXXInterop)
+const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
+    const clang::Decl *candidateDecl) {
+
+  if (!Impl.SwiftContext.LangOpts.EnableCXXInterop)
     return nullptr;
 
   auto enumDecl = dyn_cast<clang::EnumDecl>(candidateDecl);
   if (!enumDecl)
     return nullptr;
+
   if (!enumDecl->getDeclName().isEmpty())
     return nullptr;
 
   const clang::ElaboratedType *elaboratedType =
-      enumDecl->getIntegerType()->getAs<clang::ElaboratedType>();
+      dyn_cast<clang::ElaboratedType>(enumDecl->getIntegerType().getTypePtr());
   if (auto typedefType =
           elaboratedType
               ? dyn_cast<clang::TypedefType>(elaboratedType->desugar())
-              : enumDecl->getIntegerType()->getAs<clang::TypedefType>()) {
+              : dyn_cast<clang::TypedefType>(
+                    enumDecl->getIntegerType().getTypePtr())) {
     auto enumExtensibilityAttr =
         elaboratedType
             ? enumDecl->getAttr<clang::EnumExtensibilityAttr>()
@@ -7054,13 +7057,8 @@ const clang::TypedefType *ClangImporter::getTypedefForCXXCFOptionsDefinition(
         enumExtensibilityAttr->getExtensibility() ==
             clang::EnumExtensibilityAttr::Open &&
         hasFlagEnumAttr) {
-      // Make sure the typedef is marked as unavailable in Swift.
-      auto typedefDecl = typedefType->getDecl();
-      for (auto *attr :
-           typedefDecl->specific_attrs<clang::AvailabilityAttr>()) {
-        if (attr->getPlatform()->getName() == "swift")
-          return typedefType;
-      }
+      return Impl.isUnavailableInSwift(typedefType->getDecl()) ? typedefType
+                                                               : nullptr;
     }
   }
 

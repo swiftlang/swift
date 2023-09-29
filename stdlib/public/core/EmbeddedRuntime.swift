@@ -137,6 +137,7 @@ public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c)
   if predicate.pointee == 0 {
     predicate.pointee = 1
     fn(context)
+    predicate.pointee = -1
   }
 }
 
