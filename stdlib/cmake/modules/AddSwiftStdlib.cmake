@@ -2577,7 +2577,8 @@ endfunction()
 #     The Swift installation component that this executable belongs to.
 #     Defaults to never_install.
 function(_add_swift_target_executable_single name)
-  set(options)
+  set(options
+    NOSWIFTRT)
   set(single_parameter_options
     ARCHITECTURE
     SDK
@@ -2654,6 +2655,15 @@ function(_add_swift_target_executable_single name)
   add_executable(${name}
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
+
+  # ELF and COFF need swiftrt
+  if(("${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
+      "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF")
+     AND NOT SWIFTEXE_SINGLE_NOSWIFTRT)
+    target_sources(${name}
+      PRIVATE
+      $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}>)
+  endif()
 
   add_dependencies_multiple_targets(
       TARGETS "${name}"
@@ -2745,7 +2755,8 @@ function(add_swift_target_executable name)
     EXCLUDE_FROM_ALL
     BUILD_WITH_STDLIB
     BUILD_WITH_LIBEXEC
-    PREFER_STATIC)
+    PREFER_STATIC
+    NOSWIFTRT)
   set(SWIFTEXE_single_parameter_options
     INSTALL_IN_COMPONENT)
   set(SWIFTEXE_multiple_parameter_options
@@ -2948,6 +2959,7 @@ function(add_swift_target_executable name)
 
       _add_swift_target_executable_single(
           ${VARIANT_NAME}
+          ${SWIFTEXE_TARGET_NOSWIFTRT_keyword}
           ${SWIFTEXE_TARGET_SOURCES}
           DEPENDS
             ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
