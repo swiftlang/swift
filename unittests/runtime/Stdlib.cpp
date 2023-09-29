@@ -61,6 +61,15 @@ bool _swift_anyHashableDownCastConditionalIndirect(
   abort();
 }
 
+// SwiftEquatableSupport
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_stdlib_Equatable_isEqual_indirect(
+  const void *lhsValue, const void *rhsValue, const Metadata *type,
+  const void *wt) {
+  abort();
+}
+
 // Casting
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
