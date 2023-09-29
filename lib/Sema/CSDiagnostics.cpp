@@ -4125,6 +4125,84 @@ DeclName MissingMemberFailure::findCorrectEnumCaseName(
   return (candidate ? candidate->getName() : DeclName());
 }
 
+/// If  \p instanceTy is an imported Clang enum, find the best imported case (if
+/// any) which has \p name as a (capitalization-adjusted) suffix.
+ValueDecl *MissingMemberFailure::
+findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
+  IterableDeclContext *idc = nullptr;
+
+  if (auto ED = instanceTy->getEnumOrBoundGenericEnum()) {
+    idc = ED;
+  }
+  else if (auto SD = instanceTy->getStructOrBoundGenericStruct()) {
+    // Did ClangImporter add OptionSet to this struct?
+    for (auto protoAttr :
+            SD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+      auto knownProto = protoAttr->getProtocol()->getKnownProtocolKind();
+      if (knownProto == KnownProtocolKind::OptionSet) {
+        idc = SD;
+        break;
+      }
+    }
+  }
+
+  if (!idc || !idc->getDecl()->hasClangNode())
+    // Not an imported clang enum.
+    return nullptr;
+
+  auto betterMatch = [](ValueDecl *a, ValueDecl *b) -> ValueDecl * {
+#define WORSE(BAD_CONDITION) do {     \
+      auto aBad = a BAD_CONDITION;    \
+      auto bBad = b BAD_CONDITION;    \
+      if (aBad > bBad)                \
+        return b;                     \
+      if (aBad < bBad)                \
+        return a;                     \
+    } while (false)
+
+    // Is one null? Return the other.
+    WORSE(== nullptr);
+
+    assert((a && b) && "neither should be null here");
+    ASTContext &ctx = a->getASTContext();
+
+    // Is one more available than the other?
+    WORSE(->getAttrs().isUnavailable(ctx));
+    WORSE(->getAttrs().getDeprecated(ctx));
+
+    // Does one have a shorter name (so the non-matching prefix is shorter)?
+    WORSE(->getName().getBaseName().userFacingName().size());
+#undef WORSE
+
+    // Arbitrary tiebreaker: compare the names.
+    if (a->getName().compare(b->getName()) > 0)
+      return b;
+    return a;
+  };
+
+  StringRef needle = name.getBaseName().userFacingName();
+
+  ValueDecl *bestMatch = nullptr;
+  for (auto member : idc->getMembers()) {
+    auto VD = dyn_cast<ValueDecl>(member);
+    if (!VD)
+      continue;
+    if (!(isa<EnumElementDecl>(VD) || isa<VarDecl>(VD)))
+      continue;
+    if (VD->isInstanceMember())
+      continue;
+    if (!VD->getInterfaceType()->isEqual(instanceTy))
+      continue;
+    if (!camel_case::hasWordSuffix(VD->getName().getBaseName().userFacingName(),
+                                   needle))
+      continue;
+
+    // This member matches. Is it the best match?
+    bestMatch = betterMatch(bestMatch, VD);
+  }
+  return bestMatch;
+}
+
 bool MissingMemberFailure::diagnoseAsError() {
   auto anchor = getRawAnchor();
   auto memberBase = getAnchor();
@@ -4243,7 +4321,16 @@ bool MissingMemberFailure::diagnoseAsError() {
       } else {
         emitBasicError(baseType);
       }
-    } else {
+    } else if (ValueDecl *bestMatch =
+                  findImportedCaseWithMatchingSuffix(instanceTy, getName())) {
+       // Sometimes Clang Importer's case prefix stripping unexpectedly
+       // changes the name of unrelated cases when someone adds a new case or
+       // changes the deprecation of an existing case. If this is such an
+       // imported type and we can find a case which has `getName()` as a
+       // suffix, mention this possibility.
+       emitDiagnostic(diag::could_not_find_imported_enum_case, instanceTy,
+                      getName(), bestMatch);
+     } else {
       emitBasicError(baseType);
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
