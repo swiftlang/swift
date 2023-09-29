@@ -39,3 +39,12 @@ public func unavailableThrowingFunc() throws {
 // CHECK:       } // end sil function '$s4Test9globalVarAA1SVvau'
 @available(*, unavailable)
 public var globalVar = S()
+
+public enum Uninhabited {}
+
+//
+// CHECK-LABEL: sil{{.*}}@$s4Test28unavailableTakingUninhabitedyyAA0D0OF : $@convention(thin) (Uninhabited) -> () {
+// CHECK:         unreachable
+// CHECK:       } // end sil function '$s4Test28unavailableTakingUninhabitedyyAA0D0OF'
+@available(*, unavailable)
+public func unavailableTakingUninhabited(_ u: Uninhabited) {}
