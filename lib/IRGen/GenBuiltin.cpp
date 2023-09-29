@@ -577,8 +577,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // the error return register. We also have to pass a fake context
     // argument due to how swiftcc works in clang.
 
-    auto fn = IGF.IGM.getWillThrowFunctionPointer();
     auto error = args.claimNext();
+
+    if (IGF.IGM.Context.LangOpts.ThrowsAsTraps) {
+      return;
+    }
+
+    auto fn = IGF.IGM.getWillThrowFunctionPointer();
     auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
         SILType::getPrimitiveObjectType(errorTy));
