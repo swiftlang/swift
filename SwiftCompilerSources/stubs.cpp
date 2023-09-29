@@ -12,8 +12,8 @@
 
 extern "C" {
 
-void initializeSwiftModules();
+void initializeSwiftSILModules();
 
 }
 
-void initializeSwiftModules() {}
+void initializeSwiftSILModules() {}

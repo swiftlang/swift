@@ -29,12 +29,12 @@ namespace {
 
 bool nodeMetatypesInitialized = false;
 
-// Filled in by class registration in initializeSwiftModules().
+// Filled in by class registration in initializeSwiftSILModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
-// Does return null if initializeSwiftModules() is never called.
+// Does return null if initializeSwiftSILModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];
   assert((!nodeMetatypesInitialized || metatype) &&
@@ -62,7 +62,7 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 }
 
 /// Registers the metatype of a swift SIL class.
-/// Called by initializeSwiftModules().
+/// Called by initializeSwiftSILModules().
 void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
   nodeMetatypesInitialized = true;
 

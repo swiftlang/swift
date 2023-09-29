@@ -13,8 +13,8 @@
 import SIL
 import OptimizerBridging
 
-@_cdecl("initializeSwiftModules")
-public func initializeSwiftModules() {
+@_cdecl("initializeSwiftSILModules")
+public func initializeSwiftSILModules() {
   registerSILClasses()
   registerSwiftAnalyses()
   registerSwiftPasses()

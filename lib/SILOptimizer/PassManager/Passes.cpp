@@ -273,7 +273,7 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
   runFunction({{f}, {passManager->getSwiftPassInvocation()}});
 }
 
-// Called from initializeSwiftModules().
+// Called from initializeSwiftSILModules().
 void SILPassManager_registerModulePass(llvm::StringRef name,
                                        BridgedModulePassRunFn runFn) {
   bridgedModulePassRunFunctions[name] = runFn;

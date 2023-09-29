@@ -224,7 +224,7 @@ static int run_driver(StringRef ExecName,
 
   // This is done here and not done in FrontendTool.cpp, because
   // FrontendTool.cpp is linked to tools, which don't use swift modules.
-  initializeSwiftModules();
+  initializeSwiftSILModules();
 
   bool isRepl = false;
 

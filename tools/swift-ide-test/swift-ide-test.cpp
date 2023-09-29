@@ -4241,7 +4241,7 @@ int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
   initializeSwiftParseModules();
-  initializeSwiftModules();
+  initializeSwiftSILModules();
 
   std::string mainExecutablePath = llvm::sys::fs::getMainExecutable(
       argv[0], reinterpret_cast<void *>(&anchorForGetMainExecutable));
