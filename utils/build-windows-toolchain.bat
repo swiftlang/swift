@@ -855,8 +855,9 @@ endlocal
 :FetchWiX
 setlocal enableextensions enabledelayedexpansion
 
+if exist wix-4.0.1 goto :eof
 curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.1 -o wix-4.0.1.zip
-md WiX-4.0.1 || exit (/b)
+md WiX-4.0.1
 cd WiX-4.0.1 || exit (/b)
 tar -xf ../wix-4.0.1.zip || exit (/b)
 
