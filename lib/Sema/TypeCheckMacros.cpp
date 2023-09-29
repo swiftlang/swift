@@ -162,6 +162,7 @@ llvm::Optional<Identifier> getIdentifierFromStringLiteralArgument(
 
 /// For a macro expansion expression that is known to be #externalMacro,
 /// handle the definition.
+#if SWIFT_BUILD_SWIFT_SYNTAX
 static MacroDefinition  handleExternalMacroDefinition(
     ASTContext &ctx, MacroExpansionExpr *expansion) {
   // Dig out the module and type name.
@@ -177,20 +178,20 @@ static MacroDefinition  handleExternalMacroDefinition(
 
   return MacroDefinition::forExternal(*moduleName, *typeName);
 }
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 MacroDefinition MacroDefinitionRequest::evaluate(
     Evaluator &evaluator, MacroDecl *macro
 ) const {
-  ASTContext &ctx = macro->getASTContext();
-
   // If no definition was provided, the macro is... undefined, of course.
   auto definition = macro->definition;
   if (!definition)
     return MacroDefinition::forUndefined();
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  ASTContext &ctx = macro->getASTContext();
   auto sourceFile = macro->getParentSourceFile();
 
-#if SWIFT_BUILD_SWIFT_SYNTAX
   char *externalMacroNamePtr;
   ptrdiff_t externalMacroNameLength;
   ptrdiff_t *replacements;
@@ -937,6 +938,7 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
   return macroSourceFile;
 }
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 static uint8_t getRawMacroRole(MacroRole role) {
   switch (role) {
   case MacroRole::Expression: return 0;
@@ -952,6 +954,7 @@ static uint8_t getRawMacroRole(MacroRole role) {
   case MacroRole::Extension: return 8;
   }
 }
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 /// Evaluate the given freestanding macro expansion.
 static SourceFile *
@@ -993,13 +996,6 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     return "";
 #endif
   });
-
-  // Only one freestanding macro role is permitted, so look at the roles to
-  // figure out which one to use.
-  MacroRole macroRole =
-    macroRoles.contains(MacroRole::Expression) ? MacroRole::Expression
-    : macroRoles.contains(MacroRole::Declaration) ? MacroRole::Declaration
-    : MacroRole::CodeItem;
 
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
@@ -1048,6 +1044,13 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     }
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
+    // Only one freestanding macro role is permitted, so look at the roles to
+    // figure out which one to use.
+    MacroRole macroRole =
+      macroRoles.contains(MacroRole::Expression) ? MacroRole::Expression
+      : macroRoles.contains(MacroRole::Declaration) ? MacroRole::Declaration
+      : MacroRole::CodeItem;
+
     PrettyStackTraceFreestandingMacroExpansion debugStack(
         "expanding freestanding macro", expansion);
 

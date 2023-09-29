@@ -363,7 +363,6 @@ static void enqueueDiagnostic(
       info.Loc.getOpaquePointerValue(),
       highlightRanges.data(), highlightRanges.size() / 2);
 }
-#endif
 
 /// Retrieve the stack of source buffers from the provided location out to
 /// a physical source file, with source buffer IDs for each step along the way
@@ -389,7 +388,6 @@ static SmallVector<unsigned, 1> getSourceBufferStack(
   }
 }
 
-#if SWIFT_BUILD_SWIFT_SYNTAX
 void PrintingDiagnosticConsumer::queueBuffer(
     SourceManager &sourceMgr, unsigned bufferID) {
   QueuedBuffer knownSourceFile = queuedBuffers[bufferID];
