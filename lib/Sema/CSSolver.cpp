@@ -2175,8 +2175,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
 
-    return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
-                                                 CS.DC->getParentModule());
+    return bool(CS.lookupConformance(nominal->getDeclaredType(), protocol));
   };
 
   // Gather Numeric and Sequence overloads into separate buckets.

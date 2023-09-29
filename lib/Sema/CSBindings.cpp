@@ -669,7 +669,7 @@ void BindingSet::determineLiteralCoverage() {
       Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-          literal.isCoveredBy(*binding, allowsNil, CS.DC);
+          literal.isCoveredBy(*binding, allowsNil, CS);
 
       if (!isCovered)
         continue;
@@ -872,7 +872,7 @@ void PotentialBindings::addDefault(Constraint *constraint) {
   Defaults.insert(constraint);
 }
 
-bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
+bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
   auto coversDefaultType = [](Type type, Type defaultType) -> bool {
     if (!defaultType->hasUnboundGenericType())
       return type->isEqual(defaultType);
@@ -892,14 +892,12 @@ bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
   if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
     return true;
 
-  return (bool)TypeChecker::conformsToProtocol(type, getProtocol(),
-                                               useDC->getParentModule());
+  return bool(CS.lookupConformance(type, getProtocol()));
 }
 
 std::pair<bool, Type>
-LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
-                                bool canBeNil,
-                                DeclContext *useDC) const {
+LiteralRequirement::isCoveredBy(const PotentialBinding &binding, bool canBeNil,
+                                ConstraintSystem &CS) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
   case AllowedBindingKind::Exact:
@@ -919,7 +917,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
     if (type->isTypeVariableOrMember() || type->isPlaceholder())
       return std::make_pair(false, Type());
 
-    if (isCoveredBy(type, useDC)) {
+    if (isCoveredBy(type, CS)) {
       return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
     }
 
