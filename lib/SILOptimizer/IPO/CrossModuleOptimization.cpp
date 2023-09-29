@@ -491,7 +491,7 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
   if (function->isSerialized())
     return;
   
-  if (!canSerializeFlags.lookup(function))
+  if (!everything && !canSerializeFlags.lookup(function))
     return;
 
   function->setSerialized(IsSerialized);
@@ -588,9 +588,14 @@ void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
 
 void CrossModuleOptimization::makeFunctionUsableFromInline(SILFunction *function) {
   assert(canUseFromInline(function));
-  if (!isAvailableExternally(function->getLinkage()) &&
-      function->getLinkage() != SILLinkage::Public) {
-    function->setLinkage(SILLinkage::Public);
+  if (!isAvailableExternally(function->getLinkage())) {
+    bool shouldPromoteToPublic = function->getLinkage() != SILLinkage::Public;
+    if (everything)
+      shouldPromoteToPublic = function->getLinkage() != SILLinkage::Public &&
+                              function->getLinkage() != SILLinkage::Shared;
+    if (shouldPromoteToPublic) {
+      function->setLinkage(SILLinkage::Public);
+    }
   }
 }
 
