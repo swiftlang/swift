@@ -2912,10 +2912,10 @@ public:
 };
 
 /// Compute the actor isolation needed to synchronously evaluate the
-/// default argument for the given parameter.
-class DefaultArgumentIsolation
-    : public SimpleRequest<DefaultArgumentIsolation,
-                           ActorIsolation(ParamDecl *),
+/// default initializer expression.
+class DefaultInitializerIsolation
+    : public SimpleRequest<DefaultInitializerIsolation,
+                           ActorIsolation(Initializer *, Expr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2923,11 +2923,15 @@ public:
 private:
   friend SimpleRequest;
 
-  ActorIsolation evaluate(Evaluator &evaluator, ParamDecl *param) const;
+  ActorIsolation evaluate(Evaluator &evaluator, 
+                          Initializer *init,
+                          Expr *initExpr) const;
 
 public:
   bool isCached() const { return true; }
 };
+
+void simple_display(llvm::raw_ostream &out, Initializer *init);
 
 /// Computes the fully type-checked caller-side default argument within the
 /// context of the call site that it will be inserted into.

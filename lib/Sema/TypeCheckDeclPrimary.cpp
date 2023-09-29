@@ -1157,14 +1157,13 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 }
 
 ActorIsolation 
-DefaultArgumentIsolation::evaluate(Evaluator &evaluator,
-                                   ParamDecl *param) const {
-  if (!param->hasDefaultExpr())
+DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
+                                      Initializer *init,
+                                      Expr *initExpr) const {
+  if (!init || !initExpr)
     return ActorIsolation::forUnspecified();
 
-  auto *dc = param->getDefaultArgumentInitContext();
-  auto *initExpr = param->getTypeCheckedDefaultExpr();
-  return computeRequiredIsolation(dc, initExpr);
+  return computeRequiredIsolation(init, initExpr);
 }
 
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
@@ -2477,7 +2476,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             TypeChecker::contextualizeInitializer(initContext, init);
-            checkInitializerActorIsolation(initContext, init);
+            (void)PBD->getInitializerIsolation(i);
             TypeChecker::checkInitializerEffects(initContext, init);
           }
         }

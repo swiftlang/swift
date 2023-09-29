@@ -124,3 +124,59 @@ func closureWithIsolatedParam(
     _ = requiresMainActor()
   }
 ) {}
+
+@MainActor
+struct S1 {
+  var required: Int
+
+  var x: Int = requiresMainActor()
+
+  lazy var y: Int = requiresMainActor()
+
+  static var z: Int = requiresMainActor()
+}
+
+@SomeGlobalActor
+struct S2 {
+  var required: Int
+
+  var x: Int = requiresSomeGlobalActor()
+
+  lazy var y: Int = requiresSomeGlobalActor()
+
+  static var z: Int = requiresSomeGlobalActor()
+}
+
+@MainActor
+func initializeFromMainActor() {
+  _ = S1(required: 10)
+
+  // expected-error@+1 {{global actor 'SomeGlobalActor'-isolated default argument cannot be synchronously evaluated from a main actor-isolated context}}
+  _ = S2(required: 10)
+}
+
+@SomeGlobalActor
+func initializeFromSomeGlobalActor() {
+  // expected-error@+1 {{main actor-isolated default argument cannot be synchronously evaluated from a global actor 'SomeGlobalActor'-isolated context}}
+  _ = S1(required: 10)
+
+  _ = S2(required: 10)
+}
+
+func initializeFromNonisolated() {
+  // expected-error@+1 {{main actor-isolated default argument cannot be synchronously evaluated from a nonisolated context}}
+  _ = S1(required: 10)
+
+  // expected-error@+1 {{global actor 'SomeGlobalActor'-isolated default argument cannot be synchronously evaluated from a nonisolated context}}
+  _ = S2(required: 10)
+}
+
+extension A {
+  func initializeFromActorInstance() {
+    // expected-error@+1 {{main actor-isolated default argument cannot be synchronously evaluated from a actor-isolated context}}
+    _ = S1(required: 10)
+
+    // expected-error@+1 {{global actor 'SomeGlobalActor'-isolated default argument cannot be synchronously evaluated from a actor-isolated context}}
+    _ = S2(required: 10)
+  }
+}
