@@ -67,6 +67,12 @@ FunctionTest::FunctionTest(StringRef name, Invocation invocation)
       dependencies(nullptr) {
   Registry::get().registerFunctionTest(this, name);
 }
+FunctionTest::FunctionTest(StringRef name, void *context,
+                           InvocationWithContext invocation)
+    : invocation(std::make_pair(invocation, context)), pass(nullptr),
+      function(nullptr), dependencies(nullptr) {
+  Registry::get().registerFunctionTest(this, name);
+}
 
 FunctionTest *FunctionTest::get(StringRef name) {
   return Registry::get().getFunctionTest(name);
@@ -77,7 +83,13 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
   this->pass = &pass;
   this->function = &function;
   this->dependencies = &dependencies;
-  invocation(function, arguments, *this);
+  if (invocation.isa<Invocation>()) {
+    auto fn = this->invocation.get<Invocation>();
+    fn(function, arguments, *this);
+  } else {
+    auto pair = invocation.get<std::pair<InvocationWithContext, void *>>();
+    pair.first(function, arguments, *this, pair.second);
+  }
   this->pass = nullptr;
   this->function = nullptr;
   this->dependencies = nullptr;
@@ -89,4 +101,8 @@ DominanceInfo *FunctionTest::getDominanceInfo() {
 
 SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
+}
+
+BridgedTestContext FunctionTest::getContext() {
+  return BridgedTestContext{dependencies->getInvocation()};
 }

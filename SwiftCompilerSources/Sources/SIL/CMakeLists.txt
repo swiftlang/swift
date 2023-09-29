@@ -23,6 +23,7 @@ add_swift_compiler_module(SIL
     Registration.swift
     SmallProjectionPath.swift
     SubstitutionMap.swift
+    Test.swift
     Type.swift
     Utils.swift
     Value.swift

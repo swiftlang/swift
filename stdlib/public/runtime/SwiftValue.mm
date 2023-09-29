@@ -30,6 +30,7 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Debug.h"
 #include "Private.h"
+#include "SwiftEquatableSupport.h"
 #include "SwiftHashableSupport.h"
 #include <objc/runtime.h>
 #include <Foundation/Foundation.h>
@@ -63,65 +64,169 @@ struct SwiftValueHeader {
   /// The type of the value contained in the `__SwiftValue` box.
   const Metadata *type;
 
-  /// The base type that introduces the `Hashable` conformance.
-  /// This member is only available for native Swift errors.
+  /// The base type that introduces the `Hashable` or `Equatable` conformance.
   /// This member is lazily-initialized.
-  /// Instead of using it directly, call `getHashableBaseType()`.
-  mutable std::atomic<const Metadata *> hashableBaseType;
+  /// Instead of using it directly, call `getHashableBaseType()` or `getEquatableBaseType()`
+  /// Value here is encoded:
+  /// * Least-significant bit set: This is an Equatable base type
+  /// * Least-significant bit not set: This is a Hashable base type
+  mutable std::atomic<uintptr_t> cachedBaseType;
 
   /// The witness table for `Hashable` conformance.
-  /// This member is only available for native Swift errors.
   /// This member is lazily-initialized.
   /// Instead of using it directly, call `getHashableConformance()`.
-  mutable std::atomic<const hashable_support::HashableWitnessTable *>
-      hashableConformance;
+  /// Value here is encoded:
+  /// * Least-significant bit set: This is an Equatable conformance
+  /// * Least-significant bit not set: This is a Hashable conformance
+  mutable std::atomic<uintptr_t> cachedConformance;
 
   /// Get the base type that conforms to `Hashable`.
   /// Returns NULL if the type does not conform.
   const Metadata *getHashableBaseType() const;
 
+  /// Get the base type that conforms to `Equatable`.
+  /// Returns NULL if the type does not conform.
+  const Metadata *getEquatableBaseType() const;
+
   /// Get the `Hashable` protocol witness table for the contained type.
   /// Returns NULL if the type does not conform.
   const hashable_support::HashableWitnessTable *getHashableConformance() const;
 
+  /// Get the `Equatable` protocol witness table for the contained type.
+  /// Returns NULL if the type does not conform.
+  const equatable_support::EquatableWitnessTable *getEquatableConformance() const;
+
+  /// Populate the `cachedConformance` with the Hashable conformance
+  /// (if there is one), else the Equatable conformance.
+  /// Returns the encoded conformance:  least-significant
+  /// bit is set if this is an Equatable conformance,
+  /// else it is a Hashable conformance.  0 (or 1) indicates
+  /// neither was found.
+  uintptr_t cacheHashableEquatableConformance() const;
+
+
   SwiftValueHeader()
-      : hashableBaseType(nullptr), hashableConformance(nullptr) {}
+      : cachedBaseType(0), cachedConformance(0) {}
 };
 
-const Metadata *SwiftValueHeader::getHashableBaseType() const {
-  if (auto type = hashableBaseType.load(std::memory_order_acquire)) {
-    if (reinterpret_cast<uintptr_t>(type) == 1) {
-      return nullptr;
-    }
-    return type;
-  }
+// Set cachedConformance to the Hashable conformance if
+// there is one, else the Equatable conformance.
+// Also set cachedBaseType to the parent type that
+// introduced the Hashable/Equatable conformance.
+// The cached conformance and type are encoded:
+// * If the LSbit is not set, it's the Hashable conformance
+// * If the value is exactly 1, neither conformance is present
+// * If the LSbit is 1, strip it and you'll have the Equatable conformance
+// (Null indicates the cache has not been initialized yet;
+// that will never be true on exit of this function.)
+// Return: encoded cachedConformance value
+uintptr_t
+SwiftValueHeader::cacheHashableEquatableConformance() const {
+    // Relevant conformance and baseType
+    uintptr_t conformance;
+    uintptr_t baseType;
 
-  const Metadata *expectedType = nullptr;
-  const Metadata *hashableBaseType = findHashableBaseType(type);
-  this->hashableBaseType.compare_exchange_strong(
-      expectedType, hashableBaseType ? hashableBaseType
-                                     : reinterpret_cast<const Metadata *>(1),
-      std::memory_order_acq_rel);
-  return type;
+    // First, see if it's Hashable
+    const HashableWitnessTable *hashable =
+      reinterpret_cast<const HashableWitnessTable *>(
+	swift_conformsToProtocolCommon(type, &HashableProtocolDescriptor));
+    if (hashable != nullptr) {
+      conformance = reinterpret_cast<uintptr_t>(hashable);
+      baseType = reinterpret_cast<uintptr_t>(findHashableBaseType(type));
+    } else {
+      // If not Hashable, maybe Equatable?
+      auto equatable = 
+	swift_conformsToProtocolCommon(type, &equatable_support::EquatableProtocolDescriptor);
+      // Encode the equatable conformance
+      conformance = reinterpret_cast<uintptr_t>(equatable) | 1;
+
+      if (equatable != nullptr) {
+	// Find equatable base type
+#if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
+	const auto *description = lookThroughOptionalConditionalWitnessTable(
+	  reinterpret_cast<const RelativeWitnessTable*>(equatable))
+	  ->getDescription();
+#else
+	const auto *description = equatable->getDescription();
+#endif
+	const Metadata *baseTypeThatConformsToEquatable =
+	  findConformingSuperclass(type, description);
+	// Encode the equatable base type
+	baseType = reinterpret_cast<uintptr_t>(baseTypeThatConformsToEquatable) | 1;
+      } else {
+	baseType = 1; // Neither equatable nor hashable
+      }
+    }
+
+    // Set the conformance/baseType caches atomically
+    uintptr_t expectedConformance = 0;
+    cachedConformance.compare_exchange_strong(
+      expectedConformance, conformance, std::memory_order_acq_rel);
+    uintptr_t expectedType = 0;
+    cachedBaseType.compare_exchange_strong(
+      expectedType, baseType, std::memory_order_acq_rel);
+
+    return conformance;
+}
+
+const Metadata *SwiftValueHeader::getHashableBaseType() const {
+  auto type = cachedBaseType.load(std::memory_order_acquire);
+  if (type == 0) {
+    cacheHashableEquatableConformance();
+    type = cachedBaseType.load(std::memory_order_acquire);
+  }
+  if ((type & 1) == 0) {
+    // A Hashable conformance was found
+    return reinterpret_cast<const Metadata *>(type);
+  } else {
+    // Equatable conformance (or no conformance) found
+    return nullptr;
+  }
+}
+
+const Metadata *SwiftValueHeader::getEquatableBaseType() const {
+  auto type = cachedBaseType.load(std::memory_order_acquire);
+  if (type == 0) {
+    cacheHashableEquatableConformance();
+    type = cachedBaseType.load(std::memory_order_acquire);
+  }
+  if ((type & 1) == 0) {
+    // A Hashable conformance was found
+    return nullptr;
+  } else {
+    // An Equatable conformance (or neither) was found
+    return reinterpret_cast<const Metadata *>(type & ~1ULL);
+  }
 }
 
 const hashable_support::HashableWitnessTable *
 SwiftValueHeader::getHashableConformance() const {
-  if (auto wt = hashableConformance.load(std::memory_order_acquire)) {
-    if (reinterpret_cast<uintptr_t>(wt) == 1) {
-      return nullptr;
-    }
-    return wt;
+  uintptr_t wt = cachedConformance.load(std::memory_order_acquire);
+  if (wt == 0) {
+    wt = cacheHashableEquatableConformance();
   }
+  if ((wt & 1) == 0) {
+    // Hashable conformance found
+    return reinterpret_cast<const hashable_support::HashableWitnessTable *>(wt);
+  } else {
+    // Equatable conformance (or no conformance) found
+    return nullptr;
+  }
+}
 
-  const HashableWitnessTable *expectedWT = nullptr;
-  const HashableWitnessTable *wt =
-      reinterpret_cast<const HashableWitnessTable *>(
-          swift_conformsToProtocolCommon(type, &HashableProtocolDescriptor));
-  hashableConformance.compare_exchange_strong(
-      expectedWT, wt ? wt : reinterpret_cast<const HashableWitnessTable *>(1),
-      std::memory_order_acq_rel);
-  return wt;
+const equatable_support::EquatableWitnessTable *
+SwiftValueHeader::getEquatableConformance() const {
+  uintptr_t wt = cachedConformance.load(std::memory_order_acquire);
+  if (wt == 0) {
+    wt = cacheHashableEquatableConformance();
+  }
+  if ((wt & 1) == 0) {
+    // Hashable conformance found
+    return nullptr;
+  } else {
+    // Equatable conformance (or no conformance) found
+    return reinterpret_cast<const equatable_support::EquatableWitnessTable *>(wt & ~1ULL);
+  }
 }
 
 static constexpr const size_t SwiftValueHeaderOffset
@@ -300,6 +405,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     return NO;
   }
 
+  // `other` must also be a _SwiftValue box
   if (![other isKindOfClass:getSwiftValueClass()]) {
     return NO;
   }
@@ -307,23 +413,36 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   auto selfHeader = getSwiftValueHeader(self);
   auto otherHeader = getSwiftValueHeader(other);
 
-  auto hashableBaseType = selfHeader->getHashableBaseType();
-  if (!hashableBaseType ||
-      otherHeader->getHashableBaseType() != hashableBaseType) {
-    return NO;
+  if (auto hashableConformance = selfHeader->getHashableConformance()) {
+    if (auto selfHashableBaseType = selfHeader->getHashableBaseType()) {
+      auto otherHashableBaseType = otherHeader->getHashableBaseType();
+      if (selfHashableBaseType == otherHashableBaseType) {
+        return _swift_stdlib_Hashable_isEqual_indirect(
+          getSwiftValuePayload(self,
+                               getSwiftValuePayloadAlignMask(selfHeader->type)),
+          getSwiftValuePayload(other,
+                               getSwiftValuePayloadAlignMask(otherHeader->type)),
+          selfHashableBaseType, hashableConformance);
+      }
+    }
   }
 
-  auto hashableConformance = selfHeader->getHashableConformance();
-  if (!hashableConformance) {
-    return NO;
+  if (auto equatableConformance = selfHeader->getEquatableConformance()) {
+    if (auto selfEquatableBaseType = selfHeader->getEquatableBaseType()) {
+      auto otherEquatableBaseType = otherHeader->getEquatableBaseType();
+      if (selfEquatableBaseType == otherEquatableBaseType) {
+        return _swift_stdlib_Equatable_isEqual_indirect(
+          getSwiftValuePayload(self,
+                               getSwiftValuePayloadAlignMask(selfHeader->type)),
+          getSwiftValuePayload(other,
+                               getSwiftValuePayloadAlignMask(otherHeader->type)),
+          selfEquatableBaseType, equatableConformance);
+      }
+    }
   }
 
-  return _swift_stdlib_Hashable_isEqual_indirect(
-      getSwiftValuePayload(self,
-                           getSwiftValuePayloadAlignMask(selfHeader->type)),
-      getSwiftValuePayload(other,
-                           getSwiftValuePayloadAlignMask(otherHeader->type)),
-      hashableBaseType, hashableConformance);
+  // Not Equatable, not Hashable, and not the same box
+  return NO;
 }
 
 - (NSUInteger)hash {

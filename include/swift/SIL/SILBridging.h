@@ -1522,6 +1522,50 @@ BridgedBasicBlock BridgedArgument::getParent() const {
   return {getArgument()->getParent()};
 }
 
+namespace swift::test {
+struct Arguments;
+class FunctionTest;
+} // namespace swift::test
+
+struct BridgedTestArguments {
+  swift::test::Arguments *_Nonnull arguments;
+
+  bool hasUntaken() const;
+
+  SWIFT_IMPORT_UNSAFE
+  llvm::StringRef takeString() const;
+
+  bool takeBool() const;
+
+  SwiftInt takeInt() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedOperand takeOperand() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedValue takeValue() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedInstruction takeInstruction() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedArgument takeArgument() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedBasicBlock takeBlock() const;
+
+  SWIFT_IMPORT_UNSAFE
+  BridgedFunction takeFunction() const;
+};
+
+struct BridgedTestContext {
+  swift::SwiftPassInvocation *_Nonnull invocation;
+};
+
+typedef void (*_Nonnull BridgedFunctionTestThunk)(BridgedFunction,
+                                                  BridgedTestArguments,
+                                                  BridgedTestContext);
+void registerFunctionTest(llvm::StringRef, BridgedFunctionTestThunk thunk);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
