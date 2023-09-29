@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 sil_stage raw
 
 import Builtin
@@ -8,8 +10,8 @@ import Builtin
 // CHECK: test_arg_parsing_reference
 // CHECK: test_arg_parsing_referenceable
 // CHECK: test_arg_parsing
-// CHECK: bool: 1
-// CHECK: bool: 0
+// CHECK: bool: true
+// CHECK: bool: false
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
 // CHECK-LABEL: begin running test 2 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
 // CHECK: block:
@@ -45,10 +47,8 @@ import Builtin
 // CHECK: instruction: // function_ref something_remarkable
 // CHECK-LABEL: end running test 5 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
 // CHECK-LABEL: begin running test 6 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
-// CHECK: operand: 
-// CHECK: Owner:   return {{%[^,]+}} : $()
-// CHECK: operand:
-// CHECK: Value:   {{%[^,]+}} = tuple ({{%[^,]+}} : $())
+// CHECK: operand: operand #0 of return {{%[^,]+}} : $()
+// CHECK: operand: operand #1 of {{%[^,]+}} = tuple
 // CHECK-LABEL: end running test 6 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
 // CHECK-LABEL: begin running test 7 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
 // CHECK: value: {{%[^,]+}} = tuple ({{%[^,]+}} : $(), {{%[^,]+}} : $(_: ()), {{%[^,]+}} : $((), (_: ())))

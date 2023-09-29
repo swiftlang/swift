@@ -15,7 +15,7 @@
 // - #include "swift/SIL/Test.h"
 // - namespace swift::test {
 //   static FunctionTest MyNewTest(
-//     "my-new-test",
+//     "my_new_test",
 //     [](auto &function, auto &arguments, auto &test) {
 //   });
 //   } // end namespace swift::test
@@ -43,8 +43,8 @@
 //    and
 //
 //    static FunctionTest MyNeatoUtilityTest(
-//      "my-neato-utility",
-//      [](auto *test, auto *function, auto &arguments) {
+//      "my_neato_utility",
+//      [](auto &function, auto &arguments, auto &test) {
 //         // The code here is described in detail below.
 //         // See 4).
 //         auto count = arguments.takeUInt();
@@ -53,7 +53,7 @@
 //         // See 5)
 //         myNeatoUtility(count, target, callee);
 //         // See 6)
-//         getFunction()->dump();
+//         function.dump();
 //      });
 // 1) A test test/SILOptimizer/interesting_functionality_unit.sil runs the
 //    TestRunner pass:
@@ -62,13 +62,14 @@
 //    specify_test instruction.
 //      sil @f : $() -> () {
 //      ...
-//      specify_test "my-neato-utility 43 @trace[2] @function[other_fun]"
+//      specify_test "my_neato_utility 43 %2 @function[other_fun]"
 //      ...
 //      }
 // 3) TestRunner finds the FunctionTest instance MyNeatoUtilityTest registered
-//    under the name "my-neato-utility", and calls ::run() on it, passing an
-//    the pass, the function AND most importantly an test::Arguments instance
-//    that contains
+//    under the name "my_neato_utility", and calls ::run() on it, passing first
+//    the function, last the test::FunctionTest instance, AND in the middle,
+//    most importantly a test::Arguments instance that contains
+//
 //      (43 : unsigned long, someValue : SILValue, other_fun : SILFunction *)
 //
 // 4) MyNeatoUtilityTest calls takeUInt(), takeValue(), and takeFunction() on
@@ -84,7 +85,7 @@
 //      myNeatoUtility(count, target, callee);
 // 6) MyNeatoUtilityTest then dumps out the current function, which was modified
 //    in the process.
-//      getFunction()->dump();
+//      function.dump()
 // 7) The test file test/SILOptimizer/interesting_functionality_unit.sil matches
 // the
 //    expected contents of the modified function:
@@ -93,8 +94,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_SIL_TEST_H
+#define SWIFT_SIL_TEST_H
+
 #include "swift/SIL/ParseTestSpecification.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "swift/SIL/SILBridging.h"
 
 namespace swift {
 
@@ -124,12 +128,14 @@ public:
   /// - Arguments & - the resolved list of args specified by the instruction
   /// - FunctionTest & - the test being run; used to find less commonly used
   ///                    values such as the results of analyses
-  using Invocation =
-      llvm::function_ref<void(SILFunction &, Arguments &, FunctionTest &)>;
+  using Invocation = void (*)(SILFunction &, Arguments &, FunctionTest &);
+
+  using InvocationWithContext = void (*)(SILFunction &, Arguments &,
+                                         FunctionTest &, void *);
 
 private:
   /// The lambda to be run.
-  Invocation invocation;
+  TaggedUnion<Invocation, std::pair<InvocationWithContext, void *>> invocation;
 
 public:
   /// Creates a test that will run \p invocation and stores it in the global
@@ -145,6 +151,8 @@ public:
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
+  FunctionTest(StringRef name, void *context, InvocationWithContext invocation);
+
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
 
@@ -158,6 +166,8 @@ public:
   ///       depend on it.  See `Layering` below for more details.
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
+
+  BridgedTestContext getContext();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -237,6 +247,7 @@ private:
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual SILPassManager *getPassManager() = 0;
+    virtual SwiftPassInvocation *getInvocation() = 0;
     virtual ~Dependencies(){};
   };
 
@@ -282,3 +293,5 @@ Analysis *FunctionTest::getAnalysis() {
 }
 } // namespace test
 } // namespace swift
+
+#endif
