@@ -382,6 +382,7 @@ module WinSDK [system] {
 
   module OLE32 {
     header "oaidl.h"
+    header "oleauto.h"
     export *
 
     link "OleAut32.Lib"
