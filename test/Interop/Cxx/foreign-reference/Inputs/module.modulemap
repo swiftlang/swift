@@ -32,3 +32,8 @@ module MemberLayout {
   header "member-layout.h"
   requires cplusplus
 }
+
+module FunctionInheritance {
+  header "function-inheritance.h"
+  requires cplusplus
+}
