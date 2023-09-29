@@ -1,0 +1,207 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift Atomics open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% from SwiftAtomics import *
+
+import Builtin
+
+% for (intType, intStorage, builtinInt) in intTypes:
+
+//===----------------------------------------------------------------------===//
+// ${intType} AtomicValue conformance
+//===----------------------------------------------------------------------===//
+
+// FIXME: Conditionalize the conformance of {U}Int64 on 32 bit platforms that do
+// not support double word atomics.
+
+@available(SwiftStdlib 5.10, *)
+extension ${intType}: AtomicValue {
+%   if intType == "Int" or intType == "UInt":
+#if _pointerBitWidth(_64)
+  public typealias AtomicRepresentation = AtomicInt64Storage
+#elseif _pointerBitWidth(_32)
+  public typealias AtomicRepresentation = AtomicInt32Storage
+#else
+#error("Unsupported platform")
+#endif
+%   else:
+  public typealias AtomicRepresentation = ${intStorage}
+%   end
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func encodeAtomicRepresentation(
+    _ value: borrowing ${intType}
+  ) -> AtomicRepresentation {
+    AtomicRepresentation(value._value)
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func decodeAtomicRepresentation(
+    _ representation: consuming AtomicRepresentation
+  ) -> ${intType} {
+    ${intType}(representation.storage)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ${intType} load then atomic operations
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.10, *)
+extension Atomic where Value == ${intType} {
+% for (_, apiOrder, _, llvmOrder, failureOrder) in updateOrderings:
+%   for (name, builtinName, op, label, doc) in integerOperations:
+  /// Perform an atomic ${doc} operation and return the original value, applying
+  /// the specified memory ordering.
+  ///
+%     if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `${intType}` values.
+  ///
+%     end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func loadThen${name}(
+    ${label} operand: ${intType}${" = 1" if "crement" in name else ""},
+    ordering: Atomic${apiOrder}
+  ) -> ${intType} {
+%     if intType == "Int" or intType == "UInt":
+#if _pointerBitWidth(_64)
+    let result = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int64(
+      rawAddress,
+      operand._value
+    )
+#elseif _pointerBitWidth(_32)
+    let result = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int32(
+      rawAddress,
+      operand._value
+    )
+#else
+#error("Unsupported platform")
+#endif
+%     else:
+    let result = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_${builtinInt}(
+      rawAddress,
+      operand._value
+    )
+%     end
+
+    return ${intType}(result)
+  }
+%   end
+
+  /// Perform an atomic wrapping increment operation applying the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&+=` operator does on `${intType}` values.
+  ///
+  /// - Parameter operand: The value to add to the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func wrappingIncrement(
+    by operand: ${intType} = 1,
+    ordering: Atomic${apiOrder}
+  ) {
+    _ = loadThenWrappingIncrement(by: operand, ordering: ordering)
+  }
+
+  /// Perform an atomic wrapping decrement operation applying the
+  /// specified memory ordering.
+  ///
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `&-=` operator does on `${intType}` values.
+  ///
+  /// - Parameter operand: The value to subtract from the current value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func wrappingDecrement(
+    by operand: ${intType} = 1,
+    ordering: Atomic${apiOrder}
+  ) {
+    _ = loadThenWrappingDecrement(by: operand, ordering: ordering)
+  }
+% end
+}
+
+//===----------------------------------------------------------------------===//
+// ${intType} atomic operation then loads
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.10, *)
+extension Atomic where Value == ${intType} {
+% for (name, builtinName, op, label, doc) in integerOperations:
+%   for (_, apiOrder, _, llvmOrder, _) in updateOrderings:
+  /// Perform an atomic ${doc} operation and return the new value, applying
+  /// the specified memory ordering.
+  ///
+%     if "Wrapping" in name:
+  /// Note: This operation silently wraps around on overflow, like the
+  /// `${op}` operator does on `${intType}` values.
+  ///
+%     end
+  /// - Parameter operand: An integer value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The new value after the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func ${lowerFirst(name)}ThenLoad(
+    ${label} operand: Value${" = 1" if "crement" in name else ""},
+    ordering: Atomic${apiOrder}
+  ) -> ${intType} {
+%     if intType == "Int" or intType == "UInt":
+#if _pointerBitWidth(_64)
+    let original = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int64(
+      rawAddress,
+      operand._value
+    )
+#elseif _pointerBitWidth(_32)
+    let original = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_Int32(
+      rawAddress,
+      operand._value
+    )
+#else
+#error("Unsupported platform")
+#endif
+%     else:
+    let original = Builtin.atomicrmw_${atomicOperationName(intType, builtinName)}_${llvmOrder}_${builtinInt}(
+      rawAddress,
+      operand._value
+    )
+%     end
+
+%     if name == "Min":
+    return Swift.min(${intType}(original), operand)
+%     elif name == "Max":
+    return Swift.max(${intType}(original), operand)
+%     else:
+    return ${intType}(original) ${op} operand
+%     end
+  }
+%   end
+% end
+}
+
+% end

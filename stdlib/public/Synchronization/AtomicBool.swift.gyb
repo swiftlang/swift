@@ -1,0 +1,106 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% from SwiftAtomics import *
+
+import Builtin
+
+//===----------------------------------------------------------------------===//
+// Bool AtomicValue conformance
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.10, *)
+extension Bool: AtomicValue {
+  public typealias AtomicRepresentation = AtomicInt8Storage
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func encodeAtomicRepresentation(
+    _ value: borrowing Bool
+  ) -> AtomicInt8Storage {
+    AtomicInt8Storage(Builtin.zext_Int1_Int8(value._value))
+  }
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func decodeAtomicRepresentation(
+    _ representation: consuming AtomicInt8Storage
+  ) -> Bool {
+    Bool(Builtin.trunc_Int8_Int1(representation.storage))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Bool load then atomic operations
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.10, *)
+extension Atomic where Value == Bool {
+% for (name, llvmName, op, label, doc) in boolOperations:
+%   for (_, apiOrder, _, llvmOrder, failureOrder) in updateOrderings:
+  /// Perform an atomic ${doc} operation and return the original value, applying
+  /// the specified memory ordering.
+  ///
+  /// - Parameter operand: A boolean value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value before the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func loadThen${name}(
+    with operand: Bool,
+    ordering: Atomic${apiOrder}
+  ) -> Bool {
+    let original = Builtin.atomicrmw_${llvmName}_${llvmOrder}_Int8(
+      rawAddress,
+      Bool.encodeAtomicRepresentation(operand).storage
+    )
+
+    return Bool.decodeAtomicRepresentation(AtomicInt8Storage(original))
+  }
+%   end
+% end
+}
+
+//===----------------------------------------------------------------------===//
+// Bool atomic operation then loads
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 5.10, *)
+extension Atomic where Value == Bool {
+% for (name, llvmName, op, label, doc) in boolOperations:
+%   for (_, apiOrder, _, llvmOrder, failureOrder) in updateOrderings:
+  /// Perform an atomic ${doc} operation and return the original value after the
+  /// operation, applying the specified memory ordering.
+  ///
+  /// - Parameter operand: A boolean value.
+  /// - Parameter ordering: The memory ordering to apply on this operation.
+  /// - Returns: The original value after the operation.
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func ${lowerFirst(name)}ThenLoad(
+    with operand: Bool,
+    ordering: Atomic${apiOrder}
+  ) -> Bool {
+    let original = Builtin.atomicrmw_${llvmName}_${llvmOrder}_Int8(
+      rawAddress,
+      Bool.encodeAtomicRepresentation(operand).storage
+    )
+
+    return Bool.decodeAtomicRepresentation(AtomicInt8Storage(original)) ${op} operand
+  }
+%   end
+% end
+}
