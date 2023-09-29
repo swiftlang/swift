@@ -2551,8 +2551,8 @@ ASTMangler::getTypeDefForCXXCFOptionsDefinition(const ValueDecl *decl) {
   if (!clangDecl)
     return nullptr;
 
-  auto &ctx = decl->getASTContext();
-  return ClangImporter::getTypedefForCXXCFOptionsDefinition(clangDecl, ctx);
+  const auto &clangModuleLoader = decl->getASTContext().getClangModuleLoader();
+  return clangModuleLoader->getTypeDefForCXXCFOptionsDefinition(clangDecl);
 }
 
 const clang::NamedDecl *
