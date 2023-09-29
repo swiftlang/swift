@@ -3226,7 +3226,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   // synthesize a computed property for '$foo'.
   Expr *projectedValueInit = nullptr;
   if (auto *projection = var->getPropertyWrapperProjectionVar()) {
-    createPBD(projection);
+    auto *pbd = createPBD(projection);
 
     if (var->hasExternalPropertyWrapper()) {
       // Projected-value initialization is currently only supported for parameters.
@@ -3240,7 +3240,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       // Check initializer effects.
       auto *initContext = new (ctx) PropertyWrapperInitializer(
           dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
-      checkInitializerActorIsolation(initContext, projectedValueInit);
+      (void)pbd->getInitializerIsolation(0);
       TypeChecker::checkInitializerEffects(initContext, projectedValueInit);
     }
   }

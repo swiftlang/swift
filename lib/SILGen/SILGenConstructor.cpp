@@ -1542,6 +1542,26 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     if (!init)
       continue;
 
+    // Member initializer expressions are only used in a constructor with
+    // matching actor isolation. If the isolation prohibits the member
+    // initializer from being evaluated synchronously (or propagating required
+    // isolation through closure bodies), then the default value cannot be used
+    // and the member must be explicitly initialized in the constructor.
+    auto requiredIsolation = field->getInitializerIsolation(i);
+    auto contextIsolation = getActorIsolationOfContext(dc);
+    switch (requiredIsolation) {
+    // 'nonisolated' expressions can be evaluated from anywhere
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+    case ActorIsolation::ActorInstance:
+      if (requiredIsolation != contextIsolation)
+        continue;
+    }
+
     auto *varPattern = field->getPattern(i);
 
     // Cleanup after this initialization.

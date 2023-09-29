@@ -1973,6 +1973,15 @@ private:
   SourceRange getOriginalInitRange() const;
   void setInit(Expr *E);
 
+  /// Get the required actor isolation for evaluating the initializer
+  /// expression synchronously (if there is one). 
+  ///
+  /// If this pattern binding entry is for a stored instance property, the
+  /// initializer can only be used in an `init` that meets the required
+  /// isolation; otherwise, the property must be explicitly initialized in
+  /// the `init`.
+  ActorIsolation getInitializerIsolation() const;
+
   /// Gets the text of the initializer expression, stripping out inactive
   /// branches of any #ifs inside the expression.
   StringRef getInitStringRepresentation(SmallVectorImpl<char> &scratch) const;
@@ -2224,6 +2233,10 @@ public:
 
   void setOriginalInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setOriginalInit(E);
+  }
+
+  ActorIsolation getInitializerIsolation(unsigned i) const {
+    return getPatternList()[i].getInitializerIsolation();
   }
 
   Pattern *getPattern(unsigned i) const {

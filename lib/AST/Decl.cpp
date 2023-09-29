@@ -1976,6 +1976,20 @@ void PatternBindingEntry::setInit(Expr *E) {
                              PatternFlags::IsText);
 }
 
+ActorIsolation PatternBindingEntry::getInitializerIsolation() const {
+  if (!isInitialized())
+    return ActorIsolation::forUnspecified();
+
+  auto *dc = cast<Initializer>(getInitContext());
+  auto &ctx = dc->getASTContext();
+  auto *initExpr = getExecutableInit();
+
+  return evaluateOrDefault(
+      ctx.evaluator,
+      DefaultInitializerIsolation{dc, initExpr},
+      ActorIsolation::forNonisolated());
+}
+
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   SmallVector<VarDecl *, 8> variables;
   getPattern()->collectVariables(variables);
@@ -8264,10 +8278,30 @@ Type ParamDecl::getTypeOfDefaultExpr() const {
 }
 
 ActorIsolation ParamDecl::getDefaultArgumentIsolation() const {
+  // If this parameter corresponds to a stored property for a
+  // memberwise initializer, the default argument is the default
+  // initializer expression.
+  auto *var = getStoredProperty();
+  if (var && !var->isInvalid()) {
+    // FIXME: Force computation of property wrapper initializers.
+    if (auto *wrapped = var->getOriginalWrappedProperty())
+      (void)wrapped->getPropertyWrapperInitializerInfo();
+
+    auto *pbd = var->getParentPatternBinding();
+    auto i = pbd->getPatternEntryIndexForVarDecl(var);
+    return var->getParentPatternBinding()->getInitializerIsolation(i);
+  }
+
+  if (!hasDefaultExpr())
+    return ActorIsolation::forUnspecified();
+
   auto &ctx = getASTContext();
+  auto *dc = getDefaultArgumentInitContext();
+  auto *initExpr = getTypeCheckedDefaultExpr();
+
   return evaluateOrDefault(
       ctx.evaluator,
-      DefaultArgumentIsolation{const_cast<ParamDecl *>(this)},
+      DefaultInitializerIsolation{dc, initExpr},
       ActorIsolation::forNonisolated());
 }
 
@@ -10453,8 +10487,25 @@ ActorIsolation swift::getActorIsolationOfContext(
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
 
-  if (auto *var = dcToUse->getNonLocalVarDecl())
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between instance and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //     Static properties are initialized upon first use, so the isolation
+  //     of the initializer must match the isolation required to access the
+  //     property.
+  //   - For a field of a nominal type, the expression can require a specific
+  //     actor isolation. That default expression may only be used from inits
+  //     that meet the required isolation.
+  if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    auto &ctx = dc->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments) &&
+        var->isInstanceMember() &&
+        !var->getAttrs().hasAttribute<LazyAttr>()) {
+      return ActorIsolation::forNonisolated();
+    }
+
     return getActorIsolation(var);
+  }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
     return getClosureActorIsolation(closure);

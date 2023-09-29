@@ -3582,11 +3582,6 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
 }
 
-void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {
-  ActorIsolationChecker checker(init);
-  expr->walk(checker);
-}
-
 ActorIsolation 
 swift::computeRequiredIsolation(Initializer *init, Expr *expr) {
   ActorIsolationChecker checker(init);
