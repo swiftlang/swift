@@ -1,5 +1,4 @@
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
+// REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
