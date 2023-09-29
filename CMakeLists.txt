@@ -1339,8 +1339,9 @@ if(SWIFT_INCLUDE_TOOLS)
       set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
 
+    file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
     FetchContent_Declare(SwiftSyntax
-      SOURCE_DIR "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}"
+      SOURCE_DIR "${swift_syntax_path}"
     )
     FetchContent_MakeAvailable(SwiftSyntax)
   endfunction()
