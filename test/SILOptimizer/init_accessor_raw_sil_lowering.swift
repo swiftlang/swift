@@ -431,4 +431,49 @@ func test_handling_of_nonmutating_set() {
       self.count = 0
     }
   }
+
+  struct TestWithStored {
+    private var _count: Int
+    private var _text: String = ""
+
+    var count: Int {
+      @storageRestrictions(initializes: _count)
+      init { _count = newValue }
+      get { _count }
+      nonmutating set { }
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countADSi_tcfC
+    // CHECK: [[SELF_REF:%.*]] = mark_uninitialized [rootself] %2
+    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: assign_or_init [init] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value %0 : $Int, init {{.*}} : $@convention(thin) (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SELF]] : $TestWithStored
+    init(count: Int) {
+      self.count = count
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5valueADSi_tcfC
+    // CHECK: [[SELF_REF:%.*]] = mark_uninitialized [rootself] %2
+    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    //
+    // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: assign_or_init [init] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value {{.*}} : $Int, init {{.*}} : $@convention(thin) (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SELF]] : $TestWithStored
+    //
+    // CHECK: [[SELF:%.*]] = load [copy] {{.*}} : $*TestWithStored
+    // CHECK: [[SETTER_REF:%.*]] = function_ref @$s23assign_or_init_lowering32test_handling_of_nonmutating_setyyF14TestWithStoredL_V5countSivs : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF]]) : $@convention(method) (Int, @guaranteed TestWithStored) -> ()
+    // CHECK-NEXT: assign_or_init [set] #<abstract function>TestWithStored.count, self [[SELF_REF]] : $*TestWithStored, value %0 : $Int, init {{.*}} : $@convention(thin) (Int) -> @out Int, set [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SETTER_CLOSURE]] : $@noescape @callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: destroy_value [[SELF]] : $TestWithStored
+    init(value: Int) {
+      self.count = 0
+      self.count = value
+    }
+  }
 }
