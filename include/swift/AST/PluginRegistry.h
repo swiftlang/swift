@@ -33,11 +33,19 @@ class LoadedLibraryPlugin {
   /// Cache of loaded symbols.
   llvm::StringMap<void *> resolvedSymbols;
 
+  /// Path to the plugin library.
+  const std::string LibraryPath;
+
 public:
-  LoadedLibraryPlugin(void *handle) : handle(handle) {}
+  LoadedLibraryPlugin(void *handle, StringRef path)
+      : handle(handle), LibraryPath(path) {}
 
   /// Finds the address of the given symbol within the library.
   void *getAddressOfSymbol(const char *symbolName);
+
+  NullTerminatedStringRef getLibraryPath() {
+    return {LibraryPath.c_str(), LibraryPath.size()};
+  }
 };
 
 /// Represent a "resolved" executable plugin.

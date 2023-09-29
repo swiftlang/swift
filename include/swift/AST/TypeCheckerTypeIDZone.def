@@ -461,7 +461,7 @@ SWIFT_REQUEST(TypeChecker, CompilerPluginLoadRequest,
               LoadedCompilerPlugin(ASTContext *, Identifier),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExternalMacroDefinitionRequest,
-              Optional<ExternalMacroDefinition>(ASTContext *, Identifier, Identifier),
+              ExternalMacroDefinition(ASTContext *, Identifier, Identifier),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandMacroExpansionDeclRequest,
               ArrayRef<Decl *>(MacroExpansionDecl *),

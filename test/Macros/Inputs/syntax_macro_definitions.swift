@@ -2071,3 +2071,12 @@ public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
     return ["if true { return }"]
   }
 }
+
+public struct NotMacroStruct {
+  public static func expansion(
+    of macro: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    fatalError()
+  }
+}

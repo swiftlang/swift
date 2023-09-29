@@ -4296,8 +4296,8 @@ public:
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
-                           llvm::Optional<ExternalMacroDefinition>(
-                               ASTContext *, Identifier, Identifier),
+                           ExternalMacroDefinition(ASTContext *, Identifier,
+                                                   Identifier),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4305,10 +4305,9 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<ExternalMacroDefinition> evaluate(
-      Evaluator &evaluator, ASTContext *ctx,
-      Identifier moduleName, Identifier typeName
-  ) const;
+  ExternalMacroDefinition evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                   Identifier moduleName,
+                                   Identifier typeName) const;
 
 public:
   // Source location

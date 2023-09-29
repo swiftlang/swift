@@ -65,12 +65,12 @@ extern "C" void swift_ASTGen_freeExpansionReplacements(
     ptrdiff_t numReplacements);
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, void *macro, uint8_t externalKind,
+    void *diagEngine, const void *macro, uint8_t externalKind,
     const char *discriminator, uint8_t rawMacroRole, void *sourceFile,
     const void *sourceLocation, BridgedString *evaluatedSourceOut);
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, void *macro, uint8_t externalKind,
+    void *diagEngine, const void *macro, uint8_t externalKind,
     const char *discriminator, const char *qualifiedType,
     const char *conformances, uint8_t rawMacroRole, void *customAttrSourceFile,
     const void *customAttrSourceLocation, void *declarationSourceFile,
@@ -381,7 +381,7 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   return nullptr;
 }
 
-static llvm::Optional<ExternalMacroDefinition>
+static ExternalMacroDefinition
 resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName, LoadedLibraryPlugin *plugin) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -398,13 +398,27 @@ resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
 
       return ExternalMacroDefinition{
           ExternalMacroDefinition::PluginKind::InProcess, inProcess};
+    } else {
+      NullTerminatedStringRef err(
+          "type '" + moduleName.str() + "." + typeName.str() +
+              "' is not a valid macro implementation type in library plugin '" +
+              StringRef(plugin->getLibraryPath()) + "'",
+          ctx);
+
+      return ExternalMacroDefinition::error(err);
     }
   }
+  NullTerminatedStringRef err("macro implementation type '" + moduleName.str() +
+                                  "." + typeName.str() +
+                                  "' could not be found in library plugin '" +
+                                  StringRef(plugin->getLibraryPath()) + "'",
+                              ctx);
+  return ExternalMacroDefinition::error(err);
 #endif
-  return llvm::None;
+  return ExternalMacroDefinition::error("macro is not supported");
 }
 
-static llvm::Optional<ExternalMacroDefinition>
+static ExternalMacroDefinition
 resolveExecutableMacro(ASTContext &ctx,
                        LoadedExecutablePlugin *executablePlugin,
                        Identifier moduleName, Identifier typeName) {
@@ -417,11 +431,17 @@ resolveExecutableMacro(ASTContext &ctx,
     return ExternalMacroDefinition{
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
+  NullTerminatedStringRef err(
+      "macro implementation type '" + moduleName.str() + "." + typeName.str() +
+          "' could not be found in executable plugin" +
+          StringRef(executablePlugin->getExecutablePath()),
+      ctx);
+  return ExternalMacroDefinition::error(err);
 #endif
-  return llvm::None;
+  return ExternalMacroDefinition::error("macro is not supported");
 }
 
-llvm::Optional<ExternalMacroDefinition>
+ExternalMacroDefinition
 ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                          Identifier moduleName,
                                          Identifier typeName) const {
@@ -432,19 +452,17 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
       evaluateOrDefault(evaluator, loadRequest, nullptr);
 
   if (auto loadedLibrary = loaded.getAsLibraryPlugin()) {
-    if (auto inProcess = resolveInProcessMacro(
-            *ctx, moduleName, typeName, loadedLibrary))
-      return *inProcess;
+    return resolveInProcessMacro(*ctx, moduleName, typeName, loadedLibrary);
   }
 
   if (auto *executablePlugin = loaded.getAsExecutablePlugin()) {
-    if (auto executableMacro = resolveExecutableMacro(*ctx, executablePlugin,
-                                                      moduleName, typeName)) {
-      return executableMacro;
-    }
+    return resolveExecutableMacro(*ctx, executablePlugin, moduleName, typeName);
   }
 
-  return llvm::None;
+  NullTerminatedStringRef err("plugin that can handle module '" +
+                                  moduleName.str() + "' not found",
+                              *ctx);
+  return ExternalMacroDefinition::error(err);
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid
@@ -1028,11 +1046,14 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     auto external = macroDef.getExternalMacro();
     ExternalMacroDefinitionRequest request{&ctx, external.moduleName,
                                            external.macroTypeName};
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
-    if (!externalDef) {
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("request error"));
+    if (externalDef.isError()) {
       ctx.Diags.diagnose(loc, diag::external_macro_not_found,
                          external.moduleName.str(),
-                         external.macroTypeName.str(), macro->getName());
+                         external.macroTypeName.str(), macro->getName(),
+                         externalDef.getErrorMessage());
       macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
@@ -1062,9 +1083,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     BridgedString evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
     swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
+        &ctx.Diags, externalDef.opaqueHandle,
+        static_cast<uint32_t>(externalDef.kind), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
@@ -1301,13 +1323,14 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
-    if (!externalDef) {
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("failed request"));
+    if (externalDef.isError()) {
       attachedTo->diagnose(diag::external_macro_not_found,
-                        external.moduleName.str(),
-                        external.macroTypeName.str(),
-                        macro->getName()
-      );
+                           external.moduleName.str(),
+                           external.macroTypeName.str(), macro->getName(),
+                           externalDef.getErrorMessage());
       macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
@@ -1339,9 +1362,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
       searchDecl = var->getParentPatternBinding();
 
     BridgedString evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
     swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
+        &ctx.Diags, externalDef.opaqueHandle,
+        static_cast<uint32_t>(externalDef.kind), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
