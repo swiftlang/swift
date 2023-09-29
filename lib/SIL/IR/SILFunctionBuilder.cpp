@@ -32,7 +32,7 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (auto fn = mod.lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(stripExternalFromLinkage(fn->getLinkage()) ==
-           stripExternalFromLinkage(linkage));
+           stripExternalFromLinkage(linkage) || mod.getOptions().EmbeddedSwift);
     return fn;
   }
 
