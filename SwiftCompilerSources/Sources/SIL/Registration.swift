@@ -36,7 +36,7 @@ public func registerSILClasses() {
   register(PlaceholderValue.self)
 
   register(FunctionArgument.self)
-  register(BlockArgument.self)
+  register(Argument.self)
 
   register(StoreInst.self)
   register(StoreWeakInst.self)

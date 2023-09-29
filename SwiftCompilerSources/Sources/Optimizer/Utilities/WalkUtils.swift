@@ -673,9 +673,9 @@ extension ValueUseDefWalker {
          is BeginDeallocRefInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
-    case let arg as BlockArgument:
-      if arg.isPhiArgument {
-        for incoming in arg.incomingPhiValues {
+    case let arg as Argument:
+      if let phi = Phi(arg) {
+        for incoming in phi.incomingValues {
           // Check the cache to avoid cycles in the walk
           if let path = walkUpCache.needWalk(for: incoming, path: path) {
             if walkUp(value: incoming, path: path) == .abortWalk {
@@ -685,14 +685,13 @@ extension ValueUseDefWalker {
         }
         return .continueWalk
       }
-      
-      let block = arg.parentBlock
-      if let pred = block.singlePredecessor,
-         let se = pred.terminator as? SwitchEnumInst,
-         let caseIdx = se.getUniqueCase(forSuccessor: block) {
-        return walkUp(value: se.enumOp, path: path.push(.enumCase, index: caseIdx))
+      if let termResult = TerminatorResult(arg) {
+        let pred = termResult.predecessor
+        if let se = pred.terminator as? SwitchEnumInst,
+           let caseIdx = se.getUniqueCase(forSuccessor: termResult.successor) {
+          return walkUp(value: se.enumOp, path: path.push(.enumCase, index: caseIdx))
+        }
       }
-      
       return rootDef(value: def, path: path)
     default:
       return rootDef(value: def, path: path)
