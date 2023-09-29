@@ -423,8 +423,6 @@ func test_handling_of_nonmutating_set() {
       self.count = 0
     }
   }
-<<<<<<< Updated upstream
-=======
 
   struct TestWithStored {
     private var _count: Int
@@ -468,5 +466,4 @@ func test_handling_of_nonmutating_set() {
       self.count = value
     }
   }
->>>>>>> Stashed changes
 }
