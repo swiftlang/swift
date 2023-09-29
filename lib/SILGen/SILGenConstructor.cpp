@@ -595,7 +595,7 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
       return true;
 
     case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
+    case ActorIsolation::Nonisolated:
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
       return false;

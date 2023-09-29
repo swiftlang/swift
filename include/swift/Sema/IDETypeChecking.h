@@ -318,9 +318,9 @@ namespace swift {
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 
   /// Determine the isolation of a particular closure.
-  ClosureActorIsolation determineClosureActorIsolation(
+  ActorIsolation determineClosureActorIsolation(
       AbstractClosureExpr *closure, llvm::function_ref<Type(Expr *)> getType,
-      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+      llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
           getClosureActorIsolation);
 
   /// If the capture list shadows any declarations using shorthand syntax, i.e.

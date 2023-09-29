@@ -472,7 +472,7 @@ func testGlobalActorClosures() {
     return 17
   }
 
-  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-warning 2{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-warning {{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -1495,5 +1495,33 @@ extension MyActor {
         }
       }
     }
+  }
+}
+
+@MainActor
+class SuperWithNonisolatedInit {
+  static func isolatedToMainActor() {}
+
+  // expected-note@+1 2 {{mutation of this property is only permitted within the actor}}
+  var x: Int = 0 {
+    didSet {
+      SuperWithNonisolatedInit.isolatedToMainActor()
+    }
+  }
+
+  nonisolated init() {}
+}
+
+class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
+  override nonisolated init() {
+    super.init()
+
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    super.x = 10
+  }
+
+  nonisolated func f() {
+    // expected-error@+1 {{main actor-isolated property 'x' can not be mutated from a non-isolated context}}
+    super.x = 10
   }
 }

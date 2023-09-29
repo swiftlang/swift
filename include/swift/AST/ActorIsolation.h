@@ -31,18 +31,6 @@ class NominalTypeDecl;
 class SubstitutionMap;
 class AbstractFunctionDecl;
 class AbstractClosureExpr;
-class ClosureActorIsolation;
-
-/// Trampoline for AbstractClosureExpr::getActorIsolation.
-ClosureActorIsolation
-__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
-
-/// Returns a function reference to \c __AbstractClosureExpr_getActorIsolation.
-/// This is needed so we can use it as a default argument for
-/// \c getActorIsolationOfContext without knowing the layout of
-/// \c ClosureActorIsolation.
-llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
-_getRef__AbstractClosureExpr_getActorIsolation();
 
 /// Determine whether the given types are (canonically) equal, declared here
 /// to avoid having to include Types.h.
@@ -68,10 +56,10 @@ public:
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
-    /// The declaration is explicitly specified to be independent of any actor,
+    /// The declaration is explicitly specified to be not isolated to any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
-    Independent,
+    Nonisolated,
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
@@ -83,7 +71,7 @@ public:
 
 private:
   union {
-    NominalTypeDecl *actor;
+    llvm::PointerUnion<NominalTypeDecl *, VarDecl *> actorInstance;
     Type globalActor;
     void *pointer;
   };
@@ -91,21 +79,26 @@ private:
   unsigned isolatedByPreconcurrency : 1;
   unsigned parameterIndex : 28;
 
-  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex)
-      : actor(actor), kind(kind), isolatedByPreconcurrency(false),
-        parameterIndex(parameterIndex) { }
+  ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
+
+  ActorIsolation(Kind kind, VarDecl *capturedActor);
 
   ActorIsolation(Kind kind, Type globalActor)
       : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
         parameterIndex(0) { }
 
 public:
+  // No-argument constructor needed for DenseMap use in PostfixCompletion.cpp
+  explicit ActorIsolation(Kind kind = Unspecified)
+      : pointer(nullptr), kind(kind), isolatedByPreconcurrency(false),
+        parameterIndex(0) { }
+
   static ActorIsolation forUnspecified() {
     return ActorIsolation(Unspecified, nullptr);
   }
 
-  static ActorIsolation forIndependent() {
-    return ActorIsolation(Independent, nullptr);
+  static ActorIsolation forNonisolated() {
+    return ActorIsolation(Nonisolated, nullptr);
   }
 
   static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
@@ -115,6 +108,10 @@ public:
   static ActorIsolation forActorInstanceParameter(NominalTypeDecl *actor,
                                                   unsigned parameterIndex) {
     return ActorIsolation(ActorInstance, actor, parameterIndex + 1);
+  }
+
+  static ActorIsolation forActorInstanceCapture(VarDecl *capturedActor) {
+    return ActorIsolation(ActorInstance, capturedActor);
   }
 
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
@@ -128,7 +125,7 @@ public:
 
   bool isUnspecified() const { return kind == Unspecified; }
   
-  bool isIndependent() const { return kind == Independent; }
+  bool isNonisolated() const { return kind == Nonisolated; }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
@@ -146,15 +143,14 @@ public:
       return true;
 
     case Unspecified:
-    case Independent:
+    case Nonisolated:
       return false;
     }
   }
 
-  NominalTypeDecl *getActor() const {
-    assert(getKind() == ActorInstance);
-    return actor;
-  }
+  NominalTypeDecl *getActor() const;
+
+  VarDecl *getActorInstance() const;
 
   bool isGlobalActor() const {
     return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
@@ -195,12 +191,13 @@ public:
       return false;
 
     switch (lhs.getKind()) {
-    case Independent:
+    case Nonisolated:
     case Unspecified:
       return true;
 
     case ActorInstance:
-      return lhs.actor == rhs.actor && lhs.parameterIndex == rhs.parameterIndex;
+      return (lhs.getActor() == rhs.getActor() &&
+              lhs.parameterIndex == rhs.parameterIndex);
 
     case GlobalActor:
     case GlobalActorUnsafe:
@@ -223,6 +220,10 @@ public:
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
 
+/// Trampoline for AbstractClosureExpr::getActorIsolation.
+ActorIsolation
+__AbstractClosureExpr_getActorIsolation(AbstractClosureExpr *CE);
+
 /// Determine how the given declaration context is isolated.
 /// \p getClosureActorIsolation allows the specification of actor isolation for
 /// closures that haven't been saved been saved to the AST yet. This is useful
@@ -230,35 +231,14 @@ ActorIsolation getActorIsolation(ValueDecl *value);
 /// actor isolation of closures in the constraint system solution.
 ActorIsolation getActorIsolationOfContext(
     DeclContext *dc,
-    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
-        getClosureActorIsolation =
-            _getRef__AbstractClosureExpr_getActorIsolation());
+    llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
+        getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
 /// Check if both the value, and context are isolated to the same actor.
 bool isSameActorIsolated(ValueDecl *value, DeclContext *dc);
 
 /// Determines whether this function's body uses flow-sensitive isolation.
 bool usesFlowSensitiveIsolation(AbstractFunctionDecl const *fn);
-
-/// Check if it is safe for the \c globalActor qualifier to be removed from
-/// \c ty, when the function value of that type is isolated to that actor.
-///
-/// In general this is safe in a narrow but common case: a global actor
-/// qualifier can be dropped from a function type while in a DeclContext
-/// isolated to that same actor, as long as the value is not Sendable.
-///
-/// \param dc the innermost context in which the cast to remove the global actor
-///           is happening.
-/// \param globalActor global actor that was dropped from \c ty.
-/// \param ty a function type where \c globalActor was removed from it.
-/// \param getClosureActorIsolation function that knows how to produce accurate
-///        information about the isolation of a closure.
-/// \return true if it is safe to drop the global-actor qualifier.
-bool safeToDropGlobalActor(
-                DeclContext *dc, Type globalActor, Type ty,
-                llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
-                    getClosureActorIsolation =
-                        _getRef__AbstractClosureExpr_getActorIsolation());
 
 void simple_display(llvm::raw_ostream &out, const ActorIsolation &state);
 

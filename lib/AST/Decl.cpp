@@ -2354,7 +2354,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
             break;
 
           case ActorIsolation::ActorInstance:
-          case ActorIsolation::Independent:
+          case ActorIsolation::Nonisolated:
           case ActorIsolation::GlobalActor:
             return true;
         }
@@ -10210,11 +10210,13 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
 
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       switch (auto isolation = closure->getActorIsolation()) {
-      case ClosureActorIsolation::Independent:
-      case ClosureActorIsolation::GlobalActor:
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
         return false;
 
-      case ClosureActorIsolation::ActorInstance:
+      case ActorIsolation::ActorInstance:
         auto isolatedVar = isolation.getActorInstance();
         return isolatedVar->isSelfParameter() ||
             isolatedVar-isSelfParamCapture();
@@ -10237,7 +10239,7 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
 
 ActorIsolation swift::getActorIsolationOfContext(
     DeclContext *dc,
-    llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+    llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
   auto dcToUse = dc;
   // Defer bodies share actor isolation of their enclosing context.
@@ -10253,7 +10255,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getActorIsolation(var);
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
-    return getClosureActorIsolation(closure).getActorIsolation();
+    return getClosureActorIsolation(closure);
   }
 
   if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
@@ -10499,6 +10501,33 @@ void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
     simple_display(out, func);
   else
     out << "closure";
+}
+
+ActorIsolation::ActorIsolation(Kind kind, NominalTypeDecl *actor,
+                               unsigned parameterIndex)
+    : actorInstance(actor), kind(kind), 
+      isolatedByPreconcurrency(false),
+      parameterIndex(parameterIndex) { }
+
+ActorIsolation::ActorIsolation(Kind kind, VarDecl *capturedActor)
+    : actorInstance(capturedActor), kind(kind),
+      isolatedByPreconcurrency(false), 
+      parameterIndex(0) { }
+
+NominalTypeDecl *ActorIsolation::getActor() const {
+  assert(getKind() == ActorInstance);
+
+  if (auto *instance = actorInstance.dyn_cast<VarDecl *>()) {
+    return instance->getTypeInContext()
+        ->getReferenceStorageReferent()->getAnyActor();
+  }
+
+  return actorInstance.get<NominalTypeDecl *>();
+}
+
+VarDecl *ActorIsolation::getActorInstance() const {
+  assert(getKind() == ActorInstance);
+  return actorInstance.dyn_cast<VarDecl *>();
 }
 
 bool ActorIsolation::isMainActor() const {
