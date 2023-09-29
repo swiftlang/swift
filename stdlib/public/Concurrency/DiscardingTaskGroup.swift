@@ -414,20 +414,25 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// ```
 ///
+/// Generally, this suits the typical use cases of a
+/// discarding task group well, however, if you want to prevent specific
+/// errors from canceling the group you can catch them inside the child
+/// task's body like this:
 ///
-///
-/// Generally, this suits the typical use-cases of a
-/// discarding task group well, however, if you wanted to prevent specific
-/// errors from cancelling the group
-///
-///
-///
-///
-/// Throwing an error in one of the child tasks of a task group
-/// doesn't immediately cancel the other tasks in that group.
-/// However,
-/// throwing out of the `body` of the `withThrowingTaskGroup` method does cancel
-/// the group, and all of its child tasks.
+/// ```
+/// try await withThrowingDiscardingTaskGroup { group in
+///   group.addTask {
+///     do {
+///       try boom(1)
+///     } catch is HarmlessError {
+///       return
+///     }
+///   }
+///   group.addTask {
+///     try boom(2, after: .seconds(5))
+///   }
+/// }
+/// ```
 @available(SwiftStdlib 5.9, *)
 @inlinable
 @_unsafeInheritExecutor

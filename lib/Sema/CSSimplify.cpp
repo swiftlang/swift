@@ -8348,8 +8348,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
 
     // Check whether this type conforms to the protocol.
-    auto conformance = DC->getParentModule()->lookupConformance(
-        type, protocol, /*allowMissing=*/true);
+    auto conformance = lookupConformance(type, protocol);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -8469,8 +8468,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto rawValue = isRawRepresentable(*this, type)) {
         if (!rawValue->isTypeVariableOrMember() &&
-            TypeChecker::conformsToProtocol(rawValue, protocol,
-                                            DC->getParentModule())) {
+            lookupConformance(rawValue, protocol)) {
           auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
           // Since this is a conformance requirement failure (where the
           // source is most likely an argument), let's increase its impact
@@ -8629,11 +8627,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
 
-  auto *M = DC->getParentModule();
-
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
-  if (M->lookupConformance(resolvedTy, protocol))
+  if (lookupConformance(resolvedTy, protocol))
     return SolutionKind::Solved;
 
   // If the type doesn't conform, let's check whether
@@ -8705,10 +8701,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     }
   }
 
-  return llvm::any_of(typesToCheck,
-                      [&](Type type) {
-                        return bool(M->lookupConformance(type, protocol));
-                      })
+  return llvm::any_of(
+             typesToCheck,
+             [&](Type type) { return bool(lookupConformance(type, protocol)); })
              ? SolutionKind::Solved
              : SolutionKind::Error;
 }
@@ -9295,7 +9290,7 @@ static bool mayBeForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
 /// This is useful to figure out whether it makes sense to
 /// perform dynamic member lookup or not.
 static bool
-allFromConditionalConformances(DeclContext *DC, Type baseTy,
+allFromConditionalConformances(ConstraintSystem &cs, Type baseTy,
                                ArrayRef<OverloadChoice> candidates) {
   auto *NTD = baseTy->getAnyNominal();
   if (!NTD)
@@ -9314,8 +9309,7 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
     }
 
     if (auto *protocol = candidateDC->getSelfProtocolDecl()) {
-      auto conformance = DC->getParentModule()->lookupConformance(
-          baseTy, protocol);
+      auto conformance = cs.lookupConformance(baseTy, protocol);
       if (!conformance.isConcrete())
         return false;
 
@@ -10053,7 +10047,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     const auto &candidates = result.ViableCandidates;
 
     if ((candidates.empty() ||
-         allFromConditionalConformances(DC, instanceTy, candidates)) &&
+         allFromConditionalConformances(*this, instanceTy, candidates)) &&
         !isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
                                                    memberLocator)) {
       auto &ctx = getASTContext();
@@ -10636,7 +10630,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // called within extensions to that type (usually adding 'clamp').
       bool treatAsViable =
           (member.isSimpleName("min") || member.isSimpleName("max")) &&
-          allFromConditionalConformances(DC, baseTy, result.ViableCandidates);
+          allFromConditionalConformances(*this, baseTy,
+                                         result.ViableCandidates);
 
       generateConstraints(
           candidates, memberTy, outerAlternatives, useDC, locator, llvm::None,
@@ -11044,8 +11039,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   // conformance already?
   auto proto = requirement->getDeclContext()->getSelfProtocolDecl();
   assert(proto && "Value witness constraint for a non-requirement");
-  auto conformance = useDC->getParentModule()->lookupConformance(
-      baseObjectType, proto);
+  auto conformance = lookupConformance(baseObjectType, proto);
   if (!conformance)
     return fail();
 

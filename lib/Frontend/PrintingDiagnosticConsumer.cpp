@@ -316,7 +316,7 @@ namespace {
     }
 } // end anonymous namespace
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void enqueueDiagnostic(
     void *queuedDiagnostics, const DiagnosticInfo &info, SourceManager &SM
@@ -436,7 +436,7 @@ void PrintingDiagnosticConsumer::queueBuffer(
       parentID, positionInParent);
   queuedBuffers[bufferID] = sourceFile;
 }
-#endif // SWIFT_SWIFT_PARSER
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
@@ -453,7 +453,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 
   switch (FormattingStyle) {
   case DiagnosticOptions::FormattingStyle::Swift: {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
     // Use the swift-syntax formatter.
     auto bufferStack = getSourceBufferStack(SM, Info.Loc);
     if (!bufferStack.empty()) {
@@ -495,7 +495,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 }
 
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
     char *renderedString = nullptr;
     SwiftInt renderedStringLen = 0;

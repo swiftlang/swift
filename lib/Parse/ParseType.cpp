@@ -608,7 +608,7 @@ extern "C" TypeRepr *swift_ASTGen_buildTypeRepr(
 ///
 ParserResult<TypeRepr> Parser::parseType(
     Diag<> MessageID, ParseTypeReason reason) {
-  #if SWIFT_SWIFT_PARSER
+  #if SWIFT_BUILD_SWIFT_SYNTAX
   auto astGenResult = parseASTFromSyntaxTree<TypeRepr>(
       [&](void *exportedSourceFile, const void *sourceLoc) {
         const void *endLocPtr = nullptr;
