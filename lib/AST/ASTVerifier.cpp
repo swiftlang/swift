@@ -496,7 +496,6 @@ public:
       switch (afd->getBodyKind()) {
       case AbstractFunctionDecl::BodyKind::None:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
-      case AbstractFunctionDecl::BodyKind::Skipped:
       case AbstractFunctionDecl::BodyKind::SILSynthesize:
       case AbstractFunctionDecl::BodyKind::Deserialized:
         return true;

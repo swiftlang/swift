@@ -1457,11 +1457,13 @@ llvm::Optional<BraceStmt *>
 TypeCheckFunctionBodyRequest::getCachedResult() const {
   using BodyKind = AbstractFunctionDecl::BodyKind;
   auto *afd = std::get<0>(getStorage());
+  if (afd->isBodySkipped())
+    return nullptr;
+
   switch (afd->getBodyKind()) {
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     // These cases don't have any body available.
     return nullptr;
 

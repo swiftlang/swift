@@ -503,3 +503,6 @@ SWIFT_REQUEST(TypeChecker, ExpandChildTypeRefinementContextsRequest,
 SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
               GenericSignature(Decl *, SpecializeAttr *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsFunctionBodySkippedRequest,
+              bool(const AbstractFunctionDecl *),
+              SeparatelyCached, NoLocationInfo)

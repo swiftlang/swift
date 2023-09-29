@@ -450,9 +450,12 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+2+2+8+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
+
+    /// \see AbstractFunctionDecl::BodySkippedStatus
+    BodySkippedStatus : 2,
 
     /// \see AbstractFunctionDecl::SILSynthesizeKind
     SILSynthesizeKind : 2,
@@ -6857,9 +6860,6 @@ public:
     /// Function body is parsed and available as an AST subtree.
     Parsed,
 
-    /// Function body is not available, although it was written in the source.
-    Skipped,
-
     /// Function body will be synthesized on demand.
     Synthesize,
 
@@ -6873,6 +6873,14 @@ public:
     Deserialized
 
     // This enum currently needs to fit in a 3-bit bitfield.
+  };
+
+  enum class BodySkippedStatus {
+    Unknown,
+    Skipped,
+    NotSkipped,
+
+    // This enum needs to fit in a 2-bit bitfield.
   };
 
   BodyKind getBodyKind() const {
@@ -6926,13 +6934,13 @@ protected:
 
     /// The location of the function body when the body is delayed or skipped.
     ///
-    /// This enum member is active if getBodyKind() is BodyKind::Unparsed or
-    /// BodyKind::Skipped.
+    /// This enum member is active if getBodyKind() is BodyKind::Unparsed.
     SourceRange BodyRange;
   };
 
   friend class ParseAbstractFunctionBodyRequest;
   friend class TypeCheckFunctionBodyRequest;
+  friend class IsFunctionBodySkippedRequest;
 
   CaptureInfo Captures;
 
@@ -6968,6 +6976,14 @@ protected:
 
   void setBodyKind(BodyKind K) {
     Bits.AbstractFunctionDecl.BodyKind = unsigned(K);
+  }
+
+  BodySkippedStatus getBodySkippedStatus() const {
+    return BodySkippedStatus(Bits.AbstractFunctionDecl.BodySkippedStatus);
+  }
+
+  void setBodySkippedStatus(BodySkippedStatus status) {
+    Bits.AbstractFunctionDecl.BodySkippedStatus = unsigned(status);
   }
 
   void setSILSynthesizeKind(SILSynthesizeKind K) {
@@ -7088,10 +7104,7 @@ public:
   ///
   /// Note that a true return value does not imply that the body was actually
   /// parsed.
-  bool hasBody() const {
-    return getBodyKind() != BodyKind::None &&
-           getBodyKind() != BodyKind::Skipped;
-  }
+  bool hasBody() const { return getBodyKind() != BodyKind::None; }
 
   /// Returns true if the text of this function's body can be retrieved either
   /// by extracting the text from the source buffer or reading the inlinable
@@ -7112,21 +7125,6 @@ public:
 
   /// Set a new body for the function.
   void setBody(BraceStmt *S, BodyKind NewBodyKind);
-
-  /// Note that the body was skipped for this function. Function body
-  /// cannot be attached after this call.
-  void setBodySkipped(SourceRange bodyRange) {
-    // FIXME: Remove 'Parsed' from this list once we can always delay
-    //        parsing bodies. The -experimental-skip-*-function-bodies options
-    //        do currently skip parsing, unless disabled through other means in
-    //        SourceFile::hasDelayedBodyParsing.
-    assert(getBodyKind() == BodyKind::None ||
-           getBodyKind() == BodyKind::Unparsed ||
-           getBodyKind() == BodyKind::Parsed);
-    assert(bodyRange.isValid());
-    BodyRange = bodyRange;
-    setBodyKind(BodyKind::Skipped);
-  }
 
   /// Note that parsing for the body was delayed.
   void setBodyDelayed(SourceRange bodyRange) {
@@ -7205,9 +7203,9 @@ public:
     return getBodyKind() == BodyKind::SILSynthesize;
   }
 
-  bool isBodySkipped() const {
-    return getBodyKind() == BodyKind::Skipped;
-  }
+  /// Indicates whether the body of this function is skipped during
+  /// typechecking.
+  bool isBodySkipped() const;
 
   bool isMemberwiseInitializer() const {
     return getBodyKind() == BodyKind::SILSynthesize
