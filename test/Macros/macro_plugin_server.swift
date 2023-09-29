@@ -32,9 +32,9 @@
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libMacroDefinition.dylib","moduleName":"MacroDefinition"}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}MacroDefinition.{{dylib|so|dll}}","moduleName":"MacroDefinition"}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libEvilMacros.dylib","moduleName":"EvilMacros"}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(a + b)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(a + b, \"a + b\")"}}
@@ -43,9 +43,9 @@
 
 // CHECK: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libMacroDefinition.dylib","moduleName":"MacroDefinition"}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}MacroDefinition.{{dylib|so|dll}}","moduleName":"MacroDefinition"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libEvilMacros.dylib","moduleName":"EvilMacros"}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(b + a, \"b + a\")"}}
