@@ -400,9 +400,9 @@ extension Undef {
 }
 
 extension BasicBlock {
-  func addBlockArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> BlockArgument {
+  func addArgument(type: Type, ownership: Ownership, _ context: some MutatingContext) -> Argument {
     context.notifyInstructionsChanged()
-    return bridged.addBlockArgument(type.bridged, ownership._bridged).blockArgument
+    return bridged.addBlockArgument(type.bridged, ownership._bridged).argument
   }
   
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
