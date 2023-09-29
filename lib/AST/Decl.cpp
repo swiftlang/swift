@@ -8934,9 +8934,6 @@ BraceStmt *AbstractFunctionDecl::getTypecheckedBody() const {
 }
 
 void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
-  assert(getBodyKind() != BodyKind::Skipped &&
-         "cannot set a body if it was skipped");
-
   llvm::Optional<Fingerprint> fp = llvm::None;
   if (getBodyKind() == BodyKind::TypeChecked ||
       getBodyKind() == BodyKind::Parsed) {
@@ -8950,6 +8947,72 @@ void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
     if (auto *ctor = dyn_cast<ConstructorDecl>(this))
       ctor->clearCachedDelegatingOrChainedInitKind();
   }
+}
+
+bool AbstractFunctionDecl::isBodySkipped() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsFunctionBodySkippedRequest{this}, false);
+}
+
+/// Determines whether typechecking can be skipped for a function body. Bodies
+/// are skipped as a performance optimization when an
+/// `-experimental-skip-*-function-bodies` flag is specified and the body meets
+/// the criteria for skipping. If a body is skipped during typechecking, it is
+/// also skipped during SILGen. Some bodies cannot be skipped, even when they
+/// otherwise meet the criteria, because typechecking them has essential
+/// side-effects that are required for correctness of the AST.
+bool IsFunctionBodySkippedRequest::evaluate(
+    Evaluator &evaluator, const AbstractFunctionDecl *afd) const {
+  auto &Ctx = afd->getASTContext();
+  auto skippingMode = Ctx.TypeCheckerOpts.SkipFunctionBodies;
+  if (skippingMode == FunctionBodySkipping::None)
+    return false;
+
+  // Functions that have been synthesized for clang modules will be serialized
+  // because they have shared linkage.
+  if (isa<ClangModuleUnit>(afd->getDeclContext()->getModuleScopeContext()))
+    return false;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
+    // didSet accessors needs to be checked to determine whether to keep their
+    // parameters.
+    if (accessor->getAccessorKind() == AccessorKind::DidSet)
+      return false;
+
+    // Synthesized accessors with forced static dispatch are emitted on-demand
+    // and are serialized. Since they are serialized we must be willing to
+    // typecheck them.
+    if (accessor->hasForcedStaticDispatch())
+      return false;
+
+    if (auto *varDecl = dyn_cast<VarDecl>(accessor->getStorage())) {
+      // FIXME: If we don't typecheck the synthesized accessors of lazy storage
+      // properties then SILGen crashes when emitting the initializer.
+      if (varDecl->getAttrs().hasAttribute<LazyAttr>() && accessor->isSynthesized())
+        return false;
+    }
+  }
+
+  // Actor initializers need to be checked to determine delegation status.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(afd))
+    if (auto *nom = ctor->getParent()->getSelfNominalTypeDecl())
+      if (nom->isAnyActor())
+        return false;
+
+  // Skipping all bodies won't serialize anything, so we can skip everything
+  // else.
+  if (skippingMode == FunctionBodySkipping::All)
+    return true;
+
+  // If we want all types (for LLDB) then we can't skip functions with nested
+  // types. We could probably improve upon this and type-check only the nested
+  // types instead for better performances.
+  if (afd->hasNestedTypeDeclarations() &&
+      skippingMode == FunctionBodySkipping::NonInlinableWithoutTypes)
+    return false;
+
+  // Skip functions that don't need to be serialized.
+  return afd->getResilienceExpansion() != ResilienceExpansion::Minimal;
 }
 
 void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
@@ -8986,7 +9049,6 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
 
     return SourceRange();
 
-  case BodyKind::Skipped:
   case BodyKind::Unparsed:
     return BodyRange;
   }
@@ -9396,7 +9458,6 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
 
   case BodyKind::None:
   case BodyKind::Synthesize:
-  case BodyKind::Skipped:
   case BodyKind::SILSynthesize:
     return false;
   }
@@ -9847,8 +9908,7 @@ SourceRange FuncDecl::getSourceRange() const {
   if (StartLoc.isInvalid())
     return SourceRange();
 
-  if (getBodyKind() == BodyKind::Unparsed ||
-      getBodyKind() == BodyKind::Skipped)
+  if (getBodyKind() == BodyKind::Unparsed)
     return { StartLoc, BodyRange.End };
 
   SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
@@ -10530,7 +10590,6 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     return BodyAndFingerprint{};
 
   case BodyKind::TypeChecked:
@@ -10552,7 +10611,6 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     // The body is always empty, so don't cache anything.
     assert(!value.getFingerprint().has_value() && value.getBody() == nullptr);
     return;
@@ -10567,6 +10625,27 @@ void ParseAbstractFunctionBodyRequest::cacheResult(
     llvm_unreachable("evaluate() did not set the body kind");
     return;
   }
+}
+
+llvm::Optional<bool> IsFunctionBodySkippedRequest::getCachedResult() const {
+  using BodySkippedStatus = AbstractFunctionDecl::BodySkippedStatus;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodySkippedStatus()) {
+  case BodySkippedStatus::Unknown:
+    return llvm::None;
+  case BodySkippedStatus::Skipped:
+    return true;
+  case BodySkippedStatus::NotSkipped:
+    return false;
+  }
+  llvm_unreachable("bad BodySkippedStatus");
+}
+
+void IsFunctionBodySkippedRequest::cacheResult(bool isSkipped) const {
+  using BodySkippedStatus = AbstractFunctionDecl::BodySkippedStatus;
+  auto afd = std::get<0>(getStorage());
+  const_cast<AbstractFunctionDecl *>(afd)->setBodySkippedStatus(
+      isSkipped ? BodySkippedStatus::Skipped : BodySkippedStatus::NotSkipped);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, BodyAndFingerprint value) {

@@ -91,7 +91,6 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
   case BodyKind::Deserialized:
   case BodyKind::SILSynthesize:
   case BodyKind::None:
-  case BodyKind::Skipped:
     return {};
 
   case BodyKind::TypeChecked:

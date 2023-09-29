@@ -3280,48 +3280,6 @@ public:
     return true;
   }
 
-
-  bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
-    // Make sure we're in a mode that's skipping function bodies.
-    if (getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
-        FunctionBodySkipping::None)
-      return false;
-
-    // Make sure there even _is_ a body that we can skip.
-    if (!AFD->getBodySourceRange().isValid())
-      return false;
-
-    // didSet runs typechecking to determine whether to keep its parameter,
-    // so never try to skip.
-    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-      if (AD->getAccessorKind() == AccessorKind::DidSet)
-        return false;
-    }
-
-    // do not skip the body of an actor initializer.
-    // they are checked to determine delegation status
-    if (auto *ctor = dyn_cast<ConstructorDecl>(AFD))
-      if (auto *nom = ctor->getParent()->getSelfNominalTypeDecl())
-        if (nom->isAnyActor())
-          return false;
-
-    // Skipping all bodies won't serialize anything, so can skip regardless
-    if (getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
-        FunctionBodySkipping::All)
-      return true;
-
-    // If we want all types (for LLDB) we can't skip functions with nested
-    // types. We could probably improve upon this and type-check only the
-    // nested types instead for better performances.
-    if (AFD->hasNestedTypeDeclarations() &&
-        getASTContext().TypeCheckerOpts.SkipFunctionBodies ==
-          FunctionBodySkipping::NonInlinableWithoutTypes)
-      return false;
-
-    // Only skip functions where their body won't be serialized
-    return AFD->getResilienceExpansion() != ResilienceExpansion::Minimal;
-  }
-
   /// FIXME: This is an egregious hack to turn off availability checking
   /// for specific functions that were missing availability in older versions
   /// of existing libraries that we must nonetheless still support.
@@ -3385,9 +3343,7 @@ public:
       // Check local function bodies right away.
       (void)FD->getTypecheckedBody();
       TypeChecker::computeCaptures(FD);
-    } else if (shouldSkipBodyTypechecking(FD)) {
-      FD->setBodySkipped(FD->getBodySourceRange());
-    } else {
+    } else if (!FD->isBodySkipped()) {
       addDelayedFunction(FD);
     }
 
@@ -3883,9 +3839,7 @@ public:
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)CD->getTypecheckedBody();
-    } else if (shouldSkipBodyTypechecking(CD)) {
-      CD->setBodySkipped(CD->getBodySourceRange());
-    } else {
+    } else if (!CD->isBodySkipped()) {
       addDelayedFunction(CD);
     }
 
@@ -3938,9 +3892,7 @@ public:
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)DD->getTypecheckedBody();
-    } else if (shouldSkipBodyTypechecking(DD)) {
-      DD->setBodySkipped(DD->getBodySourceRange());
-    } else {
+    } else if (!DD->isBodySkipped()) {
       addDelayedFunction(DD);
     }
   }

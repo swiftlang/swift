@@ -2401,7 +2401,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
       }
     }
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-      if (AFD->hasBody() && !AFD->isBodyTypeChecked()) {
+      if (AFD->hasBody() && !AFD->isBodyTypeChecked() &&
+          !AFD->isBodySkipped()) {
         // Pre-check the function body if needed.
         (void)evaluateOrDefault(evaluator, PreCheckFunctionBodyRequest{AFD},
                                 nullptr);
@@ -2648,6 +2649,8 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
 BraceStmt *
 PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
                                       AbstractFunctionDecl *AFD) const {
+  assert(!AFD->isBodySkipped());
+
   auto &ctx = AFD->getASTContext();
   auto *body = AFD->getBody();
   assert(body && "Expected body");
@@ -2701,6 +2704,8 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 BraceStmt *
 TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
                                        AbstractFunctionDecl *AFD) const {
+  assert(!AFD->isBodySkipped());
+
   ASTContext &ctx = AFD->getASTContext();
 
   llvm::Optional<FunctionBodyTimer> timer;
