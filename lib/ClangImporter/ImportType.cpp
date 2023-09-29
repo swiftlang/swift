@@ -2656,8 +2656,9 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
     if (declIter != declsInContext.end()) {
       if (auto enumDecl = dyn_cast<clang::EnumDecl>(*declIter)) {
         if (auto cfOptionsTy =
-                ClangImporter::getTypedefForCXXCFOptionsDefinition(
-                    enumDecl, nameImporter.getContext())) {
+                nameImporter.getContext()
+                    .getClangModuleLoader()
+                    ->getTypeDefForCXXCFOptionsDefinition(enumDecl)) {
           if (cfOptionsTy->getDecl() == typedefDecl) {
             auto enumName = typedefDecl->getName();
             ArgumentAttrs argumentAttrs(DefaultArgumentKind::None, true,
