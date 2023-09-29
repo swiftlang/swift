@@ -3441,38 +3441,45 @@ static void initObjCClass(ClassMetadata *self,
                           size_t *fieldOffsets) {
   ClassROData *rodata = getROData(self);
 
-  // Always clone the ivar descriptors.
-  if (numFields) {
-    const ClassIvarList *dependentIvars = rodata->IvarList;
-    assert(dependentIvars->Count == numFields);
-    assert(dependentIvars->EntrySize == sizeof(ClassIvarEntry));
+  ClassIvarList *ivars = rodata->IvarList;
+  if (!ivars) {
+    assert(numFields == 0);
+    return;
+  }
 
-    auto ivarListSize = sizeof(ClassIvarList) +
-                        numFields * sizeof(ClassIvarEntry);
-    auto ivars = (ClassIvarList*) getResilientMetadataAllocator()
-      .Allocate(ivarListSize, alignof(ClassIvarList));
-    memcpy(ivars, dependentIvars, ivarListSize);
-    rodata->IvarList = ivars;
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
 
-    for (unsigned i = 0; i != numFields; ++i) {
-      auto *eltLayout = fieldTypes[i];
+  bool copiedIvarList = false;
 
-      ClassIvarEntry &ivar = ivars->getIvars()[i];
+  for (unsigned i = 0; i != numFields; ++i) {
+    auto *eltLayout = fieldTypes[i];
 
-      // Fill in the field offset global, if this ivar has one.
-      if (ivar.Offset) {
-        if (*ivar.Offset != fieldOffsets[i])
-          *ivar.Offset = fieldOffsets[i];
+    ClassIvarEntry &ivar = ivars->getIvars()[i];
+
+    // Fill in the field offset global, if this ivar has one.
+    if (ivar.Offset) {
+      if (*ivar.Offset != fieldOffsets[i])
+        *ivar.Offset = fieldOffsets[i];
+    }
+
+    // If the ivar's size doesn't match the field layout we
+    // computed, overwrite it and give it better type information.
+    if (ivar.Size != eltLayout->size) {
+      // If we're going to modify the ivar list, we need to copy it first.
+      if (!copiedIvarList) {
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        ivars = (ClassIvarList*) getResilientMetadataAllocator()
+          .Allocate(ivarListSize, alignof(ClassIvarList));
+        memcpy(ivars, rodata->IvarList, ivarListSize);
+        rodata->IvarList = ivars;
+        copiedIvarList = true;
       }
-
-      // If the ivar's size doesn't match the field layout we
-      // computed, overwrite it and give it better type information.
-      if (ivar.Size != eltLayout->size) {
-        ivar.Size = eltLayout->size;
-        ivar.Type = nullptr;
-        ivar.Log2Alignment =
-          getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
-      }
+      ivar.Size = eltLayout->size;
+      ivar.Type = nullptr;
+      ivar.Log2Alignment =
+        getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
     }
   }
 }
