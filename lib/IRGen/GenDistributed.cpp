@@ -271,8 +271,16 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
     auto *actor = getDistributedActorOf(Target);
     assert(actor);
 
-    for (auto *genericParam : actor->getInnermostGenericParamTypes())
+    for (auto *genericParam : actor->getInnermostGenericParamTypes()) {
       genericParams.push_back(genericParam);
+
+      // and also forward all requirements this generic parameter might have.
+      for (auto req : actor->getGenericRequirements()) {
+        if (req.getFirstType()->isEqual(genericParam)) {
+          genericRequirements.push_back(req);
+        }
+      }
+    }
 
     // Add a generic parameter `D` which stands for decoder type in the
     // accessor signature - `inout D`.
