@@ -2033,14 +2033,9 @@ public:
   }
 
   /// Determine the number of bits set.
-  static unsigned numBitsSet(uint64_t value) {
-    unsigned count = 0;
-    for (uint64_t i : range(0, 63)) {
-      if (value & (uint64_t(1) << i))
-        ++count;
-    }
+  static inline unsigned numBitsSet(uint64_t value) {
 
-    return count;
+    return static_cast<unsigned>(__builtin_popcountll(value));
   }
 
   void visitMacroDecl(MacroDecl *MD) {

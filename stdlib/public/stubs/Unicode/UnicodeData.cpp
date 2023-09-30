@@ -56,7 +56,7 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
   __swift_intptr_t resultIdx = 0;
 
   // Here, levels represent the numbers of bit arrays used for this hash table.
-  for (int i = 0; i != levels; i += 1) {
+  for (int i = 0; i < levels; i += 1) {
     auto bitArray = keys[i];
 
     // Get the specific bit that this scalar hashes to in the bit array.
