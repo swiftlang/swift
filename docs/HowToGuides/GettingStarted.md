@@ -136,11 +136,10 @@ toolchain as a one-off, there are a couple of differences:
 
 ### macOS
 
-1. Install [Xcode 13 beta 4][Xcode] or newer:
-   The required version of Xcode changes frequently and is often a beta release.
-   Check this document or the host information on <https://ci.swift.org> for the
-   current required version.
-2. Install [CMake][], [Ninja][] and [Sccache][]:
+1. Install Xcode. The minimum required version is specified in the node
+   information on <https://ci.swift.org>, may change frequently, and is often
+   a beta release.
+1. Install [CMake][], [Ninja][] and [Sccache][]:
    - Via [Homebrew][] (recommended):
      ```sh
      brew install cmake ninja sccache
