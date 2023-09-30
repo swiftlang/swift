@@ -150,10 +150,17 @@ private import LocalClang
 // RUN:   -library-level api -verify
 //--- ExplicitlyPublicImports.swift
 public import PublicSwift
+// expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}
 public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}
 
 public import PublicClang
+// expected-warning @-1 {{public import of 'PublicClang' was not used in public declarations or inlinable code}}
 public import PublicClang_Private // expected-error{{private module 'PublicClang_Private' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'PublicClang_Private' was not used in public declarations or inlinable code}}
 public import FullyPrivateClang // expected-error{{private module 'FullyPrivateClang' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'FullyPrivateClang' was not used in public declarations or inlinable code}}
 public import LocalClang // expected-error{{private module 'LocalClang' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'LocalClang' was not used in public declarations or inlinable code}}
 @_exported public import MainLib // expected-warning{{private module 'MainLib' is imported publicly from the public module 'MainLib'}}
+// expected-warning @-1 {{public import of 'MainLib' was not used in public declarations or inlinable code}}

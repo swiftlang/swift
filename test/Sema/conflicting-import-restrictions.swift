@@ -54,10 +54,11 @@
 // RUN:   -enable-experimental-feature AccessLevelOnImport
 
 //--- Public_Exported.swift
-@_exported public import Lib
+@_exported public import Lib // expected-warning {{public import of 'Lib' was not used in public declarations or inlinable code}}
 
 //--- Package_Exported.swift
 @_exported package import Lib // expected-error {{'@_exported' is incompatible with 'package'; it can only be applied to public imports}}
+// expected-warning @-1 {{package import of 'Lib' was not used in package declarations}}
 
 //--- Internal_Exported.swift
 @_exported internal import Lib // expected-error {{'@_exported' is incompatible with 'internal'; it can only be applied to public imports}}

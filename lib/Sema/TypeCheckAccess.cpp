@@ -191,6 +191,46 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
       contextAccessScope.getDeclContext()->isLocalContext())
     return;
 
+  // Report where it was imported from.
+  if (contextAccessScope.isPublic() ||
+      contextAccessScope.isPackage()) {
+    auto SF = useDC->getParentSourceFile();
+    auto report = [&](const IdentTypeRepr *typeRepr, const ValueDecl *VD) {
+      ImportAccessLevel import = VD->getImportAccessFrom(useDC);
+      if (import.has_value()) {
+        if (SF) {
+          auto useLevel = contextAccessScope.isPublic() ? AccessLevel::Public
+                                                        : AccessLevel::Package;
+          SF->registerAccessLevelUsingImport(import.value(), useLevel);
+        }
+
+        if (Context.LangOpts.EnableModuleApiImportRemarks) {
+          SourceLoc diagLoc = typeRepr? typeRepr->getLoc()
+                                      : extractNearestSourceLoc(useDC);
+          ModuleDecl *importedVia = import->module.importedModule,
+                     *sourceModule = VD->getModuleContext();
+          Context.Diags.diagnose(diagLoc, diag::module_api_import,
+                                 VD, importedVia, sourceModule,
+                                 importedVia == sourceModule,
+                                 /*isImplicit*/!typeRepr);
+        }
+      }
+    };
+
+    if (typeRepr) {
+      typeRepr->walk(TypeReprIdentFinder([&](const IdentTypeRepr *TR) {
+        const ValueDecl *VD = TR->getBoundDecl();
+        report(TR, VD);
+        return true;
+      }));
+    } else if (type) {
+      type.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+        report(/*typeRepr=*/nullptr, VD);
+        return TypeWalker::Action::Continue;
+      }));
+    }
+  };
+
   AccessScope problematicAccessScope = AccessScope::getPublic();
 
   if (type) {
@@ -339,13 +379,13 @@ static void noteLimitingImport(ASTContext &ctx,
 
   if (auto ITR = dyn_cast_or_null<IdentTypeRepr>(complainRepr)) {
     ValueDecl *VD = ITR->getBoundDecl();
-    ctx.Diags.diagnose(limitImport->accessLevelLoc,
+    ctx.Diags.diagnose(limitImport->importLoc,
                        diag::decl_import_via_here,
                        VD,
                        limitImport->accessLevel,
                        limitImport->module.importedModule);
   } else {
-    ctx.Diags.diagnose(limitImport->accessLevelLoc, diag::module_imported_here,
+    ctx.Diags.diagnose(limitImport->importLoc, diag::module_imported_here,
                        limitImport->module.importedModule,
                        limitImport->accessLevel);
   }
@@ -2356,6 +2396,39 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
                                                     const ExportContext &where) {
   auto downgradeToWarning = DowngradeToWarning::No;
   return getDisallowedOriginKind(decl, where, downgradeToWarning);
+}
+
+void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
+  ASTContext &ctx = SF.getASTContext();
+  if (ctx.TypeCheckerOpts.SkipFunctionBodies != FunctionBodySkipping::None)
+    return;
+
+  for (const auto &import : SF.getImports()) {
+    // Only check imports with an explicit access level above internal.
+    if (!import.accessLevelRange.isValid() ||
+        import.accessLevel <= AccessLevel::Internal)
+      continue;
+
+    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(import);
+    if (import.accessLevel > levelUsed) {
+      auto diagId = import.accessLevel == AccessLevel::Public ?
+                                                  diag::remove_public_import :
+                                                  diag::remove_package_import;
+
+      auto inFlight = ctx.Diags.diagnose(import.importLoc,
+                                         diagId,
+                                         import.module.importedModule);
+
+      if (levelUsed == AccessLevel::Package) {
+        inFlight.fixItReplace(import.accessLevelRange, "package");
+      } else if (ctx.isSwiftVersionAtLeast(6)) {
+        // Let it default to internal.
+        inFlight.fixItRemove(import.accessLevelRange);
+      } else {
+        inFlight.fixItReplace(import.accessLevelRange, "internal");
+      }
+    }
+  }
 }
 
 void swift::checkAccessControl(Decl *D) {

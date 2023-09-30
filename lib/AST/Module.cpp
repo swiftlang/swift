@@ -3087,6 +3087,25 @@ void SourceFile::setImportUsedPreconcurrency(
   PreconcurrencyImportsUsed.insert(import);
 }
 
+AccessLevel
+SourceFile::getMaxAccessLevelUsingImport(
+    AttributedImport<ImportedModule> import) const {
+  auto known = ImportsUseAccessLevel.find(import);
+  if (known == ImportsUseAccessLevel.end())
+    return AccessLevel::Internal;
+  return known->second;
+}
+
+void SourceFile::registerAccessLevelUsingImport(
+    AttributedImport<ImportedModule> import,
+    AccessLevel accessLevel) {
+  auto known = ImportsUseAccessLevel.find(import);
+  if (known == ImportsUseAccessLevel.end())
+    ImportsUseAccessLevel[import] = accessLevel;
+  else
+    ImportsUseAccessLevel[import] = std::max(accessLevel, known->second);
+}
+
 bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
                                              SourceFile *SF,
                                              ImportFlags flag) const {
