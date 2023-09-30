@@ -1976,20 +1976,6 @@ void PatternBindingEntry::setInit(Expr *E) {
                              PatternFlags::IsText);
 }
 
-ActorIsolation PatternBindingEntry::getInitializerIsolation() const {
-  if (!isInitialized())
-    return ActorIsolation::forUnspecified();
-
-  auto *dc = cast<Initializer>(getInitContext());
-  auto &ctx = dc->getASTContext();
-  auto *initExpr = getExecutableInit();
-
-  return evaluateOrDefault(
-      ctx.evaluator,
-      DefaultInitializerIsolation{dc, initExpr},
-      ActorIsolation::forNonisolated());
-}
-
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   SmallVector<VarDecl *, 8> variables;
   getPattern()->collectVariables(variables);
@@ -7141,6 +7127,14 @@ Expr *VarDecl::getParentExecutableInitializer() const {
   return nullptr;
 }
 
+ActorIsolation VarDecl::getInitializerIsolation() const {
+  auto *mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      DefaultInitializerIsolation{mutableThis},
+      ActorIsolation::forUnspecified());
+}
+
 SourceRange VarDecl::getSourceRange() const {
   if (auto Param = dyn_cast<ParamDecl>(this))
     return Param->getSourceRange();
@@ -8275,34 +8269,6 @@ Type ParamDecl::getTypeOfDefaultExpr() const {
   }
 
   return Type();
-}
-
-ActorIsolation ParamDecl::getDefaultArgumentIsolation() const {
-  // If this parameter corresponds to a stored property for a
-  // memberwise initializer, the default argument is the default
-  // initializer expression.
-  auto *var = getStoredProperty();
-  if (var && !var->isInvalid()) {
-    // FIXME: Force computation of property wrapper initializers.
-    if (auto *wrapped = var->getOriginalWrappedProperty())
-      (void)wrapped->getPropertyWrapperInitializerInfo();
-
-    auto *pbd = var->getParentPatternBinding();
-    auto i = pbd->getPatternEntryIndexForVarDecl(var);
-    return var->getParentPatternBinding()->getInitializerIsolation(i);
-  }
-
-  if (!hasDefaultExpr())
-    return ActorIsolation::forUnspecified();
-
-  auto &ctx = getASTContext();
-  auto *dc = getDefaultArgumentInitContext();
-  auto *initExpr = getTypeCheckedDefaultExpr();
-
-  return evaluateOrDefault(
-      ctx.evaluator,
-      DefaultInitializerIsolation{dc, initExpr},
-      ActorIsolation::forNonisolated());
 }
 
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {

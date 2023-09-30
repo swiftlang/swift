@@ -1547,7 +1547,8 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // initializer from being evaluated synchronously (or propagating required
     // isolation through closure bodies), then the default value cannot be used
     // and the member must be explicitly initialized in the constructor.
-    auto requiredIsolation = field->getInitializerIsolation(i);
+    auto *var = field->getAnchoringVarDecl(i);
+    auto requiredIsolation = var->getInitializerIsolation();
     auto contextIsolation = getActorIsolationOfContext(dc);
     switch (requiredIsolation) {
     // 'nonisolated' expressions can be evaluated from anywhere

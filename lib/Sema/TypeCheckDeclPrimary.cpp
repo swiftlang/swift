@@ -1069,7 +1069,7 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
-    (void)param->getDefaultArgumentIsolation();
+    (void)param->getInitializerIsolation();
 
     if (!ifacety->hasPlaceholder()) {
       continue;
@@ -1158,12 +1158,43 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
 ActorIsolation 
 DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
-                                      Initializer *init,
-                                      Expr *initExpr) const {
-  if (!init || !initExpr)
+                                      VarDecl *var) const {
+  if (var->isInvalid())
     return ActorIsolation::forUnspecified();
 
-  return computeRequiredIsolation(init, initExpr);
+  Initializer *dc = nullptr;
+  Expr *initExpr = nullptr;
+
+  if (auto *pbd = var->getParentPatternBinding()) {
+    if (!var->isParentInitialized())
+      return ActorIsolation::forUnspecified();
+
+    auto i = pbd->getPatternEntryIndexForVarDecl(var);
+    dc = cast<Initializer>(pbd->getInitContext(i));
+    initExpr = var->getParentInitializer();
+  } else if (auto *param = dyn_cast<ParamDecl>(var)) {
+    // If this parameter corresponds to a stored property for a
+    // memberwise initializer, the default argument is the default
+    // initializer expression.
+    if (auto *property = param->getStoredProperty()) {
+      // FIXME: Force computation of property wrapper initializers.
+      if (auto *wrapped = property->getOriginalWrappedProperty())
+        (void)property->getPropertyWrapperInitializerInfo();
+
+      return property->getInitializerIsolation();
+    }
+
+    if (!param->hasDefaultExpr())
+      return ActorIsolation::forUnspecified();
+
+    dc = param->getDefaultArgumentInitContext();
+    initExpr = param->getTypeCheckedDefaultExpr();
+  }
+
+  if (!dc || !initExpr)
+    return ActorIsolation::forUnspecified();
+
+  return computeRequiredIsolation(dc, initExpr);
 }
 
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
@@ -2476,7 +2507,11 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             TypeChecker::contextualizeInitializer(initContext, init);
-            (void)PBD->getInitializerIsolation(i);
+            if (auto *singleVar = PBD->getSingleVar()) {
+              (void)singleVar->getInitializerIsolation();
+            } else {
+              computeRequiredIsolation(initContext, init);
+            }
             TypeChecker::checkInitializerEffects(initContext, init);
           }
         }

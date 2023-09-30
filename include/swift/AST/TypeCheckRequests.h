@@ -2938,7 +2938,7 @@ public:
 /// default initializer expression.
 class DefaultInitializerIsolation
     : public SimpleRequest<DefaultInitializerIsolation,
-                           ActorIsolation(Initializer *, Expr *),
+                           ActorIsolation(VarDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2947,8 +2947,7 @@ private:
   friend SimpleRequest;
 
   ActorIsolation evaluate(Evaluator &evaluator, 
-                          Initializer *init,
-                          Expr *initExpr) const;
+                          VarDecl *) const;
 
 public:
   bool isCached() const { return true; }

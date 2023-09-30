@@ -1973,15 +1973,6 @@ private:
   SourceRange getOriginalInitRange() const;
   void setInit(Expr *E);
 
-  /// Get the required actor isolation for evaluating the initializer
-  /// expression synchronously (if there is one). 
-  ///
-  /// If this pattern binding entry is for a stored instance property, the
-  /// initializer can only be used in an `init` that meets the required
-  /// isolation; otherwise, the property must be explicitly initialized in
-  /// the `init`.
-  ActorIsolation getInitializerIsolation() const;
-
   /// Gets the text of the initializer expression, stripping out inactive
   /// branches of any #ifs inside the expression.
   StringRef getInitStringRepresentation(SmallVectorImpl<char> &scratch) const;
@@ -2233,10 +2224,6 @@ public:
 
   void setOriginalInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setOriginalInit(E);
-  }
-
-  ActorIsolation getInitializerIsolation(unsigned i) const {
-    return getPatternList()[i].getInitializerIsolation();
   }
 
   Pattern *getPattern(unsigned i) const {
@@ -5986,6 +5973,19 @@ public:
     return getParentExecutableInitializer() != nullptr;
   }
 
+  /// Get the required actor isolation for evaluating the initializer
+  /// expression synchronously (if there is one).
+  ///
+  /// If this VarDecl is a stored instance property, the initializer
+  /// can only be used in an `init` that meets the required isolation.
+  /// Otherwise, the property must be explicitly initialized in the `init`.
+  ///
+  /// If this is a ParamDecl, the initializer isolation is required at
+  /// the call-site in order to use the default argument for this parameter.
+  /// If the required isolation is not met, an argument must be written
+  /// explicitly at the call-site.
+  ActorIsolation getInitializerIsolation() const;
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
@@ -6427,11 +6427,6 @@ public:
   /// check whether the code is valid. Such default arguments get re-created
   /// at the call site in order to have the correct context information.
   Expr *getTypeCheckedDefaultExpr() const;
-
-  /// The actor isolation required of the caller in order to use the
-  /// default argument for this parameter. If the required isolation is
-  /// not met, an argument must be written explicitly at the call-site.
-  ActorIsolation getDefaultArgumentIsolation() const;
 
   /// Retrieve the potentially un-type-checked default argument expression for
   /// this parameter, which can be queried for information such as its source

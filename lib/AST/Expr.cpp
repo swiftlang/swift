@@ -1608,8 +1608,7 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
 
 ActorIsolation
 DefaultArgumentExpr::getRequiredIsolation() const {
-  auto *param = getParamDecl();
-  return param->getDefaultArgumentIsolation();
+  return getParamDecl()->getInitializerIsolation();
 }
 
 ValueDecl *ApplyExpr::getCalledValue(bool skipFunctionConversions) const {

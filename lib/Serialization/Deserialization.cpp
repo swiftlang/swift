@@ -455,6 +455,22 @@ getActualDefaultArgKind(uint8_t raw) {
   return llvm::None;
 }
 
+static llvm::Optional<swift::ActorIsolation::Kind>
+getActualActorIsolationKind(uint8_t raw) {
+  switch (static_cast<serialization::ActorIsolation>(raw)) {
+#define CASE(X) \
+  case serialization::ActorIsolation::X: \
+    return swift::ActorIsolation::Kind::X;
+  CASE(Unspecified)
+  CASE(ActorInstance)
+  CASE(Nonisolated)
+  CASE(GlobalActor)
+  CASE(GlobalActorUnsafe)
+#undef CASE
+  }
+  return llvm::None;
+}
+
 static llvm::Optional<StableSerializationPath::ExternalPath::ComponentKind>
 getActualClangDeclPathComponentKind(uint64_t raw) {
   switch (static_cast<serialization::ClangDeclPathComponentKind>(raw)) {
@@ -3764,6 +3780,8 @@ public:
     bool isCompileTimeConst;
     uint8_t rawDefaultArg;
     TypeID defaultExprType;
+    uint8_t rawDefaultArgIsolation;
+    TypeID globalActorTypeID;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
@@ -3771,7 +3789,9 @@ public:
                                          isAutoClosure, isIsolated,
                                          isCompileTimeConst,
                                          rawDefaultArg,
-                                         defaultExprType);
+                                         defaultExprType,
+                                         rawDefaultArgIsolation,
+                                         globalActorTypeID);
 
     auto argName = MF.getIdentifier(argNameID);
     auto paramName = MF.getIdentifier(paramNameID);
@@ -3815,6 +3835,29 @@ public:
 
       if (auto exprType = MF.getType(defaultExprType))
         param->setDefaultExprType(exprType);
+
+      auto isoKind = *getActualActorIsolationKind(rawDefaultArgIsolation);
+      auto globalActor = MF.getType(globalActorTypeID);
+      ActorIsolation isolation;
+      switch (isoKind) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::Nonisolated:
+        isolation = ActorIsolation::forUnspecified();
+        break;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        isolation = ActorIsolation::forGlobalActor(
+            globalActor, isoKind == ActorIsolation::GlobalActorUnsafe);
+        break;
+
+      case ActorIsolation::ActorInstance:
+        llvm_unreachable("default arg cannot be actor instance isolated");
+      }
+
+      ctx.evaluator.cacheOutput(
+          DefaultInitializerIsolation{param},
+          std::move(isolation));
 
       if (!blobData.empty())
         param->setDefaultValueStringRepresentation(blobData);
