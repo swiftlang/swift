@@ -12,6 +12,8 @@
 
 import SwiftShims
 
+/// Class object and class metadata structures
+
 public struct ClassMetadata {
   var superclassMetadata: UnsafeMutablePointer<ClassMetadata>?
 
@@ -38,6 +40,10 @@ public struct HeapObject {
 
   static let immortalRefCount = -1
 }
+
+
+
+/// Allocations
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
   let alignment = max(alignment, MemoryLayout<UnsafeRawPointer>.size)
@@ -94,11 +100,13 @@ public func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>,
   return object
 }
 
+
+
+/// Refcounting
+
 @_silgen_name("swift_setDeallocating")
 public func swift_setDeallocating(object: UnsafeMutablePointer<HeapObject>) {
 }
-
-// TODO/FIXME: Refcounting and swift_once is not thread-safe, the following only works in single-threaded environments.
 
 @_silgen_name("swift_isUniquelyReferenced_nonNull_native")
 public func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>) -> Bool {
@@ -111,34 +119,74 @@ public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
   return swift_retain_n(object: object, n: 1)
 }
 
+// Cannot use UnsafeMutablePointer<HeapObject>? directly in the function argument or return value as it causes IRGen crashes
 @_silgen_name("swift_retain_n")
 public func swift_retain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
   let o = UnsafeMutablePointer<HeapObject>(object)
-  // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
-  if o.pointee.refcount == HeapObject.immortalRefCount { return o._rawValue }
-  o.pointee.refcount += Int(n)
-  return o._rawValue
+  return swift_retain_n_(object: o, n: n)._rawValue
+}
+
+func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> UnsafeMutablePointer<HeapObject> {
+  let refcount = refcountPointer(for: object)
+  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+    return object
+  }
+
+  addRelaxed(refcount, n: Int(n))
+
+  return object
 }
 
 @_silgen_name("swift_release")
-public func swift_release(object: Builtin.RawPointer) {
+public func swift_release(object: UnsafeMutablePointer<HeapObject>?) {
   swift_release_n(object: object, n: 1)
 }
 
 @_silgen_name("swift_release_n")
-public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
-  if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
-  let o = UnsafeMutablePointer<HeapObject>(object)
-  // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
-  if o.pointee.refcount == HeapObject.immortalRefCount { return }
-  o.pointee.refcount -= Int(n)
-  if (o.pointee.refcount & HeapObject.refcountMask) == 0 {
-    _swift_embedded_invoke_heap_object_destroy(o)
-  } else if (o.pointee.refcount & HeapObject.refcountMask) < 0 {
+public func swift_release_n(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
+  guard let object else {
+    return
+  }
+
+  let refcount = refcountPointer(for: object)
+  if loadRelaxed(refcount) == HeapObject.immortalRefCount {
+    return
+  }
+
+  let resultingRefcount = subFetchAcquireRelease(refcount, n: Int(n)) & HeapObject.refcountMask
+  if resultingRefcount == 0 {
+    _swift_embedded_invoke_heap_object_destroy(object)
+  } else if resultingRefcount < 0 {
     fatalError("negative refcount")
   }
 }
+
+
+
+/// Refcount helpers
+
+fileprivate func refcountPointer(for object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<Int> {
+  // TODO: This should use MemoryLayout<HeapObject>.offset(to: \.refcount) but we don't have KeyPaths yet
+  return UnsafeMutablePointer<Int>(UnsafeRawPointer(object).advanced(by: MemoryLayout<Int>.size)._rawValue)
+}
+
+fileprivate func loadRelaxed(_ refcount: UnsafeMutablePointer<Int>) -> Int {
+  Int(Builtin.atomicload_monotonic_Word(refcount._rawValue))
+}
+
+fileprivate func subFetchAcquireRelease(_ refcount: UnsafeMutablePointer<Int>, n: Int) -> Int {
+  let oldValue = Int(Builtin.atomicrmw_sub_acqrel_Word(refcount._rawValue, n._builtinWordValue))
+  return oldValue - n
+}
+
+fileprivate func addRelaxed(_ refcount: UnsafeMutablePointer<Int>, n: Int) {
+  _ = Builtin.atomicrmw_add_monotonic_Word(refcount._rawValue, n._builtinWordValue)
+}
+
+
+
+/// Exclusivity checking
 
 @_silgen_name("swift_beginAccess")
 public func swift_beginAccess(pointer: UnsafeMutableRawPointer, buffer: UnsafeMutableRawPointer, flags: UInt, pc: UnsafeMutableRawPointer) {
@@ -150,6 +198,10 @@ public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
   // TODO: Add actual exclusivity checking.
 }
 
+
+
+// Once
+
 @_silgen_name("swift_once")
 public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c) (UnsafeMutableRawPointer)->()), context: UnsafeMutableRawPointer) {
   // TODO/FIXME: The following only works in single-threaded environments.
@@ -159,6 +211,10 @@ public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c)
     predicate.pointee = -1
   }
 }
+
+
+
+// Misc
 
 @_silgen_name("swift_deletedMethodError")
 public func swift_deletedMethodError() -> Never {
