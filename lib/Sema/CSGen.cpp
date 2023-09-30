@@ -4536,11 +4536,8 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
                                            /*flags=*/0);
   {
     auto nextType = cs.getType(forEachStmtInfo.nextCall);
-    // Note that `OptionalObject` is not used here. This is due to inference
-    // behavior where it would bind `elementType` to the `initType` before
-    // resolving `optional object` constraint which is sometimes too eager.
-    cs.addConstraint(ConstraintKind::Conversion, nextType,
-                     OptionalType::get(elementType), elementTypeLoc);
+    cs.addConstraint(ConstraintKind::OptionalObject, nextType, elementType,
+                     elementTypeLoc);
     cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
                      elementLocator);
   }
