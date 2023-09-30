@@ -45,7 +45,9 @@
 
 import DefaultLib // expected-error {{module 'DefaultLib' was not compiled with library evolution support; using it means binary compatibility for 'Client_Swift5' can't be guaranteed}} {{1-1=internal }}
 public import PublicLib // expected-error {{module 'PublicLib' was not compiled with library evolution support; using it means binary compatibility for 'Client_Swift5' can't be guaranteed}} {{1-7=internal}}
+// expected-warning @-1 {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
 package import PackageLib
+// expected-warning @-1 {{package import of 'PackageLib' was not used in package declarations}}
 internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib
@@ -54,7 +56,9 @@ private import PrivateLib
 
 import DefaultLib
 public import PublicLib // expected-error {{module 'PublicLib' was not compiled with library evolution support; using it means binary compatibility for 'Client_Swift6' can't be guaranteed}} {{1-7=internal}}
+// expected-warning @-1 {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
 package import PackageLib
+// expected-warning @-1 {{package import of 'PackageLib' was not used in package declarations}}
 internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib

@@ -397,6 +397,9 @@ def remark_loading_module : Flag<["-"], "Rmodule-loading">,
 def remark_module_recovery : Flag<["-"], "Rmodule-recovery">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about contextual inconsistencies in loaded modules">;
+def remark_module_api_import : Flag<["-"], "Rmodule-api-import">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit remarks about the import briging in each element composing the API">;
 
 def remark_macro_loading : Flag<["-"], "Rmacro-loading">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

@@ -1481,7 +1481,11 @@ ArrayRef<ValueDecl *> ImportDecl::getDecls() const {
 
 AccessLevel ImportDecl::getAccessLevel() const {
   if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
-    return attr->getAccess();
+    if (attr->getAccess() == AccessLevel::Open) {
+      // Use a conservative import if the level given is invalid.
+      return AccessLevel::Internal;
+    } else
+      return attr->getAccess();
   }
 
   auto &LangOpts = getASTContext().LangOpts;

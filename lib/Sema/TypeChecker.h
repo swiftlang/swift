@@ -1547,6 +1547,9 @@ public:
   }
 };
 
+/// Report imports that are marked public but are not used in API.
+void diagnoseUnnecessaryPublicImports(SourceFile &SF);
+
 } // end namespace swift
 
 #endif

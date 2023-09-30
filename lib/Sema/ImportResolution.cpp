@@ -570,7 +570,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 
   import.accessLevel = ID->getAccessLevel();
   if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
-    import.accessLevelLoc = attr->getLocation();
+    import.accessLevelRange = attr->getLocation();
   }
 
   if (ID->getAttrs().hasAttribute<SPIOnlyAttr>())
@@ -822,9 +822,9 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                      SF.getParentModule()->getName());
 
   if (ctx.LangOpts.hasFeature(Feature::AccessLevelOnImport)) {
-    SourceLoc attrLoc = import.accessLevelLoc;
-    if (attrLoc.isValid())
-      inFlight.fixItReplace(attrLoc, "internal");
+    SourceRange attrRange = import.accessLevelRange;
+    if (attrRange.isValid())
+      inFlight.fixItReplace(attrRange, "internal");
     else
       inFlight.fixItInsert(import.importLoc, "internal ");
   } else {

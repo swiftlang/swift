@@ -246,6 +246,9 @@ namespace swift {
     /// Emit remarks about contextual inconsistencies in loaded modules.
     bool EnableModuleRecoveryRemarks = false;
 
+    /// Emit remarks about the source of each element exposed by the module API.
+    bool EnableModuleApiImportRemarks = false;
+
      /// Emit a remark after loading a macro implementation.
     bool EnableMacroLoadingRemarks = false;
 
