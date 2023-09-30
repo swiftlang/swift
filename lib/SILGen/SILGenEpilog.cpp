@@ -21,7 +21,8 @@ using namespace swift;
 using namespace Lowering;
 
 void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
-                                   bool isThrowing, CleanupLocation CleanupL) {
+                                   llvm::Optional<Type> exnType,
+                                   CleanupLocation CleanupL) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -62,8 +63,8 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
 
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
-  if (isThrowing) {
-    prepareRethrowEpilog(CleanupL);
+  if (exnType) {
+    prepareRethrowEpilog(*exnType, CleanupL);
   }
 
   if (F.getLoweredFunctionType()->isCoroutine()) {
@@ -71,10 +72,11 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
   }
 }
 
-void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
-  auto exnType = SILType::getExceptionType(getASTContext());
+void SILGenFunction::prepareRethrowEpilog(
+    Type exnType, CleanupLocation cleanupLoc) {
+  SILType loweredExnType = getLoweredType(exnType);
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPhiArgument(exnType, OwnershipKind::Owned);
+  rethrowBB->createPhiArgument(loweredExnType, OwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 

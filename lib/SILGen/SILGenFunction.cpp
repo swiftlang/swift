@@ -1051,7 +1051,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     emitDistributedActorFactory(fd);
   } else {
     prepareEpilog(fd->getResultInterfaceType(),
-                  fd->hasThrows(), CleanupLocation(fd));
+                  fd->getEffectiveThrownInterfaceType(), CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
@@ -1078,7 +1078,8 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
              OrigFnType);
-  prepareEpilog(resultIfaceTy, ace->isBodyThrowing(), CleanupLocation(ace));
+  prepareEpilog(resultIfaceTy, ace->getEffectiveThrownType(),
+                CleanupLocation(ace));
 
   emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -1482,7 +1483,8 @@ void SILGenFunction::emitAsyncMainThreadStart(SILDeclRef entryPoint) {
             getASTContext(),
             DeclBaseName(getASTContext().getIdentifier("_asyncMainDrainQueue")),
             /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
+        {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
+        emptyParams,
         getASTContext().getNeverType(), moduleDecl);
     drainQueueFuncDecl->getAttrs().add(new (getASTContext()) SILGenNameAttr(
         "swift_task_asyncMainDrainQueue", /*raw*/ false, /*implicit*/ true));
@@ -1559,7 +1561,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     // been recorded for this expression, not the sub-expression.
     emitProfilerIncrement(topLevelValue);
   }
-  prepareEpilog(interfaceType, false, CleanupLocation(Loc));
+  prepareEpilog(interfaceType, llvm::None, CleanupLocation(Loc));
 
   {
     llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
@@ -1622,7 +1624,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
                   interfaceType, dc, /*throws=*/ false,SourceLoc(),
                   /*ignored parameters*/ 0);
-  prepareEpilog(interfaceType, false, CleanupLocation(loc));
+  prepareEpilog(interfaceType, llvm::None, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
@@ -1678,7 +1680,7 @@ void SILGenFunction::emitGeneratorFunction(
              /*selfParam=*/nullptr, dc, resultInterfaceType, /*throws=*/false,
              SourceLoc(), pattern);
 
-  prepareEpilog(resultInterfaceType, /*hasThrows=*/false, CleanupLocation(loc));
+  prepareEpilog(resultInterfaceType, llvm::None, CleanupLocation(loc));
 
   emitStmt(body);
 

@@ -45,6 +45,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ApplyFunction:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ClosureThrownError:
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::ConstructorMemberType:
@@ -185,6 +186,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::ClosureResult:
     out << "closure result";
+    break;
+
+  case ConstraintLocator::ClosureThrownError:
+    out << "closure thrown error";
     break;
 
   case ConstraintLocator::ClosureBody:

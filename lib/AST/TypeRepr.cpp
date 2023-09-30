@@ -329,6 +329,13 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   if (isThrowing()) {
     Printer << " ";
     Printer.printKeyword("throws", Opts);
+
+    if (ThrownTy) {
+      // FIXME: Do we need a PrintStructureKind for this?
+      Printer << "(";
+      printTypeRepr(ThrownTy, Printer, Opts);
+      Printer << ")";
+    }
   }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);

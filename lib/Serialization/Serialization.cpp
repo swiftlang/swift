@@ -4358,6 +4358,7 @@ public:
                            fn->hasForcedStaticDispatch(),
                            fn->hasAsync(),
                            fn->hasThrows(),
+                           S.addTypeRef(fn->getThrownInterfaceType()),
                            S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                            S.addTypeRef(fn->getResultInterfaceType()),
@@ -4475,6 +4476,7 @@ public:
                                fn->hasForcedStaticDispatch(),
                                fn->hasAsync(),
                                fn->hasThrows(),
+                               S.addTypeRef(fn->getThrownInterfaceType()),
                                S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
                                S.addTypeRef(fn->getResultInterfaceType()),
@@ -4640,6 +4642,7 @@ public:
                                   ctor->hasStubImplementation(),
                                   ctor->hasAsync(),
                                   ctor->hasThrows(),
+                                  S.addTypeRef(ctor->getThrownInterfaceType()),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
                                   S.addGenericSignatureRef(
@@ -5341,6 +5344,7 @@ public:
         fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
+        S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         globalActor);
 
@@ -5356,6 +5360,7 @@ public:
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
+        S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));

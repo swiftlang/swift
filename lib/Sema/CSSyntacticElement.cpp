@@ -908,12 +908,18 @@ private:
   }
 
   void visitThrowStmt(ThrowStmt *throwStmt) {
-    if (!cs.getASTContext().getErrorDecl()) {
-      hadError = true;
-      return;
+
+    // Find the thrown type of our current context.
+    Type errType = getContextualThrownErrorType();
+    if (!errType) {
+      if (!cs.getASTContext().getErrorDecl()) {
+        hadError = true;
+        return;
+      }
+
+      errType = cs.getASTContext().getErrorExistentialType();
     }
 
-    auto errType = cs.getASTContext().getErrorExistentialType();
     auto *errorExpr = throwStmt->getSubExpr();
 
     createConjunction(
@@ -1298,6 +1304,18 @@ private:
       return {cs.getClosureType(closure)->getResult(), CTP_ClosureResult};
 
     return {funcRef->getBodyResultType(), CTP_ReturnStmt};
+  }
+
+  Type getContextualThrownErrorType() const {
+    auto funcRef = AnyFunctionRef::fromDeclContext(context.getAsDeclContext());
+    if (!funcRef)
+      return Type();
+
+    if (auto *closure =
+            getAsExpr<ClosureExpr>(funcRef->getAbstractClosureExpr()))
+      return cs.getClosureType(closure)->getThrownError();
+
+    return funcRef->getThrownErrorType();
   }
 
 #define UNSUPPORTED_STMT(STMT) void visit##STMT##Stmt(STMT##Stmt *) { \
@@ -2519,6 +2537,11 @@ SolutionApplicationToFunctionResult ConstraintSystem::applySolution(
 
     if (llvm::is_contained(solution.preconcurrencyClosures, closure))
       closure->setIsolatedByPreconcurrency();
+
+    // Coerce the thrown type, if it was written explicitly.
+    if (closure->getExplicitThrownType()) {
+      closure->setExplicitThrownType(closureFnType->getThrownError());
+    }
 
     // Coerce the result type, if it was written explicitly.
     if (closure->hasExplicitResultType()) {

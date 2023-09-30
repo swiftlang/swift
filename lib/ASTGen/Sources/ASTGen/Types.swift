@@ -2,6 +2,7 @@ import CASTBridging
 
 // Needed to use SyntaxTransformVisitor's visit method.
 @_spi(SyntaxTransformVisitor)
+@_spi(ExperimentalLanguageFeatures)
 import SwiftSyntax
 import SwiftDiagnostics
 
@@ -159,6 +160,7 @@ extension ASTGenVisitor {
         ),
         (node.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
         (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
+        self.visit(node.effectSpecifiers?.thrownError?.type)?.rawValue,
         node.returnClause.arrow.bridgedSourceLoc(in: self),
         visit(node.returnClause.type).rawValue
       )

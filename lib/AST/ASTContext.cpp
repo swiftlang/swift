@@ -3844,13 +3844,16 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result, Type globalActor) {
+                               Type result, Type globalActor,
+                               Type thrownError) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
   if (globalActor)
     properties |= globalActor->getRecursiveProperties();
+  if (thrownError)
+    properties |= thrownError->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
@@ -4017,16 +4020,21 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddInteger(std::get<0>(infoKey));
     ID.AddPointer(std::get<1>(infoKey));
     ID.AddPointer(std::get<2>(infoKey));
+    ID.AddPointer(std::get<3>(infoKey));
   }
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, llvm::Optional<ExtInfo> info) {
+  Type thrownError;
   Type globalActor;
-  if (info.has_value())
+  if (info.has_value()) {
+    thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+  }
 
-  auto properties = getFunctionRecursiveProperties(params, result, globalActor);
+  auto properties = getFunctionRecursiveProperties(
+      params, result, globalActor, thrownError);
   auto arena = getArena(properties);
 
   if (info.has_value()) {
@@ -4058,9 +4066,10 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.has_value() && !info.value().getClangTypeInfo().empty();
 
+  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
   size_t allocSize = totalSizeToAlloc<
       AnyFunctionType::Param, ClangTypeInfo, Type
-    >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
+    >(params.size(), hasClangInfo ? 1 : 0, numTypes);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isAnyFunctionTypeCanonical(params, result);
@@ -4070,6 +4079,12 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     else
       isCanonical = false;
   }
+
+  if (thrownError &&
+      (!thrownError->isCanonical() ||
+       thrownError->isNever() ||
+       thrownError->isEqual(ctx.getErrorExistentialType())))
+    isCanonical = false;
 
   if (globalActor && !globalActor->isCanonical())
     isCanonical = false;
@@ -4093,8 +4108,13 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     auto clangTypeInfo = info.value().getClangTypeInfo();
     if (!clangTypeInfo.empty())
       *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
-    if (Type globalActor = info->getGlobalActor())
-      *getTrailingObjects<Type>() = globalActor;
+    unsigned thrownErrorIndex = 0;
+    if (Type globalActor = info->getGlobalActor()) {
+      getTrailingObjects<Type>()[0] = globalActor;
+      ++thrownErrorIndex;
+    }
+    if (Type thrownError = info->getThrownError())
+      getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
   }
 }
 
@@ -4110,6 +4130,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddInteger(std::get<0>(infoKey));
     ID.AddPointer(std::get<1>(infoKey));
     ID.AddPointer(std::get<2>(infoKey));
+    ID.AddPointer(std::get<3>(infoKey));
   }
 }
 
@@ -4153,15 +4174,30 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     return funcTy;
   }
 
+  Type thrownError;
   Type globalActor;
-  if (info.has_value())
+  if (info.has_value()) {
+    thrownError = info->getThrownError();
     globalActor = info->getGlobalActor();
+  }
+
+  if (thrownError) {
+    if (!sig->isReducedType(thrownError)) {
+      isCanonical = false;
+    } else {
+      Type reducedThrownError = thrownError->getReducedType(sig);
+      if (reducedThrownError->isNever() ||
+          reducedThrownError->isEqual(ctx.getErrorExistentialType()))
+        isCanonical = false;
+    }
+  }
 
   if (globalActor && !sig->isReducedType(globalActor))
     isCanonical = false;
 
+  unsigned numTypes = (globalActor ? 1 : 0) + (thrownError ? 1 : 0);
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(
-      params.size(), globalActor ? 1 : 0);
+      params.size(), numTypes);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
@@ -4183,8 +4219,13 @@ GenericFunctionType::GenericFunctionType(
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
   if (info) {
-    if (Type globalActor = info->getGlobalActor())
-      *getTrailingObjects<Type>() = globalActor;
+    unsigned thrownErrorIndex = 0;
+    if (Type globalActor = info->getGlobalActor()) {
+      getTrailingObjects<Type>()[0] = globalActor;
+      ++thrownErrorIndex;
+    }
+    if (Type thrownError = info->getThrownError())
+      getTrailingObjects<Type>()[thrownErrorIndex] = thrownError;
   }
 }
 

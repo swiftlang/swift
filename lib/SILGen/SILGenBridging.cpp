@@ -2081,7 +2081,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   auto foreignFnTy = foreignCI.SILFnType;
 
   // Find the foreign error/async convention and 'self' parameter index.
-  bool hasError = false;
+  llvm::Optional<Type> thrownErrorType;
   llvm::Optional<ForeignAsyncConvention> foreignAsync;
   if (nativeFnTy->isAsync()) {
     foreignAsync = fd->getForeignAsyncConvention();
@@ -2089,7 +2089,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   }
   llvm::Optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {
-    hasError = true;
+    thrownErrorType = nativeFnTy->getErrorResult().getInterfaceType();
     foreignError = fd->getForeignErrorConvention();
     assert((foreignError || foreignAsync)
            && "couldn't find foreign error or async convention for foreign error!");
@@ -2133,8 +2133,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
   // Set up the throw destination if necessary.
   CleanupLocation cleanupLoc(fd);
-  if (hasError) {
-    prepareRethrowEpilog(cleanupLoc);
+  if (thrownErrorType) {
+    prepareRethrowEpilog(*thrownErrorType, cleanupLoc);
   }
 
   SILValue result;

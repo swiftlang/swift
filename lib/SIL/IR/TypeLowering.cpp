@@ -3415,7 +3415,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
          && "There are no foreign destroying destructors");
   auto extInfoBuilder =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      /*throws*/ false);
+                                      /*throws*/ false, Type());
   if (isForeign)
     extInfoBuilder = extInfoBuilder.withSILRepresentation(
         SILFunctionTypeRepresentation::ObjCMethod);
@@ -3452,7 +3452,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
                      : classType);
   auto extInfoBuilder =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      /*throws*/ false);
+                                      /*throws*/ false, Type());
   auto extInfo = extInfoBuilder
                      .withSILRepresentation(
                          isObjC ? SILFunctionTypeRepresentation::ObjCMethod
@@ -3481,7 +3481,8 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
-                                      funcType->isThrowing())
+                                      funcType->isThrowing(),
+                                      funcType->getThrownError())
           .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .build();
@@ -3513,7 +3514,7 @@ static CanAnyFunctionType getAsyncEntryPoint(ASTContext &C) {
 
   CanType returnType = C.getVoidType()->getCanonicalType();
   FunctionType::ExtInfo extInfo =
-      FunctionType::ExtInfoBuilder().withAsync(true).withThrows(false).build();
+      FunctionType::ExtInfoBuilder().withAsync(true).build();
   return CanAnyFunctionType::get(/*genericSig*/ nullptr, {}, returnType,
                                  extInfo);
 }

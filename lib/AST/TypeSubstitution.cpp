@@ -87,8 +87,13 @@ FunctionType *GenericFunctionType::substGenericArgs(
 
   auto resultTy = substFn(getResult());
 
+  Type thrownError = getThrownError();
+  if (thrownError)
+    thrownError = substFn(thrownError);
+
   // Build the resulting (non-generic) function type.
-  return FunctionType::get(params, resultTy, getExtInfo());
+  return FunctionType::get(params, resultTy,
+                           getExtInfo().withThrows(isThrowing(), thrownError));
 }
 
 CanFunctionType

@@ -1504,11 +1504,48 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   // But for now we aren't bothering.
   SILValue exn = exnMV.forward(*this);
 
-  if (emitWillThrow) {
+  // Whether the thrown exception is already an Error existential box.
+  SILType existentialBoxType = SILType::getExceptionType(getASTContext());
+  bool isExistentialBox = exn->getType() == existentialBoxType;
+
+  // FIXME: Right now, we suppress emission of the willThrow builtin if the
+  // error isn't already the error existential, because swift_willThrow expects
+  // the existential box.
+  if (emitWillThrow && isExistentialBox) {
     // Generate a call to the 'swift_willThrow' runtime function to allow the
     // debugger to catch the throw event.
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
                     SGM.Types.getEmptyTupleType(), {}, {exn});
+  }
+
+  // If we don't have an existential box, create one to jump to the throw
+  // destination.
+  SILBasicBlock &throwBB = *ThrowDest.getBlock();
+  if (!throwBB.getArguments().empty()) {
+    auto errorArg = throwBB.getArguments()[0];
+    SILType errorArgType = errorArg->getType();
+    if (exn->getType() != errorArgType) {
+      assert(errorArgType == existentialBoxType);
+
+      // FIXME: Callers should provide this conformance from places recorded in
+      // the AST.
+      ProtocolConformanceRef conformances[1] = {
+        getModule().getSwiftModule()->conformsToProtocol(
+          exn->getType().getASTType(), getASTContext().getErrorDecl())
+      };
+      exnMV = emitExistentialErasure(
+          loc,
+          exn->getType().getASTType(),
+          getTypeLowering(exn->getType()),
+          getTypeLowering(existentialBoxType),
+          getASTContext().AllocateCopy(conformances),
+          SGFContext(),
+          [&](SGFContext C) -> ManagedValue {
+            return ManagedValue::forForwardedRValue(*this, exn);
+          });
+
+      exn = exnMV.forward(*this);
+    }
   }
 
   // Branch to the cleanup destination.

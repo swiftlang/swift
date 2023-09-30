@@ -108,6 +108,7 @@ static FuncDecl *deriveDistributedActor_resolve(DerivedConformance &derived) {
                                name, SourceLoc(),
                                /*async=*/false,
                                /*throws=*/true,
+                               /*ThrownType=*/Type(),
                                /*genericParams=*/nullptr,
                                params,
                                /*returnType*/decl->getDeclaredInterfaceType(),
@@ -257,7 +258,9 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
       DeclName(C, doInvokeLocalFuncIdent, doInvokeParamsList),
       sloc,
       /*async=*/true,
-      /*throws=*/true, doInvokeGenericParamList, doInvokeParamsList,
+      /*throws=*/true, 
+      /*ThrownType=*/Type(),
+      doInvokeGenericParamList, doInvokeParamsList,
       /*returnType=*/C.TheEmptyTupleType, parentFunc);
   doInvokeOnReturnFunc->setImplicit();
   doInvokeOnReturnFunc->setSynthesized();
@@ -419,6 +422,7 @@ static FuncDecl *deriveDistributedActorSystem_invokeHandlerOnReturn(
       FuncDecl::createImplicit(C, StaticSpellingKind::None, name, SourceLoc(),
                                /*async=*/true,
                                /*throws=*/true,
+                               /*ThrownType=*/Type(),
                                /*genericParams=*/nullptr, params,
                                /*returnType*/ TupleType::getEmpty(C), system);
   funcDecl->setSynthesized(true);

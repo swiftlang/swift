@@ -445,10 +445,12 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   // useful diagnostic when parsing a function decl.
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
+  TypeRepr *thrownTy = nullptr;
   if (isAtFunctionTypeArrow()) {
     status |= parseEffectsSpecifiers(SourceLoc(),
                                      asyncLoc, /*reasync=*/nullptr,
-                                     throwsLoc, /*rethrows=*/nullptr);
+                                     throwsLoc, /*rethrows=*/nullptr,
+                                     thrownTy);
   }
 
   // Handle type-function if we have an arrow.
@@ -458,7 +460,8 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     // Handle async/throws in the wrong place.
     parseEffectsSpecifiers(arrowLoc,
                            asyncLoc, /*reasync=*/nullptr,
-                           throwsLoc, /*rethrows=*/nullptr);
+                           throwsLoc, /*rethrows=*/nullptr,
+                           thrownTy);
 
     ParserResult<TypeRepr> SecondHalf =
         parseTypeScalar(diag::expected_type_function_result,
@@ -553,7 +556,7 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
     }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, asyncLoc, throwsLoc,
-                                         arrowLoc, SecondHalf.get(),
+                                         thrownTy, arrowLoc, SecondHalf.get(),
                                          patternGenerics, patternSubsTypes,
                                          invocationSubsTypes);
   } else if (auto firstGenerics = generics ? generics : patternGenerics) {
@@ -1654,8 +1657,14 @@ bool Parser::canParseType() {
   if (isAtFunctionTypeArrow()) {
     // Handle type-function if we have an '->' with optional
     // 'async' and/or 'throws'.
-    while (isEffectsSpecifier(Tok))
+    while (isEffectsSpecifier(Tok)) {
+      bool isThrows = isThrowsEffectSpecifier(Tok);
       consumeToken();
+
+      if (isThrows && Tok.is(tok::l_paren)) {
+        skipSingle();
+      }
+    }
 
     if (!consumeIf(tok::arrow))
       return false;
@@ -1787,6 +1796,12 @@ bool Parser::isAtFunctionTypeArrow() {
   if (isEffectsSpecifier(Tok)) {
     if (peekToken().is(tok::arrow))
       return true;
+    if (isThrowsEffectSpecifier(Tok) && peekToken().is(tok::l_paren)) {
+      BacktrackingScope backtrack(*this);
+      consumeToken();
+      skipSingle();
+      return isAtFunctionTypeArrow();
+    }
     if (isEffectsSpecifier(peekToken())) {
       BacktrackingScope backtrack(*this);
       consumeToken();

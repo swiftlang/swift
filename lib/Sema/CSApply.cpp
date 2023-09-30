@@ -8896,7 +8896,7 @@ static Expr *wrapAsyncLetInitializer(
   auto extInfo = ASTExtInfoBuilder()
     .withAsync()
     .withConcurrent()
-    .withThrows(throws)
+    .withThrows(throws, /*FIXME:*/Type())
     .build();
 
   // Form the autoclosure expression. The actual closure here encapsulates the

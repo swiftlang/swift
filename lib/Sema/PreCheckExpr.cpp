@@ -2014,6 +2014,12 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
           TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
     }
 
+    TypeRepr *ThrownTypeRepr = nullptr;
+    if (auto thrownTypeExpr = AE->getThrownTypeExpr()) {
+      ThrownTypeRepr = extractTypeRepr(thrownTypeExpr);
+      assert(ThrownTypeRepr && "Parser ensures that this never fails");
+    }
+
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
@@ -2024,7 +2030,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     auto NewTypeRepr = new (Ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getAsyncLoc(),
-                         AE->getThrowsLoc(), AE->getArrowLoc(), ResultTypeRepr);
+                         AE->getThrowsLoc(), ThrownTypeRepr, AE->getArrowLoc(),
+                         ResultTypeRepr);
     return new (Ctx) TypeExpr(NewTypeRepr);
   }
   

@@ -1462,8 +1462,8 @@ SILValue SILGenFunction::emitMainExecutor(SILLocation loc) {
             ctx,
             DeclBaseName(ctx.getIdentifier("_getMainExecutor")),
             /*Arguments*/ emptyParams),
-        {}, /*async*/ false, /*throws*/ false, {}, emptyParams,
-        ctx.TheExecutorType,
+        {}, /*async*/ false, /*throws*/ false, /*thrownType*/Type(), {},
+        emptyParams, ctx.TheExecutorType,
         getModule().getSwiftModule());
     getMainExecutorFuncDecl->getAttrs().add(
         new (ctx) SILGenNameAttr("swift_task_getMainExecutor", /*raw*/ false,

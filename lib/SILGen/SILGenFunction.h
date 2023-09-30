@@ -1172,12 +1172,14 @@ public:
   /// \param directResultType  If given a value, the epilog block will be
   ///                    created with arguments for each direct result of this
   ///                    function, corresponding to the formal return type.
-  /// \param isThrowing  If true, create an error epilog block.
+  /// \param exnType  If not None, create an error epilog block with the given
+  ///                 exception type.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(llvm::Optional<Type> directResultType, bool isThrowing,
+  void prepareEpilog(llvm::Optional<Type> directResultType, 
+                     llvm::Optional<Type> exnType,
                      CleanupLocation L);
-  void prepareRethrowEpilog(CleanupLocation l);
+  void prepareRethrowEpilog(Type exnType, CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
   /// Branch to and emit the epilog basic block. This will fuse
