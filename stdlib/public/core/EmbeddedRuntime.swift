@@ -110,8 +110,8 @@ public func swift_setDeallocating(object: UnsafeMutablePointer<HeapObject>) {
 
 @_silgen_name("swift_isUniquelyReferenced_nonNull_native")
 public func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePointer<HeapObject>) -> Bool {
-  // TODO/FIXME: Refcounting is not thread-safe, the following only works in single-threaded environments.
-  return object.pointee.refcount == 1
+  let refcount = refcountPointer(for: object)
+  return loadAcquire(refcount) == 1
 }
 
 @_silgen_name("swift_retain")
@@ -173,6 +173,10 @@ fileprivate func refcountPointer(for object: UnsafeMutablePointer<HeapObject>) -
 
 fileprivate func loadRelaxed(_ refcount: UnsafeMutablePointer<Int>) -> Int {
   Int(Builtin.atomicload_monotonic_Word(refcount._rawValue))
+}
+
+fileprivate func loadAcquire(_ refcount: UnsafeMutablePointer<Int>) -> Int {
+  Int(Builtin.atomicload_acquire_Word(refcount._rawValue))
 }
 
 fileprivate func subFetchAcquireRelease(_ refcount: UnsafeMutablePointer<Int>, n: Int) -> Int {
