@@ -35,7 +35,7 @@
 // Regex lexing delivered via libSwift.
 static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
   regexLiteralLexingFn = fn;
 }

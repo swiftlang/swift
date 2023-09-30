@@ -21,7 +21,7 @@
 // Regex parser delivered via Swift modules.
 static RegexLiteralParsingFn regexLiteralParsingFn = nullptr;
 
-#if SWIFT_SWIFT_PARSER
+#if SWIFT_BUILD_SWIFT_SYNTAX
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn fn) {
   regexLiteralParsingFn = fn;
 }
