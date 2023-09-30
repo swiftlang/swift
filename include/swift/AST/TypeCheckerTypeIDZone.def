@@ -63,7 +63,7 @@ SWIFT_REQUEST(TypeChecker, DefaultArgumentExprRequest,
 SWIFT_REQUEST(TypeChecker, DefaultArgumentTypeRequest,
               Type(ParamDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultInitializerIsolation,
-              ActorIsolation(Initializer *, Expr *),
+              ActorIsolation(VarDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DefaultArgumentInitContextRequest,
               Initializer *(ParamDecl *), SeparatelyCached, NoLocationInfo)
