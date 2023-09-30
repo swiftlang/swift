@@ -683,6 +683,9 @@ namespace swift {
     /// by name.
     bool hasFeature(llvm::StringRef featureName) const;
 
+    /// Sets the "_atomicBitWidth" conditional.
+    void setAtomicBitWidth(llvm::Triple triple);
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
@@ -720,7 +723,7 @@ namespace swift {
     }
 
   private:
-    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 6>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };
