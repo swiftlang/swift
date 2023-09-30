@@ -1196,10 +1196,18 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
-    if (!getASTContext().getErrorDecl())
+    Type errorType;
+    if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
+      errorType = TheFunc->getThrownErrorType();
+    }
+
+    if (!errorType) {
+      errorType = getASTContext().getErrorExistentialType();
+    }
+
+    if (!errorType)
       return TS;
 
-    Type errorType = getASTContext().getErrorExistentialType();
     TypeChecker::typeCheckExpression(E, DC, {errorType, CTP_ThrowStmt});
     TS->setSubExpr(E);
 

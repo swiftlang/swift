@@ -1013,9 +1013,15 @@ public:
     }
 
     void verifyChecked(ThrowStmt *S) {
-      checkSameType(S->getSubExpr()->getType(),
-                    checkExceptionTypeExists("throw expression"),
-                    "throw operand");
+      Type thrownError;
+      if (!Functions.empty()) {
+        if (auto fn = AnyFunctionRef::fromDeclContext(Functions.back()))
+          thrownError = fn->getThrownErrorType();
+      }
+
+      if (!thrownError)
+        thrownError = checkExceptionTypeExists("throw expression");
+      checkSameType(S->getSubExpr()->getType(), thrownError, "throw operand");
       verifyCheckedBase(S);
     }
 

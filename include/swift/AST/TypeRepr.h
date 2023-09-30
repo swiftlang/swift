@@ -499,13 +499,16 @@ class FunctionTypeRepr : public TypeRepr {
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
+  TypeRepr *ThrownTy;
   SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc, SourceLoc arrowLoc,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc, 
+                   TypeRepr *thrownTy,
+                   SourceLoc arrowLoc,
                    TypeRepr *retTy,
                    GenericParamList *patternGenericParams = nullptr,
                    ArrayRef<TypeRepr *> patternSubs = {},
@@ -515,7 +518,7 @@ public:
       InvocationSubs(invocationSubs),
       PatternGenericParams(patternGenericParams),
       PatternSubs(patternSubs),
-      ArgsTy(argsTy), RetTy(retTy),
+      ArgsTy(argsTy), RetTy(retTy), ThrownTy(thrownTy),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
   }
 
@@ -545,6 +548,7 @@ public:
   }
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
+  TypeRepr *getThrownTypeRepr() const { return ThrownTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool isAsync() const { return AsyncLoc.isValid(); }
   bool isThrowing() const { return ThrowsLoc.isValid(); }

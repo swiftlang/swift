@@ -1930,6 +1930,11 @@ Type AbstractClosureExpr::getResultType(
   return T->castTo<FunctionType>()->getResult();
 }
 
+llvm::Optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
+  return getType()->castTo<AnyFunctionType>()
+      ->getEffectiveThrownInterfaceType();
+}
+
 bool AbstractClosureExpr::isBodyThrowing() const {
   if (!getType() || getType()->hasError()) {
     // Scan the closure body to infer effects.
@@ -2033,6 +2038,13 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
 
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->empty();
+}
+
+void ClosureExpr::setExplicitThrownType(Type thrownType) {
+  assert(thrownType && !thrownType->hasTypeVariable() &&
+         !thrownType->hasPlaceholder());
+  assert(ThrownType);
+  ThrownType->setType(MetatypeType::get(thrownType));
 }
 
 void ClosureExpr::setExplicitResultType(Type ty) {

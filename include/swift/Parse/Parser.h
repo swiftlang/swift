@@ -1279,6 +1279,7 @@ public:
   ParserStatus parseGetEffectSpecifier(ParsedAccessors &accessors,
                                        SourceLoc &asyncLoc,
                                        SourceLoc &throwsLoc,
+                                       TypeRepr *&thrownTy,
                                        bool &hasEffectfulGet,
                                        AccessorKind currentKind,
                                        SourceLoc const& currentLoc);
@@ -1623,6 +1624,7 @@ public:
                                       bool &reasync,
                                       SourceLoc &throws,
                                       bool &rethrows,
+                                      TypeRepr *&thrownType,
                                       TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the
@@ -1639,10 +1641,14 @@ public:
   /// lieu of 'throws'.
   ParserStatus parseEffectsSpecifiers(SourceLoc existingArrowLoc,
                                       SourceLoc &asyncLoc, bool *reasync,
-                                      SourceLoc &throwsLoc, bool *rethrows);
+                                      SourceLoc &throwsLoc, bool *rethrows,
+                                      TypeRepr *&thrownType);
+
+  /// Returns 'true' if \p T is consider a throwing effect specifier.
+  static bool isThrowsEffectSpecifier(const Token &T);
 
   /// Returns 'true' if \p T is considered effects specifier.
-  bool isEffectsSpecifier(const Token &T);
+  static bool isEffectsSpecifier(const Token &T);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1870,6 +1876,7 @@ public:
           ParameterList *&params,
           SourceLoc &asyncLoc,
           SourceLoc &throwsLoc,
+          TypeExpr *&thrownType,
           SourceLoc &arrowLoc,
           TypeExpr *&explicitResultType,
           SourceLoc &inLoc);

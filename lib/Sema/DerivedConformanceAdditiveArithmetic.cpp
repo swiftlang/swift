@@ -191,6 +191,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
       /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, selfInterfaceType, parentDC);
   auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
                             void *ctx) -> std::pair<BraceStmt *, bool> {

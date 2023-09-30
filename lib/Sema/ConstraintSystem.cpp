@@ -2921,7 +2921,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
                                              .withAsync(true)
-                                             .withThrows(true)
+                                             .withThrows(true, /*FIXME:*/Type())
                                              .build());
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
@@ -2932,7 +2932,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
                                          .withAsync(true)
-                                         .withThrows(true)
+                                         .withThrows(true, /*FIXME:*/Type())
                                          .build());
     return {refType, refType, refType, refType};
   }
@@ -2954,7 +2954,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyClosure = FunctionType::get(bodyArgs, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
-                                             .withThrows(true)
+                                             .withThrows(true, /*FIXME:*/Type())
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
@@ -2964,7 +2964,7 @@ static DeclReferenceType getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
-                                         .withThrows(true)
+                                         .withThrows(true, /*FIXME:*/Type())
                                          .withAsync(true)
                                          .build());
     return {refType, refType, refType, refType};
@@ -3228,7 +3228,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
-      .withThrows(throws)
+      .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
       .withConcurrent(concurrent)
       .build();
@@ -3242,7 +3242,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
-      .withThrows(throwFinder.foundThrow())
+      .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
       .withConcurrent(concurrent)
       .build();
@@ -5806,6 +5806,16 @@ void constraints::simplifyLocator(ASTNode &anchor,
           anchor = CE->getSingleExpressionBody();
           path = path.slice(1);
           continue;
+        }
+      }
+      break;
+
+    case ConstraintLocator::ClosureThrownError:
+      if (auto CE = getAsExpr<ClosureExpr>(anchor)) {
+        if (auto thrownTypeRepr = CE->getExplicitThrownTypeRepr()) {
+          anchor = thrownTypeRepr;
+          path = path.slice(1);
+          break;
         }
       }
       break;

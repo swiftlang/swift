@@ -1861,12 +1861,12 @@ static bool canPeepholeLiteralClosureConversion(Type literalType,
   // TODO: We could also in principle let `async` through here, but that
   // interferes with the implementation of `reasync`.
   auto literalWithoutEffects = literalFnType->getExtInfo().intoBuilder()
-    .withThrows(false)
+    .withThrows(false, Type())
     .withNoEscape(false)
     .build();
     
   auto convertedWithoutEffects = convertedFnType->getExtInfo().intoBuilder()
-    .withThrows(false)
+    .withThrows(false, Type())
     .withNoEscape(false)
     .build();
   if (literalFnType->withExtInfo(literalWithoutEffects)

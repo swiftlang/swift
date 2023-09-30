@@ -844,7 +844,8 @@ bool swift::isRepresentableInObjC(
 
     Type completionHandlerType = FunctionType::get(
         completionHandlerParams, TupleType::getEmpty(ctx),
-        ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false).build());
+        ASTExtInfoBuilder(FunctionTypeRepresentation::Block, false, Type())
+          .build());
 
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,

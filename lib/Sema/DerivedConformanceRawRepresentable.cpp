@@ -429,7 +429,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                             /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
                             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            paramList,
+                            /*ThrownType=*/TypeLoc(), paramList,
                             /*GenericParams=*/nullptr, parentDC);
   
   initDecl->setImplicit();

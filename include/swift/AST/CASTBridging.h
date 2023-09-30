@@ -341,24 +341,26 @@ void AbstractFunctionDecl_setBody(void *opaqueBody, void *opaqueDecl);
 
 SWIFT_NAME("FuncDecl_create(astContext:declContext:staticLoc:funcKeywordLoc:"
            "name:nameLoc:genericParamList:parameterList:asyncSpecifierLoc:"
-           "throwsSpecifierLoc:returnType:genericWhereClause:)")
+           "throwsSpecifierLoc:thrownType:returnType:genericWhereClause:)")
 struct BridgedDeclContextAndDecl
 FuncDecl_create(BridgedASTContext cContext, BridgedDeclContext cDeclContext,
                 BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
                 BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
                 void *_Nullable opaqueGenericParamList,
                 void *opaqueParameterList, BridgedSourceLoc cAsyncLoc,
-                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueReturnType,
+                BridgedSourceLoc cThrowsLoc, void *_Nullable opaqueThrownType,
+                void *_Nullable opaqueReturnType,
                 void *_Nullable opaqueGenericWhereClause);
 
 SWIFT_NAME("ConstructorDecl_create(astContext:declContext:initKeywordLoc:"
            "failabilityMarkLoc:isIUO:genericParamList:parameterList:"
-           "asyncSpecifierLoc:throwsSpecifierLoc:genericWhereClause:)")
+           "asyncSpecifierLoc:throwsSpecifierLoc:thrownType:genericWhereClause:)")
 BridgedDeclContextAndDecl ConstructorDecl_create(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cInitKeywordLoc, BridgedSourceLoc cFailabilityMarkLoc,
     _Bool isIUO, void *_Nullable opaqueGenericParams, void *opaqueParameterList,
     BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
+    void *_Nullable opaqueThrownType,
     void *_Nullable opaqueGenericWhereClause);
 
 SWIFT_NAME("DestructorDecl_create(astContext:declContext:deinitKeywordLoc:)")
@@ -587,6 +589,7 @@ void *EmptyCompositionTypeRepr_create(BridgedASTContext cContext,
 void *FunctionTypeRepr_create(BridgedASTContext cContext, void *argsTy,
                               BridgedSourceLoc cAsyncLoc,
                               BridgedSourceLoc cThrowsLoc,
+                              void * _Nullable thrownType,
                               BridgedSourceLoc cArrowLoc, void *returnType);
 void *GenericIdentTypeRepr_create(BridgedASTContext cContext,
                                   BridgedIdentifier name,

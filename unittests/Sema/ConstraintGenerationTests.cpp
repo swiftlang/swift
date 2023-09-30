@@ -126,6 +126,7 @@ TEST_F(SemaTest, TestCaptureListIsNotOpenedEarly) {
                                             ParameterList::createEmpty(Context),
                                             /*asyncLoc=*/SourceLoc(),
                                             /*throwsLoc=*/SourceLoc(),
+                                            /*thrownType*/nullptr,
                                             /*arrowLoc=*/SourceLoc(),
                                             /*inLoc=*/SourceLoc(),
                                             /*explicitResultType=*/nullptr, DC);

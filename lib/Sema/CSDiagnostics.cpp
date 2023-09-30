@@ -3136,15 +3136,24 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
 
   auto anchor = getAnchor();
 
+  auto &Ctx = getASTContext();
+  Type toType = getToType();
+  bool toErrorExistential = false;
+  if (toType->isEqual(Ctx.getErrorExistentialType()))
+    toErrorExistential = true;
+  else if (auto protoType = toType->getAs<ProtocolType>()) {
+    toErrorExistential = protoType->getDecl()->isSpecificProtocol(
+        KnownProtocolKind::Error);
+  }
+
   // If we tried to throw the error code of an error type, suggest object
   // construction.
-  auto &Ctx = getASTContext();
   if (auto errorCodeProtocol =
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
     auto conformance = TypeChecker::conformsToProtocol(
         errorCodeType, errorCodeProtocol, getParentModule());
-    if (conformance) {
+    if (conformance && toErrorExistential) {
       Type errorType =
           conformance
               .getTypeWitnessByName(errorCodeType, getASTContext().Id_ErrorType)
@@ -3164,8 +3173,10 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   // The conversion destination of throw is always ErrorType (at the moment)
   // if this ever expands, this should be a specific form like () is for
   // return.
-  emitDiagnostic(diag::cannot_convert_thrown_type, getFromType())
-      .highlight(getSourceRange());
+  emitDiagnostic(
+      diag::cannot_convert_thrown_type, getFromType(), toType,
+      toErrorExistential)
+        .highlight(getSourceRange());
   return true;
 }
 

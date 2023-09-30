@@ -4983,7 +4983,8 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), bodyParams, computedType, declContext);
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      bodyParams, computedType, declContext);
   getterDecl->setIsTransparent(true);
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeBaseClassFieldGetterBody,
@@ -5015,8 +5016,8 @@ makeBaseClassMemberAccessors(DeclContext *declContext,
       StaticSpellingKind::None, // TODO: we should handle static vars.
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
-      /*ThrowsLoc=*/SourceLoc(), setterBodyParams, TupleType::getEmpty(ctx),
-      declContext);
+      /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
+      setterBodyParams, TupleType::getEmpty(ctx),declContext);
   setterDecl->setIsTransparent(true);
   setterDecl->setAccess(AccessLevel::Public);
   setterDecl->setBodySynthesizer(synthesizeBaseClassFieldSetterBody,
@@ -5087,6 +5088,7 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(),
         fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
+        fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
         fn->getResultInterfaceType(), newContext);
     auto inheritedAttributes = cloneImportedAttributes(decl, context);
@@ -5963,6 +5965,7 @@ static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
           func->getASTContext(), func->getNameLoc(),
           func->getName(), func->getNameLoc(),
           func->hasAsync(), func->hasThrows(),
+          /*FIXME:ThrownType=*/func->getThrownInterfaceType(),
           fixedParams, originalFnSubst->getResult(),
           /*genericParams=*/nullptr, func->getDeclContext(), newDecl->getClangDecl());
       if (func->isStatic()) newFnDecl->setStatic();
@@ -6130,7 +6133,8 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   auto newFnDecl = FuncDecl::createImplicit(
       newDecl->getASTContext(), newDecl->getStaticSpelling(),
       newDecl->getName(), newDecl->getNameLoc(), newDecl->hasAsync(),
-      newDecl->hasThrows(), /*genericParams=*/nullptr, fixedParams,
+      newDecl->hasThrows(), newDecl->getThrownInterfaceType(),
+      /*genericParams=*/nullptr, fixedParams,
       fixedResultType, newDecl->getDeclContext());
   newFnDecl->copyFormalAccessFrom(newDecl);
   newFnDecl->setBodySynthesizer(synthesizeDependentTypeThunkParamForwarding, newDecl);
@@ -6257,6 +6261,7 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
   auto thunk = FuncDecl::createImplicit(
       newDecl->getASTContext(), newDecl->getStaticSpelling(), oldDecl->getName(),
       newDecl->getNameLoc(), newDecl->hasAsync(), newDecl->hasThrows(),
+      newDecl->getThrownInterfaceType(),
       /*genericParams=*/nullptr, newParamList,
       newDecl->getResultInterfaceType(), newDecl->getDeclContext());
   thunk->copyFormalAccessFrom(newDecl);

@@ -343,7 +343,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType) {
   DeclName Name(Context, Id, paramList);
   auto *const FD = FuncDecl::createImplicit(
       Context, StaticSpellingKind::None, Name, /*NameLoc=*/SourceLoc(),
-      /*Async=*/false, /*Throws=*/false,
+      /*Async=*/false, /*Throws=*/false, /*thrownType=*/Type(),
       /*GenericParams=*/nullptr, paramList, ResType, DC);
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -364,7 +364,7 @@ getBuiltinFunctionImpl(SynthesisContext &SC, Identifier id,
   DeclName name(SC.Context, id, params);
   auto *FD = FuncDecl::createImplicit(
       SC.Context, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
-      extInfo.isAsync(), extInfo.isThrowing(),
+      extInfo.isAsync(), extInfo.isThrowing(), /*thrownType=*/Type(),
       genericParams, params, resultType, SC.DC);
   FD->setAccess(AccessLevel::Public);
   FD->setGenericSignature(signature);
@@ -450,7 +450,7 @@ getBuiltinGenericFunction(Identifier Id,
       Context, StaticSpellingKind::None, Name,
       /*NameLoc=*/SourceLoc(),
       Async,
-      Throws != BuiltinThrowsKind::None,
+      Throws != BuiltinThrowsKind::None, /*thrownType=*/Type(),
       GenericParams, paramList, ResType, DC);
 
   func->setAccess(AccessLevel::Public);
@@ -1267,7 +1267,7 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 
 static ValueDecl *getAutoDiffApplyDerivativeFunction(
     ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool throws) {
+    unsigned arity, bool throws, Type thrownType) {
   assert(arity >= 1);
   // JVP:
   //   <...T...(arity), R> (@differentiable(_forward) (...T) throws -> R, ...T)
@@ -1298,7 +1298,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
                 .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
-                .withThrows(throws)
+                .withThrows(throws, thrownType)
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
@@ -1331,7 +1331,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
 }
 
 static ValueDecl *getAutoDiffApplyTransposeFunction(
-    ASTContext &Context, Identifier Id, unsigned arity, bool throws) {
+    ASTContext &Context, Identifier Id, unsigned arity, bool throws,
+    Type thrownType) {
   assert(arity >= 1);
   // <...T...(arity), R>
   //     (@differentiable(_linear) (...T) throws -> R, ...R.TangentVector)
@@ -1363,7 +1364,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
           FunctionType::ExtInfoBuilder()
               .withDifferentiabilityKind(DifferentiabilityKind::Linear)
               .withNoEscape()
-              .withThrows(throws)
+              .withThrows(throws, thrownType)
               .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
@@ -1903,7 +1904,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
   auto Thin =
       FunctionType::ExtInfoBuilder(FunctionTypeRepresentation::CFunctionPointer,
-                                   /*throws*/ false)
+                                   /*throws*/ false, Type())
           .withClangFunctionType(ClangType)
           .build();
   auto BlockTy = FunctionType::get(CFuncParams, VoidTy, Thin);
@@ -2534,7 +2535,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
             OperationName, kind, arity, throws))
       return nullptr;
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
-                                              throws);
+                                              throws, /*thrownType=*/Type());
   }
   if (OperationName.startswith("applyTranspose_")) {
     unsigned arity;
@@ -2542,7 +2543,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!autodiff::getBuiltinApplyTransposeConfig(
             OperationName, arity, throws))
       return nullptr;
-    return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws);
+    return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws,
+                                             /*thrownType=*/Type());
   }
 
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)

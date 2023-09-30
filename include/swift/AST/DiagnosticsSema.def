@@ -336,7 +336,9 @@ ERROR(cannot_convert_to_return_type_nil,none,
       "'nil' is incompatible with return type %0", (Type))
 
 ERROR(cannot_convert_thrown_type,none,
-      "thrown expression type %0 does not conform to 'Error'", (Type))
+      "thrown expression type %0 %select{cannot be converted to error type %1|"
+      "does not conform to 'Error'}2",
+      (Type, Type, bool))
 ERROR(cannot_throw_error_code,none,
       "thrown error code type %0 does not conform to 'Error'; construct an %1 "
       "instance", (Type, Type))
@@ -2279,10 +2281,10 @@ ERROR(function_type_access,none,
       "%select{private|fileprivate|internal|package|%error|%error}1|private or fileprivate}2"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|package|public|open}1}0 "
-      "because its %select{parameter|result}5 uses "
+      "because its %select{parameter|thrown error|result}5 uses "
       "%select{a private|a fileprivate|an internal|a package|an '@_spi'|an '@_spi'}3"
       "%select{| API wrapper}6 type",
-      (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
+      (bool, AccessLevel, bool, AccessLevel, unsigned, unsigned, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
@@ -2294,10 +2296,10 @@ WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
         "%select{should be declared %select{private|fileprivate|internal|package|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|package|public|open}1}0 "
-        "because its %select{parameter|result}5 uses "
+        "because its %select{parameter|thrown error|result}5 uses "
         "%select{a private|a fileprivate|an internal|a package|%error|%error}3 "
         "%select{|API wrapper}6 type",
-        (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
+        (bool, AccessLevel, bool, AccessLevel, unsigned, unsigned, bool))
 ERROR(function_type_usable_from_inline,none,
       "the %select{parameter|result}1%select{| API wrapper}2 of a "
       "'@usableFromInline' %select{function|method|initializer}0 "
@@ -5067,6 +5069,12 @@ WARNING(no_throw_in_try,none,
 
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
+
+ERROR(experimental_typed_throws,none,
+      "typed throws is an experimental feature", ())
+
+ERROR(thrown_type_not_error,none,
+      "thrown type %0 does not conform to the 'Error' protocol", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Concurrency

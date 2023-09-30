@@ -454,10 +454,13 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
+  // FIXME: Populate thrownError
+  Type thrownError;
+
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   resultDiffKind, clangFunctionType,
-                                   globalActor)
+                                   thrownError, resultDiffKind,
+                                   clangFunctionType, globalActor)
           .withAsync(flags.isAsync())
           .withConcurrent(flags.isSendable())
           .build();

@@ -317,6 +317,7 @@ static ValueDecl *deriveDifferentiable_method(
       C, StaticSpellingKind::None, declName, /*NameLoc=*/SourceLoc(),
       /*Async=*/false,
       /*Throws=*/false,
+      /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
   funcDecl->setSynthesized();
   if (!nominal->getSelfClassDecl())
