@@ -230,7 +230,7 @@ module WinSDK [system] {
       header "dinput.h"
       export *
 
-      link "dinput.lib"
+      link "dinput8.lib"
     }
 
     link "dxguid.lib"
