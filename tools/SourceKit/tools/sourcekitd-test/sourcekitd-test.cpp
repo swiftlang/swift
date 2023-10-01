@@ -1825,6 +1825,7 @@ struct ResponseSymbolInfo {
   std::vector<ReferencedSymbol> ReferencedSymbols;
 
   std::vector<const char *> ReceiverUSRs;
+  std::vector<const char *> Substitutions;
   bool IsSystem = false;
   bool IsDynamic = false;
   bool IsSynthesized = false;
@@ -1915,6 +1916,8 @@ struct ResponseSymbolInfo {
         });
 
     Symbol.ReceiverUSRs = readStringArray(Info, KeyReceivers, KeyUSR);
+    Symbol.Substitutions =
+        readStringArray(Info, KeySubstitutions, KeySubstitutionMapping);
 
     Symbol.IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
     Symbol.IsDynamic =
@@ -2044,6 +2047,11 @@ struct ResponseSymbolInfo {
     for (auto Receiver : ReceiverUSRs)
       OS << Receiver << '\n';
     OS << "RECEIVERS END\n";
+
+    OS << "SUBSTITUTIONS BEGIN\n";
+    for (auto Mapping : Substitutions)
+      OS << Mapping << '\n';
+    OS << "SUBSTITUTIONS END\n";
   }
 };
 

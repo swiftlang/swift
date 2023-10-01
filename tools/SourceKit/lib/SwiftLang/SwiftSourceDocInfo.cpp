@@ -773,6 +773,7 @@ static StringRef getModuleName(const ValueDecl *VD,
 
 struct DeclInfo {
   const ValueDecl *VD;
+  SubstitutionMap Substitutions;
   Type ContainerType;
   bool IsRef;
   bool IsDynamic;
@@ -787,11 +788,12 @@ struct DeclInfo {
   /// Whether the \c VD is in a synthesized extension of \c BaseType
   bool InSynthesizedExtension = false;
 
-  DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
+  DeclInfo(const ValueDecl *VD, SubstitutionMap Substitutions,
+           Type ContainerType, bool IsRef, bool IsDynamic,
            ArrayRef<NominalTypeDecl *> ReceiverTypes,
            const CompilerInvocation &Invoc)
-      : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
-        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+      : VD(VD), Substitutions(Substitutions), ContainerType(ContainerType),
+        IsRef(IsRef), IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
     if (VD == nullptr)
       return;
 
@@ -983,6 +985,39 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
+
+  // Serialize the SubstitutionMap into an array of string pairs
+  if (DInfo.IsRef) {
+    PrintOptions Options;
+    Options.PrintTypeAliasUnderlyingType = true;
+
+    // Given types T1 and T2, returns "<typename(T1)> : <typename(T2)>" string
+    auto getPrintedPairOfTypes = [&](Type Ty1, Type Ty2) {
+      Ty1->print(OS, Options);
+      OS << " : ";
+      Ty2->print(OS, Options);
+      return copyAndClearString(Allocator, Buffer);
+    };
+
+    QuerySubstitutionMap GetType{DInfo.Substitutions};
+    auto Params = DInfo.Substitutions.getGenericSignature().getGenericParams();
+    SmallVector<StringRef, 2> Substitutions;
+
+    for (auto *GenericTy : Params) {
+      // Lookup the replacement type
+      Type Ty = GetType(GenericTy);
+
+      // If no replacement type was found, print <error type> instead
+      if (!Ty) {
+        Ty = ErrorType::get(DInfo.VD->getASTContext());
+      }
+
+      Substitutions.push_back(getPrintedPairOfTypes(GenericTy, Ty));
+    }
+
+    Symbol.Substitutions =
+        copyArray(Allocator, llvm::makeArrayRef(Substitutions));
+  }
 
   if (DInfo.ContainerType && !DInfo.ContainerType->hasArchetype()) {
     SwiftLangSupport::printTypeUSR(DInfo.ContainerType, OS);
@@ -1198,7 +1233,7 @@ static bool addCursorInfoForLiteral(
   }
 
   auto &Symbol = Data.Symbols.emplace_back();
-  DeclInfo Info(Decl, nullptr, true, false, {}, CompInvoc);
+  DeclInfo Info(Decl, SubstitutionMap(), nullptr, true, false, {}, CompInvoc);
   auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
                             PreviousSnaps, Data.Allocator);
 
@@ -1217,10 +1252,12 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
                      SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
                      std::string &Diagnostic,
                      ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
-  DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
-                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
-                        ArrayRef<NominalTypeDecl *>(), Invoc);
+  DeclInfo OrigInfo(Info->getValueD(), Info->getSubstitutionMap(),
+                    Info->getContainerType(), Info->isRef(), Info->isDynamic(),
+                    Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Info->getCtorSubstitutionMap(),
+                        Type(), true, false, ArrayRef<NominalTypeDecl *>(),
+                        Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
     Diagnostic = "Unavailable in the current compilation context.";
@@ -1256,8 +1293,8 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
       CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
-      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
-                     ArrayRef<NominalTypeDecl *>(), Invoc);
+      DeclInfo DInfo(D, SubstitutionMap(), Type(), /*IsRef=*/true,
+                     /*IsDynamic=*/false, ArrayRef<NominalTypeDecl *>(), Invoc);
       if (auto Err =
               fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
                              Lang, Invoc, PreviousSnaps, Data.Allocator)) {
@@ -2084,6 +2121,8 @@ void SwiftLangSupport::getCursorInfo(
               /*Ty=*/Type(),
               /*ContainerType=*/Type(),
               /*CustomAttrRef=*/llvm::None,
+              /*SubstMap*/SubstitutionMap(),
+              /*CtorSubstMap*/SubstitutionMap(),
               /*IsKeywordArgument=*/false,
               /*IsDynamic=*/false,
               /*ReceiverTypes=*/{},
@@ -2386,6 +2425,8 @@ static void resolveCursorFromUSR(
             /*IsRef=*/false,
             /*Ty=*/Type(), ContainerType,
             /*CustomAttrRef=*/llvm::None,
+            /*SubstMap*/SubstitutionMap(),
+            /*CtorSubstMap*/SubstitutionMap(),
             /*IsKeywordArgument=*/false,
             /*IsDynamic=*/false,
             /*ReceiverTypes=*/{},

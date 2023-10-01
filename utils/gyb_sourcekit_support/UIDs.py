@@ -118,6 +118,8 @@ UID_KEYS = [
     KEY('Obsoleted', 'key.obsoleted'),
     KEY('RemoveCache', 'key.removecache'),
     KEY('TypeUsr', 'key.typeusr'),
+    KEY('Substitutions', 'key.substitutions'),
+    KEY('SubstitutionMapping', 'key.substitution_mapping'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),
     KEY('ModuleGroups', 'key.modulegroups'),
     KEY('BaseName', 'key.basename'),

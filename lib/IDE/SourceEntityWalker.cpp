@@ -389,19 +389,23 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   if (auto LE = dyn_cast<LiteralExpr>(E)) {
     if (LE->getInitializer() &&
-        !passReference(LE->getInitializer().getDecl(), LE->getType(), {},
-                       LE->getSourceRange(),
-                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
-                                         /*isImplicit=*/true))) {
+        !passReference(
+            LE->getInitializer().getDecl(), LE->getType(), {},
+            LE->getSourceRange(),
+            ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                              LE->getReferencedDecl().getSubstitutions(),
+                              /*isImplicit=*/true))) {
       return Action::Stop();
     }
     return Action::Continue(E);
   } else if (auto CE = dyn_cast<CollectionExpr>(E)) {
     if (CE->getInitializer() &&
-        !passReference(CE->getInitializer().getDecl(), CE->getType(), {},
-                       CE->getSourceRange(),
-                       ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
-                                         /*isImplicit=*/true))) {
+        !passReference(
+            CE->getInitializer().getDecl(), CE->getType(), {},
+            CE->getSourceRange(),
+            ReferenceMetaData(SemaReferenceKind::DeclRef, OpAccess,
+                              CE->getReferencedDecl().getSubstitutions(),
+                              /*isImplicit=*/true))) {
       return Action::Stop();
     }
     return Action::Continue(E);
@@ -410,10 +414,11 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       if (!passReference(ModuleEntity(module),
                          {module->getName(), E->getLoc()}))
         return Action::Stop();
-    } else if (!passReference(DRE->getDecl(), DRE->getType(),
-                              DRE->getNameLoc(),
-                      ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
-                                        OpAccess))) {
+    } else if (!passReference(
+                   DRE->getDecl(), DRE->getType(), DRE->getNameLoc(),
+                   ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
+                                     OpAccess,
+                                     DRE->getDeclRef().getSubstitutions()))) {
       return Action::Stop();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
@@ -436,20 +441,21 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         return Action::Stop();
     }
 
-    if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
-                       MRE->getNameLoc(),
-                       ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
-                                         OpAccess)))
+    if (!passReference(
+            MRE->getMember().getDecl(), MRE->getType(), MRE->getNameLoc(),
+            ReferenceMetaData(SemaReferenceKind::DeclMemberRef, OpAccess,
+                              MRE->getMember().getSubstitutions())))
       return Action::Stop();
 
     // We already visited the children.
     return doSkipChildren();
 
   } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
-    if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getType(),
-                       OtherCtorE->getConstructorLoc(),
-                       ReferenceMetaData(SemaReferenceKind::DeclConstructorRef,
-                                         OpAccess)))
+    if (!passReference(
+            OtherCtorE->getDecl(), OtherCtorE->getType(),
+            OtherCtorE->getConstructorLoc(),
+            ReferenceMetaData(SemaReferenceKind::DeclConstructorRef, OpAccess,
+                              OtherCtorE->getDeclRef().getSubstitutions())))
       return Action::Stop();
 
   } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
@@ -462,7 +468,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       SubscrD = SE->getDecl().getDecl();
 
     ReferenceMetaData data(SemaReferenceKind::SubscriptRef, OpAccess,
-                           SE->isImplicit());
+                           SE->getDecl().getSubstitutions(), SE->isImplicit());
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getLoc(), data, true))
@@ -490,10 +496,10 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         SourceRange range(loc, loc);
         auto Continue = passReference(
             decl, component.getComponentType(), loc, range,
-            ReferenceMetaData((isa<SubscriptDecl>(decl)
-                                   ? SemaReferenceKind::SubscriptRef
-                                   : SemaReferenceKind::DeclMemberRef),
-                              OpAccess));
+            ReferenceMetaData(
+                (isa<SubscriptDecl>(decl) ? SemaReferenceKind::SubscriptRef
+                                          : SemaReferenceKind::DeclMemberRef),
+                OpAccess, KPE->getReferencedDecl().getSubstitutions()));
         if (!Continue)
           return Action::Stop();
         break;
@@ -601,10 +607,10 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // Visit in source order.
     if (!DMRE->getBase()->walk(*this))
       return Action::Stop();
-    if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
-                       DMRE->getNameLoc(),
-                       ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
-                                         OpAccess)))
+    if (!passReference(
+            DMRE->getMember().getDecl(), DMRE->getType(), DMRE->getNameLoc(),
+            ReferenceMetaData(SemaReferenceKind::DynamicMemberRef, OpAccess,
+                              DMRE->getMember().getSubstitutions())))
       return Action::Stop();
     // We already visited the children.
     return doSkipChildren();
@@ -615,7 +621,8 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       auto macroRefType = macroDecl->getDeclaredInterfaceType();
       if (!passReference(
               macroDecl, macroRefType, ME->getMacroNameLoc(),
-              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
+              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None,
+                                ME->getReferencedDecl().getSubstitutions())))
         return Action::Stop();
     }
   }
@@ -645,9 +652,33 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
         auto Continue = passReference(ModD, {ident, IdT->getLoc()});
         return Action::StopIf(!Continue);
       }
-      auto Continue = passReference(
-          VD, Type(), IdT->getNameLoc(),
-          ReferenceMetaData(SemaReferenceKind::TypeRef, llvm::None));
+
+      Type Ty = T->getType();
+
+      // Construct llvm::function_ref which can be used in the underlying
+      // SourceEntityWalker to lazily fetch SubstitutionMap for this TypeRepr
+      std::function<SubstitutionMap()> SubstitutionsFn = [Ty]() {
+        if (!Ty) {
+          return SubstitutionMap();
+        }
+
+        DeclContext *DC = nullptr;
+        if (auto *GenericDecl = Ty->getAnyGeneric()) {
+          DC = GenericDecl->getInnermostTypeContext();
+        } else if (auto *NominalDecl = Ty->getAnyNominal()) {
+          DC = NominalDecl->getInnermostTypeContext();
+        }
+
+        if (!DC) {
+          return SubstitutionMap();
+        }
+        return Ty->getContextSubstitutionMap(DC->getParentModule(), DC);
+      };
+
+      auto Continue =
+          passReference(VD, Ty, IdT->getNameLoc(),
+                        ReferenceMetaData(SemaReferenceKind::TypeRef,
+                                          llvm::None, SubstitutionsFn));
       return Action::StopIf(!Continue);
     }
   } else if (auto FT = dyn_cast<FixedTypeRepr>(T)) {
@@ -747,9 +778,9 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
         Type macroRefType = macroDecl->getDeclaredInterfaceType();
         auto customAttrRef =
             std::make_pair(customAttr, expansion ? expansion.get<Decl *>() : D);
-        auto refMetadata =
-            ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None,
-                              /*isImplicit=*/false, customAttrRef);
+        auto refMetadata = ReferenceMetaData(
+            SemaReferenceKind::DeclRef, llvm::None, llvm::None,
+            /*isImplicit=*/false, customAttrRef);
         if (!passReference(macroDecl, macroRefType,
                            DeclNameLoc(Repr->getStartLoc()), refMetadata))
           return false;
@@ -874,6 +905,13 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
           return true;
         }
         CtorTyRef = TD;
+
+        // For constructor calls, the substitutions should be for the called
+        // initializer
+        if (Fn) {
+          auto Substitutions = Fn->getReferencedDecl().getSubstitutions();
+          Data.SubstitutionsFn = [Substitutions]() { return Substitutions; };
+        }
       }
     }
 

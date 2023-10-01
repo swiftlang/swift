@@ -175,6 +175,14 @@ private:
   llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
       llvm::None;
 
+  /// Generic type parameters substitutions for references of generic
+  /// declarations.
+  SubstitutionMap Substitutions;
+
+  /// Generic type parameters substitutions for generic declarations
+  /// of the constructed type. Valid only if \c CtorTyRef is set.
+  SubstitutionMap CtorSubstitutions;
+
   bool IsKeywordArgument = false;
   /// It this is a ref, whether it is "dynamic". See \c ide::isDynamicRef.
   bool IsDynamic = false;
@@ -197,12 +205,14 @@ public:
       SourceFile *SF, SourceLoc Loc, ValueDecl *ValueD, TypeDecl *CtorTyRef,
       ExtensionDecl *ExtTyRef, bool IsRef, Type Ty, Type ContainerType,
       llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef,
+      SubstitutionMap Substitutions, SubstitutionMap CtorSubstitutions,
       bool IsKeywordArgument, bool IsDynamic,
       SmallVector<NominalTypeDecl *> ReceiverTypes,
       SmallVector<ValueDecl *> ShorthandShadowedDecls)
       : ResolvedCursorInfo(CursorInfoKind::ValueRef, SF, Loc), ValueD(ValueD),
         CtorTyRef(CtorTyRef), ExtTyRef(ExtTyRef), IsRef(IsRef), Ty(Ty),
         ContainerType(ContainerType), CustomAttrRef(CustomAttrRef),
+        Substitutions(Substitutions), CtorSubstitutions(CtorSubstitutions),
         IsKeywordArgument(IsKeywordArgument), IsDynamic(IsDynamic),
         ReceiverTypes(ReceiverTypes),
         ShorthandShadowedDecls(ShorthandShadowedDecls) {}
@@ -244,6 +254,10 @@ public:
   getCustomAttrRef() const {
     return CustomAttrRef;
   }
+
+  SubstitutionMap getSubstitutionMap() const { return Substitutions; }
+
+  SubstitutionMap getCtorSubstitutionMap() const { return CtorSubstitutions; }
 
   static bool classof(const ResolvedCursorInfo *Info) {
     return Info->getKind() == CursorInfoKind::ValueRef;

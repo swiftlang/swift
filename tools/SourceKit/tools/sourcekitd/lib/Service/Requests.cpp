@@ -2556,6 +2556,12 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyTypeName, Symbol.TypeName);
   if (!Symbol.TypeUSR.empty())
     Elem.set(KeyTypeUsr, Symbol.TypeUSR);
+  if (!Symbol.Substitutions.empty()) {
+    auto SubstArr = Elem.setArray(KeySubstitutions);
+    for (StringRef Mapping : Symbol.Substitutions) {
+      SubstArr.appendDictionary().set(KeySubstitutionMapping, Mapping);
+    }
+  }
   if (!Symbol.ContainerTypeUSR.empty())
     Elem.set(KeyContainerTypeUsr, Symbol.ContainerTypeUSR);
   if (!Symbol.DocComment.empty())

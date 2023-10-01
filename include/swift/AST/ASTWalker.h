@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_ASTWALKER_H
 #define SWIFT_AST_ASTWALKER_H
 
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -48,18 +49,45 @@ enum class SemaReferenceKind : uint8_t {
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
   llvm::Optional<AccessKind> AccKind;
+
+  /// For references of a declaration in generic context, fetches substitutions
+  /// of the type parameters. Creating SubstitutionMap can be expensive,
+  /// this allows for a lazy evaluation. Prefer call to \c getSubstitutions().
+  llvm::Optional<std::function<SubstitutionMap()>> SubstitutionsFn;
+
   bool isImplicit = false;
   bool isImplicitCtorType = false;
 
   /// When non-none, this is a custom attribute reference.
   llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
 
+  llvm::Optional<SubstitutionMap> getSubstitutions() const {
+    if (!SubstitutionsFn) {
+      return llvm::None;
+    }
+    return (*SubstitutionsFn)();
+  }
+
+  ReferenceMetaData(
+      SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+      llvm::Optional<std::function<SubstitutionMap()>> SubstitutionsFn =
+          llvm::None,
+      bool isImplicit = false,
+      llvm::Optional<std::pair<const CustomAttr *, Decl *>> customAttrRef =
+          llvm::None)
+      : Kind(Kind), AccKind(AccKind), SubstitutionsFn(SubstitutionsFn),
+        isImplicit(isImplicit), CustomAttrRef(customAttrRef) {}
+
+  /// Convenience constructor which allows to simply pass SubstitutionMap
+  /// without a need to wrap it into llvm::function_ref.
   ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
-                    bool isImplicit = false,
+                    SubstitutionMap Substitutions, bool isImplicit = false,
                     llvm::Optional<std::pair<const CustomAttr *, Decl *>>
                         customAttrRef = llvm::None)
-      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
-        CustomAttrRef(customAttrRef) {}
+      : ReferenceMetaData(Kind, AccKind,
+                          std::function<SubstitutionMap()>(
+                              [Substitutions]() { return Substitutions; }),
+                          isImplicit, customAttrRef) {}
 };
 
 /// Specifies how the initialization expression of a \c lazy variable should be

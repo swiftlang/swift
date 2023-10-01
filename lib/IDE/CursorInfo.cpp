@@ -372,6 +372,8 @@ public:
         /*ExtTyRef=*/nullptr, /*IsRef=*/false, /*Ty=*/Type(),
         /*ContainerType=*/Type(),
         /*CustomAttrRef=*/llvm::None,
+        /*SubstMap*/SubstitutionMap(),
+        /*CtorSubstMap*/SubstitutionMap(),
         /*IsKeywordArgument=*/false,
         /*IsDynamic=*/false,
         /*ReceiverTypes=*/{},
@@ -432,6 +434,8 @@ public:
           /*ExtTyRef=*/nullptr, /*IsRef=*/true, /*Ty=*/Type(),
           /*ContainerType=*/Res.BaseType,
           /*CustomAttrRef=*/llvm::None,
+          /*SubstMap*/SubstitutionMap(),
+          /*CtorSubstMap*/SubstitutionMap(),
           /*IsKeywordArgument=*/false, Res.IsDynamicRef, ReceiverTypes,
           Finder.getShorthandShadowedDecls(Res.ReferencedDecl));
       Results.push_back(CursorInfo);

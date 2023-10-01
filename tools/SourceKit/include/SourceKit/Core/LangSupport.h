@@ -568,6 +568,8 @@ struct CursorSymbolInfo {
   StringRef USR;
   StringRef TypeName;
   StringRef TypeUSR;
+  /// Serialized SubstitutionMap for a reference of a generic declaration.
+  ArrayRef<StringRef> Substitutions;
   StringRef ContainerTypeUSR;
   StringRef DocComment;
   StringRef GroupName;
