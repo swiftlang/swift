@@ -228,6 +228,22 @@ public struct AsyncStream<Element> {
     }
   }
 
+  final class _Backing {
+    let storage: _BackpressuredStorage<Element, Never>
+
+    init(storage: _BackpressuredStorage<Element, Never>) {
+      self.storage = storage
+    }
+
+    deinit {
+        if #available(SwiftStdlib 9999, *) {
+          self.storage.sequenceDeinitialized()
+        } else {
+          fatalError("Internal inconsistency")
+        }
+    }
+  }
+
   final class _Context {
     let storage: _Storage?
     let produce: () async -> Element?
@@ -242,7 +258,14 @@ public struct AsyncStream<Element> {
     }
   }
 
-  let context: _Context
+  enum _Implementation {
+    /// This is the implementation based on the original proposal with the Continuation
+    case contextBased(_Context)
+    /// This is the implementation with backpressure based on the Source
+    case backpressured(_Backing)
+  }
+
+  let _implementation: _Implementation
   
 
   /// Constructs an asynchronous stream for an element type, using the
@@ -293,7 +316,7 @@ public struct AsyncStream<Element> {
     _ build: (Continuation) -> Void
   ) {
     let storage: _Storage = .create(limit: limit)
-    context = _Context(storage: storage, produce: storage.next)
+    self._implementation = .contextBased(_Context(storage: storage, produce: storage.next))
     build(Continuation(storage: storage))
   }
 
@@ -336,7 +359,7 @@ public struct AsyncStream<Element> {
   ) {
     let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
       = .create(produce)
-    context = _Context {
+    self._implementation = .contextBased(_Context {
       return await withTaskCancellationHandler {
         guard let result = await storage.value?() else {
           storage.value = nil
@@ -347,7 +370,7 @@ public struct AsyncStream<Element> {
         storage.value = nil
         onCancel?()
       }
-    }
+    })
   }
 }
 
@@ -360,7 +383,34 @@ extension AsyncStream: AsyncSequence {
   /// concurrent context that contends with another such call, which
   /// results in a call to `fatalError()`.
   public struct Iterator: AsyncIteratorProtocol {
-    let context: _Context
+    final class _Backing {
+      let _storage: _BackpressuredStorage<Element, Never>
+
+      init(storage: _BackpressuredStorage<Element, Never>) {
+        self._storage = storage
+        self._storage.iteratorInitialized()
+      }
+
+      deinit {
+        if #available(SwiftStdlib 9999, *) {
+          self._storage.iteratorDeinitialized()
+        } else {
+          fatalError("Internal inconsistency")
+        }
+      }
+    }
+    enum _Implementation {
+      /// This is the implementation based on the original proposal with the Continuation
+      case contextBased(_Context)
+      /// This is the implementation with backpressure based on the Source
+      case backpressured(_Backing)
+    }
+
+    let _implementation: _Implementation
+
+    init(implementation: _Implementation) {
+      self._implementation = implementation
+    }
 
     /// The next value from the asynchronous stream.
     ///
@@ -375,14 +425,30 @@ extension AsyncStream: AsyncSequence {
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
     /// might return `nil` immediately, or return `nil` on subsequent calls.
     public mutating func next() async -> Element? {
-      await context.produce()
+      switch self._implementation {
+        case .contextBased(let context):
+          return await context.produce()
+        case .backpressured(let backing):
+          if #available(SwiftStdlib 9999, *) {
+            // The only error that can be thrown here is the `CancellationError` which we convert to nil
+            return try? await backing._storage.next()
+          } else {
+            fatalError("Internal inconsistency")
+          }
+      }
     }
   }
 
   /// Creates the asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(context: context)
+    switch self._implementation {
+      case .contextBased(let context):
+        return Iterator(implementation: .contextBased(context))
+
+      case .backpressured(let backing):
+        return Iterator(implementation: .backpressured(.init(storage: backing.storage)))
+    }
   }
 }
 

@@ -122,7 +122,9 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskSleep.swift
   ThreadingError.cpp
   TracingSignpost.cpp
+  Locking.swift
   AsyncStreamBuffer.swift
+  AsyncStreamBackpressure.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
   AsyncStream.cpp
