@@ -1,5 +1,4 @@
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
+// REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
@@ -21,7 +20,7 @@
 // RUN:   %S/Inputs/evil_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature Macros \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
@@ -47,9 +46,9 @@
 
 // CHECK: ->(plugin:[[#PID1:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION:]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libMacroDefinition.dylib","moduleName":"MacroDefinition"}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}MacroDefinition.{{dylib|so|dll}}","moduleName":"MacroDefinition"}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libEvilMacros.dylib","moduleName":"EvilMacros"}}
+// CHECK-NEXT: ->(plugin:[[#PID1]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID1]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(a + b)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID1]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(a + b, \"a + b\")"}}
@@ -58,9 +57,9 @@
 
 // CHECK: ->(plugin:[[#PID2:]]) {"getCapability":{"capability":{"protocolVersion":[[#PROTOCOL_VERSION]]}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"getCapabilityResult":{"capability":{"features":["load-plugin-library"],"protocolVersion":[[#PROTOCOL_VERSION]]}}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libMacroDefinition.dylib","moduleName":"MacroDefinition"}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}MacroDefinition.{{dylib|so|dll}}","moduleName":"MacroDefinition"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
-// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"BUILD_DIR{{.*}}plugins/libEvilMacros.dylib","moduleName":"EvilMacros"}}
+// CHECK-NEXT: ->(plugin:[[#PID2]]) {"loadPluginLibrary":{"libraryPath":"{{.*}}EvilMacros.{{dylib|so|dll}}","moduleName":"EvilMacros"}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"loadPluginLibraryResult":{"diagnostics":[],"loaded":true}}
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(b + a, \"b + a\")"}}
