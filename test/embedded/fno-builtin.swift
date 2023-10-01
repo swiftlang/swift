@@ -2,6 +2,7 @@
 // RUN: %target-swift-emit-ir %s %S/Inputs/print.swift -module-name main -Xcc -ffreestanding -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
