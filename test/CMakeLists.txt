@@ -208,6 +208,7 @@ normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
 normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
+normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
