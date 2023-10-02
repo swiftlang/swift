@@ -2319,6 +2319,10 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::EndBorrowInst:
       break;
     // We can only ignore a dealloc_stack instruction if we can ignore all
     // instructions in the block.
