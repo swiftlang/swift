@@ -917,7 +917,9 @@ public:
   bool shouldPrespecializeGenericMetadata();
   
   bool canMakeStaticObjectsReadOnly();
-  
+
+  bool canUseObjCSymbolicReferences();
+
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
@@ -1278,6 +1280,7 @@ private:
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
+  llvm::DenseMap<ProtocolDecl *, llvm::Constant *> ObjCProtocolSymRefs;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
 
@@ -1301,6 +1304,7 @@ private:
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
+  llvm::Constant *getObjCProtocolRefSymRefDescriptor(ProtocolDecl *protocol);
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 

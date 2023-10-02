@@ -585,6 +585,10 @@ ASTContext::getInitRawStructMetadataAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getObjCSymbolicReferencesAvailability() {
+  return getSwiftFutureAvailability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 

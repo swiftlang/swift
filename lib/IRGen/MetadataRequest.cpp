@@ -404,11 +404,20 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
     switch (referent.getKind()) {
     case SymbolicReferent::NominalType: {
       auto type = const_cast<NominalTypeDecl*>(referent.getNominalType());
+      bool isObjCProtocol = false;
       if (auto proto = dyn_cast<ProtocolDecl>(type)) {
-        // The symbolic reference is to the protocol descriptor of the
-        // referenced protocol.
-        ref = getAddrOfLLVMVariableOrGOTEquivalent(
-          LinkEntity::forProtocolDescriptor(proto));
+        if (proto->isObjC()) {
+          assert(canUseObjCSymbolicReferences());
+          ref = ConstantReference(
+              cast<llvm::Constant>(getObjCProtocolRefSymRefDescriptor(proto)),
+              ConstantReference::Direct);
+          isObjCProtocol = true;
+        } else {
+          // The symbolic reference is to the protocol descriptor of the
+          // referenced protocol.
+          ref = getAddrOfLLVMVariableOrGOTEquivalent(
+              LinkEntity::forProtocolDescriptor(proto));
+        }
       } else {
         // The symbolic reference is to the type context descriptor of the
         // referenced type.
@@ -417,7 +426,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
           LinkEntity::forNominalTypeDescriptor(type));
       }
       // \1 - direct reference, \2 - indirect reference
-      kind = (ref.isIndirect() ? 0x02 : 0x01);
+      kind = (ref.isIndirect() ? 0x02 : (isObjCProtocol ? 0x0c : 0x01));
       break;
     }
     case SymbolicReferent::OpaqueType: {

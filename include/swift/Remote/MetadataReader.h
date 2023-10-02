@@ -512,6 +512,33 @@ public:
                           Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
                           resolved.getResolvedAddress().getAddressData());
       }
+      case Demangle::SymbolicReferenceKind::ObjectiveCProtocol: {
+        // 'resolved' points to a struct of two relative addresses.
+        // The second entry is a relative address to the mangled protocol
+        // without symbolic references.
+        auto addr =
+            resolved.getResolvedAddress().getAddressData() + sizeof(int32_t);
+        int32_t offset;
+        Reader->readInteger(RemoteAddress(addr), &offset);
+        auto addrOfTypeRef = addr + offset;
+        resolved = Reader->getSymbol(RemoteAddress(addrOfTypeRef));
+
+        // Dig out the protocol from the protocol list.
+        auto protocolList = readMangledName(resolved.getResolvedAddress(),
+                                            MangledNameKind::Type, dem);
+        assert(protocolList->getFirstChild()
+                   ->getFirstChild()
+                   ->getFirstChild()
+                   ->getFirstChild()
+                   ->getKind() == Node::Kind::Protocol);
+        auto protocol = protocolList->getFirstChild()
+                            ->getFirstChild()
+                            ->getFirstChild()
+                            ->getFirstChild();
+        auto protocolType = dem.createNode(Node::Kind::Type);
+        protocolType->addChild(protocol, dem);
+        return protocolType;
+      }
       }
 
       return nullptr;
