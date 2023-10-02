@@ -561,6 +561,21 @@ struct LocationInfo {
   SWIFT_DEBUG_DUMP { print(llvm::errs(), ""); }
 };
 
+struct SubstitutionInfo {
+  StringRef Mapping;
+  StringRef GenericUSR;
+  StringRef ReplacementUSR;
+
+  void print(llvm::raw_ostream &OS, std::string Indentation) const {
+    OS << Indentation << "SubstitutionInfo" << '\n';
+    OS << Indentation << "  Mapping: " << Mapping << '\n';
+    OS << Indentation << "  GenericUSR: " << GenericUSR << '\n';
+    OS << Indentation << "  ReplacementUSR: " << ReplacementUSR << '\n';
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::errs(), ""); }
+};
+
 struct CursorSymbolInfo {
   UIdent Kind;
   UIdent DeclarationLang;
@@ -568,8 +583,7 @@ struct CursorSymbolInfo {
   StringRef USR;
   StringRef TypeName;
   StringRef TypeUSR;
-  /// Serialized SubstitutionMap for a reference of a generic declaration.
-  ArrayRef<StringRef> Substitutions;
+  ArrayRef<SubstitutionInfo> Substitutions;
   StringRef ContainerTypeUSR;
   StringRef DocComment;
   StringRef GroupName;
@@ -620,6 +634,9 @@ struct CursorSymbolInfo {
     OS << Indentation << "  USR: " << USR << '\n';
     OS << Indentation << "  TypeName: " << TypeName << '\n';
     OS << Indentation << "  TypeUSR: " << TypeUSR << '\n';
+    for (auto SubstInfo : Substitutions) {
+      SubstInfo.print(OS, Indentation + "    ");
+    }
     OS << Indentation << "  ContainerTypeUSR: " << ContainerTypeUSR << '\n';
     OS << Indentation << "  DocComment: " << DocComment << '\n';
     OS << Indentation << "  GroupName: " << GroupName << '\n';
@@ -1093,8 +1110,8 @@ public:
   virtual void getCursorInfo(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       unsigned Length, bool Actionables, bool SymbolGraph,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      llvm::Optional<VFSOptions> vfsOptions,
+      bool ExpandSubstitutions, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 

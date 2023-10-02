@@ -163,8 +163,8 @@ public:
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(
         DocName, DocName, Offset, /*Length=*/0, /*Actionables=*/false,
-        /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
-        /*vfsOptions=*/None, CancellationToken,
+        /*SymbolGraph=*/false, /*ExpandSubstitutions*/ false,
+        CancelOnSubsequentRequest, Args, /*vfsOptions=*/None, CancellationToken,
         [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
@@ -446,14 +446,15 @@ TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   // Schedule a cursor info request that takes long to execute. This should be
   // cancelled as the next cursor info (which is faster) gets requested.
   Semaphore FirstCursorInfoSema(0);
-  getLang().getCursorInfo(
-      SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
-      /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
-      [&](const RequestResult<CursorInfoData> &Result) {
-        EXPECT_TRUE(Result.isCancelled());
-        FirstCursorInfoSema.signal();
-      });
+  getLang().getCursorInfo(SlowDocName, SlowDocName, SlowOffset, /*Length=*/0,
+                          /*Actionables=*/false, /*SymbolGraph=*/false,
+                          /*ExpandSubstitutions*/ false,
+                          /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
+                          /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+                          [&](const RequestResult<CursorInfoData> &Result) {
+                            EXPECT_TRUE(Result.isCancelled());
+                            FirstCursorInfoSema.signal();
+                          });
 
   auto Info = getCursor(FastDocName, FastOffset, Args,
                         /*CancellationToken=*/nullptr,
@@ -491,8 +492,9 @@ TEST_F(CursorInfoTest, CursorInfoCancellation) {
   Semaphore CursorInfoSema(0);
   getLang().getCursorInfo(
       SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
-      /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      /*SymbolGraph=*/false, /*ExpandSubstitutions*/ false,
+      /*CancelOnSubsequentRequest=*/false, ArgsForSlow, /*vfsOptions=*/None,
+      /*CancellationToken=*/CancellationToken,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         CursorInfoSema.signal();

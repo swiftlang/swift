@@ -1495,10 +1495,13 @@ handleRequestCursorInfo(const RequestDict &Req,
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       int64_t SymbolGraph = false;
       Req.getInt64(KeyRetrieveSymbolGraph, SymbolGraph, /*isOptional=*/true);
+      int64_t ExpandSubstitutions = false;
+      Req.getInt64(KeyExpandSubstitutions, ExpandSubstitutions,
+                   /*isOptional=*/true);
       return Lang.getCursorInfo(
           *PrimaryFilePath, InputBufferName, Offset, Length, Actionables,
-          SymbolGraph, CancelOnSubsequentRequest, Args, std::move(vfsOptions),
-          CancellationToken,
+          SymbolGraph, ExpandSubstitutions, CancelOnSubsequentRequest, Args,
+          std::move(vfsOptions), CancellationToken,
           [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
@@ -2558,8 +2561,15 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyTypeUsr, Symbol.TypeUSR);
   if (!Symbol.Substitutions.empty()) {
     auto SubstArr = Elem.setArray(KeySubstitutions);
-    for (StringRef Mapping : Symbol.Substitutions) {
-      SubstArr.appendDictionary().set(KeySubstitutionMapping, Mapping);
+    for (auto &SubstInfo : Symbol.Substitutions) {
+      auto Dict = SubstArr.appendDictionary();
+      Dict.set(KeySubstitutionMapping, SubstInfo.Mapping);
+      if (!SubstInfo.GenericUSR.empty()) {
+        Dict.set(KeyGenericTypeUSR, SubstInfo.GenericUSR);
+      }
+      if (!SubstInfo.ReplacementUSR.empty()) {
+        Dict.set(KeyReplacementTypeUSR, SubstInfo.ReplacementUSR);
+      }
     }
   }
   if (!Symbol.ContainerTypeUSR.empty())

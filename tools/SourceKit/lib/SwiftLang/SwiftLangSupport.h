@@ -651,7 +651,8 @@ public:
 
   void getCursorInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
                      unsigned Offset, unsigned Length, bool Actionables,
-                     bool SymbolGraph, bool CancelOnSubsequentRequest,
+                     bool SymbolGraph, bool ExpandSubstitutions,
+                     bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
                      llvm::Optional<VFSOptions> vfsOptions,
                      SourceKitCancellationToken CancellationToken,
