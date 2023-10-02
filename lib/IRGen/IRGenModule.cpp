@@ -671,6 +671,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy,    // Base option record
     SwiftTaskGroupPtrTy,        // Task group
   });
+  SwiftResultTypeInfoTaskOptionRecordTy = createStructType(
+      *this, "swift.result_type_info_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SizeTy,
+    SizeTy,
+    Int8PtrTy,
+    Int8PtrTy,
+    Int8PtrTy,
+  });
   ExecutorFirstTy = SizeTy;
   ExecutorSecondTy = SizeTy;
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
