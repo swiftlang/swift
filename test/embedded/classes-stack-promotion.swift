@@ -86,7 +86,9 @@ struct Main {
 // CHECK-IR-NEXT:   call {{.*}}@"$s4main5print_10terminatorys12StaticStringV_AEtF"
 // CHECK-IR-NEXT:   call {{.*}}@"$s4main5print_10terminatorys12StaticStringV_AEtF"
 // CHECK-IR-NEXT:   call {{.*}}@"$s4main3bar1oyAA7MyClassC_tF"
-// CHECK-IR-NEXT:   call {{.*}}@swift_release
+// CHECK-IR-NEXT:   call {{.*}}@swift_setDeallocating
+// CHECK-IR-NEXT:   call {{.*}}@"$s4main5print_10terminatorys12StaticStringV_AEtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$s4main5print_10terminatorys12StaticStringV_AEtF"
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
 // CHECK-IR-NEXT:   call {{.*}}@"$s4main5print_10terminatorys12StaticStringV_AEtF"
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
