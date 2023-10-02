@@ -408,7 +408,9 @@ public:
           [](const PartitionOp &, Element) {},
       ArrayRef<Element> nonconsumables = {},
       llvm::function_ref<void(const PartitionOp &, Element)>
-          handleConsumeNonConsumable = [](const PartitionOp &, Element) {}) {
+          handleConsumeNonConsumable = [](const PartitionOp &, Element) {},
+      llvm::function_ref<bool(Element)> isActorDerived = nullptr) {
+
     REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                      op.print(llvm::dbgs()));
     REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
@@ -444,7 +446,7 @@ public:
       fresh_label = Region(fresh_label + 1);
       canonical = false;
       break;
-    case PartitionOpKind::Transfer:
+    case PartitionOpKind::Transfer: {
       assert(op.OpArgs.size() == 1 &&
              "Consume PartitionOp should be passed 1 argument");
       assert(labels.count(op.OpArgs[0]) &&
@@ -464,12 +466,26 @@ public:
         }
       }
 
-      // ensure region is transferred
-      if (!isTransferred(op.OpArgs[0]))
-        // mark region as transferred
-        horizontalUpdate(labels, op.OpArgs[0], Region::transferred());
+      // If this value is actor derived or if any elements in its region are
+      // actor derived, we need to treat as non-consumable.
+      if (isActorDerived && isActorDerived(op.OpArgs[0]))
+        return handleConsumeNonConsumable(op, op.OpArgs[0]);
+      Region elementRegion = labels.at(op.OpArgs[0]);
+      if (llvm::any_of(labels,
+                       [&](const std::pair<Element, Region> &pair) -> bool {
+                         if (pair.second != elementRegion)
+                           return false;
+                         return isActorDerived && isActorDerived(pair.first);
+                       }))
+        return handleConsumeNonConsumable(op, op.OpArgs[0]);
 
+      // Ensure if the region is transferred...
+      if (!isTransferred(op.OpArgs[0]))
+        // that all elements associated with the region are marked as
+        // transferred.
+        horizontalUpdate(labels, op.OpArgs[0], Region::transferred());
       break;
+    }
     case PartitionOpKind::Merge:
       assert(op.OpArgs.size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
