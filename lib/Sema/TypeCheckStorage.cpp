@@ -3534,7 +3534,8 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
       storage->getParsedAccessor(AccessorKind::Address) ||
       storage->getParsedAccessor(AccessorKind::Set) ||
       storage->getParsedAccessor(AccessorKind::Modify) ||
-      storage->getParsedAccessor(AccessorKind::MutableAddress))
+      storage->getParsedAccessor(AccessorKind::MutableAddress) ||
+      storage->getParsedAccessor(AccessorKind::Init))
     return false;
 
   // willSet or didSet in an overriding property imply that there is no storage.

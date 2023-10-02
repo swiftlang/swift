@@ -105,6 +105,9 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
     TypeInDeclContext,
     ImportFromModule,
     GenericRequirement,
+
+    /// Look up stored properties within a type.
+    StoredProperty,
   };
 
   LookupKind Kind;
@@ -527,6 +530,9 @@ public:
   /// can use \p VD to enrich call pattern completions of \p ExprType.
   void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr,
                                bool IsDeclUnapplied = false);
+
+  /// Add completions for stored properties of \p D.
+  void getStoredPropertyCompletions(const NominalTypeDecl *D);
 
   void collectOperators(SmallVectorImpl<OperatorDecl *> &results);
 
