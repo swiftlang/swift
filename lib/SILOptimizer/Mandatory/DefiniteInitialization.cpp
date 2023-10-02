@@ -662,14 +662,32 @@ bool LifetimeChecker::shouldEmitError(const SILInstruction *Inst) {
   // This is safe to ignore because assign_by_wrapper/assign_or_init will
   // only be re-written to use the setter if the value is fully initialized.
   if (auto *load = dyn_cast<SingleValueInstruction>(Inst)) {
-    if (auto Op = load->getSingleUse()) {
-      if (auto PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
-        if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
-              return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
-                     isa<AssignOrInitInst>(PAIUse->getUser());
-            }) != PAI->use_end()) {
-          return false;
-        }
+    auto isOnlyUsedByPartialApply =
+        [&](const SingleValueInstruction *inst) -> PartialApplyInst * {
+      Operand *result = nullptr;
+      for (auto *op : inst->getUses()) {
+        auto *user = op->getUser();
+
+        // Ignore copies, destroys and borrows because they'd be
+        // erased together with the setter.
+        if (isa<DestroyValueInst>(user) || isa<CopyValueInst>(user) ||
+            isa<BeginBorrowInst>(user) || isa<EndBorrowInst>(user))
+          continue;
+
+        if (result)
+          return nullptr;
+
+        result = op;
+      }
+      return result ? dyn_cast<PartialApplyInst>(result->getUser()) : nullptr;
+    };
+
+    if (auto *PAI = isOnlyUsedByPartialApply(load)) {
+      if (std::find_if(PAI->use_begin(), PAI->use_end(), [](auto PAIUse) {
+            return isa<AssignByWrapperInst>(PAIUse->getUser()) ||
+                   isa<AssignOrInitInst>(PAIUse->getUser());
+          }) != PAI->use_end()) {
+        return false;
       }
     }
   }

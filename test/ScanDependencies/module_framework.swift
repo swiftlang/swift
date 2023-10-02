@@ -1,23 +1,20 @@
+// REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -swift-version 4 -Xcc -Xclang
+// RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -F %S/Inputs/Frameworks
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // Ensure that round-trip serialization does not affect result
-// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -swift-version 4 -Xcc -Xclang
+// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization %s -o %t/deps.json -emit-dependencies -emit-dependencies-path %t/deps.d -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -F %S/Inputs/Frameworks
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
-// REQUIRES: OS=macosx
-
-import CryptoKit
+import ScannerTestKit
 
 // CHECK: "mainModuleName": "deps"
 // CHECK: directDependencies
-// CHECK-DAG: "swift": "CryptoKit"
+// CHECK-DAG: "swift": "ScannerTestKit"
 // CHECK-DAG: "swift": "Swift"
 // CHECK-DAG: "swift": "SwiftOnoneSupport"
-// CHECK-DAG: "swift": "_Concurrency"
-// CHECK-DAG: "swift": "_StringProcessing"
 // CHECK: ],
 
 // CHECK: "isFramework": true

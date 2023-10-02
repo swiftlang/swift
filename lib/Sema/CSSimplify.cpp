@@ -6303,10 +6303,22 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::OptionalPayload: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
                                 locator))
       return true;
 
+    if (path.size() > 1) {
+      path.pop_back();
+      if (path.back().is<LocatorPathElt::SequenceElementType>()) {
+        conversionsOrFixes.push_back(
+            CollectionElementContextualMismatch::create(
+                *this, lhs, rhs, getConstraintLocator(anchor, path)));
+        return true;
+      }
+    }
     break;
   }
 

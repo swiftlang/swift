@@ -1823,8 +1823,8 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
     SmallVector<ManagedValue, 4> captures;
     emitCaptures(loc, setter, CaptureEmission::AssignByWrapper, captures);
 
-    for (auto capture : captures)
-      capturedArgs.push_back(capture.forward(*this));
+    llvm::transform(captures, std::back_inserter(capturedArgs),
+                    [](auto &capture) { return capture.getValue(); });
   } else {
     assert(base);
 
@@ -1842,8 +1842,11 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
       // nonmutating setter, for example.
       capturedBase = B.createTrivialLoadOr(loc, base.getValue(),
                                            LoadOwnershipQualifier::Copy);
+      // On-stack partial apply doesn't take ownership of the base, so
+      // we have to destroy it manually.
+      enterDestroyCleanup(capturedBase);
     } else {
-      capturedBase = base.copy(*this, loc).forward(*this);
+      capturedBase = base.borrow(*this, loc).getValue();
     }
 
     capturedArgs.push_back(capturedBase);
@@ -1851,7 +1854,8 @@ SILGenFunction::emitApplyOfSetterToBase(SILLocation loc, SILDeclRef setter,
 
   PartialApplyInst *setterPAI =
       B.createPartialApply(loc, setterFRef, substitutions, capturedArgs,
-                           ParameterConvention::Direct_Guaranteed);
+                           ParameterConvention::Direct_Guaranteed,
+                           PartialApplyInst::OnStackKind::OnStack);
   return emitManagedRValueWithCleanup(setterPAI).getValue();
 }
 

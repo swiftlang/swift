@@ -178,9 +178,8 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 
 SyntacticElementTarget
 SyntacticElementTarget::forForEachStmt(ForEachStmt *stmt, DeclContext *dc,
-                                       bool bindPatternVarsOneWay) {
-  SyntacticElementTarget target(
-      stmt, dc, bindPatternVarsOneWay || bool(stmt->getWhere()));
+                                       bool ignoreWhereClause) {
+  SyntacticElementTarget target(stmt, dc, ignoreWhereClause);
   return target;
 }
 
