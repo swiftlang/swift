@@ -3463,7 +3463,7 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -6603,7 +6603,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,

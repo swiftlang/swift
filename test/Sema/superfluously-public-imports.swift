@@ -14,6 +14,8 @@
 // RUN: %target-swift-frontend -emit-module %t/ExtensionA.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExtensionB.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/PropertyWrapper.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExtendedDefinitionPublic.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExtendedDefinitionNonPublic.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
@@ -82,6 +84,12 @@ public struct MyPropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
+//--- ExtendedDefinitionPublic.swift
+public struct PublicExtendedType {}
+
+//--- ExtendedDefinitionNonPublic.swift
+public struct NonPublicExtendedType {}
+
 //--- UnusedImport.swift
 
 //--- UnusedPackageImport.swift
@@ -111,6 +119,8 @@ public import Aliases
 public import ExtensionA
 public import ExtensionB
 public import PropertyWrapper
+public import ExtendedDefinitionPublic
+public import ExtendedDefinitionNonPublic // expected-warning {{public import of 'ExtendedDefinitionNonPublic' was not used in public declarations or inlinable code}} {{1-8=}}
 
 /// Repeat some imports to make sure we report all of them.
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-8=}}
@@ -177,6 +187,14 @@ public func publicFuncUsesPrivate() {
 
 public struct StructUsingPropertyWrapper {
   @MyPropertyWrapper(42) public var wrapped: Any // expected-remark 2 {{generic struct 'MyPropertyWrapper' is imported via 'PropertyWrapper'}}
+}
+
+extension PublicExtendedType { // expected-remark 2 {{struct 'PublicExtendedType' is imported via 'ExtendedDefinitionPublic'}}
+    public func foo() {}
+}
+
+extension NonPublicExtendedType {
+    func foo() {}
 }
 
 public struct Struct { // expected-remark {{implicitly used struct 'Int' is imported via 'Swift'}}
