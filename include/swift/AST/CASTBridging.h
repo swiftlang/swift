@@ -239,26 +239,32 @@ extern "C" {
 ///
 /// \returns a diagnostic instance that can be extended with additional
 /// information and then must be finished via \c SwiftDiagnostic_finish.
+SWIFT_NAME("Diagnostic_create(diags:severity:loc:text:)")
 BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
                                     BridgedDiagnosticSeverity severity,
                                     BridgedSourceLoc cLoc, BridgedString cText);
 
 /// Highlight a source range as part of the diagnostic.
+SWIFT_NAME("Diagnostic_highlight(diag:startLoc:endLoc:)")
 void Diagnostic_highlight(BridgedDiagnostic cDiag, BridgedSourceLoc cStartLoc,
                           BridgedSourceLoc cEndLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
+SWIFT_NAME("Diagnostic_fixItReplace(diag:startLoc:endLoc:replaceText:)")
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
                              BridgedString cReplaceText);
 
 /// Finish the given diagnostic and emit it.
+SWIFT_NAME("Diagnostic_finish(diag:)")
 void Diagnostic_finish(BridgedDiagnostic cDiag);
 
+SWIFT_NAME("ASTContext_getIdentifier(astContext:str:)")
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
                                            BridgedString cStr);
 
+SWIFT_NAME("ASTContext_langOptsHasFeature(astContext:feature:)")
 _Bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                     BridgedFeature feature);
 
@@ -276,26 +282,34 @@ void *TopLevelCodeDecl_createExpr(BridgedASTContext cContext,
                                   BridgedSourceLoc cStartLoc, void *expression,
                                   BridgedSourceLoc cEndLoc);
 
+SWIFT_NAME("ReturnStmt_create(astContext:loc:expr:)")
 void *ReturnStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLoc,
                         void *_Nullable expr);
 
+SWIFT_NAME("SequenceExpr_create(astContext:exprs:)")
 void *SequenceExpr_create(BridgedASTContext cContext, BridgedArrayRef exprs);
 
+SWIFT_NAME("TupleExpr_create(astContext:lParen:subs:names:nameLocs:rParen:)")
 void *TupleExpr_create(BridgedASTContext cContext, BridgedSourceLoc cLParen,
                        BridgedArrayRef subs, BridgedArrayRef names,
                        BridgedArrayRef cNameLocs, BridgedSourceLoc cRParen);
 
+SWIFT_NAME("FunctionCallExpr_create(astContext:fn:args:)")
 void *FunctionCallExpr_create(BridgedASTContext cContext, void *fn, void *args);
 
+SWIFT_NAME("IdentifierExpr_create(astContext:base:loc:)")
 void *IdentifierExpr_create(BridgedASTContext cContext, BridgedIdentifier base,
                             BridgedSourceLoc cLoc);
 
+SWIFT_NAME("StringLiteralExpr_create(astContext:str:tokenLoc:)")
 void *StringLiteralExpr_create(BridgedASTContext cContext, BridgedString cStr,
                                BridgedSourceLoc cTokenLoc);
 
+SWIFT_NAME("IntegerLiteral_create(astContext:str:tokenLoc:)")
 void *IntegerLiteralExpr_create(BridgedASTContext cContext, BridgedString cStr,
                                 BridgedSourceLoc cTokenLoc);
 
+SWIFT_NAME("BooleanLiteralExpr_create(astContext:value:tokenLoc:)")
 void *BooleanLiteralExpr_create(BridgedASTContext cContext, _Bool value,
                                 BridgedSourceLoc cTokenLoc);
 
@@ -303,6 +317,7 @@ SWIFT_NAME("NilLiteralExpr_create(astContext:nilKeywordLoc:)")
 void *NilLiteralExpr_create(BridgedASTContext cContext,
                             BridgedSourceLoc cNilKeywordLoc);
 
+SWIFT_NAME("ArrayExpr_create(astContext:lLoc:elements:commas:rLoc:)")
 void *ArrayExpr_create(BridgedASTContext cContext, BridgedSourceLoc cLLoc,
                        BridgedArrayRef elements, BridgedArrayRef commas,
                        BridgedSourceLoc cRLoc);
@@ -314,17 +329,22 @@ void *VarDecl_create(BridgedASTContext cContext,
                      BridgedSourceLoc cBindingKeywordLoc, void *opaqueNameExpr,
                      void *opaqueInitExpr, _Bool isStatic, _Bool isLet);
 
+SWIFT_NAME("SingleValueStmtExpr_createWithWrappedBranches(astContext:S:"
+           "declContext:mustBeExpr:)")
 void *SingleValueStmtExpr_createWithWrappedBranches(
     BridgedASTContext cContext, void *S, BridgedDeclContext cDeclContext,
     _Bool mustBeExpr);
 
+SWIFT_NAME("IfStmt_create(astContext:ifLoc:cond:then:elseLoc:elseStmt:)")
 void *IfStmt_create(BridgedASTContext cContext, BridgedSourceLoc cIfLoc,
                     void *cond, void *_Nullable then, BridgedSourceLoc cElseLoc,
                     void *_Nullable elseStmt);
 
+SWIFT_NAME("BraceStmt_create(astContext:lBLoc:elements:rBLoc:)")
 void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
                        BridgedArrayRef elements, BridgedSourceLoc cRBLoc);
 
+SWIFT_NAME("SourceLoc_advanced(loc:len:)")
 BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len);
 
 SWIFT_NAME("ParamDecl_create(astContext:declContext:specifierLoc:firstName:"
@@ -369,13 +389,16 @@ DestructorDecl_create(BridgedASTContext cContext,
                       BridgedDeclContext cDeclContext,
                       BridgedSourceLoc cDeinitKeywordLoc);
 
+SWIFT_NAME("SimpleIdentTypeRepr_create(astContext:loc:id:)")
 void *SimpleIdentTypeRepr_create(BridgedASTContext cContext,
                                  BridgedSourceLoc cLoc, BridgedIdentifier id);
 
+SWIFT_NAME("UnresolvedDotExpr_create(astContext:base:dotLoc:name:nameLoc:)")
 void *UnresolvedDotExpr_create(BridgedASTContext cContext, void *base,
                                BridgedSourceLoc cDotLoc, BridgedIdentifier name,
                                BridgedSourceLoc cNameLoc);
 
+SWIFT_NAME("ClosureExpr_create(astContext:body:declContext:)")
 void *ClosureExpr_create(BridgedASTContext cContext, void *body,
                          BridgedDeclContext cDeclContext);
 
@@ -560,71 +583,130 @@ void *ParameterList_create(BridgedASTContext cContext,
                            BridgedArrayRef cParameters,
                            BridgedSourceLoc cRightParenLoc);
 
+SWIFT_NAME("TypeAttrKind_fromString(str:)")
 BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr);
+
+SWIFT_NAME("TypeAttributes_create()")
 BridgedTypeAttributes TypeAttributes_create(void);
+
+SWIFT_NAME("TypeAttributes_addSimpleAttr(attributes:kind:"
+           "atLoc:attrLoc:)")
 void TypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
                                   BridgedTypeAttrKind kind,
                                   BridgedSourceLoc cAtLoc,
                                   BridgedSourceLoc cAttrLoc);
 
+SWIFT_NAME("astContext:base:lSquareLoc:rSquareLoc:")
 void *ArrayTypeRepr_create(BridgedASTContext cContext, void *base,
                            BridgedSourceLoc cLSquareLoc,
                            BridgedSourceLoc cRSquareLoc);
+
+SWIFT_NAME("AttributedTypeRepr_create(astContext:base:attributes:)")
 void *AttributedTypeRepr_create(BridgedASTContext cContext, void *base,
                                 BridgedTypeAttributes cAttributes);
+
+SWIFT_NAME("AttributedTypeSpecifierRepr_create(astContext:base:specifier:"
+           "specifierLoc:)")
 void *
 AttributedTypeSpecifierRepr_create(BridgedASTContext cContext, void *base,
                                    BridgedAttributedTypeSpecifier specifier,
                                    BridgedSourceLoc cSpecifierLoc);
+
+SWIFT_NAME("CompositionTypeRepr_create(astContext:types:firstTypeLoc:"
+           "firstAmpLoc:)")
 void *CompositionTypeRepr_create(BridgedASTContext cContext,
                                  BridgedArrayRef types,
                                  BridgedSourceLoc cFirstTypeLoc,
                                  BridgedSourceLoc cFirstAmpLoc);
+
+SWIFT_NAME("DictionaryTypeRepr_create(astContext:keyType:valueType:"
+           "lSquareLoc:colonLoc:rSquareLoc:)")
 void *DictionaryTypeRepr_create(BridgedASTContext cContext, void *keyType,
                                 void *valueType, BridgedSourceLoc cLSquareLoc,
                                 BridgedSourceLoc cColonloc,
                                 BridgedSourceLoc cRSquareLoc);
+
+SWIFT_NAME("EmptyCompositionTypeRepr_create(astContext:anyLoc:)")
 void *EmptyCompositionTypeRepr_create(BridgedASTContext cContext,
                                       BridgedSourceLoc cAnyLoc);
+
+SWIFT_NAME("FunctionTypeRepr_create(astContext:argsTy:asyncLoc:throwsLoc:"
+           "arrowLoc:returnType:)")
 void *FunctionTypeRepr_create(BridgedASTContext cContext, void *argsTy,
                               BridgedSourceLoc cAsyncLoc,
                               BridgedSourceLoc cThrowsLoc,
                               void * _Nullable thrownType,
                               BridgedSourceLoc cArrowLoc, void *returnType);
+
+SWIFT_NAME("GenericIdentTypeRepr_create(astContext:name:nameLoc:genericArgs:"
+           "lAngleLoc:rAngleLoc:)")
 void *GenericIdentTypeRepr_create(BridgedASTContext cContext,
                                   BridgedIdentifier name,
                                   BridgedSourceLoc cNameLoc,
                                   BridgedArrayRef genericArgs,
                                   BridgedSourceLoc cLAngleLoc,
                                   BridgedSourceLoc cRAngleLoc);
+
+SWIFT_NAME("OptionalTypeRepr_create(astContext:base:questionLoc:)")
 void *OptionalTypeRepr_create(BridgedASTContext cContext, void *base,
                               BridgedSourceLoc cQuestionLoc);
+
+SWIFT_NAME("ImplicitlyUnwrappedOptionalTypeRepr_create(astContext:base:"
+           "exclamationLoc:)")
 void *ImplicitlyUnwrappedOptionalTypeRepr_create(
     BridgedASTContext cContext, void *base, BridgedSourceLoc cExclamationLoc);
+
+SWIFT_NAME("MemberTypeRepr_create(astContext:baseComponent:"
+           "bridgedMemberComponents:)")
 void *MemberTypeRepr_create(BridgedASTContext cContext, void *baseComponent,
                             BridgedArrayRef bridgedMemberComponents);
+
+SWIFT_NAME("MetatypeTypeRepr_create(astContext:baseType:typeLoc:)")
 void *MetatypeTypeRepr_create(BridgedASTContext cContext, void *baseType,
                               BridgedSourceLoc cTypeLoc);
+
+SWIFT_NAME("ProtocolTypeRepr_create(astContext:context:baseType:protoLoc:)")
 void *ProtocolTypeRepr_create(BridgedASTContext cContext, void *baseType,
                               BridgedSourceLoc cProtoLoc);
+
+SWIFT_NAME("PackExpansionTypeRepr_create(astContext:base:repeatLoc:)")
 void *PackExpansionTypeRepr_create(BridgedASTContext cContext, void *base,
                                    BridgedSourceLoc cRepeatLoc);
+
+SWIFT_NAME("TupleTypeRepr_create(astContext:elements:lParenLoc:rParenLoc:)")
 void *TupleTypeRepr_create(BridgedASTContext cContext, BridgedArrayRef elements,
                            BridgedSourceLoc cLParenLoc,
                            BridgedSourceLoc cRParenLoc);
+
+SWIFT_NAME("NamedOpaqueReturnTypeRepr_create(astContext:context:baseTy:)")
 void *NamedOpaqueReturnTypeRepr_create(BridgedASTContext cContext,
                                        void *baseTy);
+
+SWIFT_NAME("OpaqueReturnTypeRepr_create(astContext:loc:baseTy:)")
 void *OpaqueReturnTypeRepr_create(BridgedASTContext cContext,
                                   BridgedSourceLoc cOpaqueLoc, void *baseTy);
+
+SWIFT_NAME("ExistentialTypeRepr_create(astContext:anyLoc:baseTy:)")
 void *ExistentialTypeRepr_create(BridgedASTContext cContext,
                                  BridgedSourceLoc cAnyLoc, void *baseTy);
+
+SWIFT_NAME("VarargTypeRepr_create(astContext:base:ellipsisLoc:)")
 void *VarargTypeRepr_create(BridgedASTContext cContext, void *base,
                             BridgedSourceLoc cEllipsisLoc);
 
+SWIFT_NAME("TopLevelCodeDecl_dump(decl:)")
 void TopLevelCodeDecl_dump(void *decl);
+
+SWIFT_NAME("Expr_dump(expr:)")
 void Expr_dump(void *expr);
+
+SWIFT_NAME("Decl_dump(decl:)")
 void Decl_dump(void *decl);
+
+SWIFT_NAME("Stmt_dump(statement:)")
 void Stmt_dump(void *statement);
+
+SWIFT_NAME("Type_dump(type:)")
 void Type_dump(void *type);
 
 //===----------------------------------------------------------------------===//
