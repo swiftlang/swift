@@ -6,6 +6,8 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: OS=macosx
 
+// REQUIRES: rdar116354297
+
 public func foo() -> [Int] {
 	var a = [1, 2, 3]
 	a.append(4)
