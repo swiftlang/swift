@@ -1184,11 +1184,16 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   SmallVector<Identifier> initializesProperties;
   SmallVector<Identifier> accessesProperties;
 
-  auto parseProperties = [&](SourceLoc loc, Identifier label,
-                             SmallVectorImpl<Identifier> &properties) {
+  enum class AccessKind { Initialization, Access, Invalid };
+
+  auto parseProperties =
+      [&](SourceLoc loc, Identifier label, AccessKind kind,
+          SmallVectorImpl<Identifier> &properties) -> ParserStatus {
+    ParserStatus status;
     if (!properties.empty()) {
       diagnose(loc, diag::duplicate_storage_restrictions_attr_label, label);
-      return true;
+      status.setIsParseError();
+      return status;
     }
 
     bool hasNextProperty = false;
@@ -1199,10 +1204,49 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
       Identifier propertyName;
       SourceLoc propertyNameLoc;
-      if (parseIdentifier(propertyName, propertyNameLoc,
-                          diag::storage_restrictions_attr_expected_name,
-                          /*diagnoseDollarPrefix=*/true)) {
-        return true;
+      if (consumeIf(tok::code_complete)) {
+        status.setHasCodeCompletion();
+        if (this->CodeCompletionCallbacks) {
+          StorageRestrictionsCompletionKind completionKind;
+          if (properties.empty()) {
+            // We are parsing the first argument after a label. The argument is
+            // required.
+            completionKind = StorageRestrictionsCompletionKind::Argument;
+          } else if (!initializesProperties.empty() &&
+                     !accessesProperties.empty()) {
+            // We have specified both an 'initializes' and an 'accesses' label
+            // already. All we can accept are arguments now.
+            completionKind = StorageRestrictionsCompletionKind::Argument;
+          } else {
+            // We can accept either an argument or the label that hasn't been
+            // specified yet.
+            switch (kind) {
+            case AccessKind::Access:
+              completionKind =
+                  StorageRestrictionsCompletionKind::ArgumentOrInitializesLabel;
+              break;
+            case AccessKind::Initialization:
+              completionKind =
+                  StorageRestrictionsCompletionKind::ArgumentOrAccessesLabel;
+              break;
+            case AccessKind::Invalid:
+              // We should never end up in this case. 'parseProperties' does not
+              // get called with 'AccessKind::Invalid'.
+              // If we do end up here, suggest arguments instead of crashing
+              // since it's the most sensible fallback.
+              completionKind = StorageRestrictionsCompletionKind::Argument;
+              break;
+            }
+          }
+          this->CodeCompletionCallbacks->completeDeclAttrParam(
+              CustomSyntaxAttributeKind::StorageRestrictions,
+              static_cast<int>(completionKind), /*HasLabel=*/false);
+        }
+      } else if (parseIdentifier(propertyName, propertyNameLoc,
+                                 diag::storage_restrictions_attr_expected_name,
+                                 /*diagnoseDollarPrefix=*/true)) {
+        status.setIsParseError();
+        return status;
       }
 
       properties.push_back(propertyName);
@@ -1211,23 +1255,35 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
       hasNextProperty = consumeIf(tok::comma);
     } while (hasNextProperty);
 
-    return false;
+    return status;
   };
 
-  auto parseArgument = [&](bool isOptional = false) -> bool {
+  auto parseArgument = [&](bool isOptional = false) -> ParserStatus {
+    ParserStatus status;
+
     if (Tok.is(tok::r_paren) && isOptional)
-      return false;
+      return status;
 
     Identifier accessLabel;
     SourceLoc loc;
     parseOptionalArgumentLabel(accessLabel, loc);
 
     if (accessLabel.empty()) {
-      diagnose(Loc, diag::missing_storage_restrictions_attr_label);
-      return true;
+      if (consumeIf(tok::code_complete)) {
+        if (this->CodeCompletionCallbacks) {
+          this->CodeCompletionCallbacks->completeDeclAttrParam(
+              CustomSyntaxAttributeKind::StorageRestrictions,
+              static_cast<int>(StorageRestrictionsCompletionKind::Label),
+              /*HasLabel=*/false);
+        }
+        status.setHasCodeCompletion();
+        return status;
+      } else {
+        diagnose(Loc, diag::missing_storage_restrictions_attr_label);
+        status.setIsParseError();
+        return status;
+      }
     }
-
-    enum class AccessKind { Initialization, Access, Invalid };
 
     auto access = llvm::StringSwitch<AccessKind>(accessLabel.str())
                       .Case("initializes", AccessKind::Initialization)
@@ -1236,20 +1292,25 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 
     switch (access) {
     case AccessKind::Initialization:
-      return parseProperties(loc, accessLabel, initializesProperties);
+      return parseProperties(loc, accessLabel, access, initializesProperties);
 
     case AccessKind::Access:
-      return parseProperties(loc, accessLabel, accessesProperties);
+      return parseProperties(loc, accessLabel, access, accessesProperties);
 
     case AccessKind::Invalid:
       diagnose(loc, diag::invalid_storage_restrictions_attr_label, accessLabel);
-      return true;
+      status.setIsParseError();
+      return status;
     }
   };
 
+  ParserStatus argumentStatus = parseArgument();
   // Attribute should have at least one argument.
-  if (parseArgument() || parseArgument(/*isOptional=*/true)) {
-    Status.setIsParseError();
+  if (!argumentStatus.isErrorOrHasCompletion()) {
+    argumentStatus |= parseArgument(/*isOptional=*/true);
+  }
+  Status |= argumentStatus;
+  if (argumentStatus.isErrorOrHasCompletion()) {
     // Let's skip ahead to `)` to recover.
     skipUntil(tok::r_paren);
   }
@@ -1262,13 +1323,10 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     Status.setIsParseError();
   }
 
-  if (Status.isErrorOrHasCompletion()) {
-    return Status;
-  }
-
-  return ParserResult<StorageRestrictionsAttr>(StorageRestrictionsAttr::create(
+  auto attribute = StorageRestrictionsAttr::create(
       Context, AtLoc, SourceRange(Loc, rParenLoc), initializesProperties,
-      accessesProperties));
+      accessesProperties);
+  return makeParserResult(Status, attribute);
 }
 
 ParserResult<ImplementsAttr>
@@ -2740,6 +2798,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  ParserStatus Status;
+
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
@@ -3546,6 +3606,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_StorageRestrictions: {
     ParserResult<StorageRestrictionsAttr> Attr =
         parseStorageRestrictionsAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }
@@ -3554,6 +3615,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Implements: {
     ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }
@@ -3562,6 +3624,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3573,6 +3636,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseDerivativeAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3584,6 +3648,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseTransposeAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -3654,6 +3719,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
   case DAK_Documentation: {
     auto Attr = parseDocumentationAttribute(AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
@@ -3664,6 +3730,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
                                               : MacroSyntax::Attached);
     auto Attr = parseMacroRoleAttribute(syntax, AtLoc, Loc);
+    Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     else
@@ -3822,7 +3889,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   if (AtLoc.isValid() && DeclAttribute::isDeclModifier(DK))
     diagnose(AtLoc, diag::cskeyword_not_attribute, AttrName).fixItRemove(AtLoc);
 
-  return makeParserSuccess();
+  return Status;
 }
 
 bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
@@ -7383,12 +7450,22 @@ struct Parser::ParsedAccessors {
   }
 };
 
-static bool parseAccessorIntroducer(Parser &P,
-                                    DeclAttributes &Attributes,
-                                    AccessorKind &Kind,
-                                    SourceLoc &Loc) {
+static ParserStatus parseAccessorIntroducer(Parser &P,
+                                            DeclAttributes &Attributes,
+                                            AccessorKind &Kind,
+                                            SourceLoc &Loc) {
+  ParserStatus Status;
   assert(Attributes.isEmpty());
-  P.parseDeclAttributeList(Attributes);
+  auto AttributeStatus = P.parseDeclAttributeList(Attributes);
+  // Only propagate the `hasCodeCompletion` status outwards. If the attributes
+  // have an error, we want to just drop them and continue parsing as if they
+  // weren't present.
+  if (AttributeStatus.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+  }
+  if (Status.hasCodeCompletion() && P.CodeCompletionCallbacks) {
+    P.CodeCompletionCallbacks->setAttrTargetDeclKind(DeclKind::Accessor);
+  }
 
   // Parse the contextual keywords for 'mutating' and 'nonmutating' before
   // get and set.
@@ -7408,7 +7485,8 @@ static bool parseAccessorIntroducer(Parser &P,
 
   if (!(P.Tok.is(tok::identifier) || P.Tok.is(tok::kw_init)) ||
       P.Tok.isEscapedIdentifier()) {
-    return true;
+    Status.setIsParseError();
+    return Status;
   }
 #define SUPPRESS_ARTIFICIAL_ACCESSORS 1
 #define ACCESSOR_KEYWORD(KEYWORD)
@@ -7418,11 +7496,12 @@ static bool parseAccessorIntroducer(Parser &P,
   }
 #include "swift/AST/AccessorKinds.def"
   else {
-    return true;
+    Status.setIsParseError();
+    return Status;
   }
   P.Tok.setKind(tok::contextual_keyword);
   Loc = P.consumeToken();
-  return false;
+  return Status;
 }
 
 /// Parsing for effects specifiers. We expect the token cursor to be
@@ -7626,9 +7705,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     DeclAttributes Attributes;
     AccessorKind Kind = AccessorKind::Get;
     SourceLoc Loc;
-    bool NotAccessor = parseAccessorIntroducer(
-        *this, Attributes, Kind, Loc);
-    if (NotAccessor) {
+    ParserStatus AccessorStatus =
+        parseAccessorIntroducer(*this, Attributes, Kind, Loc);
+    Status |= AccessorStatus;
+    if (AccessorStatus.isError() && !AccessorStatus.hasCodeCompletion()) {
       if (Tok.is(tok::code_complete)) {
         // Handle code completion here only if it's not the first accessor.
         // If it's the first accessor, it's handled in function body parsing
@@ -7741,8 +7821,9 @@ void Parser::parseTopLevelAccessors(
     DeclAttributes attributes;
     AccessorKind kind = AccessorKind::Get;
     SourceLoc loc;
-    bool notAccessor = parseAccessorIntroducer(*this, attributes, kind, loc);
-    if (notAccessor)
+    ParserStatus accessorStatus =
+        parseAccessorIntroducer(*this, attributes, kind, loc);
+    if (accessorStatus.isError())
       break;
 
     (void)parseAccessorAfterIntroducer(
@@ -7892,9 +7973,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
   auto *resultTypeRepr = typedPattern ? typedPattern->getTypeRepr() : nullptr;
   auto AccessorStatus = parseGetSet(Flags, /*Indices=*/nullptr, resultTypeRepr,
                                     accessors, storage, StaticLoc);
-  if (AccessorStatus.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
-  if (AccessorStatus.isErrorOrHasCompletion())
+  if (AccessorStatus.isError())
     Invalid = true;
 
   // If we have an invalid case, bail out now.
@@ -7933,7 +8012,7 @@ Parser::parseDeclVarGetSet(PatternBindingEntry &entry, ParseDeclOptions Flags,
     setOriginalDeclarationForDifferentiableAttributes(accessor->getAttrs(),
                                                       accessor);
 
-  return makeParserResult(PrimaryVar);
+  return makeParserResult(AccessorStatus, PrimaryVar);
 }
 
 /// Add the given accessor to the collection of parsed accessors.  If
