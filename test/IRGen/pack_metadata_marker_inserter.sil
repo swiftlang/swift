@@ -15,14 +15,19 @@ case some(T)
 struct Int {
   var _value: Builtin.Int64
 }
+class AnyObject {}
 
-protocol Error {}
+sil_vtable AnyObject {}
+
+protocol Error : class {}
+
+protocol NonError {}
 
 struct S1 {}
 struct S2 {}
 struct S3 {}
 
-struct GVT<each T> : Error {
+struct GVT<each T> : NonError {
 }
 
 struct GV<each T> {

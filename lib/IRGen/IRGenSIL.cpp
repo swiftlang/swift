@@ -1611,6 +1611,9 @@ public:
   llvm::Value *getCallerErrorResultArgument() override {
     return allParamValues.takeLast();
   }
+  llvm::Value *getCallerTypedErrorResultArgument() override {
+    return allParamValues.takeLast();
+  }
   void mapAsyncParameters() override{/* nothing to map*/};
   llvm::Value *getContext() override { return allParamValues.takeLast(); }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
@@ -1704,6 +1707,9 @@ public:
 
   llvm::Value *getCallerErrorResultArgument() override {
     llvm_unreachable("should not be used");
+  }
+  llvm::Value *getCallerTypedErrorResultArgument() override {
+    return allParamValues.takeLast();
   }
   llvm::Value *getContext() override { return allParamValues.takeLast(); }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
@@ -2136,6 +2142,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     break;
   }
 
+  SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
   if (funcTy->isAsync()) {
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
@@ -2148,17 +2155,26 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       // Remap the entry block.
       IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
     }
-  }
+   }
 
   // Bind the error result by popping it off the parameter list.
-  if (funcTy->hasErrorResult() && !funcTy->isAsync()) {
-    SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+  if (funcTy->hasErrorResult()) {
     auto errorType =
         fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
     auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
-    IGF.setCallerErrorResultSlot(
+    bool isTypedError = fnConv.isTypedError();
+    if (isTypedError) {
+      IGF.setCallerTypedErrorResultSlot(Address(
+          emission->getCallerTypedErrorResultArgument(),
+          errorTI.getStorageType(),
+          errorTI.getFixedAlignment()));
+    }
+    if (!funcTy->isAsync()) {
+      IGF.setCallerErrorResultSlot(
         Address(emission->getCallerErrorResultArgument(),
-                errorTI.getStorageType(), IGF.IGM.getPointerAlignment()));
+                isTypedError ? IGF.IGM.Int8PtrTy : errorTI.getStorageType(),
+                IGF.IGM.getPointerAlignment()));
+    }
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
@@ -3736,10 +3752,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       // See below.
       Builder.CreateStore(nullError, calleeErrorSlot);
     }
+    auto hasTypedError = substConv.isTypedError();
+    llvm::BasicBlock *typedErrorLoadBB = nullptr;
+    if (hasTypedError) {
+      typedErrorLoadBB = createBasicBlock("typed.error.load");
+    }
 
     // If the error value is non-null, branch to the error destination.
     auto hasError = Builder.CreateICmpNE(errorValue, nullError);
-    Builder.CreateCondBr(hasError, errorDest.bb, normalDest.bb);
+    Builder.CreateCondBr(hasError,
+                         typedErrorLoadBB ? typedErrorLoadBB : errorDest.bb,
+                         normalDest.bb);
 
     // Set up the PHI nodes on the normal edge.
     unsigned firstIndex = 0;
@@ -3747,8 +3770,19 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     assert(firstIndex == normalDest.phis.size());
 
     // Set up the PHI nodes on the error edge.
-    assert(errorDest.phis.size() == 1);
-    errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
+    if (!typedErrorLoadBB) {
+      assert(errorDest.phis.size() == 1);
+      errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
+    } else {
+      Builder.emitBlock(typedErrorLoadBB);
+      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(errorType));
+      Explosion errorValue;
+      ti.loadAsTake(*this, getCalleeTypedErrorResultSlot(errorType), errorValue);
+      for (unsigned i = 0, e = errorDest.phis.size(); i != e; ++i) {
+        errorDest.phis[i]->addIncoming(errorValue.claimNext(), Builder.GetInsertBlock());
+      }
+      Builder.CreateBr(errorDest.bb);
+    }
 
     if (tryApplyInst->getErrorBB()->getSinglePredecessorBlock()) {
       // Zeroing out the error slot only in the error block increases the chance
@@ -4106,6 +4140,17 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
                               IGF.getSILModule());
 
+  auto getNullErrorValue = [&] () -> llvm::Value* {
+    if (!conv.isTypedError()) {
+      auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
+          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+      auto errorType =
+          cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
+      return llvm::ConstantPointerNull::get(errorType);
+    }
+    return llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  };
+
   // The invariant on the out-parameter is that it's always zeroed, so
   // there's nothing to do here.
 
@@ -4121,11 +4166,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     } else {
       if (fnType->hasErrorResult()) {
         SmallVector<llvm::Value *, 16> nativeResultsStorage;
-        auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
-            conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-        auto errorType =
-            cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
-        nativeResultsStorage.push_back(llvm::ConstantPointerNull::get(errorType));
+        nativeResultsStorage.push_back(getNullErrorValue());
         return emitAsyncReturn(IGF, asyncLayout, fnType,
                                llvm::Optional<llvm::ArrayRef<llvm::Value *>>(
                                    nativeResultsStorage));
@@ -4143,12 +4184,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     auto asyncLayout = getAsyncContextLayout(IGF);
     Explosion error;
     if (fnType->hasErrorResult()) {
-      SmallVector<llvm::Value *, 16> nativeResultsStorage;
-      auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
-          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-      auto errorType =
-          cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
-      error.add(llvm::ConstantPointerNull::get(errorType));
+      error.add(getNullErrorValue());
     }
     emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
   } else {
@@ -4180,24 +4216,44 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
 }
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
-  // Store the exception to the error slot.
-  llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
-
+  SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
+                              getSILModule());
   if (!isAsync()) {
-    Builder.CreateStore(exn, getCallerErrorResultSlot());
+    Explosion errorResult = getLoweredExplosion(i->getOperand());
+    if (conv.isTypedError()) {
+      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+            IGM.getMaximalTypeExpansionContext())));
+      llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+      flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
+      Builder.CreateStore(flag,
+                          getCallerErrorResultSlot());
+      ti.initialize(*this, errorResult, getCallerTypedErrorResultSlot(), false);
+    } else {
+      Builder.CreateStore(errorResult.claimNext(), getCallerErrorResultSlot());
+    }
     // Async functions just return to the continuation.
   } else if (isAsync()) {
+    // Store the exception to the error slot.
+    auto exn = getLoweredExplosion(i->getOperand());
+
     auto layout = getAsyncContextLayout(*this);
-    SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
-                                getSILModule());
     auto funcResultType = CurSILFn->mapTypeIntoContext(
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
+    if (conv.isTypedError()) {
+      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+            IGM.getMaximalTypeExpansionContext())));
+      ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
+      llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+      flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
+      assert(exn.empty() && "Unclaimed typed error results");
+      exn.reset();
+      exn.add(flag);
+    }
+
     Explosion empty;
-    Explosion error;
-    error.add(exn);
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty, error);
+                    i->getFunction()->getLoweredFunctionType(), empty, exn);
     return;
   }
 
@@ -5184,7 +5240,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   if (IGM.ShouldUseSwiftError)
     return;
   auto ErrorResultSlot = getCalleeErrorResultSlot(IGM.silConv.getSILType(
-      ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()));
+      ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()), false);
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
   auto Storage =
