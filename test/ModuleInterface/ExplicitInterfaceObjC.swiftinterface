@@ -1,0 +1,13 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name ExplicitInterfaceObjC
+
+// REQUIRES: objc_interop, OS=macosx
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -compile-module-from-interface -module-name ExplicitInterfaceObjC -explicit-interface-module-build -o %/t/ExplicitInterfaceObjC.swiftmodule %s -verify
+// RUN: %target-swift-frontend -typecheck-module-from-interface -module-name ExplicitInterfaceObjC -explicit-interface-module-build -o %/t/ExplicitInterfaceObjC.swiftmodule %s -verify
+import Swift
+
+final public class Foo {
+  @objc deinit
+}
