@@ -71,6 +71,11 @@ public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, req
   return object
 }
 
+@_silgen_name("swift_deallocObject")
+public func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
+  free(object)
+}
+
 @_silgen_name("swift_deallocClassInstance")
 public func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
   if (object.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
