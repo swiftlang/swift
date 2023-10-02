@@ -25,8 +25,8 @@ func testLocalWrapper() {
   // CHECK: [[S:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
   // CHECK-NEXT: [[C:%.*]] = copy_value [[W]] : ${ var Wrapper<Int> }
   // CHECK-NOT: mark_function_escape
-  // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
-  // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: [[SPA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[S]]([[C]]) : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
+  // CHECK-NEXT: assign_by_wrapper {{%.*}} : $Int to [[P]] : $*Wrapper<Int>, init [[IPA]] : $@callee_guaranteed (Int) -> Wrapper<Int>, set [[SPA]] : $@noescape @callee_guaranteed (Int) -> ()
 
   _ = value
   // CHECK: mark_function_escape [[P]] : $*Wrapper<Int>
