@@ -39,7 +39,6 @@ import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
 import CString
-import CSVParsing
 import Calculator
 import CaptureProp
 import ChaCha
@@ -232,7 +231,6 @@ register(ByteSwap.benchmarks)
 register(COWTree.benchmarks)
 register(COWArrayGuaranteedParameterOverhead.benchmarks)
 register(CString.benchmarks)
-register(CSVParsing.benchmarks)
 register(Calculator.benchmarks)
 register(CaptureProp.benchmarks)
 register(ChaCha.benchmarks)
