@@ -297,19 +297,17 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
                                     LifetimeEndingUse;
                        });
   for (auto *barrier : barriers.instructions) {
-    liveness->updateForUse(barrier, /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(barrier);
   }
   for (auto *barrier : barriers.phis) {
     for (auto *predecessor : barrier->getPredecessorBlocks()) {
-      liveness->updateForUse(predecessor->getTerminator(),
-                             /*lifetimeEnding*/ false);
+      liveness->extendToNonUse(predecessor->getTerminator());
     }
   }
   for (auto *edge : barriers.edges) {
     auto *predecessor = edge->getSinglePredecessorBlock();
     assert(predecessor);
-    liveness->updateForUse(&predecessor->back(),
-                           /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(&predecessor->back());
   }
   // Ignore barriers.initialBlocks.  If the collection is non-empty, it
   // contains the def-block.  Its presence means that no barriers were found
