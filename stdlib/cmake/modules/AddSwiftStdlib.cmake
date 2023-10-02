@@ -1553,8 +1553,14 @@ function(add_swift_target_library_single target name)
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     target_link_directories(${target_static} PRIVATE
       ${library_search_directories})
+
+    _list_add_string_suffix(
+        "${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES}"
+        "-static"
+        target_private_libs)
+
     target_link_libraries("${target_static}" PRIVATE
-        ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+        ${target_private_libs})
 
     # Force executables linker language to be CXX so that we do not link using the
     # host toolchain swiftc.
@@ -2576,7 +2582,8 @@ endfunction()
 #     The Swift installation component that this executable belongs to.
 #     Defaults to never_install.
 function(_add_swift_target_executable_single name)
-  set(options)
+  set(options
+    NOSWIFTRT)
   set(single_parameter_options
     ARCHITECTURE
     SDK
@@ -2654,6 +2661,15 @@ function(_add_swift_target_executable_single name)
       ${SWIFTEXE_SINGLE_SOURCES}
       ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
 
+  # ELF and COFF need swiftrt
+  if(("${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
+      "${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF")
+     AND NOT SWIFTEXE_SINGLE_NOSWIFTRT)
+    target_sources(${name}
+      PRIVATE
+      $<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}>)
+  endif()
+
   add_dependencies_multiple_targets(
       TARGETS "${name}"
       DEPENDS
@@ -2717,6 +2733,24 @@ function(_add_swift_target_executable_single name)
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
 
+# Conditionally append -static to a name, if that variant is a valid target
+function(append_static name result_var_name)
+  cmake_parse_arguments(APPEND_TARGET
+    "STATIC_SWIFT_STDLIB"
+    ""
+    ""
+    ${ARGN})
+  if(STATIC_SWIFT_STDLIB)
+    if(TARGET "${name}-static")
+      set("${result_var_name}" "${name}-static" PARENT_SCOPE)
+    else()
+      set("${result_var_name}" "${name}" PARENT_SCOPE)
+    endif()
+  else()
+    set("${result_var_name}" "${name}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Add an executable for each target variant. Executables are given suffixes
 # with the variant SDK and ARCH.
 #
@@ -2725,7 +2759,9 @@ function(add_swift_target_executable name)
   set(SWIFTEXE_options
     EXCLUDE_FROM_ALL
     BUILD_WITH_STDLIB
-    BUILD_WITH_LIBEXEC)
+    BUILD_WITH_LIBEXEC
+    PREFER_STATIC
+    NOSWIFTRT)
   set(SWIFTEXE_single_parameter_options
     INSTALL_IN_COMPONENT)
   set(SWIFTEXE_multiple_parameter_options
@@ -2911,8 +2947,12 @@ function(add_swift_target_executable name)
         list(APPEND swiftexe_module_dependency_targets
           "swift${mod}${MODULE_VARIANT_SUFFIX}")
 
-        list(APPEND swiftexe_link_libraries_targets
-          "swift${mod}${VARIANT_SUFFIX}")
+        set(library_target "swift${mod}${VARIANT_SUFFIX}")
+        if(SWIFTEXE_TARGET_PREFER_STATIC AND TARGET "${library_target}-static")
+          set(library_target "${library_target}-static")
+        endif()
+
+        list(APPEND swiftexe_link_libraries_targets "${library_target}")
       endforeach()
 
       # Don't add the ${arch} to the suffix.  We want to link against fat
@@ -2924,6 +2964,7 @@ function(add_swift_target_executable name)
 
       _add_swift_target_executable_single(
           ${VARIANT_NAME}
+          ${SWIFTEXE_TARGET_NOSWIFTRT_keyword}
           ${SWIFTEXE_TARGET_SOURCES}
           DEPENDS
             ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
