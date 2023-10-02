@@ -92,7 +92,6 @@ namespace swift {
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
   struct MacroDiscriminatorContext;
-  class ModuleDependencyInfo;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class PluginLoader;
@@ -1044,27 +1043,6 @@ public:
 
   /// Retrieve the module interface checker associated with this AST context.
   ModuleInterfaceChecker *getModuleInterfaceChecker() const;
-
-  /// Retrieve the module dependencies for the module with the given name.
-  ///
-  llvm::Optional<const ModuleDependencyInfo *> getModuleDependencies(
-      StringRef moduleName, ModuleDependenciesCache &cache,
-      InterfaceSubContextDelegate &delegate,
-      bool optionalDependencyLookup = false, bool isTestableImport = false,
-      llvm::Optional<std::pair<std::string, swift::ModuleDependencyKind>>
-          dependencyOf = llvm::None);
-
-  /// Retrieve the module dependencies for the Clang module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  getClangModuleDependencies(StringRef moduleName,
-                             ModuleDependenciesCache &cache,
-                             InterfaceSubContextDelegate &delegate);
-
-  /// Retrieve the module dependencies for the Swift module with the given name.
-  llvm::Optional<const ModuleDependencyInfo *>
-  getSwiftModuleDependencies(StringRef moduleName,
-                             ModuleDependenciesCache &cache,
-                             InterfaceSubContextDelegate &delegate);
 
   /// Compute the extra implicit framework search paths on Apple platforms:
   /// $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
