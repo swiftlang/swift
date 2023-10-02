@@ -385,7 +385,7 @@ class PartitionOpTranslator {
       auto *svi = cast<SingleValueInstruction>(iter.first->first);
       auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
       if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
-        if (storage.storage.getRoot()->getType().getASTType()->isActorType()) {
+        if (storage.storage.getRoot()->getType().isActor()) {
           self->neverConsumedValueIDs.push_back(iter.first->second.getID());
         }
       }
@@ -606,7 +606,7 @@ public:
       if (auto fas = FullApplySite::isa(applyInst)) {
         if (fas.hasSelfArgument()) {
           if (auto self = fas.getSelfArgument()) {
-            hasActorSelf = self->getType().getASTType()->isActorType();
+            hasActorSelf = self->getType().isActor();
           }
         }
       }

@@ -878,6 +878,8 @@ public:
 
   bool isMarkedAsImmortal() const;
 
+  bool isActor() const { return getASTType()->isActorType(); }
+
   ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
                                             ProtocolDecl *protocol) const;
 
