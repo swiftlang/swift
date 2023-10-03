@@ -3455,17 +3455,17 @@ static void initObjCClass(ClassMetadata *self,
   for (unsigned i = 0; i != numFields; ++i) {
     auto *eltLayout = fieldTypes[i];
 
-    ClassIvarEntry &ivar = ivars->getIvars()[i];
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
 
     // Fill in the field offset global, if this ivar has one.
-    if (ivar.Offset) {
-      if (*ivar.Offset != fieldOffsets[i])
-        *ivar.Offset = fieldOffsets[i];
+    if (ivar->Offset) {
+      if (*ivar->Offset != fieldOffsets[i])
+        *ivar->Offset = fieldOffsets[i];
     }
 
     // If the ivar's size doesn't match the field layout we
     // computed, overwrite it and give it better type information.
-    if (ivar.Size != eltLayout->size) {
+    if (ivar->Size != eltLayout->size) {
       // If we're going to modify the ivar list, we need to copy it first.
       if (!copiedIvarList) {
         auto ivarListSize = sizeof(ClassIvarList) +
@@ -3475,10 +3475,13 @@ static void initObjCClass(ClassMetadata *self,
         memcpy(ivars, rodata->IvarList, ivarListSize);
         rodata->IvarList = ivars;
         copiedIvarList = true;
+
+        // Update ivar to point to the newly copied list.
+        ivar = &ivars->getIvars()[i];
       }
-      ivar.Size = eltLayout->size;
-      ivar.Type = nullptr;
-      ivar.Log2Alignment =
+      ivar->Size = eltLayout->size;
+      ivar->Type = nullptr;
+      ivar->Log2Alignment =
         getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
     }
   }
