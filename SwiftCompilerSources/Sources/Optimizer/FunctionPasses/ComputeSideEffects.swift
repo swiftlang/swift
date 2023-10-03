@@ -329,7 +329,7 @@ private struct CollectedEffects {
 
   /// Adds effects to a specific value.
   ///
-  /// If the value comes from an argument (or mutliple arguments), then the effects are added
+  /// If the value comes from an argument (or multiple arguments), then the effects are added
   /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
