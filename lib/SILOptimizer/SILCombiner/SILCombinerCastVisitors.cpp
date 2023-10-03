@@ -333,16 +333,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                                ATPI->getOperand(),
                                                PTAI->getType());
       }
-
-      OwnershipRAUWHelper helper(ownershipFixupContext, PTAI,
-                                 ATPI->getOperand());
-      if (helper) {
-        auto replacement = helper.prepareReplacement();
-        auto *newInst = Builder.createUncheckedAddrCast(
-            PTAI->getLoc(), replacement, PTAI->getType());
-        helper.perform(newInst);
-        return nullptr;
-      }
+      return nullptr;
     }
   }
 

@@ -292,6 +292,9 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
 }
 
 SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
+  if (ATPI->getFunction()->hasOwnership()) {
+    return SILValue();
+  }
   // (address_to_pointer (pointer_to_address x [strict])) -> x
   // The 'strict' flag is only relevant for instructions that access memory;
   // the moment the address is cast back to a pointer, it no longer matters.
@@ -303,6 +306,9 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 }
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  if (PTAI->getFunction()->hasOwnership()) {
+    return SILValue();
+  }
   // If this address is not strict, then it cannot be replaced by an address
   // that may be strict.
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
@@ -313,6 +319,10 @@ SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 }
 
 SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw) {
+  if (RefToRaw->getFunction()->hasOwnership()) {
+    return SILValue();
+  }
+
   // Perform the following simplification:
   //
   // (ref_to_raw_pointer (raw_pointer_to_ref x)) -> x
