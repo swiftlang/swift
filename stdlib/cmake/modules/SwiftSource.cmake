@@ -903,11 +903,6 @@ function(_compile_swift_files
 
   # First generate the obj dirs
   list(REMOVE_DUPLICATES dirs_to_create)
-  add_custom_command_target(
-      create_dirs_dependency_target
-      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
-      OUTPUT ${dirs_to_create}
-      COMMENT "Generating dirs for ${first_output}")
 
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
@@ -937,6 +932,7 @@ function(_compile_swift_files
 
   add_custom_command_target(
       dependency_target
+      COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
       COMMAND
         ${set_environment_args}
         "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
