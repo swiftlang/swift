@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 

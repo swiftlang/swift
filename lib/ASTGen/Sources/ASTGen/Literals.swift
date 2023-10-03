@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftParser
 import SwiftSyntax
 
@@ -8,7 +9,7 @@ extension ASTGenVisitor {
     var segment = node.segments.first!.as(StringSegmentSyntax.self)!.content.text
     return .expr(
       segment.withUTF8 { buf in
-        return SwiftStringLiteralExpr_create(ctx, buf.baseAddress, buf.count, loc)
+        return SwiftStringLiteralExpr_create(ctx, buf.baseAddress, SwiftInt(buf.count), loc)
       })
   }
 
@@ -17,7 +18,7 @@ extension ASTGenVisitor {
     var segment = node.digits.text
     return .expr(
       segment.withUTF8 { buf in
-        return SwiftIntegerLiteralExpr_create(ctx, buf.baseAddress, buf.count, loc)
+        return SwiftIntegerLiteralExpr_create(ctx, buf.baseAddress, SwiftInt(buf.count), loc)
       })
   }
 

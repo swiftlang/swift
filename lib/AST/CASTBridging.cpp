@@ -27,6 +27,8 @@ static SourceLoc getSourceLocFromPointer(const void *loc) {
 
 namespace {
   struct BridgedDiagnosticImpl {
+    typedef llvm::MallocAllocator Allocator;
+
     InFlightDiagnostic inFlight;
     std::vector<StringRef> textBlobs;
 
@@ -37,8 +39,10 @@ namespace {
 
     ~BridgedDiagnosticImpl() {
       inFlight.flush();
+
+      Allocator allocator;
       for (auto text: textBlobs) {
-        free((void*)text.data());
+        allocator.Deallocate(text.data(), text.size());
       }
     }
   };
@@ -48,11 +52,11 @@ BridgedDiagnostic SwiftDiagnostic_create(void *diagnosticEngine,
                                          BridgedDiagnosticSeverity severity,
                                          const void *sourceLocPtr,
                                          const unsigned char *textPtr,
-                                         long textLen) {
+                                         SwiftInt textLen) {
   StringRef origText{
     reinterpret_cast<const char *>(textPtr), size_t(textLen)};
-  llvm::MallocAllocator mallocAlloc;
-  StringRef text = origText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef text = origText.copy(alloc);
 
   SourceLoc loc = getSourceLocFromPointer(sourceLocPtr);
 
@@ -95,15 +99,15 @@ void SwiftDiagnostic_fixItReplace(BridgedDiagnostic diagPtr,
                                   const void *replaceStartLocPtr,
                                   const void *replaceEndLocPtr,
                                   const unsigned char *newTextPtr,
-                                  long newTextLen) {
+                                  SwiftInt newTextLen) {
 
   SourceLoc startLoc = getSourceLocFromPointer(replaceStartLocPtr);
   SourceLoc endLoc = getSourceLocFromPointer(replaceEndLocPtr);
 
   StringRef origReplaceText{
     reinterpret_cast<const char *>(newTextPtr), size_t(newTextLen)};
-  llvm::MallocAllocator mallocAlloc;
-  StringRef replaceText = origReplaceText.copy(mallocAlloc);
+  BridgedDiagnosticImpl::Allocator alloc;
+  StringRef replaceText = origReplaceText.copy(alloc);
 
   BridgedDiagnosticImpl *impl = static_cast<BridgedDiagnosticImpl *>(diagPtr);
   impl->textBlobs.push_back(replaceText);
@@ -118,7 +122,7 @@ void SwiftDiagnostic_finish(BridgedDiagnostic diagPtr) {
 
 BridgedIdentifier
 SwiftASTContext_getIdentifier(void *ctx, const unsigned char *_Nullable str,
-                              long len) {
+                              SwiftInt len) {
   return const_cast<void *>(
       static_cast<ASTContext *>(ctx)
           ->getIdentifier(
@@ -145,7 +149,7 @@ void *SwiftImportDecl_create(void *ctx, void *dc, void *importLoc, char kind,
       getSourceLocFromPointer(kindLoc), std::move(importPath).get());
 }
 
-void *BridgedSourceLoc_advanced(void *loc, long len) {
+void *BridgedSourceLoc_advanced(void *loc, SwiftInt len) {
   SourceLoc l = getSourceLocFromPointer(loc).getAdvancedLoc(len);
   return const_cast<void *>(l.getOpaquePointerValue());
 }
@@ -216,7 +220,7 @@ void *SwiftIdentifierExpr_create(void *ctx, BridgedIdentifier base, void *loc) {
 
 void *SwiftStringLiteralExpr_create(void *ctx,
                                     const unsigned char *_Nullable string,
-                                    long len, void *TokenLoc) {
+                                    SwiftInt len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)});
@@ -226,7 +230,7 @@ void *SwiftStringLiteralExpr_create(void *ctx,
 
 void *SwiftIntegerLiteralExpr_create(void *ctx,
                                      const unsigned char *_Nullable string,
-                                     long len, void *TokenLoc) {
+                                     SwiftInt len, void *TokenLoc) {
   ASTContext &Context = *static_cast<ASTContext *>(ctx);
   auto stringRef = Context.AllocateCopy(
       StringRef{reinterpret_cast<const char *>(string), size_t(len)});
@@ -582,7 +586,7 @@ void *GenericParamList_create(void *ctx, void *lAngleLoc,
 
 void *GenericTypeParamDecl_create(void *ctx, void *declContext,
                                   BridgedIdentifier name, void *nameLoc,
-                                  void *_Nullable eachLoc, long index,
+                                  void *_Nullable eachLoc, SwiftInt index,
                                   bool isParameterPack) {
   return GenericTypeParamDecl::createParsed(
       static_cast<DeclContext *>(declContext),
@@ -695,6 +699,6 @@ bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto size = message.size();
   auto outPtr = malloc(size);
   memcpy(outPtr, message.data(), size);
-  *out = BridgedData{(const char *)outPtr, (unsigned long)size};
+  *out = BridgedData{(const char *)outPtr, (SwiftUInt)size};
   return false;
 }

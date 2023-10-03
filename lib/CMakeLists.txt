@@ -43,11 +43,17 @@ if (SWIFT_SWIFT_PARSER)
 
   # Determine the SwiftSyntax shared library files that were built as
   # part of earlyswiftsyntax.
-  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND ${CMAKE_SHARED_LIBRARY_PREFIX}
+  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND "${CMAKE_SHARED_LIBRARY_PREFIX}"
        OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
   list(TRANSFORM SWIFT_SYNTAX_SHARED_LIBRARIES APPEND
-       ${CMAKE_SHARED_LIBRARY_SUFFIX}
+       "${CMAKE_SHARED_LIBRARY_SUFFIX}"
        OUTPUT_VARIABLE SWIFT_SYNTAX_SHARED_LIBRARIES)
+
+  list(TRANSFORM SWIFT_SYNTAX_MODULES PREPEND "${CMAKE_IMPORT_LIBRARY_PREFIX}"
+    OUTPUT_VARIABLE SWIFT_SYNTAX_IMPORT_LIBRARIES)
+  list(TRANSFORM SWIFT_SYNTAX_IMPORT_LIBRARIES APPEND
+    "${CMAKE_IMPORT_LIBRARY_SUFFIX}" OUTPUT_VARIABLE
+    SWIFT_SYNTAX_IMPORT_LIBRARIES)
 
   # Interface library to collect swiftinterfaces and swiftmodules from
   # SwiftSyntax
@@ -67,26 +73,46 @@ if (SWIFT_SWIFT_PARSER)
       )
     endif()
 
-    add_custom_command(
-      OUTPUT "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
-      DEPENDS "${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib}"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
-      ${add_origin_rpath}
-    )
-
-    add_custom_target(copy_swiftSyntaxLibrary_${sharedlib}
-      DEPENDS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
-      COMMENT "Copying ${sharedlib}"
-    )
-
-    swift_install_in_component(
-      PROGRAMS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
-      COMPONENT compiler
-    )
+    if(CMAKE_SYSTEM_NAME MATCHES Windows)
+      add_custom_command(OUTPUT ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sharedlib}
+                         DEPENDS "${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/bin/${sharedlib}"
+                         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/bin/${sharedlib} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sharedlib})
+      add_custom_target(copy_swiftSyntaxLibrary_${sharedlib}
+                        DEPENDS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sharedlib}
+                        COMMENT "copying ${sharedlib}")
+      swift_install_in_component(PROGRAMS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${sharedlib}
+                                 DESTINATION bin
+                                 COMPONENT compiler)
+    else()
+      add_custom_command(OUTPUT "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+                         DEPENDS "${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib}"
+                         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_SYNTAX_LIBRARIES_BUILD_DIR}/${sharedlib} ${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}
+                         ${add_origin_rpath})
+      add_custom_target(copy_swiftSyntaxLibrary_${sharedlib}
+                        DEPENDS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+                        COMMENT "Copying ${sharedlib}")
+      swift_install_in_component(PROGRAMS "${SWIFT_HOST_LIBRARIES_DEST_DIR}/${sharedlib}"
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host"
+                                 COMPONENT compiler)
+    endif()
 
     add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${sharedlib})
   endforeach()
+
+  if(CMAKE_SYSTEM_NAME MATCHES Windows)
+    foreach(implib ${SWIFT_SYNTAX_IMPORT_LIBRARIES})
+      add_custom_command(OUTPUT ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
+        DEPENDS ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host/${implib}
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR}/lib/swift/host/${implib} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib})
+      add_custom_target(copy_swiftSyntaxLibrary_${implib}
+        DEPENDS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
+        COMMENT "Copying ${implib}")
+      swift_install_in_component(PROGRAMS ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/windows/${SWIFT_HOST_VARIANT_ARCH}/${implib}
+        DESTINATION lib
+        COMPONENT compiler)
+      add_dependencies(swiftSyntaxLibraries copy_swiftSyntaxLibrary_${implib})
+    endforeach()
+  endif()
 
   # Copy all of the Swift modules from earlyswiftsyntax so they can be found
   # in the same relative place within the build directory as in the final

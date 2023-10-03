@@ -5,6 +5,8 @@
 # parser is built in.
 function(add_swift_parser_link_libraries target)
   if(SWIFT_SWIFT_PARSER)
+    target_link_directories(${target} PRIVATE
+      ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
     target_link_libraries(${target}
                           PRIVATE swiftCore)
 

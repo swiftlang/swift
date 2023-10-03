@@ -1,4 +1,5 @@
 import CASTBridging
+import CBasicBridging
 import SwiftDiagnostics
 import SwiftSyntax
 
@@ -37,7 +38,7 @@ fileprivate func emitDiagnosticParts(
   let diag = mutableMessage.withUTF8 { messageBuffer in
     SwiftDiagnostic_create(
       diagEnginePtr, bridgedSeverity, sourceLoc(at: position),
-      messageBuffer.baseAddress, messageBuffer.count
+      messageBuffer.baseAddress, SwiftInt(messageBuffer.count)
     )
   }
 
@@ -76,7 +77,7 @@ fileprivate func emitDiagnosticParts(
     newText.withUTF8 { textBuffer in
       SwiftDiagnostic_fixItReplace(
         diag, replaceStartLoc, replaceEndLoc,
-        textBuffer.baseAddress, textBuffer.count
+        textBuffer.baseAddress, SwiftInt(textBuffer.count)
       )
     }
   }
@@ -149,7 +150,7 @@ extension SourceManager {
       SwiftDiagnostic_create(
         cxxDiagnosticEngine, bridgedSeverity,
         cxxSourceLocation(for: node, at: position),
-        messageBuffer.baseAddress, messageBuffer.count
+        messageBuffer.baseAddress, SwiftInt(messageBuffer.count)
       )
     }
 
@@ -202,7 +203,7 @@ extension SourceManager {
       newText.withUTF8 { textBuffer in
         SwiftDiagnostic_fixItReplace(
           diag, replaceStartLoc, replaceEndLoc,
-          textBuffer.baseAddress, textBuffer.count
+          textBuffer.baseAddress, SwiftInt(textBuffer.count)
         )
       }
     }

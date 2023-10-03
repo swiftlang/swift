@@ -41,8 +41,13 @@ PluginRegistry *PluginLoader::getRegistry() {
 static StringRef pluginModuleNameStringFromPath(StringRef path) {
   // Plugin library must be named 'lib${module name}(.dylib|.so|.dll)'.
   // FIXME: Shared library prefix might be different between platforms.
+#if defined(_WIN32)
+  constexpr StringRef libPrefix{};
+  constexpr StringRef libSuffix = ".dll";
+#else
   constexpr StringRef libPrefix = "lib";
   constexpr StringRef libSuffix = LTDL_SHLIB_EXT;
+#endif
 
   StringRef filename = llvm::sys::path::filename(path);
   if (filename.starts_with(libPrefix) && filename.ends_with(libSuffix)) {
