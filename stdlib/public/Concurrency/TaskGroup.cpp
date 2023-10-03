@@ -959,12 +959,9 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   ResultTypeInfo resultType;
-  #if !SWIFT_CONCURRENCY_EMBEDDED
   resultType.metadata = T;
-  #else
-  swift_unreachable("task groups not supported yet in embedded Swift");
-  #endif
 
   TaskGroupFlags groupFlags(rawGroupFlags);
   SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
@@ -990,6 +987,9 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
     }
     return true;
   });
+#else
+  swift_unreachable("task groups not supported yet in embedded Swift");
+#endif
 }
 
 // =============================================================================

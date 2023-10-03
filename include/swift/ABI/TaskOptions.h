@@ -141,6 +141,7 @@ public:
   }
 };
 
+#if SWIFT_CONCURRENCY_EMBEDDED
 class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
  public:
   size_t size;
@@ -153,6 +154,7 @@ class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
     return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;
   }
 };
+#endif
 
 class RunInlineTaskOptionRecord : public TaskOptionRecord {
   void *allocation;

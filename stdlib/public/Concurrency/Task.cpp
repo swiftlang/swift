@@ -691,8 +691,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       break;
     }
     case TaskOptionRecordKind::ResultTypeInfo: {
-      auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
 #if SWIFT_CONCURRENCY_EMBEDDED
+      auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
       futureResultType = {
           .size = typeInfo->size,
           .alignMask = typeInfo->alignMask,
@@ -700,8 +700,10 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
           .storeEnumTagSinglePayload = typeInfo->storeEnumTagSinglePayload,
           .destroy = typeInfo->destroy,
       };
-#endif
       break;
+#else
+      swift_unreachable("ResultTypeInfo in non-embedded");
+#endif
     }
     }
   }
