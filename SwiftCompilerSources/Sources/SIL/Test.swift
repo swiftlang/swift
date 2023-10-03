@@ -34,7 +34,7 @@
 //
 // CASE STUDY:
 // Here's an example of how it works:
-// 0) A source file, NeatUtils.cpp contains
+// 0) A source file, NeatUtils.swift contains
 //
 //    fileprivate func myNeatoUtility(int: Int, value: Value, function: Function) { ... }
 //
