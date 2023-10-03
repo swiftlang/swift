@@ -2029,8 +2029,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *BAI = cast<BeginAccessInst>(&SI);
     unsigned attr = unsigned(BAI->getAccessKind())
                     + (unsigned(BAI->getEnforcement()) << 2)
-                    + (BAI->hasNoNestedConflict() << 4)
-                    + (BAI->isFromBuiltin() << 5);
+                    + (BAI->hasNoNestedConflict() << 5)
+                    + (BAI->isFromBuiltin() << 6);
     SILValue operand = BAI->getOperand();
 
     SILOneOperandExtraAttributeLayout::emitRecord(
@@ -2094,8 +2094,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *BAI = cast<BeginUnpairedAccessInst>(&SI);
     unsigned attr = unsigned(BAI->getAccessKind())
                     + (unsigned(BAI->getEnforcement()) << 2)
-                    + (unsigned(BAI->hasNoNestedConflict()) << 4)
-                    + (unsigned(BAI->isFromBuiltin()) << 5);
+                    + (unsigned(BAI->hasNoNestedConflict()) << 5)
+                    + (unsigned(BAI->isFromBuiltin()) << 6);
     SILValue source = BAI->getSource();
     SILValue buffer = BAI->getBuffer();
 
@@ -2115,7 +2115,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *EAI = cast<EndUnpairedAccessInst>(&SI);
     unsigned attr = unsigned(EAI->isAborting())
                     + (unsigned(EAI->getEnforcement()) << 1)
-                    + (unsigned(EAI->isFromBuiltin()) << 3);
+                    + (unsigned(EAI->isFromBuiltin()) << 4);
     SILValue operand = EAI->getOperand();
 
     SILOneOperandExtraAttributeLayout::emitRecord(
