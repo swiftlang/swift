@@ -3827,6 +3827,18 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
+bool ValueDecl::skipAccessCheckIfInterface(const DeclContext *useDC,
+                                           AccessLevel useAcl,
+                                           AccessScope declScope) const {
+  if (!useDC || useAcl != AccessLevel::Package || !declScope.isPackage() ||
+      !isUsableFromInline() ||
+      getDeclContext()->getParentModule()->getBaseIdentifier() ==
+          useDC->getParentModule()->getBaseIdentifier())
+    return false;
+  auto useSF = useDC->getParentSourceFile();
+  return useSF && !useSF->isScriptMode();
+}
+
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4158,8 +4170,13 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
   if (accessScope.getDeclContext() == useDC) return true;
-  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
-
+  if (!AccessScope(useDC).isChildOf(accessScope)) {
+    // Grant access if this VD is an inlinable package decl referenced by
+    // another module in an interface file.
+    if (VD->skipAccessCheckIfInterface(useDC, access, accessScope))
+      return true;
+    return false;
+  }
   // useDC is null only when caller wants to skip non-public type checks.
   if (!useDC) return true;
 
