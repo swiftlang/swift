@@ -43,6 +43,16 @@ public struct HeapObject {
 
 
 
+/// Forward declarations of C functions
+
+@_silgen_name("posix_memalign")
+func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int) -> CInt
+
+@_silgen_name("free")
+func free(_ p: UnsafeMutableRawPointer?)
+
+
+
 /// Allocations
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
@@ -75,6 +85,11 @@ public func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, req
   object.pointee.metadata = metadata
   object.pointee.refcount = 1
   return object
+}
+
+@_silgen_name("swift_deallocObject")
+public func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
+  free(object)
 }
 
 @_silgen_name("swift_deallocClassInstance")
