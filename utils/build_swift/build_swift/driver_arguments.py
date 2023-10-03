@@ -750,6 +750,9 @@ def create_argument_parser():
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
                 'separate build directory ')
+    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
+           help='build the stdlib for WebAssembly target into a'
+                'separate build directory ')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1251,6 +1254,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
+    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
+           help='skip testing stdlib for WebAssembly')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')

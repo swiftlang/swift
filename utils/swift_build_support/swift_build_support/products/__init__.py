@@ -38,6 +38,8 @@ from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
+from .wasisysroot import WASILibc, WasmLLVMRuntimeLibs
+from .wasmstdlib import WasmStdlib
 from .xctest import XCTest
 from .zlib import Zlib
 
@@ -71,5 +73,8 @@ __all__ = [
     'Benchmarks',
     'TSanLibDispatch',
     'SwiftDocC',
-    'SwiftDocCRender'
+    'SwiftDocCRender',
+    'WASILibc',
+    'WasmLLVMRuntimeLibs',
+    'WasmStdlib'
 ]
