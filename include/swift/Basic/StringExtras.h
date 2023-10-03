@@ -223,6 +223,8 @@ namespace swift {
 
       reverse_iterator rbegin() const { return reverse_iterator(end()); }
       reverse_iterator rend() const { return reverse_iterator(begin()); }
+
+      bool hasWordStartingAt(unsigned targetPosition) const;
     };
 
     /// Retrieve the camelCase words in the given string.
@@ -235,6 +237,10 @@ namespace swift {
     /// Check whether the first word starts with the second word, ignoring the
     /// case of the first letter.
     bool startsWithIgnoreFirstCase(StringRef word1, StringRef word2);
+
+    /// Check whether the first word ends with the second word, ignoring the
+    /// case of the first word (handles initialisms).
+    bool hasWordSuffix(StringRef haystack, StringRef needle);
 
     /// Lowercase the first word within the given camelCase string.
     ///

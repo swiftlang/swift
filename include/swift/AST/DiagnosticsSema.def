@@ -104,6 +104,12 @@ ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
 
+ERROR(could_not_find_imported_enum_case,none,
+      "type %0 has no case %1, but it does have a case named %2; if %1 worked "
+      "before, a recent change to the underlying C enum may have affected how "
+      "prefixes are stripped from its case names",
+      (Type, DeclNameRef, ValueDecl *))
+
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
      
@@ -1727,6 +1733,9 @@ NOTE(fixit_add_private_for_objc_implementation,none,
      (DescriptiveDeclKind))
 NOTE(fixit_add_final_for_objc_implementation,none,
      "add 'final' to define a Swift %0 that cannot be overridden",
+     (DescriptiveDeclKind))
+NOTE(fixit_add_nonobjc_for_objc_implementation,none,
+     "add '@nonobjc' to define a Swift-only %0",
      (DescriptiveDeclKind))
 
 ERROR(objc_implementation_wrong_category,none,
