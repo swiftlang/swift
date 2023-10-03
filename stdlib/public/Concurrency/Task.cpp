@@ -650,7 +650,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
-  RunInlineTaskOptionRecord *runInlineOption = nullptr;  
+  RunInlineTaskOptionRecord *runInlineOption = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::Executor:
