@@ -606,10 +606,14 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
   if (group) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
-
-  headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
-  // Add the future async context prefix.
-  headerSize += sizeof(FutureAsyncContextPrefix);
+  if (!futureResultType.isNull()) {
+    headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
+    // Add the future async context prefix.
+    headerSize += sizeof(FutureAsyncContextPrefix);
+  } else {
+    // Add the async context prefix.
+    headerSize += sizeof(AsyncContextPrefix);
+  }
 
   headerSize = llvm::alignTo(headerSize, llvm::Align(alignof(AsyncContext)));
   // Allocate the initial context together with the job.
@@ -635,9 +639,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Propagate task-creation flags to job flags as appropriate.
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
-
-  jobFlags.task_setIsFuture(true);
-  assert(initialContextSize >= sizeof(FutureAsyncContext));
 
   ResultTypeInfo futureResultType;
   #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -703,6 +704,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       break;
     }
     }
+  }
+
+  #if SWIFT_CONCURRENCY_EMBEDDED
+  assert(!futureResultType.isNull());
+  #endif
+
+  if (!futureResultType.isNull()) {
+    jobFlags.task_setIsFuture(true);
+    assert(initialContextSize >= sizeof(FutureAsyncContext));
   }
 
   // Add to the task group, if requested.
@@ -853,7 +863,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   //  the async context to get at the parameters.
   //  See e.g. FutureAsyncContextPrefix.
 
-  if (taskCreateFlags.isDiscardingTask()) {
+  if (futureResultType.isNull() || taskCreateFlags.isDiscardingTask()) {
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
@@ -903,17 +913,19 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // Initialize the future fragment if applicable.
-  assert(task->isFuture());
-  auto futureFragment = task->futureFragment();
-  ::new (futureFragment) FutureFragment(futureResultType);
+  if (!futureResultType.isNull()) {
+    assert(task->isFuture());
+    auto futureFragment = task->futureFragment();
+    ::new (futureFragment) FutureFragment(futureResultType);
 
-  // Set up the context for the future so there is no error, and a successful
-  // result will be written into the future fragment's storage.
-  auto futureAsyncContextPrefix =
-      reinterpret_cast<FutureAsyncContextPrefix *>(
-          reinterpret_cast<char *>(allocation) + headerSize -
-          sizeof(FutureAsyncContextPrefix));
-  futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
+    // Set up the context for the future so there is no error, and a successful
+    // result will be written into the future fragment's storage.
+    auto futureAsyncContextPrefix =
+        reinterpret_cast<FutureAsyncContextPrefix *>(
+            reinterpret_cast<char *>(allocation) + headerSize -
+            sizeof(FutureAsyncContextPrefix));
+    futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
+  }
 
   SWIFT_TASK_DEBUG_LOG("creating task %p ID %" PRIu64
                        " with parent %p at base pri %zu",

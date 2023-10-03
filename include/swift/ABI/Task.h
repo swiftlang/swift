@@ -197,6 +197,9 @@ public:
 struct ResultTypeInfo {
 #if !SWIFT_CONCURRENCY_EMBEDDED
   const Metadata *metadata = nullptr;
+  bool isNull() {
+    return metadata == nullptr;
+  }
   size_t vw_size() {
     return metadata->vw_size();
   }
@@ -221,6 +224,9 @@ struct ResultTypeInfo {
                                     unsigned emptyCases) = nullptr;
   void (*destroy)(OpaqueValue *) = nullptr;
 
+  bool isNull() {
+    return initializeWithCopy == nullptr;
+  }
   size_t vw_size() {
     return size;
   }
