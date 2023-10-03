@@ -3832,11 +3832,10 @@ bool ValueDecl::skipAccessCheckIfInterface(const DeclContext *useDC,
                                            AccessScope declScope) const {
   if (!useDC || useAcl != AccessLevel::Package || !declScope.isPackage() ||
       !isUsableFromInline() ||
-      getDeclContext()->getParentModule()->getBaseIdentifier() ==
-          useDC->getParentModule()->getBaseIdentifier())
+      getDeclContext()->getParentModule() == useDC->getParentModule())
     return false;
   auto useSF = useDC->getParentSourceFile();
-  return useSF && !useSF->isScriptMode();
+  return useSF && useSF->Kind == SourceFileKind::Interface;
 }
 
 bool ValueDecl::shouldHideFromEditor() const {
