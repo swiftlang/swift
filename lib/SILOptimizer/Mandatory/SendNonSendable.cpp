@@ -97,6 +97,15 @@ struct TermArgSources {
 
 } // namespace
 
+/// Used for generating informative diagnostics.
+static Expr *getExprForPartitionOp(const PartitionOp &op) {
+  SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
+  Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
+  assert(expr && "PartitionOp's source location should correspond to"
+                 "an AST node");
+  return expr;
+}
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Main Computation
 //===----------------------------------------------------------------------===//
@@ -1300,8 +1309,10 @@ class ConsumeRequireAccumulator {
   std::map<PartitionOp, std::set<PartitionOpAtDistance>>
       requirementsForConsumptions;
 
+  SILFunction *fn;
+
 public:
-  ConsumeRequireAccumulator() {}
+  ConsumeRequireAccumulator(SILFunction *fn) : fn(fn) {}
 
   void accumulateConsumedReason(PartitionOp requireOp, const ConsumedReason &consumedReason) {
     for (auto [distance, consumeOps] : consumedReason.consumeOps)
@@ -1309,26 +1320,37 @@ public:
         requirementsForConsumptions[consumeOp].insert({requireOp, distance});
   }
 
-  // for each consumption in this ConsumeRequireAccumulator, call the passed
-  // processConsumeOp closure on it, followed immediately by calling the passed
-  // processRequireOp closure on the top `numRequiresPerConsume` operations
-  // that access ("require") the region consumed. Sorting is by lowest distance
-  // first, then arbitrarily. This is used for final diagnostic output.
-  void forEachConsumeRequire(
-      llvm::function_ref<void(const PartitionOp& consumeOp, unsigned numProcessed, unsigned numSkipped)>
-          processConsumeOp,
-      llvm::function_ref<void(const PartitionOp& requireOp)>
-          processRequireOp,
-      unsigned numRequiresPerConsume = UINT_MAX) const {
+  void
+  emitErrorsForConsumeRequire(unsigned numRequiresPerConsume = UINT_MAX) const {
     for (auto [consumeOp, requireOps] : requirementsForConsumptions) {
       unsigned numProcessed = std::min({(unsigned) requireOps.size(),
                                         (unsigned) numRequiresPerConsume});
-      processConsumeOp(consumeOp, numProcessed, requireOps.size() - numProcessed);
+
+      // First process our consume ops.
+      unsigned numDisplayed = numProcessed;
+      unsigned numHidden = requireOps.size() - numProcessed;
+      if (!tryDiagnoseAsCallSite(consumeOp, numDisplayed, numHidden)) {
+        assert(false && "no consumptions besides callsites implemented yet");
+
+        // default to more generic diagnostic
+        auto expr = getExprForPartitionOp(consumeOp);
+        auto diag = fn->getASTContext().Diags.diagnose(
+            expr->getLoc(), diag::consumption_yields_race, numDisplayed,
+            numDisplayed != 1, numHidden > 0, numHidden);
+        if (auto sourceExpr = consumeOp.getSourceExpr())
+          diag.highlight(sourceExpr->getSourceRange());
+        return;
+      }
+
       unsigned numRequiresToProcess = numRequiresPerConsume;
       for (auto [requireOp, _] : requireOps) {
         // ensures at most numRequiresPerConsume requires are processed per consume
-        if (numRequiresToProcess-- == 0) break;
-        processRequireOp(requireOp);
+        if (numRequiresToProcess-- == 0)
+          break;
+        auto expr = getExprForPartitionOp(requireOp);
+        fn->getASTContext()
+            .Diags.diagnose(expr->getLoc(), diag::possible_racy_access_site)
+            .highlight(expr->getSourceRange());
       }
     }
   }
@@ -1336,16 +1358,50 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    forEachConsumeRequire(
-        [&](const PartitionOp &consumeOp, unsigned numProcessed,
-            unsigned numSkipped) {
-          os << " ┌──╼ CONSUME: ";
-          consumeOp.print(os);
-        },
-        [&](const PartitionOp &requireOp) {
-          os << " ├╼ REQUIRE: ";
-          requireOp.print(os);
-        });
+    for (auto [consumeOp, requireOps] : requirementsForConsumptions) {
+      os << " ┌──╼ CONSUME: ";
+      consumeOp.print(os);
+
+      for (auto &[requireOp, _] : requireOps) {
+        os << " ├╼ REQUIRE: ";
+        requireOp.print(os);
+      }
+    }
+  }
+
+private:
+  /// Try to interpret this consumeOp as a source-level callsite (ApplyExpr),
+  /// and report a diagnostic including actor isolation crossing information
+  /// returns true iff one was succesfully formed and emitted.
+  bool tryDiagnoseAsCallSite(const PartitionOp &consumeOp,
+                             unsigned numDisplayed, unsigned numHidden) const {
+    SILInstruction *sourceInst =
+        consumeOp.getSourceInst(/*assertNonNull=*/true);
+    ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+    if (!apply)
+      // consumption does not correspond to an apply expression
+      return false;
+    auto isolationCrossing = apply->getIsolationCrossing();
+    if (!isolationCrossing) {
+      assert(false && "ApplyExprs should be consuming only if"
+                      " they are isolation crossing");
+      return false;
+    }
+    auto argExpr = consumeOp.getSourceExpr();
+    if (!argExpr)
+      assert(false &&
+             "sourceExpr should be populated for ApplyExpr consumptions");
+
+    sourceInst->getFunction()
+        ->getASTContext()
+        .Diags
+        .diagnose(argExpr->getLoc(), diag::call_site_consumption_yields_race,
+                  argExpr->findOriginalType(),
+                  isolationCrossing.value().getCallerIsolation(),
+                  isolationCrossing.value().getCalleeIsolation(), numDisplayed,
+                  numDisplayed != 1, numHidden > 0, numHidden)
+        .highlight(argExpr->getSourceRange());
+    return true;
   }
 };
 
@@ -1560,8 +1616,9 @@ class RaceTracer {
   }
 
 public:
-  RaceTracer(const BasicBlockData<BlockPartitionState>& blockStates)
-      : blockStates(blockStates) {}
+  RaceTracer(SILFunction *fn,
+             const BasicBlockData<BlockPartitionState> &blockStates)
+      : blockStates(blockStates), accumulator(fn) {}
 
   void traceUseOfConsumedValue(PartitionOp use, TrackableValueID consumedVal) {
     accumulator.accumulateConsumedReason(
@@ -1601,9 +1658,7 @@ class PartitionAnalysis {
                     [this](SILBasicBlock *block) {
                       return BlockPartitionState(block, translator);
                     }),
-        raceTracer(blockStates),
-        function(fn),
-        solved(false) {
+        raceTracer(fn, blockStates), function(fn), solved(false) {
     // initialize the entry block as needing an update, and having a partition
     // that places all its non-sendable args in a single region
     blockStates[fn->getEntryBlock()].needsUpdate = true;
@@ -1692,15 +1747,6 @@ class PartitionAnalysis {
     return false;
   }
 
-  // used for generating informative diagnostics
-  Expr *getExprForPartitionOp(const PartitionOp& op) {
-    SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
-    Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
-    assert(expr && "PartitionOp's source location should correspond to"
-                   "an AST node");
-    return expr;
-  }
-
   // once the fixpoint has been solved for, run one more pass over each basic
   // block, reporting any failures due to requiring consumed regions in the
   // fixpoint state
@@ -1710,7 +1756,7 @@ class PartitionAnalysis {
     LLVM_DEBUG(
         llvm::dbgs() << "Emitting diagnostics for function "
                      << function->getName() << "\n");
-    RaceTracer tracer = blockStates;
+    RaceTracer tracer(function, blockStates);
 
     for (auto [_, blockState] : blockStates) {
       // populate the raceTracer with all requires of consumed valued found
@@ -1738,40 +1784,12 @@ class PartitionAnalysis {
     LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
                raceTracer.getAccumulator().print(llvm::dbgs()););
 
-    // ask the raceTracer to report diagnostics at the consumption sites
-    // for all the racy requirement sites entered into it above
-    raceTracer.getAccumulator().forEachConsumeRequire(
-        /*diagnoseConsume=*/
-        [&](const PartitionOp& consumeOp,
-            unsigned numDisplayed, unsigned numHidden) {
-
-          if (tryDiagnoseAsCallSite(consumeOp, numDisplayed, numHidden))
-            return;
-
-          assert(false && "no consumptions besides callsites implemented yet");
-
-          // default to more generic diagnostic
-          auto expr = getExprForPartitionOp(consumeOp);
-          auto diag = function->getASTContext().Diags.diagnose(
-              expr->getLoc(), diag::consumption_yields_race,
-              numDisplayed, numDisplayed != 1, numHidden > 0, numHidden);
-          if (auto sourceExpr = consumeOp.getSourceExpr())
-            diag.highlight(sourceExpr->getSourceRange());
-        },
-
-        /*diagnoseRequire=*/
-        [&](const PartitionOp& requireOp) {
-          auto expr = getExprForPartitionOp(requireOp);
-          function->getASTContext().Diags.diagnose(
-              expr->getLoc(), diag::possible_racy_access_site)
-              .highlight(expr->getSourceRange());
-        },
+    // Ask the raceTracer to report diagnostics at the consumption sites for all
+    // the racy requirement sites entered into it above.
+    raceTracer.getAccumulator().emitErrorsForConsumeRequire(
         NUM_REQUIREMENTS_TO_DIAGNOSE);
   }
 
-  // try to interpret this consumeOp as a source-level callsite (ApplyExpr),
-  // and report a diagnostic including actor isolation crossing information
-  // returns true iff one was succesfully formed and emitted
   bool tryDiagnoseAsCallSite(
       const PartitionOp& consumeOp, unsigned numDisplayed, unsigned numHidden) {
     SILInstruction *sourceInst = consumeOp.getSourceInst(/*assertNonNull=*/true);
