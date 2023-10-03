@@ -1116,6 +1116,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (!Caller->shouldOptimize())
     return false;
 
+  LLVM_DEBUG(llvm::dbgs() << "Inlining calls into " << Caller->getName()
+                          << "\n");
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
   // remains valid.
@@ -1143,6 +1145,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // ownership... do not inline. The two modes are incompatible, so skip this
     // apply site for now.
     if (!Callee->hasOwnership() && Caller->hasOwnership()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Not inlining non-ossa " << Caller->getName() << "\n");
       continue;
     }
 
