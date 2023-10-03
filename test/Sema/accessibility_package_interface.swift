@@ -59,6 +59,7 @@
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 
+// RUN: rm -rf %t/Utils.swiftmodule
 // RUN: rm -rf %t/Client.swiftmodule
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t -verify
