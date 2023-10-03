@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -typecheck -verify
 
 func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
-    value is type // expected-error {{cannot find type 'type' in scope}}
+    value is type // expected-error {{cast expression expects a type on its right-hand side (got: 'type')}}
 }
 
 func foo() -> Int {
@@ -10,7 +10,7 @@ func foo() -> Int {
 
 func badIs_ifdecl<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
     #if true
-    value is type // expected-error {{cannot find type 'type' in scope}}
+    value is type // expected-error {{cast expression expects a type on its right-hand side (got: 'type')}}
     #endif
 }
 

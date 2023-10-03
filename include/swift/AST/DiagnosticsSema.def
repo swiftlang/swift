@@ -1048,6 +1048,8 @@ NOTE(single_confusable_character,none,
       (bool, StringRef, StringRef, StringRef, StringRef))
 ERROR(cannot_find_type_in_scope,none,
       "cannot find type %0 in scope", (DeclNameRef))
+ERROR(cannot_find_type_in_cast_expression,none,
+      "cast expression expects a type on its right-hand side (got: %0)", (DeclNameRef))
 ERROR(cannot_find_type_in_scope_did_you_mean,none,
       "cannot find type %0 in scope; did you mean to use '%1'?", (DeclNameRef, StringRef))
 NOTE(note_typo_candidate_implicit_member,none,

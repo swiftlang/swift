@@ -741,3 +741,13 @@ do {
     assert(Set(b.map { $0 as A }) == Set(a)) // Ok
   }
 }
+
+// https://github.com/apple/swift/issues/68825
+do {
+  func x(a: Any) {
+    _ = a is a // expected-error {{cast expression expects a type on its right-hand side (got: 'a')}}
+    _ = a is a? // expected-error {{cast expression expects a type on its right-hand side (got: 'a')}}
+    _ = a as T // expected-error {{cast expression expects a type on its right-hand side (got: 'T')}}
+    _ = a is String // OK
+  }
+}
