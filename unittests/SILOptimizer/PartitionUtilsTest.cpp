@@ -1,6 +1,18 @@
-#include "gtest/gtest.h"
+//===--- PartitionUtilsTest.cpp -------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+
+#include "gtest/gtest.h"
 
 using namespace swift;
 
@@ -109,7 +121,9 @@ TEST(PartitionUtilsTest, TestAssign) {
   p3.apply(PartitionOp::AssignFresh(Element(2)));
   p3.apply(PartitionOp::AssignFresh(Element(3)));
 
-  //expected: p1: ((Element(0)) (Element(1)) (Element(2)) (Element(3))), p2: ((Element(0)) (Element(1)) (Element(2)) (Element(3))), p3: ((Element(0)) (Element(1)) (Element(2)) (Element(3)))
+  // expected: p1: ((Element(0)) (Element(1)) (Element(2)) (Element(3))), p2:
+  // ((Element(0)) (Element(1)) (Element(2)) (Element(3))), p3: ((Element(0))
+  // (Element(1)) (Element(2)) (Element(3)))
 
   EXPECT_TRUE(Partition::equals(p1, p2));
   EXPECT_TRUE(Partition::equals(p2, p3));
@@ -119,7 +133,8 @@ TEST(PartitionUtilsTest, TestAssign) {
   p2.apply(PartitionOp::Assign(Element(1), Element(0)));
   p3.apply(PartitionOp::Assign(Element(2), Element(1)));
 
-  //expected: p1: ((0 1) (Element(2)) (Element(3))), p2: ((0 1) (Element(2)) (Element(3))), p3: ((Element(0)) (1 2) (Element(3)))
+  // expected: p1: ((0 1) (Element(2)) (Element(3))), p2: ((0 1) (Element(2))
+  // (Element(3))), p3: ((Element(0)) (1 2) (Element(3)))
 
   EXPECT_TRUE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
@@ -129,7 +144,8 @@ TEST(PartitionUtilsTest, TestAssign) {
   p2.apply(PartitionOp::Assign(Element(2), Element(1)));
   p3.apply(PartitionOp::Assign(Element(0), Element(2)));
 
-  //expected: p1: ((0 1 2) (Element(3))), p2: ((0 1 2) (Element(3))), p3: ((0 1 2) (Element(3)))
+  // expected: p1: ((0 1 2) (Element(3))), p2: ((0 1 2) (Element(3))), p3: ((0 1
+  // 2) (Element(3)))
 
   EXPECT_TRUE(Partition::equals(p1, p2));
   EXPECT_TRUE(Partition::equals(p2, p3));
@@ -139,7 +155,7 @@ TEST(PartitionUtilsTest, TestAssign) {
   p2.apply(PartitionOp::Assign(Element(1), Element(3)));
   p3.apply(PartitionOp::Assign(Element(2), Element(3)));
 
-  //expected: p1: ((1 2) (0 3)), p2: ((0 2) (1 3)), p3: ((0 1) (2 3))
+  // expected: p1: ((1 2) (0 3)), p2: ((0 2) (1 3)), p3: ((0 1) (2 3))
 
   EXPECT_FALSE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
@@ -149,7 +165,8 @@ TEST(PartitionUtilsTest, TestAssign) {
   p2.apply(PartitionOp::Assign(Element(2), Element(1)));
   p3.apply(PartitionOp::Assign(Element(0), Element(2)));
 
-  //expected: p1: ((Element(2)) (0 1 3)), p2: ((Element(0)) (1 2 3)), p3: ((Element(1)) (0 2 3))
+  // expected: p1: ((Element(2)) (0 1 3)), p2: ((Element(0)) (1 2 3)), p3:
+  // ((Element(1)) (0 2 3))
 
   EXPECT_FALSE(Partition::equals(p1, p2));
   EXPECT_FALSE(Partition::equals(p2, p3));
@@ -159,7 +176,7 @@ TEST(PartitionUtilsTest, TestAssign) {
   p2.apply(PartitionOp::Assign(Element(0), Element(3)));
   p3.apply(PartitionOp::Assign(Element(1), Element(3)));
 
-  //expected: p1: ((0 1 2 3)), p2: ((0 1 2 3)), p3: ((0 1 2 3))
+  // expected: p1: ((0 1 2 3)), p2: ((0 1 2 3)), p3: ((0 1 2 3))
 
   EXPECT_TRUE(Partition::equals(p1, p2));
   EXPECT_TRUE(Partition::equals(p2, p3));
@@ -192,7 +209,7 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   p.apply(PartitionOp::Assign(Element(7), Element(6)));
   p.apply(PartitionOp::Assign(Element(9), Element(8)));
 
-  //expected: p: ((0 1 2) (3 4 5) (6 7) (8 9) (Element(10)) (Element(11)))
+  // expected: p: ((0 1 2) (3 4 5) (6 7) (8 9) (Element(10)) (Element(11)))
 
   p.apply(PartitionOp::Transfer(Element(2)));
   p.apply(PartitionOp::Transfer(Element(7)));
@@ -200,15 +217,13 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned) {
-      EXPECT_TRUE(false);
-  };
+  auto never_called = [](const PartitionOp &, unsigned) { EXPECT_TRUE(false); };
 
   int times_called = 0;
   int expected_times_called = 0;
   auto increment_times_called = [&](const PartitionOp &, unsigned) {
-        times_called++;
-      };
+    times_called++;
+  };
   auto get_increment_times_called = [&]() {
     expected_times_called++;
     return increment_times_called;
@@ -238,12 +253,10 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   Partition p2 = p1;
   p1.apply(PartitionOp::Transfer(Element(0)));
   bool failure = false;
-  p1.apply(PartitionOp::Require(Element(0)), [&](const PartitionOp &, unsigned) {
-      failure = true;
-    });
+  p1.apply(PartitionOp::Require(Element(0)),
+           [&](const PartitionOp &, unsigned) { failure = true; });
   EXPECT_TRUE(failure);
 
-  p2.apply(PartitionOp::Require(Element(0)), [](const PartitionOp &, unsigned) {
-    EXPECT_TRUE(false);
-  });
+  p2.apply(PartitionOp::Require(Element(0)),
+           [](const PartitionOp &, unsigned) { EXPECT_TRUE(false); });
 }
