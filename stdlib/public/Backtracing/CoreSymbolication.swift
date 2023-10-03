@@ -168,7 +168,7 @@ internal func CFStringGetBytes(_ s: CFString,
                                _ isExternalRepresentation: Bool,
                                _ buffer: UnsafeMutableRawPointer?,
                                _ maxBufLen: CFIndex,
-                               _ usedBufLen: UnsafeMutablePointer<CFIndex>?)
+                               @forwardedToC _ usedBufLen: UnsafeMutablePointer<CFIndex>?)
   -> CFIndex {
   return Sym.CFStringGetBytes(s, range, encoding, lossByte,
                               isExternalRepresentation, buffer, maxBufLen,
