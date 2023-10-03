@@ -567,6 +567,21 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
                                  : GlobalVariable);
     }
   }
+  
+  // If the pattern binding appears as a compound stored `let` property with an
+  // initializer inside of a struct type, diagnose it as unsupported.
+  // This hasn't ever been implemented properly.
+  if (!Context.LangOpts.hasFeature(Feature::StructLetDestructuring)
+      && !binding->isStatic()
+      && binding->isInitialized(entryNumber)
+      && isa<StructDecl>(binding->getDeclContext())
+      && !pattern->getSingleVar()
+      && !vars.empty()
+      && vars[0]->isLet()) {
+    Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
+                           diag::destructuring_let_struct_stored_property_unsupported);
+  }
+  
   return &pbe;
 }
 

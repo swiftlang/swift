@@ -1215,7 +1215,8 @@ _ = r19874152S5()  // ok
 
 
 struct r19874152S6 {
-  let (a,b) = (1,2)   // Cannot handle implicit synth of this yet.
+  // Cannot handle implicit synth of this yet.
+  let (a,b) = (1,2)   // expected-error {{unsupported}}
 }
 _ = r19874152S5()  // ok
 
