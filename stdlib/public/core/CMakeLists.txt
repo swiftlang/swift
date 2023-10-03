@@ -424,7 +424,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       embedded-stdlib-${triple}
       swiftCore
       ONLY_SWIFTMODULE
-      IS_STDLIB IS_STDLIB_CORE
+      IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS -target "${triple}" -Xcc -D__MACH__ -enable-experimental-feature Embedded
