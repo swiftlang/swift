@@ -4845,7 +4845,7 @@ public:
                                 key.Arguments.hash());
     }
 
-    bool operator==(const Key &other) {
+    bool operator==(const Key &other) const {
       return Shape == other.Shape && Arguments == other.Arguments;
     }
   };

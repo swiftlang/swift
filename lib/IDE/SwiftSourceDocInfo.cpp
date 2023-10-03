@@ -785,7 +785,7 @@ calculateContentRange(ArrayRef<Token> Tokens) {
   return CharSourceRange(StartLoc, Length);
 }
 
-bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
+bool DeclaredDecl::operator==(const DeclaredDecl& Other) const {
   return VD == Other.VD;
 }
 

@@ -183,8 +183,8 @@ public:
     }
 
     explicit operator bool() const { return !isNoEffect(); }
-    bool operator==(const Effect &other) { return value == other.value; }
-    bool operator!=(const Effect &other) { return value != other.value; }
+    bool operator==(const Effect &other) const { return value == other.value; }
+    bool operator!=(const Effect &other) const { return value != other.value; }
   };
 
   /// How reachable a point in the function is:

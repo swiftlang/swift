@@ -120,7 +120,7 @@ public:
   };
 
 
-  bool operator==(const TypeRefID &Other) {
+  bool operator==(const TypeRefID &Other) const {
     return Bits == Other.Bits;
   }
 };
