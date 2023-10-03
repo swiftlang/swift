@@ -420,6 +420,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     add_swift_target_library_single(
       embedded-stdlib-${triple}
       swiftCore
@@ -427,7 +428,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS -target "${triple}" -Xcc -D__MACH__ -enable-experimental-feature Embedded
+      SWIFT_COMPILE_FLAGS -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
