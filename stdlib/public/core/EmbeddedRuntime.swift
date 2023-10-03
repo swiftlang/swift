@@ -43,6 +43,16 @@ public struct HeapObject {
 
 
 
+/// Forward declarations of C functions
+
+@_silgen_name("posix_memalign")
+func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int) -> CInt
+
+@_silgen_name("free")
+func free(_ p: UnsafeMutableRawPointer?)
+
+
+
 /// Allocations
 
 func alignedAlloc(size: Int, alignment: Int) -> UnsafeMutableRawPointer? {
