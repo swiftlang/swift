@@ -3123,6 +3123,8 @@ bool CompilerInvocation::parseArgs(
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;
+    IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
+    IRGenOpts.EnableReflectionNames = false;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
   }
