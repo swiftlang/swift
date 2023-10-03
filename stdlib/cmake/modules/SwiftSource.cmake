@@ -646,7 +646,7 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_MODULE_INTERFACES)
+    if(SWIFT_ENABLE_MODULE_INTERFACES AND NOT SWIFTFILE_IS_FRAGILE)
       set(interface_file "${module_base}.swiftinterface")
       set(interface_file_static "${module_base_static}.swiftinterface")
       set(private_interface_file "${module_base}.private.swiftinterface")
@@ -705,7 +705,7 @@ function(_compile_swift_files
 
       set(maccatalyst_module_outputs "${maccatalyst_module_file}" "${maccatalyst_module_doc_file}")
 
-      if(SWIFT_ENABLE_MODULE_INTERFACES)
+      if(SWIFT_ENABLE_MODULE_INTERFACES AND NOT SWIFTFILE_IS_FRAGILE)
         set(maccatalyst_interface_file "${maccatalyst_module_base}.swiftinterface")
         set(maccatalyst_private_interface_file "${maccatalyst_module_base}.private.swiftinterface")
         list(APPEND maccatalyst_module_outputs "${maccatalyst_interface_file}" "${maccatalyst_private_interface_file}")
