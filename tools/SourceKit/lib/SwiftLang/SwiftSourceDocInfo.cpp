@@ -989,31 +989,34 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   // Serialize the SubstitutionMap into an array of SubstitutionInfo
   if (DInfo.IsRef) {
-    PrintOptions Options;
-    Options.PrintTypeAliasUnderlyingType = true;
 
     // Given generic type and its corresponding replacement type, returns their
     // SubstitutionInfo
-    auto getSubstitutionInfo = [&](Type GenericTy, Type Ty) {
+    auto getSubstitutionInfo = [&](GenericTypeParamType *GenericTy, Type Ty) {
       if (!GenericTy || !Ty) {
         return SubstitutionInfo();
       }
+
       SubstitutionInfo SubstInfo;
-      GenericTy->print(OS, Options);
+      GenericTy->print(OS);
       OS << " -> ";
-      Ty->print(OS, Options);
+      Ty->print(OS);
       SubstInfo.Mapping = copyAndClearString(Allocator, Buffer);
+
       if (!ExpandSubstitutions) {
         return SubstInfo;
       }
-      auto *Decl1 = GenericTy->getAs<GenericTypeParamType>()->getDecl();
-      auto *Decl2 = Ty->getAnyNominal();
-      if (Decl1) {
-        SwiftLangSupport::printUSR(Decl1, OS);
+
+      // Get declarations for both types
+      TypeDecl *GenericTyDecl = ide::getDeclFromType(GenericTy);
+      TypeDecl *TyDecl = ide::getDeclFromType(Ty);
+
+      if (GenericTyDecl) {
+        SwiftLangSupport::printUSR(GenericTyDecl, OS);
         SubstInfo.GenericUSR = copyAndClearString(Allocator, Buffer);
       }
-      if (Decl2) {
-        SwiftLangSupport::printUSR(Decl2, OS);
+      if (TyDecl) {
+        SwiftLangSupport::printUSR(TyDecl, OS);
         SubstInfo.ReplacementUSR = copyAndClearString(Allocator, Buffer);
       }
       return SubstInfo;
@@ -1281,7 +1284,6 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
     }
 
     CursorSymbolInfo &NewSymbolInfo = Data.Symbols.emplace_back();
-
     auto Err = fillSymbolInfo(NewSymbolInfo, DInfo, Info->getLoc(),
                               AddSymbolGraph, ExpandSubstitutions, Lang, Invoc,
                               PreviousSnaps, Data.Allocator);
@@ -1342,36 +1344,19 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
       QuerySubstitutionMap GetType{Info->getSubstitutionMap()};
       Type Ty = GetType(GenericTy);
 
-      // Given Type, returns its type declaration if it exists
-      // TODO: is getAnyNominal() enough?
-      auto getDecl = [](Type Ty) -> TypeDecl * {
-        if (!Ty) {
-          return nullptr;
-        }
-        TypeDecl *Decl = nullptr;
-        if (auto *GTy = Ty->getAs<GenericTypeParamType>()) {
-          return GTy->getDecl();
-        }
-        if (auto *NominalDecl = Ty->getAnyNominal()) {
-          Decl = NominalDecl;
-        } else if (auto *GenericDecl = Ty->getAnyGeneric()) {
-          Decl = GenericDecl;
-        }
-        return Decl;
-      };
-
       // Add Symbol info for the replacement type
       if (!Visited.contains(Ty->getCanonicalType())) {
-        DeclInfo DInfo(getDecl(Ty), SubstitutionMap(), Type(), true, false, {},
-                       Invoc);
+        DeclInfo DInfo(ide::getDeclFromType(Ty), SubstitutionMap(), Type(),
+                       true, false, {}, Invoc);
         addSymbolInfo(DInfo, true);
         Visited.insert(Ty->getCanonicalType());
       }
 
       // Add Symbol info for the generic type
       if (!Visited.contains(GenericTy->getCanonicalType())) {
-        DeclInfo GenericDInfo(getDecl(GenericTy), SubstitutionMap(), Type(),
-                              true, false, {}, Invoc);
+        DeclInfo GenericDInfo(ide::getDeclFromType(GenericTy),
+                              SubstitutionMap(), Type(), true, false, {},
+                              Invoc);
         addSymbolInfo(GenericDInfo, true);
         Visited.insert(GenericTy->getCanonicalType());
       }

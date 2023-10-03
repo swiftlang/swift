@@ -662,16 +662,20 @@ ASTWalker::PreWalkAction SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
           return SubstitutionMap();
         }
 
-        DeclContext *DC = nullptr;
-        if (auto *GenericDecl = Ty->getAnyGeneric()) {
-          DC = GenericDecl->getInnermostTypeContext();
-        } else if (auto *NominalDecl = Ty->getAnyNominal()) {
-          DC = NominalDecl->getInnermostTypeContext();
+        if (auto *AliasTy = dyn_cast<TypeAliasType>(Ty.getPointer())) {
+          return AliasTy->getSubstitutionMap();
         }
 
+        auto *TyDecl = ide::getDeclFromType(Ty);
+        if (!TyDecl) {
+          return SubstitutionMap();
+        }
+
+        DeclContext *DC = TyDecl->getInnermostDeclContext();
         if (!DC) {
           return SubstitutionMap();
         }
+
         return Ty->getContextSubstitutionMap(DC->getParentModule(), DC);
       };
 

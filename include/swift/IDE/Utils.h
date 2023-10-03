@@ -750,6 +750,10 @@ bool isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(Expr *)> get
 void getReceiverType(Expr *Base,
                      SmallVectorImpl<NominalTypeDecl *> &Types);
 
+/// Given type, returns its type declaration. Prefers a typealias declaration.
+/// Returns nullptr if no declaration exists.
+TypeDecl *getDeclFromType(Type Ty);
+
 } // namespace ide
 } // namespace swift
 

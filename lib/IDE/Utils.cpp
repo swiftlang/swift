@@ -1090,3 +1090,20 @@ void swift::ide::getReceiverType(Expr *Base,
     Types.push_back(TyD);
   }
 }
+
+TypeDecl *swift::ide::getDeclFromType(Type Ty) {
+  if (!Ty) {
+    return nullptr;
+  }
+  if (auto *ArchTy = Ty->getAs<ArchetypeType>()) {
+    Ty = ArchTy->getInterfaceType();
+  }
+  if (auto *GTy = Ty->getAs<GenericTypeParamType>()) {
+    return GTy->getDecl();
+  }
+  TypeDecl *Decl = Ty->getAnyNominal();
+  if (auto *AliasTy = dyn_cast<TypeAliasType>(Ty.getPointer())) {
+    Decl = AliasTy->getDecl();
+  }
+  return Decl;
+}
