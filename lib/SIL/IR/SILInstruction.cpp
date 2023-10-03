@@ -1150,6 +1150,13 @@ bool SILInstruction::mayRelease() const {
     return Cast->getConsumptionKind() == CastConsumptionKind::TakeAlways;
   }
 
+  case SILInstructionKind::ExplicitCopyAddrInst: {
+    auto *CopyAddr = cast<ExplicitCopyAddrInst>(this);
+    // copy_addr without initialization can cause a release.
+    return CopyAddr->isInitializationOfDest() ==
+           IsInitialization_t::IsNotInitialization;
+  }
+
   case SILInstructionKind::CopyAddrInst: {
     auto *CopyAddr = cast<CopyAddrInst>(this);
     // copy_addr without initialization can cause a release.
