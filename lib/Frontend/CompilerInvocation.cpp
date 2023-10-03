@@ -735,6 +735,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
+  } else if (FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::TypecheckModuleFromInterface ||
+	     FrontendOpts.RequestedAction ==
+             FrontendOptions::ActionType::CompileModuleFromInterface) {
+    Opts.EnableObjCAttrRequiresFoundation = false;
   }
 
   if (Args.getLastArg(OPT_debug_cycles))
@@ -3118,6 +3123,8 @@ bool CompilerInvocation::parseArgs(
   if (LangOpts.hasFeature(Feature::Embedded)) {
     IRGenOpts.InternalizeAtLink = true;
     IRGenOpts.DisableLegacyTypeInfo = true;
+    IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
+    IRGenOpts.EnableReflectionNames = false;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
   }

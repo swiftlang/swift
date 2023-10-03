@@ -108,9 +108,9 @@ struct TestInitThenSetter {
   // CHECK: {{.*}} = apply [[INIT_ACCESSOR]]([[X_REF]], [[Y_REF]], {{.*}}) : $@convention(thin) (Int, Int) -> (@out Int, @out Int)
   //
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors18TestInitThenSetterV5pointSi_Sitvs : $@convention(method) (Int, Int, @inout TestInitThenSetter) -> ()
-  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, Int, @inout TestInitThenSetter) -> ()
+  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, Int, @inout TestInitThenSetter) -> ()
   // CHECK: ([[ZERO_X:%.*]], [[ZERO_Y:%.*]]) = destructure_tuple {{.*}} : $(Int, Int)
-  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]([[ZERO_X]], [[ZERO_Y]]) : $@callee_guaranteed (Int, Int) -> ()
+  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]([[ZERO_X]], [[ZERO_Y]]) : $@noescape @callee_guaranteed (Int, Int) -> ()
   init(x: Int, y: Int) {
     self.point = (x, y)
 
@@ -156,13 +156,13 @@ struct TestPartialInt {
   //
   // CHECK: [[BUILTIN_ONE:%.*]] = integer_literal $Builtin.IntLiteral, 1
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors14TestPartialIntV6pointXSivs : $@convention(method) (Int, @inout TestPartialInt) -> ()
-  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]({{.*}}) : $@convention(method) (Int, @inout TestPartialInt) -> ()
-  // CHECK-NEXT: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]({{.*}}) : $@convention(method) (Int, @inout TestPartialInt) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@noescape @callee_guaranteed (Int) -> ()
   //
   // CHECK: [[BUILTIN_TWO:%.*]] = integer_literal $Builtin.IntLiteral, 2
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors14TestPartialIntV6pointYSivs : $@convention(method) (Int, @inout TestPartialInt) -> ()
-  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]({{.*}}) : $@convention(method) (Int, @inout TestPartialInt) -> ()
-  // CHECK-NEXT: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (Int) -> ()
+  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]({{.*}}) : $@convention(method) (Int, @inout TestPartialInt) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@noescape @callee_guaranteed (Int) -> ()
   init(x: Int, y: Int) {
     // Init
     self.pointX = x
@@ -309,8 +309,8 @@ struct TestGeneric<T, U> {
   // CHECK: {{.*}} = apply [[SUBST_INIT_ACCESSOR]]({{.*}}) : $@callee_guaranteed (@in T, @in T, @inout U) -> (@out T, @out T)
   //
   // CHECK: [[SETTER:%.*]] = function_ref @$s14init_accessors11TestGenericV4datax_xtvs : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
-  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER]]<T, U>([[SELF_VALUE:%.*]]) : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
-  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@callee_guaranteed (@in T, @in T) -> ()
+  // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER]]<T, U>([[SELF_VALUE:%.*]]) : $@convention(method) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_0, @inout TestGeneric<τ_0_0, τ_0_1>) -> ()
+  // CHECK: {{.*}} = apply [[SETTER_CLOSURE]]({{.*}}) : $@noescape @callee_guaranteed (@in T, @in T) -> ()
   // CHECK-NEXT: end_access [[SELF_VALUE]] : $*TestGeneric<T, U>
   init(a: T, b: T, c: U) {
     self.c = c
@@ -458,8 +458,8 @@ func test_assignments() {
     // CHECK: [[B_REF:%.*]] = struct_element_addr {{.*}} : $*Test, #<abstract function>Test._b
     // CHECK-NEXT: store {{.*}} to [trivial] [[B_REF]] : $*Int
     // CHECK: [[SETTER_REF:%.*]] = function_ref @$s14init_accessors16test_assignmentsyyF4TestL_V1aSivs : $@convention(method) (Int, @inout Test) -> ()
-    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, @inout Test) -> ()
-    // CHECK: {{.*}} = apply [[SETTER_CLOSURE]](%0) : $@callee_guaranteed (Int) -> ()
+    // CHECK-NEXT: [[SETTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_VALUE:%.*]]) : $@convention(method) (Int, @inout Test) -> ()
+    // CHECK: {{.*}} = apply [[SETTER_CLOSURE]](%0) : $@noescape @callee_guaranteed (Int) -> ()
     init(a: Int) {
       self.a = a
       self.a = a

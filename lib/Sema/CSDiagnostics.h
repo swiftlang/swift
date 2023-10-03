@@ -1276,6 +1276,9 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+
+  static ValueDecl *findImportedCaseWithMatchingSuffix(Type instanceTy,
+                                                       DeclNameRef name);
 };
 
 class UnintendedExtraGenericParamMemberFailure final

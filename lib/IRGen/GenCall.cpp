@@ -517,6 +517,9 @@ namespace {
 
     void expandCoroutineResult(bool forContinuation);
     void expandCoroutineContinuationParameters();
+
+    void addIndirectThrowingResult();
+    llvm::Type *getErrorRegisterType();
   };
 } // end anonymous namespace
 } // end namespace irgen
@@ -1850,12 +1853,16 @@ void SignatureExpansion::expandParameters(
   if (FnType->hasErrorResult()) {
     if (claimError())
       IGM.addSwiftErrorAttributes(Attrs, ParamIRTypes.size());
-    llvm::Type *errorType =
-        IGM.getStorageType(getSILFuncConventions().getSILType(
-            FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
+    llvm::Type *errorType = getErrorRegisterType();
     ParamIRTypes.push_back(errorType->getPointerTo());
     if (recordedABIDetails)
       recordedABIDetails->hasErrorResult = true;
+    if (getSILFuncConventions().isTypedError()) {
+      ParamIRTypes.push_back(
+        IGM.getStorageType(getSILFuncConventions().getSILType(
+            FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext())
+          )->getPointerTo());
+    }
   }
 
   // Witness methods have some extra parameter types.
@@ -1903,6 +1910,14 @@ void SignatureExpansion::expandCoroutineContinuationType() {
   expandCoroutineContinuationParameters();
 }
 
+llvm::Type *SignatureExpansion::getErrorRegisterType() {
+  if (getSILFuncConventions().isTypedError())
+    return IGM.Int8PtrTy;
+
+  return IGM.getStorageType(getSILFuncConventions().getSILType(
+            FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
+}
+
 void SignatureExpansion::expandAsyncReturnType() {
   // Build up the signature of the return continuation function.
   // void (AsyncTask *, ExecutorRef, AsyncContext *, DirectResult0, ...,
@@ -1914,9 +1929,7 @@ void SignatureExpansion::expandAsyncReturnType() {
   auto addErrorResult = [&]() {
     // Add the error pointer at the end.
     if (FnType->hasErrorResult()) {
-      llvm::Type *errorType =
-          IGM.getStorageType(getSILFuncConventions().getSILType(
-              FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
+      llvm::Type *errorType = getErrorRegisterType();
       claimSelf();
       auto selfIdx = ParamIRTypes.size();
       IGM.addSwiftSelfAttributes(Attrs, selfIdx);
@@ -1943,6 +1956,17 @@ void SignatureExpansion::expandAsyncReturnType() {
   addErrorResult();
 }
 
+void SignatureExpansion::addIndirectThrowingResult() {
+  if (getSILFuncConventions().funcTy->hasErrorResult() &&
+      getSILFuncConventions().isTypedError()) {
+    auto resultType = getSILFuncConventions().getSILErrorType(
+      IGM.getMaximalTypeExpansionContext());
+    const TypeInfo &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(resultType));
+    auto storageTy = resultTI.getStorageType();
+    ParamIRTypes.push_back(storageTy->getPointerTo());
+  }
+
+}
 void SignatureExpansion::expandAsyncEntryType() {
   ResultIRType = IGM.VoidTy;
 
@@ -2029,6 +2053,8 @@ void SignatureExpansion::expandAsyncEntryType() {
     }
   }
 
+  addIndirectThrowingResult();
+
   // For now we continue to store the error result in the context to be able to
   // reuse non throwing functions.
 
@@ -2049,7 +2075,7 @@ void SignatureExpansion::expandAsyncAwaitType() {
 
   auto addErrorResult = [&]() {
     if (FnType->hasErrorResult()) {
-      llvm::Type *errorType =
+      llvm::Type *errorType = getErrorRegisterType();
           IGM.getStorageType(getSILFuncConventions().getSILType(
               FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
       auto selfIdx = components.size();
@@ -2376,9 +2402,16 @@ public:
       // don't need to do anything extra here.
       SILFunctionConventions fnConv(fnType, IGF.getSILModule());
       Address errorResultSlot = IGF.getCalleeErrorResultSlot(
-          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()),
+          fnConv.isTypedError());
 
       assert(LastArgWritten > 0);
+      if (fnConv.isTypedError()) {
+        // Return the error indirectly.
+        auto buf = IGF.getCalleeTypedErrorResultSlot(
+          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+        Args[--LastArgWritten] = buf.getAddress();
+      }
       Args[--LastArgWritten] = errorResultSlot.getAddress();
       addParamAttribute(LastArgWritten, llvm::Attribute::NoCapture);
       IGF.IGM.addSwiftErrorAttributes(CurCallee.getMutableAttributes(),
@@ -2575,7 +2608,10 @@ public:
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
-    return IGF.getCalleeErrorResultSlot(errorType);
+    SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                  IGF.getSILModule());
+
+    return IGF.getCalleeErrorResultSlot(errorType, fnConv.isTypedError());
   };
 
   llvm::Value *getResumeFunctionPointer() override {
@@ -2672,6 +2708,18 @@ public:
       while (n--) {
         Args[--LastArgWritten] = nullptr;
       }
+    }
+
+    // Add the indirect typed error result if we have one.
+    SILFunctionConventions fnConv(fnType, IGF.getSILModule());
+    if (fnType->hasErrorResult() && fnConv.isTypedError()) {
+      // The invariant is that this is always zero-initialized, so we
+      // don't need to do anything extra here.
+      assert(LastArgWritten > 0);
+      // Return the error indirectly.
+      auto buf = IGF.getCalleeTypedErrorResultSlot(
+        fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+      Args[--LastArgWritten] = buf.getAddress();
     }
 
     llvm::Value *contextPtr = CurCallee.getSwiftContext();
@@ -2855,7 +2903,8 @@ public:
     if (resultTys.size() == 1) {
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
       if (hasError) {
-        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType,
+																												 substConv.isTypedError());
         Builder.CreateStore(result, errorAddr);
         return;
       }
@@ -2863,7 +2912,7 @@ public:
       auto tmp = result;
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
       auto errorResult =  Builder.CreateExtractValue(tmp, numAsyncContextParams + 1);
-      Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+			Address errorAddr = IGF.getCalleeErrorResultSlot(errorType, substConv.isTypedError());
       Builder.CreateStore(errorResult, errorAddr);
     } else {
       auto directResultTys = hasError ? resultTys.drop_back() : resultTys;
@@ -2877,7 +2926,7 @@ public:
       if (hasError) {
         auto errorResult = Builder.CreateExtractValue(
             result, numAsyncContextParams + directResultTys.size());
-        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType, substConv.isTypedError());
         Builder.CreateStore(errorResult, errorAddr);
       }
       result = resultAgg;
@@ -2915,7 +2964,9 @@ public:
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
-    return IGF.getCalleeErrorResultSlot(errorType);
+		SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
+                                  IGF.getSILModule());
+    return IGF.getCalleeErrorResultSlot(errorType, fnConv.isTypedError());
   }
 
   llvm::CallBase *createCall(const FunctionPointer &fn,
@@ -3050,7 +3101,8 @@ void CallEmission::emitToUnmappedMemory(Address result) {
       errorType =
           substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
       auto result = Builder.CreateExtractValue(call, numAsyncContextParams);
-      Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+      Address errorAddr = IGF.getCalleeErrorResultSlot(errorType,
+																											 substConv.isTypedError());
       Builder.CreateStore(result, errorAddr);
     }
   }
@@ -4604,17 +4656,21 @@ Explosion IRGenFunction::collectParameters() {
     params.add(&*i);
   return params;
 }
-
-Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync) {
+Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
+                                             bool setSwiftErrorFlag,
+                                             bool isTypedError) {
   auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
   IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
   builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
-
+  auto errorStorageType = isTypedError ? IGM.Int8PtrTy :
+    errorTI.getStorageType();
+  auto errorAlignment  = isTypedError ? IGM.getPointerAlignment() :
+    errorTI.getFixedAlignment();
   // Create the alloca.  We don't use allocateStack because we're
   // not allocating this in stack order.
-  auto addr = createAlloca(errorTI.getStorageType(),
-                           errorTI.getFixedAlignment(), "swifterror");
+  auto addr = createAlloca(errorStorageType,
+                           errorAlignment, "swifterror");
 
   if (!isAsync) {
     builder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
@@ -4628,35 +4684,42 @@ Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync) {
   // The slot for async callees cannot be annotated swifterror because those
   // errors are never passed in registers but rather are always passed
   // indirectly in the async context.
-  if (IGM.ShouldUseSwiftError && !isAsync)
+  if (IGM.ShouldUseSwiftError && !isAsync && setSwiftErrorFlag)
     cast<llvm::AllocaInst>(addr.getAddress())->setSwiftError(true);
 
   // Initialize at the alloca point.
-  auto nullError = llvm::ConstantPointerNull::get(
-      cast<llvm::PointerType>(errorTI.getStorageType()));
-  builder.CreateStore(nullError, addr);
+  if (setSwiftErrorFlag) {
+    auto nullError = llvm::ConstantPointerNull::get(
+        cast<llvm::PointerType>(errorStorageType));
+    builder.CreateStore(nullError, addr);
+  }
 
   return addr;
 }
 
 /// Fetch the error result slot.
-Address IRGenFunction::getCalleeErrorResultSlot(SILType errorType) {
+Address IRGenFunction::getCalleeErrorResultSlot(SILType errorType,
+                                                bool isTypedError) {
   if (!CalleeErrorResultSlot.isValid()) {
-    CalleeErrorResultSlot = createErrorResultSlot(errorType, /*isAsync=*/false);
+    CalleeErrorResultSlot = createErrorResultSlot(errorType, /*isAsync=*/false,
+                                                  /*setSwiftError*/true,
+                                                  isTypedError);
   }
   return CalleeErrorResultSlot;
 }
 
-/// Fetch the error result slot.
-Address IRGenFunction::getAsyncCalleeErrorResultSlot(SILType errorType) {
-  assert(isAsync() &&
-         "throwing async functions must be called from async functions");
-  if (!AsyncCalleeErrorResultSlot.isValid()) {
-    AsyncCalleeErrorResultSlot =
-        createErrorResultSlot(errorType, /*isAsync=*/true);
+Address IRGenFunction::getCalleeTypedErrorResultSlot(SILType errorType) {
+
+  auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
+  if (!CalleeTypedErrorResultSlot.isValid() ||
+      CalleeTypedErrorResultSlot.getElementType() != errorTI.getStorageType()) {
+    CalleeTypedErrorResultSlot =
+      createErrorResultSlot(errorType, /*isAsync=*/false,
+                            /*setSwiftErrorFlag*/false);
   }
-  return AsyncCalleeErrorResultSlot;
+  return CalleeTypedErrorResultSlot;
 }
+
 
 /// Fetch the error result slot received from the caller.
 Address IRGenFunction::getCallerErrorResultSlot() {
@@ -4679,6 +4742,20 @@ void IRGenFunction::setCallerErrorResultSlot(Address address) {
   }
 }
 
+// Set the error result slot for a typed throw for the current function.
+// This should only be done in the prologue.
+void IRGenFunction::setCallerTypedErrorResultSlot(Address address) {
+  assert(!CallerTypedErrorResultSlot.isValid() &&
+         "already have a caller error result slot!");
+  assert(isa<llvm::PointerType>(address.getAddress()->getType()));
+  CallerTypedErrorResultSlot = address;
+}
+
+Address IRGenFunction::getCallerTypedErrorResultSlot() {
+  assert(CallerTypedErrorResultSlot.isValid() && "no error result slot!");
+  assert(isa<llvm::Argument>(CallerTypedErrorResultSlot.getAddress()));
+  return CallerTypedErrorResultSlot;
+}
 /// Emit the basic block that 'return' should branch to and insert it into
 /// the current function. This creates a second
 /// insertion point that most blocks should be inserted before.

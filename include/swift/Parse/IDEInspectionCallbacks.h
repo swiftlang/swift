@@ -36,6 +36,25 @@ enum class CustomSyntaxAttributeKind {
   Available,
   FreestandingMacro,
   AttachedMacro,
+  StorageRestrictions
+};
+
+/// A bit of a hack. When completing inside the '@storageRestrictions'
+/// attribute, we use the \c ParamIndex field to communicate where inside the
+/// attribute we are performing the completion.
+enum class StorageRestrictionsCompletionKind : int {
+  /// We are completing directly after the '(' and require a 'initializes' or
+  /// 'accesses' label.
+  Label,
+  /// We are completing in a context that only allows arguments (ie. accessed or
+  /// initialized variables) and doesn't permit an argument label.
+  Argument,
+  /// Completion in a context that allows either an argument or the
+  /// 'initializes' label.
+  ArgumentOrInitializesLabel,
+  /// Completion in a context that allows either an argument or the
+  /// 'accesses' label.
+  ArgumentOrAccessesLabel
 };
 
 /// Parser's interface to code completion.

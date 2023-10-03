@@ -4579,22 +4579,16 @@ generateForEachStmtConstraints(ConstraintSystem &cs,
                                            /*flags=*/0);
   {
     auto nextType = cs.getType(forEachStmtInfo.nextCall);
-    // Note that `OptionalObject` is not used here. This is due to inference
-    // behavior where it would bind `elementType` to the `initType` before
-    // resolving `optional object` constraint which is sometimes too eager.
-    cs.addConstraint(ConstraintKind::Conversion, nextType,
-                     OptionalType::get(elementType), elementTypeLoc);
+    cs.addConstraint(ConstraintKind::OptionalObject, nextType, elementType,
+                     elementTypeLoc);
     cs.addConstraint(ConstraintKind::Conversion, elementType, initType,
                      elementLocator);
   }
 
   // Generate constraints for the "where" expression, if there is one.
-  if (auto *whereExpr = stmt->getWhere()) {
-    auto *boolDecl = dc->getASTContext().getBoolDecl();
-    if (!boolDecl)
-      return llvm::None;
-
-    Type boolType = boolDecl->getDeclaredInterfaceType();
+  auto *whereExpr = stmt->getWhere();
+  if (whereExpr && !target.ignoreForEachWhereClause()) {
+    Type boolType = dc->getASTContext().getBoolType();
     if (!boolType)
       return llvm::None;
 
