@@ -1064,4 +1064,19 @@ CastsTests.test("Don't put AnyHashable inside AnyObject") {
   expectTrue(a === d)
 }
 
+CastsTests.test("__SwiftValue should not be obvious to `is`") {
+  struct S {}
+  let s = S() as AnyObject
+  expectFalse(s is NSObject)
+}
+
+CastsTests.test("type(of:) should look through __SwiftValue")
+.xfail(.always("Known to be broken"))
+.code {
+  struct S {}
+  let s = S() as AnyObject
+  let t = "\(type(of: s))"
+  expectEqual(t, "S")  // Fails: currently says `__SwiftValue`
+}
+
 runAllTests()
