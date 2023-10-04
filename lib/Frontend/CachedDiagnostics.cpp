@@ -46,7 +46,7 @@ struct SerializedSourceLoc {
   unsigned FileID = 0;
   unsigned Offset = 0;
 
-  bool operator==(const SerializedSourceLoc &RHS) {
+  bool operator==(const SerializedSourceLoc &RHS) const {
     return FileID == RHS.FileID && Offset == RHS.Offset;
   }
 };

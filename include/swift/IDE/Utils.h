@@ -412,7 +412,7 @@ struct DeclaredDecl {
   bool ReferredAfterRange;
   DeclaredDecl(ValueDecl* VD) : VD(VD), ReferredAfterRange(false) {}
   DeclaredDecl(): DeclaredDecl(nullptr) {}
-  bool operator==(const DeclaredDecl& other);
+  bool operator==(const DeclaredDecl& other) const;
 };
 
 struct ReferencedDecl {

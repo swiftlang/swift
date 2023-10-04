@@ -536,8 +536,8 @@ public:
   ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
   ViewerIterator& operator++();
   ViewerIterator operator++(int) {ViewerIterator tmp(*this); operator++(); return tmp;}
-  bool operator==(const ViewerIterator& rhs) {return P==rhs.P;}
-  bool operator!=(const ViewerIterator& rhs) {return P!=rhs.P;}
+  bool operator==(const ViewerIterator& rhs) const {return P==rhs.P;}
+  bool operator!=(const ViewerIterator& rhs) const {return P!=rhs.P;}
   const NodePtr& operator*() {return *P;}
 };
 

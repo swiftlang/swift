@@ -1607,7 +1607,7 @@ bool SILInstructionResultArray::hasSameTypes(
 }
 
 bool SILInstructionResultArray::
-operator==(const SILInstructionResultArray &other) {
+operator==(const SILInstructionResultArray &other) const {
   if (size() != other.size())
     return false;
   for (auto i : indices(*this))

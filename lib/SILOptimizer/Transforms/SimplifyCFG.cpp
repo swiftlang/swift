@@ -1137,11 +1137,11 @@ struct TrampolineDest {
   TrampolineDest(TrampolineDest &&) = default;
   TrampolineDest &operator=(TrampolineDest &&) = default;
 
-  bool operator==(const TrampolineDest &rhs) {
+  bool operator==(const TrampolineDest &rhs) const {
     return destBB == rhs.destBB
            && newSourceBranchArgs == rhs.newSourceBranchArgs;
   }
-  bool operator!=(const TrampolineDest &rhs) {
+  bool operator!=(const TrampolineDest &rhs) const {
     return !(*this == rhs);
   }
 
