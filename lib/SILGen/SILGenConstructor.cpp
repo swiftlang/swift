@@ -470,6 +470,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
+        // TODO: This doesn't correctly take into account destructuring
+        // pattern bindings on `let`s, for example `let (a, b) = foo()`. In
+        // cases like that, we ought to evaluate the initializer expression once
+        // and then do a pattern assignment to the variables in the pattern.
+        // That case is currently forbidden with an "unsupported" error message
+        // in Sema.
+        
         assert(field->getTypeInContext()->getReferenceStorageReferent()->isEqual(
                    field->getParentExecutableInitializer()->getType()) &&
                "Initialization of field with mismatched type!");
@@ -534,6 +541,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       ++elti;
     } else {
       // Otherwise, use its initializer.
+      // TODO: This doesn't correctly take into account destructuring
+      // pattern bindings on `let`s, for example `let (a, b) = foo()`. In
+      // cases like that, we ought to evaluate the initializer expression once
+      // and then do a pattern assignment to the variables in the pattern.
+      // That case is currently forbidden with an "unsupported" error message
+      // in Sema.
+
       assert(field->isParentExecutabledInitialized());
       Expr *init = field->getParentExecutableInitializer();
 

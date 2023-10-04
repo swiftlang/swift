@@ -1,18 +1,18 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface -module-name StoredProperties %s
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -typecheck -emit-module-interface-path %t.swiftinterface -module-name StoredProperties %s
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name StoredProperties
 // RUN: %FileCheck %s < %t.swiftinterface --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t-resilient.swiftinterface -module-name StoredProperties -enable-library-evolution %s
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -typecheck -emit-module-interface-path %t-resilient.swiftinterface -module-name StoredProperties -enable-library-evolution %s
 // RUN: %target-swift-typecheck-module-from-interface(%t-resilient.swiftinterface) -module-name StoredProperties
 // RUN: %FileCheck %s < %t-resilient.swiftinterface --check-prefix RESILIENT --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -module-name StoredProperties %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name StoredProperties -emit-module-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o %t/Test.swiftmodule -module-name StoredProperties %t.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name StoredProperties -emit-module-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution -emit-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -enable-experimental-feature StructLetDestructuring -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name StoredProperties -enable-library-evolution -emit-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
 // COMMON: public struct HasStoredProperties {
 public struct HasStoredProperties {
