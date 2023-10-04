@@ -51,8 +51,10 @@
 
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/Test.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -99,38 +101,215 @@ static bool endLifetimeAtBoundary(SILValue value,
   return changed;
 }
 
-void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
-    SILValue value, const SSAPrunedLiveness &liveness,
-    llvm::function_ref<void(UnreachableInst *)> visit) {
+namespace {
+/// Implements OSSALifetimeCompletion::visitUnreachableLifetimeEnds.  Finds
+/// positions as near as possible to unreachables at which `value`'s lifetime
+/// is available.
+///
+/// Finding these positions is a three step process:
+/// 1) computeRegion: Forward CFG walk from non-lifetime-ending boundary to find
+///                   the dead-end region in which the value might be available.
+/// 2) propagateAvailability: Forward iterative dataflow within the region to
+///                           determine which blocks the value is available in.
+/// 3) visitAvailabilityBoundary: Visits the final blocks in the region where
+///                               the value is available--these are the blocks
+///                               without successors or with at least one
+///                               unavailable successor.
+class VisitUnreachableLifetimeEnds {
+  /// The value whose dead-end block lifetime ends are to be visited.
+  SILValue value;
+
+  /// The non-lifetime-ending boundary of `value`.
+  BasicBlockSet starts;
+  /// The region between (inclusive) the `starts` and the unreachable blocks.
+  BasicBlockSetVector region;
+
+public:
+  VisitUnreachableLifetimeEnds(SILValue value)
+      : value(value), starts(value->getFunction()),
+        region(value->getFunction()) {}
+
+  /// Region discovery.
+  ///
+  /// Forward CFG walk from non-lifetime-ending boundary to unreachable
+  /// instructions.
+  void computeRegion(const SSAPrunedLiveness &liveness);
+
+  struct Result;
+
+  /// Iterative dataflow to determine availability for each block in `region`.
+  void propagateAvailablity(Result &result);
+
+  /// Visit the terminators of blocks on the boundary of availability.
+  void
+  visitAvailabilityBoundary(Result const &result,
+                            llvm::function_ref<void(SILInstruction *)> visit);
+
+  struct State {
+    enum class Value : uint8_t {
+      Unavailable = 0,
+      Available,
+      Unknown,
+    };
+    Value value;
+
+    State(Value value) : value(value){};
+    operator Value() const { return value; }
+    State meet(State const other) const {
+      return *this < other ? *this : other;
+    }
+
+    static State Unavailable() { return {Value::Unavailable}; }
+    static State Available() { return {Value::Available}; }
+    static State Unknown() { return {Value::Unknown}; }
+  };
+
+  struct Result {
+    BasicBlockBitfield states;
+
+    Result(SILFunction *function) : states(function, 2) {}
+
+    State getState(SILBasicBlock *block) const {
+      return {(State::Value)states.get(block)};
+    }
+
+    void setState(SILBasicBlock *block, State newState) {
+      states.set(block, (unsigned)newState.value);
+    }
+
+    /// Propagate predecessors' state into `block`.
+    ///
+    /// states[block] ∧= state[predecessor_1] ∧ ... ∧ state[predecessor_n]
+    bool updateState(SILBasicBlock *block) {
+      auto oldState = getState(block);
+      auto state = oldState;
+      for (auto *predecessor : block->getPredecessorBlocks()) {
+        state = state.meet(getState(predecessor));
+      }
+      setState(block, state);
+      return state != oldState;
+    }
+  };
+};
+
+void VisitUnreachableLifetimeEnds::computeRegion(
+    const SSAPrunedLiveness &liveness) {
+  // Find the non-lifetime-ending boundary of `value`.
   PrunedLivenessBoundary boundary;
   liveness.computeBoundary(boundary);
 
-  BasicBlockWorklist deadEndBlocks(value->getFunction());
   for (SILInstruction *lastUser : boundary.lastUsers) {
     if (liveness.isInterestingUser(lastUser)
         != PrunedLiveness::LifetimeEndingUse) {
-      deadEndBlocks.push(lastUser->getParent());
+      region.insert(lastUser->getParent());
+      starts.insert(lastUser->getParent());
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
-    deadEndBlocks.push(edge);
+    region.insert(edge);
+    starts.insert(edge);
   }
   for (SILNode *deadDef : boundary.deadDefs) {
-    deadEndBlocks.push(deadDef->getParentBlock());
+    region.insert(deadDef->getParentBlock());
+    starts.insert(deadDef->getParentBlock());
   }
-  // Forward CFG walk from the non-lifetime-ending boundary to the unreachable
-  // instructions.
-  while (auto *block = deadEndBlocks.pop()) {
+
+  // Forward walk to find the region in which `value` might be available.
+  BasicBlockWorklist regionWorklist(value->getFunction());
+  // Start the forward walk from the non-lifetime-ending boundary.
+  for (auto *start : region) {
+    regionWorklist.push(start);
+  }
+  while (auto *block = regionWorklist.pop()) {
     if (block->succ_empty()) {
       // This assert will fail unless there are already lifetime-ending
       // instruction on all paths to normal function exits.
-      auto *unreachable = cast<UnreachableInst>(block->getTerminator());
-      visit(unreachable);
+      assert(isa<UnreachableInst>(block->getTerminator()));
     }
     for (auto *successor : block->getSuccessorBlocks()) {
-      deadEndBlocks.pushIfNotVisited(successor);
+      regionWorklist.pushIfNotVisited(successor);
+      region.insert(successor);
     }
   }
+}
+
+void VisitUnreachableLifetimeEnds::propagateAvailablity(Result &result) {
+  // Initialize per-block state.
+  // - all blocks outside of the region are ::Unavailable (automatically
+  //   initialized)
+  // - non-initial in-region blocks are Unknown
+  // - start blocks are ::Available
+  for (auto *block : region) {
+    if (starts.contains(block))
+      result.setState(block, State::Available());
+    else
+      result.setState(block, State::Unknown());
+  }
+
+  BasicBlockWorklist worklist(value->getFunction());
+
+  // Initialize worklist with all participating blocks.
+  //
+  // Only perform dataflow in the non-initial region.  Every initial block is
+  // by definition ::Available.
+  for (auto *block : region) {
+    if (starts.contains(block))
+      continue;
+    worklist.push(block);
+  }
+
+  // Iterate over blocks which are successors of blocks whose state changed.
+  while (auto *block = worklist.popAndForget()) {
+    // Only propagate availability in non-initial, in-region blocks.
+    if (!region.contains(block) || starts.contains(block))
+      continue;
+    auto changed = result.updateState(block);
+    if (!changed) {
+      continue;
+    }
+    // The state has changed.  Propagate the new state into successors.
+    for (auto *successor : block->getSuccessorBlocks()) {
+      worklist.pushIfNotVisited(successor);
+    }
+  }
+}
+
+void VisitUnreachableLifetimeEnds::visitAvailabilityBoundary(
+    Result const &result, llvm::function_ref<void(SILInstruction *)> visit) {
+  for (auto *block : region) {
+    auto available = result.getState(block) == State::Available();
+    if (!available) {
+      continue;
+    }
+    auto hasUnreachableSuccessor = [&]() {
+      // Use a lambda to avoid checking if possible.
+      return llvm::any_of(block->getSuccessorBlocks(), [&result](auto *block) {
+        return result.getState(block) == State::Unavailable();
+      });
+    };
+    if (!block->succ_empty() && !hasUnreachableSuccessor()) {
+      continue;
+    }
+    assert(hasUnreachableSuccessor() ||
+           isa<UnreachableInst>(block->getTerminator()));
+    visit(block->getTerminator());
+  }
+}
+} // end anonymous namespace
+
+void OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
+    SILValue value, const SSAPrunedLiveness &liveness,
+    llvm::function_ref<void(SILInstruction *)> visit) {
+
+  VisitUnreachableLifetimeEnds visitor(value);
+
+  visitor.computeRegion(liveness);
+
+  VisitUnreachableLifetimeEnds::Result result(value->getFunction());
+
+  visitor.propagateAvailablity(result);
+
+  visitor.visitAvailabilityBoundary(result, visit);
 }
 
 static bool endLifetimeAtUnreachableBlocks(SILValue value,
@@ -274,4 +453,3 @@ bool UnreachableLifetimeCompletion::completeLifetimes() {
   }
   return changed;
 }
-
