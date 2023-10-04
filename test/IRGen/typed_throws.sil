@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-irgen | %FileCheck %s --check-prefix=CHECK
 
+// REQUIRES: PTRSIZE=64
+
 sil_stage canonical
 
 import Builtin
