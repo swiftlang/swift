@@ -4371,6 +4371,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           requiredAccessScope.requiredAccessForDiagnostics();
         auto proto = conformance->getProtocol();
         auto protoAccessScope = proto->getFormalAccessScope(DC);
+        // Skip diagnostics of a witness of a package protocol that is inlinalbe
+        // referenced in an interface file.
+        if (proto->skipAccessCheckIfInterface(DC, requiredAccess, protoAccessScope))
+          return;
         bool protoForcesAccess =
           requiredAccessScope.hasEqualDeclContextWith(protoAccessScope);
         auto diagKind = protoForcesAccess
