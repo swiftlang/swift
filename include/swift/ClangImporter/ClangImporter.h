@@ -434,9 +434,10 @@ public:
 
   void verifyAllModules() override;
 
+  using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
       const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath);
+      StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(StringRef moduleName, StringRef moduleOutputPath,
@@ -444,6 +445,7 @@ public:
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(

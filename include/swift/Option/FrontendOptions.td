@@ -79,13 +79,13 @@ def backup_module_interface_path_EQ :
 
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
+def primary_file : Separate<["-"], "primary-file">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Produce output for this file, not the whole module">;
 
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
-
-def primary_file : Separate<["-"], "primary-file">,
-  HelpText<"Produce output for this file, not the whole module">;
 
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
   HelpText<"Emit textual output in a parseable format">;

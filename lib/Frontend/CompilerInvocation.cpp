@@ -1815,6 +1815,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
+  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
+    Opts.ScannerPrefixMapper.push_back(Opt.str());
+  }
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
