@@ -255,7 +255,7 @@ bb6:
 
 // CHECK: define{{.*}} swifttailcc void @apply_closure_async(ptr swiftasync %0, ptr %1, ptr %2)
 // CHECK: %swifterror = alloca %T12typed_throws1SV
-// CHECK: call { ptr, ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0p0s(i32 512, ptr %{{[0-9]+}}, ptr @__swift_async_resume_project_context, ptr @apply_closure_async.0, ptr %{{[0-9]+}}, ptr %{{[0-9]+}}, ptr %2, ptr %swifterror)
+// CHECK: call { ptr, ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0p0s(i32 512, ptr %{{[0-9]+}}, ptr @__swift_async_resume_project_context, ptr @apply_closure_async.0, ptr %{{[0-9]+}},{{( i64 [0-9]+,)?}} ptr %{{[0-9]+}}, ptr %2, ptr %swifterror)
 sil @apply_closure_async : $@convention(thin) @async (@guaranteed @callee_guaranteed @async () -> (@owned AnyObject, @error S)) -> () {
 entry(%0 : $@callee_guaranteed @async () ->(@owned AnyObject, @error S)):
   try_apply %0() : $@callee_guaranteed @async () -> (@owned AnyObject, @error S), normal bb4, error bb5
