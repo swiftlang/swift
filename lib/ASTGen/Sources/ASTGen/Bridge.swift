@@ -45,18 +45,18 @@ extension SyntaxProtocol {
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc { 
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
     return BridgedSourceLoc(at: self.positionAfterSkippingLeadingTrivia, in: astgen.base)
   }
 }
 
-extension Optional where Wrapped: SyntaxProtocol { 
+extension Optional where Wrapped: SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc { 
-    guard let self else { 
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+    guard let self else {
       return nil
     }
     
