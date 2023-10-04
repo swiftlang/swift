@@ -5,7 +5,7 @@ struct A<T> {
 let a = A<Double>("hello")
 let fooResult = a.foo(42)
 
-// RUN: %sourcekitd-test -req=cursor  -pos=5:9 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK0 %s
+// RUN: %sourcekitd-test -req=cursor -pos=5:9 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK0 %s
 // CHECK0: source.lang.swift.ref.struct (1:8-1:9)
 // CHECK0: A
 // CHECK0: s:20cursor_info_generics1AV
@@ -89,7 +89,7 @@ let fooResult = a.foo(42)
 // CHECK0: -----
 // CHECK0: SECONDARY SYMBOLS END
 
-// RUN: %sourcekitd-test -req=cursor  -pos=6:19 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK1 %s
+// RUN: %sourcekitd-test -req=cursor -pos=6:19 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: source.lang.swift.ref.function.method.instance (3:10-3:24)
 // CHECK1: foo(_:)
 // CHECK1: s:20cursor_info_generics1AV3fooyqd__qd__lF
@@ -135,7 +135,7 @@ struct B<T> {
 var d: B<String>.C<A<Int>, Double>.D<Array<Int>>
 let e = d.e
 
-// RUN: %sourcekitd-test -req=cursor  -pos=136:11 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK2 %s
+// RUN: %sourcekitd-test -req=cursor -pos=136:11 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK2 %s
 // CHECK2: source.lang.swift.ref.var.instance (131:17-131:18)
 // CHECK2: e
 // CHECK2: s:20cursor_info_generics1BV1CV1DV1eqd_0_vp
@@ -180,7 +180,7 @@ let e = d.e
 // CHECK2: -----
 // CHECK2: SECONDARY SYMBOLS END
 
-// RUN: %sourcekitd-test -req=cursor  -pos=135:38 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK3 %s
+// RUN: %sourcekitd-test -req=cursor -pos=135:38 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3: source.lang.swift.ref.struct ()
 // CHECK3: Array
 // CHECK3: s:Sa
@@ -198,7 +198,7 @@ let e = d.e
 // CHECK3: -----
 // CHECK3: SECONDARY SYMBOLS END
 
-// RUN: %sourcekitd-test -req=cursor  -pos=135:18 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK4 %s
+// RUN: %sourcekitd-test -req=cursor -pos=135:18 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK4 %s
 // CHECK4: source.lang.swift.ref.struct (128:12-128:13)
 // CHECK4: C
 // CHECK4: s:20cursor_info_generics1BV1CV
@@ -236,7 +236,7 @@ let e = d.e
 
 var withFuncAndTuple: B<Int>.C<() -> Array<Int>, (Double, Int)>
 
-// RUN: %sourcekitd-test -req=cursor  -pos=237:30 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s
+// RUN: %sourcekitd-test -req=cursor -pos=237:30 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s
 // CHECK5: source.lang.swift.ref.struct (128:12-128:13)
 // CHECK5: C
 // CHECK5: s:20cursor_info_generics1BV1CV
@@ -267,7 +267,7 @@ var withFuncAndTuple: B<Int>.C<() -> Array<Int>, (Double, Int)>
 typealias ArrayAlias = Array<Int>
 var withTypeAlias = A<ArrayAlias>()
 
-// RUN: %sourcekitd-test -req=cursor  -pos=268:21 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK6 %s
+// RUN: %sourcekitd-test -req=cursor -pos=268:21 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK6 %s
 // CHECK6: source.lang.swift.ref.struct (1:8-1:9)
 // CHECK6: A
 // CHECK6: s:20cursor_info_generics1AV
@@ -285,7 +285,7 @@ var withTypeAlias = A<ArrayAlias>()
 // CHECK6: -----
 // CHECK6: SECONDARY SYMBOLS END
 
-// RUN: %sourcekitd-test -req=cursor  -pos=268:23 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK7 %s
+// RUN: %sourcekitd-test -req=cursor -pos=268:23 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK7 %s
 // CHECK7: source.lang.swift.ref.typealias (267:11-267:21)
 // CHECK7: ArrayAlias
 // CHECK7: s:20cursor_info_generics10ArrayAliasa
@@ -317,7 +317,7 @@ struct G<T> : Prot {
     }
 }
 
-// RUN: %sourcekitd-test -req=cursor  -pos=314:25 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK8 %s
+// RUN: %sourcekitd-test -req=cursor -pos=314:25 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK8 %s
 // CHECK8: source.lang.swift.ref.struct (128:12-128:13)
 // CHECK8: C
 // CHECK8: s:20cursor_info_generics1BV1CV
@@ -345,7 +345,7 @@ struct G<T> : Prot {
 // CHECK8: -----
 // CHECK8: SECONDARY SYMBOLS END
 
-// RUN: %sourcekitd-test -req=cursor  -pos=315:26 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK9 %s
+// RUN: %sourcekitd-test -req=cursor -pos=315:26 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK9 %s
 // CHECK9: source.lang.swift.ref.var.instance (129:13-129:14)
 // CHECK9: t
 // CHECK9: s:20cursor_info_generics1BV1CV1tqd__vp
@@ -380,7 +380,7 @@ struct G<T> : Prot {
 typealias GenericArrayAlias<T> = Array<T>
 var IntArray = GenericArrayAlias([1, 2, 3])
 
-// RUN: %sourcekitd-test -req=cursor  -pos=381:16 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK10 %s
+// RUN: %sourcekitd-test -req=cursor -pos=381:16 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK10 %s
 // CHECK10: source.lang.swift.ref.typealias (380:11-380:28)
 // CHECK10: GenericArrayAlias
 // CHECK10: s:20cursor_info_generics17GenericArrayAliasa
@@ -416,7 +416,7 @@ var IntArray = GenericArrayAlias([1, 2, 3])
 
 var arr: GenericArrayAlias<Int>
 
-// RUN: %sourcekitd-test -req=cursor  -pos=417:10 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK11 %s
+// RUN: %sourcekitd-test -req=cursor -pos=417:10 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK11 %s
 // CHECK11: source.lang.swift.ref.typealias (380:11-380:28)
 // CHECK11: GenericArrayAlias
 // CHECK11: s:20cursor_info_generics17GenericArrayAliasa
@@ -433,3 +433,44 @@ var arr: GenericArrayAlias<Int>
 // CHECK-NEXT11: SUBSTITUTIONS END
 // CHECK11: -----
 // CHECK11: SECONDARY SYMBOLS END
+
+func fooWithPack<each T: Collection>(_ elem: repeat each T) -> (repeat each T) {
+    return (repeat each elem)
+}
+let res = fooWithPack([1, 2, 3], ["a", "b", "c"])
+
+// RUN: %sourcekitd-test -req=cursor -pos=440:11 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK12 %s
+// CHECK12: source.lang.swift.ref.function.free (437:6-437:60)
+// CHECK12: fooWithPack(_:)
+// CHECK12: s:20cursor_info_generics11fooWithPackyxxQp_txxQpRvzSlRzlF
+// CHECK12: SUBSTITUTIONS BEGIN
+// CHECK-NEXT12: each T -> Pack{[Int], [String]} (s:20cursor_info_generics11fooWithPackyxxQp_txxQpRvzSlRzlF1TL_xmfp -> )
+// CHECK-NEXT12: SUBSTITUTIONS END
+// CHECK12: SECONDARY SYMBOLS BEGIN
+// CHECK12: s:20cursor_info_generics11fooWithPackyxxQp_txxQpRvzSlRzlF1TL_xmfp
+// CHECK12: SUBSTITUTIONS BEGIN
+// CHECK-NEXT12: SUBSTITUTIONS END
+// CHECK12: -----
+// CHECK12: SECONDARY SYMBOLS END
+
+func freeFoo<T>(_ t: T) -> T { return t }
+var binExprRes = 1 + freeFoo(42) + 3
+
+// RUN: %sourcekitd-test -req=cursor -pos=457:22 -req-opts=expand_substitutions=true %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK13 %s
+// CHECK13: source.lang.swift.ref.function.free (456:6-456:24)
+// CHECK13: freeFoo(_:)
+// CHECK13: s:20cursor_info_generics7freeFooyxxlF
+// CHECK13: source.lang.swift
+// CHECK13: SUBSTITUTIONS BEGIN
+// CHECK-NEXT13: T -> Int (s:20cursor_info_generics7freeFooyxxlF1TL_xmfp -> s:Si)
+// CHECK-NEXT13: SUBSTITUTIONS END
+// CHECK13: SECONDARY SYMBOLS BEGIN
+// CHECK13: s:Si
+// CHECK13: SUBSTITUTIONS BEGIN
+// CHECK-NEXT13: SUBSTITUTIONS END
+// CHECK13: -----
+// CHECK13: s:20cursor_info_generics7freeFooyxxlF1TL_xmfp
+// CHECK13: SUBSTITUTIONS BEGIN
+// CHECK-NEXT13: SUBSTITUTIONS END
+// CHECK13: -----
+// CHECK13: SECONDARY SYMBOLS END
