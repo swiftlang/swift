@@ -1156,47 +1156,6 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   return initExpr;
 }
 
-ActorIsolation 
-DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
-                                      VarDecl *var) const {
-  if (var->isInvalid())
-    return ActorIsolation::forUnspecified();
-
-  Initializer *dc = nullptr;
-  Expr *initExpr = nullptr;
-
-  if (auto *pbd = var->getParentPatternBinding()) {
-    if (!var->isParentInitialized())
-      return ActorIsolation::forUnspecified();
-
-    auto i = pbd->getPatternEntryIndexForVarDecl(var);
-    dc = cast<Initializer>(pbd->getInitContext(i));
-    initExpr = var->getParentInitializer();
-  } else if (auto *param = dyn_cast<ParamDecl>(var)) {
-    // If this parameter corresponds to a stored property for a
-    // memberwise initializer, the default argument is the default
-    // initializer expression.
-    if (auto *property = param->getStoredProperty()) {
-      // FIXME: Force computation of property wrapper initializers.
-      if (auto *wrapped = property->getOriginalWrappedProperty())
-        (void)property->getPropertyWrapperInitializerInfo();
-
-      return property->getInitializerIsolation();
-    }
-
-    if (!param->hasDefaultExpr())
-      return ActorIsolation::forUnspecified();
-
-    dc = param->getDefaultArgumentInitContext();
-    initExpr = param->getTypeCheckedDefaultExpr();
-  }
-
-  if (!dc || !initExpr)
-    return ActorIsolation::forUnspecified();
-
-  return computeRequiredIsolation(dc, initExpr);
-}
-
 Type DefaultArgumentTypeRequest::evaluate(Evaluator &evaluator,
                                           ParamDecl *param) const {
   if (auto *expr = param->getTypeCheckedDefaultExpr()) {
@@ -2507,11 +2466,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             TypeChecker::contextualizeInitializer(initContext, init);
-            if (auto *singleVar = PBD->getSingleVar()) {
-              (void)singleVar->getInitializerIsolation();
-            } else {
-              computeRequiredIsolation(initContext, init);
-            }
+            (void)PBD->getInitializerIsolation(i);
             TypeChecker::checkInitializerEffects(initContext, init);
           }
         }

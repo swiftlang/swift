@@ -147,6 +147,11 @@ struct S2 {
   static var z: Int = requiresSomeGlobalActor()
 }
 
+struct S3 {
+  // expected-error@+1 {{default argument cannot be both main actor-isolated and global actor 'SomeGlobalActor'-isolated}}
+  var (x, y, z) = (requiresMainActor(), requiresSomeGlobalActor(), 10)
+}
+
 @MainActor
 func initializeFromMainActor() {
   _ = S1(required: 10)

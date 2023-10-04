@@ -2250,7 +2250,9 @@ public:
   void setInitializerSubsumed(unsigned i) {
     getMutablePatternList()[i].setInitializerSubsumed();
   }
-  
+
+  ActorIsolation getInitializerIsolation(unsigned i) const;
+
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
 
