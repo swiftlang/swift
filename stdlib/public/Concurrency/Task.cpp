@@ -1036,11 +1036,14 @@ getAsyncClosureEntryPointAndContextSize(void *function) {
 SWIFT_CC(swift)
 void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
                                   OpaqueValue *closureContext,
-                                  const Metadata *futureResultType) {
+                                  const Metadata *futureResultTypeMetadata) {
   // Ensure that we're currently in a synchronous context.
   if (swift_task_getCurrent()) {
     swift_Concurrency_fatalError(0, "called runInline within an async context");
   }
+
+  ResultTypeInfo futureResultType;
+  futureResultType.metadata = futureResultTypeMetadata;
 
   // Unpack the asynchronous function pointer.
   FutureAsyncSignature::FunctionType *closure;
@@ -1073,7 +1076,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
 
   auto taskAndContext = swift_task_create_common(
-      taskCreateFlags, &option, futureResultType,
+      taskCreateFlags, &option, futureResultType.metadata,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 
@@ -1084,8 +1087,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
 
   // Copy the result out to our caller.
   auto *futureResult = taskAndContext.Task->futureFragment()->getStoragePtr();
-  futureResultType->getValueWitnesses()->initializeWithCopy(
-      result, futureResult, futureResultType);
+  futureResultType.vw_initializeWithCopy(result, futureResult);
 
   // Destroy the task.
   taskAndContext.Task->~AsyncTask();
