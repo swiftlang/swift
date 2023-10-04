@@ -22,8 +22,7 @@
 // RUN:   -package-name TestPackage \
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -I %t \
@@ -37,8 +36,7 @@
 // RUN:   -package-name TestPackage \
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/MultiFiles.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/MultiFiles.private.swiftinterface \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -emit-private-module-interface-path %t/MultiFiles.private.swiftinterface
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles.private.swiftinterface) -I %t \

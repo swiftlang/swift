@@ -6,8 +6,7 @@
 // RUN: %target-swift-frontend -emit-module %t/ConformanceDefinition.swift -o %t -I %t
 
 /// Check diagnostics.
-// RUN: %target-swift-frontend -typecheck -verify %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN: %target-swift-frontend -typecheck -verify %t/Client.swift -I %t
 
 //--- ConformanceBaseTypes.swift
 public protocol Proto {}

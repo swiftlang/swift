@@ -11,8 +11,7 @@
 
 /// Check that all access levels are accepted, except for 'open'.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name package
+// RUN:   -package-name package -verify
 
 //--- PublicLib.swift
 //--- PackageLib.swift
