@@ -395,6 +395,9 @@ public:
   }
 };
 
+// An Enum with no cases has no values, requires no storage,
+// and cannot be instantiated.
+// It is an uninhabited type (similar to Never).
 class EmptyEnumTypeInfo: public EnumTypeInfo {
 public:
   EmptyEnumTypeInfo(const std::vector<FieldInfo> &Cases)
@@ -418,7 +421,9 @@ public:
   }
 };
 
-// Enum with a single non-payload case
+// Non-generic Enum with a single non-payload case
+// This enum requires no storage, since it only has
+// one possible value.
 class TrivialEnumTypeInfo: public EnumTypeInfo {
 public:
   TrivialEnumTypeInfo(EnumKind Kind, const std::vector<FieldInfo> &Cases)
@@ -430,8 +435,8 @@ public:
                    Kind, Cases) {
     // Exactly one case
     assert(Cases.size() == 1);
-    // The only case has no payload
-    assert(Cases[0].TR == 0);
+    // The only case has no payload, or a zero-sized payload
+    assert(Cases[0].TR == 0 || Cases[0].TI.getSize() == 0);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,

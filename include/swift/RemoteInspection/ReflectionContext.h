@@ -369,12 +369,13 @@ public:
       if (!CmdBuf)
         return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      // Look for any segment name starting with __DATA.
-      if (strncmp(CmdHdr->segname, "__DATA", 6) == 0) {
+      // Look for any segment name starting with __DATA or __AUTH.
+      if (strncmp(CmdHdr->segname, "__DATA", 6) == 0 ||
+          strncmp(CmdHdr->segname, "__AUTH", 6) == 0) {
         auto DataSegmentStart = Slide + CmdHdr->vmaddr;
         auto DataSegmentEnd = DataSegmentStart + CmdHdr->vmsize;
         assert(DataSegmentStart > ImageStart.getAddressData() &&
-               "invalid range for __DATA");
+               "invalid range for __DATA/__AUTH");
         dataRanges.push_back(std::make_tuple(RemoteAddress(DataSegmentStart),
                                              RemoteAddress(DataSegmentEnd)));
       }
