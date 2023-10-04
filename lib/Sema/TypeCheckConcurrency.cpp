@@ -2932,12 +2932,14 @@ namespace {
       // we're in an asynchronous context.
       if (requiresAsync && !getDeclContext()->isAsyncContext()) {
         if (calleeDecl) {
+          auto preconcurrency = getContextIsolation().preconcurrency() ||
+              calleeDecl->preconcurrency();
           ctx.Diags.diagnose(
               apply->getLoc(), diag::actor_isolated_call_decl,
               *unsatisfiedIsolation,
               calleeDecl,
               getContextIsolation())
-            .warnUntilSwiftVersionIf(getContextIsolation().preconcurrency(), 6);
+            .warnUntilSwiftVersionIf(preconcurrency, 6);
           calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
         } else {
           ctx.Diags.diagnose(
@@ -3573,7 +3575,8 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       isUnsafe = true;
 
     return ActorIsolation::forGlobalActor(
-        globalActorType->mapTypeOutOfContext(), isUnsafe);
+        globalActorType->mapTypeOutOfContext(), isUnsafe)
+        .withPreconcurrency(decl->preconcurrency());
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -5446,7 +5449,8 @@ static ActorIsolation getActorIsolationForReference(
               return closure->isIsolatedByPreconcurrency();
             })) {
       declIsolation = ActorIsolation::forGlobalActor(
-          declIsolation.getGlobalActor(), /*unsafe=*/false);
+          declIsolation.getGlobalActor(), /*unsafe=*/false)
+          .withPreconcurrency(declIsolation.preconcurrency());
     } else {
       declIsolation = ActorIsolation::forUnspecified();
     }
@@ -5713,7 +5717,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   Options options = llvm::None;
 
   // Note if the reference originates from a @preconcurrency-isolated context.
-  if (contextIsolation.preconcurrency())
+  if (contextIsolation.preconcurrency() || declIsolation.preconcurrency())
     options |= Flags::Preconcurrency;
 
   // If the declaration isn't asynchronous, promote to async.

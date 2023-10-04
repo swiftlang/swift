@@ -210,7 +210,7 @@ class MyButton : NXButton {
   }
 
   @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    onButtonPress() // expected-warning{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
   }
 
   func test() {
