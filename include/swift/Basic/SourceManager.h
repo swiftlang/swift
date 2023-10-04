@@ -21,6 +21,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/SourceMgr.h"
 #include <map>
+#include <vector>
 
 namespace swift {
 
@@ -133,6 +134,28 @@ private:
 
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
+
+  /// A cache that improves the speed of location -> buffer lookups.
+  struct BufferLocCache {
+    /// The set of memory buffers IDs, sorted by the start of their source range.
+    std::vector<unsigned> sortedBuffers;
+
+    /// The number of buffers that were present when sortedBuffers was formed.
+    ///
+    /// There can be multiple buffers that refer to the same source range,
+    /// and we remove duplicates as part of the processing of forming the
+    /// vector of sorted buffers. This number is the number of original buffers,
+    /// used to determine when the sorted buffers are out of date.
+    unsigned numBuffersOriginal = 0;
+
+    /// The last buffer we looked in. This acts as a one-element MRU cache for
+    /// lookups based on source locations.
+    llvm::Optional<unsigned> lastBufferID;
+  };
+
+  /// The cache that's used to quickly map a source location to a particular
+  /// buffer ID.
+  mutable BufferLocCache LocCache;
 
   llvm::Optional<unsigned> findBufferContainingLocInternal(SourceLoc Loc) const;
 
