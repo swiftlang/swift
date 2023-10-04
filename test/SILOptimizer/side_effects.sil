@@ -1182,3 +1182,16 @@ bb0(%0 : $*T, %1 : $*T):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_explicit_copy_addr
+// CHECK-NEXT:  [%0: read v**, copy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @test_explicit_copy_addr : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  explicit_copy_addr %0 to [init] %1 : $*T
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %r = tuple()
+  return %r : $()
+}
