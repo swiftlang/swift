@@ -998,13 +998,6 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
 
   SourceFile *File = D->getDeclContext()->getParentSourceFile();
   if (auto importDecl = dyn_cast<ImportDecl>(D)) {
-    if (!D->getASTContext().LangOpts.hasFeature(Feature::AccessLevelOnImport) &&
-        !D->getASTContext().LangOpts.hasFeature(Feature::InternalImports) &&
-        File && File->Kind != SourceFileKind::Interface) {
-      diagnoseAndRemoveAttr(attr, diag::access_level_on_import_not_enabled);
-      return true;
-    }
-
     if (attr->getAccess() == AccessLevel::Open) {
       diagnoseAndRemoveAttr(attr, diag::access_level_on_import_unsupported,
                             attr);
