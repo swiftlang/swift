@@ -372,14 +372,14 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit a JSON file containing information about what modules were loaded">;
 def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
@@ -391,7 +391,7 @@ def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-p
          SupplementaryOutput, CacheInvariant]>,
   Alias<emit_loaded_module_trace_path>;
 def emit_cross_import_remarks : Flag<["-"], "Rcross-import">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, CacheInvariant]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit a remark if a cross-import of a module is triggered.">;
 
 def remark_loading_module : Flag<["-"], "Rmodule-loading">,
@@ -418,7 +418,7 @@ def remark_skip_explicit_interface_build : Flag<["-"], "Rskip-explicit-interface
 
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>;
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;
 def emit_tbd_path : Separate<["-"], "emit-tbd-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
@@ -433,7 +433,7 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
   HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
   Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
@@ -555,7 +555,7 @@ def export_as : Separate<["-"], "export-as">,
   HelpText<"Module name to use when referenced in clients module interfaces">;
 
 def emit_module : Flag<["-"], "emit-module">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
@@ -569,7 +569,7 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
 
 def emit_module_summary :
   Flag<["-"], "emit-module-summary">,
-  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Output module summary file">;
 def emit_module_summary_path :
   Separate<["-"], "emit-module-summary-path">,
@@ -579,7 +579,7 @@ def emit_module_summary_path :
 
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
-  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Output module interface file">;
 def emit_module_interface_path :
   Separate<["-"], "emit-module-interface-path">,
@@ -616,7 +616,7 @@ def emit_module_source_info_path :
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
-  Flags<[NoInteractiveOption, HelpHidden, SupplementaryOutput, CacheInvariant]>;
+  Flags<[NoInteractiveOption, HelpHidden, SupplementaryOutput]>;
 def emit_parseable_module_interface_path :
   Separate<["-"], "emit-parseable-module-interface-path">,
   Alias<emit_module_interface_path>,
@@ -644,7 +644,7 @@ def emit_api_descriptor_path :
   HelpText<"Output a JSON file describing the module's API to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
-  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
@@ -1136,7 +1136,7 @@ def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 class ModeOpt : Group<modes_Group>;
 
 // Output Modes
-let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, CacheInvariant] in {
+let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild] in {
 
 def emit_object : Flag<["-"], "emit-object">,
   HelpText<"Emit object file(s) (-c)">, ModeOpt;
@@ -1161,7 +1161,7 @@ def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
 def emit_pcm : Flag<["-"], "emit-pcm">,
   HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt;
 
-} // end let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild, CacheInvariant]
+} // end let Flags = [FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]
 
 def emit_executable : Flag<["-"], "emit-executable">,
   HelpText<"Emit a linked executable">, ModeOpt,

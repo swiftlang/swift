@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -34,12 +35,12 @@
 #include "swift/DependencyScan/StringUtils.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
+#include "swift/Frontend/CompileJobCacheResult.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
-#include "clang/Frontend/CompileJobCacheResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
@@ -52,6 +53,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/YAMLParser.h"
@@ -167,21 +169,17 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
     return base.takeError();
 
   std::string InputPath;
-  file_types::ID OutputType = file_types::ID::TY_INVALID;
-  if (auto *dep = depInfo.getAsClangModule()) {
-    OutputType = file_types::ID::TY_ClangModuleFile;
+  if (auto *dep = depInfo.getAsClangModule())
     InputPath = dep->moduleMapFile;
-  } else if (auto *dep = depInfo.getAsSwiftInterfaceModule()) {
-    OutputType = file_types::ID::TY_SwiftModuleFile;
+  else if (auto *dep = depInfo.getAsSwiftInterfaceModule())
     InputPath = dep->swiftInterfaceFile;
-  } else
+  else
     llvm_unreachable("Unhandled dependency kind");
 
   if (cache.getScanService().hasPathMapping())
     InputPath = cache.getScanService().remapPath(InputPath);
 
-  auto key =
-      createCompileJobCacheKeyForOutput(CAS, *base, InputPath, OutputType);
+  auto key = createCompileJobCacheKeyForOutput(CAS, *base, InputPath);
   if (!key)
     return key.takeError();
 
@@ -398,9 +396,8 @@ static llvm::Error resolveExplicitModuleInputs(
       assert(*Ref && "Binary module should be loaded into CASFS already");
       dependencyInfoCopy.updateModuleCacheKey(CAS.getID(**Ref).toString());
 
-      clang::cas::CompileJobCacheResult::Builder Builder;
-      Builder.addOutput(
-          clang::cas::CompileJobCacheResult::OutputKind::MainOutput, **Ref);
+      swift::cas::CompileJobCacheResult::Builder Builder;
+      Builder.addOutput(file_types::ID::TY_SwiftModuleFile, **Ref);
       auto Result = Builder.build(CAS);
       if (!Result)
         return Result.takeError();

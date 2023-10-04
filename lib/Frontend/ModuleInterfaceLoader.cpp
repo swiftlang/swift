@@ -2384,7 +2384,8 @@ struct ExplicitCASModuleLoader::Implementation {
         if (!Deps.second.moduleCacheKey)
           return nullptr;
         return loadCachedCompileResultFromCacheKey(
-            CAS, Cache, Diags, *Deps.second.moduleCacheKey, Path);
+            CAS, Cache, Diags, *Deps.second.moduleCacheKey,
+            file_types::ID::TY_SwiftModuleFile, Path);
       }
     }
     return nullptr;
@@ -2439,8 +2440,9 @@ bool ExplicitCASModuleLoader::findModule(
   // FIXME: the loaded module buffer doesn't set an identifier so it
   // is not tracked in dependency tracker, which doesn't handle modules
   // that are not located on disk.
-  auto moduleBuf = loadCachedCompileResultFromCacheKey(Impl.CAS, Impl.Cache,
-                                                       Ctx.Diags, moduleCASID);
+  auto moduleBuf = loadCachedCompileResultFromCacheKey(
+      Impl.CAS, Impl.Cache, Ctx.Diags, moduleCASID,
+      file_types::ID::TY_SwiftModuleFile);
   if (!moduleBuf) {
     // We cannot read the module content, diagnose.
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_explicit_module_file,

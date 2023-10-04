@@ -494,7 +494,7 @@ ERROR(error_caching_no_cas_fs, none,
 ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
-REMARK(output_cache_miss, none, "cache miss output file '%0': key '%1'", (StringRef, StringRef))
+REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
 ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
