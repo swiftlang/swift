@@ -65,7 +65,7 @@ extension BridgedSourceLoc {
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     if let start = buffer.baseAddress,
-      position.utf8Offset >= 0 && position.utf8Offset < buffer.count {
+      position.utf8Offset >= 0 && position.utf8Offset <= buffer.count {
       self = SourceLoc_advanced(BridgedSourceLoc(raw: start), SwiftInt(position.utf8Offset))
     } else {
       self = nil
