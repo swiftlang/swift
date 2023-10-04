@@ -1181,3 +1181,24 @@ func f_56854() {
     // expected-note@-1 2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
   }
 }
+
+// rdar://93103421 - Key path type inference doesn't work when the context is an existential type with a key-path superclass
+extension KeyPath : P {
+  var member: String { "" }
+}
+
+func test_keypath_inference_from_existentials() {
+  struct A<T> : P {
+    var member: String { "a" }
+    var other: T { fatalError() }
+  }
+
+  func test<T, U>(_: any P & KeyPath<A<T>, U>, _: T) {
+  }
+
+  let _: any P & KeyPath<A<Int>, String> = \.member   // Ok
+  let _: (any P & KeyPath<A<Int>, String>) = \.member // Ok
+
+  test(\.other, 42)  // Ok
+  test(\.member, "") // Ok
+}
