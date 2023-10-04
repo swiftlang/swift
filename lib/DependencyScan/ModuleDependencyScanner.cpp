@@ -187,14 +187,16 @@ ModuleDependencyScanningWorker::scanFilesystemForModuleDependency(
           moduleName, cache.getModuleOutputPath(),
           cache.getScanService().getCachingFS(),
           cache.getAlreadySeenClangModules(), clangScanningTool,
-          *ScanningASTDelegate, isTestableImport);
+          *ScanningASTDelegate, cache.getScanService().getPrefixMapper(),
+          isTestableImport);
 
   if (moduleDependencies.empty())
     moduleDependencies = clangScannerModuleLoader->getModuleDependencies(
         moduleName, cache.getModuleOutputPath(),
         cache.getScanService().getCachingFS(),
         cache.getAlreadySeenClangModules(), clangScanningTool,
-        *ScanningASTDelegate, isTestableImport);
+        *ScanningASTDelegate, cache.getScanService().getPrefixMapper(),
+        isTestableImport);
 
   return moduleDependencies;
 }
@@ -205,7 +207,8 @@ ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
   return swiftScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
       cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
-      clangScanningTool, *ScanningASTDelegate, false);
+      clangScanningTool, *ScanningASTDelegate,
+      cache.getScanService().getPrefixMapper(), false);
 }
 
 ModuleDependencyVector
@@ -214,7 +217,8 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   return clangScannerModuleLoader->getModuleDependencies(
       moduleName, cache.getModuleOutputPath(),
       cache.getScanService().getCachingFS(), cache.getAlreadySeenClangModules(),
-      clangScanningTool, *ScanningASTDelegate, false);
+      clangScanningTool, *ScanningASTDelegate,
+      cache.getScanService().getPrefixMapper(), false);
 }
 
 template <typename Function, typename... Args>

@@ -159,6 +159,9 @@ public:
   /// Emit a .casid file next to the object file if CAS Backend is used.
   bool EmitCASIDFile = false;
 
+  /// CacheReplay PrefixMap.
+  std::vector<std::string> CacheReplayPrefixMap;
+
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;

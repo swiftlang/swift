@@ -97,7 +97,7 @@ func testCalls(x: X) {
     })
 
   onMainActorAlways() // okay with minimal/targeted concurrency. Not ok with complete.
-  // expected-complete-sns-error @-1 {{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
+  // expected-complete-sns-warning @-1 {{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
   // Ok with minimal/targeted concurrency, Not ok with complete.
   let _: () -> Void = onMainActorAlways // expected-complete-sns-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}

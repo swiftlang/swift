@@ -35,6 +35,7 @@
 
 namespace llvm {
 class FileCollectorBase;
+class TreePathPrefixMapper;
 namespace vfs {
 class OutputBackend;
 }
@@ -346,6 +347,7 @@ public:
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
 };
 
