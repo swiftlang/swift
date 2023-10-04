@@ -3488,6 +3488,26 @@ static bool usesFeatureRawLayout(Decl *decl) {
   return decl->getAttrs().hasAttribute<RawLayoutAttr>();
 }
 
+static bool usesFeatureStructLetDestructuring(Decl *decl) {
+  auto sd = dyn_cast<StructDecl>(decl);
+  if (!sd)
+    return false;
+    
+  for (auto member : sd->getStoredProperties()) {
+    if (!member->isLet())
+      continue;
+    
+    auto init = member->getParentPattern();
+    if (!init)
+      continue;
+      
+    if (!init->getSingleVar())
+      return true;
+  }
+  
+  return false;
+}
+
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();

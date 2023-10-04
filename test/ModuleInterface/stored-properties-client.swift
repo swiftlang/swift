@@ -4,12 +4,12 @@
 
 // 1. Build ../stored-properties.swift to a dylib and emit its interface in %t
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -enable-experimental-feature StructLetDestructuring -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5
 // RUN: %target-swift-typecheck-module-from-interface(%t/StoredProperties.swiftinterface) -module-name StoredProperties
 
 // 2. Build this file and link with StoredProperties
 
-// RUN: %target-build-swift %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
+// RUN: %target-build-swift -enable-experimental-feature StructLetDestructuring %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
 
 // 3. Codesign and run this, and ensure it exits successfully.
 
@@ -20,9 +20,9 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5 -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(StoredProperties)) -enable-experimental-feature StructLetDestructuring -emit-module-interface-path %t/StoredProperties.swiftinterface %S/stored-properties.swift -module-name StoredProperties -swift-version 5 -enable-library-evolution
 
-// RUN: %target-build-swift %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
+// RUN: %target-build-swift -enable-experimental-feature StructLetDestructuring %s -I %t -L %t -lStoredProperties -o %t/stored-properties-client %target-rpath(%t)
 // RUN: %target-codesign %t/stored-properties-client %t/%target-library-name(StoredProperties)
 // RUN: %target-run %t/stored-properties-client %t/%target-library-name(StoredProperties)
 

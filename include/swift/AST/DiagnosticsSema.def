@@ -2175,6 +2175,9 @@ ERROR(pattern_binds_no_variables,none,
 ERROR(variable_bound_by_no_pattern,none,
       "variable %0 is not bound by any pattern",
       (const VarDecl *))
+ERROR(destructuring_let_struct_stored_property_unsupported,none,
+      "binding multiple 'let' stored properties from a single initializer expression in a struct is unsupported",
+      ())
 
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",

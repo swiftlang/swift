@@ -242,6 +242,9 @@ EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
 /// Enables typed throws.
 EXPERIMENTAL_FEATURE(TypedThrows, true)
 
+/// Allow destructuring stored `let` bindings in structs.
+EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
