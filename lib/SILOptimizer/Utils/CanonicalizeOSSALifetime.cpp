@@ -261,7 +261,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
 
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       getCurrentDef(), completeLiveness, [&](auto *unreachable) {
-        recordConsumingUser(unreachable);
+        recordUnreachableLifetimeEnd(unreachable);
         if (auto *previous = unreachable->getPreviousInstruction()) {
           if (liveness->isInterestingUser(previous) ==
               PrunedLiveness::IsInterestingUser::NonUser) {
@@ -923,8 +923,11 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
                                            InstModCallbacks &callbacks) {
   // OSSALifetimeCompletion: This conditional clause can be deleted with
   // complete lifetimes.
-  if (isa<UnreachableInst>(nextInstruction)) {
-    // Don't create a destroy_value if the next instruction is an unreachable.
+  if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
+    // Don't create a destroy_value if the next instruction is an unreachable
+    // (or a terminator on the availability boundary of the dead-end region
+    // starting from the non-lifetime-ending boundary of `currentDef`).
+    //
     // If there was a destroy here already, it would be reused.  Avoids
     // creating an explicit destroy of a value which might have an unclosed
     // borrow scope.  Doing so would result in

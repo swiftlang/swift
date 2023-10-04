@@ -136,6 +136,10 @@ class CanonicalOSSAConsumeInfo final {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
+  /// The instructions on the availability boundary of the dead-end region where
+  /// this value is not consumed.
+  SmallPtrSet<SILInstruction *, 4> unreachableLifetimeEnds;
+
 public:
   void clear() { finalBlockConsumes.clear(); }
 
@@ -159,6 +163,14 @@ public:
       return true;
     }
     return false;
+  }
+
+  void recordUnreachableLifetimeEnd(SILInstruction *inst) {
+    unreachableLifetimeEnds.insert(inst);
+  }
+
+  bool isUnreachableLifetimeEnd(SILInstruction *inst) {
+    return unreachableLifetimeEnds.contains(inst);
   }
 
   CanonicalOSSAConsumeInfo() {}
@@ -408,6 +420,10 @@ private:
   void recordConsumingUse(Operand *use) { recordConsumingUser(use->getUser()); }
   void recordConsumingUser(SILInstruction *user) {
     consumingBlocks.insert(user->getParent());
+  }
+  void recordUnreachableLifetimeEnd(SILInstruction *user) {
+    recordConsumingUser(user);
+    consumes.recordUnreachableLifetimeEnd(user);
   }
   bool computeCanonicalLiveness();
 
