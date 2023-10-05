@@ -1850,7 +1850,7 @@ bool ClangImporter::emitPrecompiledModule(
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
-  auto LangOpts = invocation.getLangOpts();
+  auto &LangOpts = invocation.getLangOpts();
   LangOpts.setCompilingModule(clang::LangOptions::CMK_ModuleMap);
   LangOpts.ModuleName = moduleName.str();
   LangOpts.CurrentModule = LangOpts.ModuleName;
