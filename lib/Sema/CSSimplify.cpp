@@ -2978,7 +2978,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   Type neverType = getASTContext().getNeverType();
   Type thrownError1 = func1->getEffectiveThrownInterfaceType().value_or(neverType);
   Type thrownError2 = func2->getEffectiveThrownInterfaceType().value_or(neverType);
-  if (!thrownError1->isEqual(thrownError2)) {
+  if (thrownError1 && thrownError2 && !thrownError1->isEqual(thrownError2)) {
     auto thrownErrorKind1 = getThrownErrorKind(thrownError1);
     auto thrownErrorKind2 = getThrownErrorKind(thrownError2);
 
