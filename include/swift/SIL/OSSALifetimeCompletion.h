@@ -87,7 +87,7 @@ public:
 
   static void visitUnreachableLifetimeEnds(
       SILValue value, const SSAPrunedLiveness &liveness,
-      llvm::function_ref<void(UnreachableInst *)> visit);
+      llvm::function_ref<void(SILInstruction *)> visit);
 
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, bool forceBoundaryCompletion);
