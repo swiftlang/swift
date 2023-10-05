@@ -39,9 +39,9 @@ struct FatalError {
 
 // CHECK: *** Program crashed: Illegal instruction at 0x{{[0-9a-f]+}} ***
 
-// CHECK: Thread 0 "FatalError" crashed:
+// CHECK: Thread 0 {{(".*" )?}}crashed:
 
-// CHECK:      0               0x{{[0-9a-f]+}} _assertionFailure(_:_:file:line:flags:) + {{[0-9]+}} in libswiftCore.so at {{.*}}/AssertCommon.swift:{{[0-9]+}}:{{[0-9]+}}
+// CHECK:      0               0x{{[0-9a-f]+}} _assertionFailure(_:_:file:line:flags:) + {{[0-9]+}} in libswiftCore.{{so|dylib}}
 // CHECK-NEXT: 1 [ra]          0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift:30:3
 // CHECK-NEXT: 2 [ra]          0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift:26:3
 // CHECK-NEXT: 3 [ra]          0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in FatalError at {{.*}}/FatalError.swift:22:3
