@@ -809,6 +809,36 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
                   Instance.getOutputBackend(), tbdOpts);
 }
 
+static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
+                               llvm::vfs::OutputBackend &Backend,
+                               bool PrettyPrinted) {
+  return withOutputPath(M->getDiags(), Backend, OutputPath,
+                        [&](raw_ostream &OS) -> bool {
+                          writeAPIJSONFile(M, OS, PrettyPrinted);
+                          return false;
+                        });
+}
+
+static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
+  const auto &Invocation = Instance.getInvocation();
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasAPIDescriptorOutputPath())
+    return false;
+
+  if (!frontendOpts.InputsAndOutputs.isWholeModule()) {
+    Instance.getDiags().diagnose(
+        SourceLoc(), diag::api_descriptor_only_supported_in_whole_module);
+    return false;
+  }
+
+  const std::string &APIDescriptorPath =
+      Invocation.getAPIDescriptorPathForWholeModule();
+
+  // FIXME: Need a frontend flag for pretty printing
+  return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
+                            Instance.getOutputBackend(), true);
+}
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -973,6 +1003,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   {
     hadAnyError |= writeTBDIfNeeded(Instance);
+  }
+
+  {
+    hadAnyError |= writeAPIDescriptorIfNeeded(Instance);
   }
 
   {

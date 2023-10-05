@@ -626,7 +626,19 @@ def emit_const_values :
 def emit_const_values_path : Separate<["-"], "emit-const-values-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
-  MetaVarName<"<path>">, HelpText<"Emit the extracted compile-time known values to <path>">;
+  MetaVarName<"<path>">,
+  HelpText<"Emit the extracted compile-time known values to <path>">;
+
+def emit_api_descriptor :
+  Flag<["-"], "emit-api-descriptor">,
+  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  HelpText<"Output a JSON file describing the module's API">;
+def emit_api_descriptor_path :
+  Separate<["-"], "emit-api-descriptor-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output a JSON file describing the module's API to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
