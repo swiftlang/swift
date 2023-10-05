@@ -664,8 +664,13 @@ class APIGenRecorder final : public APIRecorder {
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
-    const auto &MainFile = module->getMainFile(FileUnitKind::SerializedAST);
-    moduleLoc = apigen::APILoc(MainFile.getModuleDefiningPath().str(), 0, 0);
+    // If we're working with a serialized module, make the default location
+    // for symbols the path to the binary module.
+    if (FileUnit *MainFile = module->getFiles().front()) {
+      if (MainFile->getKind() == FileUnitKind::SerializedAST)
+        defaultLoc =
+            apigen::APILoc(MainFile->getModuleDefiningPath().str(), 0, 0);
+    }
   }
   ~APIGenRecorder() {}
 
@@ -682,7 +687,7 @@ public:
         access = apigen::APIAccess::Private;
     }
 
-    api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
+    api.addSymbol(symbol, getAPILocForDecl(decl), apigen::APILinkage::Exported,
                   apigen::APIFlags::None, access, availability);
   }
 
@@ -700,12 +705,12 @@ public:
     apigen::APIAvailability availability;
     bool isInstanceMethod = true;
     auto access = apigen::APIAccess::Public;
-    if (method.hasDecl()) {
-      availability = getAvailability(method.getDecl());
-      if (method.getDecl()->getDescriptiveKind() ==
-          DescriptiveDeclKind::ClassMethod)
+    auto decl = method.hasDecl() ? method.getDecl() : nullptr;
+    if (decl) {
+      availability = getAvailability(decl);
+      if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
-      if (isSPI(method.getDecl()))
+      if (isSPI(decl))
         access = apigen::APIAccess::Private;
     }
 
@@ -716,11 +721,27 @@ public:
       record = addOrGetObjCCategory(ext);
 
     if (record)
-      api.addObjCMethod(record, name, moduleLoc, access, isInstanceMethod,
-                        false, availability);
+      api.addObjCMethod(record, name, getAPILocForDecl(decl), access,
+                        isInstanceMethod, false, availability);
   }
 
 private:
+  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+    if (!decl)
+      return defaultLoc;
+
+    SourceLoc loc = decl->getLoc();
+    if (!loc.isValid())
+      return defaultLoc;
+
+    auto &SM = decl->getASTContext().SourceMgr;
+    unsigned line, col;
+    std::tie(line, col) = SM.getPresumedLineAndColumnForLoc(loc);
+    auto displayName = SM.getDisplayNameForLoc(loc);
+
+    return apigen::APILoc(std::string(displayName), line, col);
+  }
+
   /// Follow the naming schema that IRGen uses for Categories (see
   /// ClassDataBuilder).
   using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
@@ -776,8 +797,8 @@ private:
         decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
             ? apigen::APILinkage::Exported
             : apigen::APILinkage::Internal;
-    auto cls = api.addObjCClass(name, linkage, moduleLoc, access, availability,
-                                superCls);
+    auto cls = api.addObjCClass(name, linkage, getAPILocForDecl(decl), access,
+                                availability, superCls);
     classMap.try_emplace(decl, cls);
     return cls;
   }
@@ -809,15 +830,16 @@ private:
         decl->getMaxAccessLevel() == AccessLevel::Public
             ? apigen::APILinkage::Exported
             : apigen::APILinkage::Internal;
-    auto category = api.addObjCCategory(nameBuffer, linkage, moduleLoc, access,
-                                        availability, interface);
+    auto category =
+        api.addObjCCategory(nameBuffer, linkage, getAPILocForDecl(decl), access,
+                            availability, interface);
     categoryMap.try_emplace(decl, category);
     return category;
   }
 
   apigen::API &api;
   ModuleDecl *module;
-  apigen::APILoc moduleLoc;
+  apigen::APILoc defaultLoc;
 
   llvm::DenseMap<const ClassDecl*, apigen::ObjCInterfaceRecord*> classMap;
   llvm::DenseMap<const ExtensionDecl *, apigen::ObjCCategoryRecord *>
