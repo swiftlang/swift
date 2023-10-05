@@ -17,6 +17,8 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Nullability.h"
 
+#include <stddef.h>
+
 // NOTE: DO NOT #include any stdlib headers here. e.g. <stdint.h>. Those are
 // part of "Darwin"/"Glibc" module, so when a Swift file imports this header,
 // it causes importing the "Darwin"/"Glibc" overlay module. That violates
@@ -33,12 +35,12 @@ SWIFT_BEGIN_ASSUME_NONNULL
 
 typedef struct {
   const unsigned char *_Nullable data;
-  SwiftInt length;
+  size_t length;
 } BridgedString;
 
 typedef struct {
   const void *_Nullable data;
-  SwiftInt numElements;
+  size_t numElements;
 } BridgedArrayRef;
 
 typedef struct BridgedASTContext {
@@ -64,7 +66,7 @@ typedef struct BridgedIdentifier {
 
 typedef struct {
   void *start;
-  SwiftInt byteLength;
+  size_t byteLength;
 } BridgedCharSourceRange;
 
 typedef struct {
@@ -78,7 +80,7 @@ typedef struct {
   BridgedSourceLoc TrailingCommaLoc;
 } BridgedTupleTypeElement;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
   /// A type bound T : P, where T is a type that depends on a generic
   /// parameter and P is some type that should bound T, either as a concrete
   /// supertype or a protocol to which T must conform.
@@ -105,7 +107,7 @@ typedef struct {
 } BridgedRequirementRepr;
 
 /// Diagnostic severity when reporting diagnostics.
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
   BridgedFatalError,
   BridgedError,
   BridgedWarning,
@@ -121,7 +123,7 @@ typedef struct BridgedDiagnosticEngine {
   void *raw;
 } BridgedDiagnosticEngine;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// An expanded macro.
   BridgedExpandedMacro = 0,
   /// An external macro, spelled with either the old spelling (Module.Type)
@@ -132,7 +134,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : SwiftInt
 } BridgedMacroDefinitionKind;
 
 /// Bridged parameter specifiers
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size_t {
   BridgedAttributedTypeSpecifierInOut,
   BridgedAttributedTypeSpecifierBorrowing,
   BridgedAttributedTypeSpecifierConsuming,
@@ -143,7 +145,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : Swif
 } BridgedAttributedTypeSpecifier;
 
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
-typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_autoclosure,
   BridgedTypeAttrKind_convention,
   BridgedTypeAttrKind_noescape,
@@ -195,7 +197,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : SwiftInt {
   BridgedTypeAttrKind_Count
 } BridgedTypeAttrKind;
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : SwiftInt {
+typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
   ASTNodeKindExpr,
   ASTNodeKindStmt,
   ASTNodeKindDecl
@@ -325,7 +327,7 @@ void *IfStmt_create(BridgedASTContext cContext, BridgedSourceLoc cIfLoc,
 void *BraceStmt_create(BridgedASTContext cContext, BridgedSourceLoc cLBLoc,
                        BridgedArrayRef elements, BridgedSourceLoc cRBLoc);
 
-BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len);
+BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, size_t len);
 
 SWIFT_NAME("ParamDecl_create(astContext:declContext:specifierLoc:firstName:"
            "firstNameLoc:secondName:secondNameLoc:type:defaultValue:)")
@@ -545,7 +547,7 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedIdentifier cName,
                                   BridgedSourceLoc cNameLoc,
                                   void *_Nullable opaqueInheritedType,
-                                  SwiftInt index);
+                                  size_t index);
 
 SWIFT_NAME(
     "TrailingWhereClause_create(astContext:whereKeywordLoc:requirements:)")
