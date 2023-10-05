@@ -1596,6 +1596,9 @@ public:
   size_t size() const { return Entries.size(); }
   IntRange<size_t> const getIndices() { return indices(Entries); }
 
+  /// Returns the ASTContext associated with the wrapped declaration.
+  ASTContext &getASTContext() const;
+
   /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
   /// given index.
   TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
@@ -1615,6 +1618,10 @@ public:
   /// NOTE: The `Type` associated with the entry may not be resolved yet.
   const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
 
+  // Retrieve the location of the colon character introducing the inheritance
+  // clause.
+  SourceLoc getColonLoc() const;
+
   /// Returns the source location of the beginning of the inheritance clause.
   SourceLoc getStartLoc() const {
     return getEntries().front().getSourceRange().Start;
@@ -1624,6 +1631,10 @@ public:
   SourceLoc getEndLoc() const {
     return getEntries().back().getSourceRange().End;
   }
+
+  /// Compute the SourceRange to be used when removing entry \c i from the
+  /// inheritance clause. Accounts for commas and colons as-needed.
+  SourceRange getRemovalRange(unsigned i) const;
 };
 
 /// ExtensionDecl - This represents a type extension containing methods

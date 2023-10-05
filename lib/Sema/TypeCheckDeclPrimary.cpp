@@ -92,7 +92,8 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 /// file.
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  auto inheritedClause = InheritedTypes(declUnion).getEntries();
+  auto inheritedTypes = InheritedTypes(declUnion);
+  auto inheritedClause = inheritedTypes.getEntries();
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
@@ -122,45 +123,6 @@ static void checkInheritanceClause(
 
   ASTContext &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
-
-  // Retrieve the location of the start of the inheritance clause.
-  auto getStartLocOfInheritanceClause = [&] {
-    if (ext)
-      return ext->getSourceRange().End;
-
-    return typeDecl->getNameLoc();
-  };
-
-  // Compute the source range to be used when removing something from an
-  // inheritance clause.
-  auto getRemovalRange = [&](unsigned i) {
-    // If there is just one entry, remove the entire inheritance clause.
-    if (inheritedClause.size() == 1) {
-      SourceLoc start = getStartLocOfInheritanceClause();
-      SourceLoc end = inheritedClause[i].getSourceRange().End;
-      return SourceRange(Lexer::getLocForEndOfToken(ctx.SourceMgr, start),
-                         Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
-    }
-
-    // If we're at the first entry, remove from the start of this entry to the
-    // start of the next entry.
-    if (i == 0) {
-      return SourceRange(inheritedClause[i].getSourceRange().Start,
-                         inheritedClause[i+1].getSourceRange().Start);
-    }
-
-    // Otherwise, remove from the end of the previous entry to the end of this
-    // entry.
-    SourceLoc afterPriorLoc =
-      Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                 inheritedClause[i-1].getSourceRange().End);
-
-    SourceLoc afterMyEndLoc =
-      Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                 inheritedClause[i].getSourceRange().End);
-
-    return SourceRange(afterPriorLoc, afterMyEndLoc);
-  };
 
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
@@ -210,7 +172,7 @@ static void checkInheritanceClause(
         // Swift <= 4.
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
-        SourceRange removeRange = getRemovalRange(knownIndex);
+        SourceRange removeRange = inheritedTypes.getRemovalRange(knownIndex);
         if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
             isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
@@ -278,7 +240,7 @@ static void checkInheritanceClause(
       // Check if we already had a raw type.
       if (superclassTy) {
         if (superclassTy->isEqual(inheritedTy)) {
-          auto removeRange = getRemovalRange(i);
+          auto removeRange = inheritedTypes.getRemovalRange(i);
           diags.diagnose(inherited.getSourceRange().Start,
                          diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
@@ -305,7 +267,7 @@ static void checkInheritanceClause(
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        auto removeRange = getRemovalRange(i);
+        auto removeRange = inheritedTypes.getRemovalRange(i);
 
         diags.diagnose(inherited.getSourceRange().Start,
                        diag::raw_type_not_first, inheritedTy)
@@ -330,7 +292,7 @@ static void checkInheritanceClause(
 
         if (superclassTy->isEqual(inheritedTy)) {
           // Duplicate superclass.
-          auto removeRange = getRemovalRange(i);
+          auto removeRange = inheritedTypes.getRemovalRange(i);
           diags.diagnose(inherited.getSourceRange().Start,
                          diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
@@ -346,7 +308,7 @@ static void checkInheritanceClause(
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
-        auto removeRange = getRemovalRange(i);
+        auto removeRange = inheritedTypes.getRemovalRange(i);
         diags.diagnose(inherited.getSourceRange().Start,
                        diag::superclass_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
