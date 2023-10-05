@@ -810,11 +810,10 @@ static bool writeTBDIfNeeded(CompilerInstance &Instance) {
 }
 
 static bool writeAPIDescriptor(ModuleDecl *M, StringRef OutputPath,
-                               llvm::vfs::OutputBackend &Backend,
-                               bool PrettyPrinted) {
+                               llvm::vfs::OutputBackend &Backend) {
   return withOutputPath(M->getDiags(), Backend, OutputPath,
                         [&](raw_ostream &OS) -> bool {
-                          writeAPIJSONFile(M, OS, PrettyPrinted);
+                          writeAPIJSONFile(M, OS, /*PrettyPrinted=*/false);
                           return false;
                         });
 }
@@ -834,9 +833,8 @@ static bool writeAPIDescriptorIfNeeded(CompilerInstance &Instance) {
   const std::string &APIDescriptorPath =
       Invocation.getAPIDescriptorPathForWholeModule();
 
-  // FIXME: Need a frontend flag for pretty printing
   return writeAPIDescriptor(Instance.getMainModule(), APIDescriptorPath,
-                            Instance.getOutputBackend(), true);
+                            Instance.getOutputBackend());
 }
 
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
