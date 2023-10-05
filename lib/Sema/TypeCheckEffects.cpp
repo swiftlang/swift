@@ -864,6 +864,11 @@ public:
     }
     llvm_unreachable("Bad effect kind");
   }
+  Type getThrownError() const {
+    assert(ThrowKind == ConditionalEffectKind::Always ||
+           ThrowKind == ConditionalEffectKind::Conditional);
+    return ThrownError;
+  }
   PotentialEffectReason getThrowReason() const {
     assert(ThrowKind == ConditionalEffectKind::Always ||
            ThrowKind == ConditionalEffectKind::Conditional);
@@ -1131,7 +1136,7 @@ public:
     case EffectKind::Throws: {
       FunctionThrowsClassifier classifier(*this);
       expr->walk(classifier);
-      return classifier.classification;
+      return classifier.classification.onlyThrowing();
     }
     case EffectKind::Async: {
       FunctionAsyncClassifier classifier(*this);
@@ -1141,6 +1146,23 @@ public:
     }
     }
     llvm_unreachable("Bad effect");
+  }
+
+  // Classify a single statement without considering its enclosing context.
+  Classification classifyStmt(Stmt *stmt, EffectKind kind) {
+    switch (kind) {
+    case EffectKind::Throws: {
+      FunctionThrowsClassifier classifier(*this);
+      stmt->walk(classifier);
+      return classifier.classification.onlyThrowing();
+    }
+    case EffectKind::Async: {
+      FunctionAsyncClassifier classifier(*this);
+      stmt->walk(classifier);
+      return Classification::forAsync(
+          classifier.AsyncKind, /*FIXME:*/PotentialEffectReason::forApply());
+    }
+    }
   }
 
 private:
@@ -3240,6 +3262,26 @@ bool TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
   return classification.getConditionalKind(EffectKind::Throws) !=
       ConditionalEffectKind::None;
+}
+
+Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
+  // When typed throws is disabled, this is always "any Error".
+  // FIXME: When we distinguish "precise" typed throws from normal typed
+  // throws, we'll be able to compute a more narrow catch error type in some
+  // case, e.g., from a `try` but not a `throws`.
+  if (!ctx.LangOpts.hasFeature(Feature::TypedThrows))
+    return ctx.getErrorExistentialType();
+
+  // Classify the throwing behavior of the "do" body.
+  ApplyClassifier classifier(ctx);
+  Classification classification = classifier.classifyStmt(
+      stmt->getBody(), EffectKind::Throws);
+
+  // If it doesn't throw at all, the type is Never.
+  if (!classification.hasThrows())
+    return ctx.getNeverType();
+
+  return classification.getThrownError();
 }
 
 Type TypeChecker::errorUnion(Type type1, Type type2) {

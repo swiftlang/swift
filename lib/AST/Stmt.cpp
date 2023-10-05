@@ -476,6 +476,15 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
+Type DoCatchStmt::getCaughtErrorType() const {
+  return getCatches()
+    .front()
+    ->getCaseLabelItems()
+    .front()
+    .getPattern()
+    ->getType();
+}
+
 void LabeledConditionalStmt::setCond(StmtCondition e) {
   // When set a condition into a Conditional Statement, inform each of the
   // variables bound in any patterns that this is the owning statement for the
