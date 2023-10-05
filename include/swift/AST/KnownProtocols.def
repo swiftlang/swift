@@ -107,6 +107,7 @@ PROTOCOL(DistributedTargetInvocationDecoder)
 PROTOCOL(DistributedTargetInvocationResultHandler)
 
 // C++ Standard Library Overlay:
+PROTOCOL(CxxConvertibleToBool)
 PROTOCOL(CxxConvertibleToCollection)
 PROTOCOL(CxxDictionary)
 PROTOCOL(CxxOptional)

@@ -9,7 +9,7 @@
 // CHECK:   mutating func callAsFunction(_ x: Int32, _ y: Int32) -> Int32
 // CHECK: }
 
-// CHECK: struct LoadableBoolWrapper {
+// CHECK: struct LoadableBoolWrapper
 // CHECK:   prefix static func ! (lhs: inout LoadableBoolWrapper) -> LoadableBoolWrapper
 // CHECK:   func __convertToBool() -> Bool
 // CHECK: }
