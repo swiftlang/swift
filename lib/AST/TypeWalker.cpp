@@ -115,6 +115,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (Type thrownError = ty->getThrownError()) {
+      if (doIt(thrownError))
+        return true;
+    }
+
     return doIt(ty->getResult());
   }
 

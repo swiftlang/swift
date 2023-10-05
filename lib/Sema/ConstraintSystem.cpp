@@ -5971,6 +5971,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::GenericParameter:
       break;
 
+    case ConstraintLocator::ThrownErrorType:
+      break;
+
     case ConstraintLocator::OpenedGeneric:
     case ConstraintLocator::OpenedOpaqueArchetype:
       break;

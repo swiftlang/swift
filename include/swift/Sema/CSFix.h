@@ -375,6 +375,9 @@ enum class FixKind : uint8_t {
   /// `throws` attribute from the source function.
   DropThrowsAttribute,
 
+  /// Ignore a mismatch in the thrown error type.
+  IgnoreThrownErrorMismatch,
+
   /// Fix conversion from async to sync function by removing explicit
   /// `async` attribute from the source function.
   DropAsyncAttribute,
@@ -1005,7 +1008,6 @@ class DropThrowsAttribute final : public ContextualMismatch {
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::DropThrowsAttribute, fromType, toType,
                            locator) {
-    assert(fromType->isThrowing() != toType->isThrowing());
   }
 
 public:
@@ -1023,6 +1025,30 @@ public:
   }
 };
 
+/// This is a contextual mismatch between the thrown error types of two
+/// function types, which could be repaired by fixing one of the types.
+class IgnoreThrownErrorMismatch final : public ContextualMismatch {
+  IgnoreThrownErrorMismatch(ConstraintSystem &cs, Type fromErrorType,
+                            Type toErrorType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::IgnoreThrownErrorMismatch,
+                           fromErrorType, toErrorType, locator) {
+    assert(!fromErrorType->isEqual(toErrorType));
+  }
+
+public:
+  std::string getName() const override { return "drop 'throws' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreThrownErrorMismatch *create(ConstraintSystem &cs,
+                                           Type fromErrorType,
+                                           Type toErrorType,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreThrownErrorMismatch;
+  }
+};
 /// This is a contextual mismatch between async and non-async
 /// function types, repair it by dropping `async` attribute.
 class DropAsyncAttribute final : public ContextualMismatch {

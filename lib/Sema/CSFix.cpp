@@ -1627,6 +1627,21 @@ DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
       DropThrowsAttribute(cs, fromType, toType, locator);
 }
 
+bool IgnoreThrownErrorMismatch::diagnose(const Solution &solution,
+                                   bool asNote) const {
+  ThrownErrorTypeConversionFailure failure(solution, getFromType(),
+                                           getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreThrownErrorMismatch *IgnoreThrownErrorMismatch::create(ConstraintSystem &cs,
+                                                 Type fromErrorType,
+                                                 Type toErrorType,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreThrownErrorMismatch(cs, fromErrorType, toErrorType, locator);
+}
+
 bool DropAsyncAttribute::diagnose(const Solution &solution,
                                    bool asNote) const {
   AsyncFunctionConversionFailure failure(solution, getFromType(),

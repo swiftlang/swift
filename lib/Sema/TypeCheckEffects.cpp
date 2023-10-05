@@ -1118,9 +1118,6 @@ public:
           classifyFunctionBody(fnRef,
                                PotentialEffectReason::forApply(),
                                kind));
-        assert(result.getConditionalKind(kind)
-               != ConditionalEffectKind::None &&
-               "body classification decided function had no effect?");
       }
     };
 

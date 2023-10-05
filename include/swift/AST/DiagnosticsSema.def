@@ -615,6 +615,9 @@ ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
 
+ERROR(thrown_error_type_mismatch,none,
+      "invalid conversion of thrown error type %0 to %1", (Type, Type))
+
 ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))

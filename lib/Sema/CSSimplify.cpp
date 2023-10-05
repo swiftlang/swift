@@ -2945,20 +2945,119 @@ bool ConstraintSystem::hasPreconcurrencyCallee(
   return calleeOverload->choice.getDecl()->preconcurrency();
 }
 
+namespace {
+  /// Classifies a thrown error kind as Never, a specific type, or 'any Error'.
+  enum class ThrownErrorKind {
+    Never,
+    Specific,
+    AnyError,
+  };
+
+  ThrownErrorKind getThrownErrorKind(Type type) {
+    if (type->isNever())
+      return ThrownErrorKind::Never;
+
+    if (type->isExistentialType()) {
+      Type anyError = type->getASTContext().getErrorExistentialType();
+      if (anyError->isEqual(type))
+        return ThrownErrorKind::AnyError;
+    }
+
+    return ThrownErrorKind::Specific;
+  }
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // A non-throwing function can be a subtype of a throwing function.
-  if (func1->isThrowing() != func2->isThrowing()) {
-    // Cannot drop 'throws'.
-    if (func1->isThrowing() || kind < ConstraintKind::Subtype) {
+  // A function type that throws the error type E1 is a subtype of a function
+  // that throws error type E2 when E1 is a subtype of E2. For the purpose
+  // of this comparison, a non-throwing function has thrown error type 'Never',
+  // and an untyped throwing function has thrown error type 'any Error'.
+  Type neverType = getASTContext().getNeverType();
+  Type thrownError1 = func1->getEffectiveThrownInterfaceType().value_or(neverType);
+  Type thrownError2 = func2->getEffectiveThrownInterfaceType().value_or(neverType);
+  if (!thrownError1->isEqual(thrownError2)) {
+    auto thrownErrorKind1 = getThrownErrorKind(thrownError1);
+    auto thrownErrorKind2 = getThrownErrorKind(thrownError2);
+
+    bool mustUnify = false;
+    bool dropThrows = false;
+
+    switch (thrownErrorKind1) {
+    case ThrownErrorKind::Specific:
+      // If the specific thrown error contains no type variables and we're
+      // going to try to convert it to \c Never, treat this as dropping throws.
+      if (thrownErrorKind2 == ThrownErrorKind::Never &&
+          !thrownError1->hasTypeVariable()) {
+        dropThrows = true;
+      } else {
+        // We need to unify the thrown error types.
+        mustUnify = true;
+      }
+      break;
+
+    case ThrownErrorKind::Never:
+      switch (thrownErrorKind2) {
+      case ThrownErrorKind::Specific:
+        // We need to unify the thrown error types.
+        mustUnify = true;
+        break;
+
+      case ThrownErrorKind::Never:
+        llvm_unreachable("The thrown error types should have been equal");
+        break;
+
+      case ThrownErrorKind::AnyError:
+        // We have a subtype. If we're not allowed to do the subtype,
+        // then we need to drop "throws".
+        if (kind < ConstraintKind::Subtype)
+          dropThrows = true;
+        break;
+      }
+      break;
+
+    case ThrownErrorKind::AnyError:
+      switch (thrownErrorKind2) {
+      case ThrownErrorKind::Specific:
+        // We need to unify the thrown error types.
+        mustUnify = true;
+        break;
+
+      case ThrownErrorKind::Never:
+        // We're going to have to drop the "throws" entirely.
+        dropThrows = true;
+        break;
+
+      case ThrownErrorKind::AnyError:
+        llvm_unreachable("The thrown error types should have been equal");
+      }
+      break;
+    }
+
+    // If we know we need to drop 'throws', try it now.
+    if (dropThrows) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
       auto *fix = DropThrowsAttribute::create(*this, func1, func2,
                                               getConstraintLocator(locator));
       if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+
+    // If we need to unify the thrown error types, do so now.
+    if (mustUnify) {
+      ConstraintKind subKind = (kind < ConstraintKind::Subtype)
+          ? ConstraintKind::Equal
+          : ConstraintKind::Subtype;
+      const auto subflags = getDefaultDecompositionOptions(flags);
+      auto result = matchTypes(
+          thrownError1, thrownError2,
+          subKind, subflags,
+          locator.withPathElement(LocatorPathElt::ThrownErrorType()));
+      if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
     }
   }
@@ -5151,6 +5250,13 @@ bool ConstraintSystem::repairFailures(
                                          conversionsOrFixes,
                                          getConstraintLocator(locator)))
     return true;
+
+  if (locator.endsWith<LocatorPathElt::ThrownErrorType>()) {
+    conversionsOrFixes.push_back(
+        IgnoreThrownErrorMismatch::create(*this, lhs, rhs,
+                                          getConstraintLocator(locator)));
+    return true;
+  }
 
   if (path.empty()) {
     if (!anchor)
@@ -14999,6 +15105,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAssociatedValueMismatch:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowConcreteTypeSpecialization:
+  case FixKind::IgnoreThrownErrorMismatch:
   case FixKind::IgnoreGenericSpecializationArityMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
