@@ -9,6 +9,7 @@ import Foundation
 @available(macOS 10.13, *)
 public class Test : NSObject {
   @objc public func method1() {}
+  @available(macOS 10.14, *)
   @objc public class func method2() {}
   public func nonObjc() {}
 }
@@ -80,13 +81,15 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivg",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivs",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7method1yyFTj",
@@ -104,13 +107,15 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7method2yyFZTj",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.14"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7method2yyFZTq",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.14"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7nonObjcyyFTj",
@@ -140,7 +145,8 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule4TestCMa",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestCMn",
@@ -167,7 +173,8 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule4TestCN",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestCfD",
@@ -317,7 +324,8 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCMa",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCMn",
@@ -337,7 +345,8 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCN",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule7DerivedCfD",
@@ -370,7 +379,8 @@ public var myGlobalVar: Int = 42
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "method2",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:         "introduced": "10.14"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ]
 // CHECK-NEXT:   },

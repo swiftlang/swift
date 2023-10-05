@@ -33,7 +33,8 @@ public struct TestStruct {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVMa",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "10.13"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVMn",
@@ -46,7 +47,8 @@ public struct TestStruct {
 // CHECK-NEXT:       "name": "_$s8MyModule10TestStructVN",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "introduced": "10.13"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "interfaces": [],

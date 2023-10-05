@@ -222,26 +222,6 @@ public:
     return irEntity;
   }
 
-  /// Returns the associated decl.
-  const ValueDecl *getDecl() const {
-    switch (kind) {
-    case Kind::SIL: {
-      if (silDeclRef.hasDecl())
-        return silDeclRef.getDecl();
-      return nullptr;
-    }
-    case Kind::Global:
-      return Global;
-    case Kind::IR:
-      if (irEntity.hasDecl())
-        return irEntity.getDecl();
-      return nullptr;
-    case Kind::LinkerDirective:
-    case Kind::Unknown:
-      return nullptr;
-    }
-  }
-
   /// Typecheck the entity wrapped by this `SymbolSource`
   void typecheck() const {
     switch (kind) {

@@ -155,7 +155,7 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCMa",
-// CHECK-SPI-NEXT:       "access": "public",
+// CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:       "linkage": "exported"
 // CHECK-SPI-NEXT:     },
@@ -179,7 +179,7 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCN",
-// CHECK-SPI-NEXT:       "access": "public",
+// CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:       "linkage": "exported"
 // CHECK-SPI-NEXT:     },

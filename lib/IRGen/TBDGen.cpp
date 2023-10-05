@@ -81,7 +81,8 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     }
   }
 #endif
-  recorder.addSymbol(name, kind, source);
+  recorder.addSymbol(name, kind, source,
+                     DeclStack.empty() ? nullptr : DeclStack.back());
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -613,9 +614,8 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
     targets.push_back(targetVar);
   }
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
-    file.addSymbol(kind, symbol, targets);
-  };
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) { file.addSymbol(kind, symbol, targets); };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
@@ -626,7 +626,8 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
@@ -668,14 +669,13 @@ public:
   }
   ~APIGenRecorder() {}
 
-  void addSymbol(StringRef symbol, SymbolKind kind,
-                 SymbolSource source) override {
+  void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
+                 Decl *decl) override {
     if (kind != SymbolKind::GlobalSymbol)
       return;
 
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
-    auto decl = source.getDecl();
     if (decl) {
       availability = getAvailability(decl);
       if (isSPI(decl))
@@ -856,7 +856,8 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = desc.getParentModule()->getASTContext();
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
-  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     SymbolSources->insert({symbol, source});
   };
 
