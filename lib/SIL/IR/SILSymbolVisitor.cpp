@@ -646,19 +646,24 @@ public:
       void addMethod(SILDeclRef method) {
         assert(method.getDecl()->getDeclContext() == CD);
 
-        if (VirtualFunctionElimination || CD->hasResilientMetadata()) {
-          if (FirstTime) {
-            FirstTime = false;
+        // If the class is itself resilient and has at least one vtable
+        // entry, it has a method lookup function.
+        bool hasLookupFunc =
+            VirtualFunctionElimination || CD->hasResilientMetadata();
+        if (FirstTime) {
+          FirstTime = false;
 
-            // If the class is itself resilient and has at least one vtable
-            // entry, it has a method lookup function.
+          if (hasLookupFunc)
             Visitor.addMethodLookupFunction(CD);
-          }
-
-          Visitor.addDispatchThunk(method);
         }
 
+        if (!Visitor.willVisitDecl(method.getDecl()))
+          return;
+        if (hasLookupFunc)
+          Visitor.addDispatchThunk(method);
+
         Visitor.addMethodDescriptor(method);
+        Visitor.didVisitDecl(method.getDecl());
       }
 
       void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
