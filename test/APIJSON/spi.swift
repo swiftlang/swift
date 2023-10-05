@@ -16,6 +16,10 @@ import Foundation
 
 public class MyClass2 : NSObject {
   @_spi(Experimental) @objc public func spiMethod() {}
+
+  @_spi_available(macOS 10.10, tvOS 14.0, *)
+  @available(iOS 8.0, *)
+  @objc public func spiAvailableMethod() {}
 }
 
 @_spi_available(macOS 10.10, tvOS 14.0, *)
@@ -25,6 +29,18 @@ public func spiAvailableFunc() {}
 // CHECK:      {
 // CHECK-NEXT:   "target":
 // CHECK-NEXT:   "globals": [
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
+// CHECK-NEXT:       "access": "public",
+// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
+// CHECK-NEXT:       "access": "public",
+// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CACycfC",
 // CHECK-NEXT:       "access": "public",
@@ -51,6 +67,12 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMo",
+// CHECK-NEXT:       "access": "public",
+// CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CMu",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
 // CHECK-NEXT:       "linkage": "exported"
@@ -83,6 +105,12 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "super": "NSObject",
 // CHECK-NEXT:       "instanceMethods": [
+// CHECK-NEXT:         {
+// CHECK-NEXT:           "name": "spiAvailableMethod",
+// CHECK-NEXT:           "access": "public",
+// CHECK-NEXT:           "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:           "unavailable": true
+// CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "name": "init",
 // CHECK-NEXT:           "access": "public",
@@ -155,6 +183,18 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A5ClassCfD",
+// CHECK-SPI-NEXT:       "access": "private",
+// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
+// CHECK-SPI-NEXT:       "linkage": "exported"
+// CHECK-SPI-NEXT:     },
+// CHECK-SPI-NEXT:     {
+// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
+// CHECK-SPI-NEXT:       "access": "private",
+// CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
+// CHECK-SPI-NEXT:       "linkage": "exported"
+// CHECK-SPI-NEXT:     },
+// CHECK-SPI-NEXT:     {
+// CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
 // CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:       "linkage": "exported"
@@ -271,6 +311,12 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:           "name": "spiMethod",
 // CHECK-SPI-NEXT:           "access": "private",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule"
+// CHECK-SPI-NEXT:         },
+// CHECK-SPI-NEXT:         {
+// CHECK-SPI-NEXT:           "name": "spiAvailableMethod",
+// CHECK-SPI-NEXT:           "access": "public",
+// CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule",
+// CHECK-SPI-NEXT:           "introduced": "10.10"
 // CHECK-SPI-NEXT:         },
 // CHECK-SPI-NEXT:         {
 // CHECK-SPI-NEXT:           "name": "init",
