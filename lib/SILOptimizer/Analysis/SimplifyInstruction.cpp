@@ -463,7 +463,10 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
 }
 
 SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
-  // Remove "dead" begin_access.
+  // Don't just delete dead dynamic enforcement access scopes.
+  if (BAI->getEnforcement() == SILAccessEnforcement::Dynamic) {
+    return SILValue();
+  }
   if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
         return isIncidentalUse(operand->getUser());
       })) {

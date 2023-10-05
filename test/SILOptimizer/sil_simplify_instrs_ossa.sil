@@ -368,37 +368,6 @@ public class B {
   deinit
 }
 
-// simplify access markers
-
-// CHECK-LABEL: sil [ossa] @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
-// CHECK: bb0(%0 : @guaranteed $A):
-// CHECK-NEXT: [[ADR:%.*]] = ref_element_addr %0 : $A, #A.b
-// CHECK-NEXT: fix_lifetime [[ADR]] : $*B
-// CHECK-NEXT: %{{.*}} = tuple ()
-// CHECK-NEXT: return %{{.*}} : $()
-// CHECK: } // end sil function 'simplify_accesssil'
-sil [ossa] @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
-bb0(%0 : @guaranteed $A):
-  %badr = ref_element_addr %0 : $A, #A.b
-  %ba1 = begin_access [read] [dynamic] %badr : $*B
-  end_access %ba1 : $*B
-  %ba2 = begin_access [read] [dynamic] %badr : $*B
-  fix_lifetime %ba2 : $*B
-  end_access %ba2 : $*B
-  %ba3 = begin_access [read] [dynamic] %badr : $*B
-  %b = load [copy] %ba3 : $*B
-  end_access %ba3 : $*B
-  %bb = begin_borrow %b : $B
-  %xadr = ref_element_addr %bb : $B, #B.x
-  %xaccess = begin_access [read] [dynamic] %xadr : $*Int
-  end_access %xaccess : $*Int
-  end_borrow %bb : $B
-  destroy_value %b : $B
-
-  %r = tuple ()
-  return %r : $()
-}
-
 // Test replacement of metatype instructions with metatype arguments.
 protocol SomeP {}
 
