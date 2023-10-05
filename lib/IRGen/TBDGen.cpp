@@ -674,19 +674,11 @@ public:
 
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
-    if (source.kind == SymbolSource::Kind::SIL) {
-      auto ref = source.getSILDeclRef();
-      if (ref.hasDecl()) {
-        availability = getAvailability(ref.getDecl());
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
-    } else if (source.kind == SymbolSource::Kind::IR) {
-      auto ref = source.getIRLinkEntity();
-      if (ref.hasDecl()) {
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
+    auto decl = source.getDecl();
+    if (decl) {
+      availability = getAvailability(decl);
+      if (isSPI(decl))
+        access = apigen::APIAccess::Private;
     }
 
     api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,

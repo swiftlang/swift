@@ -33,13 +33,15 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "unavailable": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
 // CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "/@input/MyModule.swiftinterface",
-// CHECK-NEXT:       "linkage": "exported"
+// CHECK-NEXT:       "linkage": "exported",
+// CHECK-NEXT:       "unavailable": true
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2CACycfC",
@@ -191,13 +193,15 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
 // CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
+// CHECK-SPI-NEXT:       "linkage": "exported",
+// CHECK-SPI-NEXT:       "introduced": "10.10"
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
 // CHECK-SPI-NEXT:       "access": "private",
 // CHECK-SPI-NEXT:       "file": "/@input/MyModule.swiftmodule",
-// CHECK-SPI-NEXT:       "linkage": "exported"
+// CHECK-SPI-NEXT:       "linkage": "exported",
+// CHECK-SPI-NEXT:       "introduced": "10.10"
 // CHECK-SPI-NEXT:     },
 // CHECK-SPI-NEXT:     {
 // CHECK-SPI-NEXT:       "name": "_$s8MyModule0A6Class2C9spiMethodyyFTj",
