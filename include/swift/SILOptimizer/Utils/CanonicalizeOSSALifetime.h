@@ -136,6 +136,10 @@ class CanonicalOSSAConsumeInfo final {
   /// Map blocks on the lifetime boundary to the last consuming instruction.
   llvm::SmallDenseMap<SILBasicBlock *, SILInstruction *, 4> finalBlockConsumes;
 
+  /// The instructions on the availability boundary of the dead-end region where
+  /// this value is not consumed.
+  SmallPtrSet<SILInstruction *, 4> unreachableLifetimeEnds;
+
 public:
   void clear() { finalBlockConsumes.clear(); }
 
@@ -159,6 +163,14 @@ public:
       return true;
     }
     return false;
+  }
+
+  void recordUnreachableLifetimeEnd(SILInstruction *inst) {
+    unreachableLifetimeEnds.insert(inst);
+  }
+
+  bool isUnreachableLifetimeEnd(SILInstruction *inst) {
+    return unreachableLifetimeEnds.contains(inst);
   }
 
   CanonicalOSSAConsumeInfo() {}
@@ -235,9 +247,12 @@ private:
   SILValue currentDef;
 
   /// Original points in the CFG where the current value's lifetime is consumed
-  /// or destroyed. For guaranteed values it remains empty. A backward walk from
-  /// these blocks must discover all uses on paths that lead to a return or
-  /// throw.
+  /// or destroyed.  Each block either contains a consuming instruction (e.g.
+  /// `destroy_value`) or is on the availability boundary of the value in a
+  /// dead-end region (e.g. `unreachable`).
+  ///
+  /// For guaranteed values it remains empty. A backward walk from these blocks
+  /// must discover all uses on paths that lead to a return or throw.
   ///
   /// These blocks are not necessarily in the pruned live blocks since
   /// pruned liveness does not consider destroy_values.
@@ -406,8 +421,17 @@ private:
   void recordDebugValue(DebugValueInst *dvi) { debugValues.insert(dvi); }
 
   void recordConsumingUse(Operand *use) { recordConsumingUser(use->getUser()); }
+  /// Record that the value is consumed at `user`.
+  ///
+  /// Either `user` is a consuming use (e.g. `destroy_value`) or it is the
+  /// terminator of a block on the availability boundary of the value in a
+  /// dead-end region (e.g. `unreachable`).
   void recordConsumingUser(SILInstruction *user) {
     consumingBlocks.insert(user->getParent());
+  }
+  void recordUnreachableLifetimeEnd(SILInstruction *user) {
+    recordConsumingUser(user);
+    consumes.recordUnreachableLifetimeEnd(user);
   }
   bool computeCanonicalLiveness();
 
