@@ -16,6 +16,7 @@ if exists("b:current_syntax")
 endif
 
 syn keyword swiftKeyword
+      \ await
       \ break
       \ case
       \ catch
@@ -47,6 +48,7 @@ syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
 syn keyword swiftDefinitionModifier
+      \ async
       \ convenience
       \ dynamic
       \ fileprivate
@@ -59,6 +61,7 @@ syn keyword swiftDefinitionModifier
       \ prefix
       \ private
       \ public
+      \ reasync
       \ required
       \ rethrows
       \ static

@@ -154,6 +154,7 @@ parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
 
 static llvm::Expected<llvm::cas::ObjectRef>
 updateModuleCacheKey(ModuleDependencyInfo &depInfo,
+                     ModuleDependenciesCache &cache,
                      llvm::cas::ObjectStore &CAS) {
   auto commandLine = depInfo.getCommandline();
   std::vector<const char *> Args;
@@ -165,7 +166,7 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
   if (!base)
     return base.takeError();
 
-  StringRef InputPath;
+  std::string InputPath;
   file_types::ID OutputType = file_types::ID::TY_INVALID;
   if (auto *dep = depInfo.getAsClangModule()) {
     OutputType = file_types::ID::TY_ClangModuleFile;
@@ -175,6 +176,9 @@ updateModuleCacheKey(ModuleDependencyInfo &depInfo,
     InputPath = dep->swiftInterfaceFile;
   } else
     llvm_unreachable("Unhandled dependency kind");
+
+  if (cache.getScanService().hasPathMapping())
+    InputPath = cache.getScanService().remapPath(InputPath);
 
   auto key =
       createCompileJobCacheKeyForOutput(CAS, *base, InputPath, OutputType);
@@ -197,6 +201,8 @@ static llvm::Error resolveExplicitModuleInputs(
   if (resolvingDepInfo.isFinalized())
     return llvm::Error::success();
 
+  auto &service = cache.getScanService();
+  auto remapPath = [&](StringRef path) { return service.remapPath(path); };
   std::vector<std::string> rootIDs;
   if (auto ID = resolvingDepInfo.getCASFSRootID())
     rootIDs.push_back(*ID);
@@ -262,7 +268,7 @@ static llvm::Error resolveExplicitModuleInputs(
         commandLine.push_back("-Xcc");
         commandLine.push_back("-include-pch");
         commandLine.push_back("-Xcc");
-        commandLine.push_back(headerDep);
+        commandLine.push_back(remapPath(headerDep));
       }
     } break;
     case swift::ModuleDependencyKind::SwiftPlaceholder: {
@@ -277,13 +283,13 @@ static llvm::Error resolveExplicitModuleInputs(
       if (!resolvingDepInfo.isClangModule()) {
         commandLine.push_back("-Xcc");
         commandLine.push_back("-fmodule-file=" + depModuleID.ModuleName + "=" +
-                              clangDepDetails->pcmOutputPath);
+                              remapPath(clangDepDetails->pcmOutputPath));
         if (!instance.getInvocation()
                  .getClangImporterOptions()
                  .UseClangIncludeTree) {
           commandLine.push_back("-Xcc");
           commandLine.push_back("-fmodule-map-file=" +
-                                clangDepDetails->moduleMapFile);
+                                remapPath(clangDepDetails->moduleMapFile));
         }
       }
       if (!clangDepDetails->moduleCacheKey.empty()) {
@@ -298,7 +304,7 @@ static llvm::Error resolveExplicitModuleInputs(
         appendXclang();
         commandLine.push_back("-fmodule-file-cache-key");
         appendXclang();
-        commandLine.push_back(clangDepDetails->pcmOutputPath);
+        commandLine.push_back(remapPath(clangDepDetails->pcmOutputPath));
         appendXclang();
         commandLine.push_back(clangDepDetails->moduleCacheKey);
       }
@@ -322,8 +328,11 @@ static llvm::Error resolveExplicitModuleInputs(
   // Update the dependency in the cache with the modified command-line.
   auto dependencyInfoCopy = resolvingDepInfo;
   if (resolvingDepInfo.isSwiftInterfaceModule() ||
-      resolvingDepInfo.isClangModule())
+      resolvingDepInfo.isClangModule()) {
+    if (service.hasPathMapping())
+      commandLine = remapPathsFromCommandLine(commandLine, remapPath);
     dependencyInfoCopy.updateCommandLine(commandLine);
+  }
 
   // Handle CAS options.
   if (instance.getInvocation().getFrontendOptions().EnableCaching) {
@@ -363,7 +372,7 @@ static llvm::Error resolveExplicitModuleInputs(
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back("-fmodule-file-cache-key");
           newCommandLine.push_back("-Xcc");
-          newCommandLine.push_back(clangDep->pcmOutputPath);
+          newCommandLine.push_back(remapPath(clangDep->pcmOutputPath));
           newCommandLine.push_back("-Xcc");
           newCommandLine.push_back(clangDep->moduleCacheKey);
         }
@@ -374,7 +383,7 @@ static llvm::Error resolveExplicitModuleInputs(
     if (resolvingDepInfo.isClangModule() ||
         resolvingDepInfo.isSwiftInterfaceModule()) {
       // Compute and update module cache key.
-      auto Key = updateModuleCacheKey(dependencyInfoCopy, CAS);
+      auto Key = updateModuleCacheKey(dependencyInfoCopy, cache, CAS);
       if (!Key)
         return Key.takeError();
     }
