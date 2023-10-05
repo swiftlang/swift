@@ -254,6 +254,7 @@ public:
   ValueOwnershipKind getForwardingOwnershipKind();
   bool preservesOwnership();
 
+  // ForwardingInstruction.swift mirrors this implementation.
   Operand *getSingleForwardingOperand() const {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::StructInst:

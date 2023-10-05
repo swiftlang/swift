@@ -31,6 +31,7 @@ bool ForwardingOperation::preservesOwnership() {
   return ForwardingInstruction::get(forwardingInst)->preservesOwnership();
 }
 
+// See ForwardingInstruction.swift preservesRepresentation().
 bool ForwardingOperation::hasSameRepresentation() const {
   switch (forwardingInst->getKind()) {
   // Explicitly list instructions which definitely involve a representation
@@ -64,8 +65,8 @@ bool ForwardingOperation::isAddressOnly() const {
     return singleForwardingOp->get()->getType().isAddressOnly(
         *forwardingInst->getFunction());
   }
-  // All ForwardingInstructions that forward all operands are currently a
-  // single value instruction.
+  // All ForwardingInstructions that forward all operands or no operands are
+  // currently a single value instruction.
   auto *aggregate =
       cast<OwnershipForwardingSingleValueInstruction>(forwardingInst);
   // If any of the operands are address-only, then the aggregate must be.
