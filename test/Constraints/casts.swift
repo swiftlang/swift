@@ -745,9 +745,8 @@ do {
 // https://github.com/apple/swift/issues/68825
 do {
   func x(a: Any) {
-    _ = a is a // expected-error {{cast expression expects a type on its right-hand side (got: 'a')}}
-    _ = a is a? // expected-error {{cast expression expects a type on its right-hand side (got: 'a')}}
-    _ = a as T // expected-error {{cast expression expects a type on its right-hand side (got: 'T')}}
+    _ = a is a // expected-error {{type-casting operator expects a type on its right-hand side (got: 'a')}}
+    _ = a as T // expected-error {{type-casting operator expects a type on its right-hand side (got: 'T')}}
     _ = a is String // OK
   }
 }

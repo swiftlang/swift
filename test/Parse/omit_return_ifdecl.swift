@@ -2432,7 +2432,7 @@ class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } 
 
 func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
     #if true
-    value is type // expected-error {{cast expression expects a type on its right-hand side (got: 'type')}}
+    value is type // expected-error {{type-casting operator expects a type on its right-hand side (got: 'type')}}
     #endif
 }
 

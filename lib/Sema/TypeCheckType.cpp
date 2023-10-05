@@ -1294,12 +1294,6 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    if (resolution.getOptions().hasBase(TypeResolverContext::ExplicitCastExpr)) {
-      diags.diagnose(repr->getNameLoc(), diag::cannot_find_type_in_cast_expression,
-                     repr->getNameRef());
-      return ErrorType::get(ctx);
-    }
-    
     // Tailored diagnostic for custom attributes.
     if (resolution.getOptions().is(TypeResolverContext::CustomAttr)) {
       diags.diagnose(repr->getNameLoc(), diag::unknown_attribute,
@@ -1387,6 +1381,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       }
 
       return I->second;
+    }
+    
+    // type-casting operators such as 'is' and 'as'.
+    if (resolution.getOptions().is(TypeResolverContext::ExplicitCastExpr)) {
+      diags.diagnose(L, diag::cannot_find_type_in_cast_expression, repr->getNameRef())
+        .highlight(R);
+      return ErrorType::get(ctx);
     }
 
     diags.diagnose(L, diag::cannot_find_type_in_scope, repr->getNameRef())
