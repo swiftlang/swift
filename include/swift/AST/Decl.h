@@ -2273,7 +2273,9 @@ public:
   void setInitializerSubsumed(unsigned i) {
     getMutablePatternList()[i].setInitializerSubsumed();
   }
-  
+
+  ActorIsolation getInitializerIsolation(unsigned i) const;
+
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
 
@@ -5972,6 +5974,19 @@ public:
   bool isParentExecutabledInitialized() const {
     return getParentExecutableInitializer() != nullptr;
   }
+
+  /// Get the required actor isolation for evaluating the initializer
+  /// expression synchronously (if there is one).
+  ///
+  /// If this VarDecl is a stored instance property, the initializer
+  /// can only be used in an `init` that meets the required isolation.
+  /// Otherwise, the property must be explicitly initialized in the `init`.
+  ///
+  /// If this is a ParamDecl, the initializer isolation is required at
+  /// the call-site in order to use the default argument for this parameter.
+  /// If the required isolation is not met, an argument must be written
+  /// explicitly at the call-site.
+  ActorIsolation getInitializerIsolation() const;
 
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has

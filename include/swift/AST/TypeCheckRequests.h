@@ -2934,6 +2934,27 @@ public:
   void cacheResult(Type type) const;
 };
 
+/// Compute the actor isolation needed to synchronously evaluate the
+/// default initializer expression.
+class DefaultInitializerIsolation
+    : public SimpleRequest<DefaultInitializerIsolation,
+                           ActorIsolation(VarDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ActorIsolation evaluate(Evaluator &evaluator, 
+                          VarDecl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, Initializer *init);
+
 /// Computes the fully type-checked caller-side default argument within the
 /// context of the call site that it will be inserted into.
 class CallerSideDefaultArgExprRequest

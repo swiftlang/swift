@@ -3240,7 +3240,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       // Check initializer effects.
       auto *initContext = new (ctx) PropertyWrapperInitializer(
           dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
-      checkInitializerActorIsolation(initContext, projectedValueInit);
+      (void)projection->getInitializerIsolation();
       TypeChecker::checkInitializerEffects(initContext, projectedValueInit);
     }
   }

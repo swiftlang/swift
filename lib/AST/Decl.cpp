@@ -2088,6 +2088,14 @@ bool PatternBindingDecl::isAsyncLet() const {
   return false;
 }
 
+ActorIsolation
+PatternBindingDecl::getInitializerIsolation(unsigned i) const {
+  auto *var = getPatternList()[i].getAnchoringVarDecl();
+  if (!var)
+    return ActorIsolation::forUnspecified();
+
+  return var->getInitializerIsolation();
+}
 
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
@@ -7127,6 +7135,14 @@ Expr *VarDecl::getParentExecutableInitializer() const {
   return nullptr;
 }
 
+ActorIsolation VarDecl::getInitializerIsolation() const {
+  auto *mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      DefaultInitializerIsolation{mutableThis},
+      ActorIsolation::forUnspecified());
+}
+
 SourceRange VarDecl::getSourceRange() const {
   if (auto Param = dyn_cast<ParamDecl>(this))
     return Param->getSourceRange();
@@ -10445,8 +10461,25 @@ ActorIsolation swift::getActorIsolationOfContext(
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
 
-  if (auto *var = dcToUse->getNonLocalVarDecl())
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between instance and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //     Static properties are initialized upon first use, so the isolation
+  //     of the initializer must match the isolation required to access the
+  //     property.
+  //   - For a field of a nominal type, the expression can require a specific
+  //     actor isolation. That default expression may only be used from inits
+  //     that meet the required isolation.
+  if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    auto &ctx = dc->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments) &&
+        var->isInstanceMember() &&
+        !var->getAttrs().hasAttribute<LazyAttr>()) {
+      return ActorIsolation::forNonisolated();
+    }
+
     return getActorIsolation(var);
+  }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
     return getClosureActorIsolation(closure);
