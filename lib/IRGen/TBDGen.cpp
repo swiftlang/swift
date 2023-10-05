@@ -655,10 +655,11 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  bool isSPI(const ValueDecl* VD) {
-    assert(VD);
-    return VD->isSPI() || VD->isAvailableAsSPI();
+  static bool isSPI(const Decl *decl) {
+    assert(decl);
+    return decl->isSPI() || decl->isAvailableAsSPI();
   }
+
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
@@ -704,7 +705,7 @@ public:
       if (method.getDecl()->getDescriptiveKind() ==
           DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
-      if (method.getDecl()->isSPI())
+      if (isSPI(method.getDecl()))
         access = apigen::APIAccess::Private;
     }
 
@@ -770,7 +771,7 @@ private:
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
             ? apigen::APILinkage::Exported
@@ -803,7 +804,7 @@ private:
     buildCategoryName(decl, cls, nameBuffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getMaxAccessLevel() == AccessLevel::Public
             ? apigen::APILinkage::Exported

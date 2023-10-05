@@ -318,7 +318,7 @@ public func spiAvailableFunc() {}
 // CHECK-SPI-NEXT:         },
 // CHECK-SPI-NEXT:         {
 // CHECK-SPI-NEXT:           "name": "spiAvailableMethod",
-// CHECK-SPI-NEXT:           "access": "public",
+// CHECK-SPI-NEXT:           "access": "private",
 // CHECK-SPI-NEXT:           "file": "/@input/MyModule.swiftmodule",
 // CHECK-SPI-NEXT:           "introduced": "10.10"
 // CHECK-SPI-NEXT:         },
