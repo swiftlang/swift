@@ -749,11 +749,11 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   // Note: Do not provide any SILLocation. You can set it afterwards.
   SILGenFunctionBuilder builder(*this);
-  auto &SGM = *this;
+  auto &IGM = *this;
   auto *F = builder.getOrCreateFunction(
       getBestLocation(constant), constant, forDefinition,
-      [&SGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
-        return SGM.getFunction(constant, NotForDefinition);
+      [&IGM](SILLocation loc, SILDeclRef constant) -> SILFunction * {
+        return IGM.getFunction(constant, NotForDefinition);
       });
 
   assert(F && "SILFunction should have been defined");

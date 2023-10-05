@@ -51,6 +51,7 @@
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/Constants.h"
@@ -775,10 +776,8 @@ private:
     // include path set to the working directory.
     auto &HSI =
         CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
-    if (HSI.ModuleFileHomeIsCwd) {
-      Desc = ASTSourceDescriptor(Desc.getModuleName(), Opts.DebugCompilationDir,
-                                 Desc.getASTFile(), Desc.getSignature());
-    }
+    StringRef IncludePath =
+        HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -800,11 +799,11 @@ private:
                                    ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               Desc.getPath(), Signature, Desc.getASTFile());
+                               IncludePath, Signature, Desc.getASTFile());
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), Desc.getPath(), Signature,
+                             Desc.getModuleName(), IncludePath, Signature,
                              Desc.getASTFile());
   };
 
