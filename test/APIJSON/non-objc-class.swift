@@ -2,7 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5
-// RUN: %target-swift-api-extract -o - -pretty-print %t/MyModule.swiftinterface -module-name MyModule -module-cache-path %t/ModuleCache | %FileCheck %s
+// RUN: %target-swift-api-extract -o - -pretty-print %t/MyModule.swiftinterface -module-name MyModule -module-cache-path %t/ModuleCache | %FileCheck %s -check-prefixes=CHECK,CHECK-EXTRACT
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path - | %FileCheck %s --check-prefixes=CHECK,CHECK-EMIT
 
 import Foundation
 
@@ -30,19 +31,22 @@ public class NonObjC3 {
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_TtC8MyModule7NonObjC",
 // CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift",
 // CHECK-NEXT:     "linkage": "internal",
 // CHECK-NEXT:     "super": "",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "init",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift"
 // CHECK-NEXT:       },
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "testMethod",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "classMethods": []
@@ -50,14 +54,16 @@ public class NonObjC3 {
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_TtC8MyModule8NonObjC1",
 // CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift",
 // CHECK-NEXT:     "linkage": "internal",
 // CHECK-NEXT:     "super": "",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "testMethod",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "classMethods": []
@@ -65,14 +71,16 @@ public class NonObjC3 {
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_TtC8MyModule8NonObjC2",
 // CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift",
 // CHECK-NEXT:     "linkage": "internal",
 // CHECK-NEXT:     "super": "",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "testMethod",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "classMethods": []
@@ -80,14 +88,16 @@ public class NonObjC3 {
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_TtC8MyModule8NonObjC3",
 // CHECK-NEXT:     "access": "public",
-// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface",
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift",
 // CHECK-NEXT:     "linkage": "internal",
 // CHECK-NEXT:     "super": "",
 // CHECK-NEXT:     "instanceMethods": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "name": "init",
 // CHECK-NEXT:         "access": "public",
-// CHECK-NEXT:         "file": "/@input/MyModule.swiftinterface"
+// CHECK-EXTRACT-NEXT:  "file": "/@input/MyModule.swiftinterface"
+// CHECK-EMIT-NEXT:     "file": "SOURCE_DIR/test/APIJSON/non-objc-class.swift"
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "classMethods": []
