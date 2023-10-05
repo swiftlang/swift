@@ -124,17 +124,24 @@ show a helpful "Compare & Pull Request" button.
 
 ## Asking for code review
 
-If you had an active discussion with someone on how to implement your change,
-you can `@` mention them in the PR description and ask for code review.
-If you directly implemented the change without any guidance from anyone else,
-`@` mention someone from GitHub's suggested reviewers. If GitHub doesn't
-make any suggestions, ask the [Code Owner](https://github.com/apple/swift/blob/main/CODE_OWNERS.TXT) based on the
-component for your change. Please ask someone though! We don't want you to get
-stuck because you were not sure who to ask for code review.
+Collaborators and code owners are automatically requested for review per the
+[CODEOWNERS](/.github/CODEOWNERS) file. If no one is automatically requested for
+review, @mention and ask a suggested person under **Reviewers** to review your
+changes. If no reviewer suggestions are shown either, please
+[message][contributor-experience] the Contributor Experience Workgroup on the
+Swift forums to sort out review requests for you.
 
-At the beginning, contributors are not able to run the continuous integration
-(CI) bot, which builds the project and runs tests. Please ask your code
-reviewer(s) to invoke the bot for you.
+You are welcome to invite other people for review as well — say, someone you
+had an active discussion with on how to implement your change.
+Anyone with a GitHub account can review or comment on changes proposed to
+this repository!
+
+Contributors without
+[write access](https://swift.org/contributing/#commit-access) are not able to
+run the continuous integration (CI) bot, which builds the project and runs
+tests. Please ask a code reviewer with write access to invoke the bot for you.
+
+[contributor-experience]: https://forums.swift.org/g/contributor-experience-workgroup
 
 ## Responding to code review comments
 
