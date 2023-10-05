@@ -134,6 +134,11 @@ function(_add_target_variant_c_compile_link_flags)
                        "-fcoverage-mapping")
   endif()
 
+  # Use frame pointers on Linux
+  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+    list(APPEND result "-fno-omit-frame-pointer")
+  endif()
+
   _compute_lto_flag("${CFLAGS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     list(APPEND result "${_lto_flag_out}")
@@ -308,6 +313,11 @@ function(_add_target_variant_c_compile_flags)
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
     list(APPEND result "-fprofile-instr-generate"
                        "-fcoverage-mapping")
+  endif()
+
+  # Use frame pointers on Linux
+  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+    list(APPEND result "-fno-omit-frame-pointer")
   endif()
 
   if((CFLAGS_ARCH STREQUAL "armv7" OR CFLAGS_ARCH STREQUAL "aarch64") AND
@@ -933,6 +943,11 @@ function(add_swift_target_library_single target name)
     set(install_in_component "never_install")
   else()
     set(install_in_component "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+  endif()
+
+  # Use frame pointers on Linux
+  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 
   # FIXME: don't actually depend on the libraries in SWIFTLIB_SINGLE_LINK_LIBRARIES,
@@ -2605,6 +2620,10 @@ function(_add_swift_target_executable_single name)
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
       -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}")
+  endif()
+
+  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")
+    list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 
   handle_swift_sources(
