@@ -2761,10 +2761,17 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
   if (locator.isForRequirement(RequirementKind::Conformance)) {
     // Increase the impact of a conformance fix for a standard library
     // or foundation type, as it's unlikely to be a good suggestion.
-    if (resolvedTy->isStdlibType() ||
-        getKnownFoundationEntity(resolvedTy->getString())) {
-      impact += 2;
+    {
+      if (resolvedTy->isStdlibType()) {
+        impact += 2;
+      }
+
+      if (auto *NTD = resolvedTy->getAnyNominal()) {
+        if (getKnownFoundationEntity(NTD->getNameStr()))
+          impact += 2;
+      }
     }
+
     // Also do the same for the builtin compiler types Any and AnyObject, but
     // bump the impact even higher as they cannot conform to protocols at all.
     if (resolvedTy->isAny() || resolvedTy->isAnyObject())
