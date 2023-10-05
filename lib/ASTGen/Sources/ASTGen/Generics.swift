@@ -37,7 +37,7 @@ extension ASTGenVisitor {
         name: name,
         nameLoc: nameLoc,
         inheritedType: self.generate(node.inheritedType)?.rawValue,
-        index: SwiftInt(genericParameterIndex)
+        index: genericParameterIndex
       )
     )
   }

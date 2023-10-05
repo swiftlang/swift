@@ -412,7 +412,7 @@ extension Collection {
       }
     }
 
-    return .init(data: baseAddress, numElements: SwiftInt(self.count))
+    return .init(data: baseAddress, numElements: self.count)
   }
 }
 
@@ -426,7 +426,7 @@ extension LazyCollectionProtocol {
     let buffer = astgen.allocator.allocate(Element.self, count: self.count)
     _ = buffer.initialize(from: self)
 
-    return .init(data: buffer.baseAddress, numElements: SwiftInt(self.count))
+    return .init(data: buffer.baseAddress, numElements: self.count)
   }
 }
 
