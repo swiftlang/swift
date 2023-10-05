@@ -2674,24 +2674,30 @@ public:
         NTD->diagnose(diag::tuple_extension_nested_type, NTD);
         return;
       }
+    }
 
-      // We don't support protocols outside the top level of a file.
-      if (isa<ProtocolDecl>(NTD) &&
-          !DC->isModuleScopeContext()) {
-        NTD->diagnose(diag::unsupported_nested_protocol, NTD);
-        NTD->setInvalid();
-        return;
-      }
+    // We don't support protocols nested in generic contexts.
+    // This includes protocols nested in other protocols.
+    if (isa<ProtocolDecl>(NTD) && NTD->getParent()->isGenericContext()) {
+      if (auto *OuterPD = NTD->getParent()->getSelfProtocolDecl())
+        NTD->diagnose(diag::unsupported_nested_protocol_in_protocol, NTD,
+                      OuterPD);
+      else
+        NTD->diagnose(diag::unsupported_nested_protocol_in_generic, NTD);
 
-      // We don't support nested types in protocols.
-      if (auto proto = dyn_cast<ProtocolDecl>(parentDecl)) {
-        if (DC->getExtendedProtocolDecl()) {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
-                        proto);
-        } else {
-          NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
-        }
+      NTD->setInvalid();
+      return;
+    }
+
+    // We don't support nested types in protocols.
+    if (auto proto = dyn_cast<ProtocolDecl>(parentDecl)) {
+      if (DC->getExtendedProtocolDecl()) {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol_extension, NTD,
+                      proto);
+      } else {
+        NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
       }
+      NTD->setInvalid();
     }
 
     // We don't support nested types in generic functions yet.
@@ -2704,6 +2710,7 @@ public:
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_closure, NTD);
         }
+        NTD->setInvalid();
       }
     }
   }
@@ -3181,6 +3188,15 @@ public:
     // Check that all named primary associated types are valid.
     if (!PD->getPrimaryAssociatedTypeNames().empty())
       (void) PD->getPrimaryAssociatedTypes();
+
+    // We cannot compute the requirement signature of a protocol
+    // in a generic context, because superclass constraints
+    // may include implicitly inferred generic arguments that are
+    // not part of the protocol's generic signature.
+    if (PD->getParent()->isGenericContext()) {
+      assert(PD->isInvalid());
+      return;
+    }
 
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if

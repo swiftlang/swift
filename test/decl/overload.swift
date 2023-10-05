@@ -549,10 +549,9 @@ enum E2_52486 {
   static func fn(_ x: @escaping () -> Bool) -> E2_52486 {} // Okay
 }
 
-// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum E3_52486 {
-  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}}
-  case A
+  protocol A {} // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
 }
 
 enum E4_52486 {
@@ -565,10 +564,9 @@ enum E5_52486 {
   case C // expected-error {{invalid redeclaration of 'C'}}
 }
 
-// N.B. Redeclaration checks don't see this case because `protocol D` is invalid.
 enum E6_52486 {
-  case D
-  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}}
+  case D // expected-note {{'D' previously declared here}}
+  protocol D {} // expected-error {{invalid redeclaration of 'D'}}
 }
 
 enum E7_52486 {

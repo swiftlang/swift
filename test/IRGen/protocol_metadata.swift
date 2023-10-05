@@ -118,3 +118,60 @@ protocol Comprehensive {
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0 }
 
+  struct ParentType {
+
+    // NESTED: [[NESTED_NAME:@.*]] = private constant [7 x i8] c"Nested\00"
+    // NESTED: [[NESTED_RETURNVALUE_NAME:@.*]] = private constant [12 x i8] c"ReturnValue\00"
+
+    // NESTED: @"$s17protocol_metadata10ParentTypeV6NestedMp" = hidden constant
+    // NESTED-SAME: i32 65603,
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeVMn"
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeV6NestedMp", i32 0, i32 1)
+    // NESTED-SAME: [7 x i8]* [[NESTED_NAME]]
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeV6NestedMp", i32 0, i32 2)
+    // NESTED-SAME: i32 0,
+    // NESTED-SAME: i32 2,
+    // NESTED-SAME: [12 x i8]* [[NESTED_RETURNVALUE_NAME]]
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeV6NestedMp", i32 0, i32 5)
+    // NESTED-SAME: %swift.protocol_requirement { i32 7, i32 0 },
+    // NESTED-SAME: %swift.protocol_requirement { i32 17, i32 0 }
+    protocol Nested {
+      associatedtype ReturnValue
+      func doSomething() -> ReturnValue
+    }
+  }
+
+  extension ParentType {
+
+    // NESTED: [[NESTEDVIAEXT_NAME:@.*]] = private constant [19 x i8] c"NestedViaExtension\00"
+
+    // NESTED: @"$s17protocol_metadata10ParentTypeV18NestedViaExtensionMp" = hidden constant
+    // NESTED-SAME: i32 65603,
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeVMn"
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeV18NestedViaExtensionMp", i32 0, i32 1)
+    // NESTED-SAME: [19 x i8]* [[NESTEDVIAEXT_NAME]]
+    // NESTED-SAME: @"$s17protocol_metadata10ParentTypeV18NestedViaExtensionMp", i32 0, i32 2)
+    // NESTED-SAME: i32 0,
+    // NESTED-SAME: i32 1,
+    // NESTED-SAME: i32 0,
+    // NESTED-SAME: %swift.protocol_requirement { i32 17, i32 0 }
+    protocol NestedViaExtension {
+      func foo()
+    }
+  }
+
+  func parentFunc() {
+    // NESTED: @"$s17protocol_metadata10parentFuncyyF6NestedL_Mp" = internal constant
+    // NESTED-SAME: i32 65603,
+    // NESTED-SAME: @"$s17protocol_metadata10parentFuncyyF6NestedL_PMXX"
+    // NESTED-SAME: @"$s17protocol_metadata10parentFuncyyF6NestedL_Mp", i32 0, i32 1)
+    // NESTED-SAME: [7 x i8]* [[NESTED_NAME]]
+    // NESTED-SAME: @"$s17protocol_metadata10parentFuncyyF6NestedL_Mp", i32 0, i32 2)
+    // NESTED-SAME: i32 0,
+    // NESTED-SAME: i32 1,
+    // NESTED-SAME: i32 0,
+    // NESTED-SAME: %swift.protocol_requirement { i32 17, i32 0 }
+    protocol Nested {
+      func foo()
+    }
+  }

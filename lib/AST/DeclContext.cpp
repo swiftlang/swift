@@ -132,6 +132,10 @@ void DeclContext::forEachGenericContext(
       if (auto genericCtx = decl->getAsGenericContext())
         if (auto *gpList = genericCtx->getGenericParams())
           fn(gpList);
+
+      // Protocols do not capture outer generic parameters.
+      if (isa<ProtocolDecl>(decl))
+        return;
     }
   } while ((dc = dc->getParentForLookup()));
 }
@@ -259,8 +263,8 @@ DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
 }
 
 DeclContext *DeclContext::getParentForLookup() const {
-  if (isa<ProtocolDecl>(this) || isa<ExtensionDecl>(this)) {
-    // If we are inside a protocol or an extension, skip directly
+  if (isa<ExtensionDecl>(this)) {
+    // If we are inside an extension, skip directly
     // to the module scope context, without looking at any (invalid)
     // outer types.
     return getModuleScopeContext();
