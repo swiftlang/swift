@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 810; // access enforcement
+const uint16_t SWIFTMODULE_VERSION_MINOR = 811; // default argument isolation
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -525,6 +525,17 @@ enum class DefaultArgumentKind : uint8_t {
   StoredProperty,
 };
 using DefaultArgumentField = BCFixed<4>;
+
+/// These IDs must \em not be renumbered or reordered without incrementing
+/// the module version.
+enum class ActorIsolation : uint8_t {
+  Unspecified = 0,
+  ActorInstance,
+  Nonisolated,
+  GlobalActor,
+  GlobalActorUnsafe
+};
+using ActorIsolationField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1568,6 +1579,8 @@ namespace decls_block {
     BCFixed<1>,              // isCompileTimeConst?
     DefaultArgumentField,    // default argument kind
     TypeIDField,             // default argument type
+    ActorIsolationField,     // default argument isolation
+    TypeIDField,             // global actor isolation
     BCBlob                   // default argument text
   >;
 

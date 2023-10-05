@@ -5236,6 +5236,13 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "non-isolated context",
       (const ValueDecl *))
+ERROR(isolated_default_argument,none,
+      "%0 default argument cannot be synchronously evaluated from a "
+      "%1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(conflicting_default_argument_isolation,none,
+      "default argument cannot be both %0 and %1",
+      (ActorIsolation, ActorIsolation))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
