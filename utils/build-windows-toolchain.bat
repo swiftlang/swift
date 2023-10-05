@@ -269,8 +269,8 @@ cmake ^
 
   -G Ninja ^
   -S llvm-project\llvm || (exit /b)
-cmake --build "%BuildRoot%\1" || (exit /b)
-cmake --build "%BuildRoot%\1" --target install || (exit /b)
+cmake --build "%BuildRoot%\1" --target distribution || (exit /b)
+cmake --build "%BuildRoot%\1" --target install-distribution || (exit /b)
 
 :: Build Swift Standard Library
 cmake ^
