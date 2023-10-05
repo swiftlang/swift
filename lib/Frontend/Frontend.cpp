@@ -165,6 +165,14 @@ CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
 }
 
+std::string CompilerInvocation::getAPIDescriptorPathForWholeModule() const {
+  assert(
+      getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+      "APIDescriptorPath only makes sense when the whole module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.APIDescriptorOutputPath;
+}
+
 SerializationOptions CompilerInvocation::computeSerializationOptions(
     const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
   const FrontendOptions &opts = getFrontendOptions();

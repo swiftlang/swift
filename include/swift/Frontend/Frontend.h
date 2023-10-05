@@ -432,6 +432,11 @@ public:
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
 
+  /// APIDescriptorPath only makes sense in whole module compilation mode,
+  /// so return the APIDescriptorPath when in that mode and fail an assert
+  /// if not in that mode.
+  std::string getAPIDescriptorPathForWholeModule() const;
+
 public:
   /// Given the current configuration of this frontend invocation, a set of
   /// supplementary output paths, and a module, compute the appropriate set of

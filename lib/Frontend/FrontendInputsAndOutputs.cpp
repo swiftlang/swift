@@ -511,6 +511,12 @@ bool FrontendInputsAndOutputs::hasABIDescriptorOutputPath() const {
         return outs.ABIDescriptorOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasAPIDescriptorOutputPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.APIDescriptorOutputPath;
+      });
+}
 bool FrontendInputsAndOutputs::hasConstValuesOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

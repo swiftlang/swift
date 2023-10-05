@@ -2090,6 +2090,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_JSONDependencies:
       case file_types::TY_JSONFeatures:
       case file_types::TY_SwiftABIDescriptor:
+      case file_types::TY_SwiftAPIDescriptor:
       case file_types::TY_ConstValues:
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:

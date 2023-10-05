@@ -265,6 +265,7 @@ public:
   bool hasModuleInterfaceOutputPath() const;
   bool hasPrivateModuleInterfaceOutputPath() const;
   bool hasABIDescriptorOutputPath() const;
+  bool hasAPIDescriptorOutputPath() const;
   bool hasConstValuesOutputPath() const;
   bool hasModuleSemanticInfoOutputPath() const;
   bool hasModuleSummaryOutputPath() const;
