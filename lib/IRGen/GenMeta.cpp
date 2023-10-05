@@ -4996,33 +4996,63 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   }
 }
 
-void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
-                                      const ClassLayout &fragileLayout) {
-  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
-  assert(!classDecl->isForeign());
+static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
+                               SILVTable *vtable) {
+  SILType classType = SILType::getPrimitiveObjectType(classTy);
+  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
 
-  // Set up a dummy global to stand in for the metadata object while we produce
-  // relative references.
-  ConstantInitBuilder builder(IGM);
-  auto init = builder.beginStruct();
-  init.setPacked(true);
+  auto &fragileLayout =
+      classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
 
+  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
   auto strategy = IGM.getClassMetadataStrategy(classDecl);
   assert(strategy == ClassMetadataStrategy::FixedOrUpdate ||
          strategy == ClassMetadataStrategy::Fixed);
 
-  FixedClassMetadataBuilder metadataBuilder(IGM, classDecl, init,
-                                            fragileLayout);
-  metadataBuilder.layout();
-  bool canBeConstant = metadataBuilder.canBeConstant();
+  ConstantInitBuilder initBuilder(IGM);
+  auto init = initBuilder.beginStruct();
+  init.setPacked(true);
 
-  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+  assert(vtable);
+
+  FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
+                                    vtable);
+  builder.layout();
+  bool canBeConstant = builder.canBeConstant();
 
   StringRef section{};
-  bool isPattern = false;
-  auto var = IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
+  auto var = IGM.defineTypeMetadata(classTy, /*isPattern*/ false, canBeConstant,
                                     init.finishAndCreateFuture(), section);
   (void)var;
+}
+
+void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
+                                      const ClassLayout &fragileLayout) {
+  PrettyStackTraceDecl stackTraceRAII("emitting metadata for", classDecl);
+  assert(!classDecl->isForeign());
+  CanType declaredType = classDecl->getDeclaredType()->getCanonicalType();
+  SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
+  emitEmbeddedVTable(IGM, declaredType, vtable);
+}
+
+void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
+  // Might already be emitted, skip if that's the case.
+  auto entity =
+      LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
+  auto *existingVar = cast<llvm::GlobalVariable>(
+      IGM.getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo()));
+  if (!existingVar->isDeclaration()) {
+    return;
+  }
+
+  auto &context = classTy->getNominalOrBoundGenericNominal()->getASTContext();
+  PrettyStackTraceType stackTraceRAII(
+    context, "emitting lazy class metadata for", classTy);
+
+  SILType classType = SILType::getPrimitiveObjectType(classTy);
+  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
+  SILVTable *vtable = IGM.getSILModule().lookUpVTable(classDecl);
+  emitEmbeddedVTable(IGM, classTy, vtable);
 }
 
 void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
@@ -5032,28 +5062,8 @@ void irgen::emitLazySpecializedClassMetadata(IRGenModule &IGM,
     context, "emitting lazy specialized class metadata for", classTy);
 
   SILType classType = SILType::getPrimitiveObjectType(classTy);
-  auto &classTI = IGM.getTypeInfo(classType).as<ClassTypeInfo>();
-  
-  auto &fragileLayout =
-    classTI.getClassLayout(IGM, classType, /*forBackwardDeployment=*/true);
-
-  ClassDecl *classDecl = classType.getClassOrBoundGenericClass();
-
-  ConstantInitBuilder initBuilder(IGM);
-  auto init = initBuilder.beginStruct();
-  init.setPacked(true);
-
   SILVTable *vtable = IGM.getSILModule().lookUpSpecializedVTable(classType);
-  assert(vtable);
-
-  FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout, vtable);
-  builder.layout();
-  bool canBeConstant = builder.canBeConstant();
-
-  StringRef section{};
-  auto var = IGM.defineTypeMetadata(classTy, false, canBeConstant,
-                                    init.finishAndCreateFuture(), section);
-  (void)var;
+  emitEmbeddedVTable(IGM, classTy, vtable);
 }
 
 void irgen::emitSpecializedGenericClassMetadata(IRGenModule &IGM, CanType type,

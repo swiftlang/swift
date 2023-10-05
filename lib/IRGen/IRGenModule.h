@@ -327,6 +327,10 @@ private:
   /// The queue of lazy witness tables to emit.
   llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
 
+  llvm::SmallVector<CanType, 4> LazyClassMetadata;
+
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
+
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
 
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
@@ -476,6 +480,7 @@ public:
     }
   }
 
+  void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {

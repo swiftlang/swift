@@ -518,6 +518,17 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
   if (!Vtbl)
     return nullptr;
 
+  if (C->walkSuperclasses([&](ClassDecl *S) {
+    SILVTable *Vtbl = getSILLoader()->lookupVTable(S);
+    if (!Vtbl) {
+      return TypeWalker::Action::Stop;
+    }
+    VTableMap[C] = Vtbl;
+    return TypeWalker::Action::Continue;
+  })) {
+    return nullptr;
+  }
+
   // If we succeeded, map C -> VTbl in the table and return VTbl.
   VTableMap[C] = Vtbl;
   return Vtbl;
