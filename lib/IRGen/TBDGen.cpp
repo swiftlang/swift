@@ -81,7 +81,8 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     }
   }
 #endif
-  recorder.addSymbol(name, kind, source);
+  recorder.addSymbol(name, kind, source,
+                     DeclStack.empty() ? nullptr : DeclStack.back());
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -613,9 +614,8 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
     targets.push_back(targetVar);
   }
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
-    file.addSymbol(kind, symbol, targets);
-  };
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) { file.addSymbol(kind, symbol, targets); };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
@@ -626,7 +626,8 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
@@ -655,10 +656,11 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  bool isSPI(const ValueDecl* VD) {
-    assert(VD);
-    return VD->isSPI() || VD->isAvailableAsSPI();
+  static bool isSPI(const Decl *decl) {
+    assert(decl);
+    return decl->isSPI() || decl->isAvailableAsSPI();
   }
+
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
@@ -667,26 +669,17 @@ public:
   }
   ~APIGenRecorder() {}
 
-  void addSymbol(StringRef symbol, SymbolKind kind,
-                 SymbolSource source) override {
+  void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
+                 Decl *decl) override {
     if (kind != SymbolKind::GlobalSymbol)
       return;
 
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
-    if (source.kind == SymbolSource::Kind::SIL) {
-      auto ref = source.getSILDeclRef();
-      if (ref.hasDecl()) {
-        availability = getAvailability(ref.getDecl());
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
-    } else if (source.kind == SymbolSource::Kind::IR) {
-      auto ref = source.getIRLinkEntity();
-      if (ref.hasDecl()) {
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
+    if (decl) {
+      availability = getAvailability(decl);
+      if (isSPI(decl))
+        access = apigen::APIAccess::Private;
     }
 
     api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
@@ -712,7 +705,7 @@ public:
       if (method.getDecl()->getDescriptiveKind() ==
           DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
-      if (method.getDecl()->isSPI())
+      if (isSPI(method.getDecl()))
         access = apigen::APIAccess::Private;
     }
 
@@ -778,7 +771,7 @@ private:
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
             ? apigen::APILinkage::Exported
@@ -811,7 +804,7 @@ private:
     buildCategoryName(decl, cls, nameBuffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getMaxAccessLevel() == AccessLevel::Public
             ? apigen::APILinkage::Exported
@@ -863,7 +856,8 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = desc.getParentModule()->getASTContext();
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
-  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     SymbolSources->insert({symbol, source});
   };
 

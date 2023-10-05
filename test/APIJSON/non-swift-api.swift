@@ -4,7 +4,7 @@
 // RUN: cp %S/Inputs/module.modulemap %t/NativeDep.framework/Modules
 // RUN: cp %S/Inputs/NativeDep.h %t/NativeDep.framework/Headers
 
-// RUN: %target-swift-frontend %s -emit-module -emit-module-interface-path %t/MyModule.swiftinterface -emit-module-path %t/MyModule.swiftmodule -F %t -enable-library-evolution -module-cache-path %t/cache -module-name MyModule -swift-version 5
+// RUN: %target-swift-frontend %s -parse-as-library -emit-module -emit-module-interface-path %t/MyModule.swiftinterface -emit-module-path %t/MyModule.swiftmodule -F %t -enable-library-evolution -module-cache-path %t/cache -module-name MyModule -swift-version 5
 
 /// Check that both swiftmodule and swiftinterface can be used as input.
 // RUN: %target-swift-api-extract -o - -pretty-print %t/MyModule.swiftmodule -module-name MyModule -module-cache-path %t/cache -F %t | %FileCheck %s
