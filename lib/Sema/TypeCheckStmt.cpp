@@ -1679,10 +1679,26 @@ public:
     // Do-catch statements always limit exhaustivity checks.
     bool limitExhaustivityChecks = true;
 
+    Type caughtErrorType = TypeChecker::catchErrorType(Ctx, S);
     auto catches = S->getCatches();
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
-                          getASTContext().getErrorExistentialType());
+                          caughtErrorType);
+
+    if (!S->isSyntacticallyExhaustive()) {
+      // If we're implicitly rethrowing the error out of this do..catch, make
+      // sure that we can throw an error of this type out of this context.
+      // FIXME: Unify this lookup of the type with that from ThrowStmt.
+      if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
+        if (Type expectedErrorType = TheFunc->getThrownErrorType()) {
+          OpaqueValueExpr *opaque = new (Ctx) OpaqueValueExpr(
+              catches.back()->getEndLoc(), caughtErrorType);
+          Expr *rethrowExpr = opaque;
+          TypeChecker::typeCheckExpression(
+              rethrowExpr, DC, {expectedErrorType, CTP_ThrowStmt});
+        }
+      }
+    }
 
     return S;
   }
