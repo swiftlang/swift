@@ -1178,6 +1178,13 @@ void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 /// Whether the given expression can throw.
 bool canThrow(ASTContext &ctx, Expr *expr);
 
+/// Determine the error type that is thrown out of the body of the given
+/// do-catch statement.
+///
+/// The error type is used in the catch clauses and, for a nonexhausive
+/// do-catch, is implicitly rethrown out of the do...catch block.
+Type catchErrorType(ASTContext &ctx, DoCatchStmt *stmt);
+
 /// Given two error types, merge them into the "union" of both error types
 /// that is a supertype of both error types.
 Type errorUnion(Type type1, Type type2);
