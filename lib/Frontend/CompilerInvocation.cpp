@@ -2568,6 +2568,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_disable_autolink_framework)) {
     Opts.DisableAutolinkFrameworks.push_back(A->getValue());
   }
+  for (const Arg *A : Args.filtered(OPT_disable_autolink_library)) {
+    Opts.DisableAutolinkLibraries.push_back(A->getValue());
+  }
+  Opts.DisableFrameworkAutolinking = Args.hasArg(OPT_disable_autolink_frameworks);
+  Opts.DisableAllAutolinking = Args.hasArg(OPT_disable_all_autolinking);
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);

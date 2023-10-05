@@ -1459,21 +1459,33 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   // emit it into the IR of debugger expressions.
   if (Context.LangOpts.DebuggerSupport)
     return;
-  
-  switch (linkLib.getKind()) {
-  case LibraryKind::Library: {
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
-  case LibraryKind::Framework: {
-    // If we're supposed to disable autolinking of this framework, bail out.
-    auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
-    if (std::find(frameworks.begin(), frameworks.end(), linkLib.getName())
-          != frameworks.end())
-      return;
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
+
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  // '-disable-autolinking' means we will not auto-link
+  // any loaded library at all.
+  if (!IRGen.Opts.DisableAllAutolinking) {
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library: {
+      auto &libraries = IRGen.Opts.DisableAutolinkLibraries;
+      if (llvm::find(libraries, linkLib.getName()) != libraries.end())
+	return;
+      AutolinkEntries.emplace_back(linkLib);
+      break;
+    }
+    case LibraryKind::Framework: {
+      // 'disable-autolink-frameworks' means we will not auto-link
+      // any loaded framework.
+      if (!IRGen.Opts.DisableFrameworkAutolinking) {
+	auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
+	if (llvm::find(frameworks, linkLib.getName()) != frameworks.end())
+	  return;
+	AutolinkEntries.emplace_back(linkLib);
+      }
+      break;
+    }
+    }
   }
 
   if (linkLib.shouldForceLoad()) {
