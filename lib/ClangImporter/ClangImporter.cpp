@@ -1793,7 +1793,7 @@ bool ClangImporter::emitBridgingPCH(
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
-  auto LangOpts = invocation.getLangOpts();
+  auto &LangOpts = invocation.getLangOpts();
   LangOpts.NeededByPCHOrCompilationUsesPCH = true;
   LangOpts.CacheGeneratedPCH = cached;
 
@@ -1823,7 +1823,7 @@ bool ClangImporter::runPreprocessor(
     StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
-  auto LangOpts = invocation.getLangOpts();
+  auto &LangOpts = invocation.getLangOpts();
   auto &OutputOpts = invocation.getPreprocessorOutputOpts();
   OutputOpts.ShowCPP = 1;
   OutputOpts.ShowComments = 0;
