@@ -88,6 +88,38 @@ StdMapTestSuite.test("UnorderedMap.subscript") {
   expectNil(m[-1])
 }
 
+StdMapTestSuite.test("Map.filter") {
+  var m = initMap()
+  var n = initEmptyMap()
+
+  expectNotNil(m[1])
+  expectEqual(n.size(), 0)
+
+  m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in false }
+ 
+  expectNil(m[1])
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+  expectTrue(n.empty())
+}
+
+StdMapTestSuite.test("UnorderedMap.filter") {
+  var m = initUnorderedMap()
+  var n = initEmptyUnorderedMap()
+
+  expectNotNil(m[1])
+  expectEqual(n.size(), 0)
+
+  m = m.filter { k, v in k != 1 }
+  n = n.filter { k, v in false }
+
+  expectNil(m[1])
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+  expectTrue(n.empty())
+}
+
 StdMapTestSuite.test("Map.erase") {
   var m = initMap()
   expectNotNil(m[1])
