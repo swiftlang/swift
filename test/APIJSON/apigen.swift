@@ -43,6 +43,9 @@ public func myFunction1() {}
 @available(*, unavailable)
 public func myFunction2() {}
 
+@available(macOS 10.13, *)
+public var myGlobalVar: Int = 42
+
 // CHECK:      "target"
 // CHECK-NEXT: "globals": [
 // CHECK-NEXT:   {
@@ -65,6 +68,25 @@ public func myFunction2() {}
 // CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
 // CHECK-NEXT:     "linkage": "exported",
 // CHECK-NEXT:     "unavailable": true
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivM",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:     "linkage": "exported",
+// CHECK-NEXT:     "introduced": "10.13"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivg",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:     "linkage": "exported"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "name": "_$s8MyModule11myGlobalVarSivs",
+// CHECK-NEXT:     "access": "public",
+// CHECK-NEXT:     "file": "/@input/MyModule.swiftinterface",
+// CHECK-NEXT:     "linkage": "exported"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "name": "_$s8MyModule4TestC7method1yyFTj",
