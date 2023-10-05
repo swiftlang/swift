@@ -523,7 +523,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
     if (!Vtbl) {
       return TypeWalker::Action::Stop;
     }
-    VTableMap[C] = Vtbl;
+    VTableMap[S] = Vtbl;
     return TypeWalker::Action::Continue;
   })) {
     return nullptr;
