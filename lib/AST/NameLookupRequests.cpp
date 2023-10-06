@@ -452,12 +452,16 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "Looking up ";
   simple_display(out, desc.name);
   out << " in ";
-  simple_display(out, desc.decl);
+  if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.clangDecl)) {
+    namedDecl->printQualifiedName(out);
+  } else {
+    out << "<unnamed clang decl>";
+  }
 }
 
 SourceLoc
 swift::extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc) {
-  return extractNearestSourceLoc(desc.decl);
+  return SourceLoc();
 }
 
 //----------------------------------------------------------------------------//

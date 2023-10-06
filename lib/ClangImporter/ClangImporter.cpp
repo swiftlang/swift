@@ -4523,8 +4523,8 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
 
 static SmallVector<SwiftLookupTable::SingleEntry, 4>
 lookupInClassTemplateSpecialization(
-    ASTContext &ctx, const clang::ClassTemplateSpecializationDecl *clangDecl,
-    DeclName name) {
+    const ASTContext &ctx,
+    const clang::ClassTemplateSpecializationDecl *clangDecl, DeclName name) {
   // TODO: we could make this faster if we can cache class templates in the
   // lookup table as well.
   // Import all the names to figure out which ones we're looking for.
@@ -4573,7 +4573,7 @@ static bool isDirectLookupMemberContext(const clang::Decl *foundClangDecl,
 SmallVector<SwiftLookupTable::SingleEntry, 4>
 ClangDirectLookupRequest::evaluate(Evaluator &evaluator,
                                    ClangDirectLookupDescriptor desc) const {
-  auto &ctx = desc.decl->getASTContext();
+  auto &ctx = desc.ctx;
   auto *clangDecl = desc.clangDecl;
   // Class templates aren't in the lookup table.
   if (auto spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl))
@@ -4623,8 +4623,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
   TinyPtrVector<ValueDecl *> result;
   for (auto redecl : clangNamespaceDecl->redecls()) {
     auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangDirectLookupRequest({namespaceDecl, redecl, name}),
-        {});
+        ctx.evaluator, ClangDirectLookupRequest({ctx, redecl, name}), {});
 
     for (auto found : allResults) {
       auto clangMember = found.get<clang::NamedDecl *>();
@@ -5161,11 +5160,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
+  auto recordClangDecl = recordDecl->getClangDecl();
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
-      ctx.evaluator,
-      ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
+      ctx.evaluator, ClangDirectLookupRequest({ctx, recordClangDecl, name}),
       {});
 
   // Find the results that are actually a member of "recordDecl".
@@ -5173,8 +5172,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto found : allResults) {
     auto named = found.get<clang::NamedDecl *>();
-    if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
-        recordDecl->getClangDecl()) {
+    if (dyn_cast<clang::Decl>(named->getDeclContext()) == recordClangDecl) {
       // Don't import constructors on foreign reference types.
       if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
         continue;
@@ -5186,7 +5184,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   // If this is a C++ record, look through any base classes.
   if (auto cxxRecord =
-          dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl())) {
+          dyn_cast<clang::CXXRecordDecl>(recordClangDecl)) {
     // Capture the arity of already found members in the
     // current record, to avoid adding ambiguous members
     // from base classes.

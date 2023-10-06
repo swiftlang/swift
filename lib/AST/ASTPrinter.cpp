@@ -2426,7 +2426,7 @@ static void addNamespaceMembers(Decl *decl,
 
       auto lookupAndAddMembers = [&](DeclName name) {
         auto allResults = evaluateOrDefault(
-            ctx.evaluator, ClangDirectLookupRequest({decl, redecl, name}), {});
+            ctx.evaluator, ClangDirectLookupRequest({ctx, redecl, name}), {});
 
         for (auto found : allResults) {
           auto clangMember = found.get<clang::NamedDecl *>();
