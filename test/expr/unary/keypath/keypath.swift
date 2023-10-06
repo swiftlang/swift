@@ -1010,16 +1010,10 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   func kp(_: KeyPath<String?, Int>) {}
 
   kp(\.count) // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
-  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{8-8=?.}}
-  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{8-8=!.}}
   let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
-  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{37-37=?.}}
-  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{37-37=!.}}
 
   let _ : KeyPath<String?, Int> = \.utf8.count 
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
-  // expected-note@-2 {{chain the optional using '?.' to access unwrapped type member 'utf8'}} {{37-37=?.}}
-  // expected-note@-3 {{unwrap the optional using '!.' to access unwrapped type member 'utf8'}} {{37-37=!.}}
 }
 
 func testSyntaxErrors() {
@@ -1070,6 +1064,7 @@ func f_56996() {
 // Key-path missing optional crashes compiler: Inactive constraints left over?
 func f_55805() {
   let _: KeyPath<String?, Int?> = \.utf8.count
+  // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
   // expected-error@-2 {{value of optional type 'String.UTF8View?' must be unwrapped to refer to member 'count' of wrapped base type 'String.UTF8View'}}
   // expected-note@-3 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}
 }
