@@ -519,6 +519,9 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
     return nullptr;
 
   if (C->walkSuperclasses([&](ClassDecl *S) {
+    auto R = VTableMap.find(S);
+    if (R != VTableMap.end())
+      return TypeWalker::Action::Continue;
     SILVTable *Vtbl = getSILLoader()->lookupVTable(S);
     if (!Vtbl) {
       return TypeWalker::Action::Stop;
