@@ -23,7 +23,10 @@
 ///===------------------------------------------------------------------===///
 
 #include <chrono>
-#include <thread>
+#ifndef SWIFT_THREADING_NONE
+# include <thread>
+#endif
+#include <errno.h>
 #include "swift/Basic/ListMerger.h"
 
 #if __has_include(<time.h>)
@@ -195,6 +198,25 @@ static void recognizeReadyDelayedJobs() {
   DelayedJobQueue = nextDelayedJob;
 }
 
+static void sleepThisThreadUntil(JobDeadline deadline) {
+#ifdef SWIFT_THREADING_NONE
+  auto duration = deadline - std::chrono::steady_clock::now();
+  // If the deadline is in the past, don't sleep with invalid negative value
+  if (duration <= std::chrono::nanoseconds::zero()) {
+    return;
+  }
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration - sec);
+
+  struct timespec ts;
+  ts.tv_sec = sec.count();
+  ts.tv_nsec = ns.count();
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR);
+#else
+  std::this_thread::sleep_until(deadline);
+#endif
+}
+
 /// Claim the next job from the cooperative global queue.
 static Job *claimNextFromCooperativeGlobalQueue() {
   while (true) {
@@ -211,7 +233,7 @@ static Job *claimNextFromCooperativeGlobalQueue() {
     // TODO: should the donator have some say in this?
     if (auto delayedJob = DelayedJobQueue) {
       auto deadline = JobDeadlineStorage<>::get(delayedJob);
-      std::this_thread::sleep_until(deadline);
+      sleepThisThreadUntil(deadline);
       continue;
     }
 

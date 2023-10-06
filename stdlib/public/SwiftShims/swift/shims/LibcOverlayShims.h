@@ -76,7 +76,7 @@ static inline void _swift_stdlib_setErrno(int value) {
 }
 
 // Semaphores <semaphore.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if (!defined(_WIN32) && !defined(__wasi__)) || defined(__CYGWIN__)
 static inline sem_t *_stdlib_sem_open2(const char *name, int oflag) {
   return sem_open(name, oflag);
 }
