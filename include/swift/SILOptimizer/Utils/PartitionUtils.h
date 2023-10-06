@@ -322,7 +322,7 @@ public:
   // so set to false to begin with
   Partition(bool canonical) : labels({}), canonical(canonical) {}
 
-  static Partition singleRegion(std::vector<Element> indices) {
+  static Partition singleRegion(ArrayRef<Element> indices) {
     Partition p;
     if (!indices.empty()) {
       Region min_index =
