@@ -933,6 +933,7 @@ func continue1() -> Int {
 func return1() -> Int {
   // Make sure we always reject a return.
   let i = if .random() {
+    ()
     do {
       for _ in [0] {
         while true {
@@ -1502,6 +1503,11 @@ struct SomeEraserP: EraserP {}
 // rdar://113435870 - Make sure we allow an implicit init(erasing:) call.
 dynamic func testDynamicOpaqueErase() -> some EraserP {
   if .random() { SomeEraserP() } else { SomeEraserP() }
+}
+
+struct NonExhaustiveProperty {
+  let i = if .random() { 0 }
+  // expected-error@-1 {{'if' must have an unconditional 'else' to be used as expression}}
 }
 
 // MARK: Out of place if exprs
