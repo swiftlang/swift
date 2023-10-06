@@ -474,3 +474,16 @@ var binExprRes = 1 + freeFoo(42) + 3
 // CHECK-NEXT13: SUBSTITUTIONS END
 // CHECK13: -----
 // CHECK13: SECONDARY SYMBOLS END
+
+func bar<S>(s: S) {}
+func foo<T>(t: T) {
+  bar(s: t)
+}
+
+var d = B<Int>.C<Int, Int>.D<Int, Int>() // currently does not work
+
+struct Bar<T> {
+    init(arg a: T) {}
+}
+func foo<T>(t: T) {}
+foo(t: Bar(arg: 1))
