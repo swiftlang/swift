@@ -23,6 +23,203 @@
 
 namespace swift {
 
+/// MARK: diagnostic utilities
+
+/// Finds a SourceRange to remove an inverse of \c kp applied to the type decl.
+static
+SourceRange findInverseRemovalRange(const TypeDecl *typeDecl,
+                                    KnownProtocolKind targetProto) {
+  auto inheritedTypes = typeDecl->getInherited();
+
+  // Check inheritance clause.
+  auto entries = inheritedTypes.getEntries();
+  for (size_t i = 0; i < entries.size(); i++) {
+    auto entry = entries[i];
+
+    auto *repr = entry.getTypeRepr();
+    if (dyn_cast_or_null<InverseTypeRepr>(repr))
+      if (auto kp = entry.getType()->getKnownProtocol())
+        if (kp == targetProto)
+          return inheritedTypes.getRemovalRange(i);
+  }
+
+  // TODO: check where clause.
+
+  return SourceRange();
+}
+
+/// Adds the appropriate fix-it to make the given nominal conform to \c proto.
+static void addConformanceFixIt(const NominalTypeDecl *nominal,
+                                InFlightDiagnostic &diag,
+                                KnownProtocolKind proto,
+                                bool inverse) {
+  SmallString<64> text;
+  if (nominal->getInherited().empty()) {
+    SourceLoc fixItLoc = nominal->getBraces().Start;
+    text.append(": ");
+    if (inverse) text.append("~");
+    text.append(getProtocolName(proto));
+    diag.fixItInsert(fixItLoc, text);
+  } else {
+    auto fixItLoc = nominal->getInherited().getEndLoc();
+    text.append(", ");
+    if (inverse) text.append("~");
+    text.append(getProtocolName(proto));
+    diag.fixItInsertAfter(fixItLoc, text);
+  }
+}
+
+/// Emit fix-it's to help the user resolve a containment issue where the
+/// \c nonConformingTy needs to be made to conform to \c kp to resolve a
+/// containment issue.
+/// \param enclosingNom is the nominal type containing a nonconforming value
+/// \param nonConformingTy is the type of the nonconforming value
+static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
+                                     Type nonConformingTy,
+                                     KnownProtocolKind kp) {
+  auto *module = enclosingNom->getParentModule();
+
+  // First and most universal suggestion, add the inverse to the enclosing type.
+  {
+    auto diag = enclosingNom->diagnose(diag::add_inverse_for_containment,
+                                       enclosingNom,
+                                       getProtocolName(kp));
+    addConformanceFixIt(enclosingNom, diag, kp, /*inverse=*/true);
+  }
+
+  // If it's a generic parameter defined in the same module, suggest removing
+  // the ~KP constraint
+  if (auto genericArchetype = nonConformingTy->getAs<ArchetypeType>()) {
+    auto interfaceType = genericArchetype->getInterfaceType();
+    if (auto genericParamType =
+        interfaceType->getAs<GenericTypeParamType>()) {
+      auto *genericParamTypeDecl = genericParamType->getDecl();
+      if (genericParamTypeDecl &&
+          genericParamTypeDecl->getModuleContext() == module) {
+        auto diag = genericParamTypeDecl->diagnose(
+            diag::remove_inverse_on_generic_parameter_for_conformance,
+            nonConformingTy, getProtocolName(kp));
+
+        if (auto range = findInverseRemovalRange(genericParamTypeDecl, kp))
+          diag.fixItRemove(range);
+      }
+    }
+
+    // If the offending type is a nominal defined in the same module...
+  } else if (auto nominal = nonConformingTy->getAnyNominal()) {
+    if (nominal->getModuleContext() == module) {
+      // if it has a ~KP on it explicitly, suggest removing it.
+      if (auto range = findInverseRemovalRange(nominal, kp)) {
+        nominal->diagnose(
+                diag::remove_inverse_on_nominal_for_conformance,
+                nominal, getProtocolName(kp))
+            .fixItRemove(range);
+      } else if (kp == KnownProtocolKind::Copyable) {
+        // Otherwise, it became noncopyable due to a ~Copyable on one of its
+        // generic params, so suggest adding an explicit Copyable in the
+        // inheritance clause.
+        auto diag = nominal->diagnose(
+            diag::add_explicit_protocol_for_conformance,
+            nominal, getProtocolName(kp));
+        addConformanceFixIt(nominal, diag, kp, /*inverse=*/false);
+      }
+    }
+  }
+}
+
+/// MARK: conformance queries
+
+bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
+                                    CanType type) const {
+  assert(!type->hasTypeParameter() // && !type->hasUnboundGenericType()
+             && "forgot to mapTypeIntoContext first");
+  auto &ctx = type->getASTContext();
+
+  auto *protocol =
+      TypeChecker::getProtocol(ctx, SourceLoc(), KnownProtocolKind::Copyable);
+  if (!protocol)
+    llvm_unreachable("missing Copyable protocol!");
+
+  const bool conforms =
+      (bool)TypeChecker::conformsToProtocol(type,
+                                            protocol,
+                                            protocol->getParentModule(),
+                                            /*allowMissing=*/false);
+
+  return !conforms;
+}
+
+/// MARK: conformance checking
+
+bool checkCopyableConformance(ProtocolConformance *conformance) {
+  auto *proto = conformance->getProtocol();
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Copyable));
+
+  auto *nom = conformance->getType()->getAnyNominal();
+  assert(nom && "non-nominal with conformance?");
+  if (!nom)
+    return false;
+
+  // All classes can store noncopyable values.
+  if (isa<ClassDecl>(nom))
+    return true;
+
+  // Protocols do not directly define any storage.
+  if (isa<ProtocolDecl>(nom))
+    return true;
+
+  if (isa<BuiltinTupleDecl>(nom))
+    llvm_unreachable("TODO: BuiltinTupleDecl");
+
+  // NOTE: A deinit prevents a struct or enum from conforming to Copyable, but
+  // we will emit an error for that elsewhere already.
+
+  // Otherwise, we have to check its storage to ensure it is all Copyable.
+
+  class HasNoncopyable: public StorageVisitor {
+    NominalTypeDecl *Nominal;
+    DeclContext *DC;
+    bool Diagnosing;
+  public:
+    HasNoncopyable(NominalTypeDecl *nom, DeclContext *dc, bool diagnose)
+        : Nominal(nom), DC(dc), Diagnosing(diagnose) {}
+
+    bool visit() { return StorageVisitor::visit(Nominal, DC); }
+
+    bool check(ValueDecl *storage, Type type, bool isEnum) {
+      // ignore invalid storage.
+      if (type->hasError())
+        return false;
+
+      if (!type->isNoncopyable(DC))
+        return false;
+
+      if (!Diagnosing)
+        return true; // it's noncopyable
+
+      storage->diagnose(diag::noncopyable_type_member_in_copyable, type,
+                        isEnum, storage->getName(), Nominal);
+
+      tryEmitContainmentFixits(Nominal, type, KnownProtocolKind::Copyable);
+      return true;
+    }
+
+    /// Handle a stored property.
+    /// \returns true iff this visitor should stop its walk over the nominal.
+    bool operator()(VarDecl *property, Type propertyType) override {
+      return check(property, propertyType, /*isEnum=*/false);
+    }
+
+    /// Handle an enum associated value.
+    /// \returns true iff this visitor should stop its walk over the nominal.
+    bool operator()(EnumElementDecl *element, Type elementType) override {
+      return check(element, elementType, /*isEnum=*/true);
+    }
+  };
+
+  // This nominal cannot be Copyable if it contains noncopyable storage.
+  return !HasNoncopyable(nom, nom, /*diagnose=*/true).visit();
+}
 
 /// Visit the instance storage of the given nominal type as seen through
 /// the given declaration context.
@@ -60,60 +257,9 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
   return false;
 }
 
-bool canBeNoncopyable(Type type) {
-  auto &ctx = type->getASTContext();
-  if (auto *nominal = type->getNominalOrBoundGenericNominal())
-    return evaluateOrDefault(ctx.evaluator, IsNoncopyableRequest{nominal},
-                             /*default=*/false);
-
-  if (auto *expansion = type->getAs<PackExpansionType>()) {
-    return canBeNoncopyable(expansion->getPatternType());
-  }
-
-  // if any components of the tuple are move-only, then the tuple is move-only.
-  if (auto *tupl = type->getCanonicalType()->getAs<TupleType>()) {
-    for (auto eltTy : tupl->getElementTypes())
-      if (canBeNoncopyable(eltTy))
-        return true;
-  }
-
-  return false; // otherwise, the conservative assumption is it's copyable.
-}
-
-bool isNoncopyable(Type type, DeclContext *dc) { return !isCopyable(type, dc); }
-
-bool isCopyable(Type type, DeclContext *dc) {
-  assert(dc);
-  auto contextTy = dc->mapTypeIntoContext(type);
-  auto *module = dc->getParentModule();
-  return TypeChecker::conformsToKnownProtocol(contextTy,
-                                              KnownProtocolKind::Copyable,
-                                              module, false);
-}
-
-/// \returns true iff the given nominal meets the requirements of Copyable>
-bool checkCopyableConformance(Evaluator &evaluator,
-                              NominalTypeDecl *nom) {
-  // All classes can store noncopyable values.
-  if (isa<ClassDecl>(nom))
-    return true;
-
-  // Protocols do not directly define any storage.
-  if (isa<ProtocolDecl>(nom))
-    return true;
-
-  if (isa<BuiltinTupleDecl>(nom))
-    llvm_unreachable("unexpected BuiltinTupleDecl");
-
-  if (auto strct = dyn_cast<StructDecl>(nom)) {
-    for (auto stored : strct->getStoredProperties()) {
-//      stored->getInterfaceType()
-//      ImplicitKnownProtocolConformanceRequest
-    }
-  }
-
-}
-
+/// Produces implicit ProtocolConformances for known protocols. Does _not_ check
+/// whether the conformance is valid. That's done in a different step
+/// (see `TypeChecker::checkConformancesInContext`).
 ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
                                                     NominalTypeDecl *nominal,
                                                     KnownProtocolKind kp) {
@@ -122,12 +268,10 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
 
   switch (kp) {
   case KnownProtocolKind::Copyable: {
-    if (evaluateOrDefault(evaluator, IsNoncopyableRequest{nominal}, false))
+    if (evaluateOrDefault(evaluator, HasNoncopyableAnnotationRequest{nominal}, false))
       return nullptr; // it's not Copyable.
 
-    // Otherwise, verify Copyable conformance.
-
-
+    // TODO: generate conditional conformances implied by ~Copyable on generic params.
 
     // form a full unconditional conformance to Copyable.
     auto conformance = ctx.getNormalConformance(
@@ -139,7 +283,6 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
 
     nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
-
   }
   default:
     llvm_unreachable("not invertible");

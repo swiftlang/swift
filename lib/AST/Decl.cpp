@@ -4836,11 +4836,10 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
 }
 
 bool TypeDecl::isNoncopyable() const {
-  assert(!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)
-  && "TypeDecl::isNoncopyable() is not compatible with NoncopyableGenerics");
-
+  // NOTE: must answer true iff it is unconditionally noncopyable.
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsNoncopyableRequest{const_cast<TypeDecl *>(this)},
+                           HasNoncopyableAnnotationRequest{
+                               const_cast<TypeDecl *>(this)},
                            true); // default to true for safety
 }
 

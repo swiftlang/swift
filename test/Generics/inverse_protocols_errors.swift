@@ -3,14 +3,23 @@
 // REQUIRES: asserts
 
 protocol RegularProto {}
-protocol NCProto: ~Copyable, RegularProto {} // FIXME: ought to diagnose
+protocol NCProto: ~Copyable, RegularProto { // FIXME: diagnose the ~Copyable annotation when it's implied.
+  func checkIfCopyableSelf(_ s: Self)
+}
 
 protocol Hello: ~Copyable {
-  func greet(_ s: Self) // FIXME: should complain about no ownership!
+  func greet(_ s: Self)
+  // expected-error@-1 {{noncopyable parameter must specify its ownership}}
+  // expected-note@-2 {{add 'borrowing' for an immutable reference}}
+  // expected-note@-3 {{add 'inout' for a mutable reference}}
+  // expected-note@-4 {{add 'consuming' to take the value from the caller}}
+
+  func salute(_ s: borrowing Self)
 }
 
 struct RegularStruct: Hello {
     func greet(_ s: Self) {}
+    func salute(_ s: Self) {}
 }
 
 struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
@@ -23,5 +32,11 @@ struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 
-  func setThinger(_ t: T) {} // FIXME: should complain about no ownership!
+  func salute(_ s: borrowing Self) {}
+
+  func setThinger(_ t: T) {}
+  // expected-error@-1 {{noncopyable parameter must specify its ownership}}
+  // expected-note@-2 {{add 'borrowing' for an immutable reference}}
+  // expected-note@-3 {{add 'inout' for a mutable reference}}
+  // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 }

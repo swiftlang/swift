@@ -314,21 +314,21 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isNoncopyable computation.
+// hasNoncopyableAnnotation computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> IsNoncopyableRequest::getCachedResult() const {
+llvm::Optional<bool> HasNoncopyableAnnotationRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isNoncopyableComputed)
-    return decl->LazySemanticInfo.isNoncopyable;
+  if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
+    return decl->LazySemanticInfo.hasNoncopyableAnnotation;
 
   return llvm::None;
 }
 
-void IsNoncopyableRequest::cacheResult(bool value) const {
+void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isNoncopyableComputed = true;
-  decl->LazySemanticInfo.isNoncopyable = value;
+  decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
+  decl->LazySemanticInfo.hasNoncopyableAnnotation = value;
 
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     // Add an attribute for printing

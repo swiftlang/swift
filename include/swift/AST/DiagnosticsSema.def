@@ -7452,6 +7452,25 @@ ERROR(accessor_macro_not_single_var, none,
 ERROR(noncopyable_class, none,
       "classes cannot be noncopyable",
       ())
+ERROR(noncopyable_type_member_in_copyable,none,
+      "%select{stored property %2|associated value %2}1 of "
+      "'Copyable'-conforming %kind3 has noncopyable type %0",
+      (Type, bool, DeclName, const ValueDecl *))
+NOTE(add_inverse_for_containment,none,
+     "consider removing implicit '%1' conformance from %kind0",
+     (const ValueDecl *, StringRef))
+NOTE(remove_inverse_on_generic_parameter_for_conformance,none,
+     "consider removing '~%1' from generic parameter %0 so it conforms to the '%1' protocol",
+     (Type, StringRef))
+NOTE(remove_inverse_on_nominal_for_conformance,none,
+     "consider removing '~%1' from %kind0 so it conforms to the '%1' protocol",
+     (const ValueDecl *, StringRef))
+NOTE(add_explicit_protocol_for_conformance,none,
+     "consider making %kind0 explicitly conform to the '%1' protocol",
+     (const ValueDecl *, StringRef))
+
+// -- older ones below --
+
 ERROR(noncopyable_within_copyable, none,
       "%kind0 cannot contain a noncopyable type without also being noncopyable",
       (const ValueDecl *))

@@ -1795,16 +1795,21 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
-  // Only metatypes of Copyable types are Copyable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
-      !metatypeType->getInstanceType()->isNoncopyable()) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics) &&
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    // Only metatypes of Copyable types are Copyable.
+    if (metatypeType->getInstanceType()->isNoncopyable()) {
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+    } else {
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
+                                    BuiltinConformanceKind::Synthesized));
+    }
   }
 
-  // All metatypes are Sendable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All metatypes are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -1876,9 +1881,10 @@ LookupConformanceInModuleRequest::evaluate(
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
-    // All archetypes conform to Copyable since they represent a generic.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
-      return ProtocolConformanceRef(protocol);
+    // Without noncopyable generics, all archetypes are Copyable
+    if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
+        return ProtocolConformanceRef(protocol);
 
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
@@ -2002,6 +2008,18 @@ LookupConformanceInModuleRequest::evaluate(
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
     } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+
+      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+        // Return an abstract conformance to maintain legacy compatability.
+        // We only need to do this until we are properly dealing with or
+        // omitting Copyable conformances in modules/interfaces.
+
+        if (nominal->isNoncopyable())
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        else
+          return ProtocolConformanceRef(protocol);
+      }
+
       // Try to infer Copyable conformance.
       ImplicitKnownProtocolConformanceRequest
           cvRequest{nominal, KnownProtocolKind::Copyable};

@@ -3110,13 +3110,13 @@ private:
   ArrayRef<InheritedEntry> Inherited;
 
   struct {
-    /// Whether the "isNoncopyable" bit has been computed yet.
-    unsigned isNoncopyableComputed : 1;
+    /// Whether the "hasNoncopyableAnnotation" bit has been computed yet.
+    unsigned isNoncopyableAnnotationComputed : 1;
 
-    /// Whether this declaration supports copying.
-    unsigned isNoncopyable : 1;
+    /// Whether this declaration had a noncopyable inverse written somewhere.
+    unsigned hasNoncopyableAnnotation : 1;
   } LazySemanticInfo = { };
-  friend class IsNoncopyableRequest;
+  friend class HasNoncopyableAnnotationRequest;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,

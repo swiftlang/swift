@@ -407,9 +407,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration is noncopyable
-class IsNoncopyableRequest
-    : public SimpleRequest<IsNoncopyableRequest, bool(TypeDecl *),
+/// Determine whether the given declaration has any markings that would cause it
+/// to not have an implicit, unconditional conformance to Copyable.
+class HasNoncopyableAnnotationRequest
+    : public SimpleRequest<HasNoncopyableAnnotationRequest, bool(TypeDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -419,6 +420,45 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, TypeDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether the given type is noncopyable. Assumes type parameters
+/// have become archetypes.
+class IsNoncopyableRequest
+    : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, CanType type) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Determine whether the given declaration is escapable.
+class IsEscapableRequest
+    : public SimpleRequest<IsEscapableRequest, bool(ValueDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
   // Separate caching.
@@ -446,6 +486,25 @@ public:
   bool isCached() const { return true; }
   llvm::Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Determine whether the given type is noncopyable. Assumes type parameters
+/// have become archetypes.
+class IsNoncopyableRequest
+    : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, CanType type) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// Determine whether the given declaration is 'dynamic''.

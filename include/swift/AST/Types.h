@@ -100,6 +100,7 @@ class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
 class ErrorExpr;
+enum class KnownProtocolKind : uint8_t;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -636,8 +637,11 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this is a noncopyable type.
+  /// DEPRECIATED: Returns true if this is a noncopyable type.
   bool isNoncopyable();
+
+  /// Returns true if this type lacks conformance to Copyable in the context.
+  bool isNoncopyable(const DeclContext *dc);
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }

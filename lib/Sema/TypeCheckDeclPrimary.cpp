@@ -1773,7 +1773,7 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
       proto->getSelfInterfaceType());
-  const bool enabledNoncopyableGenerics =
+  const bool EnabledNoncopyableGenerics =
       proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   for (auto *otherProto : requiredProtos) {
@@ -1781,13 +1781,13 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (otherProto == proto)
       continue;
 
-    if (enabledNoncopyableGenerics) {
+    if (EnabledNoncopyableGenerics) {
       // For any protocol 'P', there is an implied requirement 'Self: Copyable',
       // unless it was suppressed via `Self: ~Copyable`; so skip if present.
       if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
         continue;
 
-      // TODO: report that something implied Copyable despite writing ~Copyable
+      // TODO: report that something implied Copyable despite writing ~Copyable?
     }
 
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol
@@ -2453,7 +2453,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (var->getInterfaceType()->isNoncopyable()) {
+      if (var->getInterfaceType()->isNoncopyable(DC)) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {

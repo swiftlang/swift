@@ -914,32 +914,52 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool IsNoncopyableRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
-  assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
+bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
+  auto &ctx = decl->getASTContext();
 
-  // The legacy check.
-  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
-    if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
-      if (!decl->getASTContext().supportsMoveOnlyTypes())
+  // ----------------
+  // The legacy check
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
+      if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+        if (!decl->getASTContext().supportsMoveOnlyTypes())
           decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
-      return true;
+        return true;
+      }
     }
+    return false;
+  }
+  // ----------------
+
+  // FIXME: just never allow lexical-lifetimes to be disabled?
+  if (!ctx.supportsMoveOnlyTypes())
+    decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+  if (isa<TypeAliasDecl>(decl)) {
+    llvm_unreachable("todo: handle type aliases");
   }
 
-  auto &ctx = decl->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
-    return false;
+  assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
 
-  // For protocols, inspect its requirement signature for a Copyable requirement
+  // For protocols, inspect its generic signature for a Copyable requirement
   if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    auto reqs = proto->getRequirementSignature().getRequirements();
-    for (auto &req : reqs) {
-      if (req.getKind() == RequirementKind::Conformance)
-        if (auto kp = req.getSecondType()->getKnownProtocol())
-          if (*kp == KnownProtocolKind::Copyable)
-            return false; // found a Copyable requirement
-    }
+    auto *copyableProto = ctx.getProtocol(KnownProtocolKind::Copyable);
+    if (!copyableProto)
+      llvm_unreachable("missing Copyable protocol!");
+
+    auto sig = proto->getGenericSignature();
+    auto requiresCopyable =
+        sig->requiresProtocol(proto->getSelfInterfaceType(), copyableProto);
+
+    // TODO: report that something implied Copyable despite writing ~Copyable?
+
+    return !requiresCopyable;
+  }
+
+  // Handle the legacy '@_moveOnly' attribute
+  if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
     return true;
   }
 

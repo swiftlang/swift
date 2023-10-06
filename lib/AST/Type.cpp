@@ -157,25 +157,73 @@ bool TypeBase::isMarkerExistential() {
   return true;
 }
 
-bool TypeBase::isNoncopyable() {
-  assert(!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)
-  && "TypeBase::isNoncopyable() is not compatible with NoncopyableGenerics");
+/// Returns true if this type is _always_ Copyable using the legacy check
+/// that does not rely on conformances.
+static bool alwaysNoncopyable(Type ty) {
+  if (auto *nominal = ty->getNominalOrBoundGenericNominal())
+    return nominal->isNoncopyable();
 
-  if (auto *nom = getAnyNominal())
-    return nom->isNoncopyable();
-
-  if (auto *expansion = getAs<PackExpansionType>()) {
-    return expansion->getPatternType()->isNoncopyable();
+  if (auto *expansion = ty->getAs<PackExpansionType>()) {
+    return alwaysNoncopyable(expansion->getPatternType());
   }
 
   // if any components of the tuple are move-only, then the tuple is move-only.
-  if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
+  if (auto *tupl = ty->getCanonicalType()->getAs<TupleType>()) {
     for (auto eltTy : tupl->getElementTypes())
-      if (eltTy->isNoncopyable())
+      if (alwaysNoncopyable(eltTy))
         return true;
   }
 
-  return false;
+  return false; // otherwise, the conservative assumption is it's copyable.
+}
+
+/// \returns true iff this type lacks conformance to Copyable, using the given
+/// context to substitute unbound types.
+bool TypeBase::isNoncopyable(const DeclContext *dc) {
+  assert(dc);
+
+  /** FIXME: seems this is busted :(
+  // Fast-path for type parameters; ask the generic signature directly and
+  // cache that answer.
+  if (isTypeParameter()) {
+    auto canType = getCanonicalType();
+    auto &ctx = canType->getASTContext();
+    IsNoncopyableRequest req {canType};
+
+    if (ctx.evaluator.hasCachedResult(req))
+      return evaluateOrDefault(ctx.evaluator, req, true);
+
+    auto *copyableProto = ctx.getProtocol(KnownProtocolKind::Copyable);
+    if (!copyableProto)
+      llvm_unreachable("missing Copyable protocol!");
+
+    auto sig = dc->getGenericSignatureOfContext();
+    bool isNoncopyable = !sig->requiresProtocol(canType, copyableProto);
+    ctx.evaluator.cacheOutput(req, isNoncopyable == true);
+
+    return isNoncopyable;
+  }
+  */
+
+  if (!hasArchetype() || hasOpenedExistential())
+  // TODO: the need for the following test is suspicious.
+    if (dc->getGenericEnvironmentOfContext() || !hasTypeParameter())
+      return dc->mapTypeIntoContext(this)->isNoncopyable();
+
+  return isNoncopyable();
+}
+
+/// \returns true iff this type lacks conformance to Copyable.
+bool TypeBase::isNoncopyable() {
+  auto canType = getCanonicalType();
+  auto &ctx = canType->getASTContext();
+
+  // for legacy-mode queries that are not dependent on conformances to Copyable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return alwaysNoncopyable(canType);
+
+  IsNoncopyableRequest request{canType};
+  return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
 }
 
 bool TypeBase::isPlaceholder() {
