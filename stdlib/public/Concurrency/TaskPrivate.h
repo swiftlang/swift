@@ -1134,32 +1134,6 @@ inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
 
-// ==== Task Executor Preference ----------------------------------------------
-
-inline void AsyncTask::pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
-  assert(false && "not implemented yet");
-
-  void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
-  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
-  SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
-
-  // FIXME: LOCKING
-    assert(false && "not implemented adding to existing");
-//    auto addedRecord = addStatusRecordToSelf(
-//        record,
-//        [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
-//
-//
-//    });
-//    assert(addedRecord);
-
-}
-
-inline void AsyncTask::popTaskExecutorPreference() {
-  assert(false && "not implemented yet");
-}
-
-
 } // end namespace swift
 
 #endif

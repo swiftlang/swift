@@ -136,7 +136,7 @@ public:
 
   llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
   llvm::Optional<FuncDecl *> GetMainExecutor;
-  llvm::Optional<FuncDecl *> GetTaskExecutor;
+  llvm::Optional<FuncDecl *> GetPreferredTaskExecutor;
   llvm::Optional<FuncDecl *> SwiftJobRun;
   llvm::Optional<FuncDecl *> ExitFunc;
 

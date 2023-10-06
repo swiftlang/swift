@@ -546,10 +546,11 @@ ExecutorRef swift_task_getPreferredTaskExecutor();
 
 /// Push an executor preference onto the current task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_pushTaskExecutorPreference(ExecutorRef executor);
+TaskExecutorPreferenceStatusRecord*
+swift_task_pushTaskExecutorPreference(ExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_popTaskExecutorPreference();
+void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);

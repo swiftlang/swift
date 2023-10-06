@@ -509,7 +509,7 @@ FuncDecl *SILGenModule::getGetMainExecutor() {
 }
 
 FuncDecl *SILGenModule::getPreferredTaskExecutor() {
-  return lookupConcurrencyIntrinsic(getASTContext(), GetTaskExecutor,
+  return lookupConcurrencyIntrinsic(getASTContext(), GetPreferredTaskExecutor,
                                     "_getPreferredTaskExecutor");
 }
 

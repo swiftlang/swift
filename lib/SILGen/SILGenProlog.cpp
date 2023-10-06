@@ -1633,6 +1633,13 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
                         executor, /*mandatory*/ true);
 }
 
+/// Exposed for Builtin.hopToExecutor, since it cannot call the HopToTargetExecutor
+void SILGenFunction::emitHopToExecutorValue(
+    SILLocation loc, SILValue executor) {
+  emitHopToTargetExecutor(loc, executor);
+}
+
+
 void SILGenFunction::emitPreconditionCheckExpectedExecutor(
     SILLocation loc, SILValue executorOrActor) {
   auto checkExecutor = SGM.getCheckExpectedExecutor();
