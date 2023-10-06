@@ -35,6 +35,17 @@ public struct X {
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
     _ = Builtin.createAsyncTask(0, closure)
   }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV24launchFutureWithExecutor_8executoryx_BetlF : $@convention(method) <T> (@in_guaranteed T, Builtin.Executor, X) -> () {
+  func launchFutureWithExecutor<T>(_ value: T, executor: Builtin.Executor) {
+    // CHECK: builtin "createAsyncTaskWithExecutor"<T>([[ZERO:%.*]] : $Int, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    _ = Builtin.createAsyncTaskWithExecutor(0, executor) {
+      () async throws -> T in
+      return value
+    }
+  }
+
+}
 }
 
 // CHECK-LABEL: sil [ossa] @$s4test26usesWithUnsafeContinuationyyYaF : $@convention(thin) @async () -> () {

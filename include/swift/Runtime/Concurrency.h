@@ -530,7 +530,7 @@ void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
 /// func swift_taskGroup_hasTaskGroupRecord()
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_hasTaskGroupRecord();
+bool swift_taskGroup_hasTaskGroupRecord(); // FIXME: not used? we have swift_task_hasTaskGroupStatusRecord
 
 /// Signifies whether the current task is in the middle of executing the
 /// operation block of a `with(Throwing)TaskGroup(...) { <operation> }`.
@@ -540,6 +540,16 @@ bool swift_taskGroup_hasTaskGroupRecord();
 /// out-life the scope of a task-local value binding.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ExecutorRef swift_task_getPreferredTaskExecutor();
+
+/// Push an executor preference onto the current task.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_pushTaskExecutorPreference(ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popTaskExecutorPreference();
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);

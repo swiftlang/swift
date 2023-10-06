@@ -1081,6 +1081,8 @@ public:
 
   /// Emit a hop to the target executor, returning a breadcrumb with enough
   /// enough information to hop back.
+  ///
+  /// This hop instruction may take into account current tasks' executor preference.
   ExecutorBreadcrumb emitHopToTargetExecutor(SILLocation loc,
                                              SILValue executor);
 
@@ -1115,6 +1117,10 @@ public:
   /// Emit the executor value that corresponds to the generic (concurrent)
   /// executor.
   SILValue emitGenericExecutor(SILLocation loc);
+
+  /// A nonisolated func may execute on a task's preferred executor,
+  /// or on the default generic concurrent executor if no preference is found.
+  SILValue emitGetNonisolatedFuncExecutor(SILLocation loc);
 
   /// Emit the executor value that corresponds to the main actor.
   SILValue emitMainExecutor(SILLocation loc);

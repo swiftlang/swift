@@ -277,6 +277,18 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
   swift_task_hasTaskGroupStatusRecord();
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, task_getTaskExecutorPreference) {
+  swift_task_getPreferredTaskExecutor();
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_pushTaskExecutorPreference) {
+  swift_task_pushTaskExecutorPreference(ExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_popTaskExecutorPreference) {
+  swift_task_popTaskExecutorPreference();
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel) {
   swift_task_cancel(nullptr);
 }

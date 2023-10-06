@@ -1519,18 +1519,29 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
-ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
-                                        SubstitutionMap subs,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
+ManagedValue emitBuiltinCreateAsyncTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C,
+    BuiltinValueKind kind,
+    bool inGroup, bool withExecutor) {
   ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
+
+  SmallVector<SILValue, 4> builtinArgs;
+  unsigned nextArgIdx = 0;
+  builtinArgs.push_back(args[nextArgIdx++].forward(SGF)); // flags
+  if (inGroup) {
+    builtinArgs.push_back(
+        args[nextArgIdx++].borrow(SGF, loc).forward(SGF)); // group
+  }
+  if (withExecutor) {
+    builtinArgs.push_back(
+        args[nextArgIdx++].forward(SGF)); // executor
+  }
 
   // Form the metatype of the result type.
   CanType futureResultType =
       Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                       /*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()),
+                                 /*depth*/ 0, /*index*/ 0, SGF.getASTContext()),
                              MetatypeRepresentation::Thick))
           .subst(subs)
           ->getCanonicalType();
@@ -1548,6 +1559,7 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
              })
           .borrow(SGF, loc)
           .forward(SGF);
+  builtinArgs.push_back(futureResultMetadata);
 
   // Ensure that the closure has the appropriate type.
   auto extInfo =
@@ -1567,16 +1579,17 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
   AbstractionPattern origParam(genericSig, functionTy);
   CanType substParamType = functionTy.subst(subs)->getCanonicalType();
   auto reabstractedFun =
-      SGF.emitSubstToOrigValue(loc, args[1], origParam, substParamType);
+      SGF.emitSubstToOrigValue(loc, args[nextArgIdx], origParam, substParamType);
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
       SGF, loc, reabstractedFun, futureResultType);
+  builtinArgs.push_back(function.forward(SGF));
 
   auto apply = SGF.B.createBuiltin(
       loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
+      ctx.getIdentifier(getBuiltinName(kind)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, futureResultMetadata, function.forward(SGF) });
+      builtinArgs);
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
@@ -1586,7 +1599,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
     ArrayRef<ManagedValue> args, SGFContext C) {
   ASTContext &ctx = SGF.getASTContext();
   auto flags = args[0].forward(SGF);
-  auto group = args[1].borrow(SGF, loc).forward(SGF);
+      /*inGroup=*/true, /*withExecutor=*/false);
 
   // Form the metatype of the result type.
   CanType futureResultType =

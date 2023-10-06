@@ -2510,6 +2510,9 @@ enum class TaskStatusRecordKind : uint8_t {
   /// escalated.
   EscalationNotification = 4,
 
+  /// An executor preference, where the task would like to run nonisolated async functions.
+  TaskExecutorPreference = 5,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192

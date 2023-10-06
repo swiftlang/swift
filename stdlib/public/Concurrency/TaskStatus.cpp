@@ -452,7 +452,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
 
 }
 
-// Convenience wrapper for when client hasnt already done the load of the status
+// Convenience wrapper for when client hasn't already done the load of the status
 SWIFT_CC(swift)
 void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)>fn) {
@@ -516,6 +516,72 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
   });
 
   return foundTaskGroupRecord;
+}
+
+//
+///**************************************************************************/
+///************************** TASK EXECUTORS ********************************/
+///**************************************************************************/
+
+// TODO(ktoso): worth introducing an impl taking a Task that we already fetched?
+SWIFT_CC(swift)
+ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+  fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+  auto task = swift_task_getCurrent();
+
+  if (!task)
+    return ExecutorRef::generic(); // the default executor, meaning no preference
+
+  ExecutorRef preference = ExecutorRef::generic();
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto record: status.records()) {
+      if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
+        auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
+        preference = executorPreferenceRecord->getPreferredExecutor();
+        return;
+      }
+    }
+  });
+
+  return preference;
+}
+
+//// TODO(ktoso): worth introducing an impl taking a Task that we already fetched?
+//SWIFT_CC(swift)
+//static ExecutorRef swift_task_getPreferredTaskExecutor() {
+//  auto task = swift_task_getCurrent();
+//
+//  if (!task)
+//    return ExecutorRef::generic(); // the default executor, meaning no preference
+//
+//  ExecutorRef preference = ExecutorRef::generic();
+//  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+//    for (auto record: status.records()) {
+//      if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
+//        auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
+//        preference = executorPreferenceRecord->getPreferredExecutor();
+//        return;
+//      }
+//    }
+//  });
+//
+//  return preference;
+//}
+
+SWIFT_CC(swift)
+void swift::swift_task_pushTaskExecutorPreference(ExecutorRef executor) {
+  auto task = swift_task_getCurrent();
+  assert(task && "Executor preference can only be called from async contexts.");
+
+  task->pushTaskExecutorPreference(executor);
+}
+
+SWIFT_CC(swift)
+void swift::swift_task_popTaskExecutorPreference() {
+  auto task = swift_task_getCurrent();
+  assert(task && "Executor preference can only be called from async contexts.");
+
+  task->popTaskExecutorPreference();
 }
 
 /**************************************************************************/
@@ -638,6 +704,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // No cancellation action needs to be taken for dependency status records
   case TaskStatusRecordKind::TaskDependency:
     break;
+
+  // Cancellation has no impact on executor preference.
+  case TaskStatusRecordKind::TaskExecutorPreference:
+    break;
   }
 
   // Other cases can fall through here and be ignored.
@@ -708,6 +778,10 @@ static void performEscalationAction(TaskStatusRecord *record,
 
   // Cancellation notifications can be ignore.
   case TaskStatusRecordKind::CancellationNotification:
+    return;
+
+  /// Executor preference we can ignore.
+  case TaskStatusRecordKind::TaskExecutorPreference:
     return;
 
   // Escalation notifications need to be called.

@@ -2,6 +2,7 @@
 
 // REQUIRES: concurrency
 
+import Swift
 import _Concurrency
 
 @MainActor
@@ -30,4 +31,15 @@ func runDetached() {
 @available(SwiftStdlib 5.1, *)
 func testRunInline<T>(_ cl: () async -> T) -> T {
   return Builtin.taskRunInline(cl)
+}
+
+// CHECK-LABEL: sil{{.*}} @$s14builtin_silgen30testNonisolatedTaskExecutorGetyyYaF : {{.*}} {
+// CHECK: bb0:
+// CHECK: [[PREFERRED_EXECUTOR_FN:%[0-9]+]] = function_ref @swift_task_getPreferredTaskExecutor
+// CHECK: [[PREFERRED_EXECUTOR:%[0-9]+]] = apply [[PREFERRED_EXECUTOR_FN]]()
+// CHECK: [[PREFERRED_EXECUTOR_OPT:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[PREFERRED_EXECUTOR]] : $Builtin.Executor
+// CHECK: hop_to_executor [[PREFERRED_EXECUTOR_OPT]]
+@available(SwiftStdlib 9999, *)
+func testNonisolatedTaskExecutorGet() async {
+  Swift.print("test") // don't leave the method empty, or the hop might be optimized away
 }

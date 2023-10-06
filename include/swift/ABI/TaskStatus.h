@@ -276,6 +276,22 @@ public:
   }
 };
 
+class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
+private:
+  const ExecutorRef Preferred;
+
+public:
+  TaskExecutorPreferenceStatusRecord(ExecutorRef executor)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
+        Preferred(executor) {}
+
+  ExecutorRef getPreferredExecutor() { return Preferred; }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;
+  }
+};
+
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.
 class TaskDependencyStatusRecord : public TaskStatusRecord {
