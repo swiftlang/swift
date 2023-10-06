@@ -507,6 +507,9 @@ class SyntacticElementConstraintGenerator
   SyntacticElementContext context;
   ConstraintLocator *locator;
 
+  /// Whether a conjunction was generated.
+  bool generatedConjunction = false;
+
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
@@ -519,6 +522,16 @@ public:
   void createConjunction(ArrayRef<ElementInfo> elements,
                          ConstraintLocator *locator, bool isIsolated = false,
                          ArrayRef<TypeVariableType *> extraTypeVars = {}) {
+    assert(!generatedConjunction && "Already generated conjunction");
+    generatedConjunction = true;
+
+    // Inject a join if we have one.
+    SmallVector<ElementInfo, 4> scratch;
+    if (auto *join = context.ElementJoin.getPtrOrNull()) {
+      scratch.append(elements.begin(), elements.end());
+      scratch.push_back(makeJoinElement(cs, join, locator));
+      elements = scratch;
+    }
     ::createConjunction(cs, context.getAsDeclContext(), elements, locator,
                         isIsolated, extraTypeVars);
   }
@@ -865,10 +878,6 @@ private:
       elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
     }
 
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, locator));
-
     createConjunction(elements, locator);
   }
 
@@ -1010,10 +1019,6 @@ private:
         elements.push_back(makeElement(rawCase, switchLoc));
     }
 
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, switchLoc));
-
     createConjunction(elements, switchLoc);
   }
 
@@ -1035,10 +1040,6 @@ private:
     // individual `catch` statements.
     for (auto *catchStmt : doStmt->getCatches())
       elements.push_back(makeElement(catchStmt, doLoc));
-
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, locator));
 
     createConjunction(elements, doLoc);
   }
@@ -1227,10 +1228,6 @@ private:
                                   LocatorPathElt::SyntacticElement(element)),
           contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
     }
-
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, locator));
 
     createConjunction(elements, locator);
   }
