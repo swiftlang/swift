@@ -269,6 +269,12 @@ DeclContext *DeclContext::getParentForLookup() const {
     // outer types.
     return getModuleScopeContext();
   }
+  if (isa<ProtocolDecl>(this) && getParent()->isGenericContext()) {
+    // Protocols in generic contexts must not look in to their parents,
+    // as the parents may contain types with inferred implicit
+    // generic parameters not present in the protocol's generic signature.
+    return getModuleScopeContext();
+  }
   if (isa<NominalTypeDecl>(this)) {
     // If we are inside a nominal type that is inside a protocol,
     // skip the protocol.

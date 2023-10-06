@@ -163,7 +163,7 @@ struct OuterGeneric<D> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested in a generic context}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: D)
+    func flop(_ t: D) // expected-error {{cannot find type 'D' in scope}}
   }
 }
 
@@ -171,7 +171,7 @@ class OuterGenericClass<T> {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested in a generic context}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ t: T)
+    func flop(_ t: T) // expected-error {{cannot find type 'T' in scope}}
   }
 }
 
@@ -180,7 +180,7 @@ protocol OuterProtocol {
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested in protocol 'OuterProtocol'}}
     associatedtype Rooster
     func flip(_ r: Rooster)
-    func flop(_ h: Hen)
+    func flop(_ h: Hen) // expected-error {{cannot find type 'Hen' in scope}}
   }
 }
 
@@ -195,14 +195,14 @@ struct ConformsToOuterProtocol : OuterProtocol {
 
 extension OuterProtocol {
   func f() {
-    protocol Invalid_0 {} // expected-error{{protocol 'Invalid_0' cannot be nested in a generic context}}
+    protocol Invalid_0 {} // expected-error{{type 'Invalid_0' cannot be nested in generic function 'f()'}}
 
     struct SomeType { // expected-error{{type 'SomeType' cannot be nested in generic function 'f()'}}
       protocol Invalid_1 {} // expected-error{{protocol 'Invalid_1' cannot be nested in a generic context}}
     }
   }
   func g<T>(_: T) {
-    protocol Invalid_2 {} // expected-error{{protocol 'Invalid_2' cannot be nested in a generic context}}
+    protocol Invalid_2 {} // expected-error{{type 'Invalid_2' cannot be nested in generic function 'g'}}
   }
 }
 
@@ -210,22 +210,25 @@ extension OuterProtocol {
 // 'OtherGenericClass', so the occurrence of 'OtherGenericClass'
 // in 'InnerProtocol' is not "in context" with implicitly
 // inferred generic arguments <T, U>.
-class OtherGenericClass<T, U> {
+class OtherGenericClass<T, U> { // expected-note {{generic type 'OtherGenericClass' declared here}}
   protocol InnerProtocol : OtherGenericClass { }
-  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested in a generic context}}
+  // expected-error@-1 {{protocol 'InnerProtocol' cannot be nested in a generic context}}
+  // expected-error@-2 {{reference to generic type 'OtherGenericClass' requires arguments in <...>}}
 }
 
 protocol InferredGenericTest {
   associatedtype A
 }
 extension OtherGenericClass {
-  protocol P: InferredGenericTest where Self.A == T {} // expected-error {{protocol 'P' cannot be nested in a generic context}}
+  protocol P: InferredGenericTest where Self.A == T {}
+  // expected-error@-1 {{protocol 'P' cannot be nested in a generic context}}
+  // expected-error@-2 {{cannot find type 'T' in scope}}
 }
 
 // A nested protocol does not satisfy an associated type requirement.
 
 protocol HasAssoc {
-  associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+  associatedtype A // expected-note {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
 }
 struct ConformsToHasAssoc: HasAssoc { // expected-error {{type 'ConformsToHasAssoc' does not conform to protocol 'HasAssoc'}}
   protocol A {}
@@ -257,12 +260,12 @@ func testLookup<T: OuterForUFI.Inner>(_ x: T) {
 // Protocols cannot be nested inside of generic functions.
 
 func invalidProtocolInGeneric<T>(_: T) {
-  protocol Test {} // expected-error{{protocol 'Test' cannot be nested in a generic context}}
+  protocol Test {} // expected-error{{type 'Test' cannot be nested in generic function 'invalidProtocolInGeneric'}}
 }
 
 struct NestedInGenericMethod<T> {
   func someMethod() {
-    protocol AnotherTest {} // expected-error{{protocol 'AnotherTest' cannot be nested in a generic context}}
+    protocol AnotherTest {} // expected-error{{type 'AnotherTest' cannot be nested in generic function 'someMethod()'}}
   }
 }
 
