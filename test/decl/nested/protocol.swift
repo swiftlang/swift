@@ -44,12 +44,19 @@ class OuterClass {
   protocol InnerProtocol : OuterClass { }
 }
 
+// Protocols can be nested in actors.
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+actor SomeActor {
+  protocol Proto {}
+}
+
 // Deeply nested.
 
 enum Level0 {
   struct Level1 {
     class Level2 {
-      actor Level3 {
+      enum Level3 {
         struct Level4 {
           class Level5 {
             protocol DeeplyNested {
