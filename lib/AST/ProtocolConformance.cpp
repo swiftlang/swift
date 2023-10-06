@@ -546,29 +546,27 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
-  // Fill in the signature conformances, if we haven't done so yet.
-  if (getSignatureConformances().empty()) {
-    const_cast<NormalProtocolConformance *>(this)->finishSignatureConformances();
-  }
+  llvm::Optional<ProtocolConformanceRef> result;
 
-  assert(!getSignatureConformances().empty() &&
-         "signature conformances not yet computed");
+  forEachAssociatedConformance(
+      [&](Type t, ProtocolDecl *p, unsigned index) {
+        if (t->isEqual(assocType) && p == protocol) {
+          // Fill in the signature conformances, if we haven't done so yet.
+          if (getSignatureConformances().empty()) {
+            const_cast<NormalProtocolConformance *>(this)->finishSignatureConformances();
+          }
 
-  unsigned conformanceIndex = 0;
-  auto requirements = getProtocol()->getRequirementSignature().getRequirements();
-  for (const auto &reqt : requirements) {
-    if (reqt.getKind() == RequirementKind::Conformance) {
-      // Is this the conformance we're looking for?
-      if (reqt.getFirstType()->isEqual(assocType) &&
-          reqt.getProtocolDecl() == protocol)
-        return getSignatureConformances()[conformanceIndex];
+          assert(!getSignatureConformances().empty() &&
+                 "signature conformances not yet computed");
 
-      ++conformanceIndex;
-    }
-  }
+          result = getSignatureConformances()[index];
+          return true;
+        }
 
-  llvm_unreachable(
-    "requested conformance was not a direct requirement of the protocol");
+        return false;
+      });
+
+  return *result;
 }
 
 
