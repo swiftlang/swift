@@ -3563,6 +3563,10 @@ static bool usesFeatureThenStatements(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDoExpressions(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
 }

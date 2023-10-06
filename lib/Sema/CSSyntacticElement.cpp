@@ -1023,13 +1023,22 @@ private:
 
     SmallVector<ElementInfo, 4> elements;
 
-    // First, let's record a body of `do` statement.
-    elements.push_back(makeElement(doStmt->getBody(), doLoc));
+    // First, let's record a body of `do` statement. Note we need to add a
+    // SyntaticElement locator path element here to avoid treating the inner
+    // brace conjunction as being isolated if 'doLoc' is for an isolated
+    // conjunction (as is the case with 'do' expressions).
+    auto *doBodyLoc = cs.getConstraintLocator(
+        doLoc, LocatorPathElt::SyntacticElement(doStmt->getBody()));
+    elements.push_back(makeElement(doStmt->getBody(), doBodyLoc));
 
     // After that has been type-checked, let's switch to
     // individual `catch` statements.
     for (auto *catchStmt : doStmt->getCatches())
       elements.push_back(makeElement(catchStmt, doLoc));
+
+    // Inject a join if we have one.
+    if (auto *join = context.ElementJoin.getPtrOrNull())
+      elements.push_back(makeJoinElement(cs, join, locator));
 
     createConjunction(elements, doLoc);
   }
@@ -1218,6 +1227,10 @@ private:
                                   LocatorPathElt::SyntacticElement(element)),
           contextInfo.value_or(ContextualTypeInfo()), isDiscarded));
     }
+
+    // Inject a join if we have one.
+    if (auto *join = context.ElementJoin.getPtrOrNull())
+      elements.push_back(makeJoinElement(cs, join, locator));
 
     createConjunction(elements, locator);
   }

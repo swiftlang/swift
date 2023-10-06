@@ -859,6 +859,15 @@ SwitchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
   return scratch;
 }
 
+ArrayRef<Stmt *>
+DoCatchStmt::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
+  scratch.push_back(getBody());
+  for (auto *CS : getCatches())
+    scratch.push_back(CS->getBody());
+  return scratch;
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Stmts, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.

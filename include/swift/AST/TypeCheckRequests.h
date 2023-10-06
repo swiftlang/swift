@@ -3947,6 +3947,10 @@ public:
     /// The statement is an 'if' statement without an unconditional 'else'.
     NonExhaustiveIf,
 
+    /// The statement is a 'do catch' statement without an unconditional
+    /// 'catch'.
+    NonExhaustiveDoCatch,
+
     /// There is no branch that produces a resulting value.
     NoResult,
 
@@ -4002,6 +4006,9 @@ public:
   }
   static IsSingleValueStmtResult nonExhaustiveIf() {
     return IsSingleValueStmtResult(Kind::NonExhaustiveIf);
+  }
+  static IsSingleValueStmtResult nonExhaustiveDoCatch() {
+    return IsSingleValueStmtResult(Kind::NonExhaustiveDoCatch);
   }
   static IsSingleValueStmtResult noResult() {
     return IsSingleValueStmtResult(Kind::NoResult);

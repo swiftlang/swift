@@ -1417,6 +1417,9 @@ public:
     return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
   }
 
+  /// Retrieve the complete set of branches for this do-catch statement.
+  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
+
   /// Does this statement contain a syntactically exhaustive catch
   /// clause?
   ///

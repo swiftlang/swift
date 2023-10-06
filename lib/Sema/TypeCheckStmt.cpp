@@ -3010,14 +3010,11 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
   assert(_ctx);
   auto &ctx = *_ctx;
 
-  if (!isa<IfStmt>(S) && !isa<SwitchStmt>(S))
-    return IsSingleValueStmtResult::unhandledStmt();
-
   // Statements must be unlabeled.
-  auto *LS = cast<LabeledStmt>(S);
-  if (LS->getLabelInfo())
-    return IsSingleValueStmtResult::hasLabel();
-
+  if (auto *LS = dyn_cast<LabeledStmt>(S)) {
+    if (LS->getLabelInfo())
+      return IsSingleValueStmtResult::hasLabel();
+  }
   if (auto *IS = dyn_cast<IfStmt>(S)) {
     // Must be exhaustive.
     if (!IS->isSyntacticallyExhaustive())
@@ -3030,7 +3027,23 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
     SmallVector<Stmt *, 4> scratch;
     return areBranchesValidForSingleValueStmt(ctx, SS->getBranches(scratch));
   }
-  llvm_unreachable("Unhandled case");
+  if (auto *DS = dyn_cast<DoStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    return areBranchesValidForSingleValueStmt(ctx, DS->getBody());
+  }
+  if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+    if (!ctx.LangOpts.hasFeature(Feature::DoExpressions))
+      return IsSingleValueStmtResult::unhandledStmt();
+
+    if (!DCS->isSyntacticallyExhaustive())
+      return IsSingleValueStmtResult::nonExhaustiveDoCatch();
+
+    SmallVector<Stmt *, 4> scratch;
+    return areBranchesValidForSingleValueStmt(ctx, DCS->getBranches(scratch));
+  }
+  return IsSingleValueStmtResult::unhandledStmt();
 }
 
 void swift::checkUnknownAttrRestrictions(

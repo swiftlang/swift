@@ -2477,6 +2477,8 @@ SingleValueStmtExpr *SingleValueStmtExpr::create(ASTContext &ctx, Stmt *S,
 
 SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
     ASTContext &ctx, Stmt *S, DeclContext *DC, bool mustBeExpr) {
+  assert(!(isa<DoStmt>(S) || isa<DoCatchStmt>(S)) ||
+         ctx.LangOpts.hasFeature(Feature::DoExpressions));
   auto *SVE = create(ctx, S, DC);
 
   // Attempt to wrap any branches that can be wrapped.
@@ -2488,12 +2490,15 @@ SingleValueStmtExpr *SingleValueStmtExpr::createWithWrappedBranches(
 
     if (auto *S = BS->getSingleActiveStatement()) {
       if (mustBeExpr) {
-        // If this must be an expression, we can eagerly wrap any exhaustive if
-        // and switch branch.
+        // If this must be an expression, we can eagerly wrap any exhaustive if,
+        // switch, and do statement.
         if (auto *IS = dyn_cast<IfStmt>(S)) {
           if (!IS->isSyntacticallyExhaustive())
             continue;
-        } else if (!isa<SwitchStmt>(S)) {
+        } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+          if (!DCS->isSyntacticallyExhaustive())
+            continue;
+        } else if (!isa<SwitchStmt>(S) && !isa<DoStmt>(S)) {
           continue;
         }
       } else {
@@ -2576,6 +2581,10 @@ SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
     return Kind::If;
   case StmtKind::Switch:
     return Kind::Switch;
+  case StmtKind::Do:
+    return Kind::Do;
+  case StmtKind::DoCatch:
+    return Kind::DoCatch;
   default:
     llvm_unreachable("Unhandled kind!");
   }
@@ -2583,11 +2592,17 @@ SingleValueStmtExpr::Kind SingleValueStmtExpr::getStmtKind() const {
 
 ArrayRef<Stmt *>
 SingleValueStmtExpr::getBranches(SmallVectorImpl<Stmt *> &scratch) const {
+  assert(scratch.empty());
   switch (getStmtKind()) {
   case Kind::If:
     return cast<IfStmt>(getStmt())->getBranches(scratch);
   case Kind::Switch:
     return cast<SwitchStmt>(getStmt())->getBranches(scratch);
+  case Kind::Do:
+    scratch.push_back(cast<DoStmt>(getStmt())->getBody());
+    return scratch;
+  case Kind::DoCatch:
+    return cast<DoCatchStmt>(getStmt())->getBranches(scratch);
   }
   llvm_unreachable("Unhandled case in switch!");
 }

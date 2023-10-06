@@ -1256,6 +1256,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(do_catch_expr_must_be_syntactically_exhaustive,none,
+      "'do catch' must have an unconditional 'catch' to be used as expression",
+      ())
 ERROR(single_value_stmt_branch_empty,none,
       "expected expression in branch of '%0' expression",
       (StmtKind))
@@ -1269,8 +1272,8 @@ ERROR(cannot_jump_in_single_value_stmt,none,
 ERROR(effect_marker_on_single_value_stmt,none,
       "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
 ERROR(out_of_place_then_stmt,none,
-      "'then' may only appear as the last statement in an 'if' or 'switch' "
-      "expression", ())
+      "'then' may only appear as the last statement in an 'if', 'switch', or "
+      "'do' expression", ())
 
 ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",

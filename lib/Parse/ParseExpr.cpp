@@ -592,11 +592,13 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   // First check to see if we have the start of a regex literal `/.../`.
   tryLexRegexLiteral(/*forUnappliedOperator*/ false);
 
-  // Try parse an 'if' or 'switch' as an expression. Note we do this here in
-  // parseExprUnary as we don't allow postfix syntax to hang off such
+  // Try parse 'if', 'switch', and 'do' as expressions. Note we do this here
+  // in parseExprUnary as we don't allow postfix syntax to hang off such
   // expressions to avoid ambiguities such as postfix '.member', which can
   // currently be parsed as a static dot member for a result builder.
-  if (Tok.isAny(tok::kw_if, tok::kw_switch)) {
+  if (Tok.isAny(tok::kw_if, tok::kw_switch) ||
+      (Tok.is(tok::kw_do) &&
+       Context.LangOpts.hasFeature(Feature::DoExpressions))) {
     auto Result = parseStmt();
     Expr *E = nullptr;
     if (Result.isNonNull()) {

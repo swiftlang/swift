@@ -6075,7 +6075,7 @@ public:
 class SingleValueStmtExpr : public Expr {
 public:
   enum class Kind {
-    If, Switch
+    If, Switch, Do, DoCatch
   };
 
 private:
