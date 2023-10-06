@@ -1065,8 +1065,7 @@ func f_56996() {
 func f_55805() {
   let _: KeyPath<String?, Int?> = \.utf8.count
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
-  // expected-error@-2 {{cannot assign value of type 'KeyPath<String?, Int>' to type 'KeyPath<String?, Int?>'}}
-  // expected-note@-3 {{arguments to generic parameter 'Value' ('Int' and 'Int?') are expected to be equal}}
+  // expected-error@-2 {{key path value type 'Int' cannot be converted to contextual type 'Int?'}}
 }
 
 // rdar://74711236 - crash due to incorrect member access in key path

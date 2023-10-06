@@ -11650,6 +11650,13 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
         contextualType = BoundGenericType::get(
             keyPathTy->getDecl(), keyPathTy->getParent(), {root, value});
       }
+    } else if (contextualType->isPlaceholder()) {
+      auto root = simplifyType(getKeyPathRootType(keyPath));
+      if (!(root->isTypeVariableOrMember() || root->isPlaceholder())) {
+        auto value = getKeyPathValueType(keyPath);
+        contextualType =
+            BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
+      }
     }
   }
 
@@ -12222,6 +12229,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
                  tv->getImpl().canBindToHole();
         })) {
       (void)tryMatchRootAndValueFromType(keyPathTy);
+
+      // If the type of the key path is not yet resolved simplifying this
+      // constraint would disconnect it from root and value, let's bind it
+      // to a placeholder type to make sure this doesn't happen.
+      if (auto *typeVar = keyPathTy->getAs<TypeVariableType>()) {
+        return matchTypes(keyPathTy, PlaceholderType::get(Context, typeVar),
+                          ConstraintKind::Bind, subflags,
+                          locator.getBaseLocator());
+      }
+
       return SolutionKind::Solved;
     }
   }
