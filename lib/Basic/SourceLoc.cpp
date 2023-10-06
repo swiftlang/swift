@@ -512,7 +512,8 @@ SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
                                 Loc,
                                 BufferIDRangeComparison{this});
 
-  // If we didn't find
+  // If the location was past the range covered by source buffers or
+  // is not within any of the source buffers, fail.
   if (found == LocCache.sortedBuffers.end() || !isInBuffer(*found))
     return llvm::None;
 
