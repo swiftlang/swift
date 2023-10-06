@@ -29,7 +29,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
@@ -9527,12 +9529,28 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       auto sendableProtocol =
           DC->getParentModule()->getASTContext().getProtocol(
               KnownProtocolKind::Sendable);
-      auto baseSendable = swift::TypeChecker::conformsToProtocol(
-          instanceTy, sendableProtocol, DC->getParentModule());
+      auto baseConformance = DC->getParentModule()->lookupConformance(
+          instanceTy, sendableProtocol);
 
-      if (!baseSendable.isInvalid() &&
-          !baseSendable.getConditionalRequirements().empty() &&
-          instanceTy->hasTypeVariable()) {
+      if (llvm::any_of(
+              baseConformance.getConditionalRequirements(),
+              [&](const auto &req) {
+                switch (req.getKind()) {
+                case RequirementKind::Conformance: {
+                  if (auto secondType =
+                          req.getSecondType()->template getAs<ProtocolType>()) {
+                    return req.getFirstType()->hasTypeVariable() &&
+                           secondType->getDecl()->isSpecificProtocol(
+                               KnownProtocolKind::Sendable);
+                  }
+                }
+                case RequirementKind::Superclass:
+                case RequirementKind::SameType:
+                case RequirementKind::SameShape:
+                case RequirementKind::Layout:
+                  return false;
+                }
+              })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;
       }

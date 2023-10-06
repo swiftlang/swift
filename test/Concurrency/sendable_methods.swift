@@ -41,7 +41,9 @@ enum InferredSendableE: P {
 }
 
 struct GenericS<T>: P {
-  func f() { }
+    init(_: T) { }
+
+    func f() { }
 }
 
 final class GenericC<T>: P {
@@ -79,6 +81,9 @@ g(GenericC<Int>.f)
 
 g(GenericS<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
 g(GenericC<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
+
+g(GenericS(NonSendable()).f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
+g(GenericS(1).f)
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {
@@ -133,3 +138,8 @@ func doWork() -> Int {
 let work: @Sendable () -> Int = doWork
 Task<Int, Never>.detached(priority: nil, operation: doWork)
 Task<Int, Never>.detached(priority: nil, operation: work)
+
+func generic<T>(_: T) {
+    Task<Int, Never>.detached(priority: nil, operation: T)
+}
+generic(GenericS<Int>.f) // generic argument for `T` should be inferred as `@escaping @Sendable`
