@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  -target %target-future-triple %s -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-objective-c-protocol-symbolic-references -target %target-future-triple %s -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

@@ -1233,6 +1233,13 @@ def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
 
+def enable_objective_c_protocol_symbolic_references :
+  Flag<["-"], "enable-objective-c-protocol-symbolic-references">,
+  HelpText<"Enable objective-c protocol symbolic references">;
+def disable_objective_c_protocol_symbolic_references :
+  Flag<["-"], "disable-objective-c-protocol-symbolic-references">,
+  HelpText<"Disable objective-c protocol symbolic references">;
+
 def disable_emit_generic_class_ro_t_list :
   Flag<["-"], "disable-emit-generic-class-ro_t-list">,
   HelpText<"Disable emission of a section with references to class_ro_t of "

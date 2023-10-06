@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-future-triple -enable-objc-interop -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objective-c-protocol-symbolic-references -target %target-future-triple -enable-objc-interop -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 // REQIURES: objc_interop

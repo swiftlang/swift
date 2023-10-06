@@ -2927,6 +2927,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return true;
   }
 
+  Opts.EnableObjectiveCProtocolSymbolicReferences =
+    Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
+                 OPT_disable_objective_c_protocol_symbolic_references,
+                 Opts.EnableObjectiveCProtocolSymbolicReferences);
+
   if (const Arg *A = Args.getLastArg(options::OPT_platform_c_calling_convention)) {
     Opts.PlatformCCallingConvention =
       llvm::StringSwitch<llvm::CallingConv::ID>(A->getValue())

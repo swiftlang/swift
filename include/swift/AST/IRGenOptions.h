@@ -399,6 +399,8 @@ public:
   /// Enable runtime instantiation of value witness strings for generic types
   unsigned EnableLayoutStringValueWitnessesInstantiation : 1;
 
+  unsigned EnableObjectiveCProtocolSymbolicReferences : 1;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
@@ -518,6 +520,7 @@ public:
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
+        EnableObjectiveCProtocolSymbolicReferences(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),

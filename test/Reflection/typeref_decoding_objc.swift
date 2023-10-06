@@ -5,7 +5,7 @@
 // Test objective c symbolic references
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-future-triple %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -Xfrontend -enable-objective-c-protocol-symbolic-references -target %target-future-triple %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 
 // REQUIRES: objc_interop

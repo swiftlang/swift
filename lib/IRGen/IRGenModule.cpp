@@ -1936,6 +1936,8 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
 }
 
 bool IRGenModule::canUseObjCSymbolicReferences() {
+  if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
+    return false;
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability =
       AvailabilityContext::forDeploymentTarget(context);
