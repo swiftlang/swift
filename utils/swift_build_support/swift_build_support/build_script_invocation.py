@@ -613,13 +613,13 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_swift)
         builder.add_impl_product(products.LLDB,
                                  is_enabled=self.args.build_lldb)
+        builder.add_impl_product(products.LibDispatch,
+                                 is_enabled=self.args.build_libdispatch)
 
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
-        builder.add_impl_product(products.LibDispatch,
-                                 is_enabled=self.args.build_libdispatch)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
         builder.add_impl_product(products.XCTest,
