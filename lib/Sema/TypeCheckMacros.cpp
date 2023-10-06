@@ -277,7 +277,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 #endif
 }
 
-static LoadedExecutablePlugin *
+static llvm::Expected<LoadedExecutablePlugin *>
 initializeExecutablePlugin(ASTContext &ctx,
                            LoadedExecutablePlugin *executablePlugin,
                            StringRef libraryPath, Identifier moduleName) {
@@ -291,7 +291,10 @@ initializeExecutablePlugin(ASTContext &ctx,
   if (!executablePlugin->isInitialized()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
-      return nullptr;
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "failed to initialize executable plugin '" +
+              StringRef(executablePlugin->getExecutablePath()) + "'");
     }
 
     // Resend the compiler capability on reconnect.
@@ -314,9 +317,7 @@ initializeExecutablePlugin(ASTContext &ctx,
     llvm::SmallString<128> resolvedLibraryPath;
     auto fs = ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
-      ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded,
-                         executablePlugin->getExecutablePath(), err.message());
-      return nullptr;
+      return llvm::createStringError(err, err.message());
     }
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
@@ -325,7 +326,11 @@ initializeExecutablePlugin(ASTContext &ctx,
         executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
         &ctx.Diags);
     if (!loaded)
-      return nullptr;
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "failed to load library plugin '" + resolvedLibraryPathStr +
+              "' in plugin server '" +
+              StringRef(executablePlugin->getExecutablePath()) + "'");
 
     // Set a callback to load the library again on reconnections.
     auto *callback = new std::function<void(void)>(
@@ -348,37 +353,59 @@ initializeExecutablePlugin(ASTContext &ctx,
   return executablePlugin;
 }
 
-LoadedCompilerPlugin
+CompilerPluginLoadResult
 CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
   PluginLoader &loader = ctx->getPluginLoader();
   const auto &entry = loader.lookupPluginByModuleName(moduleName);
 
+  std::string errorMessage;
+
   if (!entry.executablePath.empty()) {
-    if (LoadedExecutablePlugin *executablePlugin =
-            loader.loadExecutablePlugin(entry.executablePath)) {
+    llvm::Expected<LoadedExecutablePlugin *> executablePlugin =
+        loader.loadExecutablePlugin(entry.executablePath);
+    if (executablePlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         unsigned tag = entry.libraryPath.empty() ? 1 : 2;
         ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, tag,
                             entry.executablePath, entry.libraryPath);
       }
 
-      return initializeExecutablePlugin(*ctx, executablePlugin,
-                                        entry.libraryPath, moduleName);
+      executablePlugin = initializeExecutablePlugin(
+          *ctx, executablePlugin.get(), entry.libraryPath, moduleName);
     }
+    if (executablePlugin)
+      return executablePlugin.get();
+    llvm::handleAllErrors(
+        executablePlugin.takeError(),
+        [&](const llvm::ErrorInfoBase &err) { errorMessage += err.message(); });
   } else if (!entry.libraryPath.empty()) {
-    if (LoadedLibraryPlugin *libraryPlugin =
-            loader.loadLibraryPlugin(entry.libraryPath)) {
+
+    llvm::Expected<LoadedLibraryPlugin *> libraryPlugin =
+        loader.loadLibraryPlugin(entry.libraryPath);
+    if (libraryPlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, 0,
                             entry.libraryPath, StringRef());
       }
 
-      return libraryPlugin;
+      return libraryPlugin.get();
+    } else {
+      llvm::handleAllErrors(libraryPlugin.takeError(),
+                            [&](const llvm::ErrorInfoBase &err) {
+                              errorMessage += err.message();
+                            });
     }
   }
-
-  return nullptr;
+  if (!errorMessage.empty()) {
+    NullTerminatedStringRef err(errorMessage, *ctx);
+    return CompilerPluginLoadResult::error(err);
+  } else {
+    NullTerminatedStringRef errMsg("plugin that can handle module '" +
+                                       moduleName.str() + "' not found",
+                                   *ctx);
+    return CompilerPluginLoadResult::error(errMsg);
+  }
 }
 
 static ExternalMacroDefinition
@@ -431,6 +458,8 @@ resolveExecutableMacro(ASTContext &ctx,
     return ExternalMacroDefinition{
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
+  // NOTE: this is not reachable because executable macro resolution always
+  // succeeds.
   NullTerminatedStringRef err(
       "macro implementation type '" + moduleName.str() + "." + typeName.str() +
           "' could not be found in executable plugin" +
@@ -448,8 +477,8 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   // Try to load a plugin module from the plugin search paths. If it
   // succeeds, resolve in-process from that plugin
   CompilerPluginLoadRequest loadRequest{ctx, moduleName};
-  LoadedCompilerPlugin loaded =
-      evaluateOrDefault(evaluator, loadRequest, nullptr);
+  CompilerPluginLoadResult loaded = evaluateOrDefault(
+      evaluator, loadRequest, CompilerPluginLoadResult::error("request error"));
 
   if (auto loadedLibrary = loaded.getAsLibraryPlugin()) {
     return resolveInProcessMacro(*ctx, moduleName, typeName, loadedLibrary);
@@ -459,10 +488,7 @@ ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     return resolveExecutableMacro(*ctx, executablePlugin, moduleName, typeName);
   }
 
-  NullTerminatedStringRef err("plugin that can handle module '" +
-                                  moduleName.str() + "' not found",
-                              *ctx);
-  return ExternalMacroDefinition::error(err);
+  return ExternalMacroDefinition::error(loaded.getErrorMessage());
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid

@@ -76,14 +76,15 @@ public:
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  LoadedLibraryPlugin *loadLibraryPlugin(llvm::StringRef path);
+  llvm::Expected<LoadedLibraryPlugin *> loadLibraryPlugin(llvm::StringRef path);
 
   /// Launch the specified executable plugin path resolving the path with the
   /// current VFS. If it fails to load the plugin, a diagnostic is emitted, and
   /// returns a nullptr.
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
-  LoadedExecutablePlugin *loadExecutablePlugin(llvm::StringRef path);
+  llvm::Expected<LoadedExecutablePlugin *>
+  loadExecutablePlugin(llvm::StringRef path);
 };
 
 } // namespace swift

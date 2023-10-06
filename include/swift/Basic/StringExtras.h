@@ -497,6 +497,10 @@ public:
   NullTerminatedStringRef(llvm::Twine Str, Allocator &A) : Ref("") {
     if (Str.isTriviallyEmpty())
       return;
+    if (Str.isSingleStringLiteral()) {
+      Ref = Str.getSingleStringRef();
+      return;
+    }
     llvm::SmallString<0> stash;
     auto _ref = Str.toStringRef(stash);
 

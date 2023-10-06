@@ -43,8 +43,8 @@ struct ExternalMacroDefinition {
                                    static_cast<const void *>(message.data())};
   }
   bool isError() const { return kind == PluginKind::Error; }
-  llvm::StringRef getErrorMessage() const {
-    return llvm::StringRef(static_cast<const char *>(opaqueHandle));
+  NullTerminatedStringRef getErrorMessage() const {
+    return static_cast<const char *>(opaqueHandle);
   }
 };
 

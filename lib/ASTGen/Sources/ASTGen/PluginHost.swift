@@ -37,9 +37,8 @@ public func _initializePlugin(
     try plugin.initialize()
     return true
   } catch {
-    diagEngine?.diagnose(
-      message: "compiler plugin not loaded: '\(plugin.executableFilePath); failed to initialize",
-      severity: .warning)
+    // Don't care the actual error. Probably the plugin is completely broken.
+    // The failure is diagnosed in the caller.
     return false
   }
 }
