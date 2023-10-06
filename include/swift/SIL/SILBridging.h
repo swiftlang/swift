@@ -1657,14 +1657,13 @@ struct BridgedTestArguments {
   BridgedFunction takeFunction() const;
 };
 
-struct BridgedTestContext {
+struct BridgedSwiftPassInvocation {
   swift::SwiftPassInvocation *_Nonnull invocation;
 };
 
-using SwiftNativeFunctionTestThunk = void (*_Nonnull)(void *_Nonnull,
-                                                      BridgedFunction,
-                                                      BridgedTestArguments,
-                                                      BridgedTestContext);
+using SwiftNativeFunctionTestThunk =
+    void (*_Nonnull)(void *_Nonnull, BridgedFunction, BridgedTestArguments,
+                     BridgedSwiftPassInvocation);
 
 void registerFunctionTestThunk(SwiftNativeFunctionTestThunk);
 
