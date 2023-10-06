@@ -794,9 +794,11 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
-  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
   let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static method 'bar()'}}
-  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
   let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
 
   struct A {
@@ -1067,8 +1069,9 @@ func f_56996() {
 // https://github.com/apple/swift/issues/55805
 // Key-path missing optional crashes compiler: Inactive constraints left over?
 func f_55805() {
-  let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{value of optional type 'String.UTF8View?' must be unwrapped to refer to member 'count' of wrapped base type 'String.UTF8View'}}
-  // expected-note@-1 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}
+  let _: KeyPath<String?, Int?> = \.utf8.count
+  // expected-error@-2 {{value of optional type 'String.UTF8View?' must be unwrapped to refer to member 'count' of wrapped base type 'String.UTF8View'}}
+  // expected-note@-3 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}
 }
 
 // rdar://74711236 - crash due to incorrect member access in key path

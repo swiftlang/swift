@@ -5958,14 +5958,6 @@ bool ConstraintSystem::repairFailures(
     if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
       break;
 
-    // If both types are key path, the only differences
-    // between them are mutability and/or root, value type mismatch.
-    if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
-      auto *fix = KeyPathContextualMismatch::create(
-          *this, lhs, rhs, getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-    }
-
     if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
         isExpr<ClosureExpr>(anchor)) {
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
@@ -6608,8 +6600,20 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
       return true;
 
+    auto *keyPathLoc = getConstraintLocator(anchor);
+
+    if (hasFixFor(keyPathLoc))
+      return true;
+
+    if (auto contextualInfo = getContextualTypeInfo(anchor)) {
+      if (hasFixFor(getConstraintLocator(
+              keyPathLoc,
+              LocatorPathElt::ContextualType(contextualInfo->purpose))))
+        return true;
+    }
+
     conversionsOrFixes.push_back(IgnoreContextualType::create(
-        *this, lhs, rhs, getConstraintLocator(anchor)));
+        *this, lhs, rhs, keyPathLoc));
     break;
   }
   default:
@@ -12150,12 +12154,14 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
 
     if (boundRoot &&
-        matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+        matchTypes(rootTy, boundRoot, ConstraintKind::Bind, subflags,
+                   locator.withPathElement(ConstraintLocator::KeyPathRoot))
             .isFailure())
       return false;
 
     if (boundValue &&
-        matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags, locator)
+        matchTypes(valueTy, boundValue, ConstraintKind::Bind, subflags,
+                   locator.withPathElement(ConstraintLocator::KeyPathValue))
             .isFailure())
       return false;
 
@@ -12409,8 +12415,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
     } else {
       auto resolvedKPTy =
           BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-      return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                        loc);
+      return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind,
+                        subflags, loc);
     }
   } else {
     formUnsolved();
