@@ -17,7 +17,7 @@
 //       }
 // - In SwiftCompilerSources/Sources/SIL/Test.swift's registerSILTests function,
 //   register the new test:
-//       registerFunctionTest(myNewTest, implementation: { myNewTest.run($0, $1, $2) })
+//       registerFunctionTest(myNewTest)
 //
 //===----------------------------------------------------------------------===//
 //
@@ -90,22 +90,21 @@
 import Basic
 import SILBridging
 
+/// The primary interface to in-IR tests.
 public struct FunctionTest {
-  public var name: String
-  public typealias FunctionTestImplementation = (Function, TestArguments, TestContext) -> ()
-  private var implementation: FunctionTestImplementation
-  init(name: String, implementation: @escaping FunctionTestImplementation) {
+  let name: String
+  let invocation: FunctionTestInvocation
+
+  public init(name: String, invocation: @escaping FunctionTestInvocation) {
     self.name = name
-    self.implementation = implementation
-  }
-  fileprivate func run(
-    _ function: BridgedFunction, 
-    _ arguments: BridgedTestArguments, 
-    _ test: BridgedTestContext) {
-    implementation(function.function, arguments.native, test.native)
+    self.invocation = invocation
   }
 }
 
+/// The type of the closure passed to a FunctionTest.
+public typealias FunctionTestInvocation = @convention(thin) (Function, TestArguments, TestContext) -> ()
+
+/// Wraps the arguments specified in the specify_test instruction.
 public struct TestArguments {
   public var bridged: BridgedTestArguments
   fileprivate init(bridged: BridgedTestArguments) {
@@ -128,6 +127,7 @@ extension BridgedTestArguments {
   public var native: TestArguments { TestArguments(bridged: self) }
 }
 
+/// An interface to the various analyses that are available.
 public struct TestContext {
   public var bridged: BridgedTestContext
   fileprivate init(bridged: BridgedTestContext) {
@@ -139,16 +139,52 @@ extension BridgedTestContext {
   public var native: TestContext { TestContext(bridged: self) }
 }
 
-private func registerFunctionTest(
-  _ test: FunctionTest,
-  implementation: BridgedFunctionTestThunk) {
+/// Registration of each test in the SIL module.
+public func registerSILTests() {
+  // Register each test.
+  registerFunctionTest(parseTestSpecificationTest)
+
+  // Finally register the thunk they all call through.
+  registerFunctionTestThunk(functionTestThunk)
+}
+
+
+private func registerFunctionTest(_ test: FunctionTest) {
   test.name._withStringRef { ref in
-    registerFunctionTest(ref, implementation)
+    registerFunctionTest(ref, eraseInvocation(test.invocation))
   }
 }
 
-public func registerSILTests() {
-  registerFunctionTest(parseTestSpecificationTest, implementation: { parseTestSpecificationTest.run($0, $1, $2) })
+/// The function called by the swift::test::FunctionTest which invokes the
+/// actual test function.
+///
+/// This function is necessary because tests need to be written in terms of
+/// native Swift types (Function, TestArguments, TestContext) rather than their
+/// bridged variants, but such a function isn't representable in C++.  This
+/// thunk unwraps the bridged types and invokes the real function.
+private func functionTestThunk(
+  _ erasedInvocation: UnsafeMutableRawPointer,
+  _ function: BridgedFunction, 
+  _ arguments: BridgedTestArguments, 
+  _ context: BridgedTestContext) {
+  let invocation = uneraseInvocation(erasedInvocation)
+  invocation(function.function, arguments.native, context.native)
+}
+
+/// Bitcast a thin test closure to void *.
+///
+/// Needed so that the closure can be represented in C++ for storage in the test
+/// registry.
+private func eraseInvocation(_ invocation: FunctionTestInvocation) -> UnsafeMutableRawPointer {
+  return unsafeBitCast(invocation, to: UnsafeMutableRawPointer.self)
+}
+
+/// Bitcast a void * to a thin test closure.
+///
+/// Needed so that the closure stored in the C++ test registry can be invoked
+/// via the functionTestThunk.
+private func uneraseInvocation(_ erasedInvocation: UnsafeMutableRawPointer) -> FunctionTestInvocation {
+  return unsafeBitCast(erasedInvocation, to: FunctionTestInvocation.self)
 }
 
 // Arguments:

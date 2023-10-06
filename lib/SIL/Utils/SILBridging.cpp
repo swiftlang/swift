@@ -133,14 +133,8 @@ void registerBridgedClass(StringRef className, SwiftMetatype metatype) {
 //                                Test
 //===----------------------------------------------------------------------===//
 
-void registerFunctionTest(llvm::StringRef name,
-                          BridgedFunctionTestThunk thunk) {
-  new swift::test::FunctionTest(
-      name, reinterpret_cast<void *>(thunk),
-      [](auto &function, auto &args, auto &test, void *ctx) {
-        auto thunk = reinterpret_cast<BridgedFunctionTestThunk>(ctx);
-        thunk({&function}, {&args}, test.getContext());
-      });
+void registerFunctionTest(llvm::StringRef name, void *nativeSwiftInvocation) {
+  new swift::test::FunctionTest(name, nativeSwiftInvocation);
 }
 
 bool BridgedTestArguments::hasUntaken() const {

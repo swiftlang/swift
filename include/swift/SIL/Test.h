@@ -130,12 +130,11 @@ public:
   ///                    values such as the results of analyses
   using Invocation = void (*)(SILFunction &, Arguments &, FunctionTest &);
 
-  using InvocationWithContext = void (*)(SILFunction &, Arguments &,
-                                         FunctionTest &, void *);
+  using NativeSwiftInvocation = void *;
 
 private:
   /// The lambda to be run.
-  TaggedUnion<Invocation, std::pair<InvocationWithContext, void *>> invocation;
+  TaggedUnion<Invocation, NativeSwiftInvocation> invocation;
 
 public:
   /// Creates a test that will run \p invocation and stores it in the global
@@ -151,7 +150,7 @@ public:
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
-  FunctionTest(StringRef name, void *context, InvocationWithContext invocation);
+  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
 
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
