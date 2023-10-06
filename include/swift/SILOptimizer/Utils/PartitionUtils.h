@@ -1,6 +1,7 @@
 #ifndef SWIFT_PARTITIONUTILS_H
 #define SWIFT_PARTITIONUTILS_H
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallVector.h"
@@ -12,6 +13,18 @@
 namespace swift {
 
 namespace PartitionPrimitives {
+
+#ifndef NDEBUG
+extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
+#define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
+  do {                                                                         \
+    if (REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {                         \
+      LLVM_DEBUG(__VA_ARGS__);                                                 \
+    }                                                                          \
+  } while (0);
+#else
+#define REGIONBASEDISOLATION_VERBOSE_LOG(...)
+#endif
 
 struct Element {
   unsigned num;
@@ -391,11 +404,17 @@ public:
       PartitionOp op,
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
           [](const PartitionOp &, Element) {},
-
       ArrayRef<Element> nonconsumables = {},
-
       llvm::function_ref<void(const PartitionOp &, Element)>
           handleConsumeNonConsumable = [](const PartitionOp &, Element) {}) {
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
+                                     op.print(llvm::dbgs()));
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
+                                     print(llvm::dbgs()));
+    SWIFT_DEFER {
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
+                                       print(llvm::dbgs()));
+    };
     switch (op.OpKind) {
     case PartitionOpKind::Assign:
       assert(op.OpArgs.size() == 2 &&
