@@ -339,7 +339,7 @@ class PartitionOpTranslator {
   std::vector<TrackableValueID> neverTransferredValueIDs;
 
   /// A cache of argument IDs.
-  SmallVector<TrackableValueID> argIDs;
+  std::optional<Partition> functionArgPartition;
 
   /// A builder struct that we use to convert individual instructions into lists
   /// of PartitionOps.
@@ -523,35 +523,39 @@ private:
 
   // ===========================================================================
 
-  /// Get the vector of IDs corresponding to the arguments to the underlying
-  /// function, and the self parameter if there is one.
-  ArrayRef<TrackableValueID> getArgIDs() const {
-    auto functionArguments = function->getArguments();
-    if (functionArguments.empty())
-      return {};
-
-    // If we have arguments and argIDs is empty, then we need to initialize our
-    // lazy array.
-    if (argIDs.empty()) {
-      auto *self = const_cast<PartitionOpTranslator *>(this);
-      for (SILArgument *arg : functionArguments) {
-        if (auto state = trackIfNonSendable(arg)) {
-          self->neverTransferredValueIDs.push_back(state->getID());
-          self->argIDs.push_back(state->getID());
-        }
-      }
-    }
-
-    return argIDs;
-  }
-
 public:
   // Create a partition that places all arguments from this function,
   // including self if available, into the same region, ensuring those
   // arguments get IDs in doing so. This Partition will be used as the
   // entry point for the full partition analysis.
-  Partition getEntryPartition() {
-    return Partition::singleRegion(getArgIDs());
+  Partition getEntryPartition() const {
+    if (!functionArgPartition) {
+      LLVM_DEBUG(llvm::dbgs() << "Initializing Function Args:\n");
+      auto *self = const_cast<PartitionOpTranslator *>(this);
+      auto functionArguments = function->getArguments();
+      if (functionArguments.empty()) {
+        LLVM_DEBUG(llvm::dbgs() << "    None.\n");
+        self->functionArgPartition = Partition::singleRegion({});
+      } else {
+        llvm::SmallVector<Element, 8> nonSendableIndices;
+        for (SILArgument *arg : functionArguments) {
+          if (auto state = tryToTrackValue(arg)) {
+            // If we have an arg that is an actor, we allow for it to be
+            // consumed... value ids derived from it though cannot be consumed.
+            LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID());
+            self->neverTransferredValueIDs.push_back(state->getID());
+            nonSendableIndices.push_back(state->getID());
+            LLVM_DEBUG(llvm::dbgs() << *arg);
+          }
+        }
+
+        // All non actor values are in the same partition.
+        self->functionArgPartition =
+            Partition::singleRegion(nonSendableIndices);
+      }
+    }
+
+    return *functionArgPartition;
   }
 
   // Get the vector of IDs that cannot be legally transferred at any point in
