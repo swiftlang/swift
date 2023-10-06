@@ -10845,6 +10845,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
         return fixMissingMember(origBaseTy, memberTy, locator);
 
+      bool baseIsKeyPathRootType = [&]() {
+        auto keyPathComponent =
+            locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
+        return keyPathComponent && keyPathComponent->getIndex() == 0;
+      }();
+
       // The result of the member access can either be the expected member type
       // (for '!' or optional members with '?'), or the original member type
       // with one extra level of optionality ('?' with non-optional members).
@@ -10858,13 +10864,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           *this, ConstraintKind::Bind,
           UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
           memberTy, innerTV, locator);
-      auto optionalResult = Constraint::createFixed(
-          *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::createWithOptionalResult(*this, member,
-                                                       baseObjTy, locator),
-          optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
-      optionalities.push_back(optionalResult);
+
+      if (!baseIsKeyPathRootType) {
+        auto optionalResult = Constraint::createFixed(
+            *this, ConstraintKind::Bind,
+            UnwrapOptionalBase::createWithOptionalResult(*this, member,
+                                                         baseObjTy, locator),
+            optTy, memberTy, locator);
+        optionalities.push_back(optionalResult);
+      }
+
       addDisjunctionConstraint(optionalities, locator);
 
       // Look through one level of optional.
