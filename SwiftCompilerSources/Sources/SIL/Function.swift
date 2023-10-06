@@ -22,8 +22,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   final public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var shortDescription: String { name.string }
@@ -113,7 +112,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
-      bridged.hasSemanticsAttr(llvm.StringRef(buffer.baseAddress!, buffer.count))
+      bridged.hasSemanticsAttr(BridgedStringRef(buffer.baseAddress!, buffer.count))
     }
   }
 
@@ -286,19 +285,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         } else {
           s = effects.description
         }
-        s._withStringRef { OStream_write(os, $0) }
+        s._withBridgedStringRef { $0.write(os) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: llvm.StringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedFunction.ParsingError in
+      { (f: BridgedFunction, str: BridgedStringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedFunction.ParsingError in
         do {
-          var parser = StringParser(str.string)
+          var parser = StringParser(String(str))
           let function = f.function
 
           switch mode {
           case .argumentEffectsFromSource:
-            let paramToIdx = paramNames.withElements(ofType: llvm.StringRef.self) {
-                (buffer: UnsafeBufferPointer<llvm.StringRef>) -> Dictionary<String, Int> in
-              let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
+            let paramToIdx = paramNames.withElements(ofType: BridgedStringRef.self) {
+                (buffer: UnsafeBufferPointer<BridgedStringRef>) -> Dictionary<String, Int> in
+              let keyValPairs = buffer.enumerated().lazy.map { (String($0.1), $0.0) }
               return Dictionary(uniqueKeysWithValues: keyValPairs)
             }
             let effect = try parser.parseEffectFromSource(for: function, params: paramToIdx)
@@ -360,7 +359,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
         return BridgedFunction.EffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
       },
       // getMemBehaviorFn
-      { (f: BridgedFunction, observeRetains: Bool) -> swift.MemoryBehavior in
+      { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
         let e = f.function.getSideEffects()
         return e.getMemBehavior(observeRetains: observeRetains)
       }
@@ -395,7 +394,7 @@ extension OptionalBridgedFunction {
 }
 
 public extension SideEffects.GlobalEffects {
-  func getMemBehavior(observeRetains: Bool) -> swift.MemoryBehavior {
+  func getMemBehavior(observeRetains: Bool) -> BridgedMemoryBehavior {
     if allocates || ownership.destroy || (ownership.copy && observeRetains) {
       return .MayHaveSideEffects
     }

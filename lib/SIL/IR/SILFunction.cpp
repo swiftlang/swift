@@ -985,9 +985,14 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
 std::pair<const char *, int>  SILFunction::
 parseArgumentEffectsFromSource(StringRef effectStr, ArrayRef<StringRef> paramNames) {
   if (parseFunction) {
+    llvm::SmallVector<BridgedStringRef, 8> bridgedParamNames;
+    for (StringRef paramName : paramNames) {
+      bridgedParamNames.push_back(paramName);
+    }
+    ArrayRef<BridgedStringRef> bridgedParamNameArray = bridgedParamNames;
     auto error = parseFunction(
         {this}, effectStr, BridgedFunction::ParseEffectsMode::argumentEffectsFromSource, -1,
-        {(const unsigned char *)paramNames.data(), paramNames.size()});
+        {(const unsigned char *)bridgedParamNameArray.data(), bridgedParamNameArray.size()});
     return {(const char *)error.message, (int)error.position};
   }
   return {nullptr, 0};

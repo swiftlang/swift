@@ -34,8 +34,7 @@ public class Instruction : CustomStringConvertible, Hashable {
   final public var parentFunction: Function { parentBlock.parentFunction }
 
   final public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   final public var isDeleted: Bool {
@@ -347,7 +346,7 @@ final public class CondFailInst : Instruction, UnaryInstruction {
   public var condition: Value { operand.value }
   public override var mayTrap: Bool { true }
 
-  public var message: String { bridged.CondFailInst_getMessage().string }
+  public var message: StringRef { StringRef(bridged: bridged.CondFailInst_getMessage()) }
 }
 
 final public class HopToExecutorInst : Instruction, UnaryInstruction {}
@@ -478,7 +477,7 @@ final public class LoadUnownedInst : SingleValueInstruction, LoadInstruction {}
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction {}
 
 final public class BuiltinInst : SingleValueInstruction {
-  public typealias ID = swift.BuiltinValueKind
+  public typealias ID = BridgedInstruction.BuiltinValueKind
 
   public var id: ID {
     return bridged.BuiltinInst_getID()
@@ -622,11 +621,16 @@ final public class AllocGlobalInst : Instruction {
 }
 
 final public class IntegerLiteralInst : SingleValueInstruction {
-  public var value: llvm.APInt { bridged.IntegerLiteralInst_getValue() }
+  public var value: Int? {
+    let optionalInt = bridged.IntegerLiteralInst_getValue()
+    if optionalInt.hasValue {
+      return optionalInt.value
+    }
+    return nil
+  }
 }
 
 final public class FloatLiteralInst : SingleValueInstruction {
-  public var value: llvm.APFloat { bridged.FloatLiteralInst_getValue() }
 }
 
 final public class StringLiteralInst : SingleValueInstruction {
@@ -789,7 +793,7 @@ final public class BridgeObjectToRefInst : SingleValueInstruction,
 final public class BridgeObjectToWordInst : SingleValueInstruction,
                                            ConversionInstruction {}
 
-public typealias AccessKind = swift.SILAccessKind
+public typealias AccessKind = BridgedInstruction.AccessKind
 
 
 // TODO: add support for begin_unpaired_access
@@ -890,7 +894,7 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var isNonThrowing: Bool { bridged.ApplyInst_getNonThrowing() }
   public var isNonAsync: Bool { bridged.ApplyInst_getNonAsync() }
 
-  public typealias SpecializationInfo = UnsafePointer<swift.GenericSpecializationInformation>?
+  public typealias SpecializationInfo = BridgedGenericSpecializationInformation
 
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 }

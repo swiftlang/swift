@@ -14,8 +14,8 @@ import Basic
 import SILBridging
 
 public struct Type : CustomStringConvertible, NoReflectionChildren {
-  public let bridged: swift.SILType
-  
+  public let bridged: BridgedType
+
   public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
@@ -23,12 +23,12 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var objectType: Type { bridged.getObjectType().type }
 
   public func isTrivial(in function: Function) -> Bool {
-    return bridged.isTrivial(function.bridged.getFunction())
+    return bridged.isTrivial(function.bridged)
   }
 
   /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
   public func isTrivialNonPointer(in function: Function) -> Bool {
-    return !bridged.isNonTrivialOrContainsRawPointer(function.bridged.getFunction())
+    return !bridged.isNonTrivialOrContainsRawPointer(function.bridged)
   }
 
   /// True if this type is a value type (struct/enum) that requires deinitialization beyond
@@ -36,11 +36,11 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isValueTypeWithDeinit: Bool { bridged.isValueTypeWithDeinit() }
 
   public func isLoadable(in function: Function) -> Bool {
-    return bridged.isLoadable(function.bridged.getFunction())
+    return bridged.isLoadable(function.bridged)
   }
 
   public func isReferenceCounted(in function: Function) -> Bool {
-    return bridged.isReferenceCounted(function.bridged.getFunction())
+    return bridged.isReferenceCounted(function.bridged)
   }
 
   public var isUnownedStorageType: Bool {
@@ -49,23 +49,23 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
 
   public var hasArchetype: Bool { bridged.hasArchetype() }
 
-  public var isNominal: Bool { bridged.getNominalOrBoundGenericNominal() != nil }
-  public var isClass: Bool { bridged.getClassOrBoundGenericClass() != nil }
-  public var isStruct: Bool { bridged.getStructOrBoundGenericStruct() != nil }
+  public var isNominal: Bool { bridged.isNominalOrBoundGenericNominal() }
+  public var isClass: Bool { bridged.isClassOrBoundGenericClass() }
+  public var isStruct: Bool { bridged.isStructOrBoundGenericStruct() }
   public var isTuple: Bool { bridged.isTuple() }
-  public var isEnum: Bool { bridged.getEnumOrBoundGenericEnum() != nil }
+  public var isEnum: Bool { bridged.isEnumOrBoundGenericEnum() }
   public var isFunction: Bool { bridged.isFunction() }
   public var isMetatype: Bool { bridged.isMetatype() }
   public var isNoEscapeFunction: Bool { bridged.isNoEscapeFunction() }
   public var isAsyncFunction: Bool { bridged.isAsyncFunction() }
 
-  public var canBeClass: swift.TypeTraitResult { bridged.canBeClass() }
+  public var canBeClass: BridgedType.TraitResult { bridged.canBeClass() }
 
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
   /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
   public var nominal: NominalTypeDecl {
-    NominalTypeDecl(_bridged: BridgedNominalTypeDecl(decl: bridged.getNominalOrBoundGenericNominal()))
+    NominalTypeDecl(_bridged: bridged.getNominalOrBoundGenericNominal())
   }
 
   public var isOrContainsObjectiveCClass: Bool { bridged.isOrContainsObjectiveCClass() }
@@ -76,7 +76,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var builtinVectorElementType: Type { bridged.getBuiltinVectorElementType().type }
 
   public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
-    bridged.isBuiltinFixedWidthInteger(UInt32(width))
+    bridged.isBuiltinFixedWidthInteger(width)
   }
 
   public func isExactSuperclass(of type: Type) -> Bool {
@@ -89,12 +89,14 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     NominalFieldsArray(type: self, function: function)
   }
 
+  public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
+
   public func instanceTypeOfMetatype(in function: Function) -> Type {
-    bridged.getInstanceTypeOfMetatype(function.bridged.getFunction()).type
+    bridged.getInstanceTypeOfMetatype(function.bridged).type
   }
 
-  public func representationOfMetatype(in function: Function) -> swift.MetatypeRepresentation {
-    bridged.getRepresentationOfMetatype(function.bridged.getFunction())
+  public func representationOfMetatype(in function: Function) -> MetatypeRepresentation {
+    bridged.getRepresentationOfMetatype(function.bridged)
   }
 
   public var isCalleeConsumedFunction: Bool { bridged.isCalleeConsumedFunction() }
@@ -102,20 +104,20 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
 
   public func getIndexOfEnumCase(withName name: String) -> Int? {
-    let idx = name._withStringRef {
+    let idx = name._withBridgedStringRef {
       bridged.getCaseIdxOfEnumType($0)
     }
     return idx >= 0 ? idx : nil
   }
 
   public var description: String {
-    String(_cxxString: bridged.getDebugDescription())
+    String(taking: bridged.getDebugDescription())
   }
 }
 
 extension Type: Equatable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
-    lhs.bridged == rhs.bridged
+    lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
   }
 }
 
@@ -167,11 +169,11 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   public var endIndex: Int { Int(type.bridged.getNumNominalFields()) }
 
   public subscript(_ index: Int) -> Type {
-    type.bridged.getFieldType(index, function.bridged.getFunction()).type
+    type.bridged.getFieldType(index, function.bridged).type
   }
 
   public func getIndexOfField(withName name: String) -> Int? {
-    let idx = name._withStringRef {
+    let idx = name._withBridgedStringRef {
       type.bridged.getFieldIdxOfNominalType($0)
     }
     return idx >= 0 ? idx : nil
@@ -193,7 +195,7 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
   }
 }
 
-extension swift.SILType {
+extension BridgedType {
   var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
 }

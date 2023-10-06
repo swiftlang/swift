@@ -540,9 +540,9 @@ static llvm::StringMap<BridgedInstructionPassRunFn> swiftInstPasses;
 static bool passesRegistered = false;
 
 // Called from initializeSwiftModules().
-void SILCombine_registerInstructionPass(llvm::StringRef instClassName,
+void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[instClassName] = runFn;
+  swiftInstPasses[instClassName.get()] = runFn;
   passesRegistered = true;
 }
 
