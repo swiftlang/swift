@@ -144,7 +144,6 @@ public:
 
   /// Whether the statement can produce a single value, and as such may be
   /// treated as an expression.
-  IsSingleValueStmtResult mayProduceSingleValue(Evaluator &eval) const;
   IsSingleValueStmtResult mayProduceSingleValue(ASTContext &ctx) const;
 
   /// isImplicit - Determines whether this statement was implicitly-generated,

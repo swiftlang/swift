@@ -448,7 +448,7 @@ SWIFT_REQUEST(TypeChecker, PreCheckReturnStmtRequest,
               Stmt *(ReturnStmt *, DeclContext *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsSingleValueStmtRequest,
-              IsSingleValueStmtResult(const Stmt *),
+              IsSingleValueStmtResult(const Stmt *, ASTContext *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, MacroDefinitionRequest,
               MacroDefinition(MacroDecl *),

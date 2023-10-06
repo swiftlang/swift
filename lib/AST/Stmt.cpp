@@ -333,13 +333,9 @@ Stmt *BraceStmt::getSingleActiveStatement() const {
   return getSingleActiveElement().dyn_cast<Stmt *>();
 }
 
-IsSingleValueStmtResult Stmt::mayProduceSingleValue(Evaluator &eval) const {
-  return evaluateOrDefault(eval, IsSingleValueStmtRequest{this},
-                           IsSingleValueStmtResult::circularReference());
-}
-
 IsSingleValueStmtResult Stmt::mayProduceSingleValue(ASTContext &ctx) const {
-  return mayProduceSingleValue(ctx.evaluator);
+  return evaluateOrDefault(ctx.evaluator, IsSingleValueStmtRequest{this, &ctx},
+                           IsSingleValueStmtResult::circularReference());
 }
 
 SourceLoc ReturnStmt::getStartLoc() const {

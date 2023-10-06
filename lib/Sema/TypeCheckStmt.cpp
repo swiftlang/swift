@@ -2696,7 +2696,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
     // single expression return, do so now.
     if (!func->getResultInterfaceType()->isVoid()) {
       if (auto *S = body->getSingleActiveStatement()) {
-        if (S->mayProduceSingleValue(evaluator)) {
+        if (S->mayProduceSingleValue(ctx)) {
           auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
               ctx, S, /*DC*/ func, /*mustBeExpr*/ false);
           auto *RS = new (ctx) ReturnStmt(SourceLoc(), SVE);
@@ -2943,7 +2943,7 @@ static bool doesBraceEndWithThrow(BraceStmt *BS) {
 
 /// Whether the given brace statement is considered to produce a result for
 /// an if/switch expression.
-static bool doesBraceProduceResult(BraceStmt *BS, Evaluator &eval) {
+static bool doesBraceProduceResult(BraceStmt *BS, ASTContext &ctx) {
   if (BS->empty())
     return false;
 
@@ -2955,14 +2955,14 @@ static bool doesBraceProduceResult(BraceStmt *BS, Evaluator &eval) {
     return true;
 
   if (auto *S = BS->getSingleActiveStatement()) {
-    if (S->mayProduceSingleValue(eval))
+    if (S->mayProduceSingleValue(ctx))
       return true;
   }
   return SingleValueStmtExpr::hasResult(BS);
 }
 
 IsSingleValueStmtResult
-areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
+areBranchesValidForSingleValueStmt(ASTContext &ctx, ArrayRef<Stmt *> branches) {
   TinyPtrVector<Stmt *> invalidJumps;
   TinyPtrVector<Stmt *> unterminatedBranches;
   JumpOutOfContextFinder jumpFinder(invalidJumps);
@@ -2979,7 +2979,7 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
     BS->walk(jumpFinder);
 
     // Check to see if a result is produced from the branch.
-    if (doesBraceProduceResult(BS, eval)) {
+    if (doesBraceProduceResult(BS, ctx)) {
       hadResult = true;
       continue;
     }
@@ -3005,7 +3005,11 @@ areBranchesValidForSingleValueStmt(Evaluator &eval, ArrayRef<Stmt *> branches) {
 }
 
 IsSingleValueStmtResult
-IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S) const {
+IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S,
+                                   ASTContext *_ctx) const {
+  assert(_ctx);
+  auto &ctx = *_ctx;
+
   if (!isa<IfStmt>(S) && !isa<SwitchStmt>(S))
     return IsSingleValueStmtResult::unhandledStmt();
 
@@ -3020,11 +3024,11 @@ IsSingleValueStmtRequest::evaluate(Evaluator &eval, const Stmt *S) const {
       return IsSingleValueStmtResult::nonExhaustiveIf();
 
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(eval, IS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, IS->getBranches(scratch));
   }
   if (auto *SS = dyn_cast<SwitchStmt>(S)) {
     SmallVector<Stmt *, 4> scratch;
-    return areBranchesValidForSingleValueStmt(eval, SS->getBranches(scratch));
+    return areBranchesValidForSingleValueStmt(ctx, SS->getBranches(scratch));
   }
   llvm_unreachable("Unhandled case");
 }

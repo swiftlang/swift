@@ -4039,9 +4039,12 @@ public:
 };
 
 /// Computes whether a given statement can be treated as a SingleValueStmtExpr.
+///
+// TODO: We ought to consider storing a reference to the ASTContext on the
+// evaluator.
 class IsSingleValueStmtRequest
     : public SimpleRequest<IsSingleValueStmtRequest,
-                           IsSingleValueStmtResult(const Stmt *),
+                           IsSingleValueStmtResult(const Stmt *, ASTContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4049,8 +4052,8 @@ public:
 private:
   friend SimpleRequest;
 
-  IsSingleValueStmtResult
-  evaluate(Evaluator &evaluator, const Stmt *stmt) const;
+  IsSingleValueStmtResult evaluate(Evaluator &evaluator, const Stmt *stmt,
+                                   ASTContext *ctx) const;
 
 public:
   bool isCached() const { return true; }
