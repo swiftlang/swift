@@ -65,3 +65,7 @@ Added: _OBJC_CLASS_$__TtCs20__StaticArrayStorage
 Added: _OBJC_METACLASS_$__TtCs20__StaticArrayStorage
 
 // Runtime Symbols
+Added: __swift_pod_copy
+Added: __swift_pod_destroy
+Added: __swift_pod_direct_initializeBufferWithCopyOfBuffer
+Added: __swift_pod_indirect_initializeBufferWithCopyOfBuffer

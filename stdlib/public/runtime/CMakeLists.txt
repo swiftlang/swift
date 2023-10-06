@@ -52,6 +52,7 @@ set(swift_runtime_sources
     Float16Support.cpp
     FoundationSupport.cpp
     FunctionReplacement.cpp
+    GenericMetadataBuilder.cpp
     Heap.cpp
     HeapObject.cpp
     ImageInspectionCommon.cpp
