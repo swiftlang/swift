@@ -191,6 +191,27 @@ public:
     return false;
   }
 
+  /// Apply the given function object to each associated conformance requirement
+  /// within this protocol conformance.
+  ///
+  /// \returns true if the function ever returned true
+  template<typename F>
+  bool forEachAssociatedConformance(F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    unsigned index = 0;
+    for (auto req : protocol->getRequirementSignature().getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      if (f(req.getFirstType(), req.getProtocolDecl(), index))
+        return true;
+
+      ++index;
+    }
+
+    return false;
+  }
+
   /// Retrieve the value witness declaration corresponding to the given
   /// requirement.
   ValueDecl *getWitnessDecl(ValueDecl *requirement) const;
