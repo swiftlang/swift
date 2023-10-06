@@ -2277,7 +2277,7 @@ namespace {
     ActorIsolation computeRequiredIsolation(Expr *expr) {
       auto &ctx = getDeclContext()->getASTContext();
 
-      if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments))
+      if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues))
         requiredIsolationLoc = expr->getLoc();
 
       expr->walk(*this);
