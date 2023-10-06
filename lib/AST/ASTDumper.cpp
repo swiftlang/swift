@@ -3414,7 +3414,8 @@ public:
       });
     }
 
-    printRecRange(T->getGenericArguments(), "generic_arguments");
+    for (auto arg : T->getGenericArguments())
+      printRec(arg);
 
     printFoot();
   }
@@ -3886,14 +3887,16 @@ namespace {
 
       printFieldQuoted(T->getDecl()->printRef(), "decl");
       if (auto underlying = T->getSinglyDesugaredType()) {
-        printField(underlying, "underlying", TypeColor);
+        printRec(underlying, "underlying");
       } else {
+        // This can't actually happen
         printFlag("unresolved_underlying");
       }
 
       if (T->getParent())
         printRec(T->getParent(), "parent");
-      printRecRange(T->getDirectGenericArgs(), "direct_generic_args");
+      for (auto arg : T->getDirectGenericArgs())
+        printRec(arg);
 
       printFoot();
     }
