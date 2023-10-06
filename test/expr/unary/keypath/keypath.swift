@@ -1202,3 +1202,17 @@ func test_keypath_inference_from_existentials() {
   test(\.other, 42)  // Ok
   test(\.member, "") // Ok
 }
+
+// rdar://116376651 - key path type is bound before context is fully resolved.
+func keypath_to_func_conversion_as_arg_to_overloaded_func() {
+  struct Data {
+    var value: Int = 42
+  }
+
+  func test<S: Sequence>(_: S, _: (S.Element) -> Int) {}
+  func test<C: Collection>(_: C, _: (C.Element) -> Int) {}
+
+  func test(arr: [Data]) {
+    test(arr, \Data.value) // Ok
+  }
+}

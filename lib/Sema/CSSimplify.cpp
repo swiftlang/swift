@@ -12364,21 +12364,56 @@ ConstraintSystem::simplifyKeyPathConstraint(
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
 
+  auto formUnsolved = [&]() {
+    addUnsolvedConstraint(Constraint::create(
+        *this, ConstraintKind::KeyPath, keyPathTy, rootTy, valueTy,
+        locator.getBaseLocator(), componentTypeVars));
+  };
+
   auto loc = locator.getBaseLocator();
   if (definitelyFunctionType) {
     increaseScore(SK_FunctionConversion, locator);
     return SolutionKind::Solved;
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
-    auto resolvedKPTy =
-      BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-    return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                      loc);
+    // If key path is connected to a function application it cannot be
+    // bound until the choice is selected because it's undetermined
+    // until then whether key path is implicitly converted to a function
+    // type or not.
+    //
+    // \code
+    // struct Data {
+    //   var value: Int = 42
+    // }
+    //
+    // func test<S: Sequence>(_: S, _: (S.Element) -> Int) {}
+    // func test<C: Collection>(_: C, _: (C.Element) -> Int) {}
+    //
+    // func test(arr: [Data]) {
+    //  test(arr, \Data.value)
+    // }
+    // \endcode
+    //
+    // In this example if we did allow to bind the key path before
+    // an overload of `test` is selected, we'd end up with no solutions
+    // because the type of the key path expression is actually: '(Data) -> Int'
+    // and not 'WritableKeyPath<Data, Int>`.
+    auto *typeVar = keyPathTy->getAs<TypeVariableType>();
+    if (typeVar && findConstraintThroughOptionals(
+                       typeVar, OptionalWrappingDirection::Unwrap,
+                       [&](Constraint *match, TypeVariableType *) {
+                         return match->getKind() ==
+                                ConstraintKind::ApplicableFunction;
+                       })) {
+      formUnsolved();
+    } else {
+      auto resolvedKPTy =
+          BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+      return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
+                        loc);
+    }
   } else {
-    addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
-                                             keyPathTy, rootTy, valueTy,
-                                             locator.getBaseLocator(),
-                                             componentTypeVars));
+    formUnsolved();
   }
   return SolutionKind::Solved;
 }
