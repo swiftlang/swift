@@ -207,5 +207,18 @@ bool SerialExecutorRef::isMainExecutor() const {
 #endif
 }
 
+//ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+//  AsyncTask *task = swift_task_getCurrent();
+//  if (!task) {
+//    fprintf(stderr, "[%s:%d](%s) no current task, default executor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//
+//    // If we don't have any task executor, we can't have a task executor preference.
+//    // So, return the "generic" which is "nil" and used as the "default" global executor.
+//    return ExecutorRef::generic();
+//  }
+//
+//  return task->getPreferredTaskExecutor();
+//}
+
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnreachableCode"
 //===--- TaskPrivate.h - Concurrency library internal interface -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -1115,6 +1117,8 @@ inline void AsyncTask::flagAsDestroyed() {
   SWIFT_TASK_DEBUG_LOG("task destroyed %p", this);
 }
 
+// ==== Task Local Values -----------------------------------------------------
+
 inline void AsyncTask::localValuePush(const HeapObject *key,
                                       /* +1 */ OpaqueValue *value,
                                       const Metadata *valueType) {
@@ -1130,6 +1134,34 @@ inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
 }
 
+// ==== Task Executor Preference ----------------------------------------------
+
+inline void AsyncTask::pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
+  assert(false && "not implemented yet");
+
+  void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
+  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+  SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
+
+  // FIXME: LOCKING
+    assert(false && "not implemented adding to existing");
+//    auto addedRecord = addStatusRecordToSelf(
+//        record,
+//        [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
+//
+//
+//    });
+//    assert(addedRecord);
+
+}
+
+inline void AsyncTask::popTaskExecutorPreference() {
+  assert(false && "not implemented yet");
+}
+
+
 } // end namespace swift
 
 #endif
+
+#pragma clang diagnostic pop

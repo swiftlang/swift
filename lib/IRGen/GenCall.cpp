@@ -4547,19 +4547,25 @@ llvm::Value *irgen::addEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
   return taskOptions;
 }
 
-llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
-                                   llvm::Value *taskGroup,
-                                   llvm::Value *futureResultType,
-                                   llvm::Value *taskFunction,
-                                   llvm::Value *localContextInfo,
-                                   SubstitutionMap subs) {
-  // Start with empty task options.
-  llvm::Value *taskOptions =
-      llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+llvm::Value *irgen::emitTaskCreate(
+    IRGenFunction &IGF,
+    llvm::Value *flags,
+    llvm::Value *taskGroup,
+    llvm::Value *executor1,
+    llvm::Value *executor2,
+    llvm::Value *futureResultType,
+    llvm::Value *taskFunction,
+    llvm::Value *localContextInfo,
+    SubstitutionMap subs) {
+    llvm::Value *taskOptions = llvm::ConstantInt::get(
+      IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
 
+  // If there is a task group, emit a task group option structure to contain
+  // it.
   // If there is a task group, emit a task group option structure to contain it.
   if (taskGroup) {
     TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::Executor);
     llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
         IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
 
@@ -4580,6 +4586,12 @@ llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
     IGF.Builder.CreateStore(
         taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
 
+    auto executorRecord = IGF.Builder.CreateStructGEP(optionsRecord, 1, Size());
+    IGF.Builder.CreateStore(
+        executor1, IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        executor2, IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
+
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
   }
@@ -4587,10 +4599,42 @@ llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   // In embedded Swift, create and pass result type info.
   taskOptions = addEmbeddedSwiftResultTypeInfo(IGF, taskOptions, subs);
 
+  // If there is an executor, emit an executor option to contain it.
+  if (executor1) {
+    assert(executor2 && "second executor field must be present when first was");
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::Executor);
+    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
+        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    auto optionsRecord = IGF.createAlloca(
+        IGF.IGM.SwiftExecutorTaskOptionRecordTy, Alignment(),
+        "executor_options");
+    auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
+        optionsRecord, 0, Size());
+    IGF.Builder.CreateStore(
+        optionsFlagsVal,
+        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+
+    auto executorRecord = IGF.Builder.CreateStructGEP(optionsRecord, 1, Size());
+    IGF.Builder.CreateStore(
+        executor1, IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        executor2, IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
+
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  }
+
   assert(futureResultType && "no future?!");
   llvm::CallInst *result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFunctionPointer(),
-      {flags, taskOptions, futureResultType, taskFunction, localContextInfo});
+      {flags,
+       taskOptions,
+       futureResultType,
+       taskFunction,
+       localContextInfo});
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 
