@@ -1951,6 +1951,20 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getHopToExecutor(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _async(_thin),
+                            _parameters(_optional(_executor)),
+                            _void);
+//  BuiltinFunctionBuilder builder(ctx);
+//  auto *actorProto = ctx.getExecutor;
+//  // Create type parameters and add conformance constraints.
+//  auto actorParam = makeGenericParam();
+//  builder.addParameter(actorParam);
+//  builder.addConformanceRequirement(actorParam, actorProto);
+//  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+//  return builder.build(id);
+}
+
 static ValueDecl *getPackLength(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 1,
                                  /* anyObject */ false,
@@ -2982,6 +2996,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
+  case BuiltinValueKind::HopToExecutor:
+    return getHopToExecutor(Context, Id);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     return getAutoDiffCreateLinearMapContext(Context, Id);

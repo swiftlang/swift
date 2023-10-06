@@ -421,18 +421,6 @@ public:
   /// Returns true if storage has still more bindings.
   bool localValuePop();
 
-  // ==== Task Executor Preference ---------------------------------------------
-
-  /// Get the preferred executor for this task.
-  ExecutorRef getTaskExecutorPreference();
-
-  /// Push a task executor preference onto the task.
-  void pushTaskExecutorPreference(ExecutorRef executor);
-
-  /// Pop a task executor preference from the task.
-  /// If no preference was present this is allowed to crash.
-  void popTaskExecutorPreference();
-
   // ==== Child Fragment -------------------------------------------------------
 
   /// A fragment of an async task structure that happens to be a child task.

@@ -17,14 +17,20 @@ import Swift
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
+@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
 public func withExecutor<T: Sendable>(
   _ executor: any SerialExecutor, // FIXME: any Executor
   operation: () async throws -> T
   ) async rethrows -> T {
-  _pushTaskExecutorPreference(executor.asUnownedSerialExecutor().executor)
-  defer {
-    _popTaskExecutorPreference()
-  }
+  let executorBuiltin = executor.asUnownedSerialExecutor().executor
+  let record = _pushTaskExecutorPreference(executorBuiltin)
+  defer { _popTaskExecutorPreference(record: record) }
+
+#if compiler(>=5.5) && $BuiltinHopToExecutor
+  Builtin.hopToExecutor(executorBuiltin)
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 
   return try await operation()
 }
@@ -204,6 +210,7 @@ extension Task where Failure == Never {
 
 // ==== Runtime ---------------------------------------------------------------
 
+// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
 @usableFromInline
 @_silgen_name("swift_task_getPreferredTaskExecutor")
@@ -213,8 +220,11 @@ internal func _getPreferredTaskExecutor() -> Builtin.Executor
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_pushTaskExecutorPreference")
 internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
+  -> UnsafeRawPointer /*TaskExecutorPreferenceStatusRecord*/
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_popTaskExecutorPreference")
-internal func _popTaskExecutorPreference()
+internal func _popTaskExecutorPreference(
+  record: UnsafeRawPointer /*TaskExecutorPreferenceStatusRecord*/
+)

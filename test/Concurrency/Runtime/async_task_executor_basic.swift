@@ -81,7 +81,7 @@ public actor MyGlobalActor: GlobalActor {
       let countingExecutor = CountEnqueuesExecutor()
 
       var expectedSerialEnqueues = 0
-      var expectedEnqueues = 0
+      let expectedEnqueues = 0;
 
       do {
         Task(on: countingSerialExecutor) {
