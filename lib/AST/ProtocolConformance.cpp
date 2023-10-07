@@ -588,28 +588,6 @@ void NormalProtocolConformance::setAssociatedConformance(
   AssociatedConformances[index] = assocConf;
 }
 
-/// Collect conformances for the requirement signature.
-void NormalProtocolConformance::finishSignatureConformances() {
-  if (Loader)
-    resolveLazyInfo();
-
-  if (hasComputedAssociatedConformances())
-    return;
-
-  createAssociatedConformanceArray();
-
-  auto &ctx = getDeclContext()->getASTContext();
-
-  forEachAssociatedConformance(
-    [&](Type origTy, ProtocolDecl *reqProto, unsigned index) {
-      auto canTy = origTy->getCanonicalType();
-      evaluateOrDefault(ctx.evaluator,
-                        AssociatedConformanceRequest{this, canTy, reqProto, index},
-                        ProtocolConformanceRef::forInvalid());
-      return false;
-    });
-}
-
 Witness RootProtocolConformance::getWitness(ValueDecl *requirement) const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement))
 }
