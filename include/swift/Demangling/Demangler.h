@@ -383,6 +383,8 @@ enum class SymbolicReferenceKind : uint8_t {
   UniqueExtendedExistentialTypeShape,
   /// A symbolic reference to a non-unique extended existential type shape.
   NonUniqueExtendedExistentialTypeShape,
+  /// A symbolic reference to a objective C protocol ref.
+  ObjectiveCProtocol,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,

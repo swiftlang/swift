@@ -48,6 +48,12 @@ module WinSDK [system] {
       export *
     }
 
+    // api-ms-win-appmodel-runtime-l1
+    module appmodel {
+      header "appmodel.h"
+      export *
+    }
+
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
       header "errhandlingapi.h"

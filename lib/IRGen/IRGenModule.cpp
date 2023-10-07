@@ -1968,6 +1968,16 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          canPrespecializeTarget;
 }
 
+bool IRGenModule::canUseObjCSymbolicReferences() {
+  if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
+    return false;
+  auto &context = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return deploymentAvailability.isContainedIn(
+      context.getObjCSymbolicReferencesAvailability());
+}
+
 bool IRGenModule::canMakeStaticObjectsReadOnly() {
   // Unconditionally disable this until we can fix the metadata.
   // The trick of using the Empty array metadata for static arrays
