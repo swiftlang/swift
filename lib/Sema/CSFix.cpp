@@ -1296,13 +1296,6 @@ AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
       AllowInvalidRefInKeyPath(cs, kind, member, locator);
 }
 
-KeyPathContextualMismatch *
-KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                                  ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      KeyPathContextualMismatch(cs, lhs, rhs, locator);
-}
-
 bool RemoveAddressOf::diagnose(const Solution &solution, bool asNote) const {
   InvalidUseOfAddressOf failure(solution, getFromType(), getToType(),
                                 getLocator());
