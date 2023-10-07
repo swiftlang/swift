@@ -8479,7 +8479,6 @@ void ClangImporter::Implementation::finishNormalConformance(
   PrettyStackTraceConformance trace("completing import of", conformance);
 
   finishTypeWitnesses(conformance);
-  conformance->finishSignatureConformances();
 
   // Imported conformances to @objc protocols also require additional
   // initialization to complete the requirement to witness mapping.
