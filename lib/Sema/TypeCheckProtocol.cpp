@@ -832,6 +832,8 @@ RequirementMatch swift::matchWitness(
       }
 
       // If the witness is 'throws', the requirement must be.
+      // FIXME: We need the same matching we do in the constraint solver,
+      // with the same fast paths for obvious throws/nonthrows cases.
       if (witnessFnType->getExtInfo().isThrowing() &&
           !reqFnType->getExtInfo().isThrowing()) {
         return RequirementMatch(witness, MatchKind::ThrowsConflict);
