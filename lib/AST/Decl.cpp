@@ -10472,7 +10472,7 @@ ActorIsolation swift::getActorIsolationOfContext(
   //     that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
     auto &ctx = dc->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultArguments) &&
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues) &&
         var->isInstanceMember() &&
         !var->getAttrs().hasAttribute<LazyAttr>()) {
       return ActorIsolation::forNonisolated();

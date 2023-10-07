@@ -3551,7 +3551,7 @@ static bool usesFeatureSendNonSendable(Decl *decl) {
 
 static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
 
-static bool usesFeatureIsolatedDefaultArguments(Decl *decl) {
+static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
   return false;
 }
 
