@@ -263,6 +263,8 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                           OptimizationLevel Level) {
       if (Level != OptimizationLevel::O0)
         MPM.addPass(createModuleToFunctionPassAdaptor(SwiftARCContractPass()));
+      if (Level == OptimizationLevel::O0)
+        MPM.addPass(AlwaysInlinerPass());
     });
   }
 

@@ -2529,6 +2529,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
                              llvm::StringRef(name), &IGM.Module);
   dispatch->setCallingConv(IGM.SwiftAsyncCC);
   dispatch->setDoesNotThrow();
+  dispatch->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction dispatchIGF(IGM, dispatch);
   // Don't emit debug info if we are generating a function for the prologue.
   if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
@@ -2581,13 +2582,15 @@ void IRGenFunction::emitSuspensionPoint(Explosion &toExecutor,
 
 llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
   auto name = "__swift_async_resume_get_context";
-  return cast<llvm::Function>(IGM.getOrCreateHelperFunction(
+  auto fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
         auto &Builder = IGF.Builder;
         Builder.CreateRet(&*IGF.CurFn->arg_begin());
       },
       false /*isNoInline*/));
+  fn->addFnAttr(llvm::Attribute::AlwaysInline);
+  return fn;
 }
 
 llvm::Function *IRGenFunction::createAsyncSuspendFn() {
@@ -2612,6 +2615,7 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
                              name, &IGM.Module);
   suspendFn->setCallingConv(IGM.SwiftAsyncCC);
   suspendFn->setDoesNotThrow();
+  suspendFn->addFnAttr(llvm::Attribute::AlwaysInline);
   IRGenFunction suspendIGF(IGM, suspendFn);
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitOutlinedFunction(suspendIGF, suspendFn,
