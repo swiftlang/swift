@@ -1385,9 +1385,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     
     // type-casting operators such as 'is' and 'as'.
     if (resolution.getOptions().is(TypeResolverContext::ExplicitCastExpr)) {
-      diags.diagnose(L, diag::cannot_find_type_in_cast_expression, repr->getNameRef())
-        .highlight(R);
-      return ErrorType::get(ctx);
+      auto lookupResult = TypeChecker::lookupUnqualified(
+          dc, repr->getNameRef(), repr->getLoc(), lookupOptions);
+      if (!lookupResult.empty()) {
+        diags.diagnose(L, diag::cannot_find_type_in_cast_expression, repr->getNameRef())
+          .highlight(R);
+        return ErrorType::get(ctx);
+      }
     }
 
     diags.diagnose(L, diag::cannot_find_type_in_scope, repr->getNameRef())
