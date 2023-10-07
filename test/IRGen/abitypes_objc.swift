@@ -1,9 +1,9 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -enable-objc-interop | %FileCheck -check-prefix=%target-cpu-%target-os-abi %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -module-name abitypes -enable-objc-interop | %FileCheck -check-prefix=%target-cpu-%target-os-abi %s
 
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: OS=linux-gnu, OS=windows-msvc, OS=openbsd, OS=linux-android, OS=linux-androideabi
+// REQUIRES: objc_interop
 
 import gadget
+import c_gadget
 import Foundation
 
 @objc protocol P1 {}
@@ -559,33 +559,6 @@ class Foo {
   @objc dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
-
-  // Test that the makeOne() that we generate somewhere below doesn't
-  // use arm_aapcscc for armv7.
-  func callInline() -> Float {
-    return makeOne(3,5).second
-  }
-}
-
-// armv7-ios: define internal void @makeOne(ptr noalias sret({{.*}}) align 4 %agg.result, float %f, float %s)
-// armv7s-ios: define internal void @makeOne(ptr noalias sret({{.*}}) align 4 %agg.result, float %f, float %s)
-// armv7k-watchos: define internal %struct.One @makeOne(float {{.*}}%f, float {{.*}}%s)
-
-// rdar://17631440 - Expand direct arguments that are coerced to aggregates.
-// x86_64-macosx: define{{( protected)?}} swiftcc float @"$s8abitypes13testInlineAggySfSo6MyRectVF"(float %0, float %1, float %2, float %3) {{.*}} {
-// x86_64-macosx: [[COERCED:%.*]] = alloca %TSo6MyRectV, align 8
-// x86_64-macosx: store float %0,
-// x86_64-macosx: store float %1,
-// x86_64-macosx: store float %2,
-// x86_64-macosx: store float %3,
-// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 0
-// x86_64-macosx: [[FIRST_HALF:%.*]] = load <2 x float>, ptr [[T0]], align 8
-// x86_64-macosx: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 1
-// x86_64-macosx: [[SECOND_HALF:%.*]] = load <2 x float>, ptr [[T0]], align 8
-// x86_64-macosx: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
-// x86_64-macosx: ret float [[RESULT]]
-public func testInlineAgg(_ rect: MyRect) -> Float {
-  return MyRect_Area(rect)
 }
 
 // We need to allocate enough memory on the stack to hold the argument value we load.
