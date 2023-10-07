@@ -167,7 +167,7 @@ public:
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
 
-  SwiftPassInvocation *getInvocation();
+  SwiftPassInvocation *getSwiftPassInvocation();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===
@@ -247,7 +247,7 @@ private:
   struct Dependencies {
     virtual DominanceInfo *getDominanceInfo() = 0;
     virtual SILPassManager *getPassManager() = 0;
-    virtual SwiftPassInvocation *getInvocation() = 0;
+    virtual SwiftPassInvocation *getSwiftPassInvocation() = 0;
     virtual ~Dependencies(){};
   };
 
