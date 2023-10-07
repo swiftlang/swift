@@ -5062,7 +5062,6 @@ static void diagnoseInvariantSelfRequirement(
 }
 
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
-  Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
   auto &diags = proto->getASTContext().Diags;
 
