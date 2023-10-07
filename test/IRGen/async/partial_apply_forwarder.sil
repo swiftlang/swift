@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -g -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
 // RUN: %target-swift-frontend  -g -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 
-// REQUIRES: concurrency
+// REQUIRES: concurrency, objc_codegen
 
 sil_stage canonical
 

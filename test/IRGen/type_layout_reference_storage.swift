@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop  | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize
 // RUN: %target-swift-frontend -emit-ir %s -disable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native-%target-ptrsize
+// REQUIRES: objc_codegen
 
 class C {}
 protocol P: class {}

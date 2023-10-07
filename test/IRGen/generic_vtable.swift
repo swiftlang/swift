@@ -2,6 +2,7 @@
 // RUN: %{python} %utils/chex.py < %s > %t/generic_vtable.swift
 // RUN: %target-swift-frontend -enable-objc-interop  %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefixes=CHECK,CHECK-objc,CHECK-objc%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-abi -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -disable-objc-interop %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-import-type,CHECK-%target-abi -DINT=i%target-ptrsize
+// REQUIRES: objc_codegen
 
 public class Base {
   public func m1() {}
