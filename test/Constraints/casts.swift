@@ -746,7 +746,7 @@ do {
 do {
   func x(a: Any) {
     _ = a is a // expected-error {{type-casting operator expects a type on its right-hand side (got: 'a')}}
-    _ = a as T // expected-error {{type-casting operator expects a type on its right-hand side (got: 'T')}}
+    _ = a as a // expected-error {{type-casting operator expects a type on its right-hand side (got: 'a')}}
     _ = a is String // OK
   }
 }
