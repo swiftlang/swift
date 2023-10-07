@@ -1213,3 +1213,14 @@ func keypath_to_func_conversion_as_arg_to_overloaded_func() {
     test(arr, \Data.value) // Ok
   }
 }
+
+// https://github.com/apple/swift/issues/55436
+func test_keypath_coercion_to_function() {
+  struct User {
+    let email: String
+  }
+
+  let users = [User]()
+  let fn = \User.email as (User) -> String // Ok
+  _ = users.map(fn) // Ok
+}

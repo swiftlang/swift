@@ -12409,7 +12409,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return SolutionKind::Solved;
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
-    // If key path is connected to a function application it cannot be
+    // If key path is connected to a disjunction (i.e. through coercion
+    // or used as an argument to a function/subscipt call) it cannot be
     // bound until the choice is selected because it's undetermined
     // until then whether key path is implicitly converted to a function
     // type or not.
@@ -12436,7 +12437,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
                        typeVar, OptionalWrappingDirection::Unwrap,
                        [&](Constraint *match, TypeVariableType *) {
                          return match->getKind() ==
-                                ConstraintKind::ApplicableFunction;
+                                    ConstraintKind::ApplicableFunction ||
+                                match->getKind() == ConstraintKind::Disjunction;
                        })) {
       formUnsolved();
     } else {
