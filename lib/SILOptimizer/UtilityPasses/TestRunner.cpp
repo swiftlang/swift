@@ -63,7 +63,7 @@ class TestRunner : public SILFunctionTransform {
     SwiftPassInvocation swiftPassInvocation;
     FunctionTestDependenciesImpl(TestRunner *pass, SILFunction *function)
         : pass(pass), function(function),
-          swiftPassInvocation(pass->getPassManager()) {}
+          swiftPassInvocation(pass->getPassManager(), pass, function) {}
     DominanceInfo *getDominanceInfo() override {
       auto *dominanceAnalysis = pass->getAnalysis<DominanceAnalysis>();
       return dominanceAnalysis->get(function);
