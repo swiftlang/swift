@@ -23,32 +23,24 @@ public func test() async -> Int {
   return v
 }
 
-@_silgen_name("swift_task_asyncMainDrainQueue")
-func _asyncMainDrainQueue() -> Never
-
 @main
 struct Main {
-  static func main() {
+  static func main() async {
     print("main")
     // CHECK: main
-
-    Task {
+    let t = Task {
       print("task")
       let x = await test()
       print(x == 42 ? "42" : "???")
     }
-    print("drain")
-    // CHECK-NEXT: drain
-
-    _asyncMainDrainQueue()
+    print("after task")
+    await t.value
+    // CHECK-NEXT: after task
     // CHECK-NEXT: task
     // CHECK-NEXT: test
     // CHECK-NEXT: await
     // CHECK-NEXT: return 42
     // CHECK-NEXT: return
     // CHECK-NEXT: 42
-
-    print("done")
-    // CHECK-NOT: done
   }
 }

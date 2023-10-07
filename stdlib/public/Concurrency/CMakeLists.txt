@@ -210,7 +210,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       # TODO: Only a handful of Swift Concurrency .swift sources, for now.
       Task.swift
       AsyncLet.swift
+      Executor.swift
       Errors.swift
+      PartialAsyncTask.swift
 
       SWIFT_COMPILE_FLAGS
         -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded
