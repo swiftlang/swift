@@ -52,6 +52,19 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
+public var standardError = CFileStream(fp: stderr)
+
+public struct CFileStream: TextOutputStream {
+  var fp: UnsafeMutablePointer<FILE>
+
+  public func write(_ string: String) {
+    fputs(string, fp)
+  }
+
+  public func flush() {
+    fflush(fp)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                              StringRef
