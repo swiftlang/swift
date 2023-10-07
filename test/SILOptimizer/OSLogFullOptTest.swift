@@ -5,7 +5,7 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: swift_in_compiler
 
-// REQUIRES: rdar104969234
+// REQUIRES: rdar97728676
 
 // This tests the optimality of the IR generated for the new os log APIs. This
 // is not testing the output of a specific optimization pass (which has separate
