@@ -1978,16 +1978,17 @@ void IRGenerator::emitDynamicReplacements() {
     auto keyRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forDynamicallyReplaceableFunctionKey(origFunc));
 
-    llvm::Constant *newFnPtr = llvm::ConstantExpr::getBitCast(
-        newFunc->isAsync()
-            ? IGM.getAddrOfAsyncFunctionPointer(
-                  LinkEntity::forSILFunction(newFunc))
-            : IGM.getAddrOfSILFunction(newFunc, NotForDefinition),
-        IGM.Int8PtrTy);
-
     auto replacement = replacementsArray.beginStruct();
     replacement.addRelativeAddress(keyRef); // tagged relative reference.
-    replacement.addRelativeAddress(newFnPtr); // direct relative reference.
+    if (newFunc->isAsync()) {
+      replacement.addRelativeAddress(llvm::ConstantExpr::getBitCast(
+          IGM.getAddrOfAsyncFunctionPointer(
+              LinkEntity::forSILFunction(newFunc)),
+          IGM.Int8PtrTy));
+    } else {
+      replacement.addCompactFunctionReference(IGM.getAddrOfSILFunction(
+          newFunc, NotForDefinition)); // direct relative reference.
+    }
     replacement.addRelativeAddress(
         replacementLinkEntry); // direct relative reference.
     replacement.addInt32(
