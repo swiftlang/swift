@@ -102,6 +102,7 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
         *(const TargetSignedContextPointer<InProcess> *)ptr;
       return (uintptr_t)contextPtr;
     }
+    case SymbolicReferenceKind::ObjectiveCProtocol:
     case SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
     case SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
     case SymbolicReferenceKind::AccessorFunctionReference: {
@@ -198,6 +199,10 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape);
 #endif
     break;
+  case Demangle::SymbolicReferenceKind::ObjectiveCProtocol:
+    nodeKind = Node::Kind::ObjectiveCProtocolSymbolicReference;
+    isType = false;
+    break;
   }
   
   auto node = Dem.createNode(nodeKind, ptr);
@@ -245,8 +250,11 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
 #endif
     return Dem.createNode(Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
                           (uintptr_t)resolvedReference);
+  case SymbolicReferenceKind::ObjectiveCProtocol:
+    return Dem.createNode(Node::Kind::ObjectiveCProtocolSymbolicReference,
+                          (uintptr_t)resolvedReference);
   }
-  
+
   swift_unreachable("invalid symbolic reference kind");
 }
   
@@ -1496,6 +1504,21 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   return nullptr;
 }
 
+#if SWIFT_OBJC_INTEROP
+static Protocol *_asObjectiveCProtocol(NodePointer demangleNode) {
+  if (demangleNode->getKind() ==
+      Node::Kind::ObjectiveCProtocolSymbolicReference) {
+
+    auto protocolPtr =
+        ((RelativeDirectPointer<Protocol *, false> *)demangleNode->getIndex())
+            ->get();
+    Protocol *protocol = *protocolPtr;
+    return protocol;
+  }
+  return nullptr;
+}
+#endif
+
 namespace {
 
 /// Constructs metadata by decoding a mangled type name, for use with
@@ -1638,6 +1661,13 @@ public:
   }
 
   BuiltProtocolDecl createProtocolDecl(NodePointer node) const {
+#if SWIFT_OBJC_INTEROP
+    // Check for an objective c protocol symbolic reference.
+    if (auto protocol = _asObjectiveCProtocol(node)) {
+      return ProtocolDescriptorRef::forObjC(protocol);
+    }
+#endif
+
     // Look for a protocol descriptor based on its mangled name.
     if (auto protocol = _findProtocolDescriptor(node, demangler))
       return ProtocolDescriptorRef::forSwift(protocol);;

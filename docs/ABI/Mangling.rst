@@ -108,6 +108,10 @@ The following symbolic reference kinds are currently implemented:
      symbolic-extended-existential-type-shape ::= '\x0B' .{4} // Reference points directly to a NonUniqueExtendedExistentialTypeShape
    #endif
 
+   #if SWIFT_RUNTIME_VERSION >= 5.TBD
+    objective-c-protocol-relative-reference  ::=  `\x0C`  .{4} // Reference points directly to a objective-c protcol reference
+   #endif
+
 A mangled name may also include ``\xFF`` bytes, which are only used for
 alignment padding. They do not affect what the mangled name references and can
 be skipped over and ignored.
