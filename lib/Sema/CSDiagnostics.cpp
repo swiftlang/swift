@@ -7096,6 +7096,12 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool ThrownErrorTypeConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::thrown_error_type_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
 bool AsyncFunctionConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
 
