@@ -515,6 +515,9 @@ ProtocolConformance::getAssociatedConformance(Type assocType,
 ProtocolConformanceRef
 NormalProtocolConformance::getAssociatedConformance(Type assocType,
                                                  ProtocolDecl *protocol) const {
+  if (Loader)
+    resolveLazyInfo();
+
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
@@ -523,19 +526,28 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   forEachAssociatedConformance(
       [&](Type t, ProtocolDecl *p, unsigned index) {
         if (t->isEqual(assocType) && p == protocol) {
-          // Fill in the signature conformances, if we haven't done so yet.
-          if (!hasComputedAssociatedConformances()) {
-            const_cast<NormalProtocolConformance *>(this)
-                ->finishSignatureConformances();
+          // Not strictly necessary, but avoids a bit of request evaluator
+          // overhead in the happy case.
+          if (hasComputedAssociatedConformances()) {
+            result = AssociatedConformances[index];
+            if (result)
+              return true;
           }
 
-          result = getAssociatedConformance(index);
+          auto &ctx = getDeclContext()->getASTContext();
+          result = evaluateOrDefault(ctx.evaluator,
+                                     AssociatedConformanceRequest{
+                                       const_cast<NormalProtocolConformance *>(this),
+                                       t->getCanonicalType(), p, index
+                                     }, ProtocolConformanceRef::forInvalid());
           return true;
         }
 
         return false;
       });
 
+  assert(result && "Subject type must be exactly equal to left-hand side of a"
+         "conformance requirement in protocol requirement signature");
   return *result;
 }
 
