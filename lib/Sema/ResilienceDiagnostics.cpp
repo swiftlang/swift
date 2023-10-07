@@ -233,13 +233,41 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
   auto definingModule = D->getModuleContext();
   auto downgradeToWarning = DowngradeToWarning::No;
 
-  auto originKind = getDisallowedOriginKind(
-      D, where, downgradeToWarning);
-  if (originKind == DisallowedOriginKind::None)
-    return false;
+  auto reason = where.getExportabilityReason();
+  auto DC = where.getDeclContext();
+  ASTContext &ctx = DC->getASTContext();
+  auto originKind = getDisallowedOriginKind(D, where, downgradeToWarning);
+
+  // If we got here it was used in API, we can record the use of the import.
+  ImportAccessLevel import = D->getImportAccessFrom(DC);
+  if (import.has_value() && reason.has_value()) {
+    auto SF = DC->getParentSourceFile();
+    if (SF)
+      SF->registerAccessLevelUsingImport(import.value(),
+                                         AccessLevel::Public);
+  }
 
   // Access levels from imports are reported with the others access levels.
-  if (originKind == DisallowedOriginKind::NonPublicImport)
+  // Except for extensions, we report them here.
+  if (originKind == DisallowedOriginKind::NonPublicImport &&
+      reason != ExportabilityReason::ExtensionWithPublicMembers &&
+      reason != ExportabilityReason::ExtensionWithConditionalConformances)
+    return false;
+
+  if (ctx.LangOpts.EnableModuleApiImportRemarks &&
+      import.has_value() && where.isExported() &&
+      reason != ExportabilityReason::General &&
+      originKind != DisallowedOriginKind::NonPublicImport) {
+    // These may be reported twice, for the Type and for the TypeRepr.
+    ModuleDecl *importedVia = import->module.importedModule,
+               *sourceModule = D->getModuleContext();
+    ctx.Diags.diagnose(loc, diag::module_api_import,
+                       D, importedVia, sourceModule,
+                       importedVia == sourceModule,
+                       /*isImplicit*/false);
+  }
+
+  if (originKind == DisallowedOriginKind::None)
     return false;
 
   auto diagName = D->getName();
@@ -254,11 +282,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     diagName = accessor->getStorage()->getName();
   }
 
-  ASTContext &ctx = where.getDeclContext()->getASTContext();
-
   auto fragileKind = where.getFragileFunctionKind();
-  auto reason = where.getExportabilityReason();
-
   if (fragileKind.kind == FragileFunctionKind::None) {
     DiagnosticBehavior limit = downgradeToWarning == DowngradeToWarning::Yes
                              ? DiagnosticBehavior::Warning
@@ -286,6 +310,17 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
     if (originKind == DisallowedOriginKind::MissingImport &&
         downgradeToWarning == DowngradeToWarning::Yes)
       addMissingImport(loc, D, where);
+  }
+
+  // If limited by an import, note which one.
+  if (originKind == DisallowedOriginKind::NonPublicImport) {
+    assert(import.has_value() &&
+           import->accessLevel < AccessLevel::Public &&
+           "The import should still be non-public");
+    ctx.Diags.diagnose(import->importLoc,
+                       diag::decl_import_via_here, D,
+                       import->accessLevel,
+                       import->module.importedModule);
   }
 
   return true;

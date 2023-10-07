@@ -2820,6 +2820,7 @@ namespace {
         auto nominalDecl = cast<NominalTypeDecl>(result);
         conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
+        conformToCxxConvertibleToBoolIfNeeded(Impl, nominalDecl, decl);
         conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
         conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
         conformToCxxPairIfNeeded(Impl, nominalDecl, decl);

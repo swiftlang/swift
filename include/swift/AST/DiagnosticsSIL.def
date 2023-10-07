@@ -102,14 +102,6 @@ ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())
 
-WARNING(error_attr_effects_consume_requires_explicit_releasenone_self,none,
-      "annotation implies no releases, but consumes self", ())
-WARNING(error_attr_effects_consume_requires_explicit_releasenone,none,
-      "annotation implies no releases, but consumes parameter %0", (DeclName))
-NOTE(note_attr_effects_consume_requires_explicit_releasenone,none,
-     "parameter %0 defined here", (DeclName))
-NOTE(fixit_attr_effects_consume_requires_explicit_releasenone,none,"add explicit @_effects(releasenone) if this is intended", ())
-
 ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
       (Type, Type))

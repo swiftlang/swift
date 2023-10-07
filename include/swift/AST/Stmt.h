@@ -1425,6 +1425,12 @@ public:
   /// errors out of its catch block(s).
   bool isSyntacticallyExhaustive() const;
 
+  // Determines the type of the error that is thrown out of the 'do' block
+  // and caught by the various 'catch' clauses. If this the catch clauses
+  // aren't exhausive, this is also the type of the error that is implicitly
+  // rethrown.
+  Type getCaughtErrorType() const;
+
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::DoCatch;
   }

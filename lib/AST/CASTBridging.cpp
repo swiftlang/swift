@@ -192,7 +192,7 @@ bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
   return convertASTContext(cContext).LangOpts.hasFeature((Feature)feature);
 }
 
-BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, SwiftInt len) {
+BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, size_t len) {
   SourceLoc loc = convertSourceLoc(cLoc).getAdvancedLoc(len);
   return {loc.getOpaquePointerValue()};
 }
@@ -1120,7 +1120,7 @@ void *GenericTypeParamDecl_create(BridgedASTContext cContext,
                                   BridgedIdentifier cName,
                                   BridgedSourceLoc cNameLoc,
                                   void *_Nullable opaqueInheritedType,
-                                  SwiftInt index) {
+                                  size_t index) {
   auto eachLoc = convertSourceLoc(cEachLoc);
   auto *decl = GenericTypeParamDecl::createParsed(
       convertDeclContext(cDeclContext), convertIdentifier(cName),
@@ -1265,6 +1265,6 @@ bool Plugin_waitForNextMessage(PluginHandle handle, BridgedData *out) {
   auto size = message.size();
   auto outPtr = malloc(size);
   memcpy(outPtr, message.data(), size);
-  *out = BridgedData{(const char *)outPtr, (SwiftUInt)size};
+  *out = BridgedData{(const char *)outPtr, size};
   return false;
 }

@@ -212,3 +212,186 @@ bb0(%0 : @guaranteed $C):
   return %12 : $()
 }
 
+// Insert destroy on availability boundary of `value` within the region after
+// the non-lifetime-ending boundary of `value`.  Namely, in to_die_11.
+// CHECK-LABEL: sil [ossa] @availability_boundary_1 : {{.*}} {
+// CHECK:         [[VALUE:%[^,]+]] = move_value [lexical]
+// CHECK:         br [[CONDITION_1:bb[0-9]+]]
+// CHECK:       [[CONDITION_1]]:
+// CHECK:         cond_br undef, [[CONDITION_2:bb[0-9]+]], [[TO_DIE_1:bb[0-9]+]]
+// CHECK:       [[CONDITION_2]]:
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_DIE_2:bb[0-9]+]]
+// CHECK:       [[TO_DIE_1]]:
+// CHECK:         br [[TO_DIE_11:bb[0-9]+]]
+// CHECK:       [[TO_DIE_11]]:
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         br [[DIE:bb[0-9]+]]
+// CHECK:       [[TO_DIE_2]]:
+// CHECK:         br [[DIE]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'availability_boundary_1'
+sil [ossa] @availability_boundary_1 : $@convention(thin) () -> () {
+entry:
+  %value = apply undef() : $@convention(thin) () -> @owned C
+  %lexical = move_value [lexical] %value : $C // required (for lexicality)
+  specify_test "ossa-lifetime-completion %lexical"
+  br condition_1
+
+condition_1:
+  cond_br undef, condition_2, to_die_1
+
+condition_2:
+  destroy_value %lexical : $C
+  cond_br undef, exit, to_die_2
+
+to_die_1:
+  br to_die_11
+
+to_die_11:
+  // End lifetime here.
+  br die
+
+to_die_2:
+  br die
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @availability_boundary_2_after_loop : {{.*}} {
+// CHECK:         [[REGISTER_1:%[^,]+]] = move_value [lexical]
+// CHECK:         br [[CONDITION_1:bb[0-9]+]]
+// CHECK:       [[CONDITION_1]]:
+// CHECK:         cond_br undef, [[CONDITION_2:bb[0-9]+]], [[PREHEADER:bb[0-9]+]]
+// CHECK:       [[CONDITION_2]]:
+// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_DIE_2:bb[0-9]+]]
+// CHECK:       [[PREHEADER]]:
+// CHECK:         br [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LATCH:bb[0-9]+]]
+// CHECK:       [[LATCH]]:
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[TO_DIE_1:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         br [[HEADER]]
+// CHECK:       [[TO_DIE_1]]:
+// CHECK:         destroy_value [[REGISTER_1]]
+// CHECK:         br [[DIE:bb[0-9]+]]
+// CHECK:       [[TO_DIE_2]]:
+// CHECK:         br [[DIE]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'availability_boundary_2_after_loop'
+sil [ossa] @availability_boundary_2_after_loop : $@convention(thin) () -> () {
+entry:
+  %value = apply undef() : $@convention(thin) () -> @owned C
+  %lexical = move_value [lexical] %value : $C // required (for lexicality)
+  specify_test "ossa-lifetime-completion %lexical"
+  br condition_1
+
+condition_1:
+  cond_br undef, condition_2, preheader
+
+condition_2:
+  destroy_value %lexical : $C
+  cond_br undef, exit, to_die_2
+
+preheader:
+  br header
+
+header:
+  br latch
+
+latch:
+  cond_br undef, backedge, to_die_1
+
+backedge:
+  br header
+
+to_die_1:
+  br die
+
+to_die_2:
+  br die
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @availability_boundary_3_after_loop : {{.*}} {
+// CHECK:         [[VALUE:%[^,]+]] = move_value [lexical]
+// CHECK:         br [[CONDITION_1:bb[0-9]+]]
+// CHECK:       [[CONDITION_1]]:
+// CHECK:         cond_br undef, [[CONDITION_2:bb[0-9]+]], [[PREHEADER:bb[0-9]+]]
+// CHECK:       [[CONDITION_2]]:
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[TO_BODY:bb[0-9]+]]
+// CHECK:       [[TO_BODY]]:
+// CHECK:         br [[BODY:bb[0-9]+]]
+// CHECK:       [[PREHEADER]]:
+// CHECK:         destroy_value [[VALUE]]
+// CHECK:         br [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[BODY]]
+// CHECK:       [[BODY]]:
+// CHECK:         br [[LATCH:bb[0-9]+]]
+// CHECK:       [[LATCH]]:
+// CHECK:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[BACKEDGE]]:
+// CHECK:         br [[HEADER]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'availability_boundary_3_after_loop'
+sil [ossa] @availability_boundary_3_after_loop : $@convention(thin) () -> () {
+entry:
+  %value = apply undef() : $@convention(thin) () -> @owned C
+  %lexical = move_value [lexical] %value : $C // required (for lexicality)
+  specify_test "ossa-lifetime-completion %lexical"
+  br condition_1
+
+condition_1:
+  cond_br undef, condition_2, preheader
+
+condition_2:
+  destroy_value %lexical : $C
+  cond_br undef, exit, to_body2
+
+to_body2:
+  br body
+
+preheader:
+  // End lifetime here.
+  br header
+
+header:
+  br body
+
+body:
+  br latch
+
+latch:
+  cond_br undef, backedge, die
+
+backedge:
+  br header
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}

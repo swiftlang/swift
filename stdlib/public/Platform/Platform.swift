@@ -383,7 +383,7 @@ internal var _ignore = _UnsupportedPlatformError()
 // semaphore.h
 //===----------------------------------------------------------------------===//
 
-#if !os(Windows) 
+#if !os(Windows) && !os(WASI)
 
 #if os(OpenBSD)
 public typealias Semaphore = UnsafeMutablePointer<sem_t?>

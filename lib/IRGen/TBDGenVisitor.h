@@ -62,7 +62,7 @@ public:
   virtual ~APIRecorder() {}
 
   virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
-                         SymbolSource source) {}
+                         SymbolSource source, Decl *decl) {}
   virtual void addObjCInterface(const ClassDecl *decl) {}
   virtual void addObjCCategory(const ExtensionDecl *decl) {}
   virtual void addObjCMethod(const GenericContext *ctx, SILDeclRef method) {}
@@ -71,14 +71,15 @@ public:
 class SimpleAPIRecorder final : public APIRecorder {
 public:
   using SymbolCallbackFn = llvm::function_ref<void(
-      StringRef, llvm::MachO::SymbolKind, SymbolSource)>;
+      StringRef, llvm::MachO::SymbolKind, SymbolSource, Decl *)>;
 
   SimpleAPIRecorder(SymbolCallbackFn func) : func(func) {}
 
   void addSymbol(StringRef symbol, llvm::MachO::SymbolKind kind,
-                 SymbolSource source) override {
-    func(symbol, kind, source);
+                 SymbolSource source, Decl *decl) override {
+    func(symbol, kind, source, decl);
   }
+
 private:
   SymbolCallbackFn func;
 };

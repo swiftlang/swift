@@ -20,6 +20,7 @@
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -75,8 +76,8 @@ struct BridgedValue {
   SWIFT_IMPORT_UNSAFE
   swift::SILType getType() const { return getSILValue()->getType(); }
 
-  Ownership getOwnership() const {
-    switch (getSILValue()->getOwnershipKind()) {
+  static Ownership castOwnership(swift::OwnershipKind ownership) {
+    switch (ownership) {
       case swift::OwnershipKind::Any:
         llvm_unreachable("Invalid ownership for value");
       case swift::OwnershipKind::Unowned:    return Ownership::Unowned;
@@ -84,6 +85,10 @@ struct BridgedValue {
       case swift::OwnershipKind::Guaranteed: return Ownership::Guaranteed;
       case swift::OwnershipKind::None:       return Ownership::None;
     }
+  }
+
+  Ownership getOwnership() const {
+    return castOwnership(getSILValue()->getOwnershipKind());
   }
 };
 
@@ -122,7 +127,26 @@ struct BridgedValueArray {
 struct BridgedOperand {
   swift::Operand * _Nonnull op;
 
+  enum class OperandOwnership {
+    NonUse,
+    TrivialUse,
+    InstantaneousUse,
+    UnownedInstantaneousUse,
+    ForwardingUnowned,
+    PointerEscape,
+    BitwiseEscape,
+    Borrow,
+    DestroyingConsume,
+    ForwardingConsume,
+    InteriorPointer,
+    GuaranteedForwarding,
+    EndBorrow,
+    Reborrow
+  };
+
   bool isTypeDependent() const { return op->isTypeDependent(); }
+
+  bool isLifetimeEnding() const { return op->isLifetimeEnding(); }
 
   SWIFT_IMPORT_UNSAFE
   inline OptionalBridgedOperand getNextUse() const;
@@ -132,6 +156,39 @@ struct BridgedOperand {
 
   SWIFT_IMPORT_UNSAFE
   inline BridgedInstruction getUser() const;
+
+  OperandOwnership getOperandOwnership() const {
+    switch (op->getOperandOwnership()) {
+    case swift::OperandOwnership::NonUse:
+      return OperandOwnership::NonUse;
+    case swift::OperandOwnership::TrivialUse:
+      return OperandOwnership::TrivialUse;
+    case swift::OperandOwnership::InstantaneousUse:
+      return OperandOwnership::InstantaneousUse;
+    case swift::OperandOwnership::UnownedInstantaneousUse:
+      return OperandOwnership::UnownedInstantaneousUse;
+    case swift::OperandOwnership::ForwardingUnowned:
+      return OperandOwnership::ForwardingUnowned;
+    case swift::OperandOwnership::PointerEscape:
+      return OperandOwnership::PointerEscape;
+    case swift::OperandOwnership::BitwiseEscape:
+      return OperandOwnership::BitwiseEscape;
+    case swift::OperandOwnership::Borrow:
+      return OperandOwnership::Borrow;
+    case swift::OperandOwnership::DestroyingConsume:
+      return OperandOwnership::DestroyingConsume;
+    case swift::OperandOwnership::ForwardingConsume:
+      return OperandOwnership::ForwardingConsume;
+    case swift::OperandOwnership::InteriorPointer:
+      return OperandOwnership::InteriorPointer;
+    case swift::OperandOwnership::GuaranteedForwarding:
+      return OperandOwnership::GuaranteedForwarding;
+    case swift::OperandOwnership::EndBorrow:
+      return OperandOwnership::EndBorrow;
+    case swift::OperandOwnership::Reborrow:
+      return OperandOwnership::Reborrow;
+    }
+  }
 };
 
 struct OptionalBridgedOperand {
@@ -491,6 +548,12 @@ struct BridgedInstruction {
     return {{operands.data()}, (SwiftInt)operands.size()};
   }
 
+  SWIFT_IMPORT_UNSAFE
+  BridgedOperandArray getTypeDependentOperands() const {
+    auto typeOperands = getInst()->getTypeDependentOperands();
+    return {{typeOperands.data()}, (SwiftInt)typeOperands.size()};
+  }
+
   void setOperand(SwiftInt index, BridgedValue value) const {
     getInst()->setOperand((unsigned)index, value.getSILValue());
   }
@@ -521,6 +584,10 @@ struct BridgedInstruction {
   bool maySynchronizeNotConsideringSideEffects() const;
   bool mayBeDeinitBarrierNotConsideringSideEffects() const;
 
+  // =========================================================================//
+  //                   Generalized instruction subclasses
+  // =========================================================================//
+  
   SwiftInt MultipleValueInstruction_getNumResults() const {
     return getAs<swift::MultipleValueInstruction>()->getNumResults();
   }
@@ -532,6 +599,34 @@ struct BridgedInstruction {
 
   SWIFT_IMPORT_UNSAFE
   inline BridgedSuccessorArray TermInst_getSuccessors() const;
+
+  // =========================================================================//
+  //                         Instruction protocols
+  // =========================================================================//
+
+  OptionalBridgedOperand ForwardingInst_singleForwardedOperand() const {
+    return {swift::ForwardingOperation(getInst()).getSingleForwardingOperand()};
+  }
+
+  BridgedOperandArray ForwardingInst_forwardedOperands() const {
+    auto operands =
+      swift::ForwardingOperation(getInst()).getForwardedOperands();
+    return {{operands.data()}, (SwiftInt)operands.size()};
+  }
+
+  BridgedValue::Ownership ForwardingInst_forwardingOwnership() const {
+    auto *forwardingInst = swift::ForwardingInstruction::get(getInst());
+    return 
+      BridgedValue::castOwnership(forwardingInst->getForwardingOwnershipKind());
+  }
+
+  bool ForwardingInst_preservesOwnership() const {
+    return swift::ForwardingInstruction::get(getInst())->preservesOwnership();
+  }
+
+  // =========================================================================//
+  //                    Specific instruction subclasses
+  // =========================================================================//
 
   SWIFT_IMPORT_UNSAFE
   llvm::StringRef CondFailInst_getMessage() const {

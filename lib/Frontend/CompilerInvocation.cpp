@@ -1815,6 +1815,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
+  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
+    Opts.ScannerPrefixMapper.push_back(Opt.str());
+  }
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -2606,6 +2609,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   for (const Arg *A : Args.filtered(OPT_disable_autolink_framework)) {
     Opts.DisableAutolinkFrameworks.push_back(A->getValue());
   }
+  for (const Arg *A : Args.filtered(OPT_disable_autolink_library)) {
+    Opts.DisableAutolinkLibraries.push_back(A->getValue());
+  }
+  Opts.DisableFrameworkAutolinking = Args.hasArg(OPT_disable_autolink_frameworks);
+  Opts.DisableAllAutolinking = Args.hasArg(OPT_disable_all_autolinking);
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);

@@ -29,6 +29,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <algorithm>
@@ -303,13 +304,14 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-    InterfaceSubContextDelegate &delegate, bool isTestableDependencyLookup) {
+    InterfaceSubContextDelegate &delegate, llvm::TreePathPrefixMapper *mapper,
+    bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
   llvm::Optional<SwiftDependencyTracker> tracker = llvm::None;
   if (CacheFS)
-    tracker = SwiftDependencyTracker(*CacheFS);
+    tracker = SwiftDependencyTracker(*CacheFS, mapper);
 
   // Instantiate dependency scanning "loaders".
   SmallVector<std::unique_ptr<SwiftModuleScanner>, 2> scanners;
@@ -345,4 +347,3 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
 
   return {};
 }
-

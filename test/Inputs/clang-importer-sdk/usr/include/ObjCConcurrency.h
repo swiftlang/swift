@@ -327,4 +327,10 @@ UI_ACTOR
 - (void)icedMochaService:(NSObject *)mochaService generateMochaWithCompletion:(void (^)(NSObject *_Nullable ingredient1, NSObject *ingredient2, NSObject *ingredient3))completionHandler;
 @end
 
+MAIN_ACTOR
+@interface MyView : NSObject
+- (void)display;
+@property(readonly) BOOL isVisible;
+@end
+
 #pragma clang assume_nonnull end

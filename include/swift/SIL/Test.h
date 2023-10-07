@@ -26,13 +26,14 @@
 // of a function.  The goal is to get the same effect as calling a function and
 // checking its output.
 //
-// This is done via the specify_test instruction.  Using one or more
-// instances of it in your test case's SIL function, you can specify which test
-// (instance of FunctionTest) should be run and what arguments should be
-// provided to it.  The test grabs the arguments it expects out of the
-// test::Arguments instance it is provided.  It calls some function or
-// functions.  It then prints out interesting results.  These results can then
-// be FileCheck'd.
+// This is done via the specify_test instruction.  Using one or more instances
+// of it in your test case's SIL function, you can specify which test (instance
+// of FunctionTest) should be run and what arguments should be provided to it.
+// For full details of the specify_test instruction's grammar, see SIL.rst.
+//
+// The test grabs the arguments it expects out of the test::Arguments instance
+// it is provided.  It calls some function or functions.  It then prints out
+// interesting results.  These results can then be FileCheck'd.
 //
 // CASE STUDY:
 // Here's an example of how it works:

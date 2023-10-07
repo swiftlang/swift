@@ -1135,6 +1135,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:
     M = getLoadedModule(Id_Distributed);
     break;
+  case KnownProtocolKind::CxxConvertibleToBool:
   case KnownProtocolKind::CxxConvertibleToCollection:
   case KnownProtocolKind::CxxDictionary:
   case KnownProtocolKind::CxxPair:

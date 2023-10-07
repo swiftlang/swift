@@ -172,12 +172,12 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while (bytesToWrite > 0) {
-      let writtenSize = PluginServer_write(handle, ptr, SwiftUInt(bytesToWrite))
+      let writtenSize = PluginServer_write(handle, ptr, bytesToWrite)
       if (writtenSize <= 0) {
         // error e.g. broken pipe.
         break
       }
-      ptr = ptr.advanced(by: Int(writtenSize))
+      ptr = ptr.advanced(by: writtenSize)
       bytesToWrite -= Int(writtenSize)
     }
     return buffer.count - bytesToWrite
@@ -193,13 +193,13 @@ final class PluginHostConnection: MessageConnection {
     var ptr = buffer.baseAddress!
 
     while bytesToRead > 0 {
-      let readSize = PluginServer_read(handle, ptr, SwiftUInt(bytesToRead))
+      let readSize = PluginServer_read(handle, ptr, bytesToRead)
       if (readSize <= 0) {
         // 0: EOF (the host closed), -1: Broken pipe (the host crashed?)
         break;
       }
-      ptr = ptr.advanced(by: Int(readSize))
-      bytesToRead -= Int(readSize)
+      ptr = ptr.advanced(by: readSize)
+      bytesToRead -= readSize
     }
     return buffer.count - bytesToRead
   }

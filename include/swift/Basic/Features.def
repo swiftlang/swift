@@ -222,6 +222,9 @@ EXPERIMENTAL_FEATURE(SendNonSendable, false)
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
 
+/// Allow default values to require isolation at the call-site.
+EXPERIMENTAL_FEATURE(IsolatedDefaultValues, false)
+
 /// Enable extended callbacks (with additional parameters) to be used when the
 /// "playground transform" is enabled.
 EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
@@ -241,6 +244,9 @@ EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
 
 /// Enables typed throws.
 EXPERIMENTAL_FEATURE(TypedThrows, true)
+
+/// Allow destructuring stored `let` bindings in structs.
+EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

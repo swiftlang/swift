@@ -1606,6 +1606,11 @@ Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
                            new (ctx) ErrorExpr(getSourceRange(), getType()));
 }
 
+ActorIsolation
+DefaultArgumentExpr::getRequiredIsolation() const {
+  return getParamDecl()->getInitializerIsolation();
+}
+
 ValueDecl *ApplyExpr::getCalledValue(bool skipFunctionConversions) const {
   return ::getCalledValue(Fn, skipFunctionConversions);
 }

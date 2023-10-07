@@ -36,3 +36,6 @@
 
 // RUN: not %target-swift-frontend -parse -emit-const-values-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_CONST_VALUES %s
 // PARSE_NO_CONST_VALUES: error: this mode does not support emitting extracted const values{{$}}
+
+// RUN: not %target-swift-frontend -parse -emit-api-descriptor-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_API_DESCRIPTOR %s
+// PARSE_NO_API_DESCRIPTOR: error: this mode does not support emitting API descriptor files{{$}}

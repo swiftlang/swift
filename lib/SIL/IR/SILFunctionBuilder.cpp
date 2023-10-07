@@ -13,10 +13,9 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Availability.h"
-#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 
@@ -60,8 +59,6 @@ void SILFunctionBuilder::addFunctionAttributes(
   // to change any of the underlying optremark mechanisms.
   if (auto *A = Attrs.getAttribute(DAK_EmitAssemblyVisionRemarks))
     F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
-
-  auto *attributedFuncDecl = constant.getAbstractFunctionDecl();
 
   // Propagate @_specialize.
   for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
@@ -107,74 +104,21 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
   }
 
-  EffectsAttr const *writeNoneEffect = nullptr;
-  EffectsAttr const *releaseNoneEffect = nullptr;
   llvm::SmallVector<const EffectsAttr *, 8> customEffects;
   if (constant) {
     for (auto *attr : Attrs.getAttributes<EffectsAttr>()) {
       auto *effectsAttr = cast<EffectsAttr>(attr);
-      switch (effectsAttr->getKind()) {
-      case EffectsKind::Custom:
+      if (effectsAttr->getKind() == EffectsKind::Custom) {
         customEffects.push_back(effectsAttr);
-        // Proceed to the next attribute, don't set the effects kind based on
-        // this attribute.
-        continue;
-      case EffectsKind::ReadNone:
-      case EffectsKind::ReadOnly:
-        writeNoneEffect = effectsAttr;
-        break;
-      case EffectsKind::ReleaseNone:
-        releaseNoneEffect = effectsAttr;
-        break;
-      default:
-        break;
-      }
-      if (effectsAttr->getKind() == EffectsKind::Custom)
-        continue;
-      if (F->getEffectsKind() != EffectsKind::Unspecified) {
-        // If multiple known effects are specified, the most restrictive one
-        // is used.
-        F->setEffectsKind(
-            std::min(effectsAttr->getKind(), F->getEffectsKind()));
       } else {
-        F->setEffectsKind(effectsAttr->getKind());
+        if (F->getEffectsKind() != EffectsKind::Unspecified &&
+            F->getEffectsKind() != effectsAttr->getKind()) {
+          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
+              diag::warning_in_effects_attribute, "mismatching function effects");
+        } else {
+          F->setEffectsKind(effectsAttr->getKind());
+        }
       }
-    }
-  }
-
-  if (writeNoneEffect && !releaseNoneEffect) {
-    auto constantType = mod.Types.getConstantFunctionType(
-        TypeExpansionContext::minimal(), constant);
-    SILFunctionConventions fnConv(constantType, mod);
-
-    auto selfIndex = fnConv.getSILArgIndexOfSelf();
-    for (auto index : indices(fnConv.getParameters())) {
-      auto param = fnConv.getParameters()[index];
-      if (!param.isConsumed())
-        continue;
-      if (index == selfIndex) {
-        mod.getASTContext().Diags.diagnose(
-            writeNoneEffect->getLocation(),
-            diag::
-                error_attr_effects_consume_requires_explicit_releasenone_self);
-      } else {
-        auto *pd = attributedFuncDecl->getParameters()->get(index);
-        mod.getASTContext().Diags.diagnose(
-            writeNoneEffect->getLocation(),
-            diag::error_attr_effects_consume_requires_explicit_releasenone,
-            pd->getName());
-        mod.getASTContext().Diags.diagnose(
-            pd->getNameLoc(),
-            diag::note_attr_effects_consume_requires_explicit_releasenone,
-            pd->getName());
-      }
-      mod.getASTContext()
-          .Diags
-          .diagnose(
-              writeNoneEffect->getLocation(),
-              diag::fixit_attr_effects_consume_requires_explicit_releasenone)
-          .fixItInsertAfter(writeNoneEffect->getRange().End,
-                            " @_effects(releasenone)");
     }
   }
 

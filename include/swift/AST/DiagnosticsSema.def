@@ -2177,6 +2177,9 @@ ERROR(pattern_binds_no_variables,none,
 ERROR(variable_bound_by_no_pattern,none,
       "variable %0 is not bound by any pattern",
       (const VarDecl *))
+ERROR(destructuring_let_struct_stored_property_unsupported,none,
+      "binding multiple 'let' stored properties from a single initializer expression in a struct is unsupported",
+      ())
 
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
@@ -3474,7 +3477,7 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -5235,6 +5238,13 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "non-isolated context",
       (const ValueDecl *))
+ERROR(isolated_default_argument,none,
+      "%0 default argument cannot be synchronously evaluated from a "
+      "%1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(conflicting_default_argument_isolation,none,
+      "default argument cannot be both %0 and %1",
+      (ActorIsolation, ActorIsolation))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
@@ -6614,7 +6624,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,

@@ -47,6 +47,14 @@ public class Instruction : CustomStringConvertible, Hashable {
     return OperandArray(base: operands.base, count: operands.count)
   }
 
+  // All operands defined by the operation. Returns the prefix of `operands` that does not include trailing type dependent operands.
+  final public var definedOperands: OperandArray {
+    let operands = bridged.getOperands()
+    let typeOperands = bridged.getTypeDependentOperands()
+    return OperandArray(base: operands.base,
+      count: operands.count - typeOperands.count)
+  }
+
   fileprivate var resultCount: Int { 0 }
   fileprivate func getResult(index: Int) -> Value { fatalError() }
 
@@ -296,7 +304,7 @@ final public class EndAccessInst : Instruction, UnaryInstruction {
 
 final public class EndBorrowInst : Instruction, UnaryInstruction {}
 
-final public class MarkUninitializedInst : SingleValueInstruction, UnaryInstruction {
+final public class MarkUninitializedInst : SingleValueInstruction, ConversionInstruction {
 
   /// This enum captures what the mark_uninitialized instruction is designating.
   ///
@@ -485,12 +493,12 @@ final public class BuiltinInst : SingleValueInstruction {
   }
 }
 
-final public class UpcastInst : SingleValueInstruction, UnaryInstruction {
+final public class UpcastInst : SingleValueInstruction, ConversionInstruction {
   public var fromInstance: Value { operand.value }
 }
 
 final public
-class UncheckedRefCastInst : SingleValueInstruction, UnaryInstruction {
+class UncheckedRefCastInst : SingleValueInstruction, ConversionInstruction {
   public var fromInstance: Value { operand.value }
 }
 
@@ -543,10 +551,10 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
-class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, ForwardingInstruction {}
 
 final public
-class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction {}
+class OpenExistentialValueInst : SingleValueInstruction, UnaryInstruction, ForwardingInstruction {}
 
 final public
 class InitExistentialAddrInst : SingleValueInstruction, UnaryInstruction {}
@@ -641,10 +649,10 @@ final public class StringLiteralInst : SingleValueInstruction {
   }
 }
 
-final public class TupleInst : SingleValueInstruction {
+final public class TupleInst : SingleValueInstruction, ForwardingInstruction {
 }
 
-final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction {
+final public class TupleExtractInst : SingleValueInstruction, UnaryInstruction, ForwardingInstruction  {
   public var `tuple`: Value { operand.value }
   public var fieldIndex: Int { bridged.TupleExtractInst_fieldIndex() }
 }
@@ -655,10 +663,10 @@ class TupleElementAddrInst : SingleValueInstruction, UnaryInstruction {
   public var fieldIndex: Int { bridged.TupleElementAddrInst_fieldIndex() }
 }
 
-final public class StructInst : SingleValueInstruction {
+final public class StructInst : SingleValueInstruction, ForwardingInstruction {
 }
 
-final public class StructExtractInst : SingleValueInstruction, UnaryInstruction {
+final public class StructExtractInst : SingleValueInstruction, UnaryInstruction, ForwardingInstruction {
   public var `struct`: Value { operand.value }
   public var fieldIndex: Int { bridged.StructExtractInst_fieldIndex() }
 }
@@ -673,14 +681,14 @@ public protocol EnumInstruction : AnyObject {
   var caseIndex: Int { get }
 }
 
-final public class EnumInst : SingleValueInstruction, EnumInstruction {
+final public class EnumInst : SingleValueInstruction, EnumInstruction, ForwardingInstruction {
   public var caseIndex: Int { bridged.EnumInst_caseIndex() }
 
   public var operand: Operand? { operands.first }
   public var payload: Value? { operand?.value }
 }
 
-final public class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
+final public class UncheckedEnumDataInst : SingleValueInstruction, UnaryInstruction, EnumInstruction, ForwardingInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.UncheckedEnumDataInst_caseIndex() }
 }
@@ -693,6 +701,10 @@ final public class InitEnumDataAddrInst : SingleValueInstruction, UnaryInstructi
 final public class UncheckedTakeEnumDataAddrInst : SingleValueInstruction, UnaryInstruction, EnumInstruction {
   public var `enum`: Value { operand.value }
   public var caseIndex: Int { bridged.UncheckedTakeEnumDataAddrInst_caseIndex() }
+}
+
+final public class SelectEnumInst : SingleValueInstruction {
+  public var enumOperand: Operand { operands[0] }
 }
 
 final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -727,24 +739,24 @@ final public class KeyPathInst : SingleValueInstruction {
 }
 
 final public
-class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
+class UnconditionalCheckedCastInst : SingleValueInstruction, ConversionInstruction {
   public override var mayTrap: Bool { true }
 }
 
 final public
-class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
+class ConvertFunctionInst : SingleValueInstruction, ConversionInstruction {
   public var fromFunction: Value { operand.value }
 }
 
 final public
-class ThinToThickFunctionInst : SingleValueInstruction, UnaryInstruction {}
+class ThinToThickFunctionInst : SingleValueInstruction, ConversionInstruction {}
 
 final public
 class ObjCExistentialMetatypeToObjectInst : SingleValueInstruction,
-                                            UnaryInstruction {}
+                                            ConversionInstruction {}
 
 final public
-class ObjCMetatypeToObjectInst : SingleValueInstruction, UnaryInstruction {}
+class ObjCMetatypeToObjectInst : SingleValueInstruction, ConversionInstruction {}
 
 final public
 class ValueToBridgeObjectInst : SingleValueInstruction, UnaryInstruction {
@@ -759,19 +771,23 @@ class GetAsyncContinuationAddrInst : SingleValueInstruction, UnaryInstruction {}
 
 
 final public
-class MarkDependenceInst : SingleValueInstruction {
-  public var value: Value { return operands[0].value }
-  public var base: Value { return operands[1].value }
+class MarkDependenceInst : SingleValueInstruction, ForwardingInstruction {
+  public var valueOperand: Operand { operands[0] }
+  public var baseOperand: Operand { operands[1] }
+  public var value: Value { return valueOperand.value }
+  public var base: Value { return baseOperand.value }
 }
 
-final public class RefToBridgeObjectInst : SingleValueInstruction,
-                                           UnaryInstruction {}
+final public class RefToBridgeObjectInst : SingleValueInstruction, ForwardingInstruction {
+  public var convertedOperand: Operand { operands[0] }
+  public var maskOperand: Operand { operands[1] }
+}
 
 final public class BridgeObjectToRefInst : SingleValueInstruction,
-                                           UnaryInstruction {}
+                                           ConversionInstruction {}
 
 final public class BridgeObjectToWordInst : SingleValueInstruction,
-                                           UnaryInstruction {}
+                                           ConversionInstruction {}
 
 public typealias AccessKind = swift.SILAccessKind
 
@@ -907,6 +923,15 @@ final public class ObjectInst : SingleValueInstruction {
   }
 }
 
+final public class TuplePackExtractInst: SingleValueInstruction, ForwardingInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var tupleOperand: Operand { operands[1] }
+}
+
+final public class DifferentiableFunctionInst: SingleValueInstruction, ForwardingInstruction {}
+
+final public class LinearFunctionInst: SingleValueInstruction, ForwardingInstruction {}
+
 //===----------------------------------------------------------------------===//
 //                      single-value allocation instructions
 //===----------------------------------------------------------------------===//
@@ -961,11 +986,11 @@ final public class BeginCOWMutationInst : MultipleValueInstruction,
   public var instanceResult: Value { return getResult(index: 1) }
 }
 
-final public class DestructureStructInst : MultipleValueInstruction, UnaryInstruction {
+final public class DestructureStructInst : MultipleValueInstruction, UnaryInstruction, ForwardingInstruction {
   public var `struct`: Value { operand.value }
 }
 
-final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction {
+final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruction, ForwardingInstruction {
   public var `tuple`: Value { operand.value }
 }
 
@@ -1059,7 +1084,7 @@ final public class CondBranchInst : TermInst {
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst {
+final public class SwitchEnumInst : TermInst, ForwardingInstruction {
 
   public var enumOp: Value { operands[0].value }
 
@@ -1102,7 +1127,7 @@ final public class DynamicMethodBranchInst : TermInst {
 final public class AwaitAsyncContinuationInst : TermInst, UnaryInstruction {
 }
 
-final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
+final public class CheckedCastBranchInst : TermInst, UnaryInstruction, ForwardingInstruction {
   public var source: Value { operand.value }
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }

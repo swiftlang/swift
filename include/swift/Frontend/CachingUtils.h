@@ -20,6 +20,7 @@
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include <memory>
@@ -59,6 +60,10 @@ llvm::Error storeCachedCompilerOutput(llvm::cas::ObjectStore &CAS,
 llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
 createCASFileSystem(llvm::cas::ObjectStore &CAS, ArrayRef<std::string> FSRoots,
                     ArrayRef<std::string> IncludeTreeRoots);
-}
+
+std::vector<std::string> remapPathsFromCommandLine(
+    ArrayRef<std::string> Args,
+    llvm::function_ref<std::string(StringRef)> RemapCallback);
+} // namespace swift
 
 #endif

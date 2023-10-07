@@ -36,6 +36,7 @@ class AbstractFunctionDecl;
 class AnyFunctionType;
 class SourceFile;
 class SILFunctionType;
+class SILResultInfo;
 class TupleType;
 class VarDecl;
 
@@ -621,8 +622,16 @@ IndexSubset *getFunctionSemanticResultIndices(
 IndexSubset *getLoweredParameterIndices(IndexSubset *astParameterIndices,
                                         AnyFunctionType *functionType);
 
+/// Collects the semantic results of the given function type in
+/// `originalResults`. The semantic results are formal results followed by
+/// semantic result parameters, in type order.
+void
+getSemanticResults(SILFunctionType *functionType,
+                   IndexSubset *parameterIndices,
+                   SmallVectorImpl<SILResultInfo> &originalResults);
+
 /// "Constrained" derivative generic signatures require all differentiability
-/// parameters to conform to the `Differentiable` protocol.
+/// parameters / results to conform to the `Differentiable` protocol.
 ///
 /// "Constrained" transpose generic signatures additionally require all
 /// linearity parameters to satisfy `Self == Self.TangentVector`.
@@ -630,9 +639,11 @@ IndexSubset *getLoweredParameterIndices(IndexSubset *astParameterIndices,
 /// Returns the "constrained" derivative/transpose generic signature given:
 /// - An original SIL function type.
 /// - Differentiability/linearity parameter indices.
+/// - Differentiability/linearity result indices.
 /// - A possibly "unconstrained" derivative/transpose generic signature.
 GenericSignature getConstrainedDerivativeGenericSignature(
-    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    SILFunctionType *originalFnTy,
+    IndexSubset *diffParamIndices, IndexSubset *diffResultIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose = false);
 

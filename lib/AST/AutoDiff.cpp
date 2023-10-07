@@ -297,8 +297,30 @@ autodiff::getLoweredParameterIndices(IndexSubset *parameterIndices,
                           loweredSILIndices);
 }
 
+/// Collects the semantic results of the given function type in
+/// `originalResults`. The semantic results are formal results followed by
+/// semantic result parameters, in type order.
+void
+autodiff::getSemanticResults(SILFunctionType *functionType,
+                             IndexSubset *parameterIndices,
+                             SmallVectorImpl<SILResultInfo> &originalResults) {
+  // Collect original formal results.
+  originalResults.append(functionType->getResults().begin(),
+                         functionType->getResults().end());
+
+  // Collect original semantic result parameters.
+  for (auto i : range(functionType->getNumParameters())) {
+    auto param = functionType->getParameters()[i];
+    if (!param.isAutoDiffSemanticResult())
+      continue;
+    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
+      originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
+  }
+}
+
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
-    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    SILFunctionType *originalFnTy,
+    IndexSubset *diffParamIndices, IndexSubset *diffResultIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose) {
   if (!derivativeGenSig)
@@ -308,21 +330,48 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
   auto &ctx = originalFnTy->getASTContext();
   auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   SmallVector<Requirement, 4> requirements;
-  for (unsigned paramIdx : diffParamIndices->getIndices()) {
-    // Require differentiability parameters to conform to `Differentiable`.
-    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
+
+  auto addRequirement = [&](CanType type) {
+    Requirement req(RequirementKind::Conformance, type,
                     diffableProto->getDeclaredInterfaceType());
     requirements.push_back(req);
     if (isTranspose) {
       // Require linearity parameters to additionally satisfy
       // `Self == Self.TangentVector`.
-      auto tanSpace = paramType->getAutoDiffTangentSpace(lookupConformance);
-      auto paramTanType = tanSpace->getCanonicalType();
-      Requirement req(RequirementKind::SameType, paramType, paramTanType);
+      auto tanSpace = type->getAutoDiffTangentSpace(lookupConformance);
+      auto tanType = tanSpace->getCanonicalType();
+      Requirement req(RequirementKind::SameType, type, tanType);
       requirements.push_back(req);
     }
+  };
+
+  // Require differentiability parameters to conform to `Differentiable`.
+  for (unsigned paramIdx : diffParamIndices->getIndices()) {
+    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
+    addRequirement(paramType);
   }
+
+  // Require differentiability results to conform to `Differentiable`.
+  SmallVector<SILResultInfo, 2> originalResults;
+  getSemanticResults(originalFnTy, diffParamIndices, originalResults);
+  for (unsigned resultIdx : diffResultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIdx < originalFnTy->getNumResults()) {
+      auto resultType = originalResults[resultIdx].getInterfaceType();
+      addRequirement(resultType);
+      continue;
+    }
+    // Handle original semantic result parameters.
+    // FIXME: Constraint generic yields when we will start supporting them
+    auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
+    auto resultParamIt = std::next(
+      originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+      resultParamIndex);
+    auto paramIndex =
+      std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+    addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
+  }
+
   return buildGenericSignature(ctx, derivativeGenSig,
                                /*addedGenericParams*/ {},
                                std::move(requirements));

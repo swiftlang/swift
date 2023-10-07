@@ -1303,6 +1303,24 @@ void DefaultArgumentTypeRequest::cacheResult(Type type) const {
 }
 
 //----------------------------------------------------------------------------//
+// DefaultInitializerIsolation computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out, Initializer *init) {
+  switch (init->getInitializerKind()) {
+  case InitializerKind::PatternBinding:
+    out << "pattern binding initializer";
+    break;
+  case InitializerKind::DefaultArgument:
+    out << "default argument initializer";
+    break;
+  case InitializerKind::PropertyWrapper:
+    out << "property wrapper initializer";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
 // CallerSideDefaultArgExprRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -320,6 +320,9 @@ def import_underlying_module : Flag<["-"], "import-underlying-module">,
 def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Implicitly imports an Objective-C header file">;
+def import_bridging_header : Separate<["-"], "import-bridging-header">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  Alias<import_objc_header>;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
@@ -626,7 +629,19 @@ def emit_const_values :
 def emit_const_values_path : Separate<["-"], "emit-const-values-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
-  MetaVarName<"<path>">, HelpText<"Emit the extracted compile-time known values to <path>">;
+  MetaVarName<"<path>">,
+  HelpText<"Emit the extracted compile-time known values to <path>">;
+
+def emit_api_descriptor :
+  Flag<["-"], "emit-api-descriptor">,
+  Flags<[NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
+  HelpText<"Output a JSON file describing the module's API">;
+def emit_api_descriptor_path :
+  Separate<["-"], "emit-api-descriptor-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output a JSON file describing the module's API to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, CacheInvariant]>,
@@ -1855,6 +1870,22 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
+
+def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+  Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
+
+def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Remap paths within SDK reported by dependency scanner">, MetaVarName<"<path>">;
+
+def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
+
+def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
+  Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
+  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
 

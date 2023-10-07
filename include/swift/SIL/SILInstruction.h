@@ -260,8 +260,8 @@ public:
     llvm::mapped_iterator<iterator, SILType(*)(SILValue), SILType>>;
   type_range getTypes() const;
 
-  bool operator==(const SILInstructionResultArray &rhs);
-  bool operator!=(const SILInstructionResultArray &other) {
+  bool operator==(const SILInstructionResultArray &rhs) const;
+  bool operator!=(const SILInstructionResultArray &other) const {
     return !(*this == other);
   }
 

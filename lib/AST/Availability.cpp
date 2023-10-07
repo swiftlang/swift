@@ -23,6 +23,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Platform.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include <map>
 
 using namespace swift;
@@ -312,7 +313,7 @@ bool Decl::isAvailableDuringLowering() const {
       UnavailableDeclOptimization::Complete)
     return true;
 
-  if (hasClangNode())
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return true;
 
   return !isUnconditionallyUnavailable(this);
@@ -323,6 +324,9 @@ bool Decl::requiresUnavailableDeclABICompatibilityStubs() const {
   // -unavailable-decl-optimization=stub is specified.
   if (getASTContext().LangOpts.UnavailableDeclOptimizationMode !=
       UnavailableDeclOptimization::Stub)
+    return false;
+
+  if (isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext()))
     return false;
 
   return isUnconditionallyUnavailable(this);

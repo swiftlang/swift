@@ -2,6 +2,7 @@
 
 enum MyError: Error {
   case fail
+  case epicFail
 }
 
 enum MyBigError: Error {
@@ -79,4 +80,38 @@ func throwsOneOrTheOtherWithRethrow() throws {
   } catch let be as MyBigError {
     sink(be)
   }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B26ConcreteWithDoCatchRethrowyyKF : $@convention(thin) () -> @error any Error
+func throwsConcreteWithDoCatchRethrow() throws {
+  do {
+    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyKF : $@convention(thin) () -> @error MyError
+    // CHECK: try_apply [[FN]]() : $@convention(thin) () -> @error MyError, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+    try throwsConcrete()
+
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : $MyError):
+    // CHECK-NEXT: switch_enum [[ERROR]] : $MyError, case #MyError.fail!enumelt: [[FAILCASE_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
+  } catch .fail {
+  }
+
+  // CHECK: [[DEFAULT_BB]]:
+  // CHECK-NOT: throw
+  // CHECK: alloc_existential_box $any Error
+  // CHECK: throw [[ERR:%[0-9]+]] : $any Error
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B31ConcreteWithDoCatchTypedRethrowyyKF : $@convention(thin) () -> @error MyError
+func throwsConcreteWithDoCatchTypedRethrow() throws(MyError) {
+  do {
+    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyKF : $@convention(thin) () -> @error MyError
+    // CHECK: try_apply [[FN]]() : $@convention(thin) () -> @error MyError, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+    try throwsConcrete()
+
+    // CHECK: [[ERROR_BB]]([[ERROR:%[0-9]+]] : $MyError):
+    // CHECK-NEXT: switch_enum [[ERROR]] : $MyError, case #MyError.fail!enumelt: [[FAILCASE_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
+  } catch .fail {
+  }
+
+  // CHECK: [[DEFAULT_BB]]:
+  // CHECK-NEXT: throw [[ERROR]] : $MyError
 }

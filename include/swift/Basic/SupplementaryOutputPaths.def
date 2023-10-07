@@ -143,6 +143,9 @@ OUTPUT(ModuleSummaryOutputPath, TY_SwiftModuleSummaryFile)
 /// The output path to generate ABI baseline.
 OUTPUT(ABIDescriptorOutputPath, TY_SwiftABIDescriptor)
 
+/// The output path to the module's API description.
+OUTPUT(APIDescriptorOutputPath, TY_SwiftAPIDescriptor)
+
 /// The output path for extracted compile-time-known value information
 OUTPUT(ConstValuesOutputPath, TY_ConstValues)
 

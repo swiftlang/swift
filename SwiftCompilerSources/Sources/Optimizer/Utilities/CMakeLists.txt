@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   EscapeUtils.swift
   OptUtils.swift
+  ForwardingUtils.swift
   WalkUtils.swift
   AccessUtils.swift
   SSAUpdater.swift

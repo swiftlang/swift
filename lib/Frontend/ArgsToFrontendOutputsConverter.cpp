@@ -331,6 +331,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_summary_path);
   auto abiDescriptorOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_abi_descriptor_path);
+  auto apiDescriptorOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_api_descriptor_path);
   auto constValuesOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_const_values_path);
   auto moduleSemanticInfoOutput = getSupplementaryFilenamesFromArguments(
@@ -365,6 +367,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
+    sop.APIDescriptorOutputPath = (*apiDescriptorOutput)[i];
     sop.ConstValuesOutputPath = (*constValuesOutput)[i];
     sop.ModuleSemanticInfoOutputPath = (*moduleSemanticInfoOutput)[i];
     sop.YAMLOptRecordPath = (*optRecordOutput)[i];
@@ -475,8 +478,13 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
 
   // There is no non-path form of -emit-abi-descriptor-path
   auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
+
+  // There is no non-path form of -emit-api-descriptor-path
+  auto APIDescriptorOutputPath = pathsFromArguments.APIDescriptorOutputPath;
+
   // There is no non-path form of -emit-module-semantic-info-path
-  auto ModuleSemanticInfoOutputPath = pathsFromArguments.ModuleSemanticInfoOutputPath;
+  auto ModuleSemanticInfoOutputPath =
+      pathsFromArguments.ModuleSemanticInfoOutputPath;
 
   ID emitModuleOption;
   std::string moduleExtension;
@@ -513,6 +521,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
+  sop.APIDescriptorOutputPath = APIDescriptorOutputPath;
   sop.ConstValuesOutputPath = constValuesOutputPath;
   sop.ModuleSemanticInfoOutputPath = ModuleSemanticInfoOutputPath;
   sop.YAMLOptRecordPath = YAMLOptRecordPath;

@@ -79,13 +79,13 @@ def backup_module_interface_path_EQ :
 
 } // end let Flags = [FrontendOption, NoDriverOption, CacheInvariant]
 
+def primary_file : Separate<["-"], "primary-file">,
+  Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+  HelpText<"Produce output for this file, not the whole module">;
 
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
-
-def primary_file : Separate<["-"], "primary-file">,
-  HelpText<"Produce output for this file, not the whole module">;
 
 def frontend_parseable_output : Flag<["-"], "frontend-parseable-output">,
   HelpText<"Emit textual output in a parseable format">;
@@ -523,6 +523,15 @@ def code_complete_call_pattern_heuristics : Flag<["-"], "code-complete-call-patt
 
 def disable_autolink_framework : Separate<["-"],"disable-autolink-framework">,
   HelpText<"Disable autolinking against the provided framework">;
+
+def disable_autolink_library : Separate<["-"],"disable-autolink-library">,
+  HelpText<"Disable autolinking against the provided library">;
+
+def disable_autolink_frameworks : Flag<["-"],"disable-autolink-frameworks">,
+  HelpText<"Disable autolinking against all frameworks">;
+
+def disable_all_autolinking : Flag<["-"],"disable-all-autolinking">,
+  HelpText<"Disable all Swift autolink directives">;
 
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;

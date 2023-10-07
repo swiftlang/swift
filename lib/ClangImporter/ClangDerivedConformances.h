@@ -28,6 +28,12 @@ void conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
                                   NominalTypeDecl *decl,
                                   const clang::CXXRecordDecl *clangDecl);
 
+/// If the decl defines `operator bool()`, synthesize a conformance to the
+/// CxxConvertibleToBool protocol, which is defined in the Cxx module.
+void conformToCxxConvertibleToBoolIfNeeded(
+    ClangImporter::Implementation &impl, NominalTypeDecl *decl,
+    const clang::CXXRecordDecl *clangDecl);
+
 /// If the decl is an instantiation of C++ `std::optional`, synthesize a
 /// conformance to CxxOptional protocol, which is defined in the Cxx module.
 void conformToCxxOptionalIfNeeded(ClangImporter::Implementation &impl,

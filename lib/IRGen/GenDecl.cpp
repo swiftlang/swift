@@ -1436,6 +1436,7 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
     assert(LazyMetadataAccessors.empty());
+    // LazyClassMetadata is allowed
     // LazySpecializedClassMetadata is allowed
   }
 
@@ -1446,7 +1447,9 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
-         !LazySpecializedClassMetadata.empty()) {
+         !LazyClassMetadata.empty() ||
+         !LazySpecializedClassMetadata.empty()
+         ) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
@@ -1544,6 +1547,12 @@ void IRGenerator::emitLazyDefinitions() {
       emitLazyMetadataAccessor(*IGM.get(), nominal);
     }
 
+    while (!LazyClassMetadata.empty()) {
+      CanType classType = LazyClassMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      emitLazyClassMetadata(*IGM.get(), classType);
+    }
+
     while (!LazySpecializedClassMetadata.empty()) {
       CanType classType = LazySpecializedClassMetadata.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
@@ -1634,6 +1643,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+void IRGenerator::noteUseOfClassMetadata(CanType classType) {
+  if (LazilyEmittedClassMetadata.insert(classType.getPointer()).second) {
+    LazyClassMetadata.push_back(classType);
+  }
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
@@ -5151,6 +5166,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (classDecl->isGenericContext()) {
           IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+        } else {
+          IRGen.noteUseOfClassMetadata(concreteType);
         }
       }
     }

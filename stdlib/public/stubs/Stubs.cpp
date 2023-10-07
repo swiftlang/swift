@@ -58,7 +58,9 @@
 #endif // SWIFT_STDLIB_HAS_LOCALE
 
 #include <limits>
+#ifndef SWIFT_THREADING_NONE
 #include <thread>
+#endif
 
 #if defined(__ANDROID__)
 #include <android/api-level.h>

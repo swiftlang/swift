@@ -366,27 +366,6 @@ getDifferentiabilityParameters(SILFunctionType *originalFnTy,
       diffParams.push_back(valueAndIndex.value());
 }
 
-/// Collects the semantic results of the given function type in
-/// `originalResults`. The semantic results are formal results followed by
-/// semantic result parameters, in type order.
-static void
-getSemanticResults(SILFunctionType *functionType,
-                   IndexSubset *parameterIndices,
-                   SmallVectorImpl<SILResultInfo> &originalResults) {
-  // Collect original formal results.
-  originalResults.append(functionType->getResults().begin(),
-                         functionType->getResults().end());
-
-  // Collect original semantic result parameters.
-  for (auto i : range(functionType->getNumParameters())) {
-    auto param = functionType->getParameters()[i];
-    if (!param.isAutoDiffSemanticResult())
-      continue;
-    if (param.getDifferentiability() != SILParameterDifferentiability::NotDifferentiable)
-      originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
-  }
-}
-
 static CanGenericSignature buildDifferentiableGenericSignature(CanGenericSignature sig,
                                                                CanType tanType,
                                                                CanType origTypeOfAbstraction) {
@@ -563,7 +542,7 @@ static CanSILFunctionType getAutoDiffDifferentialType(
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, originalResults);
+  autodiff::getSemanticResults(originalFnTy, parameterIndices, originalResults);
 
   SmallVector<SILParameterInfo, 4> diffParams;
   getDifferentiabilityParameters(originalFnTy, parameterIndices, diffParams);
@@ -647,7 +626,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
   SmallVector<ProtocolConformanceRef, 4> substConformances;
 
   SmallVector<SILResultInfo, 2> originalResults;
-  getSemanticResults(originalFnTy, parameterIndices, originalResults);
+  autodiff::getSemanticResults(originalFnTy, parameterIndices, originalResults);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterConventionForOriginalResult =
@@ -791,9 +770,9 @@ static CanSILFunctionType getAutoDiffPullbackType(
                              llvm::makeArrayRef(substConformances));
   }
   return SILFunctionType::get(
-      GenericSignature(), SILFunctionType::ExtInfo(), SILCoroutineKind::None,
-      ParameterConvention::Direct_Guaranteed, pullbackParams, {},
-      pullbackResults, llvm::None, substitutions,
+      GenericSignature(), SILFunctionType::ExtInfo(), originalFnTy->getCoroutineKind(),
+      ParameterConvention::Direct_Guaranteed,
+      pullbackParams, {}, pullbackResults, llvm::None, substitutions,
       /*invocationSubstitutions*/ SubstitutionMap(), ctx);
 }
 
@@ -804,7 +783,7 @@ static CanSILFunctionType getAutoDiffPullbackType(
 /// - The invocation generic signature is replaced by the
 ///   `constrainedInvocationGenSig` argument.
 static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
-    SILFunctionType *original, IndexSubset *parameterIndices,
+    SILFunctionType *original, IndexSubset *parameterIndices, IndexSubset *resultIndices,
     LookupConformanceFn lookupConformance,
     CanGenericSignature constrainedInvocationGenSig) {
   auto originalInvocationGenSig = original->getInvocationGenericSignature();
@@ -813,6 +792,25 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
            constrainedInvocationGenSig->areAllParamsConcrete() &&
                "derivative function cannot have invocation generic signature "
                "when original function doesn't");
+    if (auto patternSig = original->getPatternGenericSignature()) {
+      auto constrainedPatternSig =
+        autodiff::getConstrainedDerivativeGenericSignature(
+          original, parameterIndices, resultIndices,
+          patternSig, lookupConformance).getCanonicalSignature();
+      auto constrainedPatternSubs =
+        SubstitutionMap::get(constrainedPatternSig,
+                             QuerySubstitutionMap{original->getPatternSubstitutions()},
+                             lookupConformance);
+      return SILFunctionType::get(GenericSignature(),
+                                  original->getExtInfo(), original->getCoroutineKind(),
+                                  original->getCalleeConvention(),
+                                  original->getParameters(), original->getYields(),
+                                  original->getResults(), original->getOptionalErrorResult(),
+                                  constrainedPatternSubs,
+                                  /*invocationSubstitutions*/ SubstitutionMap(), original->getASTContext(),
+                                  original->getWitnessMethodConformanceOrInvalid());
+    }
+
     return original;
   }
 
@@ -823,10 +821,10 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
   if (!constrainedInvocationGenSig)
     return original;
   constrainedInvocationGenSig =
-      autodiff::getConstrainedDerivativeGenericSignature(
-          original, parameterIndices, constrainedInvocationGenSig,
-          lookupConformance)
-          .getCanonicalSignature();
+    autodiff::getConstrainedDerivativeGenericSignature(
+      original, parameterIndices, resultIndices,
+      constrainedInvocationGenSig,
+      lookupConformance).getCanonicalSignature();
 
   SmallVector<SILParameterInfo, 4> newParameters;
   newParameters.reserve(original->getNumParameters());
@@ -882,9 +880,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     return cachedResult;
 
   SILFunctionType *constrainedOriginalFnTy =
-      getConstrainedAutoDiffOriginalFunctionType(this, parameterIndices,
+      getConstrainedAutoDiffOriginalFunctionType(this, parameterIndices, resultIndices,
                                                  lookupConformance,
                                                  derivativeFnInvocationGenSig);
+
   // Compute closure type.
   CanSILFunctionType closureType;
   switch (kind) {
@@ -957,11 +956,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature transposeFnGenSig) {
+  auto &ctx = getASTContext();
+
   // Get the "constrained" transpose function generic signature.
   if (!transposeFnGenSig)
     transposeFnGenSig = getSubstGenericSignature();
   transposeFnGenSig = autodiff::getConstrainedDerivativeGenericSignature(
-                          this, parameterIndices, transposeFnGenSig,
+                          this, parameterIndices, IndexSubset::getDefault(ctx, 0),
+                          transposeFnGenSig,
                           lookupConformance, /*isLinear*/ true)
                           .getCanonicalSignature();
 

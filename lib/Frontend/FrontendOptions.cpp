@@ -743,6 +743,48 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
+bool FrontendOptions::canActionEmitAPIDescriptor(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::PrintASTDecl:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIBGen:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::ScanDependencies:
+  case ActionType::PrintFeature:
+    return false;
+  case ActionType::ResolveImports:
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::PrintVersion:
+    return true;
+  }
+  llvm_unreachable("unhandled action");
+}
+
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   switch (action) {
   case ActionType::Parse:
