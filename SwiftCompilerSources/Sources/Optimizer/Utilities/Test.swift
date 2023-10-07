@@ -16,8 +16,8 @@
 //       FunctionTest("my_new_test") { function, arguments, context in
 //       }
 // - In SwiftCompilerSources/Sources/SIL/Test.swift's registerOptimizerTests
-//   function, register the new test:
-//       registerFunctionTest(myNewTest)
+//   function, add a new argument to the variadic function:
+//       registerFunctionTests(..., myNewTest)
 //
 //===----------------------------------------------------------------------===//
 //
@@ -100,7 +100,7 @@ struct FunctionTest {
   let name: String
   let invocation: FunctionTestInvocation
 
-  public init(name: String, invocation: @escaping FunctionTestInvocation) {
+  public init(_ name: String, invocation: @escaping FunctionTestInvocation) {
     self.name = name
     self.invocation = invocation
   }
@@ -135,12 +135,19 @@ extension BridgedTestArguments {
 /// Registration of each test in the SIL module.
 public func registerOptimizerTests() {
   // Register each test.
-  registerFunctionTest(parseTestSpecificationTest)
+  registerFunctionTests(
+      parseTestSpecificationTest,
+      forwardingUseDefTest,
+      forwardingDefUseTest
+    )
 
   // Finally register the thunk they all call through.
   registerFunctionTestThunk(functionTestThunk)
 }
 
+private func registerFunctionTests(_ tests: FunctionTest...) {
+  tests.forEach { registerFunctionTest($0) }
+}
 
 private func registerFunctionTest(_ test: FunctionTest) {
   test.name._withBridgedStringRef { ref in
@@ -202,7 +209,7 @@ private func castToInvocation(fromOpaquePointer erasedInvocation: UnsafeMutableR
 //   - its type
 //   - something to identify the instance (mostly this means calling dump)
 let parseTestSpecificationTest = 
-FunctionTest(name: "test_specification_parsing") { function, arguments, context in 
+FunctionTest("test_specification_parsing") { function, arguments, context in 
   let expectedFields = arguments.takeString()
   for expectedField in expectedFields.string {
     switch expectedField {
