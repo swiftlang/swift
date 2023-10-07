@@ -403,6 +403,10 @@ SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
               TypeWitnessAndDecl(NormalProtocolConformance *,
                                  AssociatedTypeDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AssociatedConformanceRequest,
+              ProtocolConformanceRef(NormalProtocolConformance *,
+                                     Type, ProtocolDecl *, unsigned),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)

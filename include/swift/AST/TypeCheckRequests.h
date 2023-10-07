@@ -2737,6 +2737,30 @@ public:
   void cacheResult(Witness value) const;
 };
 
+class AssociatedConformanceRequest
+    : public SimpleRequest<AssociatedConformanceRequest,
+                           ProtocolConformanceRef(NormalProtocolConformance *,
+                                                  CanType, ProtocolDecl *,
+                                                  unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ProtocolConformanceRef
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
+           CanType t, ProtocolDecl *proto, unsigned index) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<ProtocolConformanceRef> getCachedResult() const;
+  void cacheResult(ProtocolConformanceRef value) const;
+};
+
 struct PreCheckResultBuilderDescriptor {
   AnyFunctionRef Fn;
   bool SuppressDiagnostics;
