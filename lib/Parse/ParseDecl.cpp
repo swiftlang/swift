@@ -8980,6 +8980,18 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
         return ParserStatus(ArgParams);
     }
+    
+    // See if there are generic params.
+    auto genericParams = maybeParseGenericParams()
+      .getPtrOrNull();
+    if (genericParams) {
+      auto param = genericParams->getParams().front()->getStartLoc();
+      if (param) {
+        diagnose(param, diag::generic_param_cant_be_used_in_enum_case_decl);
+        Status.setIsParseError();
+        return Status;
+      }
+    }
 
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
