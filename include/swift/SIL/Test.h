@@ -167,7 +167,7 @@ public:
   template <typename Analysis, typename Transform = SILFunctionTransform>
   Analysis *getAnalysis();
 
-  BridgedTestContext getContext();
+  SwiftPassInvocation *getInvocation();
 
 //===----------------------------------------------------------------------===//
 //=== MARK: Implementation Details                                         ===

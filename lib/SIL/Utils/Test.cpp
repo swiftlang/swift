@@ -99,7 +99,7 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
   } else {
     auto *fn = invocation.get<NativeSwiftInvocation>();
     Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
-                                           getContext());
+                                           {getInvocation()});
   }
   this->pass = nullptr;
   this->function = nullptr;
@@ -114,6 +114,6 @@ SILPassManager *FunctionTest::getPassManager() {
   return dependencies->getPassManager();
 }
 
-BridgedTestContext FunctionTest::getContext() {
-  return BridgedTestContext{dependencies->getInvocation()};
+SwiftPassInvocation *FunctionTest::getInvocation() {
+  return dependencies->getInvocation();
 }

@@ -20,7 +20,7 @@ public func initializeSwiftModules() {
   registerSwiftAnalyses()
   registerSwiftPasses()
   initializeSwiftParseModules()
-  registerSILTests()
+  registerOptimizerTests()
 }
 
 private func registerPass(
