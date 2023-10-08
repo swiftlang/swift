@@ -25,6 +25,7 @@ entry:
 // CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
+// CHECK-LABEL-wasm32:  define swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call swiftcc ptr @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
@@ -49,6 +50,7 @@ sil @does_throw : $@convention(thin) () -> @error Error {
 // CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
+// CHECK-LABEL-wasm32: define swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -74,6 +76,7 @@ entry(%0 : $AnyObject):
   // CHECK-aarch64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] ptr, align
   // CHECK-arm64_32:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] ptr, align
   // CHECK-powerpc64le: [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] ptr, align
+  // CHECK-wasm32:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] ptr, align
   // CHECK-NEXT: store ptr null, ptr [[ERRORSLOT]], align
 
   // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
