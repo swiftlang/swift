@@ -636,3 +636,9 @@ if case nil = foo1 {} // Okay
 if case .none? = foo1 {} // Okay
 if case nil = foo2 {} // Okay
 if case .none?? = foo2 {} // Okay
+
+enum EnumCaseWithGenericDeclaration {
+  case foo<T>(T) // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
+  case bar<T>(param: T) // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
+  case baz<T> // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
+}
