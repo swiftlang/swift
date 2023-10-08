@@ -6,6 +6,7 @@
 // to emit a GenericWitnessTable in the ProtocolConformanceDescriptor so that
 // the initializer for the protocol witness table actually runs.
 // (see rdar://97290618)
+// UNSUPPORTED: CPU=wasm32
 
 import SynthesizedProtocol
 
