@@ -326,7 +326,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
         ? args.claimNext()
         : nullptr;
-    auto futureResultType = args.claimNext();
+
+    // In embedded Swift, futureResultType is a thin metatype, not backed by any
+    // actual value.
+    llvm::Value *futureResultType =
+        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      futureResultType = args.claimNext();
+    }
+
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 

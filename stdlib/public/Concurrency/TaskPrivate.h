@@ -289,12 +289,9 @@ public:
   void *_reserved;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
-    fillWithSuccess(future->getStoragePtr(), future->getResultType(),
-                    successResultPointer);
-  }
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType,
-                       OpaqueValue *result) {
-    successType->vw_initializeWithCopy(result, src);
+    OpaqueValue *src = future->getStoragePtr();
+    OpaqueValue *result = successResultPointer;
+    future->getResultType().vw_initializeWithCopy(result, src);
   }
 
   void fillWithError(AsyncTask::FutureFragment *future) {

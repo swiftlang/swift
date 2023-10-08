@@ -663,7 +663,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness: {
     auto *nominal = getType().getAnyNominal();
-    if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+    if (nominal && getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
       return SILLinkage::Shared;
     assert(forDefinition);
     return SILLinkage::Private;

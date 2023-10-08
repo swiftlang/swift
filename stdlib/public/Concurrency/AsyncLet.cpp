@@ -395,7 +395,7 @@ static void _asyncLet_finish_continuation(
   if (error) {
     swift_errorRelease((SwiftError*)error);
   } else {
-    alet->getTask()->futureFragment()->getResultType()->vw_destroy(resultBuffer);
+    alet->getTask()->futureFragment()->getResultType().vw_destroy(resultBuffer);
   }
 
   // Clean up the async let now that the task has finished.
@@ -417,7 +417,7 @@ static void swift_asyncLet_finishImpl(SWIFT_ASYNC_CONTEXT AsyncContext *callerCo
   // If the result buffer is already populated, then we just need to destroy
   // the value in it and then clean up the task.
   if (asImpl(alet)->hasResultInBuffer()) {
-    task->futureFragment()->getResultType()->vw_destroy(
+    task->futureFragment()->getResultType().vw_destroy(
                                   reinterpret_cast<OpaqueValue*>(resultBuffer));
     return asyncLet_finish_after_task_completion(callerContext,
                                                  alet,

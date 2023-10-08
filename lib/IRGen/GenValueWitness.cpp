@@ -389,7 +389,7 @@ static Address getArgAsBuffer(IRGenFunction &IGF,
 /// Don't add new callers of this, it doesn't make any sense.
 static CanType getFormalTypeInPrimaryContext(CanType abstractType) {
   auto *nominal = abstractType.getAnyNominal();
-  if (abstractType->isEqual(nominal->getDeclaredType())) {
+  if (nominal && abstractType->isEqual(nominal->getDeclaredType())) {
     return nominal->mapTypeIntoContext(nominal->getDeclaredInterfaceType())
       ->getCanonicalType();
   }
@@ -1260,12 +1260,20 @@ addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B, ValueWitness index,
   llvm_unreachable("bad value witness kind");
 
  standard:
-  llvm::Function *fn =
-    IGM.getAddrOfValueWitness(abstractType, index, ForDefinition);
-  if (fn->empty())
-    buildValueWitnessFunction(IGM, fn, index, packing, abstractType,
-                              concreteType, concreteTI);
+  llvm::Function *fn = IGM.getOrCreateValueWitnessFunction(
+      index, packing, abstractType, concreteType, concreteTI);
   addFunction(fn);
+ }
+
+ llvm::Function *IRGenModule::getOrCreateValueWitnessFunction(
+     ValueWitness index, FixedPacking packing, CanType abstractType,
+     SILType concreteType, const TypeInfo &type) {
+  llvm::Function *fn =
+      getAddrOfValueWitness(abstractType, index, ForDefinition);
+  if (fn->empty())
+  buildValueWitnessFunction(*this, fn, index, packing, abstractType,
+                            concreteType, type);
+  return fn;
  }
 
 static bool shouldAddEnumWitnesses(CanType abstractType) {

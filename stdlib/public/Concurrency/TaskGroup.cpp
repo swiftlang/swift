@@ -209,7 +209,7 @@ public:
     /// object itself.
     OpaqueValue *storage;
 
-    const Metadata *successType;
+    ResultTypeInfo successType;
 
     /// The completed task, if necessary to keep alive until consumed by next().
     ///
@@ -234,7 +234,7 @@ public:
       };
     }
 
-    static PollResult getEmpty(const Metadata *successType) {
+    static PollResult getEmpty(ResultTypeInfo successType) {
       return PollResult{
           /*status*/PollStatus::Empty,
           /*storage*/nullptr,
@@ -248,7 +248,7 @@ public:
       return PollResult{
           /*status*/PollStatus::Error,
           /*storage*/reinterpret_cast<OpaqueValue *>(error),
-          /*successType*/nullptr,
+          /*successType*/ResultTypeInfo(),
           /*task*/nullptr
       };
     }
@@ -330,9 +330,9 @@ protected:
   /// AsyncTask.
   NaiveTaskGroupQueue<ReadyQueueItem> readyQueue;
 
-  const Metadata *successType;
+  ResultTypeInfo successType;
 
-  explicit TaskGroupBase(const Metadata* T, uint64_t initialStatus)
+  explicit TaskGroupBase(ResultTypeInfo T, uint64_t initialStatus)
     : TaskGroupTaskStatusRecord(),
       status(initialStatus),
       waitQueue(nullptr),
@@ -579,6 +579,7 @@ struct TaskGroupStatus {
         "error: %sTaskGroup: detected pending task count overflow, in task group %p! Status: %s",
         group->isDiscardingResults() ? "Discarding" : "", group, status.to_string(group).c_str());
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
     if (_swift_shouldReportFatalErrorsToDebugger()) {
       RuntimeErrorDetails details = {
           .version = RuntimeErrorDetails::currentVersion,
@@ -588,6 +589,7 @@ struct TaskGroupStatus {
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
     }
+#endif
 
 #if defined(_WIN32)
     #define STDERR_FILENO 2
@@ -768,7 +770,7 @@ class AccumulatingTaskGroup: public TaskGroupBase {
 
 public:
 
-  explicit AccumulatingTaskGroup(const Metadata *T)
+  explicit AccumulatingTaskGroup(ResultTypeInfo T)
     : TaskGroupBase(T, TaskGroupStatus::initial().status) {}
 
   virtual void destroy() override;
@@ -815,7 +817,7 @@ class DiscardingTaskGroup: public TaskGroupBase {
 
 public:
 
-  explicit DiscardingTaskGroup(const Metadata *T)
+  explicit DiscardingTaskGroup(ResultTypeInfo T)
     : TaskGroupBase(T, TaskGroupStatus::initial().status) {}
 
   virtual void destroy() override;
@@ -957,6 +959,10 @@ SWIFT_CC(swift)
 static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
                                                     TaskGroup *group, const Metadata *T) {
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  ResultTypeInfo resultType;
+  resultType.metadata = T;
+
   TaskGroupFlags groupFlags(rawGroupFlags);
   SWIFT_TASK_GROUP_DEBUG_LOG_0(group, "create group, from task:%p; flags: isDiscardingResults=%d",
                                swift_task_getCurrent(),
@@ -964,9 +970,9 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
 
   TaskGroupBase *impl;
   if (groupFlags.isDiscardResults()) {
-    impl = ::new(group) DiscardingTaskGroup(T);
+    impl = ::new(group) DiscardingTaskGroup(resultType);
   } else {
-    impl = ::new(group) AccumulatingTaskGroup(T);
+    impl = ::new(group) AccumulatingTaskGroup(resultType);
   }
 
   TaskGroupTaskStatusRecord *record = impl->getTaskRecord();
@@ -981,6 +987,9 @@ static void swift_taskGroup_initializeWithFlagsImpl(size_t rawGroupFlags,
     }
     return true;
   });
+#else
+  swift_unreachable("task groups not supported yet in embedded Swift");
+#endif
 }
 
 // =============================================================================
@@ -1104,21 +1113,19 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
-    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
     // TODO: figure out a way to try to optimistically take the
     // value out of the finished task's future, if there are no
     // remaining references to it.
-    successType->vw_initializeWithCopy(destPtr, result.storage);
-    successType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
+    result.successType.vw_initializeWithCopy(destPtr, result.storage);
+    result.successType.vw_storeEnumTagSinglePayload(destPtr, 0, 1);
     return;
   }
 
   case PollStatus::Empty: {
     // Initialize the result as a .none Optional<Success>.
-    const Metadata *successType = result.successType;
     OpaqueValue *destPtr = context->successResultPointer;
-    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    result.successType.vw_storeEnumTagSinglePayload(destPtr, 1, 1);
     return;
   }
   }
@@ -1669,7 +1676,7 @@ PollResult AccumulatingTaskGroup::poll(AsyncTask *waitingTask) {
 
   PollResult result;
   result.storage = nullptr;
-  result.successType = nullptr;
+  result.successType = ResultTypeInfo();
   result.retainedTask = nullptr;
 
   // Have we suspended the task?
@@ -1751,7 +1758,7 @@ reevaluate_if_taskgroup_has_results:;
           result.status = PollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-          result.successType = nullptr;
+          result.successType = ResultTypeInfo();
           result.retainedTask = item.getTask();
           assert(result.retainedTask && "polled a task, it must be not null");
           _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));

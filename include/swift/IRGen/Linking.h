@@ -1012,7 +1012,8 @@ public:
   }
 
   static LinkEntity forValueWitness(CanType concreteType, ValueWitness witness) {
-    assert(!isEmbedded(concreteType));
+    // Explicitly allowed in embedded Swift because we generate value witnesses
+    // (but not witness tables) for Swift Concurrency usage.
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ValueWitness))
