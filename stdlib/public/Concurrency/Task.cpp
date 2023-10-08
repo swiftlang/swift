@@ -94,11 +94,15 @@ void FutureFragment::destroy() {
     swift_unreachable("destroying a task that never completed");
 
   case Status::Success:
-    resultType->vw_destroy(getStoragePtr());
+    resultType.vw_destroy(getStoragePtr());
     break;
 
   case Status::Error:
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     swift_errorRelease(getError());
+    #endif
     break;
   }
 }
@@ -263,7 +267,11 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     auto waitingContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
     if (hadErrorResult) {
+      #if SWIFT_CONCURRENCY_EMBEDDED
+      swift_unreachable("untyped error used in embedded Swift");
+      #else
       waitingContext->fillWithError(fragment);
+      #endif
     } else {
       waitingContext->fillWithSuccess(fragment);
     }
@@ -589,7 +597,7 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
     const AsyncTask *parent, const TaskGroup *group,
-    const Metadata *futureResultType, size_t initialContextSize) {
+    ResultTypeInfo futureResultType, size_t initialContextSize) {
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
   if (parent) {
@@ -598,7 +606,7 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
   if (group) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
-  if (futureResultType) {
+  if (!futureResultType.isNull()) {
     headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
@@ -622,7 +630,7 @@ SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
     size_t rawTaskCreateFlags,
     TaskOptionRecord *options,
-    const Metadata *futureResultType,
+    const Metadata *futureResultTypeMetadata,
     TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize) {
 
@@ -631,10 +639,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Propagate task-creation flags to job flags as appropriate.
   jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
-  if (futureResultType) {
-    jobFlags.task_setIsFuture(true);
-    assert(initialContextSize >= sizeof(FutureAsyncContext));
-  }
+
+  ResultTypeInfo futureResultType;
+  #if !SWIFT_CONCURRENCY_EMBEDDED
+  futureResultType.metadata = futureResultTypeMetadata;
+  #endif
 
   // Collect the options we know about.
   ExecutorRef executor = ExecutorRef::generic();
@@ -681,7 +690,31 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       // thread and therefore need to behave a bit more like SC child tasks.
       break;
     }
+    case TaskOptionRecordKind::ResultTypeInfo: {
+#if SWIFT_CONCURRENCY_EMBEDDED
+      auto *typeInfo = cast<ResultTypeInfoTaskOptionRecord>(option);
+      futureResultType = {
+          .size = typeInfo->size,
+          .alignMask = typeInfo->alignMask,
+          .initializeWithCopy = typeInfo->initializeWithCopy,
+          .storeEnumTagSinglePayload = typeInfo->storeEnumTagSinglePayload,
+          .destroy = typeInfo->destroy,
+      };
+      break;
+#else
+      swift_unreachable("ResultTypeInfo in non-embedded");
+#endif
     }
+    }
+  }
+
+  #if SWIFT_CONCURRENCY_EMBEDDED
+  assert(!futureResultType.isNull());
+  #endif
+
+  if (!futureResultType.isNull()) {
+    jobFlags.task_setIsFuture(true);
+    assert(initialContextSize >= sizeof(FutureAsyncContext));
   }
 
   // Add to the task group, if requested.
@@ -832,7 +865,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   //  the async context to get at the parameters.
   //  See e.g. FutureAsyncContextPrefix.
 
-  if (!futureResultType || taskCreateFlags.isDiscardingTask()) {
+  if (futureResultType.isNull() || taskCreateFlags.isDiscardingTask()) {
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
@@ -882,7 +915,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // Initialize the future fragment if applicable.
-  if (futureResultType) {
+  if (!futureResultType.isNull()) {
     assert(task->isFuture());
     auto futureFragment = task->futureFragment();
     ::new (futureFragment) FutureFragment(futureResultType);
@@ -1003,11 +1036,14 @@ getAsyncClosureEntryPointAndContextSize(void *function) {
 SWIFT_CC(swift)
 void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
                                   OpaqueValue *closureContext,
-                                  const Metadata *futureResultType) {
+                                  const Metadata *futureResultTypeMetadata) {
   // Ensure that we're currently in a synchronous context.
   if (swift_task_getCurrent()) {
     swift_Concurrency_fatalError(0, "called runInline within an async context");
   }
+
+  ResultTypeInfo futureResultType;
+  futureResultType.metadata = futureResultTypeMetadata;
 
   // Unpack the asynchronous function pointer.
   FutureAsyncSignature::FunctionType *closure;
@@ -1040,7 +1076,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t taskCreateFlags = 1 << TaskCreateFlags::Task_IsInlineTask;
 
   auto taskAndContext = swift_task_create_common(
-      taskCreateFlags, &option, futureResultType,
+      taskCreateFlags, &option, futureResultType.metadata,
       reinterpret_cast<TaskContinuationFunction *>(closure), closureContext,
       /*initialContextSize=*/closureContextSize);
 
@@ -1051,8 +1087,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
 
   // Copy the result out to our caller.
   auto *futureResult = taskAndContext.Task->futureFragment()->getStoragePtr();
-  futureResultType->getValueWitnesses()->initializeWithCopy(
-      result, futureResult, futureResultType);
+  futureResultType.vw_initializeWithCopy(result, futureResult);
 
   // Destroy the task.
   taskAndContext.Task->~AsyncTask();
@@ -1142,8 +1177,7 @@ static void swift_task_future_waitImpl(
   case FutureFragment::Status::Success: {
     // Run the task with a successful result.
     auto future = task->futureFragment();
-    future->getResultType()->vw_initializeWithCopy(result,
-                                                   future->getStoragePtr());
+    future->getResultType().vw_initializeWithCopy(result, future->getStoragePtr());
     return resumeFn(callerContext);
   }
 
@@ -1197,8 +1231,7 @@ void swift_task_future_wait_throwingImpl(
 
   case FutureFragment::Status::Success: {
     auto future = task->futureFragment();
-    future->getResultType()->vw_initializeWithCopy(result,
-                                                   future->getStoragePtr());
+    future->getResultType().vw_initializeWithCopy(result, future->getStoragePtr());
     return resumeFunction(callerContext, nullptr /*error*/);
   }
 

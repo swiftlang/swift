@@ -388,24 +388,8 @@ add_swift_target_library(swiftCore
 #
 # For now, we build a hardcoded list of target triples of the embedded stdlib,
 # and only when building Swift on macOS.
-set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB TRUE)
-if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-elseif(NOT SWIFT_INCLUDE_TOOLS)
-  # Temporarily, only build embedded stdlib when building the compiler, to
-  # unblock CI jobs that run against old(er) toolchains.
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib ALL)
-  set(EMBEDDED_STDLIB_TARGET_TRIPLES
-    # arch    module_name               target triple
-    "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
-    "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
-    "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
-    "arm64    arm64-apple-macos         arm64-apple-macos10.13"
-    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
-    )
 
   set(SWIFT_ENABLE_REFLECTION OFF)
   set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
@@ -422,7 +406,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     add_swift_target_library_single(
-      embedded-stdlib-${triple}
+      embedded-stdlib-${mod}
       swiftCore
       ONLY_SWIFTMODULE
       IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
@@ -435,6 +419,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       FILE_DEPENDS ${swiftCore_common_dependencies}
       INSTALL_IN_COMPONENT stdlib
       )
-    add_dependencies(embedded-stdlib embedded-stdlib-${triple})
+    add_dependencies(embedded-stdlib embedded-stdlib-${mod})
   endforeach()
 endif()

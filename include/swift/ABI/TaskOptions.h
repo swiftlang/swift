@@ -141,6 +141,21 @@ public:
   }
 };
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+class ResultTypeInfoTaskOptionRecord : public TaskOptionRecord {
+ public:
+  size_t size;
+  size_t alignMask;
+  void (*initializeWithCopy)(OpaqueValue *, OpaqueValue *);
+  void (*storeEnumTagSinglePayload)(OpaqueValue *, unsigned, unsigned);
+  void (*destroy)(OpaqueValue *);
+
+  static bool classof(const TaskOptionRecord *record) {
+    return record->getKind() == TaskOptionRecordKind::ResultTypeInfo;
+  }
+};
+#endif
+
 class RunInlineTaskOptionRecord : public TaskOptionRecord {
   void *allocation;
   size_t allocationBytes;
