@@ -175,9 +175,12 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
 )
 
 # Embedded Swift Concurrency library
-# For now, we build a hardcoded list of target triples of the embedded stdlib,
-# and only when building Swift on macOS.
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY TRUE)
+is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
+if(NOT swift_optimized)
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY FALSE)
+endif()
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency ALL)
 
   set(SWIFT_ENABLE_REFLECTION OFF)
