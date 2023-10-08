@@ -2734,7 +2734,6 @@ public:
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {
     printSelectEnumInst(SEI);
-    printForwardingOwnershipKind(SEI, SEI->getOperand());
   }
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     printSelectEnumInst(SEI);

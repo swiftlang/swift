@@ -1754,20 +1754,10 @@ public:
       ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
       llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts = llvm::None,
       ProfileCounter DefaultCount = ProfileCounter()) {
-    return createSelectEnum(Loc, Operand, Ty, DefaultValue, CaseValues,
-                            CaseCounts, DefaultCount,
-                            Operand->getOwnershipKind());
-  }
-
-  SelectEnumInst *createSelectEnum(
-      SILLocation Loc, SILValue Operand, SILType Ty, SILValue DefaultValue,
-      ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-      llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind) {
     assert(isLoadableOrOpaque(Ty));
     return insert(SelectEnumInst::create(
         getSILDebugLocation(Loc), Operand, Ty, DefaultValue, CaseValues,
-        getModule(), CaseCounts, DefaultCount, forwardingOwnershipKind));
+        getModule(), CaseCounts, DefaultCount));
   }
 
   SelectEnumAddrInst *createSelectEnumAddr(
