@@ -90,10 +90,12 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import SIL
 import SILBridging
+import OptimizerBridging
 
 /// The primary interface to in-IR tests.
-public struct FunctionTest {
+struct FunctionTest {
   let name: String
   let invocation: FunctionTestInvocation
 
@@ -104,7 +106,7 @@ public struct FunctionTest {
 }
 
 /// The type of the closure passed to a FunctionTest.
-public typealias FunctionTestInvocation = @convention(thin) (Function, TestArguments, TestContext) -> ()
+typealias FunctionTestInvocation = @convention(thin) (Function, TestArguments, FunctionPassContext) -> ()
 
 /// Wraps the arguments specified in the specify_test instruction.
 public struct TestArguments {
@@ -129,20 +131,8 @@ extension BridgedTestArguments {
   public var native: TestArguments { TestArguments(bridged: self) }
 }
 
-/// An interface to the various analyses that are available.
-public struct TestContext {
-  public var bridged: BridgedTestContext
-  fileprivate init(bridged: BridgedTestContext) {
-    self.bridged = bridged
-  }
-}
-
-extension BridgedTestContext {
-  public var native: TestContext { TestContext(bridged: self) }
-}
-
 /// Registration of each test in the SIL module.
-public func registerSILTests() {
+public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTest(parseTestSpecificationTest)
 
@@ -161,16 +151,18 @@ private func registerFunctionTest(_ test: FunctionTest) {
 /// actual test function.
 ///
 /// This function is necessary because tests need to be written in terms of
-/// native Swift types (Function, TestArguments, TestContext) rather than their
-/// bridged variants, but such a function isn't representable in C++.  This
-/// thunk unwraps the bridged types and invokes the real function.
+/// native Swift types (Function, TestArguments, BridgedPassContext)
+/// rather than their bridged variants, but such a function isn't representable
+/// in C++.  This thunk unwraps the bridged types and invokes the real
+/// function.
 private func functionTestThunk(
   _ erasedInvocation: UnsafeMutableRawPointer,
   _ function: BridgedFunction, 
   _ arguments: BridgedTestArguments, 
-  _ context: BridgedTestContext) {
+  _ passInvocation: BridgedSwiftPassInvocation) {
   let invocation = uneraseInvocation(erasedInvocation)
-  invocation(function.function, arguments.native, context.native)
+  let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
+  invocation(function.function, arguments.native, context)
 }
 
 /// Bitcast a thin test closure to void *.
