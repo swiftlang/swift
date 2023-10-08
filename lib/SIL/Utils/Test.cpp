@@ -26,6 +26,7 @@ namespace {
 
 class Registry {
   DenseMap<StringRef, FunctionTest *> registeredTests;
+  SwiftNativeFunctionTestThunk thunk;
 
 public:
   static Registry &get() {
@@ -38,6 +39,12 @@ public:
     assert(inserted);
     (void)inserted;
   }
+
+  void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
+    this->thunk = thunk;
+  }
+
+  SwiftNativeFunctionTestThunk getFunctionTestThunk() { return thunk; }
 
   FunctionTest *getFunctionTest(StringRef name) {
     auto *res = registeredTests[name];
@@ -62,15 +69,18 @@ public:
 
 } // end anonymous namespace
 
+void registerFunctionTestThunk(SwiftNativeFunctionTestThunk thunk) {
+  Registry::get().registerFunctionTestThunk(thunk);
+}
+
 FunctionTest::FunctionTest(StringRef name, Invocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
       dependencies(nullptr) {
   Registry::get().registerFunctionTest(this, name);
 }
-FunctionTest::FunctionTest(StringRef name, void *context,
-                           InvocationWithContext invocation)
-    : invocation(std::make_pair(invocation, context)), pass(nullptr),
-      function(nullptr), dependencies(nullptr) {
+FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
+    : invocation(invocation), pass(nullptr), function(nullptr),
+      dependencies(nullptr) {
   Registry::get().registerFunctionTest(this, name);
 }
 
@@ -84,11 +94,12 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
   this->function = &function;
   this->dependencies = &dependencies;
   if (invocation.isa<Invocation>()) {
-    auto fn = this->invocation.get<Invocation>();
+    auto fn = invocation.get<Invocation>();
     fn(function, arguments, *this);
   } else {
-    auto pair = invocation.get<std::pair<InvocationWithContext, void *>>();
-    pair.first(function, arguments, *this, pair.second);
+    auto *fn = invocation.get<NativeSwiftInvocation>();
+    Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
+                                           getContext());
   }
   this->pass = nullptr;
   this->function = nullptr;
