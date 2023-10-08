@@ -2218,9 +2218,12 @@ ERROR(unsupported_type_nested_in_protocol,none,
 ERROR(unsupported_type_nested_in_protocol_extension,none,
       "type %0 cannot be nested in protocol extension of %1",
       (const NominalTypeDecl *, const ProtocolDecl *))
-ERROR(unsupported_nested_protocol,none,
-      "protocol %0 cannot be nested inside another declaration",
+ERROR(unsupported_nested_protocol_in_generic,none,
+      "protocol %0 cannot be nested in a generic context",
       (const NominalTypeDecl *))
+ERROR(unsupported_nested_protocol_in_protocol,none,
+      "protocol %0 cannot be nested in protocol %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(where_nongeneric_ctx,none,
       "'where' clause on non-generic member declaration requires a "
       "generic context", ())
