@@ -8902,7 +8902,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
 
   // Parse comma-separated enum elements.
   SmallVector<EnumElementDecl*, 4> Elements;
-  
+
   SourceLoc CommaLoc;
   for (;;) {
     Identifier Name;
@@ -8968,6 +8968,12 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
+    }
+
+    // See if there's an illegal generic parameter list.
+    if (startsWithLess(Tok)) {
+      diagnose(Tok, diag::unexpected_generic_in_enum_case);
+      skipUntilGreaterInTypeList();
     }
 
     // See if there's a following argument type.

@@ -226,6 +226,8 @@ ERROR(let_cannot_be_addressed_property,none,
 ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
+ERROR(unexpected_generic_in_enum_case,none,
+      "enum cases cannot have generic parameters. did you mean to attach it to enum declaration?", ())
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())

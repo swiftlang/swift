@@ -636,3 +636,10 @@ if case nil = foo1 {} // Okay
 if case .none? = foo1 {} // Okay
 if case nil = foo2 {} // Okay
 if case .none?? = foo2 {} // Okay
+
+enum UnsupportedGenericEnumCase { 
+  case one<Type>(param: Type) // expected-error {{enum cases cannot have generic parameters. did you mean to attach it to enum declaration?}} 
+  // expected-error@-1 {{cannot find type 'Type' in scope}}
+  case two<Partial(param: Int) // expected-error {{enum cases cannot have generic parameters. did you mean to attach it to enum declaration?}}
+  case three<(param: Int) // expected-error {{enum cases cannot have generic parameters. did you mean to attach it to enum declaration?}}
+}
