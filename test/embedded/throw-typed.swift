@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift(%S/Inputs/print.swift -enable-experimental-feature Embedded -enable-experimental-feature TypedThrows -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(%S/Inputs/print.swift -O -enable-experimental-feature Embedded -enable-experimental-feature TypedThrows -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
+// RUN: %target-run-simple-swift(%S/Inputs/print.swift -Osize -enable-experimental-feature Embedded -enable-experimental-feature TypedThrows -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
