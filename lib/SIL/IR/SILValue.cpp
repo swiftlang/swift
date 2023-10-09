@@ -166,9 +166,9 @@ static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
                                                    auto &test) {
   auto value = arguments.takeValue();
   auto isLexical = value->isLexical();
-  value->dump();
+  value->print(llvm::outs());
   auto *boolString = isLexical ? "true" : "false";
-  llvm::errs() << boolString << "\n";
+  llvm::outs() << boolString << "\n";
 });
 } // end namespace swift::test
 

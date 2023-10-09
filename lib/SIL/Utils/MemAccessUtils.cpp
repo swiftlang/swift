@@ -375,10 +375,10 @@ static FunctionTest
     GetTypedAccessAddress("get_typed_access_address",
                           [](auto &function, auto &arguments, auto &test) {
                             auto address = arguments.takeValue();
-                            function.dump();
-                            llvm::dbgs() << "Address: " << address;
+                            function.print(llvm::outs());
+                            llvm::outs() << "Address: " << address;
                             auto access = getTypedAccessAddress(address);
-                            llvm::dbgs() << "Access: " << access;
+                            llvm::outs() << "Access: " << access;
                           });
 } // end namespace swift::test
 
@@ -404,10 +404,10 @@ static FunctionTest GetAccessBaseTest("get_access_base",
                                       [](auto &function, auto &arguments,
                                          auto &test) {
                                         auto address = arguments.takeValue();
-                                        function.dump();
-                                        llvm::dbgs() << "Address: " << address;
+                                        function.print(llvm::outs());
+                                        llvm::outs() << "Address: " << address;
                                         auto base = getAccessBase(address);
-                                        llvm::dbgs() << "Base: " << base;
+                                        llvm::outs() << "Base: " << base;
                                       });
 } // end namespace swift::test
 
@@ -1196,10 +1196,10 @@ static FunctionTest ComputeAccessStorage("compute_access_storage",
                                       [](auto &function, auto &arguments,
                                          auto &test) {
                                         auto address = arguments.takeValue();
-                                        function.dump();
-                                        llvm::dbgs() << "Address: " << address;
+                                        function.print(llvm::outs());
+                                        llvm::outs() << "Address: " << address;
                                         auto accessStorage = AccessStorage::compute(address);
-                                        accessStorage.dump();
+                                        accessStorage.print(llvm::outs());
                                       });
 } // end namespace swift::test
 
@@ -2070,7 +2070,7 @@ static FunctionTest AccessPathBaseTest("accesspath-base", [](auto &function,
                                                              auto &arguments,
                                                              auto &test) {
   auto value = arguments.takeValue();
-  function.dump();
+  function.print(llvm::outs());
   llvm::outs() << "Access path base: " << value;
   auto accessPathWithBase = AccessPathWithBase::compute(value);
   AccessUseTestVisitor visitor;

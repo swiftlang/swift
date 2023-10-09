@@ -97,6 +97,7 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
     auto fn = invocation.get<Invocation>();
     fn(function, arguments, *this);
   } else {
+    llvm::outs().flush();
     auto *fn = invocation.get<NativeSwiftInvocation>();
     Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
                                            {getInvocation()});

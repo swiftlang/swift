@@ -182,8 +182,9 @@ static FunctionTest
           while (arguments.hasUntaken()) {
             boundary.lastUsers.push_back(arguments.takeInstruction());
           }
-          boundary.visitInsertionPoints(
-              [](SILBasicBlock::iterator point) { point->dump(); });
+          boundary.visitInsertionPoints([](SILBasicBlock::iterator point) {
+            point->print(llvm::outs());
+          });
         });
 } // end namespace swift::test
 

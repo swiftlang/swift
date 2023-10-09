@@ -105,9 +105,9 @@ static FunctionTest OwnershipUtilsHasPointerEscape(
     "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto has = findPointerEscape(value);
-      value->print(llvm::errs());
+      value->print(llvm::outs());
       auto *boolString = has ? "true" : "false";
-      llvm::errs() << boolString << "\n";
+      llvm::outs() << boolString << "\n";
     });
 } // end namespace swift::test
 
@@ -2057,10 +2057,10 @@ namespace swift::test {
 // - the enclosing defs
 static FunctionTest FindEnclosingDefsTest(
     "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Enclosing Defs:\n";
+      function.print(llvm::outs());
+      llvm::outs() << "Enclosing Defs:\n";
       visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
-        def->dump();
+        def->print(llvm::outs());
         return true;
       });
     });
@@ -2082,10 +2082,10 @@ namespace swift::test {
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
     "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
-      function.dump();
-      llvm::dbgs() << "Introducers:\n";
+      function.print(llvm::outs());
+      llvm::outs() << "Introducers:\n";
       visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
-        def->dump();
+        def->print(llvm::outs());
         return true;
       });
     });
@@ -2202,10 +2202,10 @@ namespace swift::test {
 static FunctionTest VisitInnerAdjacentPhisTest(
     "visit-inner-adjacent-phis",
     [](auto &function, auto &arguments, auto &test) {
-      function.dump();
+      function.print(llvm::outs());
       visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
                              [](auto *argument) -> bool {
-                               argument->dump();
+                               argument->print(llvm::outs());
                                return true;
                              });
     });

@@ -314,10 +314,10 @@ static FunctionTest DeleterDeleteIfDeadTest(
     "deleter-delete-if-dead", [](auto &function, auto &arguments, auto &test) {
       auto *inst = arguments.takeInstruction();
       InstructionDeleter deleter;
-      llvm::dbgs() << "Deleting-if-dead " << *inst;
+      llvm::outs() << "Deleting-if-dead " << *inst;
       auto deleted = deleter.deleteIfDead(inst);
-      llvm::dbgs() << "deleteIfDead returned " << deleted << "\n";
-      function.dump();
+      llvm::outs() << "deleteIfDead returned " << deleted << "\n";
+      function.print(llvm::outs());
     });
 } // namespace swift::test
 
