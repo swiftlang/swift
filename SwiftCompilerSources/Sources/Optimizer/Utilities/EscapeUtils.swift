@@ -104,6 +104,7 @@ extension ProjectedValue {
                                          _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, complexityBudget: complexityBudget, context)
     if walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -119,6 +120,7 @@ extension ProjectedValue {
                                                       _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, context)
     if walker.walkDown(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -182,6 +184,12 @@ extension EscapeVisitor {
 protocol EscapeVisitorWithResult : EscapeVisitor {
   associatedtype Result
   var result: Result { get }
+
+  mutating func cleanupOnAbort()
+}
+
+extension EscapeVisitorWithResult {
+  mutating func cleanupOnAbort() {}
 }
 
 // FIXME: This ought to be marked private, but that triggers a compiler bug
