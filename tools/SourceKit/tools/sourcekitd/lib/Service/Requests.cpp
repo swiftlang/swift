@@ -183,7 +183,8 @@ static SourceKit::Context &getGlobalContext() {
 }
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args, IndexSourceOptions Opts);
+                                         ArrayRef<const char *> Args,
+                                         IndexSourceOptions Opts);
 
 static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
@@ -2179,7 +2180,8 @@ public:
 } // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args, IndexSourceOptions Opts) {
+                                         ArrayRef<const char *> Args,
+                                         IndexSourceOptions Opts) {
   ResponseBuilder RespBuilder;
   SKIndexingConsumer IdxConsumer(RespBuilder);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();

@@ -38,7 +38,8 @@ static UIdent getUIDForDependencyKind(bool isClangModule) {
 
 class SKIndexDataConsumer : public IndexDataConsumer {
 public:
-  SKIndexDataConsumer(IndexingConsumer &C, IndexSourceOptions Opts) : impl(C), Opts(Opts) {}
+  SKIndexDataConsumer(IndexingConsumer &C, IndexSourceOptions Opts)
+      : impl(C), Opts(Opts) {}
 
 private:
   void failed(StringRef error) override { impl.failed(error); }
