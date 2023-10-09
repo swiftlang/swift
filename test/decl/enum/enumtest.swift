@@ -638,11 +638,14 @@ if case nil = foo2 {} // Okay
 if case .none?? = foo2 {} // Okay
 
 enum EnumCaseWithGenericDeclaration {
+  // expected-error@+1 {{cannot find type 'T' in scope}}
   case foo<T>(T) // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
+  // expected-error@+1 {{cannot find type 'T' in scope}}
   case bar<T>(param: T) // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
   case baz<T> // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
   case one, two<T> // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
   case three<T>, four // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
+  // expected-error@+1 {{cannot find type 'T' in scope}}
   case five<T>(param: T), six // expected-error {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
   // expected-error@+2 {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}
   // expected-error@+1 {{generic signature cannot be declared in enum 'case'. did you mean to attach it to enum declaration?}}

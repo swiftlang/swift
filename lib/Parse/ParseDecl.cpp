@@ -8969,6 +8969,14 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
     }
+    
+    // See if there are generic params.
+    auto genericResults = maybeParseGenericParams()
+      .getPtrOrNull();
+    if (genericResults && !genericResults->getParams().empty()) {
+      auto genericLoc = genericResults->getParams().front()->getStartLoc();
+      diagnose(genericLoc, diag::generic_param_cant_be_used_in_enum_case_decl);
+    }
 
     // See if there's a following argument type.
     ParserResult<ParameterList> ArgParams;
@@ -8979,23 +8987,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                              &argumentNames, &DefaultArgs);
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
         return ParserStatus(ArgParams);
-    }
-    
-    // See if there are generic params.
-    auto genericResults = maybeParseGenericParams()
-      .getPtrOrNull();
-    if (genericResults && !genericResults->getParams().empty()) {
-      auto genericLoc = genericResults->getParams().front()->getStartLoc();
-      diagnose(genericLoc, diag::generic_param_cant_be_used_in_enum_case_decl);
-      
-      // check if there's a following argument type after
-      // generic declaration and parse it to ignore it.
-      if (Tok.isFollowingLParen()) {
-        SmallVector<Identifier, 4> argNamesAfterGenerics;
-        DefaultArgumentInfo defaultArgsAfterGenerics;
-        parseSingleParameterClause(ParameterContextKind::EnumElement,
-                                   &argNamesAfterGenerics, &defaultArgsAfterGenerics);
-      }
     }
 
     // See if there's a raw value expression.
