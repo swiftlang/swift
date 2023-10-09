@@ -38,7 +38,7 @@ static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticArgument has wrong size");
 
 static SourceLoc getSourceLoc(BridgedSourceLoc bridgedLoc) {
-  return SourceLoc(llvm::SMLoc::getFromPointer((const char *)bridgedLoc.opaquePointer));
+  return SourceLoc(llvm::SMLoc::getFromPointer(bridgedLoc.getLoc()));
 }
 
 BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text)
@@ -60,7 +60,7 @@ void DiagnosticEngine_diagnose(
   for (auto arg : getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
     arguments.push_back(arg.get());
   }
-  auto inflight = D->diagnose(SourceLoc(llvm::SMLoc::getFromPointer((const char *)loc.opaquePointer)), diagID, arguments);
+  auto inflight = D->diagnose(SourceLoc(llvm::SMLoc::getFromPointer(loc.getLoc())), diagID, arguments);
 
   // Add highlight.
   if (highlightStart.isValid()) {
