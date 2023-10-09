@@ -23,11 +23,11 @@ public func callsNew() {
 }
 
 // CHECK-OLD-LABEL: declare swiftcc void @"$s36weak_import_deployment_target_helper13hasDefaultArgyySiF"(i64)
+// CHECK-OLD-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper8functionSiyF"()
 // CHECK-OLD-LABEL: declare extern_weak swiftcc void @"$s36weak_import_deployment_target_helper22hasAvailableDefaultArgyySiF"(i64)
 // CHECK-OLD-LABEL: declare extern_weak swiftcc i64 @"$s36weak_import_deployment_target_helper17availableFunctionSiyF"()
-// CHECK-OLD-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper8functionSiyF"()
 
 // CHECK-NEW-LABEL: declare swiftcc void @"$s36weak_import_deployment_target_helper13hasDefaultArgyySiF"(i64)
+// CHECK-NEW-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper8functionSiyF"()
 // CHECK-NEW-LABEL: declare swiftcc void @"$s36weak_import_deployment_target_helper22hasAvailableDefaultArgyySiF"(i64)
 // CHECK-NEW-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper17availableFunctionSiyF"()
-// CHECK-NEW-LABEL: declare swiftcc i64 @"$s36weak_import_deployment_target_helper8functionSiyF"()

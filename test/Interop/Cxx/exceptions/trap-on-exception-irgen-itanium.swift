@@ -335,6 +335,8 @@ public func test() {
 // CHECK-NEXT: unreachable
 // CHECK-NEXT: }
 
+// CHECK: i32 @__gxx_personality_v0(...)
+
 // CHECK: define {{.*}} @"$s4test0A11MethodCallss5Int32VyF"() #[[#SWIFTUWMETA]] personality
 // CHECK: call swiftcc i32 @"$s4test8makeCInts5Int32VyF"()
 // CHECK: invoke i32 @_ZNK9TestClass6methodEi
@@ -465,10 +467,7 @@ public func test() {
 // CHECK-NOT: invoke
 // CHECK: }
 
-// CHECK: i32 @__gxx_personality_v0(...)
-
 // CHECK: attributes #[[#SWIFTMETA]] = {
-// CHECK-NOT: uwtable
 // CHECK: attributes #[[#SWIFTUWMETA]] = {
 // CHECK-SAME: uwtable
 

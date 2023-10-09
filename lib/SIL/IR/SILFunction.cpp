@@ -862,6 +862,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (markedAsUsed())
     return true;
 
+  if (shouldBePreservedForDebugger())
+    return true;
+
   // Declaration marked as `@_alwaysEmitIntoClient` that
   // returns opaque result type with availability conditions
   // has to be kept alive to emit opaque type metadata descriptor.
@@ -870,6 +873,39 @@ SILFunction::isPossiblyUsedExternally() const {
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
+bool SILFunction::shouldBePreservedForDebugger() const {
+  // Only preserve for the debugger at Onone.
+  if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
+    return false;
+
+  // Only keep functions defined in this module.
+  if (!isDefinition())
+    return false;
+
+  // Don't preserve anything markes as always emit into client.
+  if (markedAsAlwaysEmitIntoClient())
+    return false;
+
+  // Needed by lldb to print global variables which are propagated by the
+  // mandatory GlobalOpt.
+  if (isGlobalInit())
+    return true;
+
+  // Preserve any user-written functions.
+  if (auto declContext = getDeclContext())
+    if (auto decl = declContext->getAsDecl())
+      if (!decl->isImplicit())
+        return true;
+
+  // Keep any setters/getters, even compiler generated ones.
+  if (auto *accessorDecl =
+          llvm::dyn_cast_or_null<swift::AccessorDecl>(getDeclContext()))
+    if (accessorDecl->isGetterOrSetter())
+      return true;
+
+  return false;
 }
 
 bool SILFunction::isExternallyUsedSymbol() const {

@@ -5,7 +5,9 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-//              CHECK: @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]CyAA4LeftACLLVySiGGMf" = linkonce_odr hidden 
+// CHECK: @"$s4main4Left[[UNIQUE_ID_1:[A-Za-z0-9_]+]]VySiGMf" =
+
+//              CHECK: @"$s4main5Value[[UNIQUE_ID_1]]CyAA4LeftACLLVySiGGMf" = linkonce_odr hidden 
 //   CHECK-apple-SAME: global 
 // CHECK-unknown-SAME: constant 
 //         CHECK-SAME: <{
@@ -64,7 +66,6 @@
 //         CHECK-SAME: }>,
 //         CHECK-SAME: align [[ALIGNMENT]]
 
-// CHECK: @"$s4main4Left[[UNIQUE_ID_1]]VySiGMf" =
 
 fileprivate class Value<First> {
   let first_Value: First
@@ -96,17 +97,6 @@ func doit() {
 }
 doit()
 
-//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
-//      CHECK: entry:
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr %1, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CMn
-//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
-//      CHECK: }
-
 //         CHECK: ; Function Attrs: noinline nounwind memory(none)
 //         CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CyAA4LeftACLLVySiGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]+}} {{(section)?.*}}{
 // CHECK-unknown: ret
@@ -117,3 +107,14 @@ doit()
 //   CHECK-apple:   [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 //   CHECK-apple:   ret %swift.metadata_response [[METADATA_RESPONSE]]
 //         CHECK: }
+
+//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]CMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr %1) #{{[0-9]+}} {{(section)?.*}}{
+//      CHECK: entry:
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
+// CHECK-SAME:     ptr %1, 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]CMn
+//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
+//      CHECK: }
