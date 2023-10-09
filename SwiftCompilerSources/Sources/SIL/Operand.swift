@@ -16,8 +16,13 @@ import SILBridging
 public struct Operand : CustomStringConvertible, NoReflectionChildren {
   fileprivate let bridged: BridgedOperand
 
-  init(bridged: BridgedOperand) {
+  public init(bridged: BridgedOperand) {
     self.bridged = bridged
+  }
+
+  init?(bridged: OptionalBridgedOperand) {
+    guard let op = bridged.op else { return nil }
+    self.bridged = BridgedOperand(op: op)
   }
 
   public var value: Value { bridged.getValue().value }
@@ -35,6 +40,8 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   /// True if the operand is used to describe a type dependency, but it's not
   /// used as value.
   public var isTypeDependent: Bool { bridged.isTypeDependent() }
+
+  public var endsLifetime: Bool { bridged.isLifetimeEnding() }
   
   public var description: String { "operand #\(index) of \(instruction)" }
 }
@@ -45,6 +52,11 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   
   init(base: OptionalBridgedOperand, count: Int) {
     self.base = base
+    self.count = count
+  }
+
+  init(base: Operand, count: Int) {
+    self.base = OptionalBridgedOperand(bridged: base.bridged)
     self.count = count
   }
 
@@ -132,10 +144,117 @@ public struct UseList : CollectionLikeSequence {
 }
 
 extension OptionalBridgedOperand {
+  init(bridged: BridgedOperand?) {
+    self = OptionalBridgedOperand(op: bridged?.op)
+  }
   var operand: BridgedOperand? {
     if let op = op {
       return BridgedOperand(op: op)
     }
     return nil
+  }
+}
+
+/// Categorize all uses in terms of their ownership effect. Implies ownership and lifetime constraints.
+public enum OperandOwnership {
+  /// Operands that do not use the value. They only represent a dependence on a dominating definition and do not require liveness. (type-dependent operands)
+  case nonUse
+  
+  /// Uses that can only handle trivial values. The operand value must have None ownership. These uses require liveness but are otherwise unverified.
+  case trivialUse
+  
+  /// Use the value only for the duration of the operation, which may have side effects. (single-instruction apply with @guaranteed argument)
+  case instantaneousUse
+  
+  /// Use a value without requiring or propagating ownership. The operation may not have side-effects that could affect ownership. This is limited to a small number of operations that are allowed to take Unowned values. (copy_value, single-instruction apply with @unowned argument))
+  case unownedInstantaneousUse
+  
+  /// Forwarding instruction with an Unowned result. Its operands may have any ownership.
+  case forwardingUnowned
+  
+  /// Escape a pointer into a value which cannot be tracked or verified.
+  ///
+  /// PointerEscape  operands indicate a SIL deficiency to suffuciently model dependencies. They never arise from user-level escapes.
+  case pointerEscape
+  
+  /// Bitwise escape. Escapes the nontrivial contents of the value. OSSA does not enforce the lifetime of the escaping bits. The programmer must explicitly force lifetime extension. (ref_to_unowned, unchecked_trivial_bitcast)
+  case bitwiseEscape
+  
+  /// Borrow. Propagates the owned or guaranteed value within a scope, without ending its lifetime. (begin_borrow, begin_apply with @guaranteed argument)
+  case borrow
+  
+  /// Destroying Consume. Destroys the owned value immediately. (store, destroy, @owned destructure).
+  case destroyingConsume
+
+  /// Forwarding Consume. Consumes the owned value indirectly via a move. (br, destructure, tuple, struct, cast, switch).
+  case forwardingConsume
+  
+  /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or no-escape closure) that depends on the guaranteed value within the base's borrow scope. The verifier checks that all uses of the trivial
+  /// value are in scope. (ref_element_addr, open_existential_box)
+  case interiorPointer
+  
+  /// Forwarded Borrow. Propagates the guaranteed value within the base's borrow scope. (tuple_extract, struct_extract, cast, switch)
+  case guaranteedForwarding
+  
+  /// End Borrow. End the borrow scope opened directly by the operand. The operand must be a begin_borrow, begin_apply, or function argument. (end_borrow, end_apply)
+  case endBorrow
+  
+  /// Reborrow. Ends the borrow scope opened directly by the operand and begins one or multiple disjoint borrow scopes. If a forwarded value is reborrowed, then its base must also be reborrowed at the same point. (br, FIXME: should also include destructure, tuple, struct)
+  case reborrow
+
+  public var _bridged: BridgedOperand.OperandOwnership {
+    switch self {
+    case .nonUse:
+      return BridgedOperand.OperandOwnership.NonUse
+    case .trivialUse:
+      return BridgedOperand.OperandOwnership.TrivialUse
+    case .instantaneousUse:
+      return BridgedOperand.OperandOwnership.InstantaneousUse
+    case .unownedInstantaneousUse:
+      return BridgedOperand.OperandOwnership.UnownedInstantaneousUse
+    case .forwardingUnowned:
+      return BridgedOperand.OperandOwnership.ForwardingUnowned
+    case .pointerEscape:
+      return BridgedOperand.OperandOwnership.PointerEscape
+    case .bitwiseEscape:
+      return BridgedOperand.OperandOwnership.BitwiseEscape
+    case .borrow:
+      return BridgedOperand.OperandOwnership.Borrow
+    case .destroyingConsume:
+      return BridgedOperand.OperandOwnership.DestroyingConsume
+    case .forwardingConsume:
+      return BridgedOperand.OperandOwnership.ForwardingConsume
+    case .interiorPointer:
+      return BridgedOperand.OperandOwnership.InteriorPointer
+    case .guaranteedForwarding:
+      return BridgedOperand.OperandOwnership.GuaranteedForwarding
+    case .endBorrow:
+      return BridgedOperand.OperandOwnership.EndBorrow
+    case .reborrow:
+      return BridgedOperand.OperandOwnership.Reborrow
+    }
+  }
+}
+
+extension Operand {
+  public var ownership: OperandOwnership {
+    switch bridged.getOperandOwnership() {
+    case .NonUse: return .nonUse
+    case .TrivialUse: return .trivialUse
+    case .InstantaneousUse: return .instantaneousUse
+    case .UnownedInstantaneousUse: return .unownedInstantaneousUse
+    case .ForwardingUnowned: return .forwardingUnowned
+    case .PointerEscape: return .pointerEscape
+    case .BitwiseEscape: return .bitwiseEscape
+    case .Borrow: return .borrow
+    case .DestroyingConsume: return .destroyingConsume
+    case .ForwardingConsume: return .forwardingConsume
+    case .InteriorPointer: return .interiorPointer
+    case .GuaranteedForwarding: return .guaranteedForwarding
+    case .EndBorrow: return .endBorrow
+    case .Reborrow: return .reborrow
+    default:
+      fatalError("unsupported operand ownership")
+    }
   }
 }

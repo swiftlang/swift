@@ -326,7 +326,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
         ? args.claimNext()
         : nullptr;
-    auto futureResultType = args.claimNext();
+
+    // In embedded Swift, futureResultType is a thin metatype, not backed by any
+    // actual value.
+    llvm::Value *futureResultType =
+        llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      futureResultType = args.claimNext();
+    }
+
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
@@ -577,8 +585,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // the error return register. We also have to pass a fake context
     // argument due to how swiftcc works in clang.
 
-    auto fn = IGF.IGM.getWillThrowFunctionPointer();
     auto error = args.claimNext();
+
+    if (IGF.IGM.Context.LangOpts.ThrowsAsTraps) {
+      return;
+    }
+
+    auto fn = IGF.IGM.getWillThrowFunctionPointer();
     auto errorTy = IGF.IGM.Context.getErrorExistentialType();
     auto errorBuffer = IGF.getCalleeErrorResultSlot(
         SILType::getPrimitiveObjectType(errorTy), false);
@@ -1110,6 +1123,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       SILType elemTy = valueTy.first;
       const TypeInfo &elemTI = valueTy.second;
 
+      if (elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+          IsTriviallyDestroyable)
+        return;
+
       llvm::Value *firstElem = IGF.Builder.CreateBitCast(
           ptr, elemTI.getStorageType()->getPointerTo());
 
@@ -1169,6 +1186,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           IGF.IGM, substitutions.getReplacementTypes()[0]);
       SILType elemTy = tyPair.first;
       const TypeInfo &elemTI = tyPair.second;
+
+      // Do nothing for zero-sized POD array elements.
+      if (llvm::Constant *SizeConst = elemTI.getStaticSize(IGF.IGM)) {
+        auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
+        if (SizeInt->getSExtValue() == 0 &&
+            elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+                IsTriviallyDestroyable)
+          return;
+      }
 
       llvm::Value *firstSrcElem = IGF.Builder.CreateBitCast(
           src, elemTI.getStorageType()->getPointerTo());

@@ -1985,11 +1985,15 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
     return swift_defaultActor_enqueue(job, executor.getDefaultActor());
   }
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_unreachable("custom executors not supported in embedded Swift");
+#else
   // For main actor or actors with custom executors
   auto wtable = executor.getSerialExecutorWitnessTable();
   auto executorObject = executor.getIdentity();
   auto executorType = swift_getObjectType(executorObject);
   _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
+#endif
 }
 
 static void

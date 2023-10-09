@@ -15,6 +15,7 @@ add_swift_compiler_module(SIL
     BasicBlock.swift
     Builder.swift
     Effects.swift
+    ForwardingInstruction.swift
     Function.swift
     GlobalVariable.swift
     Instruction.swift
@@ -23,7 +24,6 @@ add_swift_compiler_module(SIL
     Registration.swift
     SmallProjectionPath.swift
     SubstitutionMap.swift
-    Test.swift
     Type.swift
     Utils.swift
     Value.swift

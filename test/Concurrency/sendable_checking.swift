@@ -100,16 +100,6 @@ public actor MyActor: MyProto {
   }
 }
 
-// rdar://82452688 - make sure sendable checking doesn't fire for a capture
-// of a value of error-type
-@available(SwiftStdlib 5.1, *)
-func f() async {
-  let n = wobble() // expected-error{{cannot find 'wobble' in scope}}
-  @Sendable func nested() {
-    n.pointee += 1
-  }
-}
-
 // Make sure the generic signature doesn't minimize away Sendable requirements.
 @_nonSendable class NSClass { }
 
@@ -242,7 +232,10 @@ extension MyActor {
 @available(SwiftStdlib 5.1, *)
 func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> Void) async {
   await a.f(s)
+
+  // FIXME: 'f' is Sendable
   await a.g(f)
+  // expected-sns-warning@-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -261,15 +254,21 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-sns-warning@-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-sns-warning@-3 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
+
 
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+    // expected-sns-note@-2 {{access here could race}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+    // expected-sns-note@-2 {{access here could race}}
 
     _ = await self.x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+    // expected-sns-note@-2 {{access here could race}}
   }
 
   @MainActor
@@ -281,9 +280,11 @@ func testNonSendableBaseArg() async {
   let t = NonSendable()
   await t.update()
   // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
+  // expected-sns-warning@-2 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
 
   _ = await t.x
   // expected-warning @-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
+  // expected-sns-note@-2 {{access here could race}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -296,15 +297,16 @@ func callNonisolatedAsyncClosure(
   ns: NonSendable,
   g: (NonSendable) async -> Void
 ) async {
-  // FIXME: Both cases below should also produce a diagnostic with SendNonSendable,
-  // because the 'ns' parameter should be merged into the MainActor's region.
-
   await g(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-sns-warning@-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-sns-warning@-3 {{passing argument of non-sendable type 'NonSendable' from main actor-isolated context to nonisolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-targeted-and-complete-warning@-1 {{passing argument of non-sendable type 'NonSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-sns-note@-2 {{access here could race}}
+
 }
 
 @available(SwiftStdlib 5.1, *)

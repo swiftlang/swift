@@ -185,6 +185,67 @@ public:
   }
 };
 
+/// Descibes type information and offers value methods for an arbitrary concrete
+/// type in a way that's compatible with regular Swift and embedded Swift. In
+/// regular Swift, just holds a Metadata pointer and dispatches to the value
+/// witness table. In embedded Swift, because we do not have any value witness
+/// tables present at runtime, the witnesses are stored and referenced directly.
+///
+/// This structure is created from swift_task_create, where in regular Swift, the
+/// compiler provides the Metadata pointer, and in embedded Swift, a
+/// TaskOptionRecord is used to provide the witnesses.
+struct ResultTypeInfo {
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  const Metadata *metadata = nullptr;
+  bool isNull() {
+    return metadata == nullptr;
+  }
+  size_t vw_size() {
+    return metadata->vw_size();
+  }
+  size_t vw_alignment() {
+    return metadata->vw_alignment();
+  }
+  void vw_initializeWithCopy(OpaqueValue *result, OpaqueValue *src) {
+    metadata->vw_initializeWithCopy(result, src);
+  }
+  void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
+                                    unsigned emptyCases) {
+    metadata->vw_storeEnumTagSinglePayload(v, whichCase, emptyCases);
+  }
+  void vw_destroy(OpaqueValue *v) {
+    metadata->vw_destroy(v);
+  }
+#else
+  size_t size = 0;
+  size_t alignMask = 0;
+  void (*initializeWithCopy)(OpaqueValue *result, OpaqueValue *src) = nullptr;
+  void (*storeEnumTagSinglePayload)(OpaqueValue *v, unsigned whichCase,
+                                    unsigned emptyCases) = nullptr;
+  void (*destroy)(OpaqueValue *) = nullptr;
+
+  bool isNull() {
+    return initializeWithCopy == nullptr;
+  }
+  size_t vw_size() {
+    return size;
+  }
+  size_t vw_alignment() {
+    return alignMask + 1;
+  }
+  void vw_initializeWithCopy(OpaqueValue *result, OpaqueValue *src) {
+    initializeWithCopy(result, src);
+  }
+  void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
+                                    unsigned emptyCases) {
+    storeEnumTagSinglePayload(v, whichCase, emptyCases);
+  }
+  void vw_destroy(OpaqueValue *v) {
+    destroy(v);
+  }
+#endif
+};
+
 /// An asynchronous task.  Tasks are the analogue of threads for
 /// asynchronous functions: that is, they are a persistent identity
 /// for the overall async computation.
@@ -503,7 +564,7 @@ public:
     std::atomic<WaitQueueItem> waitQueue;
 
     /// The type of the result that will be produced by the future.
-    const Metadata *resultType;
+    ResultTypeInfo resultType;
 
     SwiftError *error = nullptr;
 
@@ -513,14 +574,14 @@ public:
     friend class AsyncTask;
 
   public:
-    explicit FutureFragment(const Metadata *resultType)
+    explicit FutureFragment(ResultTypeInfo resultType)
       : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
         resultType(resultType) { }
 
     /// Destroy the storage associated with the future.
     void destroy();
 
-    const Metadata *getResultType() const {
+    ResultTypeInfo getResultType() const {
       return resultType;
     }
 
@@ -534,7 +595,7 @@ public:
       // `this` must have the same value modulo that alignment as
       // `fragmentOffset` has in that function.
       char *fragmentAddr = reinterpret_cast<char *>(this);
-      uintptr_t alignment = resultType->vw_alignment();
+      uintptr_t alignment = resultType.vw_alignment();
       char *resultAddr = fragmentAddr + sizeof(FutureFragment);
       uintptr_t unalignedResultAddrInt =
         reinterpret_cast<uintptr_t>(resultAddr);
@@ -553,12 +614,12 @@ public:
     /// Determine the size of the future fragment given the result type
     /// of the future.
     static size_t fragmentSize(size_t fragmentOffset,
-                               const Metadata *resultType) {
+                               ResultTypeInfo resultType) {
       assert((fragmentOffset & (alignof(FutureFragment) - 1)) == 0);
-      size_t alignment = resultType->vw_alignment();
+      size_t alignment = resultType.vw_alignment();
       size_t resultOffset = fragmentOffset + sizeof(FutureFragment);
       resultOffset = (resultOffset + alignment - 1) & ~(alignment - 1);
-      size_t endOffset = resultOffset + resultType->vw_size();
+      size_t endOffset = resultOffset + resultType.vw_size();
       return (endOffset - fragmentOffset);
     }
   };

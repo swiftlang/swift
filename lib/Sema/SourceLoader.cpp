@@ -27,6 +27,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <system_error>
 
@@ -160,6 +161,7 @@ SourceLoader::getModuleDependencies(StringRef moduleName,
                                     const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                     InterfaceSubContextDelegate &delegate,
+                                    llvm::TreePathPrefixMapper* mapper,
                                     bool isTestableImport) {
   // FIXME: Implement?
   return {};

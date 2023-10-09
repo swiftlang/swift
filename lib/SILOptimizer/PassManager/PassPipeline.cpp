@@ -760,14 +760,8 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
-  // MandatoryPerformanceOptimizations already took care of all specializations
-  // in embedded Swift mode, running the release devirtualizer might introduce
-  // more generic calls from non-generic functions, which breaks the assumptions
-  // of embedded Swift.
-  if (!P.getOptions().EmbeddedSwift) {
-    // Should be after FunctionSignatureOpts and before the last inliner.
-    P.addReleaseDevirtualizer();
-  }
+  // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 

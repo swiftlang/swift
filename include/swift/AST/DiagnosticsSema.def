@@ -104,6 +104,12 @@ ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
 
+ERROR(could_not_find_imported_enum_case,none,
+      "type %0 has no case %1, but it does have a case named %2; if %1 worked "
+      "before, a recent change to the underlying C enum may have affected how "
+      "prefixes are stripped from its case names",
+      (Type, DeclNameRef, ValueDecl *))
+
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
      
@@ -608,6 +614,9 @@ ERROR(cannot_convert_sequence_element_protocol,none,
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
+
+ERROR(thrown_error_type_mismatch,none,
+      "invalid conversion of thrown error type %0 to %1", (Type, Type))
 
 ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
@@ -1728,6 +1737,9 @@ NOTE(fixit_add_private_for_objc_implementation,none,
 NOTE(fixit_add_final_for_objc_implementation,none,
      "add 'final' to define a Swift %0 that cannot be overridden",
      (DescriptiveDeclKind))
+NOTE(fixit_add_nonobjc_for_objc_implementation,none,
+     "add '@nonobjc' to define a Swift-only %0",
+     (DescriptiveDeclKind))
 
 ERROR(objc_implementation_wrong_category,none,
       "%kind0 should be implemented in extension for "
@@ -2166,6 +2178,9 @@ ERROR(pattern_binds_no_variables,none,
 ERROR(variable_bound_by_no_pattern,none,
       "variable %0 is not bound by any pattern",
       (const VarDecl *))
+ERROR(destructuring_let_struct_stored_property_unsupported,none,
+      "binding multiple 'let' stored properties from a single initializer expression in a struct is unsupported",
+      ())
 
 WARNING(optional_ambiguous_case_ref,none,
         "assuming you mean '%0.%2'; did you mean '%1.%2' instead?",
@@ -2203,9 +2218,12 @@ ERROR(unsupported_type_nested_in_protocol,none,
 ERROR(unsupported_type_nested_in_protocol_extension,none,
       "type %0 cannot be nested in protocol extension of %1",
       (const NominalTypeDecl *, const ProtocolDecl *))
-ERROR(unsupported_nested_protocol,none,
-      "protocol %0 cannot be nested inside another declaration",
+ERROR(unsupported_nested_protocol_in_generic,none,
+      "protocol %0 cannot be nested in a generic context",
       (const NominalTypeDecl *))
+ERROR(unsupported_nested_protocol_in_protocol,none,
+      "protocol %0 cannot be nested in protocol %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(where_nongeneric_ctx,none,
       "'where' clause on non-generic member declaration requires a "
       "generic context", ())
@@ -3463,7 +3481,7 @@ ERROR(decl_from_hidden_module,none,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ types from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const Decl *, unsigned, Identifier, unsigned))
 ERROR(typealias_desugars_to_type_from_hidden_module,none,
       "%0 aliases '%1.%2' and cannot be used %select{here|"
@@ -5224,6 +5242,13 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "non-isolated context",
       (const ValueDecl *))
+ERROR(isolated_default_argument,none,
+      "%0 default argument cannot be synchronously evaluated from a "
+      "%1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(conflicting_default_argument_isolation,none,
+      "default argument cannot be both %0 and %1",
+      (ActorIsolation, ActorIsolation))
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'Distributed' module not imported, required for 'distributed actor'",
       ())
@@ -6603,7 +6628,7 @@ ERROR(inlinable_decl_ref_from_hidden_module,
       "%2 was imported for SPI only|"
       "%2 was not imported by this file|"
       "C++ APIs from imported module %2 do not support library evolution|"
-      "<<ERROR>>}3",
+      "%2 was not imported publicly}3",
       (const ValueDecl *, unsigned, Identifier, unsigned))
 
 WARNING(inlinable_decl_ref_from_hidden_module_warn,

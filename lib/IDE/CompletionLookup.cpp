@@ -1305,6 +1305,7 @@ bool CompletionLookup::isImplicitlyCurriedInstanceMethod(
 
   switch (Kind) {
   case LookupKind::ValueExpr:
+  case LookupKind::StoredProperty:
     return ExprType->is<AnyMetatypeType>();
   case LookupKind::ValueInDeclContext:
     if (InsideStaticMethod)
@@ -2248,6 +2249,13 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
     }
 
     return;
+  case LookupKind::StoredProperty:
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (VD->hasStorage()) {
+        addVarDeclRef(VD, Reason, dynamicLookupInfo);
+      }
+      return;
+    }
   }
 }
 
@@ -2461,6 +2469,17 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
                            IncludeInstanceMembers,
                            /*includeDerivedRequirements*/ false,
                            /*includeProtocolExtensionMembers*/ true);
+}
+
+void CompletionLookup::getStoredPropertyCompletions(const NominalTypeDecl *D) {
+  Kind = LookupKind::StoredProperty;
+  NeedLeadingDot = false;
+
+  lookupVisibleMemberDecls(*this, D->getDeclaredInterfaceType(),
+                           /*DotLoc=*/SourceLoc(), CurrDeclContext,
+                           /*IncludeInstanceMembers*/ true,
+                           /*includeDerivedRequirements*/ false,
+                           /*includeProtocolExtensionMembers*/ false);
 }
 
 void CompletionLookup::collectOperators(
@@ -3051,6 +3070,43 @@ void CompletionLookup::getAttributeDeclParamCompletions(
       break;
     }
     break;
+  case CustomSyntaxAttributeKind::StorageRestrictions: {
+    bool suggestInitializesLabel = false;
+    bool suggestAccessesLabel = false;
+    bool suggestArgument = false;
+    switch (static_cast<StorageRestrictionsCompletionKind>(ParamIndex)) {
+    case StorageRestrictionsCompletionKind::Label:
+      suggestAccessesLabel = true;
+      suggestInitializesLabel = true;
+      break;
+    case StorageRestrictionsCompletionKind::Argument:
+      suggestArgument = true;
+      break;
+    case StorageRestrictionsCompletionKind::ArgumentOrInitializesLabel:
+      suggestArgument = true;
+      suggestInitializesLabel = true;
+      break;
+    case StorageRestrictionsCompletionKind::ArgumentOrAccessesLabel:
+      suggestArgument = true;
+      suggestAccessesLabel = true;
+      break;
+    }
+    if (suggestInitializesLabel) {
+      addDeclAttrParamKeyword(
+          "initializes", /*Parameters=*/{},
+          "Specify stored properties initialized by the accessor", true);
+    }
+    if (suggestAccessesLabel) {
+      addDeclAttrParamKeyword(
+          "accesses", /*Parameters=*/{},
+          "Specify stored properties accessed by the accessor", true);
+    }
+    if (suggestArgument) {
+      if (auto NT = dyn_cast<NominalTypeDecl>(CurrDeclContext)) {
+        getStoredPropertyCompletions(NT);
+      }
+    }
+  }
   }
 }
 

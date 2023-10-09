@@ -1111,12 +1111,7 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
-  Type formalExnType = S->getCatches()
-                           .front()
-                           ->getCaseLabelItems()
-                           .front()
-                           .getPattern()
-                           ->getType();
+  Type formalExnType = S->getCaughtErrorType();
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   // Create the throw destination at the end of the function.

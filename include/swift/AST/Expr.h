@@ -4569,6 +4569,11 @@ public:
   /// expression within the context of the call site.
   Expr *getCallerSideDefaultExpr() const;
 
+  /// Get the required actor isolation for evaluating this default argument
+  /// synchronously. If the caller does not meet the required isolation, the
+  /// argument must be written explicitly at the call-site.
+  ActorIsolation getRequiredIsolation() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;
   }

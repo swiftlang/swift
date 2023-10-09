@@ -470,6 +470,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
           .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
+        // TODO: This doesn't correctly take into account destructuring
+        // pattern bindings on `let`s, for example `let (a, b) = foo()`. In
+        // cases like that, we ought to evaluate the initializer expression once
+        // and then do a pattern assignment to the variables in the pattern.
+        // That case is currently forbidden with an "unsupported" error message
+        // in Sema.
+        
         assert(field->getTypeInContext()->getReferenceStorageReferent()->isEqual(
                    field->getParentExecutableInitializer()->getType()) &&
                "Initialization of field with mismatched type!");
@@ -534,6 +541,13 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       ++elti;
     } else {
       // Otherwise, use its initializer.
+      // TODO: This doesn't correctly take into account destructuring
+      // pattern bindings on `let`s, for example `let (a, b) = foo()`. In
+      // cases like that, we ought to evaluate the initializer expression once
+      // and then do a pattern assignment to the variables in the pattern.
+      // That case is currently forbidden with an "unsupported" error message
+      // in Sema.
+
       assert(field->isParentExecutabledInitialized());
       Expr *init = field->getParentExecutableInitializer();
 
@@ -1527,6 +1541,27 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     auto init = field->getExecutableInit(i);
     if (!init)
       continue;
+
+    // Member initializer expressions are only used in a constructor with
+    // matching actor isolation. If the isolation prohibits the member
+    // initializer from being evaluated synchronously (or propagating required
+    // isolation through closure bodies), then the default value cannot be used
+    // and the member must be explicitly initialized in the constructor.
+    auto *var = field->getAnchoringVarDecl(i);
+    auto requiredIsolation = var->getInitializerIsolation();
+    auto contextIsolation = getActorIsolationOfContext(dc);
+    switch (requiredIsolation) {
+    // 'nonisolated' expressions can be evaluated from anywhere
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Nonisolated:
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+    case ActorIsolation::ActorInstance:
+      if (requiredIsolation != contextIsolation)
+        continue;
+    }
 
     auto *varPattern = field->getPattern(i);
 

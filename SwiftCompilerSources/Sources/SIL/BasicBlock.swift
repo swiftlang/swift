@@ -21,8 +21,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Eq
   public var parentFunction: Function { bridged.getFunction().function }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
   public var shortDescription: String { name }
 

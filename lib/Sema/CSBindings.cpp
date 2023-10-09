@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/CSBindings.h"
 #include "TypeChecker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -1249,6 +1250,21 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
   if (TypeVar->getImpl().isKeyPathType()) {
     auto objectTy = type->lookThroughAllOptionalTypes();
+
+    // If contextual type is an existential with a superclass
+    // constraint, let's try to infer a key path type from it.
+    if (kind == AllowedBindingKind::Subtypes) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        if (auto superclass = layout.explicitSuperclass) {
+          if (isKnownKeyPathType(superclass)) {
+            type = superclass;
+            objectTy = superclass;
+          }
+        }
+      }
+    }
+
     if (!(isKnownKeyPathType(objectTy) || objectTy->is<AnyFunctionType>()))
       return llvm::None;
   }

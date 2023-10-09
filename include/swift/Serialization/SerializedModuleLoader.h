@@ -17,6 +17,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/PrefixMapper.h"
 
 namespace swift {
 class ModuleFile;
@@ -247,6 +248,7 @@ public:
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
+                        llvm::TreePathPrefixMapper *mapper,
                         bool isTestableImport) override;
 };
 

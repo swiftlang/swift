@@ -882,6 +882,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   if (hadError)
     PBD->setInvalid();
   PBD->setInitializerChecked(patternNumber);
+  
   return hadError;
 }
 
@@ -901,8 +902,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     return true;
   };
 
-  auto target = SyntacticElementTarget::forForEachStmt(
-      stmt, dc, /*bindPatternVarsOneWay=*/false);
+  auto target = SyntacticElementTarget::forForEachStmt(stmt, dc);
   if (!typeCheckTarget(target))
     return failed();
 

@@ -13,31 +13,100 @@
 #ifndef SWIFT_BASIC_BASICBRIDGING_H
 #define SWIFT_BASIC_BASICBRIDGING_H
 
+#if !defined(COMPILED_WITH_SWIFT) || !defined(PURE_BRIDGING_MODE)
+#define USED_IN_CPP_SOURCE
+#endif
+
+// Do not add other C++/llvm/swift header files here!
+// Function implementations should be placed into BasicBridging.cpp and required header files should be added there.
+//
+#include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/Compiler.h"
+
+#include <stddef.h>
+#include <stdint.h>
+#ifdef USED_IN_CPP_SOURCE
 // Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
 // when including VirtualFileSystem.h
 #include <cassert>
 #include "llvm/CAS/CASReference.h"
 
-#include "swift/Basic/BridgedSwiftObject.h"
-#include "swift/Basic/Nullability.h"
-#include "swift/Basic/SourceLoc.h"
-#include <stddef.h>
+#include "llvm/ADT/StringRef.h"
+#include <string>
+#endif
+
+#ifdef PURE_BRIDGING_MODE
+// In PURE_BRIDGING_MODE, briding functions are not inlined
+#define BRIDGED_INLINE
+#else
+#define BRIDGED_INLINE inline
+#endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef intptr_t SwiftInt;
 typedef uintptr_t SwiftUInt;
 
-typedef struct {
+struct BridgedOStream {
+  void * _Nonnull streamAddr;
+};
+
+class BridgedStringRef {
+  const char * _Nonnull data;
+  size_t length;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedStringRef(llvm::StringRef sref) : data(sref.data()), length(sref.size()) {}
+
+  llvm::StringRef get() const { return llvm::StringRef(data, length); }
+#endif
+
+  BridgedStringRef(const char * _Nullable data, size_t length)
+    : data(data), length(length) {}
+
+  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
+    return (const uint8_t * _Nonnull)data;
+  }
+  SwiftInt size() const { return (SwiftInt)length; }
+  void write(BridgedOStream os) const;
+};
+
+class BridgedOwnedString {
+  char * _Nonnull data;
+  size_t length;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedOwnedString(const std::string &stringToCopy);
+#endif
+
+  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
+    return (const uint8_t * _Nonnull)(data ? data : "");
+  }
+  SwiftInt size() const { return (SwiftInt)length; }
+  void destroy() const;
+};
+
+class BridgedSourceLoc {
+  const void * _Nullable opaquePointer;
+public:
+  BridgedSourceLoc() : opaquePointer(nullptr) {}
+  BridgedSourceLoc(const void * _Nullable loc) : opaquePointer(loc) {}
+
+  bool isValid() const { return opaquePointer != nullptr; }
+  SWIFT_IMPORT_UNSAFE const uint8_t * _Nullable uint8Pointer() const {
+    return (const uint8_t * _Nullable)opaquePointer;
+  }
+  const char * _Nullable getLoc() const {
+    return (const char * _Nullable)opaquePointer;
+  }
+};
+
+struct BridgedArrayRef {
   const void * _Nullable data;
   size_t numElements;
-} BridgedArrayRef;
-
-typedef struct {
-  void * _Nonnull streamAddr;
-} BridgedOStream;
-
-void OStream_write(BridgedOStream os, llvm::StringRef str);
+};
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

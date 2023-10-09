@@ -76,6 +76,17 @@ public enum Ownership {
   /// statically available on some control flow paths.
   case none
   
+  public init(bridged: BridgedValue.Ownership) {
+    switch bridged {
+    case .Unowned:    self = .unowned
+    case .Owned:      self = .owned
+    case .Guaranteed: self = .guaranteed
+    case .None:       self = .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
+
   public var _bridged: BridgedValue.Ownership {
     switch self {
       case .unowned:    return BridgedValue.Ownership.Unowned
@@ -88,8 +99,7 @@ public enum Ownership {
 
 extension Value {
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var uses: UseList { UseList(bridged.getFirstUse()) }

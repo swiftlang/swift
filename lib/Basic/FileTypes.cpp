@@ -86,6 +86,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONFeatures:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
     return true;
   case file_types::TY_Image:
@@ -164,6 +165,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
@@ -220,6 +222,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_JSONFeatures:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
+  case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:

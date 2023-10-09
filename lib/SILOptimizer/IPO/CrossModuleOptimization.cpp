@@ -611,6 +611,30 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     decl->getAttrs().add(attr);
+
+    if (everything) {
+      // Serialize vtables, their superclass vtables, and make all vfunctions
+      // usable from inline.
+      if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+        auto *vTable = M.lookUpVTable(classDecl);
+        vTable->setSerialized(IsSerialized);
+        for (auto &entry : vTable->getEntries()) {
+          makeFunctionUsableFromInline(entry.getImplementation());
+        }
+
+        classDecl->walkSuperclasses([&](ClassDecl *superClassDecl) {
+          auto *vTable = M.lookUpVTable(superClassDecl);
+          if (!vTable) {
+            return TypeWalker::Action::Stop;
+          }
+          vTable->setSerialized(IsSerialized);
+          for (auto &entry : vTable->getEntries()) {
+            makeFunctionUsableFromInline(entry.getImplementation());
+          }
+          return TypeWalker::Action::Continue;
+        });
+      }
+    }
   }
   if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
     makeDeclUsableFromInline(nominalCtx);

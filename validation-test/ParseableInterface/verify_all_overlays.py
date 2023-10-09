@@ -50,6 +50,12 @@ for filename in os.listdir(sdk_overlay_dir):
     ]:
         continue
 
+    # Cxx and CxxStdlib are built without library evolution and don't have a
+    # .swiftinterface file
+    if module_name in ["Cxx", "CxxStdlib"]:
+        if not os.path.exists(interface_file):
+            continue
+
     # swift -build-module-from-parseable-interface
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")
     compiler_args = ["-o", output_path, "-module-name", module_name,

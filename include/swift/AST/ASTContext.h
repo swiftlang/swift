@@ -944,6 +944,10 @@ public:
   /// that fixes up the value witness table of @_rawLayout dependent types.
   AvailabilityContext getInitRawStructMetadataAvailability();
 
+  /// Get the runtime availability of being able to use symbolic references to
+  /// objective c protocols.
+  AvailabilityContext getObjCSymbolicReferencesAvailability();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();

@@ -215,6 +215,17 @@ void WordIterator::computePrevPosition() const {
   PrevPositionValid = true;
 }
 
+bool camel_case::Words::hasWordStartingAt(unsigned targetPosition) const {
+  // Iterate over the words until we see one at or past targetPosition.
+  // FIXME: Is there a faster way to do this by looking at the characters around
+  //        the position?
+  for (auto i = begin(); i != end() && i.getPosition() <= targetPosition; i++) {
+    if (i.getPosition() == targetPosition)
+      return true;
+  }
+  return false;
+}
+
 StringRef camel_case::getFirstWord(StringRef string) {
   if (string.empty())
     return "";
@@ -247,6 +258,30 @@ bool camel_case::startsWithIgnoreFirstCase(StringRef word1, StringRef word2) {
     return false;
 
   return word1.substr(1, word2.size() - 1) == word2.substr(1);
+}
+
+bool camel_case::hasWordSuffix(StringRef haystack, StringRef needle) {
+  // Is it even possible for one to be a suffix of the other?
+  if (needle.empty() || haystack.size() <= needle.size())
+    return false;
+
+  // Does haystack have a word boundary at the right position?
+  auto targetPosition = haystack.size() - needle.size();
+  if (!Words(haystack).hasWordStartingAt(targetPosition))
+    return false;
+
+  StringRef suffix = haystack.substr(targetPosition);
+
+  // Fast path: Without potentially copying the strings, do they match?
+  if (sameWordIgnoreFirstCase(suffix, needle))
+    return true;
+
+  // Flatten out leading initialisms. Do they match?
+  SmallString<32> suffixScratch, needleScratch;
+  auto suffixFlat = toLowercaseInitialisms(suffix, suffixScratch);
+  auto needleFlat = toLowercaseInitialisms(needle, needleScratch);
+
+  return suffixFlat == needleFlat;
 }
 
 StringRef camel_case::toLowercaseWord(StringRef string,

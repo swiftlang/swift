@@ -75,6 +75,11 @@ static void addSearchPathInvocationArguments(
     invocationArgStrs.push_back("-I");
     invocationArgStrs.push_back(path);
   }
+
+  for (const auto &arg : searchPathOpts.ScannerPrefixMapper) {
+    std::string prefixMapArg = "-fdepscan-prefix-map=" + arg;
+    invocationArgStrs.push_back(prefixMapArg);
+  }
 }
 
 /// Create the command line for Clang dependency scanning.
@@ -124,16 +129,22 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
 
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-     StringRef moduleOutputPath) {
+     StringRef moduleOutputPath, RemapPathCallback callback) {
   const auto &ctx = Impl.SwiftContext;
   ModuleDependencyVector result;
 
-  // This scanner invocation's already-captured APINotes version
-  std::vector<std::string> capturedPCMArgs = {
-    "-Xcc",
-    ("-fapinotes-swift-version=" +
-     ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())
+  auto remapPath = [&](StringRef path) {
+    if (callback)
+      return callback(path);
+    return path.str();
   };
+
+  // This scanner invocation's already-captured APINotes version
+  std::vector<std::string>
+      capturedPCMArgs = {
+          "-Xcc",
+          ("-fapinotes-swift-version=" +
+           ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())};
 
   for (const auto &clangModuleDep : clangDependencies) {
     // File dependencies for this module.
@@ -170,13 +181,13 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     swiftArgs.push_back("-direct-clang-cc1-module-build");
 
     // Swift frontend option for input file path (Foo.modulemap).
-    swiftArgs.push_back(clangModuleDep.ClangModuleMapFile);
+    swiftArgs.push_back(remapPath(clangModuleDep.ClangModuleMapFile));
 
     // Handle VFSOverlay.
     if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
       for (auto &overlay : ctx.SearchPathOpts.VFSOverlayFiles) {
         swiftArgs.push_back("-vfsoverlay");
-        swiftArgs.push_back(overlay);
+        swiftArgs.push_back(remapPath(overlay));
       }
     }
 
@@ -202,6 +213,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     // Clear the cache key for module. The module key is computed from clang
     // invocation, not swift invocation.
     depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
+    depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
 
     // FIXME: workaround for rdar://105684525: find the -ivfsoverlay option
     // from clang scanner and pass to swift.
@@ -327,6 +339,7 @@ void ClangImporter::recordBridgingHeaderOptions(
   depsInvocation.getFrontendOpts().ProgramAction =
       clang::frontend::ActionKind::GeneratePCH;
   depsInvocation.getFrontendOpts().ModuleCacheKeys.clear();
+  depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
   depsInvocation.getFrontendOpts().OutputFile = "";
 
   llvm::BumpPtrAllocator allocator;
@@ -400,6 +413,7 @@ ClangImporter::getModuleDependencies(StringRef moduleName,
                                      const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                      InterfaceSubContextDelegate &delegate,
+                                     llvm::TreePathPrefixMapper *mapper,
                                      bool isTestableImport) {
   auto &ctx = Impl.SwiftContext;
   // Determine the command-line arguments for dependency scanning.
@@ -435,7 +449,12 @@ ClangImporter::getModuleDependencies(StringRef moduleName,
     return {};
   }
 
-  return bridgeClangModuleDependencies(*clangModuleDependencies, moduleOutputPath);
+  return bridgeClangModuleDependencies(*clangModuleDependencies,
+                                       moduleOutputPath, [&](StringRef path) {
+                                         if (mapper)
+                                           return mapper->mapToString(path);
+                                         return path.str();
+                                       });
 }
 
 bool ClangImporter::addBridgingHeaderDependencies(
@@ -494,8 +513,11 @@ bool ClangImporter::addBridgingHeaderDependencies(
   }
 
   // Record module dependencies for each new module we found.
-  auto bridgedDeps = bridgeClangModuleDependencies(clangModuleDependencies->ModuleGraph,
-                                                   cache.getModuleOutputPath());
+  auto bridgedDeps = bridgeClangModuleDependencies(
+      clangModuleDependencies->ModuleGraph, cache.getModuleOutputPath(),
+      [&cache](StringRef path) {
+        return cache.getScanService().remapPath(path);
+      });
   cache.recordDependencies(bridgedDeps);
 
   // Record dependencies for the source files the bridging header includes.

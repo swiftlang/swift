@@ -671,6 +671,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     SwiftTaskOptionRecordTy,    // Base option record
     SwiftTaskGroupPtrTy,        // Task group
   });
+  SwiftResultTypeInfoTaskOptionRecordTy = createStructType(
+      *this, "swift.result_type_info_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SizeTy,
+    SizeTy,
+    Int8PtrTy,
+    Int8PtrTy,
+    Int8PtrTy,
+  });
   ExecutorFirstTy = SizeTy;
   ExecutorSecondTy = SizeTy;
   SwiftExecutorTy = createStructType(*this, "swift.executor", {
@@ -1466,21 +1475,30 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
 
   if (Context.LangOpts.hasFeature(Feature::Embedded))
     return;
-  
-  switch (linkLib.getKind()) {
-  case LibraryKind::Library: {
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
-  case LibraryKind::Framework: {
-    // If we're supposed to disable autolinking of this framework, bail out.
-    auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
-    if (std::find(frameworks.begin(), frameworks.end(), linkLib.getName())
-          != frameworks.end())
-      return;
-    AutolinkEntries.emplace_back(linkLib);
-    break;
-  }
+
+  // '-disable-autolinking' means we will not auto-link
+  // any loaded library at all.
+  if (!IRGen.Opts.DisableAllAutolinking) {
+    switch (linkLib.getKind()) {
+    case LibraryKind::Library: {
+      auto &libraries = IRGen.Opts.DisableAutolinkLibraries;
+      if (llvm::find(libraries, linkLib.getName()) != libraries.end())
+	return;
+      AutolinkEntries.emplace_back(linkLib);
+      break;
+    }
+    case LibraryKind::Framework: {
+      // 'disable-autolink-frameworks' means we will not auto-link
+      // any loaded framework.
+      if (!IRGen.Opts.DisableFrameworkAutolinking) {
+	auto &frameworks = IRGen.Opts.DisableAutolinkFrameworks;
+	if (llvm::find(frameworks, linkLib.getName()) != frameworks.end())
+	  return;
+	AutolinkEntries.emplace_back(linkLib);
+      }
+      break;
+    }
+    }
   }
 
   if (linkLib.shouldForceLoad()) {
@@ -1933,6 +1951,16 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
          deploymentAvailability.isContainedIn(
              context.getPrespecializedGenericMetadataAvailability()) &&
          canPrespecializeTarget;
+}
+
+bool IRGenModule::canUseObjCSymbolicReferences() {
+  if (!IRGen.Opts.EnableObjectiveCProtocolSymbolicReferences)
+    return false;
+  auto &context = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return deploymentAvailability.isContainedIn(
+      context.getObjCSymbolicReferencesAvailability());
 }
 
 bool IRGenModule::canMakeStaticObjectsReadOnly() {

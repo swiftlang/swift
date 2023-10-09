@@ -387,6 +387,47 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreakReordered2Custom) {
   NSPrefixWordBreakReordered2DeprecatedGoodCase __attribute__((deprecated)),
 };
 
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakForgotToDeprecate) {
+  NSPrefixWordBreakNewName1,
+  NSPrefixWordBreakNewName2,
+  NSOldName1PrefixWordBreak = NSPrefixWordBreakNewName1, // should have been deprecated
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakInvalidWord) {
+  NSPrefixWordBreakFoo,
+  NSPrefixWordBreakBar,
+  NSPrefixWordBreak42,  // expected prefix would have left an invalid identifier
+};
+
+// Check tiebreaking rules. In each case, the diagnostic should choose the 'Better' case over the 'Worse' case.
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakSuffixTieBreakers) {
+  // Available preferred over unavailable.
+  NSPrefixWordBreakBetterForTest1,
+  NSPrefixWordBreakWorseForTest1 __attribute__((unavailable)),
+
+  // Un-deprecated preferred over deprecated.
+  NSPrefixWordBreakBetterForTest2,
+  NSPrefixWordBreakWorseForTest2 __attribute__((deprecated)),
+
+  // Shorter preferred over longer (it's a closer match).
+  NSPrefixWordBreakBetterForTest3,
+  NSPrefixWordBreakWorseXXXForTest3,
+
+  // Alphabetically first preferred over second (arbitrary tiebreaker).
+  NSPrefixWordBreakBetterForTest4,
+  NSPrefixWordBreakWorseXForTest4,
+
+  // Make sure we're not choosing based on ordering.
+  NSPrefixWordBreakWorseXForTest5,
+  NSPrefixWordBreakBetterForTest5,
+};
+
+typedef NS_OPTIONS(NSInteger, NSPrefixWordBreakOptions) {
+  NSPrefixWordBreakNewOption1 = 0x1,
+  NSPrefixWordBreakNewOption2 = 0x2,
+  NSOldOption1PrefixWordBreak = NSPrefixWordBreakNewOption1, // should have been deprecated
+};
+
 typedef NS_ENUM(NSInteger, NSSwiftNameAllTheThings) {
   NSSwiftNameAllTheThingsA __attribute__((swift_name("Foo"))),
   NSSwiftNameAllTheThingsB __attribute__((swift_name("Bar"))),

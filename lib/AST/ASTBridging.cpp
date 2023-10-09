@@ -25,30 +25,53 @@ DiagnosticEngine *getDiagnosticEngine(const BridgedDiagnosticEngine &bridged) {
 
 } // namespace
 
+static_assert(sizeof(BridgedDiagnosticArgument) >= sizeof(DiagnosticArgument),
+              "BridgedDiagnosticArgument has wrong size");
+
+BridgedDiagnosticArgument::BridgedDiagnosticArgument(SwiftInt i)
+  : BridgedDiagnosticArgument(DiagnosticArgument((int)i)) {}
+
+BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
+  : BridgedDiagnosticArgument(DiagnosticArgument(s.get())) {}
+
+static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
+              "BridgedDiagnosticArgument has wrong size");
+
+static SourceLoc getSourceLoc(BridgedSourceLoc bridgedLoc) {
+  return SourceLoc(llvm::SMLoc::getFromPointer(bridgedLoc.getLoc()));
+}
+
+BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text)
+  : BridgedDiagnosticFixIt(DiagnosticInfo::FixIt(
+      CharSourceRange(getSourceLoc(start), length),
+      text.get(),
+      llvm::ArrayRef<DiagnosticArgument>())) {}
+
 void DiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, SourceLoc loc,
+    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
     BridgedDiagID bridgedDiagID,
-    BridgedArrayRef /*DiagnosticArgument*/ bridgedArguments,
-    CharSourceRange highlight,
-    BridgedArrayRef /*DiagnosticInfo::FixIt*/ bridgedFixIts) {
+    BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
+    BridgedSourceLoc highlightStart, uint32_t hightlightLength,
+    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
   auto *D = getDiagnosticEngine(bridgedEngine);
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
-  for (auto arg : getArrayRef<DiagnosticArgument>(bridgedArguments)) {
-    arguments.push_back(arg);
+  for (auto arg : getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
+    arguments.push_back(arg.get());
   }
-  auto inflight = D->diagnose(loc, diagID, arguments);
+  auto inflight = D->diagnose(SourceLoc(llvm::SMLoc::getFromPointer(loc.getLoc())), diagID, arguments);
 
   // Add highlight.
-  if (highlight.isValid()) {
+  if (highlightStart.isValid()) {
+    CharSourceRange highlight(getSourceLoc(highlightStart), (unsigned)hightlightLength);
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }
 
   // Add fix-its.
-  for (auto fixIt : getArrayRef<DiagnosticInfo::FixIt>(bridgedFixIts)) {
-    auto range = fixIt.getRange();
-    auto text = fixIt.getText();
+  for (const BridgedDiagnosticFixIt &fixIt : getArrayRef<BridgedDiagnosticFixIt>(bridgedFixIts)) {
+    auto range = fixIt.get().getRange();
+    auto text = fixIt.get().getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
 }

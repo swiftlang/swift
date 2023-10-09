@@ -1069,6 +1069,8 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
+    (void)param->getInitializerIsolation();
+
     if (!ifacety->hasPlaceholder()) {
       continue;
     }
@@ -1149,8 +1151,6 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   // Walk the checked initializer and contextualize any closures
   // we saw there.
   TypeChecker::contextualizeInitializer(dc, initExpr);
-
-  checkInitializerActorIsolation(dc, initExpr);
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
@@ -2466,7 +2466,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             TypeChecker::contextualizeInitializer(initContext, init);
-            checkInitializerActorIsolation(initContext, init);
+            (void)PBD->getInitializerIsolation(i);
             TypeChecker::checkInitializerEffects(initContext, init);
           }
         }
@@ -2675,10 +2675,15 @@ public:
         return;
       }
 
-      // We don't support protocols outside the top level of a file.
-      if (isa<ProtocolDecl>(NTD) &&
-          !DC->isModuleScopeContext()) {
-        NTD->diagnose(diag::unsupported_nested_protocol, NTD);
+      // We don't support protocols nested in generic contexts.
+      // This includes protocols nested in other protocols.
+      if (isa<ProtocolDecl>(NTD) && DC->isGenericContext()) {
+        if (auto *OuterPD = DC->getSelfProtocolDecl())
+          NTD->diagnose(diag::unsupported_nested_protocol_in_protocol, NTD,
+                        OuterPD);
+        else
+          NTD->diagnose(diag::unsupported_nested_protocol_in_generic, NTD);
+
         NTD->setInvalid();
         return;
       }
@@ -2691,6 +2696,7 @@ public:
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
         }
+        NTD->setInvalid();
       }
     }
 
@@ -2704,6 +2710,7 @@ public:
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_closure, NTD);
         }
+        NTD->setInvalid();
       }
     }
   }

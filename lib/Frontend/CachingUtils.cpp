@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
+#include "swift/Option/Options.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
@@ -24,6 +25,8 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CAS/TreeEntry.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Option/OptTable.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -421,6 +424,38 @@ createCASFileSystem(ObjectStore &CAS, ArrayRef<std::string> FSRoots,
   }
 
   return CASFS;
+}
+
+std::vector<std::string> remapPathsFromCommandLine(
+    ArrayRef<std::string> commandLine,
+    llvm::function_ref<std::string(StringRef)> RemapCallback) {
+  // parse and remap options that is path and not cache invariant.
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  std::vector<const char *> Args;
+  std::for_each(commandLine.begin(), commandLine.end(),
+                [&](const std::string &arg) { Args.push_back(arg.c_str()); });
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+  llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
+      Args, MissingIndex, MissingCount, options::FrontendOption);
+  SmallVector<const char *, 16> newArgs;
+  std::vector<std::string> newCommandLine;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  for (auto *Arg : ParsedArgs) {
+    Arg->render(ParsedArgs, newArgs);
+    const auto &Opt = Arg->getOption();
+    if (Opt.matches(options::OPT_INPUT) ||
+        (!Opt.hasFlag(options::CacheInvariant) &&
+         Opt.hasFlag(options::ArgumentIsPath))) {
+      StringRef newPath = Saver.save(RemapCallback(Arg->getValue()));
+      newArgs.back() = newPath.data();
+    }
+  }
+  std::for_each(newArgs.begin(), newArgs.end(),
+                [&](const char *arg) { newCommandLine.emplace_back(arg); });
+
+  return newCommandLine;
 }
 
 } // namespace swift

@@ -148,6 +148,9 @@ public:
   /// CacheKey for input file.
   std::string InputFileKey;
 
+  /// CacheReplay PrefixMap.
+  std::vector<std::string> CacheReplayPrefixMap;
+
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.
   unsigned BadFileDescriptorRetryCount = 0;
@@ -566,6 +569,7 @@ private:
   static bool canActionEmitModuleSummary(ActionType);
   static bool canActionEmitInterface(ActionType);
   static bool canActionEmitABIDescriptor(ActionType);
+  static bool canActionEmitAPIDescriptor(ActionType);
   static bool canActionEmitConstValues(ActionType);
   static bool canActionEmitModuleSemanticInfo(ActionType);
 

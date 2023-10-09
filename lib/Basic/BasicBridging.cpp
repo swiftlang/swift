@@ -16,10 +16,27 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                            Bridging C functions
+//                                BridgedStringRef
 //===----------------------------------------------------------------------===//
 
-void OStream_write(BridgedOStream os, StringRef str) {
-  static_cast<raw_ostream *>(os.streamAddr)
-      ->write(str.data(), str.size());
+void BridgedStringRef::write(BridgedOStream os) const {
+  static_cast<raw_ostream *>(os.streamAddr)->write(data, length);
 }
+
+//===----------------------------------------------------------------------===//
+//                                BridgedOwnedString
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString::BridgedOwnedString(const std::string &stringToCopy)
+  : data(nullptr), length(stringToCopy.size()) {
+  if (length != 0) {
+    data = new char[length];
+    std::memcpy(data, stringToCopy.data(), length);
+  }
+}
+
+void BridgedOwnedString::destroy() const {
+  if (data)
+    delete [] data;
+}
+

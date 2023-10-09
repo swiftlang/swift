@@ -345,7 +345,7 @@ extension _SmallString {
 extension _SmallString {
   // Resiliently create from a tagged cocoa string
   //
-  @_effects(readonly) @_effects(releasenone) // @opaque
+  @_effects(readonly) // @opaque
   @usableFromInline // testable
   internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
@@ -367,7 +367,7 @@ extension _SmallString {
     self._invariantCheck()
   }
   
-  @_effects(readonly) @_effects(releasenone) // @opaque
+  @_effects(readonly) // @opaque
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
     var success = true

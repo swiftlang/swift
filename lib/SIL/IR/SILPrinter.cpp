@@ -853,8 +853,11 @@ public:
   }
 
 #ifndef NDEBUG
-  void printID(const SILBasicBlock *BB) {
-    *this << Ctx.getID(BB) << "\n";
+  void printID(const SILBasicBlock *BB, bool newline) {
+    *this << Ctx.getID(BB);
+    if (newline) {
+      *this << "\n";
+    }
   }
 #endif
 
@@ -2734,7 +2737,6 @@ public:
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {
     printSelectEnumInst(SEI);
-    printForwardingOwnershipKind(SEI, SEI->getOperand());
   }
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     printSelectEnumInst(SEI);
@@ -3115,17 +3117,17 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
 }
 
 #ifndef NDEBUG
-void SILBasicBlock::dumpID() const {
-  printID(llvm::errs());
+void SILBasicBlock::dumpID(bool newline) const {
+  printID(llvm::errs(), newline);
 }
 
-void SILBasicBlock::printID(llvm::raw_ostream &OS) const {
+void SILBasicBlock::printID(llvm::raw_ostream &OS, bool newline) const {
   SILPrintContext Ctx(OS);
-  printID(Ctx);
+  printID(Ctx, newline);
 }
 
-void SILBasicBlock::printID(SILPrintContext &Ctx) const {
-  SILPrinter(Ctx).printID(this);
+void SILBasicBlock::printID(SILPrintContext &Ctx, bool newline) const {
+  SILPrinter(Ctx).printID(this, newline);
 }
 #endif
 

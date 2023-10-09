@@ -1392,6 +1392,22 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
+static uint8_t 
+getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
+  switch (kind) {
+#define CASE(X) \
+  case swift::ActorIsolation::X: \
+    return static_cast<uint8_t>(serialization::ActorIsolation::X);
+  CASE(Unspecified)
+  CASE(ActorInstance)
+  CASE(Nonisolated)
+  CASE(GlobalActor)
+  CASE(GlobalActorUnsafe)
+#undef CASE
+  }
+  llvm_unreachable("bad actor isolation");
+}
+
 static uint8_t
 getRawStableMetatypeRepresentation(const AnyMetatypeType *metatype) {
   if (!metatype->hasRepresentation()) {
@@ -4304,6 +4320,11 @@ public:
       defaultExprType = param->getTypeOfDefaultExpr();
     }
 
+    auto isolation = param->getInitializerIsolation();
+    Type globalActorType;
+    if (isolation.isGlobalActor())
+      globalActorType = isolation.getGlobalActor();
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addDeclBaseNameRef(param->getArgumentName()),
@@ -4318,6 +4339,8 @@ public:
         param->isCompileTimeConst(),
         getRawStableDefaultArgumentKind(argKind),
         S.addTypeRef(defaultExprType),
+        getRawStableActorIsolationKind(isolation.getKind()),
+        S.addTypeRef(globalActorType),
         defaultArgumentText);
 
     if (interfaceType->hasError() && !S.allowCompilerErrors()) {

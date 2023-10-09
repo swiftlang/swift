@@ -1008,6 +1008,17 @@ void DestroyAddrHoisting::run() {
   // blocks and pushing begin_access as we see them and then popping them off
   // the end will result in hoisting inner begin_access' destroy_addrs first.
   for (auto *bai : llvm::reverse(bais)) {
+    // [exclusive_modify_scope_hoisting] Hoisting within modify access scopes
+    // doesn't respect deinit barriers because
+    //
+    //   Mutable variable lifetimes that are formally modified in the middle of
+    //   a lexical scope are anchored to the beginning of the lexical scope
+    //   rather than to the end.
+    //
+    // TODO: If the performance issues associated with failing to hoist
+    //       destroys within an exclusive modify scope are otherwise addressed,
+    //       it may be less confusing not to make use of the above rule and
+    //       respect deinit barriers here also ( rdar://116335154 ).
     changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
                              remainingDestroyAddrs, deleter, calleeAnalysis);
   }
@@ -1028,6 +1039,10 @@ void DestroyAddrHoisting::run() {
       //
       // but communicates the rationale: in order to ignore deinit barriers, the
       // address must be exclusively accessed and be a modification.
+      //
+      // The situation with inout parameters is analogous to that with
+      // mutable exclusive access scopes [exclusive_modify_scope_hoisting], so
+      // deinit barriers are not respected.
       bool ignoredByConvention = convention.isInoutConvention() &&
                                  convention.isExclusiveIndirectParameter();
       auto lifetime = arg->getLifetime();

@@ -36,6 +36,7 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <string>
 #include <unordered_map>
@@ -790,16 +791,18 @@ using ModuleDependenciesKindRefMap =
 /// Track swift dependency
 class SwiftDependencyTracker {
 public:
-  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS)
-      : FS(FS.createProxyFS()) {}
+  SwiftDependencyTracker(llvm::cas::CachingOnDiskFileSystem &FS,
+                         llvm::TreePathPrefixMapper *Mapper)
+      : FS(FS.createProxyFS()), Mapper(Mapper) {}
 
   void startTracking();
-  void addCommonSearchPathDeps(const SearchPathOptions& Opts);
+  void addCommonSearchPathDeps(const SearchPathOptions &Opts);
   void trackFile(const Twine &path) { (void)FS->status(path); }
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
 
 private:
   llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> FS;
+  llvm::TreePathPrefixMapper *Mapper;
 };
 
 // MARK: SwiftDependencyScanningService
@@ -839,6 +842,9 @@ class SwiftDependencyScanningService {
 
   /// The common dependencies that is needed for every swift compiler instance.
   std::vector<std::string> CommonDependencyFiles;
+
+  /// File prefix mapper.
+  std::unique_ptr<llvm::TreePathPrefixMapper> Mapper;
 
   /// The global file system cache.
   llvm::Optional<
@@ -894,11 +900,11 @@ public:
     return *CacheFS;
   }
 
-  llvm::Optional<SwiftDependencyTracker> createSwiftDependencyTracker() const {
+  llvm::Optional<SwiftDependencyTracker> createSwiftDependencyTracker() {
     if (!CacheFS)
       return llvm::None;
 
-    return SwiftDependencyTracker(*CacheFS);
+    return SwiftDependencyTracker(*CacheFS, Mapper.get());
   }
 
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getClangScanningFS() const {
@@ -910,6 +916,16 @@ public:
           CAS, llvm::vfs::createPhysicalFileSystem());
 
     return llvm::vfs::createPhysicalFileSystem();
+  }
+
+  bool hasPathMapping() const {
+    return Mapper && !Mapper->getMappings().empty();
+  }
+  llvm::TreePathPrefixMapper *getPrefixMapper() const { return Mapper.get(); }
+  std::string remapPath(StringRef Path) const {
+    if (!Mapper)
+      return Path.str();
+    return Mapper->mapToString(Path);
   }
 
   /// Wrap the filesystem on the specified `CompilerInstance` with a

@@ -81,7 +81,8 @@ void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
     }
   }
 #endif
-  recorder.addSymbol(name, kind, source);
+  recorder.addSymbol(name, kind, source,
+                     DeclStack.empty() ? nullptr : DeclStack.back());
 }
 
 static std::vector<OriginallyDefinedInAttr::ActiveVersion>
@@ -613,9 +614,8 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
     targets.push_back(targetVar);
   }
 
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
-    file.addSymbol(kind, symbol, targets);
-  };
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) { file.addSymbol(kind, symbol, targets); };
   SimpleAPIRecorder recorder(addSymbol);
   TBDGenVisitor visitor(desc, recorder);
   visitor.visit(desc);
@@ -626,7 +626,8 @@ std::vector<std::string>
 PublicSymbolsRequest::evaluate(Evaluator &evaluator,
                                TBDGenDescriptor desc) const {
   std::vector<std::string> symbols;
-  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [&](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     if (kind == SymbolKind::GlobalSymbol)
       symbols.push_back(symbol.str());
     // TextAPI ObjC Class Kinds represents two symbols.
@@ -655,41 +656,38 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
 }
 
 class APIGenRecorder final : public APIRecorder {
-  bool isSPI(const ValueDecl* VD) {
-    assert(VD);
-    return VD->isSPI() || VD->isAvailableAsSPI();
+  static bool isSPI(const Decl *decl) {
+    assert(decl);
+    return decl->isSPI() || decl->isAvailableAsSPI();
   }
+
 public:
   APIGenRecorder(apigen::API &api, ModuleDecl *module)
       : api(api), module(module) {
-    const auto &MainFile = module->getMainFile(FileUnitKind::SerializedAST);
-    moduleLoc = apigen::APILoc(MainFile.getModuleDefiningPath().str(), 0, 0);
+    // If we're working with a serialized module, make the default location
+    // for symbols the path to the binary module.
+    if (FileUnit *MainFile = module->getFiles().front()) {
+      if (MainFile->getKind() == FileUnitKind::SerializedAST)
+        defaultLoc =
+            apigen::APILoc(MainFile->getModuleDefiningPath().str(), 0, 0);
+    }
   }
   ~APIGenRecorder() {}
 
-  void addSymbol(StringRef symbol, SymbolKind kind,
-                 SymbolSource source) override {
+  void addSymbol(StringRef symbol, SymbolKind kind, SymbolSource source,
+                 Decl *decl) override {
     if (kind != SymbolKind::GlobalSymbol)
       return;
 
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
-    if (source.kind == SymbolSource::Kind::SIL) {
-      auto ref = source.getSILDeclRef();
-      if (ref.hasDecl()) {
-        availability = getAvailability(ref.getDecl());
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
-    } else if (source.kind == SymbolSource::Kind::IR) {
-      auto ref = source.getIRLinkEntity();
-      if (ref.hasDecl()) {
-        if (isSPI(ref.getDecl()))
-          access = apigen::APIAccess::Private;
-      }
+    if (decl) {
+      availability = getAvailability(decl);
+      if (isSPI(decl))
+        access = apigen::APIAccess::Private;
     }
 
-    api.addSymbol(symbol, moduleLoc, apigen::APILinkage::Exported,
+    api.addSymbol(symbol, getAPILocForDecl(decl), apigen::APILinkage::Exported,
                   apigen::APIFlags::None, access, availability);
   }
 
@@ -707,12 +705,12 @@ public:
     apigen::APIAvailability availability;
     bool isInstanceMethod = true;
     auto access = apigen::APIAccess::Public;
-    if (method.hasDecl()) {
-      availability = getAvailability(method.getDecl());
-      if (method.getDecl()->getDescriptiveKind() ==
-          DescriptiveDeclKind::ClassMethod)
+    auto decl = method.hasDecl() ? method.getDecl() : nullptr;
+    if (decl) {
+      availability = getAvailability(decl);
+      if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
-      if (method.getDecl()->isSPI())
+      if (isSPI(decl))
         access = apigen::APIAccess::Private;
     }
 
@@ -723,11 +721,27 @@ public:
       record = addOrGetObjCCategory(ext);
 
     if (record)
-      api.addObjCMethod(record, name, moduleLoc, access, isInstanceMethod,
-                        false, availability);
+      api.addObjCMethod(record, name, getAPILocForDecl(decl), access,
+                        isInstanceMethod, false, availability);
   }
 
 private:
+  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+    if (!decl)
+      return defaultLoc;
+
+    SourceLoc loc = decl->getLoc();
+    if (!loc.isValid())
+      return defaultLoc;
+
+    auto &SM = decl->getASTContext().SourceMgr;
+    unsigned line, col;
+    std::tie(line, col) = SM.getPresumedLineAndColumnForLoc(loc);
+    auto displayName = SM.getDisplayNameForLoc(loc);
+
+    return apigen::APILoc(std::string(displayName), line, col);
+  }
+
   /// Follow the naming schema that IRGen uses for Categories (see
   /// ClassDataBuilder).
   using CategoryNameKey = std::pair<const ClassDecl *, const ModuleDecl *>;
@@ -778,13 +792,13 @@ private:
       superCls = super->getObjCRuntimeName(buffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getFormalAccess() == AccessLevel::Public && decl->isObjC()
             ? apigen::APILinkage::Exported
             : apigen::APILinkage::Internal;
-    auto cls = api.addObjCClass(name, linkage, moduleLoc, access, availability,
-                                superCls);
+    auto cls = api.addObjCClass(name, linkage, getAPILocForDecl(decl), access,
+                                availability, superCls);
     classMap.try_emplace(decl, cls);
     return cls;
   }
@@ -811,20 +825,21 @@ private:
     buildCategoryName(decl, cls, nameBuffer);
     apigen::APIAvailability availability = getAvailability(decl);
     apigen::APIAccess access =
-        decl->isSPI() ? apigen::APIAccess::Private : apigen::APIAccess::Public;
+        isSPI(decl) ? apigen::APIAccess::Private : apigen::APIAccess::Public;
     apigen::APILinkage linkage =
         decl->getMaxAccessLevel() == AccessLevel::Public
             ? apigen::APILinkage::Exported
             : apigen::APILinkage::Internal;
-    auto category = api.addObjCCategory(nameBuffer, linkage, moduleLoc, access,
-                                        availability, interface);
+    auto category =
+        api.addObjCCategory(nameBuffer, linkage, getAPILocForDecl(decl), access,
+                            availability, interface);
     categoryMap.try_emplace(decl, category);
     return category;
   }
 
   apigen::API &api;
   ModuleDecl *module;
-  apigen::APILoc moduleLoc;
+  apigen::APILoc defaultLoc;
 
   llvm::DenseMap<const ClassDecl*, apigen::ObjCInterfaceRecord*> classMap;
   llvm::DenseMap<const ExtensionDecl *, apigen::ObjCCategoryRecord *>
@@ -863,7 +878,8 @@ SymbolSourceMapRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = desc.getParentModule()->getASTContext();
   auto *SymbolSources = Ctx.Allocate<SymbolSourceMap>();
 
-  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source) {
+  auto addSymbol = [=](StringRef symbol, SymbolKind kind, SymbolSource source,
+                       Decl *decl) {
     SymbolSources->insert({symbol, source});
   };
 

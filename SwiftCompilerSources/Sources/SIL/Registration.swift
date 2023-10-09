@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 private func register<T: AnyObject>(_ cl: T.Type) {
-  String(describing: cl)._withStringRef { nameStr in
+  String(describing: cl)._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
     registerBridgedClass(nameStr, metatype)
   }
@@ -85,6 +85,9 @@ public func registerSILClasses() {
   register(UncheckedTrivialBitCastInst.self)
   register(MarkUnresolvedNonCopyableValueInst.self)
   register(ObjectInst.self)
+  register(TuplePackExtractInst.self)
+  register(DifferentiableFunctionInst.self)
+  register(LinearFunctionInst.self)
   register(RawPointerToRefInst.self)
   register(AddressToPointerInst.self)
   register(PointerToAddressInst.self)
@@ -121,6 +124,7 @@ public func registerSILClasses() {
   register(UncheckedEnumDataInst.self)
   register(InitEnumDataAddrInst.self)
   register(UncheckedTakeEnumDataAddrInst.self)
+  register(SelectEnumInst.self)
   register(RefElementAddrInst.self)
   register(RefTailAddrInst.self)
   register(KeyPathInst.self)

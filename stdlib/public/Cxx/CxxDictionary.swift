@@ -25,9 +25,10 @@ public protocol CxxDictionary<Key, Value> {
   associatedtype Size: BinaryInteger
   associatedtype InsertionResult
 
+  init()
+
   /// Do not implement this function manually in Swift.
   func __findUnsafe(_ key: Key) -> RawIterator
-
   /// Do not implement this function manually in Swift.
   mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator
 
@@ -38,6 +39,9 @@ public protocol CxxDictionary<Key, Value> {
   /// Do not implement this function manually in Swift.
   @discardableResult
   mutating func erase(_ key: Key) -> Size
+
+  /// Do not implement this function manually in Swift.
+  func __beginUnsafe() -> RawIterator
 
   /// Do not implement this function manually in Swift.
   func __endUnsafe() -> RawIterator
@@ -71,5 +75,23 @@ extension CxxDictionary {
         self.__insertUnsafe(keyValuePair)
       }
     }
+  }
+  
+  public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
+    var filteredDictionary = Self.init()
+    var iterator = __beginUnsafe()
+    let endIterator = __endUnsafe()
+
+    while iterator != endIterator {
+      let pair = iterator.pointee
+
+      if try isIncluded(pair.first, pair.second) {
+        filteredDictionary.__insertUnsafe(pair)
+      }
+
+      iterator = iterator.successor()
+    }
+
+    return filteredDictionary
   }
 }

@@ -270,6 +270,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CASFSRootIDs = Args.getAllArgValues(OPT_cas_fs);
   Opts.ClangIncludeTrees = Args.getAllArgValues(OPT_clang_include_tree_root);
   Opts.InputFileKey = Args.getLastArgValue(OPT_input_file_key);
+  Opts.CacheReplayPrefixMap = Args.getAllArgValues(OPT_cache_replay_prefix_map);
 
   if (Opts.EnableCaching && Opts.CASFSRootIDs.empty() &&
       Opts.ClangIncludeTrees.empty() &&
@@ -762,6 +763,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitABIDescriptor(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasABIDescriptorOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_abi_descriptor);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitAPIDescriptor(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasAPIDescriptorOutputPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_api_descriptor);
     return true;
   }
   if (!FrontendOptions::canActionEmitConstValues(Opts.RequestedAction) &&

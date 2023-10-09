@@ -40,7 +40,7 @@ void JSON_value_serialize(void *value, BridgedData *out) {
 
   auto outPtr = malloc(result.size());
   memcpy(outPtr, result.data(), result.size());
-  *out = BridgedData{(const char *)outPtr, (unsigned long)result.size()};
+  *out = BridgedData{(const char *)outPtr, (size_t)result.size()};
 }
 
 void JSON_value_delete(void *value) {
@@ -70,7 +70,7 @@ _Bool JSON_value_getAsDouble(void *value, double *result) {
   return true;
 }
 
-_Bool JSON_value_getAsInteger(void *value, long long *result) {
+_Bool JSON_value_getAsInteger(void *value, int64_t *result) {
   if (auto val = static_cast<llvm::json::Value *>(value)->getAsInteger()) {
     *result = *val;
     return false;
@@ -80,7 +80,7 @@ _Bool JSON_value_getAsInteger(void *value, long long *result) {
 
 _Bool JSON_value_getAsString(void *value, BridgedData *result) {
   if (auto val = static_cast<llvm::json::Value *>(value)->getAsString()) {
-    *result = {val->data(), (unsigned long)val->size()};
+    *result = {val->data(), val->size()};
     return false;
   }
   return true;
@@ -101,18 +101,18 @@ _Bool JSON_value_getAsArray(void *value, void **result) {
   return true;
 }
 
-unsigned long JSON_object_getSize(void *objectPtr) {
+size_t JSON_object_getSize(void *objectPtr) {
   llvm::json::Object *object = static_cast<llvm::json::Object *>(objectPtr);
   return object->size();
 }
 
-BridgedData JSON_object_getKey(void *objectPtr, unsigned long i) {
+BridgedData JSON_object_getKey(void *objectPtr, size_t i) {
   llvm::json::Object *object = static_cast<llvm::json::Object *>(objectPtr);
   std::map<int, float> map;
   auto iter = object->begin();
   std::advance(iter, i);
   auto str = llvm::StringRef(iter->first);
-  return {str.data(), (unsigned long)str.size()};
+  return {str.data(), str.size()};
 }
 
 _Bool JSON_object_hasKey(void *objectPtr, const char *key) {
@@ -124,11 +124,11 @@ void *JSON_object_getValue(void *objectPtr, const char *key) {
   return object->get(key);
 }
 
-long long JSON_array_getSize(void *objectPtr) {
+size_t JSON_array_getSize(void *objectPtr) {
   llvm::json::Array *array = static_cast<llvm::json::Array *>(objectPtr);
   return array->size();
 }
-void *JSON_array_getValue(void *objectPtr, long long index) {
+void *JSON_array_getValue(void *objectPtr, size_t index) {
   llvm::json::Array *array = static_cast<llvm::json::Array *>(objectPtr);
   return array->data() + index;
 }
@@ -149,7 +149,7 @@ void JSON_value_emplaceDouble(void *valuePtr, double newValue) {
   auto *value = static_cast<llvm::json::Value *>(valuePtr);
   *value = newValue;
 }
-void JSON_value_emplaceInteger(void *valuePtr, long long newValue) {
+void JSON_value_emplaceInteger(void *valuePtr, int64_t newValue) {
   auto *value = static_cast<llvm::json::Value *>(valuePtr);
   *value = newValue;
 }
@@ -185,7 +185,7 @@ void JSON_object_setDouble(void *objectPtr, const char *key, double value) {
   auto keyStr = std::string(key);
   (*object)[keyStr] = value;
 }
-void JSON_object_setInteger(void *objectPtr, const char *key, long long value) {
+void JSON_object_setInteger(void *objectPtr, const char *key, int64_t value) {
   llvm::json::Object *object = static_cast<llvm::json::Object *>(objectPtr);
   auto keyStr = std::string(key);
   (*object)[keyStr] = value;
@@ -225,7 +225,7 @@ void JSON_array_pushDouble(void *arrayPtr, double value) {
   llvm::json::Array *array = static_cast<llvm::json::Array *>(arrayPtr);
   array->emplace_back(value);
 }
-void JSON_array_pushInteger(void *arrayPtr, long long value) {
+void JSON_array_pushInteger(void *arrayPtr, int64_t value) {
   llvm::json::Array *array = static_cast<llvm::json::Array *>(arrayPtr);
   array->emplace_back(value);
 }

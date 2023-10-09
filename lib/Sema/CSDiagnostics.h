@@ -933,6 +933,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures related to conversion between the thrown error type
+/// of two function types, e.g.,
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws(MyError) -> Void {}
+/// let _: (Int) throws (OtherError)-> Void = foo
+///   // `MyError` can't be implicitly converted to `OtherError`
+/// ```
+class ThrownErrorTypeConversionFailure final : public ContextualFailure {
+public:
+  ThrownErrorTypeConversionFailure(const Solution &solution, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between 'async' function type
 /// and a synchronous one e.g.
 ///
@@ -1276,6 +1294,9 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclNameRef memberName);
+
+  static ValueDecl *findImportedCaseWithMatchingSuffix(Type instanceTy,
+                                                       DeclNameRef name);
 };
 
 class UnintendedExtraGenericParamMemberFailure final

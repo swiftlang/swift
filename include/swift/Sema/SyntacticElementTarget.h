@@ -147,7 +147,7 @@ private:
       ForEachStmt *stmt;
       DeclContext *dc;
       Pattern *pattern;
-      bool bindPatternVarsOneWay;
+      bool ignoreWhereClause;
       ForEachStmtInfo info;
     } forEachStmt;
 
@@ -227,11 +227,11 @@ public:
   }
 
   SyntacticElementTarget(ForEachStmt *stmt, DeclContext *dc,
-                         bool bindPatternVarsOneWay)
+                         bool ignoreWhereClause)
       : kind(Kind::forEachStmt) {
     forEachStmt.stmt = stmt;
     forEachStmt.dc = dc;
-    forEachStmt.bindPatternVarsOneWay = bindPatternVarsOneWay;
+    forEachStmt.ignoreWhereClause = ignoreWhereClause;
   }
 
   /// Form a target for the initialization of a pattern from an expression.
@@ -249,7 +249,7 @@ public:
   /// Form a target for a for-in loop.
   static SyntacticElementTarget forForEachStmt(ForEachStmt *stmt,
                                                DeclContext *dc,
-                                               bool bindPatternVarsOneWay);
+                                               bool ignoreWhereClause = false);
 
   /// Form a target for a property with an attached property wrapper that is
   /// initialized out-of-line.
@@ -469,10 +469,6 @@ public:
   bool shouldBindPatternVarsOneWay() const {
     if (kind == Kind::expression)
       return expression.bindPatternVarsOneWay;
-
-    if (kind == Kind::forEachStmt)
-      return forEachStmt.bindPatternVarsOneWay;
-
     return false;
   }
 
@@ -519,6 +515,11 @@ public:
   unsigned getInitializationPatternBindingIndex() const {
     assert(isForInitialization());
     return expression.initialization.patternBindingIndex;
+  }
+
+  bool ignoreForEachWhereClause() const {
+    assert(isForEachStmt());
+    return forEachStmt.ignoreWhereClause;
   }
 
   const ForEachStmtInfo &getForEachStmtInfo() const {

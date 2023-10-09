@@ -135,6 +135,26 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
 endif()
 
 if(SWIFT_BUILD_STDLIB)
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB TRUE)
+  if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+    set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+  elseif(NOT SWIFT_INCLUDE_TOOLS)
+    # Temporarily, only build embedded stdlib when building the compiler, to
+    # unblock CI jobs that run against old(er) toolchains.
+    set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+  endif()
+
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES
+    # arch    module_name               target triple
+    "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+    "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+    "x86_64   x86_64-apple-macos        x86_64-apple-macos10.13"
+    "arm64    arm64-apple-macos         arm64-apple-macos10.13"
+    "arm64e   arm64e-apple-macos        arm64e-apple-macos10.13"
+    )
+endif()
+
+if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
   add_subdirectory(runtime)

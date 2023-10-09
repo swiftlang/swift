@@ -219,7 +219,7 @@ struct FunctionPassContext : MutatingContext {
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
+      let nameStr = BridgedStringRef(nameBuffer.baseAddress, nameBuffer.count)
       return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
   }
@@ -237,7 +237,7 @@ struct FunctionPassContext : MutatingContext {
   /// Returns nil if no such function or multiple matching functions are found.
   func lookupStdlibFunction(name: StaticString) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      let nameStr = llvm.StringRef(nameBuffer.baseAddress, nameBuffer.count)
+      let nameStr = BridgedStringRef(nameBuffer.baseAddress, nameBuffer.count)
       return _bridged.lookupStdlibFunction(nameStr).function
     }
   }
@@ -252,7 +252,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if swift.optimizeMemoryAccesses(function.bridged.getFunction()) {
+    if BridgedPassContext.optimizeMemoryAccesses(function.bridged) {
       notifyInstructionsChanged()
       return true
     }
@@ -260,7 +260,7 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
-    if swift.eliminateDeadAllocations(function.bridged.getFunction()) {
+    if BridgedPassContext.eliminateDeadAllocations(function.bridged) {
       notifyInstructionsChanged()
       return true
     }
@@ -293,12 +293,11 @@ struct FunctionPassContext : MutatingContext {
   }
 
   func mangleOutlinedVariable(from function: Function) -> String {
-    let stdString = _bridged.mangleOutlinedVariable(function.bridged)
-    return String(_cxxString: stdString)
+    return String(taking: _bridged.mangleOutlinedVariable(function.bridged))
   }
 
   func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
-    let gv = name._withStringRef {
+    let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, isPrivate)
     }
     return gv.globalVar

@@ -4470,18 +4470,17 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
-llvm::Value *irgen::emitTaskCreate(
-    IRGenFunction &IGF,
-    llvm::Value *flags,
-    llvm::Value *taskGroup,
-    llvm::Value *futureResultType,
-    llvm::Value *taskFunction,
-    llvm::Value *localContextInfo,
-    SubstitutionMap subs) {
-  // If there is a task group, emit a task group option structure to contain
-  // it.
-  llvm::Value *taskOptions = llvm::ConstantInt::get(
-      IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+                                   llvm::Value *taskGroup,
+                                   llvm::Value *futureResultType,
+                                   llvm::Value *taskFunction,
+                                   llvm::Value *localContextInfo,
+                                   SubstitutionMap subs) {
+  // Start with empty task options.
+  llvm::Value *taskOptions =
+      llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+
+  // If there is a task group, emit a task group option structure to contain it.
   if (taskGroup) {
     TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
     llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
@@ -4492,14 +4491,73 @@ llvm::Value *irgen::emitTaskCreate(
         "task_group_options");
     auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
         optionsRecord, 0, Size());
+
+    // Flags
     IGF.Builder.CreateStore(
         optionsFlagsVal,
         IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    // Parent
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+    // TaskGroup
+    IGF.Builder.CreateStore(
+        taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  }
+
+  // In embedded Swift, create and pass result type info.
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    auto optionsRecord =
+        IGF.createAlloca(IGF.IGM.SwiftResultTypeInfoTaskOptionRecordTy,
+                         Alignment(), "result_type_info");
+    auto optionsBaseRecord =
+        IGF.Builder.CreateStructGEP(optionsRecord, 0, Size());
+
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::ResultTypeInfo);
+    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
+        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    // Flags
+    IGF.Builder.CreateStore(
+        optionsFlagsVal,
+        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    // Parent
     IGF.Builder.CreateStore(
         taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
 
+    Type unloweredType = subs.getReplacementTypes()[0];
+    SILType lowered = IGF.IGM.getLoweredType(unloweredType);
+    const TypeInfo &TI = IGF.IGM.getTypeInfo(lowered);
+    CanType canType = lowered.getASTType();
+    FixedPacking packing = TI.getFixedPacking(IGF.IGM);
+
+    // Size
     IGF.Builder.CreateStore(
-        taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+        TI.getStaticSize(IGF.IGM),
+        IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+    // Align mask
+    IGF.Builder.CreateStore(
+        TI.getStaticAlignmentMask(IGF.IGM),
+        IGF.Builder.CreateStructGEP(optionsRecord, 2, Size()));
+    // initializeWithCopy witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(
+            ValueWitness::InitializeWithCopy, packing, canType, lowered, TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 3, Size()));
+    // storeEnumTagSinglePayload witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(
+            ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
+            TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 4, Size()));
+    // destroy witness
+    IGF.Builder.CreateStore(
+        IGF.IGM.getOrCreateValueWitnessFunction(ValueWitness::Destroy, packing,
+                                                canType, lowered, TI),
+        IGF.Builder.CreateStructGEP(optionsRecord, 5, Size()));
+
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
   }

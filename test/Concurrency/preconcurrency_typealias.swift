@@ -20,11 +20,11 @@ struct Outer {
 
 func test() {
   var _: Outer.FN = {
-    f() // expected-complete-sns-error {{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
+    f() // expected-complete-sns-warning {{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
   }
 
   var _: FN = {
-    f() // expected-complete-sns-error {{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
+    f() // expected-complete-sns-warning {{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
     print("Hello")
   }
 
@@ -39,11 +39,11 @@ func test() {
 @available(SwiftStdlib 5.1, *)
 func testAsync() async {
   var _: Outer.FN = {
-    f() // expected-error{{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
+    f() // expected-warning{{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
   }
 
   var _: FN = {
-    f() // expected-error{{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
+    f() // expected-warning{{call to main actor-isolated global function 'f()' in a synchronous nonisolated context}}
     print("Hello")
   }
 

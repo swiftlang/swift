@@ -27,8 +27,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -2088,6 +2086,14 @@ bool PatternBindingDecl::isAsyncLet() const {
   return false;
 }
 
+ActorIsolation
+PatternBindingDecl::getInitializerIsolation(unsigned i) const {
+  auto *var = getPatternList()[i].getAnchoringVarDecl();
+  if (!var)
+    return ActorIsolation::forUnspecified();
+
+  return var->getInitializerIsolation();
+}
 
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
@@ -3850,6 +3856,17 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
+bool ValueDecl::skipAccessCheckIfInterface(const DeclContext *useDC,
+                                           AccessLevel useAcl,
+                                           AccessScope declScope) const {
+  if (!useDC || useAcl != AccessLevel::Package || !declScope.isPackage() ||
+      !isUsableFromInline() ||
+      getDeclContext()->getParentModule() == useDC->getParentModule())
+    return false;
+  auto useSF = useDC->getParentSourceFile();
+  return useSF && useSF->Kind == SourceFileKind::Interface;
+}
+
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4181,8 +4198,13 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
   if (accessScope.getDeclContext() == useDC) return true;
-  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
-
+  if (!AccessScope(useDC).isChildOf(accessScope)) {
+    // Grant access if this VD is an inlinable package decl referenced by
+    // another module in an interface file.
+    if (VD->skipAccessCheckIfInterface(useDC, access, accessScope))
+      return true;
+    return false;
+  }
   // useDC is null only when caller wants to skip non-public type checks.
   if (!useDC) return true;
 
@@ -4905,11 +4927,10 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
-  bool isObjCProtocol = isa<ProtocolDecl>(decl) && decl->hasClangNode();
+  bool isUnsupportedNestedProtocol =
+    isa<ProtocolDecl>(decl) && decl->getParent()->isGenericContext();
 
-  // Objective-C protocols, unlike Swift protocols, could be nested
-  // in other types.
-  if ((isObjCProtocol || !isa<ProtocolDecl>(decl)) && dc->isTypeContext()) {
+  if (!isUnsupportedNestedProtocol && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       if (auto *nominal = dc->getSelfNominalTypeDecl())
@@ -4946,9 +4967,9 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     }
 
     llvm_unreachable("Unhandled DeclTypeKind in switch.");
-  } else {
-    return NominalType::get(decl, ParentTy, ctx);
   }
+
+  return NominalType::get(decl, ParentTy, ctx);
 }
 
 Type NominalTypeDecl::getDeclaredType() const {
@@ -7109,6 +7130,14 @@ Expr *VarDecl::getParentExecutableInitializer() const {
   }
 
   return nullptr;
+}
+
+ActorIsolation VarDecl::getInitializerIsolation() const {
+  auto *mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      DefaultInitializerIsolation{mutableThis},
+      ActorIsolation::forUnspecified());
 }
 
 SourceRange VarDecl::getSourceRange() const {
@@ -10429,8 +10458,25 @@ ActorIsolation swift::getActorIsolationOfContext(
   if (auto *vd = dyn_cast_or_null<ValueDecl>(dcToUse->getAsDecl()))
     return getActorIsolation(vd);
 
-  if (auto *var = dcToUse->getNonLocalVarDecl())
+  // In the context of the initializing or default-value expression of a
+  // stored property, the isolation varies between instance and type members:
+  //   - For a static stored property, the isolation matches the VarDecl.
+  //     Static properties are initialized upon first use, so the isolation
+  //     of the initializer must match the isolation required to access the
+  //     property.
+  //   - For a field of a nominal type, the expression can require a specific
+  //     actor isolation. That default expression may only be used from inits
+  //     that meet the required isolation.
+  if (auto *var = dcToUse->getNonLocalVarDecl()) {
+    auto &ctx = dc->getASTContext();
+    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues) &&
+        var->isInstanceMember() &&
+        !var->getAttrs().hasAttribute<LazyAttr>()) {
+      return ActorIsolation::forNonisolated();
+    }
+
     return getActorIsolation(var);
+  }
 
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dcToUse)) {
     return getClosureActorIsolation(closure);

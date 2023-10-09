@@ -137,6 +137,26 @@ extension NSString : A, ZZZ {}
   @objc optional func f()
 }
 
+// NESTED-LABEL: @interface ParentClass
+// NESTED-NEXT: @end
+@objc class ParentClass {
+
+  // NESTED-LABEL: @protocol Nested
+  // NESTED-NEXT: @end
+  @objc protocol Nested {}
+
+  // NESTED-LABEL: SWIFT_PROTOCOL_NAMED("Nested2")
+  // NESTED-NEXT: @protocol NestedInParent
+  // NESTED-NEXT: @end
+  @objc(NestedInParent) protocol Nested2 {}
+}
+
+extension ParentClass {
+  // NESTED-LABEL: @protocol NestedInExtensionOfParent
+  // NESTED-NEXT: @end
+  @objc protocol NestedInExtensionOfParent {}
+}
+
 // NEGATIVE-NOT: @protocol PrivateProto
 @objc private protocol PrivateProto {}
 

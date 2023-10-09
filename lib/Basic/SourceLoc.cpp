@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
@@ -407,21 +408,119 @@ SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   return known->second;
 }
 
+namespace {
+  /// Compare the source location ranges for two buffers, as an ordering to
+  /// use for fast searches.
+  struct BufferIDRangeComparison {
+    const SourceManager *sourceMgr;
+
+    bool operator()(unsigned lhsID, unsigned rhsID) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      // If the source buffers are identical, we want the higher-numbered
+      // source buffers to occur first. This is important when uniquing.
+      if (lhsRange == rhsRange)
+        return lhsID > rhsID;
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getStart().getOpaquePointerValue(),
+          (const char *)rhsRange.getStart().getOpaquePointerValue());
+    }
+
+    bool operator()(unsigned lhsID, SourceLoc rhsLoc) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsRange.getEnd().getOpaquePointerValue(),
+          (const char *)rhsLoc.getOpaquePointerValue());
+    }
+
+    bool operator()(SourceLoc lhsLoc, unsigned rhsID) const {
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      std::less<const char *> pointerCompare;
+      return pointerCompare(
+          (const char *)lhsLoc.getOpaquePointerValue(),
+          (const char *)rhsRange.getEnd().getOpaquePointerValue());
+    }
+  };
+
+  /// Determine whether the source ranges for two buffers are equivalent.
+  struct BufferIDSameRange {
+    const SourceManager *sourceMgr;
+
+    bool operator()(unsigned lhsID, unsigned rhsID) const {
+      auto lhsRange = sourceMgr->getRangeForBuffer(lhsID);
+      auto rhsRange = sourceMgr->getRangeForBuffer(rhsID);
+
+      return lhsRange == rhsRange;
+    }
+  };
+}
+
 llvm::Optional<unsigned>
 SourceManager::findBufferContainingLocInternal(SourceLoc Loc) const {
   assert(Loc.isValid());
-  // Search the buffers back-to front, so later alias buffers are
-  // visited first.
-  auto less_equal = std::less_equal<const char *>();
-  for (unsigned i = LLVMSourceMgr.getNumBuffers(), e = 1; i >= e; --i) {
-    auto Buf = LLVMSourceMgr.getMemoryBuffer(i);
-    if (less_equal(Buf->getBufferStart(), Loc.Value.getPointer()) &&
+
+  // If the cache is out-of-date, update it now.
+  unsigned numBuffers = LLVMSourceMgr.getNumBuffers();
+  if (numBuffers != LocCache.numBuffersOriginal) {
+    LocCache.sortedBuffers.assign(
+        std::begin(range(1, numBuffers+1)), std::end(range(1, numBuffers+1)));
+    LocCache.numBuffersOriginal = numBuffers;
+
+    // Sort the buffer IDs by source range.
+    std::sort(LocCache.sortedBuffers.begin(),
+              LocCache.sortedBuffers.end(),
+              BufferIDRangeComparison{this});
+
+    // Remove lower-numbered buffers with the same source ranges as higher-
+    // numbered buffers. We want later alias buffers to be found first.
+    auto newEnd = std::unique(
+        LocCache.sortedBuffers.begin(), LocCache.sortedBuffers.end(),
+        BufferIDSameRange{this});
+    LocCache.sortedBuffers.erase(newEnd, LocCache.sortedBuffers.end());
+
+    // Forget the last buffer we looked at; it might have been replaced.
+    LocCache.lastBufferID = llvm::None;
+  }
+
+  // Determine whether the source location we're looking for is within the
+  // given buffer ID.
+  auto isInBuffer = [&](unsigned bufferID) {
+    auto less_equal = std::less_equal<const char *>();
+    auto buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
+
+    return less_equal(buffer->getBufferStart(), Loc.Value.getPointer()) &&
         // Use <= here so that a pointer to the null at the end of the buffer
         // is included as part of the buffer.
-        less_equal(Loc.Value.getPointer(), Buf->getBufferEnd()))
-      return i;
+        less_equal(Loc.Value.getPointer(), buffer->getBufferEnd());
+  };
+
+  // Check the last buffer we looked in.
+  if (auto lastBufferID = LocCache.lastBufferID) {
+    if (isInBuffer(*lastBufferID))
+      return *lastBufferID;
   }
-  return llvm::None;
+
+  // Search the sorted list of buffer IDs.
+  auto found = std::lower_bound(LocCache.sortedBuffers.begin(),
+                                LocCache.sortedBuffers.end(),
+                                Loc,
+                                BufferIDRangeComparison{this});
+
+  // If the location was past the range covered by source buffers or
+  // is not within any of the source buffers, fail.
+  if (found == LocCache.sortedBuffers.end() || !isInBuffer(*found))
+    return llvm::None;
+
+  // Cache the buffer ID we just found, because the next location is likely to
+  // be close by.
+  LocCache.lastBufferID = *found;
+  return *found;
 }
 
 unsigned SourceManager::findBufferContainingLoc(SourceLoc Loc) const {

@@ -327,6 +327,10 @@ private:
   /// The queue of lazy witness tables to emit.
   llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
 
+  llvm::SmallVector<CanType, 4> LazyClassMetadata;
+
+  llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedClassMetadata;
+
   llvm::SmallVector<CanType, 4> LazySpecializedClassMetadata;
 
   llvm::SmallPtrSet<TypeBase *, 4> LazilyEmittedSpecializedClassMetadata;
@@ -476,6 +480,7 @@ public:
     }
   }
 
+  void noteUseOfClassMetadata(CanType classType);
   void noteUseOfSpecializedClassMetadata(CanType classType);
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
@@ -775,6 +780,7 @@ public:
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
+  llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;
@@ -917,7 +923,9 @@ public:
   bool shouldPrespecializeGenericMetadata();
   
   bool canMakeStaticObjectsReadOnly();
-  
+
+  bool canUseObjCSymbolicReferences();
+
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }
 
@@ -1278,6 +1286,7 @@ private:
   };
 
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
+  llvm::DenseMap<ProtocolDecl *, llvm::Constant *> ObjCProtocolSymRefs;
   llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
 
@@ -1301,6 +1310,7 @@ private:
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
+  llvm::Constant *getObjCProtocolRefSymRefDescriptor(ProtocolDecl *protocol);
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
@@ -1565,6 +1575,11 @@ public:
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
   Address getAddrOfFieldOffset(VarDecl *D, ForDefinition_t forDefinition);
+  llvm::Function *getOrCreateValueWitnessFunction(ValueWitness index,
+                                                  FixedPacking packing,
+                                                  CanType abstractType,
+                                                  SILType concreteType,
+                                                  const TypeInfo &type);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);

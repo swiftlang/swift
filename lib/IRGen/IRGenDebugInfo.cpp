@@ -48,7 +48,10 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/HeaderSearchOptions.h"
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
 #include "llvm/IR/Constants.h"
@@ -404,7 +407,7 @@ public:
     auto *CS = DS->InlinedCallSite;
     if (!CS)
       return nullptr;
- 
+
     auto CachedInlinedAt = InlinedAtCache.find(CS);
     if (CachedInlinedAt != InlinedAtCache.end())
       return cast<llvm::MDNode>(CachedInlinedAt->second);
@@ -769,6 +772,13 @@ private:
     uint64_t Signature =
       Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
+    // Clang modules using fmodule-file-home-is-cwd should have their
+    // include path set to the working directory.
+    auto &HSI =
+        CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
+    StringRef IncludePath =
+        HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
+
     // Handle Clang modules.
     if (ClangModule) {
       llvm::DIModule *Parent = nullptr;
@@ -789,11 +799,11 @@ private:
                                    ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               Desc.getPath(), Signature, Desc.getASTFile());
+                               IncludePath, Signature, Desc.getASTFile());
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), Desc.getPath(), Signature,
+                             Desc.getModuleName(), IncludePath, Signature,
                              Desc.getASTFile());
   };
 
@@ -1308,7 +1318,7 @@ private:
     }
     // FIXME: assert that SizeInBits == OffsetInBits.
     SizeInBits = OffsetInBits;
-   
+
     auto FwdDecl = llvm::TempDINode(DBuilder.createReplaceableCompositeType(
         llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, MainFile, 0,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
@@ -1561,7 +1571,7 @@ private:
       return createPointerSizedStruct(Scope,
                                       MangledName,
                                       MainFile, 0, Flags, MangledName);
-      
+
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType should not show up here");
 
@@ -1818,7 +1828,7 @@ private:
     return true;
   }
 #endif
-  
+
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy) {
     // Is this an empty type?
     if (DbgTy.isNull())

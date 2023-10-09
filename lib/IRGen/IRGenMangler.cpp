@@ -110,7 +110,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // TODO: We could assign a symbolic reference discriminator to refer
       // to objc protocol refs.
       if (auto proto = dyn_cast<ProtocolDecl>(type)) {
-        if (proto->isObjC()) {
+        if (proto->isObjC() && !IGM.canUseObjCSymbolicReferences()) {
           return false;
         }
       }

@@ -19,8 +19,7 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var shortDescription: String { name.string }
@@ -163,8 +162,10 @@ private extension TupleExtractInst {
        let bi = tuple as? BuiltinInst,
        bi.id == .USubOver,
        bi.operands[1].value is IntegerLiteralInst,
-       let overFlowFlag = bi.operands[2].value as? IntegerLiteralInst,
-       overFlowFlag.value.isNullValue() {
+       let overflowLiteral = bi.operands[2].value as? IntegerLiteralInst,
+       let overflowValue = overflowLiteral.value,
+       overflowValue == 0
+    {
       return true
     }
     return false

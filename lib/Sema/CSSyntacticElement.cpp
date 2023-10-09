@@ -629,9 +629,13 @@ private:
   ///
   /// - From sequence to pattern, when pattern has no type information.
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
+    // The `where` clause should be ignored because \c visitForEachStmt
+    // records it as a separate conjunction element to allow for a more
+    // granular control over what contextual information is brought into
+    // the scope during pattern + sequence and `where` clause solving.
     auto target = SyntacticElementTarget::forForEachStmt(
         forEachStmt, context.getAsDeclContext(),
-        /*bindTypeVarsOneWay=*/false);
+        /*ignoreWhereClause=*/true);
 
     if (cs.generateConstraints(target)) {
       hadError = true;
@@ -961,10 +965,24 @@ private:
 
     // For-each pattern.
     //
-    // Note that we don't record a sequence or where clause here,
-    // they would be handled together with pattern because pattern can
-    // inform a type of sequence element e.g. `for i: Int8 in 0 ..< 8`
+    // Note that we don't record a sequence here, it would be handled
+    // together with pattern because pattern can inform a type of sequence
+    // element e.g. `for i: Int8 in 0 ..< 8`
     elements.push_back(makeElement(forEachStmt->getPattern(), stmtLoc));
+
+    // Where clause if any.
+    if (auto *where = forEachStmt->getWhere()) {
+      Type boolType = cs.getASTContext().getBoolType();
+      if (!boolType) {
+        hadError = true;
+        return;
+      }
+
+      ContextualTypeInfo context(boolType, CTP_Condition);
+      elements.push_back(
+          makeElement(where, stmtLoc, context, /*isDiscarded=*/false));
+    }
+
     // Body of the `for-in` loop.
     elements.push_back(makeElement(forEachStmt->getBody(), stmtLoc));
 

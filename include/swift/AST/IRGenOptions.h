@@ -325,6 +325,15 @@ public:
   /// Frameworks that we should not autolink against.
   SmallVector<std::string, 1> DisableAutolinkFrameworks;
 
+  /// Non-framework libraries that we should not autolink against.
+  SmallVector<std::string, 1> DisableAutolinkLibraries;
+
+  /// Whether we should disable inserting autolink directives for any frameworks.
+  unsigned DisableFrameworkAutolinking : 1;
+
+  /// Whether we should disable inserting autolink directives altogether.
+  unsigned DisableAllAutolinking : 1;
+
   /// Print the LLVM inline tree at the end of the LLVM pass pipeline.
   unsigned PrintInlineTree : 1;
 
@@ -398,6 +407,8 @@ public:
 
   /// Enable runtime instantiation of value witness strings for generic types
   unsigned EnableLayoutStringValueWitnessesInstantiation : 1;
+
+  unsigned EnableObjectiveCProtocolSymbolicReferences : 1;
 
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
@@ -518,6 +529,7 @@ public:
         UseTypeLayoutValueHandling(true), ForceStructTypeLayouts(false),
         EnableLayoutStringValueWitnesses(false),
         EnableLayoutStringValueWitnessesInstantiation(false),
+        EnableObjectiveCProtocolSymbolicReferences(false),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false),

@@ -19,3 +19,10 @@
 
 // Verify the serialized diags have the right magic at the top.
 // CHECK-SERIALIZED: DIA
+
+/// Check path remapping.
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json -- %target-swift-frontend -c -cache-compile-job -cas-path %t/cas -allow-unstable-cache-key-for-testing %s \
+// RUN:   -import-objc-header %S/Inputs/objc.h -emit-module -emit-module-path %t/test.swiftmodule -cache-replay-prefix-map %S=/^test  2>&1 | %FileCheck %s --check-prefix REMAP
+
+// REMAP: /^test/Inputs/objc.h:3:2: warning: warning in bridging header
+// REMAP: /^test/cached_diagnostics.swift:10:10: warning: this is a warning

@@ -261,7 +261,7 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
 
   OSSALifetimeCompletion::visitUnreachableLifetimeEnds(
       getCurrentDef(), completeLiveness, [&](auto *unreachable) {
-        recordConsumingUser(unreachable);
+        recordUnreachableLifetimeEnd(unreachable);
         unreachable->visitPriorInstructions([&](auto *inst) {
           liveness->extendToNonUse(inst);
           return true;
@@ -297,19 +297,17 @@ void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
                                     LifetimeEndingUse;
                        });
   for (auto *barrier : barriers.instructions) {
-    liveness->updateForUse(barrier, /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(barrier);
   }
   for (auto *barrier : barriers.phis) {
     for (auto *predecessor : barrier->getPredecessorBlocks()) {
-      liveness->updateForUse(predecessor->getTerminator(),
-                             /*lifetimeEnding*/ false);
+      liveness->extendToNonUse(predecessor->getTerminator());
     }
   }
   for (auto *edge : barriers.edges) {
     auto *predecessor = edge->getSinglePredecessorBlock();
     assert(predecessor);
-    liveness->updateForUse(&predecessor->back(),
-                           /*lifetimeEnding*/ false);
+    liveness->extendToNonUse(&predecessor->back());
   }
   // Ignore barriers.initialBlocks.  If the collection is non-empty, it
   // contains the def-block.  Its presence means that no barriers were found
@@ -907,8 +905,11 @@ static void insertDestroyBeforeInstruction(SILInstruction *nextInstruction,
                                            InstModCallbacks &callbacks) {
   // OSSALifetimeCompletion: This conditional clause can be deleted with
   // complete lifetimes.
-  if (isa<UnreachableInst>(nextInstruction)) {
-    // Don't create a destroy_value if the next instruction is an unreachable.
+  if (consumes.isUnreachableLifetimeEnd(nextInstruction)) {
+    // Don't create a destroy_value if the next instruction is an unreachable
+    // (or a terminator on the availability boundary of the dead-end region
+    // starting from the non-lifetime-ending boundary of `currentDef`).
+    //
     // If there was a destroy here already, it would be reused.  Avoids
     // creating an explicit destroy of a value which might have an unclosed
     // borrow scope.  Doing so would result in

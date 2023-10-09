@@ -626,6 +626,7 @@ private:
     case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     case Node::Kind::SymbolicExtendedExistentialType:
     case Node::Kind::HasSymbolQuery:
+    case Node::Kind::ObjectiveCProtocolSymbolicReference:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -3191,6 +3192,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "non-unique existential shape symbolic reference 0x";
+    Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::ObjectiveCProtocolSymbolicReference:
+    Printer << "objective-c protocol symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
     return nullptr;
   case Node::Kind::SymbolicExtendedExistentialType: {

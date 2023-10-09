@@ -1436,6 +1436,7 @@ void IRGenerator::emitLazyDefinitions() {
     assert(LazyWitnessTables.empty());
     assert(LazyCanonicalSpecializedMetadataAccessors.empty());
     assert(LazyMetadataAccessors.empty());
+    // LazyClassMetadata is allowed
     // LazySpecializedClassMetadata is allowed
   }
 
@@ -1446,7 +1447,9 @@ void IRGenerator::emitLazyDefinitions() {
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
          !LazyCanonicalSpecializedMetadataAccessors.empty() ||
          !LazyMetadataAccessors.empty() ||
-         !LazySpecializedClassMetadata.empty()) {
+         !LazyClassMetadata.empty() ||
+         !LazySpecializedClassMetadata.empty()
+         ) {
     // Emit any lazy type metadata we require.
     while (!LazyTypeMetadata.empty()) {
       NominalTypeDecl *type = LazyTypeMetadata.pop_back_val();
@@ -1544,6 +1547,12 @@ void IRGenerator::emitLazyDefinitions() {
       emitLazyMetadataAccessor(*IGM.get(), nominal);
     }
 
+    while (!LazyClassMetadata.empty()) {
+      CanType classType = LazyClassMetadata.pop_back_val();
+      CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
+      emitLazyClassMetadata(*IGM.get(), classType);
+    }
+
     while (!LazySpecializedClassMetadata.empty()) {
       CanType classType = LazySpecializedClassMetadata.pop_back_val();
       CurrentIGMPtr IGM = getGenModule(classType->getClassOrBoundGenericClass());
@@ -1634,6 +1643,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+void IRGenerator::noteUseOfClassMetadata(CanType classType) {
+  if (LazilyEmittedClassMetadata.insert(classType.getPointer()).second) {
+    LazyClassMetadata.push_back(classType);
+  }
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
@@ -1963,16 +1978,17 @@ void IRGenerator::emitDynamicReplacements() {
     auto keyRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
         LinkEntity::forDynamicallyReplaceableFunctionKey(origFunc));
 
-    llvm::Constant *newFnPtr = llvm::ConstantExpr::getBitCast(
-        newFunc->isAsync()
-            ? IGM.getAddrOfAsyncFunctionPointer(
-                  LinkEntity::forSILFunction(newFunc))
-            : IGM.getAddrOfSILFunction(newFunc, NotForDefinition),
-        IGM.Int8PtrTy);
-
     auto replacement = replacementsArray.beginStruct();
     replacement.addRelativeAddress(keyRef); // tagged relative reference.
-    replacement.addRelativeAddress(newFnPtr); // direct relative reference.
+    if (newFunc->isAsync()) {
+      replacement.addRelativeAddress(llvm::ConstantExpr::getBitCast(
+          IGM.getAddrOfAsyncFunctionPointer(
+              LinkEntity::forSILFunction(newFunc)),
+          IGM.Int8PtrTy));
+    } else {
+      replacement.addCompactFunctionReference(IGM.getAddrOfSILFunction(
+          newFunc, NotForDefinition)); // direct relative reference.
+    }
     replacement.addRelativeAddress(
         replacementLinkEntry); // direct relative reference.
     replacement.addInt32(
@@ -5151,6 +5167,8 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (classDecl->isGenericContext()) {
           IRGen.noteUseOfSpecializedClassMetadata(concreteType);
+        } else {
+          IRGen.noteUseOfClassMetadata(concreteType);
         }
       }
     }
@@ -5594,7 +5612,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
@@ -5649,6 +5666,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
     case DeclKind::Class:
       emitClassDecl(cast<ClassDecl>(member));
+      continue;
+    case DeclKind::Protocol:
+      emitProtocolDecl(cast<ProtocolDecl>(member));
       continue;
     case DeclKind::MacroExpansion:
       // Expansion already visited as auxiliary decls.

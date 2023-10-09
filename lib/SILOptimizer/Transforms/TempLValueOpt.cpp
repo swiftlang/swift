@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SIL/NodeBits.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -176,6 +177,13 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   // but a block argument.
   SILInstruction *destRootInst = destRootAddr->getDefiningInstruction();
 
+  bool needDestroyEarly = false;
+  BasicCalleeAnalysis *bca = nullptr;
+  if (!copyInst->isInitializationOfDest()) {
+    needDestroyEarly = true;
+    bca = PM->getAnalysis<BasicCalleeAnalysis>();
+  }
+
   // Iterate over the liferange of the temporary and make some validity checks.
   AliasAnalysis *AA = nullptr;
   SILInstruction *beginOfLiferange = nullptr;
@@ -219,6 +227,9 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       if (AA->mayReadOrWriteMemory(inst, destination) &&
           // Needed to treat init_existential_addr as not-writing projection.
           projections.contains(inst) == 0)
+        return;
+
+      if (needDestroyEarly && isDeinitBarrier(inst, bca))
         return;
     }
   }
