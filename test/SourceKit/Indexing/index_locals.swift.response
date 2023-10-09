@@ -1,0 +1,656 @@
+{
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "foo(a:b:)",
+      key.usr: "s:12index_locals3foo1a1bySi_SdtF",
+      key.line: 4,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "a",
+          key.usr: "s:12index_locals3foo1a1bySi_SdtFACL_Sivp",
+          key.line: 4,
+          key.column: 10,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 4,
+              key.column: 13
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "b",
+          key.usr: "s:12index_locals3foo1a1bySi_SdtFADL_Sdvp",
+          key.line: 4,
+          key.column: 18,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Double",
+              key.usr: "s:Sd",
+              key.line: 4,
+              key.column: 21
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "locVar",
+          key.usr: "s:12index_locals3foo1a1bySi_SdtF6locVarL_Sivp",
+          key.line: 5,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3foo1a1bySi_SdtF6locVarL_Sivg",
+              key.line: 5,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3foo1a1bySi_SdtF6locVarL_Sivs",
+              key.line: 5,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "globalVar",
+      key.usr: "s:12index_locals9globalVarSivp",
+      key.line: 8,
+      key.column: 5,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:12index_locals9globalVarSivg",
+          key.line: 8,
+          key.column: 5,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:12index_locals9globalVarSivs",
+          key.line: 8,
+          key.column: 5,
+          key.is_implicit: 1
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "A",
+      key.usr: "s:12index_locals1AC",
+      key.line: 10,
+      key.column: 7,
+      key.related: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ExpressibleByIntegerLiteral",
+          key.usr: "s:s27ExpressibleByIntegerLiteralP",
+          key.line: 10,
+          key.column: 11
+        }
+      ],
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.protocol,
+          key.name: "ExpressibleByIntegerLiteral",
+          key.usr: "s:s27ExpressibleByIntegerLiteralP",
+          key.line: 10,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.name: "init(integerLiteral:)",
+          key.usr: "s:12index_locals1AC14integerLiteralACSi_tcfc",
+          key.line: 11,
+          key.column: 14,
+          key.related: [
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.name: "init(integerLiteral:)",
+              key.usr: "s:s27ExpressibleByIntegerLiteralP07integerD0x0cD4TypeQz_tcfc"
+            }
+          ],
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "value",
+              key.usr: "s:12index_locals1AC14integerLiteralACSi_tcfc5valueL_Sivp",
+              key.line: 11,
+              key.column: 34,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.typealias,
+                  key.name: "IntegerLiteralType",
+                  key.usr: "s:s18IntegerLiteralTypea",
+                  key.line: 11,
+                  key.column: 41
+                }
+              ]
+            }
+          ],
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.required
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "bar()",
+      key.usr: "s:12index_locals3baryyF",
+      key.line: 14,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "locVar1",
+          key.usr: "s:12index_locals3baryyF7locVar1L_AA1ACvp",
+          key.line: 15,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyF7locVar1L_AA1ACvg",
+              key.line: 15,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3baryyF7locVar1L_AA1ACvs",
+              key.line: 15,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "A",
+          key.usr: "s:12index_locals1AC",
+          key.line: 15,
+          key.column: 18
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.usr: "s:12index_locals1AC14integerLiteralACSi_tcfc",
+          key.line: 15,
+          key.column: 22,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "locVar2",
+          key.usr: "s:12index_locals3baryyF7locVar2L_Sivp",
+          key.line: 16,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyF7locVar2L_Sivg",
+              key.line: 16,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3baryyF7locVar2L_Sivs",
+              key.line: 16,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.function.free,
+          key.name: "foo(a:b:)",
+          key.usr: "s:12index_locals3foo1a1bySi_SdtF",
+          key.line: 17,
+          key.column: 5
+        },
+        {
+          key.kind: source.lang.swift.ref.var.global,
+          key.name: "globalVar",
+          key.usr: "s:12index_locals9globalVarSivp",
+          key.line: 17,
+          key.column: 12,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:12index_locals9globalVarSivg",
+              key.line: 17,
+              key.column: 12,
+              key.is_implicit: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Double",
+          key.usr: "s:Sd",
+          key.line: 17,
+          key.column: 26
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.name: "init(_:)",
+          key.usr: "s:SdySdSicfc",
+          key.line: 17,
+          key.column: 26
+        },
+        {
+          key.kind: source.lang.swift.ref.var.local,
+          key.name: "locVar2",
+          key.usr: "s:12index_locals3baryyF7locVar2L_Sivp",
+          key.line: 17,
+          key.column: 33,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyF7locVar2L_Sivg",
+              key.line: 17,
+              key.column: 33,
+              key.is_implicit: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "closure",
+          key.usr: "s:12index_locals3baryyF7closureL_yS2i_Sitcvp",
+          key.line: 18,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyF7closureL_yS2i_Sitcvg",
+              key.line: 18,
+              key.column: 9,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3baryyF7closureL_yS2i_Sitcvs",
+              key.line: 18,
+              key.column: 9,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "arg1",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_4arg1L_Sivp",
+          key.line: 18,
+          key.column: 22,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 18,
+              key.column: 28
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.var.parameter,
+          key.name: "arg2",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_4arg2L_Sivp",
+          key.line: 18,
+          key.column: 33,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 18,
+              key.column: 39
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 18,
+          key.column: 47
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "locVar3",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_7locVar3L_Sivp",
+          key.line: 19,
+          key.column: 14,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyFS2i_SitcfU_7locVar3L_Sivg",
+              key.line: 19,
+              key.column: 14,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3baryyFS2i_SitcfU_7locVar3L_Sivs",
+              key.line: 19,
+              key.column: 14,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.decl.var.local,
+          key.name: "expr",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_4exprL_Sivp",
+          key.line: 20,
+          key.column: 14,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyFS2i_SitcfU_4exprL_Sivg",
+              key.line: 20,
+              key.column: 14,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12index_locals3baryyFS2i_SitcfU_4exprL_Sivs",
+              key.line: 20,
+              key.column: 14,
+              key.is_implicit: 1
+            }
+          ],
+          key.effective_access: source.decl.effective_access.less_than_fileprivate
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "Int",
+          key.usr: "s:Si",
+          key.line: 20,
+          key.column: 20
+        },
+        {
+          key.kind: source.lang.swift.ref.var.local,
+          key.name: "locVar2",
+          key.usr: "s:12index_locals3baryyF7locVar2L_Sivp",
+          key.line: 20,
+          key.column: 26,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyF7locVar2L_Sivg",
+              key.line: 20,
+              key.column: 26,
+              key.is_implicit: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.function.operator.infix,
+          key.name: "+(_:_:)",
+          key.usr: "s:Si1poiyS2i_SitFZ",
+          key.line: 20,
+          key.column: 34
+        },
+        {
+          key.kind: source.lang.swift.ref.var.global,
+          key.name: "globalVar",
+          key.usr: "s:12index_locals9globalVarSivp",
+          key.line: 20,
+          key.column: 36,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:12index_locals9globalVarSivg",
+              key.line: 20,
+              key.column: 36,
+              key.is_implicit: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.function.operator.infix,
+          key.name: "+(_:_:)",
+          key.usr: "s:Si1poiyS2i_SitFZ",
+          key.line: 20,
+          key.column: 46
+        },
+        {
+          key.kind: source.lang.swift.ref.var.local,
+          key.name: "arg1",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_4arg1L_Sivp",
+          key.line: 20,
+          key.column: 48
+        },
+        {
+          key.kind: source.lang.swift.ref.var.local,
+          key.name: "expr",
+          key.usr: "s:12index_locals3baryyFS2i_SitcfU_4exprL_Sivp",
+          key.line: 21,
+          key.column: 17,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:12index_locals3baryyFS2i_SitcfU_4exprL_Sivg",
+              key.line: 21,
+              key.column: 17,
+              key.is_implicit: 1
+            }
+          ]
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "X",
+      key.usr: "s:12index_locals1XC",
+      key.line: 25,
+      key.column: 7,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "baz()",
+          key.usr: "s:12index_locals1XC3bazyyF",
+          key.line: 26,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.free,
+              key.name: "inner(_:)",
+              key.usr: "s:12index_locals1XC3bazyyF5innerL_yS2iF",
+              key.line: 27,
+              key.column: 14,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.decl.var.parameter,
+                  key.name: "x",
+                  key.usr: "s:12index_locals1XC3bazyyF5innerL_yS2iF1xL_Sivp",
+                  key.line: 27,
+                  key.column: 22,
+                  key.entities: [
+                    {
+                      key.kind: source.lang.swift.ref.struct,
+                      key.name: "Int",
+                      key.usr: "s:Si",
+                      key.line: 27,
+                      key.column: 25
+                    }
+                  ]
+                },
+                {
+                  key.kind: source.lang.swift.ref.struct,
+                  key.name: "Int",
+                  key.usr: "s:Si",
+                  key.line: 27,
+                  key.column: 33
+                },
+                {
+                  key.kind: source.lang.swift.ref.var.local,
+                  key.name: "x",
+                  key.usr: "s:12index_locals1XC3bazyyF5innerL_yS2iF1xL_Sivp",
+                  key.line: 27,
+                  key.column: 46
+                }
+              ],
+              key.effective_access: source.decl.effective_access.less_than_fileprivate
+            },
+            {
+              key.kind: source.lang.swift.decl.var.local,
+              key.name: "arr",
+              key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvp",
+              key.line: 28,
+              key.column: 13,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.decl.function.accessor.getter,
+                  key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvg",
+                  key.line: 28,
+                  key.column: 13,
+                  key.is_implicit: 1
+                },
+                {
+                  key.kind: source.lang.swift.decl.function.accessor.setter,
+                  key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvs",
+                  key.line: 28,
+                  key.column: 13,
+                  key.is_implicit: 1
+                }
+              ],
+              key.effective_access: source.decl.effective_access.less_than_fileprivate
+            },
+            {
+              key.kind: source.lang.swift.ref.struct,
+              key.name: "Int",
+              key.usr: "s:Si",
+              key.line: 28,
+              key.column: 19
+            },
+            {
+              key.kind: source.lang.swift.ref.function.constructor,
+              key.usr: "s:Sa12arrayLiteralSayxGxd_tcfc",
+              key.line: 28,
+              key.column: 26,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.ref.var.global,
+              key.name: "globalVar",
+              key.usr: "s:12index_locals9globalVarSivp",
+              key.line: 29,
+              key.column: 13,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.function.accessor.getter,
+                  key.usr: "s:12index_locals9globalVarSivg",
+                  key.line: 29,
+                  key.column: 13,
+                  key.is_implicit: 1
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.ref.function.operator.infix,
+              key.name: ">(_:_:)",
+              key.usr: "s:Si1goiySbSi_SitFZ",
+              key.line: 29,
+              key.column: 23
+            },
+            {
+              key.kind: source.lang.swift.ref.var.local,
+              key.name: "arr",
+              key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvp",
+              key.line: 30,
+              key.column: 13,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.function.accessor.setter,
+                  key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvs",
+                  key.line: 30,
+                  key.column: 13,
+                  key.is_implicit: 1
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.ref.var.local,
+              key.name: "arr",
+              key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvp",
+              key.line: 30,
+              key.column: 19,
+              key.entities: [
+                {
+                  key.kind: source.lang.swift.ref.function.accessor.getter,
+                  key.usr: "s:12index_locals1XC3bazyyF3arrL_SaySiGvg",
+                  key.line: 30,
+                  key.column: 19,
+                  key.is_implicit: 1
+                }
+              ]
+            },
+            {
+              key.kind: source.lang.swift.ref.function.method.instance,
+              key.name: "map(_:)",
+              key.usr: "s:SlsE3mapySayqd__Gqd__7ElementQzKXEKlF",
+              key.line: 30,
+              key.column: 23,
+              key.receiver_usr: "s:Sa",
+              key.is_dynamic: 1
+            },
+            {
+              key.kind: source.lang.swift.ref.function.free,
+              key.name: "inner(_:)",
+              key.usr: "s:12index_locals1XC3bazyyF5innerL_yS2iF",
+              key.line: 30,
+              key.column: 29
+            }
+          ],
+          key.effective_access: source.decl.effective_access.internal
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:12index_locals1XCACycfc",
+          key.line: 25,
+          key.column: 7,
+          key.is_implicit: 1,
+          key.effective_access: source.decl.effective_access.internal
+        }
+      ],
+      key.effective_access: source.decl.effective_access.internal
+    }
+  ]
+}
