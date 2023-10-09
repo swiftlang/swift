@@ -107,7 +107,9 @@ static const SupportedConditionalValue SupportedConditionalCompilationPtrAuthSch
   "_arm64e",
 };
 
-static const SupportedConditionalValue SupportedConditionalCompilationAtomicBitWidths[] = {
+static const SupportedConditionalValue SupportedConditionalCompilationHasAtomicBitWidths[] = {
+  "_8",
+  "_16",
   "_32",
   "_64",
   "_128"
@@ -137,8 +139,8 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationTargetEnvironments;
   case PlatformConditionKind::PtrAuth:
     return SupportedConditionalCompilationPtrAuthSchemes;
-  case PlatformConditionKind::AtomicBitWidth:
-    return SupportedConditionalCompilationAtomicBitWidths;
+  case PlatformConditionKind::HasAtomicBitWidth:
+    return SupportedConditionalCompilationHasAtomicBitWidths;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
@@ -202,7 +204,7 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::Runtime:
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
-  case PlatformConditionKind::AtomicBitWidth:
+  case PlatformConditionKind::HasAtomicBitWidth:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -244,6 +246,14 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
         return true;
   }
 
+  if (Kind == PlatformConditionKind::HasAtomicBitWidth) {
+    for (auto bitWidth : AtomicBitWidths) {
+      if (bitWidth == Value) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -277,7 +287,7 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
   return false;
 }
 
-void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
+void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
   // We really want to use Clang's getMaxAtomicInlineWidth(), but that requires
   // a Clang::TargetInfo and we're setting up lang opts very early in the
   // pipeline before any ASTContext or any ClangImporter instance where we can
@@ -291,11 +301,11 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
     switch (triple.getSubArch()) {
     case llvm::Triple::SubArchType::ARMSubArch_v6m:
     case llvm::Triple::SubArchType::ARMSubArch_v7m:
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_32");
+      setMaxAtomicBitWidth(32);
       break;
 
     default:
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+      setMaxAtomicBitWidth(64);
       break;
     }
     break;
@@ -307,11 +317,11 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
     case llvm::Triple::SubArchType::ARMSubArch_v8m_baseline:
     case llvm::Triple::SubArchType::ARMSubArch_v8m_mainline:
     case llvm::Triple::SubArchType::ARMSubArch_v8_1m_mainline:
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+      setMaxAtomicBitWidth(64);
       break;
 
     default:
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_128");
+      setMaxAtomicBitWidth(128);
       break;
     }
     break;
@@ -319,28 +329,28 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
   // arm64_32 has 32 bit pointer words, but it has the same architecture as
   // arm64 and supports 128 bit atomics.
   case llvm::Triple::ArchType::aarch64_32:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_128");
+    setMaxAtomicBitWidth(128);
     break;
 
   // PowerPC does not support double word atomics.
   case llvm::Triple::ArchType::ppc:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_32");
+    setMaxAtomicBitWidth(32);
     break;
 
   // All of the 64 bit PowerPC flavors do not support double word atomics.
   case llvm::Triple::ArchType::ppc64:
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+    setMaxAtomicBitWidth(64);
     break;
 
   // SystemZ (s390x) does not support double word atomics.
   case llvm::Triple::ArchType::systemz:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+    setMaxAtomicBitWidth(64);
     break;
 
   // Wasm32 supports double word atomics.
   case llvm::Triple::ArchType::wasm32:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+    setMaxAtomicBitWidth(64);
     break;
 
   // x86 supports double word atomics.
@@ -348,7 +358,7 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
   // Technically, this is incorrect. However, on all x86 platforms where Swift
   // is deployed this is true.
   case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+    setMaxAtomicBitWidth(64);
     break;
 
   // x86_64 supports double word atomics.
@@ -357,7 +367,7 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
   // is deployed this is true. If the ClangImporter ever stops unconditionally
   // adding '-mcx16' to its Clang instance, then be sure to update this below.
   case llvm::Triple::ArchType::x86_64:
-    addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_128");
+    setMaxAtomicBitWidth(128);
     break;
 
   default:
@@ -366,17 +376,18 @@ void LangOptions::setAtomicBitWidth(llvm::Triple triple) {
     // every arch supports at least word atomics.
 
     if (triple.isArch32Bit()) {
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_32");
+      setMaxAtomicBitWidth(32);
     }
 
     if (triple.isArch64Bit()) {
-      addPlatformConditionValue(PlatformConditionKind::AtomicBitWidth, "_64");
+      setMaxAtomicBitWidth(64);
     }
   }
 }
 
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
+  clearAtomicBitWidths();
 
   if (triple.getOS() == llvm::Triple::Darwin &&
       triple.getVendor() == llvm::Triple::Apple) {
@@ -546,8 +557,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "macabi");
 
-  // Set the "_atomicBitWidth" platform condition.
-  setAtomicBitWidth(triple);
+  // Set the "_hasHasAtomicBitWidth" platform condition.
+  setHasAtomicBitWidth(triple);
 
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation
