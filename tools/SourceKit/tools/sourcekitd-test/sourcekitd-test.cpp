@@ -725,6 +725,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   case SourceKitRequest::Index:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestIndex);
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::CodeComplete:

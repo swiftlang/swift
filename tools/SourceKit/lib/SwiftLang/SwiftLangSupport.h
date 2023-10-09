@@ -561,7 +561,7 @@ public:
           Receiver) override;
 
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
-                   ArrayRef<const char *> Args) override;
+                   ArrayRef<const char *> Args, IndexSourceOptions Opts) override;
 
   void indexToStore(StringRef InputFile,
                     ArrayRef<const char *> Args,

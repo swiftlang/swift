@@ -183,7 +183,7 @@ static SourceKit::Context &getGlobalContext() {
 }
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args);
+                                         ArrayRef<const char *> Args, IndexSourceOptions Opts);
 
 static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
@@ -1417,7 +1417,12 @@ static void handleRequestIndex(const RequestDict &Req,
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
-    return Rec(indexSource(*PrimaryFilePath, Args));
+
+    int64_t ShouldIndexLocals = false;
+    Req.getInt64(KeyShouldIndexLocals, ShouldIndexLocals, /*isOptional*/true);
+    IndexSourceOptions Opts{.IndexLocals = ShouldIndexLocals > 0};
+
+    return Rec(indexSource(*PrimaryFilePath, Args, Opts));
   });
 }
 
@@ -2174,11 +2179,11 @@ public:
 } // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args) {
+                                         ArrayRef<const char *> Args, IndexSourceOptions Opts) {
   ResponseBuilder RespBuilder;
   SKIndexingConsumer IdxConsumer(RespBuilder);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.indexSource(Filename, IdxConsumer, Args);
+  Lang.indexSource(Filename, IdxConsumer, Args, Opts);
 
   if (!IdxConsumer.ErrorDescription.empty())
     return createErrorRequestFailed(IdxConsumer.ErrorDescription.c_str());

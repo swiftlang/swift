@@ -38,7 +38,7 @@ static UIdent getUIDForDependencyKind(bool isClangModule) {
 
 class SKIndexDataConsumer : public IndexDataConsumer {
 public:
-  SKIndexDataConsumer(IndexingConsumer &C) : impl(C) {}
+  SKIndexDataConsumer(IndexingConsumer &C, IndexSourceOptions Opts) : impl(C), Opts(Opts) {}
 
 private:
   void failed(StringRef error) override { impl.failed(error); }
@@ -51,6 +51,8 @@ private:
     return Logger::isLoggingEnabledForLevel(Logger::Level::Warning);
   }
 
+  virtual bool indexLocals() override { return Opts.IndexLocals; }
+
   bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     auto kindUID = getUIDForDependencyKind(isClangModule);
     return impl.startDependency(kindUID, name, path, isSystem);
@@ -61,7 +63,7 @@ private:
   }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (symbol.symInfo.Kind == SymbolKind::Parameter)
+    if (!indexLocals() && symbol.symInfo.Kind == SymbolKind::Parameter)
       return Skip;
 
     // report any parent relations to this reference
@@ -204,13 +206,15 @@ private:
 
 private:
   IndexingConsumer &impl;
+  IndexSourceOptions Opts;
 };
 
 static void indexModule(llvm::MemoryBuffer *Input,
                         StringRef ModuleName,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
-                        ArrayRef<const char *> Args) {
+                        ArrayRef<const char *> Args,
+                        IndexSourceOptions Opts) {
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<ImplicitSerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
@@ -245,7 +249,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     Mod->setHasResolvedImports();
   }
 
-  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer, Opts);
   index::indexModule(Mod, IdxDataConsumer);
 }
 
@@ -277,7 +281,8 @@ void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
-                                   ArrayRef<const char *> OrigArgs) {
+                                   ArrayRef<const char *> OrigArgs,
+                                   IndexSourceOptions Opts) {
   std::string Error;
   auto InputBuf =
       ASTMgr->getMemoryBuffer(InputFile, llvm::vfs::getRealFileSystem(), Error);
@@ -333,7 +338,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     }
 
     indexModule(InputBuf.get(), llvm::sys::path::stem(Filename),
-                IdxConsumer, CI, Args);
+                IdxConsumer, CI, Args, Opts);
     return;
   }
 
@@ -365,7 +370,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
   
-  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer, Opts);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }
 

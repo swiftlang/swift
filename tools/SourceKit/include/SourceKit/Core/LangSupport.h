@@ -878,6 +878,10 @@ struct RenameLocations {
   std::vector<RenameLocation> LineColumnLocs;
 };
 
+struct IndexSourceOptions {
+  bool IndexLocals = false;
+};
+
 struct IndexStoreOptions {
   std::string IndexStorePath;
   std::string IndexUnitOutputPath;
@@ -998,7 +1002,8 @@ public:
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
-                           ArrayRef<const char *> Args) = 0;
+                           ArrayRef<const char *> Args,
+                           IndexSourceOptions Opts) = 0;
 
   virtual void indexToStore(StringRef InputFile,
                             ArrayRef<const char *> Args,

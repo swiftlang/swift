@@ -33,6 +33,7 @@
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Index/IndexSymbol.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -58,6 +59,7 @@ using swift::index::SymbolPropertySet;
 using swift::index::SymbolInfo;
 using swift::index::SymbolRole;
 using swift::index::SymbolRoleSet;
+using swift::index::operator&;
 
 #define KIND(NAME, CONTENT) static UIdent Kind##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
@@ -711,8 +713,19 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
     } else {
       return UID_FOR(FunctionFree);
     }
-  case SymbolKind::Variable:
+  case SymbolKind::Parameter:
+    if (isRef) {
+      return KindRefVarLocal;
+    } else {
+      return KindDeclVarParam;
+    }
+  case SymbolKind::Variable: {
+    bool IsLocalSymbol = sym.Properties & SymbolProperty::Local;
+    if (IsLocalSymbol) {
+      return UID_FOR(VarLocal);
+    }
     return UID_FOR(VarGlobal);
+  }
   case SymbolKind::InstanceMethod:
     return UID_FOR(MethodInstance);
   case SymbolKind::ClassMethod:
