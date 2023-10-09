@@ -118,3 +118,16 @@ func local() {
   anotherVar = "hello!"
   _ = anotherVar
 }
+
+// https://github.com/apple/swift/issues/69066
+
+ @propertyWrapper
+ struct Wrapper {
+   var wrappedValue: Int
+
+   init(i: Int) {}
+ }
+
+ do {
+   @Wrapper var w: Int = 0 // expected-error {{property wrapper type must provide an initializer with either no parameters or a first parameter with argument label 'wrappedValue'}}
+ }

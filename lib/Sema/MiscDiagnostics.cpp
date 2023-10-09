@@ -2166,7 +2166,6 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
           haveBuffer += '_';
         else
           haveBuffer += haveName.str();
-        haveBuffer += ':';
       }
 
       for (auto expected : newNames) {
@@ -2178,11 +2177,9 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       }
 
       StringRef haveStr = haveBuffer;
-      StringRef expectedStr = expectedBuffer;
       diagOpt.emplace(diags.diagnose(argList->getLoc(),
                                      diag::wrong_argument_labels,
-                                     plural, haveStr, expectedStr,
-                                     static_cast<unsigned>(paramContext)));
+                                     plural, haveStr));
     } else if (numMissing > 0) {
       StringRef missingStr = missingBuffer;
       diagOpt.emplace(diags.diagnose(argList->getLoc(),

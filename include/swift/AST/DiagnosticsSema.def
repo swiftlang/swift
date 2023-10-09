@@ -1471,10 +1471,10 @@ ERROR(missing_argument_labels,none,
       "%select{call|subscript|macro expansion}2",
       (bool, StringRef, unsigned))
 ERROR(wrong_argument_labels,none,
-      "incorrect argument label%select{|s}0 in "
-      "%select{call|subscript|macro expansion}3 "
-      "(have '%1', expected '%2')",
-      (bool, StringRef, StringRef, unsigned))
+      "property wrapper type must provide an "
+      "initializer with either no parameters "
+      "or a first parameter with argument label '%1'\n",
+      (bool, StringRef))
 ERROR(argument_out_of_order_named_named,none,
       "argument %0 must precede argument %1", (Identifier, Identifier))
 ERROR(argument_out_of_order_named_unnamed,none,
