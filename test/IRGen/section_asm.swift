@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
 // REQUIRES: swift_in_compiler
+// UNSUPPORTED: CPU=wasm32
 
 // ASM: .section{{.*}}__TEXT,__mysection
 // ASM-NOT: .section
