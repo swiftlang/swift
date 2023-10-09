@@ -36,11 +36,20 @@ using namespace swift::instrumenter_support;
 
 namespace {
 
+struct TransformOptions {
+  bool LogScopeEvents;
+  bool LogFunctionParameters;
+
+  TransformOptions(const LangOptions &opts) :
+    LogScopeEvents(opts.PlaygroundOptions.contains("scope-events")),
+    LogFunctionParameters(opts.PlaygroundOptions.contains("function-parameters")) {}
+};
+
 class Instrumenter : InstrumenterBase {
 private:
   std::mt19937_64 &RNG;
   unsigned &TmpNameIndex;
-  bool HighPerformance;
+  TransformOptions Options;
   bool ExtendedCallbacks;
 
   DeclNameRef DebugPrintName;
@@ -113,7 +122,7 @@ private:
   // all the braces up to its target.
   size_t escapeToTarget(BracePair::TargetKinds TargetKind,
                         ElementVector &Elements, size_t EI) {
-    if (HighPerformance)
+    if (!Options.LogScopeEvents)
       return EI;
 
     for (const BracePair &BP : BracePairs) {
@@ -127,10 +136,9 @@ private:
   }
 
 public:
-  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
-               unsigned &TmpNameIndex)
-      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
-        HighPerformance(HP),
+  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG,
+               TransformOptions OPT, unsigned &TmpNameIndex)
+      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex), Options(OPT),
         ExtendedCallbacks(C.LangOpts.hasFeature(Feature::PlaygroundExtendedCallbacks)),
         DebugPrintName(C.getIdentifier("__builtin_debugPrint")),
         PrintName(C.getIdentifier("__builtin_print")),
@@ -609,7 +617,7 @@ public:
     // If we were given any parameters that apply to this brace block, we insert
     // log calls for them now (before any of the other statements). We only log
     // named parameters (not `{ _ in ... }`, for example).
-    if (PL && !HighPerformance) {
+    if (PL && Options.LogFunctionParameters) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
         if (PD->hasName()) {
@@ -627,7 +635,7 @@ public:
       }
     }
 
-    if (!TopLevel && !HighPerformance && !BS->isImplicit()) {
+    if (!TopLevel && Options.LogScopeEvents && !BS->isImplicit()) {
       Elements.insert(Elements.begin(), *buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), *buildScopeExit(BS->getSourceRange()));
     }
@@ -895,16 +903,16 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
+void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
   private:
     ASTContext &ctx;
+    TransformOptions Options;
     std::mt19937_64 RNG;
-    bool HighPerformance;
     unsigned TmpNameIndex = 0;
 
   public:
-    ExpressionFinder(ASTContext &ctx, bool HP) : ctx(ctx), HighPerformance(HP) {}
+    ExpressionFinder(ASTContext &ctx) : ctx(ctx), Options(ctx.LangOpts) {}
 
     // FIXME: Remove this
     bool shouldWalkAccessorsTheOldWay() override { return true; }
@@ -918,7 +926,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
-            Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
+            Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, PL);
             if (NewBody != Body) {
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -930,7 +938,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            Instrumenter I(ctx, TLCD, RNG, HighPerformance, TmpNameIndex);
+            Instrumenter I(ctx, TLCD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
@@ -944,6 +952,6 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     }
   };
 
-  ExpressionFinder EF(SF.getASTContext(), HighPerformance);
+  ExpressionFinder EF(SF.getASTContext());
   SF.walk(EF);
 }

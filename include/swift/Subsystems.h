@@ -131,12 +131,10 @@ namespace swift {
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once type checking is complete, this optionally transforms the ASTs to add
-  /// calls to external logging functions.
-  ///
-  /// \param HighPerformance True if the playground transform should omit
-  /// instrumentation that has a high runtime performance impact.
-  void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
+  /// Once type checking is complete, this optionally transforms the ASTs to
+  /// insert calls to external logging functions. The specific transforms that
+  /// are performed are controlled by `LangOptions.PlaygroundOptions`.
+  void performPlaygroundTransform(SourceFile &SF);
   
   /// Once type checking is complete this optionally walks the ASTs to add calls
   /// to externally provided functions that simulate "program counter"-like

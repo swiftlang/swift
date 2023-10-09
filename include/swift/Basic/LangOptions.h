@@ -289,9 +289,13 @@ namespace swift {
     /// Indicates whether the playground transformation should be applied.
     bool PlaygroundTransform = false;
 
-    /// Indicates whether the playground transformation should omit
-    /// instrumentation that has a high runtime performance impact.
-    bool PlaygroundHighPerformance = false;
+    /// Indicates the specific playground transformations to apply. Known names
+    /// are defined in the PlaygroundTransform module; unknown names are skipped
+    /// (similar to how `-enable-experimental-feature` handles unknown strings).
+    /// NOTE: We can consider doing something similar to Feature here instead of
+    /// using strings, unless we think that is too much machinery for what is a
+    /// rather specialized use.
+    llvm::SmallSet<std::string, 4> PlaygroundOptions;
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;

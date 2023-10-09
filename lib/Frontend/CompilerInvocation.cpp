@@ -712,8 +712,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
     Opts.PlaygroundTransform = false;
-  Opts.PlaygroundHighPerformance |=
-      Args.hasArg(OPT_playground_high_performance);
+  if (!Args.hasArg(OPT_playground_high_performance)) {
+    // The legacy "high performance" mode disables logging of scope entry/exit
+    // events and function/closure parameters.
+    Opts.PlaygroundOptions.insert("scope-events");
+    Opts.PlaygroundOptions.insert("function-parameters");
+  }
+  for (const Arg *A : Args.filtered(OPT_playground_option)) {
+    Opts.PlaygroundOptions.insert(A->getValue());
+  }
 
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
