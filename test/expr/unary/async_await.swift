@@ -203,6 +203,13 @@ func testAsyncLet() async throws {
   _ = await x5
 }
 
+func search(query: String) async throws -> [String] {
+  let entities: [String] = []
+
+  async let r = entities.filter { $0.contains(query) }.map { String($0) }
+  return await r
+}
+
 // expected-note@+1 3{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
 func testAsyncLetOutOfAsync() {
   async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
