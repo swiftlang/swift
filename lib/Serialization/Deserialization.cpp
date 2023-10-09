@@ -7988,7 +7988,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
           llvm::inconvertibleErrorCode()));
     }
   }
-  conformance->setSignatureConformances(reqConformances);
 
   for (unsigned index : indices(reqConformances)) {
     conformance->setAssociatedConformance(index, reqConformances[index]);

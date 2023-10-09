@@ -480,7 +480,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   /// Conformances that satisfy each of conformance requirements of the
   /// requirement signature of the protocol.
-  ArrayRef<ProtocolConformanceRef> SignatureConformances;
   MutableArrayRef<llvm::Optional<ProtocolConformanceRef>> AssociatedConformances;
 
   /// The lazy member loader provides callbacks for populating imported and
@@ -545,7 +544,6 @@ public:
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndBits.setInt(ContextAndBits.getInt() | InvalidFlag);
-    SignatureConformances = {};
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -665,19 +663,6 @@ public:
 
   /// Override the witness for a given requirement.
   void overrideWitness(ValueDecl *requirement, Witness newWitness);
-
-  /// Retrieve the protocol conformances that satisfy the requirements of the
-  /// protocol, which line up with the conformance constraints in the
-  /// protocol's requirement signature.
-  ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
-    if (Loader)
-      resolveLazyInfo();
-    return SignatureConformances;
-  }
-
-  /// Copy the given protocol conformances for the requirement signature into
-  /// the normal conformance.
-  void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Populate the signature conformances without checking if they satisfy
   /// requirements. Can only be used with parsed or imported conformances.

@@ -433,7 +433,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     auto normal = concrete->getRootNormalConformance();
 
     // If we haven't set the signature conformances yet, force the issue now.
-    if (normal->getSignatureConformances().empty()) {
+    if (!normal->hasComputedAssociatedConformances()) {
       // If we're in the process of checking the type witnesses, fail
       // gracefully.
       // FIXME: Seems like we should be able to get at the intermediate state

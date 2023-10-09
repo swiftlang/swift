@@ -388,34 +388,6 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
   return NPC->getProtocol()->getASTContext().AllocateCopy(unsatReqs);
 }
 
-void NormalProtocolConformance::setSignatureConformances(
-                               ArrayRef<ProtocolConformanceRef> conformances) {
-  if (conformances.empty()) {
-    SignatureConformances = { };
-    return;
-  }
-
-  auto &ctx = getProtocol()->getASTContext();
-  SignatureConformances = ctx.AllocateCopy(conformances);
-
-#if !NDEBUG
-  unsigned idx = 0;
-  auto reqs = getProtocol()->getRequirementSignature().getRequirements();
-  for (const auto &req : reqs) {
-    if (req.getKind() == RequirementKind::Conformance) {
-      assert(!conformances[idx].isConcrete() ||
-             !conformances[idx].getConcrete()->getType()->hasArchetype() &&
-             "Should have interface types here");
-      assert(idx < conformances.size());
-      assert(conformances[idx].isInvalid() ||
-             conformances[idx].getRequirement() == req.getProtocolDecl());
-      ++idx;
-    }
-  }
-  assert(idx == conformances.size() && "Too many conformances");
-#endif
-}
-
 void NormalProtocolConformance::resolveLazyInfo() const {
   assert(Loader);
 
@@ -552,14 +524,12 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
       [&](Type t, ProtocolDecl *p, unsigned index) {
         if (t->isEqual(assocType) && p == protocol) {
           // Fill in the signature conformances, if we haven't done so yet.
-          if (getSignatureConformances().empty()) {
-            const_cast<NormalProtocolConformance *>(this)->finishSignatureConformances();
+          if (!hasComputedAssociatedConformances()) {
+            const_cast<NormalProtocolConformance *>(this)
+                ->finishSignatureConformances();
           }
 
-          assert(!getSignatureConformances().empty() &&
-                 "signature conformances not yet computed");
-
-          result = getSignatureConformances()[index];
+          result = getAssociatedConformance(index);
           return true;
         }
 
@@ -639,55 +609,53 @@ recursivelySubstituteBaseType(ModuleDecl *module,
 
 /// Collect conformances for the requirement signature.
 void NormalProtocolConformance::finishSignatureConformances() {
-  if (!SignatureConformances.empty())
+  if (Loader)
+    resolveLazyInfo();
+
+  if (hasComputedAssociatedConformances())
     return;
+
+  createAssociatedConformanceArray();
 
   auto *proto = getProtocol();
-  auto reqSig = proto->getRequirementSignature().getRequirements();
-  if (reqSig.empty())
-    return;
+  ModuleDecl *module = getDeclContext()->getParentModule();
 
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (const auto &req : reqSig) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
+  forEachAssociatedConformance(
+    [&](Type origTy, ProtocolDecl *reqProto, unsigned index) {
+      Type substTy;
 
-    ModuleDecl *module = getDeclContext()->getParentModule();
+      if (origTy->isEqual(proto->getSelfInterfaceType())) {
+        substTy = getType();
+      } else {
+        auto *depMemTy = origTy->castTo<DependentMemberType>();
+        substTy = recursivelySubstituteBaseType(module, this, depMemTy);
+      }
 
-    Type substTy;
-    auto origTy = req.getFirstType();
-    if (origTy->isEqual(proto->getSelfInterfaceType())) {
-      substTy = getType();
-    } else {
-      auto *depMemTy = origTy->castTo<DependentMemberType>();
-      substTy = recursivelySubstituteBaseType(module, this, depMemTy);
-    }
-    auto reqProto = req.getProtocolDecl();
+      // Looking up a conformance for a contextual type and mapping the
+      // conformance context produces a more accurate result than looking
+      // up a conformance from an interface type.
+      //
+      // This can happen if the conformance has an associated conformance
+      // depending on an associated type that is made concrete in a
+      // refining protocol.
+      //
+      // That is, the conformance of an interface type G<T> : P really
+      // depends on the generic signature of the current context, because
+      // performing the lookup in a "more" constrained extension than the
+      // one where the conformance was defined must produce concrete
+      // conformances.
+      //
+      // FIXME: Eliminate this, perhaps by adding a variant of
+      // lookupConformance() taking a generic signature.
+      if (substTy->hasTypeParameter())
+        substTy = getDeclContext()->mapTypeIntoContext(substTy);
 
-    // Looking up a conformance for a contextual type and mapping the
-    // conformance context produces a more accurate result than looking
-    // up a conformance from an interface type.
-    //
-    // This can happen if the conformance has an associated conformance
-    // depending on an associated type that is made concrete in a
-    // refining protocol.
-    //
-    // That is, the conformance of an interface type G<T> : P really
-    // depends on the generic signature of the current context, because
-    // performing the lookup in a "more" constrained extension than the
-    // one where the conformance was defined must produce concrete
-    // conformances.
-    //
-    // FIXME: Eliminate this, perhaps by adding a variant of
-    // lookupConformance() taking a generic signature.
-    if (substTy->hasTypeParameter())
-      substTy = getDeclContext()->mapTypeIntoContext(substTy);
-
-    reqConformances.push_back(module->lookupConformance(substTy, reqProto,
-                                                        /*allowMissing=*/true)
-                                  .mapConformanceOutOfContext());
-  }
-  setSignatureConformances(reqConformances);
+      auto assocConf = module->lookupConformance(substTy, reqProto,
+                                                 /*allowMissing=*/true)
+                                    .mapConformanceOutOfContext();
+      setAssociatedConformance(index, assocConf);
+      return false;
+    });
 }
 
 Witness RootProtocolConformance::getWitness(ValueDecl *requirement) const {
