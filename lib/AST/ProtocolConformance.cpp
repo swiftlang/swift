@@ -569,6 +569,42 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   return *result;
 }
 
+/// Allocate the backing array if needed, computing its size from the
+///protocol's requirement signature.
+void NormalProtocolConformance::createAssociatedConformanceArray() {
+  if (hasComputedAssociatedConformances())
+    return;
+
+  setHasComputedAssociatedConformances();
+
+  auto *proto = getProtocol();
+
+  unsigned count = 0;
+  for (auto req : proto->getRequirementSignature().getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance)
+      ++count;
+  }
+
+  auto &ctx = proto->getASTContext();
+  AssociatedConformances =
+      ctx.Allocate<llvm::Optional<ProtocolConformanceRef>>(count);
+}
+
+llvm::Optional<ProtocolConformanceRef>
+NormalProtocolConformance::getAssociatedConformance(unsigned index) const {
+  if (!hasComputedAssociatedConformances())
+    return llvm::None;
+
+  return AssociatedConformances[index];
+}
+
+void NormalProtocolConformance::setAssociatedConformance(
+    unsigned index, ProtocolConformanceRef assocConf) {
+  createAssociatedConformanceArray();
+
+  assert(!AssociatedConformances[index]);
+  AssociatedConformances[index] = assocConf;
+}
 
 /// A stripped-down version of Type::subst that only works on the protocol
 /// Self type wrapped in zero or more DependentMemberTypes.

@@ -481,6 +481,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// Conformances that satisfy each of conformance requirements of the
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
+  MutableArrayRef<llvm::Optional<ProtocolConformanceRef>> AssociatedConformances;
 
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
@@ -635,6 +636,16 @@ public:
   /// return its associated conformance.
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const;
+
+  /// Allocate the backing array if needed, computing its size from the
+  ///protocol's requirement signature.
+  void createAssociatedConformanceArray();
+
+  llvm::Optional<ProtocolConformanceRef>
+  getAssociatedConformance(unsigned index) const;
+
+  void
+  setAssociatedConformance(unsigned index, ProtocolConformanceRef assocConf);
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement) const;
