@@ -719,8 +719,26 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.PlaygroundTransform |= Args.hasArg(OPT_playground);
   if (Args.hasArg(OPT_disable_playground_transform))
     Opts.PlaygroundTransform = false;
-  Opts.PlaygroundHighPerformance |=
-      Args.hasArg(OPT_playground_high_performance);
+  if (Args.hasArg(OPT_playground_high_performance)) {
+    // Disable any playground options that are marked as not being enabled in
+    // high performance mode.
+  #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+    if (!HighPerfOn) \
+      Opts.PlaygroundOptions.erase(PlaygroundOption::OptionName);
+  #include "swift/Basic/PlaygroundOptions.def"
+  }
+  for (const Arg *A : Args.filtered(OPT_playground_option)) {
+    // Enable the option (or disable if it has a "No" prefix). Any unknown
+    // options are ignored.
+    StringRef optionName = A->getValue();
+    const bool disableOption = optionName.consume_front("No");
+    if (auto option = getPlaygroundOption(optionName)) {
+      if (disableOption)
+        Opts.PlaygroundOptions.erase(*option);
+      else
+        Opts.PlaygroundOptions.insert(*option);
+    }
+  }
 
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);

@@ -21,6 +21,7 @@
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
 #include "clang/CAS/CASOptions.h"
@@ -295,9 +296,8 @@ namespace swift {
     /// Indicates whether the playground transformation should be applied.
     bool PlaygroundTransform = false;
 
-    /// Indicates whether the playground transformation should omit
-    /// instrumentation that has a high runtime performance impact.
-    bool PlaygroundHighPerformance = false;
+    /// Indicates the specific playground transformations to apply.
+    PlaygroundOptionSet PlaygroundOptions;
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
