@@ -14,8 +14,8 @@
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
 // Do not add other C++/llvm/swift header files here!
-// Function implementations should be placed into OptimizerBridgingImpl.h or OptimizerBridging.cpp and
-// required header files should be added there.
+// Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
+// (under OptimizerBridging) andrequired header files should be added there.
 //
 #include "swift/SIL/SILBridging.h"
 

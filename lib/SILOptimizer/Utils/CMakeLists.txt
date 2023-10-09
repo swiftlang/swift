@@ -22,7 +22,6 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalDestroyHoisting.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
-  OptimizerBridging.cpp
   PartialApplyCombiner.cpp
   PerformanceInlinerUtils.cpp
   ShrinkBorrowScope.cpp
