@@ -59,7 +59,7 @@ class X {
   @objc class func g() {}
 }
 
-protocol SwiftKlassP : class {
+protocol SwiftKlassP : AnyObject {
   func foo()
 }
 
@@ -253,12 +253,11 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick SuperKlass.Type):
 }
 
 // All of these uses should not be consuming except for the destroy.
-sil [ossa] @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @owned Builtin.NativeObject, Optional<Builtin.Int32>, @owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : @owned $Builtin.NativeObject, %2 : $Optional<Builtin.Int32>, %3 : @owned $Builtin.NativeObject):
+sil [ossa] @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, Builtin.Int1, Optional<Builtin.Int32>, Builtin.Int1) -> () {
+bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : $Builtin.Int1, %2 : $Optional<Builtin.Int32>, %3 : $Builtin.Int1):
   %4 = integer_literal $Builtin.Int32, 2
   select_enum %0 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: %4, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: %4, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: %4 : $Builtin.Int32
-  %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt: %3 : $Builtin.NativeObject
-  destroy_value %5 : $Builtin.NativeObject
+  %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt: %3 : $Builtin.Int1
   destroy_value %0 : $ThreeDifferingPayloadEnum
   %9999 = tuple()
   return %9999 : $()

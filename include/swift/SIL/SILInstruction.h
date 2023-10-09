@@ -6687,23 +6687,20 @@ public:
 class SelectEnumInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::SelectEnumInst, SelectEnumInst,
-          SelectEnumInstBase<SelectEnumInst,
-                             OwnershipForwardingSingleValueInstruction>,
+          SelectEnumInstBase<SelectEnumInst, SingleValueInstruction>,
           EnumElementDecl *> {
   friend SILBuilder;
-  friend SelectEnumInstBase<SelectEnumInst,
-                            OwnershipForwardingSingleValueInstruction>;
+  friend SelectEnumInstBase<SelectEnumInst, SingleValueInstruction>;
 
 public:
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                  bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
                  llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                 ProfileCounter DefaultCount,
-                 ValueOwnershipKind forwardingOwnershipKind)
+                 ProfileCounter DefaultCount)
       : InstructionBaseWithTrailingOperands(
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
-            DefaultCount, forwardingOwnershipKind) {
+            DefaultCount) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -6713,8 +6710,7 @@ public:
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
          SILModule &M, llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-         ProfileCounter DefaultCount,
-         ValueOwnershipKind forwardingOwnershipKind);
+         ProfileCounter DefaultCount);
 };
 
 /// Select one of a set of values based on the case of an enum.
@@ -10654,7 +10650,6 @@ OwnershipForwardingSingleValueInstruction::classof(SILInstructionKind kind) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::ThinToThickFunctionInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
-  case SILInstructionKind::SelectEnumInst:
     return true;
   default:
     return false;
