@@ -238,3 +238,20 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
     return visitor(.deadValue(value))
   }
 }
+
+let forwardingUseDefTest = FunctionTest("forwarding_use_def_test") {
+  function, arguments, context in
+  let value = arguments.takeValue()
+  for introducer in gatherLifetimeIntroducers(for: value, context) {
+    print("INTRODUCER: \(introducer)")
+  }
+}
+
+let forwardingDefUseTest = FunctionTest("forwarding_def_use_test") {
+  function, arguments, context in
+  let value = arguments.takeValue()
+  _ = visitForwardedUses(introducer: value, context) { operand in
+    print("USE: \(operand)")
+    return .continueWalk
+  }
+}
