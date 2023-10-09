@@ -5,7 +5,7 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: stress_test
 // REQUIRES: executable_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import StdlibUnittest
 

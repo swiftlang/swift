@@ -9,7 +9,7 @@
 // REQUIRES: stress_test
 
 // REQUIRES: objc_interop
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import StdlibUnittest
 import Foundation

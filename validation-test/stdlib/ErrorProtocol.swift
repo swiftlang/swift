@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: objc_interop
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import SwiftPrivate
 import StdlibUnittest
