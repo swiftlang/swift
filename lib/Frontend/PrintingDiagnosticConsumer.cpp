@@ -577,17 +577,16 @@ void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
                                            Info.FormatArgs);
   }
 
-  auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts,
-                           EmitMacroExpansionFiles);
+  auto Msg =
+      SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts, MacroExpansionOpts);
   rawSM.PrintMessage(out, Msg, ForceColors);
 }
 
 llvm::SMDiagnostic
 SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
-                          const Twine &Msg,
-                          ArrayRef<llvm::SMRange> Ranges,
+                          const Twine &Msg, ArrayRef<llvm::SMRange> Ranges,
                           ArrayRef<llvm::SMFixIt> FixIts,
-                          bool EmitMacroExpansionFiles) const {
+                          MacroExpansionOptions MacroExpansionOpts) const {
 
   // First thing to do: find the current buffer containing the specified
   // location to pull out the source line.
@@ -597,7 +596,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
   std::string LineStr;
 
   if (Loc.isValid()) {
-    BufferID = getDisplayNameForLoc(Loc, EmitMacroExpansionFiles);
+    BufferID = getDisplayNameForLoc(Loc, MacroExpansionOpts);
     auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
 
     // Scan backward to find the start of the line.

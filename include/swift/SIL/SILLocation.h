@@ -13,10 +13,11 @@
 #ifndef SWIFT_SIL_LOCATION_H
 #define SWIFT_SIL_LOCATION_H
 
-#include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/MacroExpansionOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/AST/TypeAlignments.h"
+#include "llvm/ADT/PointerUnion.h"
 
 #include <cstddef>
 #include <type_traits>
@@ -438,11 +439,12 @@ public:
 
   /// Extract the line, column, and filename from \p Loc.
   ///
-  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
-  /// file on-disk for buffers containing generated source code, returning the
-  /// name of that temporary file.
-  static FilenameAndLocation decode(SourceLoc Loc, const SourceManager &SM,
-                                    bool ForceGeneratedSourceToDisk = false);
+  /// \p MacroExpansionOptions can be passed to create a file on-disk for
+  /// buffers containing generated source code, returning the name of that
+  /// generated file.
+  static FilenameAndLocation
+  decode(SourceLoc Loc, const SourceManager &SM,
+         MacroExpansionOptions MacroExpansionOpts = {});
 
   /// Return the decoded FilenameAndLocation.
   /// In case the location has a separate AST node for debugging, this node is

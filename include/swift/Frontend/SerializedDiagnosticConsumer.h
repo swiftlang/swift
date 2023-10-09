@@ -27,6 +27,7 @@ namespace llvm {
 namespace swift {
 
   class DiagnosticConsumer;
+  struct MacroExpansionOptions;
 
   namespace serialized_diagnostics {
     /// Create a DiagnosticConsumer that serializes diagnostics to a file, using
@@ -35,8 +36,9 @@ namespace swift {
     /// \param outputPath the file path to write the diagnostics to.
     ///
     /// \returns A new diagnostic consumer that serializes diagnostics.
-    std::unique_ptr<DiagnosticConsumer>
-    createConsumer(llvm::StringRef outputPath, bool emitMacroExpansionFiles);
+  std::unique_ptr<DiagnosticConsumer>
+  createConsumer(llvm::StringRef outputPath,
+                 const MacroExpansionOptions &macroExpansionOpts);
   }
 }
 

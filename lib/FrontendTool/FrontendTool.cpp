@@ -2031,18 +2031,16 @@ createDispatchingDiagnosticConsumerIfNeeded(
 static std::unique_ptr<DiagnosticConsumer>
 createSerializedDiagnosticConsumerIfNeeded(
     const FrontendInputsAndOutputs &inputsAndOutputs,
-    bool emitMacroExpansionFiles
-) {
+    const MacroExpansionOptions &macroExpansionOpts) {
   return createDispatchingDiagnosticConsumerIfNeeded(
       inputsAndOutputs,
-      [emitMacroExpansionFiles](
-          const InputFile &input
-      ) -> std::unique_ptr<DiagnosticConsumer> {
+      [&macroExpansionOpts](
+          const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         auto serializedDiagnosticsPath = input.getSerializedDiagnosticsPath();
         if (serializedDiagnosticsPath.empty())
           return nullptr;
-        return serialized_diagnostics::createConsumer(
-            serializedDiagnosticsPath, emitMacroExpansionFiles);
+        return serialized_diagnostics::createConsumer(serializedDiagnosticsPath,
+                                                      macroExpansionOpts);
       });
 }
 
@@ -2378,8 +2376,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // See https://github.com/apple/swift/issues/45288 for details.
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
       createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs,
-        Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
+          Invocation.getFrontendOptions().InputsAndOutputs,
+          Invocation.getDiagnosticOptions().MacroExpansionOpts);
   if (SerializedConsumerDispatcher)
     Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
 
@@ -2397,8 +2395,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   PDC.setFormattingStyle(
       Invocation.getDiagnosticOptions().PrintedFormattingStyle);
 
-  PDC.setEmitMacroExpansionFiles(
-      Invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
+  PDC.setMacroExpansionOpts(
+      Invocation.getDiagnosticOptions().MacroExpansionOpts);
 
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();

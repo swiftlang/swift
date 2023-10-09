@@ -59,11 +59,13 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
 
@@ -139,6 +141,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
+  llvm::BumpPtrAllocator RemappedSILLocationPathAllocator;
+  llvm::StringSaver RemappedSILLocationPathSaver;
   /// \}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
@@ -1975,7 +1979,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        StringRef MainOutputFilenameForDebugInfo,
                                        StringRef PD)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), M(M), DBuilder(M),
-      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap) {
+      IGM(IGM), DebugPrefixMap(Opts.DebugPrefixMap),
+      RemappedSILLocationPathSaver(RemappedSILLocationPathAllocator) {
   assert(Opts.DebugInfoLevel > IRGenDebugInfoLevel::None &&
          "no debug info should be generated");
   llvm::SmallString<256> SourcePath;
@@ -3095,8 +3100,18 @@ SILLocation::FilenameAndLocation
 IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
   auto &Cached = FilenameAndLocationCache[SL.getOpaquePointerValue()];
   if (Cached.filename.empty()) {
-    Cached = sanitizeCodeViewFilenameAndLocation(
-        SILLocation::decode(SL, SM, /*ForceGeneratedSourceToDisk=*/true));
+    Cached = sanitizeCodeViewFilenameAndLocation(SILLocation::decode(
+        SL, SM, /*MacroExpansionOpts=*/{true, Opts.MacroExpansionFilesPath}));
+
+    // If `-debug-prefix-map` would change the path, handle that here.
+    // This is necessary to handle macro expansions correctly.
+    if (!Opts.MacroExpansionFilesPath.empty() &&
+        Cached.filename.startswith(Opts.MacroExpansionFilesPath)) {
+      std::string remapped = DebugPrefixMap.remapPath(Cached.filename);
+      if (remapped != Cached.filename) {
+        Cached.filename = RemappedSILLocationPathSaver.save(remapped);
+      }
+    }
   }
   return Cached;
 }

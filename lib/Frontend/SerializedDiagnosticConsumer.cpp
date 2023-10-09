@@ -103,15 +103,15 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
 class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
-  bool EmitMacroExpansionFiles = false;
+  MacroExpansionOptions MacroExpansionOpts;
   bool CalledFinishProcessing = false;
   bool CompilationWasComplete = true;
 
 public:
   SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
-                               bool emitMacroExpansionFiles)
+                               const MacroExpansionOptions &macroExpansionOpts)
       : State(new SharedState(serializedDiagnosticsPath)),
-        EmitMacroExpansionFiles(emitMacroExpansionFiles) {
+        MacroExpansionOpts(macroExpansionOpts) {
     emitPreamble();
   }
 
@@ -216,12 +216,12 @@ private:
 
 namespace swift {
 namespace serialized_diagnostics {
-  std::unique_ptr<DiagnosticConsumer> createConsumer(
-      StringRef outputPath, bool emitMacroExpansionFiles
-  ) {
-    return std::make_unique<SerializedDiagnosticConsumer>(
-        outputPath, emitMacroExpansionFiles);
-  }
+std::unique_ptr<DiagnosticConsumer>
+createConsumer(StringRef outputPath,
+               const MacroExpansionOptions &macroExpansionOpts) {
+  return std::make_unique<SerializedDiagnosticConsumer>(outputPath,
+                                                        macroExpansionOpts);
+}
 } // namespace serialized_diagnostics
 } // namespace swift
 
@@ -265,8 +265,8 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   // The source range that this buffer was generated from, expressed as
   // offsets into the original buffer.
   if (generatedInfo->originalSourceRange.isValid()) {
-    auto originalFilename = SM.getDisplayNameForLoc(generatedInfo->originalSourceRange.getStart(),
-                                EmitMacroExpansionFiles);
+    auto originalFilename = SM.getDisplayNameForLoc(
+        generatedInfo->originalSourceRange.getStart(), MacroExpansionOpts);
     addRangeToRecord(
         generatedInfo->originalSourceRange,
         SM, originalFilename, Record
@@ -541,7 +541,7 @@ emitDiagnosticMessage(SourceManager &SM,
 
   StringRef filename = "";
   if (Loc.isValid())
-    filename = SM.getDisplayNameForLoc(Loc, EmitMacroExpansionFiles);
+    filename = SM.getDisplayNameForLoc(Loc, MacroExpansionOpts);
 
   // Emit the RECORD_DIAG record.
   Record.clear();

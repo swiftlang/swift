@@ -502,6 +502,9 @@ public:
   /// The calling convention used to perform non-swift calls.
   llvm::CallingConv::ID PlatformCCallingConvention;
 
+  /// The directory where macro source buffers will be expanded into files.
+  std::string MacroExpansionFilesPath;
+
   IRGenOptions()
       : DWARFVersion(2),
         OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
@@ -544,7 +547,8 @@ public:
         UseRelativeProtocolWitnessTables(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All),
-        PlatformCCallingConvention(llvm::CallingConv::C) {
+        PlatformCCallingConvention(llvm::CallingConv::C),
+        MacroExpansionFilesPath() {
 #ifndef NDEBUG
     DisableRoundTripDebugTypes = false;
 #else

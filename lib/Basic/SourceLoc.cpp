@@ -71,14 +71,15 @@ bool SourceManager::rangeContainsRespectingReplacedRanges(
          containsRespectingReplacedRanges(Enclosing, Inner.End);
 }
 
-StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc, bool ForceGeneratedSourceToDisk) const {
+StringRef SourceManager::getDisplayNameForLoc(
+    SourceLoc Loc, MacroExpansionOptions MacroExpansionOpts) const {
   // Respect #line first
   if (auto VFile = getVirtualFile(Loc))
     return VFile->Name;
 
   // Next, try the stat cache
-  auto Ident = getIdentifierForBuffer(
-      findBufferContainingLoc(Loc), ForceGeneratedSourceToDisk);
+  auto Ident =
+      getIdentifierForBuffer(findBufferContainingLoc(Loc), MacroExpansionOpts);
   auto found = StatusCache.find(Ident);
   if (found != StatusCache.end()) {
     return found->second.getName();
@@ -221,14 +222,18 @@ SourceManager::~SourceManager() {
 
 /// Dump the contents of the given memory buffer to a file, returning the
 /// name of that file (when successful) and \c None otherwise.
-static llvm::Optional<std::string>
-dumpBufferToFile(const llvm::MemoryBuffer *buffer,
-                 const SourceManager &sourceMgr,
-                 CharSourceRange originalSourceRange) {
-  // Create file in the system temporary directory.
+static llvm::Optional<std::string> dumpBufferToFile(
+    const llvm::MemoryBuffer *buffer, const SourceManager &sourceMgr,
+    CharSourceRange originalSourceRange, llvm::StringRef ExpansionPath) {
+  // Create file in the system temporary directory unless an explicit
+  // path was provided.
   SmallString<128> outputFileName;
-  llvm::sys::path::system_temp_directory(true, outputFileName);
-  llvm::sys::path::append(outputFileName, "swift-generated-sources");
+  if (ExpansionPath.empty()) {
+    llvm::sys::path::system_temp_directory(true, outputFileName);
+    llvm::sys::path::append(outputFileName, "swift-generated-sources");
+  } else {
+    outputFileName = ExpansionPath;
+  }
   if (llvm::sys::fs::create_directory(outputFileName))
     return llvm::None;
 
@@ -250,9 +255,9 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
         if (originalSourceRange.isValid()) {
           out << "\n";
 
-          auto originalFilename =
-            sourceMgr.getDisplayNameForLoc(originalSourceRange.getStart(),
-                                           true);
+          auto originalFilename = sourceMgr.getDisplayNameForLoc(
+              originalSourceRange.getStart(),
+              {true, std::string(ExpansionPath)});
           unsigned startLine, startColumn, endLine, endColumn;
           std::tie(startLine, startColumn) =
               sourceMgr.getPresumedLineAndColumnForLoc(
@@ -274,14 +279,13 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
 }
 
 StringRef SourceManager::getIdentifierForBuffer(
-    unsigned bufferID, bool ForceGeneratedSourceToDisk
-) const {
+    unsigned bufferID, MacroExpansionOptions MacroExpansionOpts) const {
   auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
   assert(buffer && "invalid buffer ID");
 
   // If this is generated source code, and we're supposed to force it to disk
   // so external clients can see it, do so now.
-  if (ForceGeneratedSourceToDisk) {
+  if (MacroExpansionOpts.EmitFiles) {
     if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
       // We only care about macros, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
@@ -290,7 +294,8 @@ StringRef SourceManager::getIdentifierForBuffer(
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
         if (auto newFileNameOpt = dumpBufferToFile(
-                buffer, *this,  generatedInfo->originalSourceRange)) {
+                buffer, *this, generatedInfo->originalSourceRange,
+                MacroExpansionOpts.Path)) {
           generatedInfo->onDiskBufferCopyFileName =
               strdup(newFileNameOpt->c_str());
         }

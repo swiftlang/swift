@@ -1873,7 +1873,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     if (negated)
       contents = contents.drop_front(3);
     if (contents == "diagnostics")
-      Opts.EmitMacroExpansionFiles = !negated;
+      Opts.MacroExpansionOpts.EmitFiles = !negated;
+  }
+  if (Arg *A = Args.getLastArg(OPT_emit_macro_expansion_files_path)) {
+    Opts.MacroExpansionOpts.Path = A->getValue();
   }
 
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
@@ -2945,6 +2948,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         .Case("arm_aapcs", llvm::CallingConv::ARM_AAPCS)
         .Case("arm_aapcs_vfp", llvm::CallingConv::ARM_AAPCS_VFP)
         .Default(llvm::CallingConv::C);
+  }
+
+  if (Arg *A = Args.getLastArg(OPT_emit_macro_expansion_files_path)) {
+    Opts.MacroExpansionFilesPath = A->getValue();
   }
 
   return false;

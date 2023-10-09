@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/MacroExpansionOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/DenseSet.h"
@@ -319,18 +320,17 @@ public:
   ///
   /// \p BufferID must be a valid buffer ID.
   ///
-  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
-  /// file on-disk for buffers containing generated source code, returning the
-  /// name of that temporary file.
+  /// \p MacroExpansionOptions can be passed to create a file on-disk for
+  /// buffers containing generated source code, returning the name of that
+  /// generated file.
   ///
   /// This should not be used for displaying information about the \e contents
   /// of a buffer, since lines within the buffer may be marked as coming from
   /// other files using \c #sourceLocation. Use #getDisplayNameForLoc instead
   /// in that case.
-  StringRef getIdentifierForBuffer(
-      unsigned BufferID,
-      bool ForceGeneratedSourceToDisk = false
-  ) const;
+  StringRef
+  getIdentifierForBuffer(unsigned BufferID,
+                         MacroExpansionOptions MacroExpansionOpts = {}) const;
 
   /// Returns a SourceRange covering the entire specified buffer.
   ///
@@ -362,15 +362,16 @@ public:
   /// Returns a buffer identifier suitable for display to the user containing
   /// the given source location.
   ///
-  /// \p ForceGeneratedSourceToDisk can be set to true to create a temporary
-  /// file on-disk for buffers containing generated source code, returning the
-  /// name of that temporary file.
+  /// \p MacroExpansionOptions can be passed to create a file on-disk for
+  /// buffers containing generated source code, returning the name of that
+  /// generated file.
   ///
   /// This respects \c #sourceLocation directives and the 'use-external-names'
   /// directive in VFS overlay files. If you need an on-disk file name, use
   /// #getIdentifierForBuffer instead.
-  StringRef getDisplayNameForLoc(
-      SourceLoc Loc, bool ForceGeneratedSourceToDisk = false) const;
+  StringRef
+  getDisplayNameForLoc(SourceLoc Loc,
+                       MacroExpansionOptions MacroExpansionOpts = {}) const;
 
   /// Returns the line and column represented by the given source location.
   ///
@@ -406,11 +407,10 @@ public:
   StringRef extractText(CharSourceRange Range,
                         llvm::Optional<unsigned> BufferID = llvm::None) const;
 
-  llvm::SMDiagnostic GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
-                                const Twine &Msg,
-                                ArrayRef<llvm::SMRange> Ranges,
-                                ArrayRef<llvm::SMFixIt> FixIts,
-                                bool EmitMacroExpansionFiles = false) const;
+  llvm::SMDiagnostic
+  GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind, const Twine &Msg,
+             ArrayRef<llvm::SMRange> Ranges, ArrayRef<llvm::SMFixIt> FixIts,
+             MacroExpansionOptions MacroExpansionOpts = {}) const;
 
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;
