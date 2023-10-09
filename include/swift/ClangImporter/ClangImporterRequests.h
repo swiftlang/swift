@@ -31,6 +31,8 @@ class Decl;
 class DeclName;
 class EnumDecl;
 
+void simple_display(llvm::raw_ostream &out, const clang::Decl* decl);
+
 /// The input type for a clang direct lookup request.
 struct ClangDirectLookupDescriptor final {
   const ASTContext &ctx;
@@ -131,22 +133,23 @@ private:
 
 /// The input type for a record member lookup request.
 struct ClangRecordMemberLookupDescriptor final {
-  NominalTypeDecl *recordDecl;
+  ASTContext &ctx;
+  const clang::RecordDecl *clangDecl;
   DeclName name;
 
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
-    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
-  }
+  ClangRecordMemberLookupDescriptor(ASTContext &ctx,
+                                    const clang::RecordDecl *clangDecl,
+                                    DeclName name)
+      : ctx(ctx), clangDecl(clangDecl), name(name) {}
 
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.clangDecl);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.clangDecl == rhs.clangDecl;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,

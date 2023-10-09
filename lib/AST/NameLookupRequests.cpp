@@ -447,16 +447,20 @@ void UnqualifiedLookupRequest::writeDependencySink(
 // ClangDirectLookupRequest computation.
 //----------------------------------------------------------------------------//
 
+void swift::simple_display(llvm::raw_ostream &out, const clang::Decl *decl) {
+  if (auto namedDecl = dyn_cast<clang::NamedDecl>(decl)) {
+    namedDecl->printQualifiedName(out);
+  } else {
+    out << "<unnamed clang decl>";
+  }
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            const ClangDirectLookupDescriptor &desc) {
   out << "Looking up ";
   simple_display(out, desc.name);
   out << " in ";
-  if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.clangDecl)) {
-    namedDecl->printQualifiedName(out);
-  } else {
-    out << "<unnamed clang decl>";
-  }
+  simple_display(out, desc.clangDecl);
 }
 
 SourceLoc
@@ -490,12 +494,12 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "Looking up ";
   simple_display(out, desc.name);
   out << " in ";
-  simple_display(out, desc.recordDecl);
+  simple_display(out, desc.clangDecl);
 }
 
 SourceLoc
 swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
-  return extractNearestSourceLoc(desc.recordDecl);
+  return SourceLoc();
 }
 
 //----------------------------------------------------------------------------//

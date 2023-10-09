@@ -27,6 +27,7 @@ static TinyPtrVector<ValueDecl *>
 lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   ASTContext &ctx = decl->getASTContext();
   auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto clangDecl = cast<clang::RecordDecl>(decl->getClangDecl());
 
   TinyPtrVector<ValueDecl *> result;
 
@@ -34,7 +35,8 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
     auto underlyingId =
         ctx.getIdentifier(getPrivateOperatorName(std::string(id)));
     TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
+        ctx.evaluator, ClangRecordMemberLookup({ctx, clangDecl, underlyingId}),
+        {});
     for (auto it : underlyingFuncs) {
       if (auto synthesizedFunc =
               importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
@@ -42,8 +44,8 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
     }
   } else {
     // See if there is a Clang decl with the given name.
-    result = evaluateOrDefault(ctx.evaluator,
-                               ClangRecordMemberLookup({decl, id}), {});
+    result = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({ctx, clangDecl, id}), {});
   }
 
   // Check if there are any synthesized Swift members that match the name.

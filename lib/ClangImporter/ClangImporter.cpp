@@ -5158,14 +5158,11 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
 
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
-  NominalTypeDecl *recordDecl = desc.recordDecl;
   DeclName name = desc.name;
-  auto recordClangDecl = recordDecl->getClangDecl();
-
-  auto &ctx = recordDecl->getASTContext();
+  auto recordClangDecl = desc.clangDecl;
+  auto &ctx = desc.ctx;
   auto allResults = evaluateOrDefault(
-      ctx.evaluator, ClangDirectLookupRequest({ctx, recordClangDecl, name}),
-      {});
+      evaluator, ClangDirectLookupRequest({ctx, recordClangDecl, name}), {});
 
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
@@ -5174,8 +5171,13 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     auto named = found.get<clang::NamedDecl *>();
     if (dyn_cast<clang::Decl>(named->getDeclContext()) == recordClangDecl) {
       // Don't import constructors on foreign reference types.
-      if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
-        continue;
+      if (isa<clang::CXXConstructorDecl>(named)) {
+        auto semantics = evaluateOrDefault(
+            evaluator, CxxRecordSemantics({recordClangDecl, ctx}), {});
+        if (semantics == CxxRecordSemanticsKind::Reference ||
+            semantics == CxxRecordSemanticsKind::SwiftClassType)
+          continue;
+      }
 
       if (auto import = clangModuleLoader->importDeclDirectly(named))
         result.push_back(cast<ValueDecl>(import));
@@ -5205,37 +5207,48 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
-      if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
+      if (auto baseRecordName = clangModuleLoader->importName(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
-        if (cast<ValueDecl>(import)->getName() == name)
+        if (baseRecordName == name)
           continue;
 
         // Add Clang members that are imported lazily.
         auto baseResults = evaluateOrDefault(
-            ctx.evaluator,
-            ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name}), {});
-        // Add members that are synthesized eagerly, such as subscripts.
-        for (auto member :
-             cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
-          if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-            if (namedMember->hasName() &&
-                namedMember->getName().getBaseName() == name &&
-                // Make sure we don't add duplicate entries, as that would
-                // wrongly imply that lookup is ambiguous.
-                !llvm::is_contained(baseResults, namedMember)) {
-              baseResults.push_back(namedMember);
+            evaluator, ClangRecordMemberLookup({ctx, baseRecord, name}), {});
+        // Add members that are synthesized eagerly, such as subscripts. That
+        // requires importing the base struct.
+        // FIXME: this is a hack, this should either happen eagerly for all base
+        // records in VisitRecord, or lazily without importing the struct
+        if (name.isOperator() || name.getBaseName().isSubscript() ||
+            name.isSimpleName("pointee")) {
+          auto recordDecl = cast<NominalTypeDecl>(
+              clangModuleLoader->importDeclDirectly(baseRecord));
+          for (auto member : recordDecl->getCurrentMembersWithoutLoading()) {
+            if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+              if (namedMember->hasName() &&
+                  namedMember->getName().getBaseName() == name &&
+                  // Make sure we don't add duplicate entries, as that would
+                  // wrongly imply that lookup is ambiguous.
+                  !llvm::is_contained(baseResults, namedMember)) {
+                baseResults.push_back(namedMember);
+              }
             }
           }
         }
-        for (auto foundInBase : baseResults) {
-          // Do not add duplicate entry with the same arity,
-          // as that would cause an ambiguous lookup.
-          if (foundNameArities.count(getArity(foundInBase)))
-            continue;
-          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
-                  foundInBase, recordDecl)) {
-            result.push_back(newDecl);
+        if (!baseResults.empty()) {
+          // Only import the base struct if the lookup found something.
+          auto recordDecl = cast<NominalTypeDecl>(
+              clangModuleLoader->importDeclDirectly(recordClangDecl));
+          for (auto foundInBase : baseResults) {
+            // Do not add duplicate entry with the same arity,
+            // as that would cause an ambiguous lookup.
+            if (foundNameArities.count(getArity(foundInBase)))
+              continue;
+            if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
+                    foundInBase, recordDecl)) {
+              result.push_back(newDecl);
+            }
           }
         }
       }

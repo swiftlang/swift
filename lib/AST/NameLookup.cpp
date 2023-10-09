@@ -2039,10 +2039,10 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
         }
         return allFound;
       }
-    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+    } else if (auto clangRecordDecl =
+                   dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
-          ctx.evaluator,
-          ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
+          evaluator, ClangRecordMemberLookup({ctx, clangRecordDecl, name}), {});
       // Add all the members we found, later we'll combine these with the
       // existing members.
       for (auto found : allFound)
