@@ -1124,127 +1124,112 @@ BridgedWitnessTableEntryArray BridgedDefaultWitnessTable::getEntries() const {
 //                                BridgedBuilder
 //===----------------------------------------------------------------------===//
 
-static swift::SILBuilder builder(const BridgedBuilder * _Nonnull b) {
-  switch (b->insertAt) {
-  case BridgedBuilder::InsertAt::beforeInst:
-    return swift::SILBuilder(BridgedInstruction(b->insertionObj).get(), b->loc.getLoc().getScope());
-  case BridgedBuilder::InsertAt::endOfBlock:
-    return swift::SILBuilder(BridgedBasicBlock(b->insertionObj).get(), b->loc.getLoc().getScope());
-  case BridgedBuilder::InsertAt::intoGlobal:
-    return swift::SILBuilder(BridgedGlobalVar(b->insertionObj).getGlobal());
-  }
-}
-
-static swift::SILLocation regularLoc(const BridgedBuilder * _Nonnull b) {
-  return swift::RegularLocation(b->loc.getLoc().getLocation());
-}
-
 BridgedInstruction BridgedBuilder::createBuiltinBinaryFunction(BridgedStringRef name,
                                                BridgedType operandType, BridgedType resultType,
                                                BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {builder(this).createBuiltinBinaryFunction(regularLoc(this),
+  return {get().createBuiltinBinaryFunction(regularLoc(),
                                                 name.get(),
                                                 operandType.get(), resultType.get(),
                                                 arguments.getValues(argValues))};
 }
 
 BridgedInstruction BridgedBuilder::createCondFail(BridgedValue condition, BridgedStringRef message) const {
-  return {builder(this).createCondFail(regularLoc(this), condition.getSILValue(), message.get())};
+  return {get().createCondFail(regularLoc(), condition.getSILValue(), message.get())};
 }
 
 BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftInt value) const {
-  return {builder(this).createIntegerLiteral(regularLoc(this), type.get(), value)};
+  return {get().createIntegerLiteral(regularLoc(), type.get(), value)};
 }
 
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
                                     bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
-  return {builder(this).createAllocStack(regularLoc(this), type.get(), llvm::None,
+  return {get().createAllocStack(regularLoc(), type.get(), llvm::None,
                                          hasDynamicLifetime, isLexical, wasMoved)};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
-  return {builder(this).createDeallocStack(regularLoc(this), operand.getSILValue())};
+  return {get().createDeallocStack(regularLoc(), operand.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) const {
-  return {builder(this).createDeallocStackRef(regularLoc(this), operand.getSILValue())};
+  return {get().createDeallocStackRef(regularLoc(), operand.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
-  return {builder(this).createUncheckedRefCast(regularLoc(this), op.getSILValue(), type.get())};
+  return {get().createUncheckedRefCast(regularLoc(), op.getSILValue(), type.get())};
 }
 
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
-  return {builder(this).createUpcast(regularLoc(this), op.getSILValue(), type.get())};
+  return {get().createUpcast(regularLoc(), op.getSILValue(), type.get())};
 }
 
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
-  return {builder(this).createLoad(regularLoc(this), op.getSILValue(), (swift::LoadOwnershipQualifier)ownership)};
+  return {get().createLoad(regularLoc(), op.getSILValue(), (swift::LoadOwnershipQualifier)ownership)};
 }
 
 BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference, BridgedValue allocation) const {
-  return {builder(this).createBeginDeallocRef(regularLoc(this), reference.getSILValue(), allocation.getSILValue())};
+  return {get().createBeginDeallocRef(regularLoc(), reference.getSILValue(), allocation.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createEndInitLetRef(BridgedValue op) const {
-  return {builder(this).createEndInitLetRef(regularLoc(this), op.getSILValue())};
+  return {get().createEndInitLetRef(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRetain(BridgedValue op) const {
-  auto b = builder(this);
-  return {b.createStrongRetain(regularLoc(this), op.getSILValue(), b.getDefaultAtomicity())};
+  auto b = get();
+  return {b.createStrongRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRelease(BridgedValue op) const {
-  auto b = builder(this);
-  return {b.createStrongRelease(regularLoc(this), op.getSILValue(), b.getDefaultAtomicity())};
+  auto b = get();
+  return {b.createStrongRelease(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createUnownedRetain(BridgedValue op) const {
-  auto b = builder(this);
-  return {b.createUnownedRetain(regularLoc(this), op.getSILValue(), b.getDefaultAtomicity())};
+  auto b = get();
+  return {b.createUnownedRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createUnownedRelease(BridgedValue op) const {
-  auto b = builder(this);
-  return {b.createUnownedRelease(regularLoc(this), op.getSILValue(), b.getDefaultAtomicity())};
+  auto b = get();
+  return {b.createUnownedRelease(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createFunctionRef(BridgedFunction function) const {
-  return {builder(this).createFunctionRef(regularLoc(this), function.getFunction())};
+  return {get().createFunctionRef(regularLoc(), function.getFunction())};
 }
 
 BridgedInstruction BridgedBuilder::createCopyValue(BridgedValue op) const {
-  return {builder(this).createCopyValue(regularLoc(this), op.getSILValue())};
+  return {get().createCopyValue(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createBeginBorrow(BridgedValue op) const {
-  return {builder(this).createBeginBorrow(regularLoc(this), op.getSILValue())};
+  return {get().createBeginBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createEndBorrow(BridgedValue op) const {
-  return {builder(this).createEndBorrow(regularLoc(this), op.getSILValue())};
+  return {get().createEndBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValue to,
                                   bool takeSource, bool initializeDest) const {
-  return {builder(this).createCopyAddr(regularLoc(this),
+  return {get().createCopyAddr(regularLoc(),
                                    from.getSILValue(), to.getSILValue(),
                                    swift::IsTake_t(takeSource),
                                    swift::IsInitialization_t(initializeDest))};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op) const {
-  return {builder(this).createDestroyValue(regularLoc(this), op.getSILValue())};
+  return {get().createDestroyValue(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
-  return {builder(this).createDestroyAddr(regularLoc(this), op.getSILValue())};
+  return {get().createDestroyAddr(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDebugStep() const {
-  return {builder(this).createDebugStep(regularLoc(this))};
+  return {get().createDebugStep(regularLoc())};
 }
 
 BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSubstitutionMap subMap,
@@ -1255,7 +1240,7 @@ BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSub
   if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
   if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
 
-  return {builder(this).createApply(regularLoc(this),
+  return {get().createApply(regularLoc(),
                                 function.getSILValue(), subMap.get(),
                                 arguments.getValues(argValues),
                                 applyOpts, specInfo.data)};
@@ -1277,7 +1262,7 @@ BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, Op
     assert(mappedElements.count(c.first) && "wrong enum element index");
     convertedCases.push_back({mappedElements[c.first], c.second.get()});
   }
-  return {builder(this).createSwitchEnum(regularLoc(this),
+  return {get().createSwitchEnum(regularLoc(),
                                        enumVal.getSILValue(),
                                        defaultBlock.get(), convertedCases)};
 }
@@ -1285,7 +1270,7 @@ BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, Op
 BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
                                            BridgedType resultType) const {
   swift::SILValue en = enumVal.getSILValue();
-  return {builder(this).createUncheckedEnumData(regularLoc(this), enumVal.getSILValue(),
+  return {get().createUncheckedEnumData(regularLoc(), enumVal.getSILValue(),
                                             en->getType().getEnumElement(caseIdx), resultType.get())};
 }
 
@@ -1293,75 +1278,75 @@ BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedV
                               BridgedType resultType) const {
   swift::EnumElementDecl *caseDecl = resultType.get().getEnumElement(caseIdx);
   swift::SILValue pl = payload.getSILValue();
-  return {builder(this).createEnum(regularLoc(this), pl, caseDecl, resultType.get())};
+  return {get().createEnum(regularLoc(), pl, caseDecl, resultType.get())};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {builder(this).createBranch(regularLoc(this), destBlock.get(), arguments.getValues(argValues))};
+  return {get().createBranch(regularLoc(), destBlock.get(), arguments.getValues(argValues))};
 }
 
 BridgedInstruction BridgedBuilder::createUnreachable() const {
-  return {builder(this).createUnreachable(regularLoc(this))};
+  return {get().createUnreachable(regularLoc())};
 }
 
 BridgedInstruction BridgedBuilder::createObject(BridgedType type,
                                                 BridgedValueArray arguments,
                                                 SwiftInt numBaseElements) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {builder(this).createObject(swift::ArtificialUnreachableLocation(),
+  return {get().createObject(swift::ArtificialUnreachableLocation(),
                                  type.get(), arguments.getValues(argValues), numBaseElements)};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global) const {
-  return {builder(this).createGlobalAddr(regularLoc(this), global.getGlobal())};
+  return {get().createGlobalAddr(regularLoc(), global.getGlobal())};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalValue(BridgedGlobalVar global, bool isBare) const {
-  return {builder(this).createGlobalValue(regularLoc(this), global.getGlobal(), isBare)};
+  return {get().createGlobalValue(regularLoc(), global.getGlobal(), isBare)};
 }
 
 BridgedInstruction BridgedBuilder::createStruct(BridgedType type, BridgedValueArray elements) const {
   llvm::SmallVector<swift::SILValue, 16> elementValues;
-  return {builder(this).createStruct(regularLoc(this), type.get(), elements.getValues(elementValues))};
+  return {get().createStruct(regularLoc(), type.get(), elements.getValues(elementValues))};
 }
 
 BridgedInstruction BridgedBuilder::createStructExtract(BridgedValue str, SwiftInt fieldIndex) const {
   swift::SILValue v = str.getSILValue();
-  return {builder(this).createStructExtract(regularLoc(this), v, v->getType().getFieldDecl(fieldIndex))};
+  return {get().createStructExtract(regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 
 BridgedInstruction BridgedBuilder::createStructElementAddr(BridgedValue addr, SwiftInt fieldIndex) const {
   swift::SILValue v = addr.getSILValue();
-  return {builder(this).createStructElementAddr(regularLoc(this), v, v->getType().getFieldDecl(fieldIndex))};
+  return {get().createStructElementAddr(regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 
 BridgedInstruction BridgedBuilder::createDestructureStruct(BridgedValue str) const {
-  return {builder(this).createDestructureStruct(regularLoc(this), str.getSILValue())};
+  return {get().createDestructureStruct(regularLoc(), str.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createTuple(BridgedType type, BridgedValueArray elements) const {
   llvm::SmallVector<swift::SILValue, 16> elementValues;
-  return {builder(this).createTuple(regularLoc(this), type.get(), elements.getValues(elementValues))};
+  return {get().createTuple(regularLoc(), type.get(), elements.getValues(elementValues))};
 }
 
 BridgedInstruction BridgedBuilder::createTupleExtract(BridgedValue str, SwiftInt elementIndex) const {
   swift::SILValue v = str.getSILValue();
-  return {builder(this).createTupleExtract(regularLoc(this), v, elementIndex)};
+  return {get().createTupleExtract(regularLoc(), v, elementIndex)};
 }
 
 BridgedInstruction BridgedBuilder::createTupleElementAddr(BridgedValue addr, SwiftInt elementIndex) const {
   swift::SILValue v = addr.getSILValue();
-  return {builder(this).createTupleElementAddr(regularLoc(this), v, elementIndex)};
+  return {get().createTupleElementAddr(regularLoc(), v, elementIndex)};
 }
 
 BridgedInstruction BridgedBuilder::createDestructureTuple(BridgedValue str) const {
-  return {builder(this).createDestructureTuple(regularLoc(this), str.getSILValue())};
+  return {get().createDestructureTuple(regularLoc(), str.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue dst,
                                SwiftInt ownership) const {
-  return {builder(this).createStore(regularLoc(this), src.getSILValue(), dst.getSILValue(),
+  return {get().createStore(regularLoc(), src.getSILValue(), dst.getSILValue(),
                                 (swift::StoreOwnershipQualifier)ownership)};
 }
 
@@ -1369,7 +1354,7 @@ BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instanc
                                             BridgedType type,
                                             BridgedInstruction useConformancesOf) const {
   auto *src = useConformancesOf.getAs<swift::InitExistentialRefInst>();
-  return {builder(this).createInitExistentialRef(regularLoc(this), type.get(),
+  return {get().createInitExistentialRef(regularLoc(), type.get(),
                                              src->getFormalConcreteType(),
                                              instance.getSILValue(),
                                              src->getConformances())};
@@ -1379,11 +1364,11 @@ BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,
                                                   BridgedType::MetatypeRepresentation representation) const {
   auto *mt = swift::MetatypeType::get(type.get().getASTType(), (swift::MetatypeRepresentation)representation);
   auto t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
-  return {builder(this).createMetatype(regularLoc(this), t)};
+  return {get().createMetatype(regularLoc(), t)};
 }
 
 BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
-  return {builder(this).createEndCOWMutation(regularLoc(this), instance.getSILValue(), keepUnique)};
+  return {get().createEndCOWMutation(regularLoc(), instance.getSILValue(), keepUnique)};
 }
 
 //===----------------------------------------------------------------------===//
