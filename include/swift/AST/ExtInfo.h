@@ -21,7 +21,6 @@
 #define SWIFT_EXTINFO_H
 
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/ClangModuleLoader.h"
 
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
@@ -38,6 +37,7 @@ namespace swift {
 class AnyFunctionType;
 class ASTExtInfo;
 class ASTExtInfoBuilder;
+class ClangModuleLoader;
 class FunctionType;
 class SILExtInfo;
 class SILExtInfoBuilder;
