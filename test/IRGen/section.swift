@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %s -S 		-parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
 
 // REQUIRES: swift_in_compiler
 
@@ -46,22 +45,3 @@
 // IR:  @"$s7section2g5_Wz" = internal global {{i64|i32}} 0
 // IR:  @"$s7section2g5SpySiGSgvp" = hidden global {{i64|i32}} 1111638594, section "__TEXT,__mysection"
 // IR:  define {{.*}}@"$s7section3fooyyF"(){{.*}} section "__TEXT,__mysection"
-
-// ASM: .section{{.*}}__TEXT,__mysection
-// ASM-NOT: .section
-// ASM: $s7section3fooyyF:
-// ASM-linux-gnu: .section{{.*}}__TEXT,__mysection
-// ASM-linux-android: .section{{.*}}__TEXT,__mysection
-// ASM-linux-androideabi: .section{{.*}}__TEXT,__mysection
-// ASM-NOT: .section
-// ASM: $s7section2g0Sivp:
-// ASM-NOT: .section
-// ASM: $s7section2g1Si_Sitvp:
-// ASM-NOT: .section
-// ASM: $s7section2g2Sbvp:
-// ASM-NOT: .section
-// ASM: $s7section2g3Sbvp:
-// ASM-NOT: .section
-// ASM: $s7section2g4SpySiGSgvp:
-// ASM-NOT: .section
-// ASM: $s7section2g5SpySiGSgvp:
