@@ -346,6 +346,13 @@ How to build the swift compiler modules. Possible values are
                                    compiler, provided in `SWIFT_NATIVE_SWIFT_TOOLS_PATH`
 ]=] OFF)
 
+option(BRIDGING_MODE [=[
+How swift-C++ bridging code is compiled:
+    INLINE:       uses full swift C++ interop and briding functions are inlined
+    PURE:         uses limited C++ interp an bridging functions are not inlined
+    DEFAULT:      based on the build configuration
+]=] DEFAULT)
+
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
   "Define the maximum number of linker jobs for swift.")
@@ -389,6 +396,17 @@ endif()
 set(SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY
   ${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY_default}
   CACHE STRING "MSVC Runtime Library for the standard library")
+
+
+if(BRIDGING_MODE STREQUAL "DEFAULT" OR NOT BRIDGING_MODE)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    # In debug builds, to workaround a problem with LLDB's `po` command (rdar://115770255).
+    # On windows to workaround a build problem.
+    set(BRIDGING_MODE "PURE")
+  else()
+    set(BRIDGING_MODE "INLINE")
+  endif()
+endif()
 
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(swift_optimized)

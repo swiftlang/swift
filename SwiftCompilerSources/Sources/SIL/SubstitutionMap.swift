@@ -13,17 +13,17 @@
 import SILBridging
 
 public struct SubstitutionMap {
-  public let bridged: swift.SubstitutionMap
+  public let bridged: BridgedSubstitutionMap
 
-  public init(_ bridged: swift.SubstitutionMap) {
+  public init(_ bridged: BridgedSubstitutionMap) {
     self.bridged = bridged
   }
   
   public init() {
-    self.bridged = swift.SubstitutionMap()
+    self.bridged = BridgedSubstitutionMap()
   }
 
-  public var isEmpty: Bool { bridged.empty() }
+  public var isEmpty: Bool { bridged.isEmpty() }
 
   public var replacementTypes: OptionalTypeArray {
     let types = BridgedTypeArray.fromReplacementTypes(bridged)

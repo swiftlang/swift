@@ -159,10 +159,11 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
   for use in tailAddr.uses {
     switch use.instruction {
     case let indexAddr as IndexAddrInst:
-      guard let indexLiteral = indexAddr.index as? IntegerLiteralInst else {
+      guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
+            let tailIdx = indexLiteral.value else
+      {
         return false
       }
-      let tailIdx = Int(indexLiteral.value.getZExtValue())
       if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores) {
         return false
       }
@@ -399,11 +400,12 @@ private extension AllocRefInstBase {
     }
 
     // The number of tail allocated elements must be constant.
-    guard let tailCountLiteral = tailAllocatedCounts[0].value as? IntegerLiteralInst,
-          tailCountLiteral.value.getActiveBits() <= 20 else {
-      return nil
+    if let tailCountLiteral = tailAllocatedCounts[0].value as? IntegerLiteralInst,
+       let count = tailCountLiteral.value
+    {
+      return count
     }
-    return Int(tailCountLiteral.value.getZExtValue());
+    return nil
   }
 
   var numClassFields: Int {

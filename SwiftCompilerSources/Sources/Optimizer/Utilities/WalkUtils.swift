@@ -490,7 +490,7 @@ extension AddressDefUseWalker {
       }
     case let ia as IndexAddrInst:
       if let (pathIdx, subPath) = path.pop(kind: .indexedElement) {
-        if let idx = ia.constantSmallIndex,
+        if let idx = ia.constantIndex,
            idx == pathIdx {
           return walkDownUses(ofAddress: ia, path: subPath)
         }
@@ -761,7 +761,7 @@ extension AddressUseDefWalker {
     case is BeginAccessInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
     case let ia as IndexAddrInst:
-      if let idx = ia.constantSmallIndex {
+      if let idx = ia.constantIndex {
         return walkUp(address: ia.base, path: path.push(.indexedElement, index: idx))
       } else {
         return walkUp(address: ia.base, path: path.push(.anyIndexedElement, index: 0))
@@ -775,13 +775,11 @@ extension AddressUseDefWalker {
 }
 
 private extension IndexAddrInst {
-  var constantSmallIndex: Int? {
-    guard let literal = index as? IntegerLiteralInst else {
-      return nil
-    }
-    let index = literal.value
-    if index.isIntN(16) {
-      return Int(index.getSExtValue())
+  var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
     }
     return nil
   }

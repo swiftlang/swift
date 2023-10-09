@@ -143,7 +143,7 @@ public func registerOptimizerTests() {
 
 
 private func registerFunctionTest(_ test: FunctionTest) {
-  test.name._withStringRef { ref in
+  test.name._withBridgedStringRef { ref in
     registerFunctionTest(ref, eraseInvocation(test.invocation))
   }
 }
@@ -207,7 +207,7 @@ FunctionTest(name: "test_specification_parsing") { function, arguments, context 
 
     public mutating func write(_ string: String) {
       for c in string.utf8 {
-        _swift_stdlib_putc_stderr(CInt(c))
+        writeCharToStderr(CInt(c))
       }
     }
   }

@@ -76,6 +76,7 @@ function(add_swift_compiler_modules_library name)
       "-Xfrontend" "-validate-tbd-against-ir=none"
       "-Xfrontend" "-enable-experimental-cxx-interop"
       "-Xcc" "-std=c++17"
+      "-Xcc" "-DCOMPILED_WITH_SWIFT"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
@@ -89,6 +90,10 @@ function(add_swift_compiler_modules_library name)
 
   if(NOT LLVM_ENABLE_ASSERTIONS)
     list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
+  endif()
+
+  if("${BRIDGING_MODE}" STREQUAL "PURE")
+    list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
 
   if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
@@ -237,16 +242,11 @@ else()
   # defined in include/swift/module.modulemap
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
        "
-#include \"Basic/BridgedSwiftObject.h\"
+#define COMPILED_WITH_SWIFT
+
 #include \"Basic/BasicBridging.h\"
-#include \"Basic/SourceLoc.h\"
-
 #include \"AST/ASTBridging.h\"
-#include \"AST/DiagnosticEngine.h\"
-#include \"AST/DiagnosticConsumer.h\"
-
 #include \"SIL/SILBridging.h\"
-
 #include \"SILOptimizer/OptimizerBridging.h\"
 
 #include \"Parse/RegexParserBridging.h\"
