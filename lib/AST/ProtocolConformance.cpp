@@ -535,14 +535,14 @@ Type ProtocolConformance::getAssociatedType(Type assocType) const {
 
 ProtocolConformanceRef
 ProtocolConformance::getAssociatedConformance(Type assocType,
-                                               ProtocolDecl *protocol) const {
+                                              ProtocolDecl *protocol) const {
   CONFORMANCE_SUBCLASS_DISPATCH(getAssociatedConformance,
                                 (assocType, protocol))
 }
 
 ProtocolConformanceRef
 NormalProtocolConformance::getAssociatedConformance(Type assocType,
-                                                ProtocolDecl *protocol) const {
+                                                 ProtocolDecl *protocol) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 

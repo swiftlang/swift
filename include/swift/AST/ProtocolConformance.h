@@ -444,13 +444,18 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
     /// The conformance was labeled with @unchecked.
     UncheckedFlag = 0x02,
+
+    /// We have allocated the AssociatedConformances array (but not necessarily
+    /// populated any of its elements).
+    HasComputedAssociatedConformancesFlag = 0x04,
   };
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   ///
-  /// Also stores the "invalid" and "unchecked" bits.
-  llvm::PointerIntPair<DeclContext *, 2, unsigned> ContextAndBits;
+  /// Also stores the "invalid", "unchecked" and "has computed associated
+  /// conformances" bits.
+  llvm::PointerIntPair<DeclContext *, 3, unsigned> ContextAndBits;
 
   /// The reason that this conformance exists.
   ///
@@ -552,6 +557,17 @@ public:
   void setUnchecked() {
     // OK to mutate because the flags are not part of the folding set node ID.
     ContextAndBits.setInt(ContextAndBits.getInt() | UncheckedFlag);
+  }
+
+  /// Determine whether we've lazily computed the associated conformance array
+  /// already.
+  bool hasComputedAssociatedConformances() const {
+    return ContextAndBits.getInt() & HasComputedAssociatedConformancesFlag;
+  }
+
+  /// Mark this conformance as having computed the assocaited conformance array.
+  void setHasComputedAssociatedConformances() {
+    ContextAndBits.setInt(ContextAndBits.getInt() | HasComputedAssociatedConformancesFlag);
   }
 
   /// Get the kind of source from which this conformance comes.
