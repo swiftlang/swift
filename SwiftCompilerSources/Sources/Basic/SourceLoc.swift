@@ -27,11 +27,11 @@ public struct SourceLoc {
     guard bridged.isValid() else {
       return nil
     }
-    self.locationInFile = bridged.opaquePointer!
+    self.locationInFile = bridged.uint8Pointer()!
   }
 
   public var bridged: BridgedSourceLoc {
-    .init(opaquePointer: locationInFile)
+    .init(locationInFile)
   }
 }
 

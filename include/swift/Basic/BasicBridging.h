@@ -88,9 +88,19 @@ public:
   void destroy() const;
 };
 
-struct BridgedSourceLoc {
-  const uint8_t * _Nullable opaquePointer;
+class BridgedSourceLoc {
+  const void * _Nullable opaquePointer;
+public:
+  BridgedSourceLoc() : opaquePointer(nullptr) {}
+  BridgedSourceLoc(const void * _Nullable loc) : opaquePointer(loc) {}
+
   bool isValid() const { return opaquePointer != nullptr; }
+  SWIFT_IMPORT_UNSAFE const uint8_t * _Nullable uint8Pointer() const {
+    return (const uint8_t * _Nullable)opaquePointer;
+  }
+  const char * _Nullable getLoc() const {
+    return (const char * _Nullable)opaquePointer;
+  }
 };
 
 struct BridgedArrayRef {

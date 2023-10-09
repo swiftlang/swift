@@ -21,6 +21,7 @@
 
 #ifdef USED_IN_CPP_SOURCE
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILWitnessTable.h"
 #endif
@@ -769,6 +770,23 @@ struct BridgedBuilder{
 
   SwiftObject insertionObj;
   BridgedLocation loc;
+
+#ifdef USED_IN_CPP_SOURCE
+  swift::SILBuilder get() const {
+    switch (insertAt) {
+    case BridgedBuilder::InsertAt::beforeInst:
+      return swift::SILBuilder(BridgedInstruction(insertionObj).get(), loc.getLoc().getScope());
+    case BridgedBuilder::InsertAt::endOfBlock:
+      return swift::SILBuilder(BridgedBasicBlock(insertionObj).get(), loc.getLoc().getScope());
+    case BridgedBuilder::InsertAt::intoGlobal:
+      return swift::SILBuilder(BridgedGlobalVar(insertionObj).getGlobal());
+    }
+  }
+  swift::SILLocation regularLoc() const {
+    return swift::RegularLocation(loc.getLoc().getLocation());
+  }
+#endif
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBuiltinBinaryFunction(BridgedStringRef name,
                                           BridgedType operandType, BridgedType resultType,
                                           BridgedValueArray arguments) const;
