@@ -1905,11 +1905,9 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
   //
   // If for-in is already type-checked, the type-checked version
   // of the sequence is going to be visited as part of `iteratorVar`.
-  if (S->getTypeCheckedSequence()) {
-    if (auto IteratorVar = S->getIteratorVar()) {
-      if (doIt(IteratorVar))
-        return nullptr;
-    }
+  if (auto IteratorVar = S->getIteratorVar()) {
+    if (doIt(IteratorVar))
+      return nullptr;
 
     if (auto NextCall = S->getNextCall()) {
       if ((NextCall = doIt(NextCall)))
