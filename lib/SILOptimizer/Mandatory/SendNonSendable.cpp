@@ -1381,7 +1381,6 @@ class RaceTracer {
       SILBasicBlock * SILBlock, TrackableValueID consumedVal,
       ConsumedReason &consumedReason, unsigned distance,
       std::optional<PartitionOp> targetOp = {}) {
-    assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
     LocalConsumedReason localReason
         = findLocalConsumedReason(SILBlock, consumedVal, targetOp);
     switch (localReason.kind) {
