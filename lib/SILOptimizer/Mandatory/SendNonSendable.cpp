@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
@@ -47,10 +48,6 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   // We assume that any instruction that does not correspond to an ApplyExpr
   // cannot cross an isolation domain.
   return false;
-}
-
-static bool isApplyInst(SILInstruction &inst) {
-  return ApplySite::isa(&inst) || isa<BuiltinInst>(inst);
 }
 
 static AccessStorage getAccessStorageFromAddr(SILValue value) {
@@ -435,13 +432,26 @@ class PartitionOpTranslator {
 
     for (auto &block : *function) {
       for (auto &inst : block) {
-        if (isApplyInst(inst)) {
-          // add all nonsendable, uniquely identified arguments to applications
-          // to capturedUIValues, because applications capture them
+        if (auto *pai = dyn_cast<PartialApplyInst>(&inst)) {
+          // If we find an address or a box of a non-Sendable type that is
+          // passed to a partial_apply, mark the value's representative as being
+          // uniquely identified and captured.
           for (SILValue val : inst.getOperandValues()) {
-            if (val->getType().isAddress()) {
+            if (val->getType().isAddress() &&
+                isNonSendableType(val->getType())) {
               auto trackVal = getTrackableValue(val, true);
+              (void)trackVal;
               LLVM_DEBUG(trackVal.print(llvm::dbgs()));
+              continue;
+            }
+
+            if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
+              if (isNonSendableType(
+                      pbi->getType().getSILBoxFieldType(function))) {
+                auto trackVal = getTrackableValue(val, true);
+                (void)trackVal;
+                continue;
+              }
             }
           }
         }
