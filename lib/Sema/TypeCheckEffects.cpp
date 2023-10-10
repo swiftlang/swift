@@ -762,7 +762,7 @@ public:
 
       if (considerThrows) {
         if (auto thrownInterfaceType =
-                func->getEffectiveThrownInterfaceType()) {
+                func->getEffectiveThrownErrorType()) {
           Type thrownType =
               thrownInterfaceType->subst(declRef.getSubstitutions());
           result.merge(Classification::forThrows(thrownType,
@@ -1660,7 +1660,7 @@ private:
         return Classification();
 
       case EffectKind::Throws:
-        if (auto thrownError = fnType->getEffectiveThrownInterfaceType())
+        if (auto thrownError = fnType->getEffectiveThrownErrorType())
           return Classification::forThrows(*thrownError, conditional, reason);
 
         return Classification();
@@ -3303,13 +3303,6 @@ Type TypeChecker::errorUnion(Type type1, Type type2) {
   // FIXME: When either or both contain type variables, we'll need to form an
   // actual union type here.
   return type1->getASTContext().getErrorExistentialType();
-}
-
-Type swift::getEffectiveThrownErrorTypeOrNever(AnyFunctionType *func) {
-  if (auto thrownError = func->getEffectiveThrownInterfaceType())
-    return *thrownError;
-
-  return func->getASTContext().getNeverType();
 }
 
 namespace {

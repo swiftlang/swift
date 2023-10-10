@@ -38,3 +38,34 @@ struct ConformingToVeryThrowing: VeryThrowing {
                                // FIXME: Diagnostic above should be better
   var prop4: Int { get throws(SubError) { 0 } }
 }
+
+// Associated type inference.
+protocol FailureAssociatedType {
+  associatedtype Failure: Error
+
+  func f() throws(Failure)
+}
+
+struct S1: FailureAssociatedType {
+  func f() throws(MyError) { }
+}
+
+struct S2: FailureAssociatedType {
+  func f() throws { }
+}
+
+struct S3: FailureAssociatedType {
+  func f() { }
+}
+
+func testAssociatedTypes() {
+  let _ = S1.Failure() // expected-error{{'S1.Failure' (aka 'MyError') cannot be constructed because it has no accessible initializers}}
+  let _ = S2.Failure() // expected-error{{'S2.Failure' (aka 'any Error') cannot be constructed because it has no accessible initializers}}
+  let _: Int = S3.Failure() // expected-error{{cannot convert value of type 'S3.Failure' (aka 'Never') to specified type 'Int'}}
+  // expected-error@-1{{missing argument for parameter 'from' in call}}
+}
+
+// Make sure we can throw the generic failure type.
+func assocFailureType<T: FailureAssociatedType>(_ value: T, _ error: T.Failure) throws(T.Failure) {
+  throw error
+}

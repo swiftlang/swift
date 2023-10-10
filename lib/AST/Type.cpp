@@ -5419,7 +5419,7 @@ AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
   return withExtInfo(info);
 }
 
-llvm::Optional<Type> AnyFunctionType::getEffectiveThrownInterfaceType() const {
+llvm::Optional<Type> AnyFunctionType::getEffectiveThrownErrorType() const {
   // A non-throwing function... has no thrown interface type.
   if (!isThrowing())
     return llvm::None;
@@ -5435,6 +5435,13 @@ llvm::Optional<Type> AnyFunctionType::getEffectiveThrownInterfaceType() const {
 
   // Otherwise, return the typed error.
   return thrownError;
+}
+
+Type AnyFunctionType::getEffectiveThrownErrorTypeOrNever() const {
+  if (auto thrown = getEffectiveThrownErrorType())
+    return *thrown;
+
+  return getASTContext().getNeverType();
 }
 
 llvm::Optional<TangentSpace>

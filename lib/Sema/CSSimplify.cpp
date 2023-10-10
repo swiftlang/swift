@@ -2957,8 +2957,8 @@ matchFunctionThrowing(ConstraintSystem &cs,
   // that throws error type E2 when E1 is a subtype of E2. For the purpose
   // of this comparison, a non-throwing function has thrown error type 'Never',
   // and an untyped throwing function has thrown error type 'any Error'.
-  Type thrownError1 = getEffectiveThrownErrorTypeOrNever(func1);
-  Type thrownError2 = getEffectiveThrownErrorTypeOrNever(func2);
+  Type thrownError1 = func1->getEffectiveThrownErrorTypeOrNever();
+  Type thrownError2 = func2->getEffectiveThrownErrorTypeOrNever();
   if (!thrownError1 || !thrownError2)
     return cs.getTypeMatchSuccess();
 

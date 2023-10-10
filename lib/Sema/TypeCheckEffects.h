@@ -22,11 +22,6 @@
 
 namespace swift {
 
-/// Retrieve the effective thrown error type for the given function type, which
-/// is the thrown error type (is specified), `any Error` if untyped throwing, or
-/// `Never` if non-throwing.
-Type getEffectiveThrownErrorTypeOrNever(AnyFunctionType *func);
-
 /// Classifies the result of a subtyping comparison between two thrown error
 /// types.
 enum class ThrownErrorSubtyping {

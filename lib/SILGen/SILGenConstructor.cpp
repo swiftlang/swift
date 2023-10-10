@@ -680,7 +680,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(llvm::None, ctor->getEffectiveThrownInterfaceType(),
+  prepareEpilog(llvm::None, ctor->getEffectiveThrownErrorType(),
                 CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
@@ -1185,7 +1185,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(llvm::None, ctor->getEffectiveThrownInterfaceType(),
+  prepareEpilog(llvm::None, ctor->getEffectiveThrownErrorType(),
                 CleanupLocation(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
@@ -1751,7 +1751,7 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
   }
 
   prepareEpilog(accessor->getResultInterfaceType(),
-                accessor->getEffectiveThrownInterfaceType(),
+                accessor->getEffectiveThrownErrorType(),
                 CleanupLocation(accessor));
 
   emitProfilerIncrement(accessor->getTypecheckedBody());

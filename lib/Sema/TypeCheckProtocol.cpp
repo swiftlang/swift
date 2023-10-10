@@ -861,8 +861,8 @@ RequirementMatch swift::matchWitness(
       if (!reqThrownError) {
         // Save the thrown error types of the requirement and witness so we
         // can check them later.
-        reqThrownError = getEffectiveThrownErrorTypeOrNever(reqFnType);
-        witnessThrownError = getEffectiveThrownErrorTypeOrNever(witnessFnType);
+        reqThrownError = reqFnType->getEffectiveThrownErrorTypeOrNever();
+        witnessThrownError = witnessFnType->getEffectiveThrownErrorTypeOrNever();
       }
     }
   } else {
@@ -901,13 +901,19 @@ RequirementMatch swift::matchWitness(
       return RequirementMatch(witness, MatchKind::ThrowsConflict);
 
     case ThrownErrorSubtyping::ExactMatch:
-    case ThrownErrorSubtyping::Subtype:
       // All is well.
       break;
 
+    case ThrownErrorSubtyping::Subtype:
+      // If there were no type parameters, we're done.
+      if (!reqThrownError->hasTypeParameter())
+        break;
+
+      LLVM_FALLTHROUGH;
+
     case ThrownErrorSubtyping::Dependent:
       // We need to perform type matching
-      if (auto result = matchTypes(witnessThrownError, reqThrownError)) {
+      if (auto result = matchTypes(reqThrownError, witnessThrownError)) {
         return std::move(result.value());
       }
       break;
