@@ -1486,3 +1486,8 @@ extension OpaquePointer {
     self._rawValue = unwrapped._rawValue
   }
 }
+
+@available(*, unavailable)
+extension UnsafeRawPointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutableRawPointer: Sendable { }
