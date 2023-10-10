@@ -2453,7 +2453,6 @@ namespace {
       auto resultLocator =
           CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
 
-      // FIXME: Need a better locator.
       auto thrownErrorLocator =
         CS.getConstraintLocator(closure, ConstraintLocator::ClosureThrownError);
 

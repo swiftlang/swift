@@ -432,8 +432,8 @@ OperandOwnershipClassifier::visitSelectEnumInst(SelectEnumInst *i) {
   if (getValue() == i->getEnumOperand()) {
     return OperandOwnership::InstantaneousUse;
   }
-  return getOwnershipKind().getForwardingOperandOwnership(
-    /*allowUnowned*/true);
+  assert(i->getType().isTrivial(i->getFunction()));
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {

@@ -42,7 +42,12 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
            .IsPOD:
-        optimizeFirstArgumentToThinMetatype(context)
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CreateAsyncTask:
+        // In embedded Swift, CreateAsyncTask needs a thin metatype
+        if context.options.enableEmbeddedSwift {
+          optimizeArgumentToThinMetatype(argument: 1, context)
+        }
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -174,16 +179,25 @@ private extension BuiltinInst {
     context.erase(instruction: self)
   }
   
-  func optimizeFirstArgumentToThinMetatype(_ context: SimplifyContext) {
-    guard let metatypeInst = operands[0].value as? MetatypeInst,
-          metatypeInst.type.representationOfMetatype(in: parentFunction) == .Thick else {
+  func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
+    let type: Type
+
+    if let metatypeInst = operands[argument].value as? MetatypeInst {
+      type = metatypeInst.type
+    } else if let initExistentialInst = operands[argument].value as? InitExistentialMetatypeInst {
+      type = initExistentialInst.metatype.type
+    } else {
+      return
+    }
+
+    guard type.representationOfMetatype(in: parentFunction) == .Thick else {
       return
     }
     
-    let instanceType = metatypeInst.type.instanceTypeOfMetatype(in: parentFunction)
+    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
-    let metatype = builder.createMetatype(of: instanceType, representation: .Thin)
-    operands[0].set(to: metatype, context)
+    let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
+    operands[argument].set(to: newMetatype, context)
   }
 }
 

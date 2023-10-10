@@ -102,6 +102,7 @@ static uintptr_t resolveSymbolicReferenceOffset(SymbolicReferenceKind kind,
         *(const TargetSignedContextPointer<InProcess> *)ptr;
       return (uintptr_t)contextPtr;
     }
+    case SymbolicReferenceKind::ObjectiveCProtocol:
     case SymbolicReferenceKind::UniqueExtendedExistentialTypeShape:
     case SymbolicReferenceKind::NonUniqueExtendedExistentialTypeShape:
     case SymbolicReferenceKind::AccessorFunctionReference: {
@@ -198,6 +199,10 @@ ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
       SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape);
 #endif
     break;
+  case Demangle::SymbolicReferenceKind::ObjectiveCProtocol:
+    nodeKind = Node::Kind::ObjectiveCProtocolSymbolicReference;
+    isType = false;
+    break;
   }
   
   auto node = Dem.createNode(nodeKind, ptr);
@@ -245,8 +250,11 @@ _buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
 #endif
     return Dem.createNode(Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference,
                           (uintptr_t)resolvedReference);
+  case SymbolicReferenceKind::ObjectiveCProtocol:
+    return Dem.createNode(Node::Kind::ObjectiveCProtocolSymbolicReference,
+                          (uintptr_t)resolvedReference);
   }
-  
+
   swift_unreachable("invalid symbolic reference kind");
 }
   
@@ -1496,6 +1504,21 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   return nullptr;
 }
 
+#if SWIFT_OBJC_INTEROP
+static Protocol *_asObjectiveCProtocol(NodePointer demangleNode) {
+  if (demangleNode->getKind() ==
+      Node::Kind::ObjectiveCProtocolSymbolicReference) {
+
+    auto protocolPtr =
+        ((RelativeDirectPointer<Protocol *, false> *)demangleNode->getIndex())
+            ->get();
+    Protocol *protocol = *protocolPtr;
+    return protocol;
+  }
+  return nullptr;
+}
+#endif
+
 namespace {
 
 /// Constructs metadata by decoding a mangled type name, for use with
@@ -1638,6 +1661,13 @@ public:
   }
 
   BuiltProtocolDecl createProtocolDecl(NodePointer node) const {
+#if SWIFT_OBJC_INTEROP
+    // Check for an objective c protocol symbolic reference.
+    if (auto protocol = _asObjectiveCProtocol(node)) {
+      return ProtocolDescriptorRef::forObjC(protocol);
+    }
+#endif
+
     // Look for a protocol descriptor based on its mangled name.
     if (auto protocol = _findProtocolDescriptor(node, demangler))
       return ProtocolDescriptorRef::forSwift(protocol);;
@@ -2846,17 +2876,29 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
     return nullptr;
   }
 
-  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+  llvm::SmallVector<const void *, 8> extraArguments;
 
-  llvm::ArrayRef<MetadataOrPack> genericArgsRef(
-      reinterpret_cast<const MetadataOrPack *>(genericArgs), genericArgsSize);
-  llvm::SmallVector<unsigned, 8> genericParamCounts;
-  llvm::SmallVector<const void *, 8> allGenericArgs;
+  for (size_t i = 0; i != genericArgsSize; i += 1) {
+    extraArguments.push_back(genericArgs[i]);
+  }
 
-  auto result = _gatherGenericParameters(context, genericArgsRef,
-                                         /* parent */ nullptr,
-                                         genericParamCounts, allGenericArgs,
-                                         demangler);
+  // Check whether the generic requirements are satisfied, collecting
+  // any extra arguments we need for the instantiation function.
+  //
+  // Note: The extra arguemnts provided are not complete and do not include
+  // witness tables. This is fine for _checkGenericRequirements because it does
+  // not look for any of those.
+  SubstGenericParametersFromMetadata substitutions(context, extraArguments.data());
+
+  auto result = _checkGenericRequirements(
+      context->getGenericContext()->getGenericRequirements(), extraArguments,
+      [&substitutions](unsigned depth, unsigned index) {
+        return substitutions.getMetadata(depth, index).Ptr;
+      },
+      [](const Metadata *type, unsigned index) {
+        // In fact, just don't offer any witness tables if asked for one.
+        return nullptr;
+      }, /* allowsUnresolvedSubject */ true);
 
   // _gatherGenericParameters returns llvm::None on success.
   if (result.hasValue()) {
@@ -2865,7 +2907,7 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
 
   auto accessFunction = context->getAccessFunction();
 
-  return accessFunction(MetadataState::Complete, allGenericArgs).Value;
+  return accessFunction(MetadataState::Complete, extraArguments).Value;
 }
 
 #if SWIFT_OBJC_INTEROP

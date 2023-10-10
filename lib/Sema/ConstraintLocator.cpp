@@ -109,6 +109,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::GlobalActorType:
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
+  case ConstraintLocator::ThrownErrorType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -519,6 +520,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
         << expansionElt.getOpenedType()->getString(PO) << ")";
     break;
   }
+  case ConstraintLocator::ThrownErrorType: {
+    out << "thrown error type";
+    break;
+  }
   }
 }
 
@@ -666,7 +671,8 @@ bool ConstraintLocator::isForSingleValueStmtConjunction() const {
 }
 
 bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
-  if (!isExpr<SingleValueStmtExpr>(getAnchor()))
+  auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
+  if (!SVE)
     return false;
 
   auto path = getPath();
@@ -677,11 +683,17 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
       continue;
     }
 
-    // Ignore a SyntaticElement path element for a case statement of a switch.
+    // Ignore a SyntaticElement path element for a case statement of a switch,
+    // or the catch of a do-catch, or the brace of a do-statement.
     if (auto elt = path.back().getAs<LocatorPathElt::SyntacticElement>()) {
       if (elt->getElement().isStmt(StmtKind::Case)) {
         path = path.drop_back();
-        continue;
+        break;
+      }
+      if (elt->getElement().isStmt(StmtKind::Brace) &&
+          isa<DoCatchStmt>(SVE->getStmt())) {
+        path = path.drop_back();
+        break;
       }
     }
     break;

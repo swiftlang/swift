@@ -23,7 +23,7 @@ public struct CalleeAnalysis {
         return inst.instruction.isDeinitBarrier(bca.analysis)
       },
       // getMemBehaviorFn
-      { (bridgedApply: BridgedInstruction, observeRetains: Bool, bca: BridgedCalleeAnalysis) -> swift.MemoryBehavior in
+      { (bridgedApply: BridgedInstruction, observeRetains: Bool, bca: BridgedCalleeAnalysis) -> BridgedMemoryBehavior in
         let apply = bridgedApply.instruction as! ApplySite
         let e = bca.analysis.getSideEffects(ofApply: apply)
         return e.getMemBehavior(observeRetains: observeRetains)
@@ -126,13 +126,13 @@ extension Instruction {
 }
 
 public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
-  fileprivate let bridged: swift.CalleeList
+  fileprivate let bridged: BridgedCalleeAnalysis.CalleeList
 
   public var startIndex: Int { 0 }
-  public var endIndex: Int { Int(bridged.getCount()) }
+  public var endIndex: Int { bridged.getCount() }
 
   public subscript(_ index: Int) -> Function {
-    return BridgedCalleeAnalysis.getCallee(bridged, index).function
+    return bridged.getCallee(index).function
   }
 }
 // Bridging utilities

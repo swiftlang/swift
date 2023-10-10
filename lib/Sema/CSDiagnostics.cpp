@@ -20,6 +20,7 @@
 #include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1493,10 +1494,10 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     } else {
       emitDiagnostic(diag::invalid_optional_inferred_keypath_root, baseType,
                      Member, unwrappedBaseType);
-      emitDiagnostic(diag::optional_key_path_root_base_chain, Member)
-          .fixItInsert(sourceRange.End, "?.");
-      emitDiagnostic(diag::optional_key_path_root_base_unwrap, Member)
-          .fixItInsert(sourceRange.End, "!.");
+      // Note that unwrapping fix-its cannot be suggested in this case
+      // because neither `.?` nor `.!` can be used to start a key path
+      // literal. Suggesting an explicit type here won't work either
+      // because contextual root is going to be optional still.
     }
   } else {
     // Check whether or not the base of this optional unwrap is implicit self
@@ -7092,6 +7093,12 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
 
 bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   emitDiagnostic(diag::throws_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool ThrownErrorTypeConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::thrown_error_type_mismatch, getFromType(),
                  getToType());
   return true;
 }

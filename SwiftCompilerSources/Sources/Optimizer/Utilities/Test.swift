@@ -15,9 +15,9 @@
 //       let myNewTest = 
 //       FunctionTest("my_new_test") { function, arguments, context in
 //       }
-// - In SwiftCompilerSources/Sources/SIL/Test.swift's registerSILTests function,
-//   register the new test:
-//       registerFunctionTest(myNewTest, implementation: { myNewTest.run($0, $1, $2) })
+// - In SwiftCompilerSources/Sources/SIL/Test.swift's registerOptimizerTests
+//   function, register the new test:
+//       registerFunctionTest(myNewTest)
 //
 //===----------------------------------------------------------------------===//
 //
@@ -57,6 +57,7 @@
 // 1) A test test/SILOptimizer/interesting_functionality_unit.sil runs the
 //    TestRunner pass:
 //     // RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+//     // REQUIRES: swift_in_compiler
 // 2) A function in interesting_functionality_unit.sil contains the
 //    specify_test instruction.
 //      sil @f : $() -> () {
@@ -90,24 +91,25 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import SIL
 import SILBridging
+import OptimizerBridging
 
-public struct FunctionTest {
-  public var name: String
-  public typealias FunctionTestImplementation = (Function, TestArguments, TestContext) -> ()
-  private var implementation: FunctionTestImplementation
-  init(name: String, implementation: @escaping FunctionTestImplementation) {
+/// The primary interface to in-IR tests.
+struct FunctionTest {
+  let name: String
+  let invocation: FunctionTestInvocation
+
+  public init(name: String, invocation: @escaping FunctionTestInvocation) {
     self.name = name
-    self.implementation = implementation
-  }
-  fileprivate func run(
-    _ function: BridgedFunction, 
-    _ arguments: BridgedTestArguments, 
-    _ test: BridgedTestContext) {
-    implementation(function.function, arguments.native, test.native)
+    self.invocation = invocation
   }
 }
 
+/// The type of the closure passed to a FunctionTest.
+typealias FunctionTestInvocation = @convention(thin) (Function, TestArguments, FunctionPassContext) -> ()
+
+/// Wraps the arguments specified in the specify_test instruction.
 public struct TestArguments {
   public var bridged: BridgedTestArguments
   fileprivate init(bridged: BridgedTestArguments) {
@@ -130,27 +132,54 @@ extension BridgedTestArguments {
   public var native: TestArguments { TestArguments(bridged: self) }
 }
 
-public struct TestContext {
-  public var bridged: BridgedTestContext
-  fileprivate init(bridged: BridgedTestContext) {
-    self.bridged = bridged
+/// Registration of each test in the SIL module.
+public func registerOptimizerTests() {
+  // Register each test.
+  registerFunctionTest(parseTestSpecificationTest)
+
+  // Finally register the thunk they all call through.
+  registerFunctionTestThunk(functionTestThunk)
+}
+
+
+private func registerFunctionTest(_ test: FunctionTest) {
+  test.name._withBridgedStringRef { ref in
+    registerFunctionTest(ref, castToOpaquePointer(fromInvocation: test.invocation))
   }
 }
 
-extension BridgedTestContext {
-  public var native: TestContext { TestContext(bridged: self) }
+/// The function called by the swift::test::FunctionTest which invokes the
+/// actual test function.
+///
+/// This function is necessary because tests need to be written in terms of
+/// native Swift types (Function, TestArguments, BridgedPassContext)
+/// rather than their bridged variants, but such a function isn't representable
+/// in C++.  This thunk unwraps the bridged types and invokes the real
+/// function.
+private func functionTestThunk(
+  _ erasedInvocation: UnsafeMutableRawPointer,
+  _ function: BridgedFunction, 
+  _ arguments: BridgedTestArguments, 
+  _ passInvocation: BridgedSwiftPassInvocation) {
+  let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
+  let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
+  invocation(function.function, arguments.native, context)
 }
 
-private func registerFunctionTest(
-  _ test: FunctionTest,
-  implementation: BridgedFunctionTestThunk) {
-  test.name._withStringRef { ref in
-    registerFunctionTest(ref, implementation)
-  }
+/// Bitcast a thin test closure to void *.
+///
+/// Needed so that the closure can be represented in C++ for storage in the test
+/// registry.
+private func castToOpaquePointer(fromInvocation invocation: FunctionTestInvocation) -> UnsafeMutableRawPointer {
+  return unsafeBitCast(invocation, to: UnsafeMutableRawPointer.self)
 }
 
-public func registerSILTests() {
-  registerFunctionTest(parseTestSpecificationTest, implementation: { parseTestSpecificationTest.run($0, $1, $2) })
+/// Bitcast a void * to a thin test closure.
+///
+/// Needed so that the closure stored in the C++ test registry can be invoked
+/// via the functionTestThunk.
+private func castToInvocation(fromOpaquePointer erasedInvocation: UnsafeMutableRawPointer) -> FunctionTestInvocation {
+  return unsafeBitCast(erasedInvocation, to: FunctionTestInvocation.self)
 }
 
 // Arguments:
@@ -178,7 +207,7 @@ FunctionTest(name: "test_specification_parsing") { function, arguments, context 
 
     public mutating func write(_ string: String) {
       for c in string.utf8 {
-        _swift_stdlib_putc_stderr(CInt(c))
+        writeCharToStderr(CInt(c))
       }
     }
   }

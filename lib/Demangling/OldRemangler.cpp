@@ -2877,6 +2877,12 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 ManglingError
+Remangler::mangleObjectiveCProtocolSymbolicReference(Node *node,
+                                                     unsigned int depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError
 Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node,
                                                       unsigned depth) {
   RETURN_IF_ERROR(mangleSingleChildNode(node, depth + 1)); // type

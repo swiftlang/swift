@@ -44,7 +44,7 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
       regexLiteralParsingFn(regexText.str().c_str(), &version,
                             /*captureStructureOut*/ capturesBuf.data(),
                             /*captureStructureSize*/ capturesBuf.size(),
-                            /*diagBaseLoc*/ Tok.getLoc(),
+                            /*diagBaseLoc*/ {(const uint8_t *)(Tok.getLoc().getOpaquePointerValue())},
                             getBridgedDiagnosticEngine(&Diags));
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);

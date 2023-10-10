@@ -2932,6 +2932,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     return true;
   }
 
+  Opts.EnableObjectiveCProtocolSymbolicReferences =
+    Args.hasFlag(OPT_enable_objective_c_protocol_symbolic_references,
+                 OPT_disable_objective_c_protocol_symbolic_references,
+                 Opts.EnableObjectiveCProtocolSymbolicReferences);
+
   if (const Arg *A = Args.getLastArg(options::OPT_platform_c_calling_convention)) {
     Opts.PlatformCCallingConvention =
       llvm::StringSwitch<llvm::CallingConv::ID>(A->getValue())
@@ -3133,6 +3138,8 @@ bool CompilerInvocation::parseArgs(
     IRGenOpts.DisableLegacyTypeInfo = true;
     IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
     IRGenOpts.EnableReflectionNames = false;
+    TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
+    SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
     SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
     SILOpts.EmbeddedSwift = true;
   }

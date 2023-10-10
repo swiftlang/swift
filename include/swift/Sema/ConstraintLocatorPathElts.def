@@ -275,6 +275,9 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
 /// A function type global actor.
 SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
 
+/// The thrown error of a function type.
+SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
+
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 

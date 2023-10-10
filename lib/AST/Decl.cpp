@@ -27,8 +27,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ForeignAsyncConvention.h"
-#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -4929,11 +4927,10 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
   // If `decl` is a nested type, find the parent type.
   Type ParentTy;
   DeclContext *dc = decl->getDeclContext();
-  bool isObjCProtocol = isa<ProtocolDecl>(decl) && decl->hasClangNode();
+  bool isUnsupportedNestedProtocol =
+    isa<ProtocolDecl>(decl) && decl->getParent()->isGenericContext();
 
-  // Objective-C protocols, unlike Swift protocols, could be nested
-  // in other types.
-  if ((isObjCProtocol || !isa<ProtocolDecl>(decl)) && dc->isTypeContext()) {
+  if (!isUnsupportedNestedProtocol && dc->isTypeContext()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType: {
       if (auto *nominal = dc->getSelfNominalTypeDecl())
@@ -4970,9 +4967,9 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     }
 
     llvm_unreachable("Unhandled DeclTypeKind in switch.");
-  } else {
-    return NominalType::get(decl, ParentTy, ctx);
   }
+
+  return NominalType::get(decl, ParentTy, ctx);
 }
 
 Type NominalTypeDecl::getDeclaredType() const {

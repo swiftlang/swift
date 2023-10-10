@@ -4942,7 +4942,10 @@ public:
   void checkSelectEnumInst(SelectEnumInst *SEI) {
     require(SEI->getEnumOperand()->getType().isObject(),
             "select_enum operand must be an object");
-
+    // A non-trivial select_enum would result in leaking whatever cases were not
+    // selected.
+    require(SEI->getType().isTrivial(SEI->getFunction()),
+            "select_enum type must be trivial");
     checkSelectEnumCases(SelectEnumOperation(SEI));
   }
   void checkSelectEnumAddrInst(SelectEnumAddrInst *SEI) {

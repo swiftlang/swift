@@ -3474,6 +3474,14 @@ ManglingError Remangler::mangleTypeSymbolicReference(Node *node,
       depth + 1);
 }
 
+ManglingError
+Remangler::mangleObjectiveCProtocolSymbolicReference(Node *node,
+                                                     unsigned depth) {
+  return mangle(Resolver(SymbolicReferenceKind::ObjectiveCProtocol,
+                         (const void *)node->getIndex()),
+                depth + 1);
+}
+
 ManglingError Remangler::mangleProtocolSymbolicReference(Node *node,
                                                          unsigned depth) {
   return mangle(
@@ -3710,7 +3718,6 @@ mangleNonUniqueExtendedExistentialTypeShapeSymbolicReference(Node *node,
   // We don't support absolute references in the mangling of these
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
-
 } // anonymous namespace
 
 /// The top-level interface to the remangler.

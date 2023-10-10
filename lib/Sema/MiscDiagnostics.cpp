@@ -3947,6 +3947,11 @@ private:
                        diag::if_expr_must_be_syntactically_exhaustive);
         break;
       }
+      case IsSingleValueStmtResult::Kind::NonExhaustiveDoCatch: {
+        Diags.diagnose(S->getStartLoc(),
+                       diag::do_catch_expr_must_be_syntactically_exhaustive);
+        break;
+      }
       case IsSingleValueStmtResult::Kind::HasLabel: {
         // FIXME: We should offer a fix-it to remove (currently we don't track
         // the colon SourceLoc).

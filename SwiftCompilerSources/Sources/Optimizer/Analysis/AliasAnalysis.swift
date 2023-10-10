@@ -36,7 +36,7 @@ struct AliasAnalysis {
   static func register() {
     BridgedAliasAnalysis.registerAnalysis(
       // getMemEffectsFn
-      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> swift.MemoryBehavior in
+      { (bridgedCtxt: BridgedPassContext, bridgedVal: BridgedValue, bridgedInst: BridgedInstruction, complexityBudget: Int) -> BridgedMemoryBehavior in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let inst = bridgedInst.instruction
         let val = bridgedVal.value
@@ -255,7 +255,7 @@ private struct IsIndirectResultWalker: AddressDefUseWalker {
 }
 
 private extension SideEffects.Memory {
-  var bridged: swift.MemoryBehavior {
+  var bridged: BridgedMemoryBehavior {
     switch (read, write) {
       case (false, false): return .None
       case (true, false):  return .MayRead

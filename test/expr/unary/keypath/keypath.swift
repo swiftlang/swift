@@ -794,9 +794,11 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
-  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
   let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static method 'bar()'}}
-  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<S, () -> Int>' to type 'KeyPath<S, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('() -> Int' and 'Int') are expected to be equal}}
   let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
 
   struct A {
@@ -1008,16 +1010,10 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   func kp(_: KeyPath<String?, Int>) {}
 
   kp(\.count) // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
-  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{8-8=?.}}
-  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{8-8=!.}}
   let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
-  // expected-note@-1 {{chain the optional using '?.' to access unwrapped type member 'count'}} {{37-37=?.}}
-  // expected-note@-2 {{unwrap the optional using '!.' to access unwrapped type member 'count'}} {{37-37=!.}}
 
   let _ : KeyPath<String?, Int> = \.utf8.count 
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
-  // expected-note@-2 {{chain the optional using '?.' to access unwrapped type member 'utf8'}} {{37-37=?.}}
-  // expected-note@-3 {{unwrap the optional using '!.' to access unwrapped type member 'utf8'}} {{37-37=!.}}
 }
 
 func testSyntaxErrors() {
@@ -1067,8 +1063,9 @@ func f_56996() {
 // https://github.com/apple/swift/issues/55805
 // Key-path missing optional crashes compiler: Inactive constraints left over?
 func f_55805() {
-  let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{value of optional type 'String.UTF8View?' must be unwrapped to refer to member 'count' of wrapped base type 'String.UTF8View'}}
-  // expected-note@-1 {{chain the optional using '?' to access member 'count' only for non-'nil' base values}}
+  let _: KeyPath<String?, Int?> = \.utf8.count
+  // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
+  // expected-error@-2 {{key path value type 'Int' cannot be converted to contextual type 'Int?'}}
 }
 
 // rdar://74711236 - crash due to incorrect member access in key path
@@ -1201,4 +1198,29 @@ func test_keypath_inference_from_existentials() {
 
   test(\.other, 42)  // Ok
   test(\.member, "") // Ok
+}
+
+// rdar://116376651 - key path type is bound before context is fully resolved.
+func keypath_to_func_conversion_as_arg_to_overloaded_func() {
+  struct Data {
+    var value: Int = 42
+  }
+
+  func test<S: Sequence>(_: S, _: (S.Element) -> Int) {}
+  func test<C: Collection>(_: C, _: (C.Element) -> Int) {}
+
+  func test(arr: [Data]) {
+    test(arr, \Data.value) // Ok
+  }
+}
+
+// https://github.com/apple/swift/issues/55436
+func test_keypath_coercion_to_function() {
+  struct User {
+    let email: String
+  }
+
+  let users = [User]()
+  let fn = \User.email as (User) -> String // Ok
+  _ = users.map(fn) // Ok
 }

@@ -351,6 +351,10 @@ macro(swift_common_cxx_warnings)
 
   # Disallow calls to objc_msgSend() with no function pointer cast.
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOBJC_OLD_DISPATCH_PROTOTYPES=0")
+
+  if(BRIDGING_MODE STREQUAL "PURE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPURE_BRIDGING_MODE")
+  endif()
 endmacro()
 
 # Like 'llvm_config()', but uses libraries from the selected build

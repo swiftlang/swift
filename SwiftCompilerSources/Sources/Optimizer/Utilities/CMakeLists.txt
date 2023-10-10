@@ -14,4 +14,5 @@ swift_compiler_sources(Optimizer
   AccessUtils.swift
   SSAUpdater.swift
   StaticInitCloner.swift
+  Test.swift
 )

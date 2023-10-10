@@ -22,6 +22,7 @@
 
 namespace clang {
 class NamedDecl;
+class TypedefType;
 }
 
 namespace swift {

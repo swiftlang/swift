@@ -78,8 +78,10 @@ bool Parser::isStartOfStmt(bool preferExpr) {
     // "try" cannot actually start any statements, but we parse it there for
     // better recovery in cases like 'try return'.
 
-    // For 'if' and 'switch' we can parse as an expression.
-    if (peekToken().isAny(tok::kw_if, tok::kw_switch)) {
+    // For 'if', 'switch', and 'do' we can parse as an expression.
+    if (peekToken().isAny(tok::kw_if, tok::kw_switch) ||
+        (peekToken().is(tok::kw_do) &&
+         Context.LangOpts.hasFeature(Feature::DoExpressions))) {
       return false;
     }
     Parser::BacktrackingScope backtrack(*this);
@@ -157,7 +159,10 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
       // We could also achieve this by more eagerly attempting to parse an 'if'
       // or 'switch' as an expression when in statement position, but that
       // could result in less useful recovery behavior.
-      if ((isa<IfStmt>(S) || isa<SwitchStmt>(S)) && Tok.is(tok::kw_as)) {
+      if ((isa<IfStmt>(S) || isa<SwitchStmt>(S) ||
+           ((isa<DoStmt>(S) || isa<DoCatchStmt>(S)) &&
+            Context.LangOpts.hasFeature(Feature::DoExpressions))) &&
+          Tok.is(tok::kw_as)) {
         auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
             Context, S, CurDeclContext, /*mustBeExpr*/ true);
         auto As = parseExprAs();
@@ -778,8 +783,10 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
                   tok::pound_else, tok::pound_elseif)) {
       return false;
     }
-    // Allowed for if/switch expressions.
-    if (Tok.isAny(tok::kw_if, tok::kw_switch)) {
+    // Allowed for if/switch/do expressions.
+    if (Tok.isAny(tok::kw_if, tok::kw_switch) ||
+        (Tok.is(tok::kw_do) &&
+         Context.LangOpts.hasFeature(Feature::DoExpressions))) {
       return true;
     }
     if (isStartOfStmt(/*preferExpr*/ true) || isStartOfSwiftDecl())

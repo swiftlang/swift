@@ -92,7 +92,7 @@ public func _RegexLiteralParsingFn(
   _ versionOut: UnsafeMutablePointer<CUnsignedInt>,
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: CUnsignedInt,
-  _ bridgedDiagnosticBaseLoc: swift.SourceLoc,
+  _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
   _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
   let str = String(cString: inputPtr)
