@@ -290,10 +290,10 @@ func concrete(_: Int) {}
 
 func invalidRepeat<each T>(t: repeat each T) {
   _ = repeat each t
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 
   let _: Int = repeat each t
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 
   identity(identity(repeat each t))
   // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'T'}}
@@ -302,7 +302,7 @@ func invalidRepeat<each T>(t: repeat each T) {
   // expected-error@-1 {{cannot pass value pack expansion to non-pack parameter of type 'Int'}}
 
   _ = [repeat each t]
-  // expected-error@-1 {{value pack expansion can only appear inside a function argument list or tuple element}}
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
 }
 
 // Make sure that single parameter initializers are handled correctly because
