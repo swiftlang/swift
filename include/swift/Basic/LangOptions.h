@@ -683,8 +683,36 @@ namespace swift {
     /// by name.
     bool hasFeature(llvm::StringRef featureName) const;
 
-    /// Sets the "_atomicBitWidth" conditional.
-    void setAtomicBitWidth(llvm::Triple triple);
+    /// Sets the "_hasAtomicBitWidth" conditional.
+    void setHasAtomicBitWidth(llvm::Triple triple);
+
+    /// Set the max atomic bit widths with the given bit width.
+    void setMaxAtomicBitWidth(unsigned maxWidth) {
+      switch (maxWidth) {
+      case 128:
+        AtomicBitWidths.emplace_back("_128");
+        LLVM_FALLTHROUGH;
+      case 64:
+        AtomicBitWidths.emplace_back("_64");
+        LLVM_FALLTHROUGH;
+      case 32:
+        AtomicBitWidths.emplace_back("_32");
+        LLVM_FALLTHROUGH;
+      case 16:
+        AtomicBitWidths.emplace_back("_16");
+        LLVM_FALLTHROUGH;
+      case 8:
+        AtomicBitWidths.emplace_back("_8");
+        break;
+      default:
+        return;
+      }
+    }
+
+    /// Removes all atomic bit widths.
+    void clearAtomicBitWidths() {
+      AtomicBitWidths.clear();
+    }
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
@@ -723,6 +751,7 @@ namespace swift {
     }
 
   private:
+    llvm::SmallVector<std::string, 2> AtomicBitWidths;
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>, 10>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;

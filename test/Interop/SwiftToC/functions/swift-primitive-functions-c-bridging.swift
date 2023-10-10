@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
-// RUN: %FileCheck %s < %t/functions.h
+// RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi < %t/functions.h
 
 // RUN: %check-interop-c-header-in-clang(%t/functions.h)
 
@@ -19,7 +19,8 @@
 // CHECK-NEXT: SWIFT_EXTERN unsigned long long $s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF(unsigned long long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned short $s9Functions25passThroughCUnsignedShortys6UInt16VADF(unsigned short x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN unsigned char $s9Functions30passThroughCUnsignedSignedCharys5UInt8VADF(unsigned char x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN wchar_t $s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(wchar_t x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-SYSV-NEXT: SWIFT_EXTERN wchar_t $s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(wchar_t x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-WIN-NEXT: SWIFT_EXTERN wchar_t $s9Functions20passThroughCWideCharys6UInt16VADF(wchar_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN double $s9Functions17passThroughDoubleyS2dF(double x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN float $s9Functions16passThroughFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN float $s9Functions18passThroughFloat32yS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;

@@ -116,7 +116,11 @@ public typealias CLongDouble = Float80
 // FIXME: Is it actually UTF-32 on Darwin?
 //
 /// The C++ 'wchar_t' type.
+#if os(Windows)
+public typealias CWideChar = UInt16
+#else
 public typealias CWideChar = Unicode.Scalar
+#endif
 
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
