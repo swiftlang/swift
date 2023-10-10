@@ -688,7 +688,18 @@ static void validateMacroExpansion(SourceFile *expansionBuffer,
             introducedNameSet.count(MacroDecl::getArbitraryName()));
   };
 
-  for (auto *decl : expansionBuffer->getTopLevelDecls()) {
+  for (auto item : expansionBuffer->getTopLevelItems()) {
+    auto *decl = item.dyn_cast<Decl *>();
+    if (!decl) {
+      if (role != MacroRole::CodeItem) {
+        auto &ctx = expansionBuffer->getASTContext();
+        ctx.Diags.diagnose(item.getStartLoc(),
+                           diag::expected_macro_expansion_decls);
+      }
+
+      continue;
+    }
+
     // Certain macro roles can generate special declarations.
     if ((isa<AccessorDecl>(decl) && role == MacroRole::Accessor) ||
         (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance)) {
@@ -1156,11 +1167,16 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
     return llvm::None;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
+  auto macroRoles = macro->getMacroRoles();
+  assert(macroRoles.contains(MacroRole::Declaration) ||
+         macroRoles.contains(MacroRole::CodeItem));
   DeclContext *dc = med->getDeclContext();
 
   validateMacroExpansion(macroSourceFile, macro,
                          /*attachedTo*/nullptr,
-                         MacroRole::Declaration);
+                         macroRoles.contains(MacroRole::Declaration) ?
+                             MacroRole::Declaration :
+                             MacroRole::CodeItem);
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
