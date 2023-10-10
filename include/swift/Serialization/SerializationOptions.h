@@ -158,6 +158,7 @@ namespace swift {
     bool EmbeddedSwiftModule = false;
     bool IsOSSA = false;
     bool SerializeExternalDeclsOnly = false;
+    bool ExplicitModuleBuild = false;
   };
 
 } // end namespace swift

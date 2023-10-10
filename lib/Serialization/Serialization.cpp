@@ -1302,7 +1302,8 @@ void Serializer::writeInputBlock() {
     // We do not want to serialize the explicitly-specified .pch path if one was
     // provided. Instead we write out the path to the original header source so
     // that clients can consume it.
-    if (llvm::sys::path::extension(importedHeaderPath)
+    if (Options.ExplicitModuleBuild &&
+        llvm::sys::path::extension(importedHeaderPath)
             .endswith(file_types::getExtension(file_types::TY_PCH)))
       importedHeaderPath = clangImporter->getClangInstance()
                                .getASTReader()
