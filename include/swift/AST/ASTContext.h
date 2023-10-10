@@ -92,11 +92,13 @@ namespace swift {
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
   struct MacroDiscriminatorContext;
+  class ModuleInterfaceChecker;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class PluginLoader;
   class SourceFile;
   class SourceLoc;
+  struct TemplateInstantiationError;
   class Type;
   class TypeVariableType;
   class TupleType;

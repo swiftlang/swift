@@ -40,6 +40,7 @@
 namespace swift {
 
 class DeclContext;
+enum class KnownProtocolKind : uint8_t;
 class ProtocolDecl;
 
 namespace constraints {

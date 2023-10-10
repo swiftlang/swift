@@ -97,6 +97,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstModCallbacks.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 

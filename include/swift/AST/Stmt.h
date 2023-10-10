@@ -144,7 +144,6 @@ public:
 
   /// Whether the statement can produce a single value, and as such may be
   /// treated as an expression.
-  IsSingleValueStmtResult mayProduceSingleValue(Evaluator &eval) const;
   IsSingleValueStmtResult mayProduceSingleValue(ASTContext &ctx) const;
 
   /// isImplicit - Determines whether this statement was implicitly-generated,
@@ -1417,6 +1416,9 @@ public:
   MutableArrayRef<CaseStmt *> getMutableCatches() {
     return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
   }
+
+  /// Retrieve the complete set of branches for this do-catch statement.
+  ArrayRef<Stmt *> getBranches(SmallVectorImpl<Stmt *> &scratch) const;
 
   /// Does this statement contain a syntactically exhaustive catch
   /// clause?

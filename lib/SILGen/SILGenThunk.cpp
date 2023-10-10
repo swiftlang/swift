@@ -26,6 +26,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignAsyncConvention.h"
