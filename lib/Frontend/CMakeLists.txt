@@ -37,9 +37,9 @@ target_link_libraries(swiftFrontend PRIVATE
 
 set_swift_llvm_is_available(swiftFrontend)
 
-if (SWIFT_SWIFT_PARSER)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_compile_definitions(swiftFrontend
     PRIVATE
-    SWIFT_SWIFT_PARSER
+    SWIFT_BUILD_SWIFT_SYNTAX
     )
 endif()

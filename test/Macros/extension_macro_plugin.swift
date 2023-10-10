@@ -1,5 +1,4 @@
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
+// REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
@@ -13,7 +12,7 @@
 // RUN:   %S/Inputs/syntax_macro_definitions.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
-// RUN: SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %swift-target-frontend \
 // RUN:   -typecheck -verify \
 // RUN:   -swift-version 5 -enable-experimental-feature ExtensionMacros \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \

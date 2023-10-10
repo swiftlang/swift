@@ -155,10 +155,10 @@ target_link_libraries(swiftAST INTERFACE
   clangAPINotes
   clangBasic)
 
-if(SWIFT_SWIFT_PARSER)
+if(SWIFT_BUILD_SWIFT_SYNTAX)
   target_compile_definitions(swiftAST
     PRIVATE
-    SWIFT_SWIFT_PARSER
+    SWIFT_BUILD_SWIFT_SYNTAX
   )
 endif()
 
