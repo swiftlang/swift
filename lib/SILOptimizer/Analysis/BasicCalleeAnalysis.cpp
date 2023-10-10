@@ -394,8 +394,8 @@ static FunctionTest IsDeinitBarrierTest("is-deinit-barrier", [](auto &function,
   auto *instruction = arguments.takeInstruction();
   auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
   auto isBarrier = isDeinitBarrier(instruction, analysis);
-  instruction->dump();
+  instruction->print(llvm::outs());
   auto *boolString = isBarrier ? "true" : "false";
-  llvm::errs() << boolString << "\n";
+  llvm::outs() << boolString << "\n";
 });
 } // namespace swift::test

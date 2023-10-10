@@ -1249,7 +1249,7 @@ static FunctionTest CanonicalizeOSSALifetimeTest(
           calleeAnalysis, deleter);
       auto value = arguments.takeValue();
       canonicalizer.canonicalizeValueLifetime(value);
-      function.dump();
+      function.print(llvm::outs());
     });
 } // end namespace swift::test
 

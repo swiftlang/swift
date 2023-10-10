@@ -2758,7 +2758,7 @@ static FunctionTest PrintTypeLowering("print-type-lowering", [](auto &function,
                                                                 auto &test) {
   auto value = arguments.takeValue();
   auto ty = value->getType();
-  function.getModule().Types.getTypeLowering(ty, function).print(llvm::dbgs());
+  function.getModule().Types.getTypeLowering(ty, function).print(llvm::outs());
 });
 } // end namespace swift::test
 

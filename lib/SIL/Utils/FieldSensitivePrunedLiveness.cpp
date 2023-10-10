@@ -1024,12 +1024,12 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
         TypeTreeLeafTypeRange range(begin, end);
         liveness.updateForUse(inst, range, lifetimeEnding);
       }
-      liveness.print(llvm::errs());
+      liveness.print(llvm::outs());
 
       FieldSensitivePrunedLivenessBoundary boundary(
           liveness.getNumSubElements());
       liveness.computeBoundary(boundary);
-      boundary.print(llvm::errs());
+      boundary.print(llvm::outs());
     });
 } // end namespace swift::test
 
