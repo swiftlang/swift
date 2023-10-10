@@ -2054,3 +2054,20 @@ extension RequiredDefaultInitMacro: MemberMacro {
     return [ decl ]
   }
 }
+
+public struct FakeCodeItemMacro: DeclarationMacro, PeerMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["guard true else { return }"]
+  }
+
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return ["if true { return }"]
+  }
+}
