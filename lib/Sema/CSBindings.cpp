@@ -2060,8 +2060,15 @@ bool TypeVarBindingProducer::computeNext() {
 
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
-        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))
-          addNewBinding(binding.withType(*simplifiedSuper));
+        if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype)) {
+          auto supertype = *simplifiedSuper;
+          // A key path type cannot be bound to type-erased key path variants.
+          if (TypeVar->getImpl().isKeyPathType() &&
+              (supertype->isPartialKeyPath() || supertype->isAnyKeyPath()))
+            continue;
+
+          addNewBinding(binding.withType(supertype));
+        }
       }
     }
   }

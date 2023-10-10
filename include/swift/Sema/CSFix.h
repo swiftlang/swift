@@ -396,10 +396,6 @@ enum class FixKind : uint8_t {
   /// is marked as `inout`.
   AllowConversionThroughInOut,
 
-  /// Ignore either capability (read/write) or type mismatch in conversion
-  /// between two key path types.
-  IgnoreKeyPathContextualMismatch,
-
   /// Ignore a type mismatch between deduced element type and externally
   /// imposed one.
   IgnoreCollectionElementContextualMismatch,
@@ -1190,36 +1186,6 @@ private:
 
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
-  }
-};
-
-/// Detect situations where key path doesn't have capability required
-/// by the context e.g. read-only vs. writable, or either root or value
-/// types are incorrect e.g.
-///
-/// ```swift
-/// struct S { let foo: Int }
-/// let _: WritableKeyPath<S, Int> = \.foo
-/// ```
-///
-/// Here context requires a writable key path but `foo` property is
-/// read-only.
-class KeyPathContextualMismatch final : public ContextualMismatch {
-  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                            ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::IgnoreKeyPathContextualMismatch, lhs,
-                           rhs, locator) {}
-
-public:
-  std::string getName() const override {
-    return "fix key path contextual mismatch";
-  }
-
-  static KeyPathContextualMismatch *
-  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::IgnoreKeyPathContextualMismatch;
   }
 };
 
