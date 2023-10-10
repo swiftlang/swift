@@ -1198,7 +1198,13 @@ extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible {
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
+
+@available(*, unavailable)
+extension Unsafe${Mutable}BufferPointer: Sendable { }
 %end
+
+@available(*, unavailable)
+extension UnsafeBufferPointer.Iterator: Sendable { }
 
 
 // ${'Local Variables'}:
