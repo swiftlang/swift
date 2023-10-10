@@ -2976,6 +2976,13 @@ function(add_swift_target_executable name)
           "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
           SWIFTEXE_TARGET_DEPENDS_with_suffix)
 
+      # Note: we add ${swiftexe_link_libraries_targets} to the DEPENDS
+      # below because when --bootstrapping=bootstrapping with
+      # skip-early-swiftsyntax, the build system builds the Swift compiler
+      # but not the standard library during the bootstrap, and then when
+      # it tries to build swift-backtrace it fails because *the compiler*
+      # refers to a libswiftCore.so that can't be found.
+
       _add_swift_target_executable_single(
           ${VARIANT_NAME}
           ${SWIFTEXE_TARGET_NOSWIFTRT_keyword}
@@ -2983,6 +2990,7 @@ function(add_swift_target_executable name)
           DEPENDS
             ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
             ${swiftexe_module_dependency_targets}
+            ${swiftexe_link_libraries_targets}
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
           COMPILE_FLAGS
