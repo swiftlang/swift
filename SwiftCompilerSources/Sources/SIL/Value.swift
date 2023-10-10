@@ -99,8 +99,7 @@ public enum Ownership {
 
 extension Value {
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var uses: UseList { UseList(bridged.getFirstUse()) }

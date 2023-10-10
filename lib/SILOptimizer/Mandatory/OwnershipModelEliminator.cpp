@@ -208,7 +208,6 @@ struct OwnershipModelEliminatorVisitor
   HANDLE_FORWARDING_INST(Tuple)
   HANDLE_FORWARDING_INST(Enum)
   HANDLE_FORWARDING_INST(UncheckedEnumData)
-  HANDLE_FORWARDING_INST(SelectEnum)
   HANDLE_FORWARDING_INST(OpenExistentialRef)
   HANDLE_FORWARDING_INST(InitExistentialRef)
   HANDLE_FORWARDING_INST(MarkDependence)

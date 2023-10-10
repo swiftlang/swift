@@ -2008,9 +2008,9 @@ SelectEnumInst *SelectEnumInst::create(
     SILDebugLocation Loc, SILValue Operand, SILType Type, SILValue DefaultValue,
     ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues, SILModule &M,
     llvm::Optional<ArrayRef<ProfileCounter>> CaseCounts,
-    ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnership) {
+    ProfileCounter DefaultCount) {
   return createSelectEnum(Loc, Operand, Type, DefaultValue, CaseValues, M,
-                          CaseCounts, DefaultCount, forwardingOwnership);
+                          CaseCounts, DefaultCount);
 }
 
 SelectEnumAddrInst *SelectEnumAddrInst::create(

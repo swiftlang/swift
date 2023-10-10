@@ -13,14 +13,21 @@
 #ifndef SWIFT_AST_ASTBRIDGING_H
 #define SWIFT_AST_ASTBRIDGING_H
 
-#include "swift/AST/DiagnosticEngine.h"
+// Do not add other C++/llvm/swift header files here!
+// Function implementations should be placed into ASTBridging.cpp and required header files should be added there.
+//
 #include "swift/Basic/BasicBridging.h"
-#include "swift/Basic/Compiler.h"
-#include "swift/Basic/Nullability.h"
-#include <stdbool.h>
-#include <stddef.h>
+
+#ifdef USED_IN_CPP_SOURCE
+#include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
+#endif
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+namespace swift {
+  class DiagnosticArgument;
+}
 
 //===----------------------------------------------------------------------===//
 // Diagnostic Engine
@@ -33,23 +40,54 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-typedef struct {
+struct BridgedDiagnosticEngine {
   void * _Nonnull object;
-} BridgedDiagnosticEngine;
+};
 
-typedef struct {
+struct BridgedOptionalDiagnosticEngine {
   void *_Nullable object;
-} BridgedOptionalDiagnosticEngine;
+};
+
+class BridgedDiagnosticArgument {
+  int64_t storage[3];
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
+    *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
+  }
+  const swift::DiagnosticArgument &get() const {
+    return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
+  }
+#endif
+
+  BridgedDiagnosticArgument(SwiftInt i);
+  BridgedDiagnosticArgument(BridgedStringRef s);
+};
+
+class BridgedDiagnosticFixIt {
+  int64_t storage[6];
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedDiagnosticFixIt(const swift::DiagnosticInfo::FixIt &fixit){
+    *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
+  }
+  const swift::DiagnosticInfo::FixIt &get() const {
+    return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&storage);
+  }
+#endif
+
+  BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text);
+};
 
 // FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, swift::SourceLoc loc,
+void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
-                               swift::CharSourceRange highlight,
+                               BridgedSourceLoc highlightStart, uint32_t hightlightLength,
                                BridgedArrayRef fixIts);
 
 bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
-
-using ArrayRefOfDiagnosticArgument = llvm::ArrayRef<swift::DiagnosticArgument>;
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
