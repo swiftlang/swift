@@ -48,9 +48,7 @@ protected:
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
-  virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
-                                        const ParameterList *PL = nullptr,
-                                        bool TopLevel = false) = 0;
+  virtual BraceStmt *transformBraceStmt(BraceStmt *BS, ASTNode Parent) = 0;
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
   /// FileIdentifier, if available.
@@ -80,8 +78,7 @@ protected:
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
-          const ParameterList *PL = CE->getParameters();
-          BraceStmt *NB = I.transformBraceStmt(B, PL);
+          BraceStmt *NB = I.transformBraceStmt(B, CE);
           CE->setBody(NB, false);
           // just with the entry and exit logging this is going to
           // be more than a single expression!

@@ -152,12 +152,12 @@ public:
         LogScopeEntryExtendedName(C.getIdentifier("__builtin_log_scope_entry_extended")),
         SendDataName(C.getIdentifier("__builtin_send_data")) { }
 
-  Stmt *transformStmt(Stmt *S) {
+  Stmt *transformStmt(Stmt *S, ASTNode Parent) {
     switch (S->getKind()) {
     default:
       return S;
     case StmtKind::Brace:
-      return transformBraceStmt(cast<BraceStmt>(S));
+      return transformBraceStmt(cast<BraceStmt>(S), Parent);
     case StmtKind::Defer:
       return transformDeferStmt(cast<DeferStmt>(S));
     case StmtKind::If:
@@ -205,14 +205,14 @@ public:
   // or a modified copy of their input otherwise.
   IfStmt *transformIfStmt(IfStmt *IS) {
     if (Stmt *TS = IS->getThenStmt()) {
-      Stmt *NTS = transformStmt(TS);
+      Stmt *NTS = transformStmt(TS, IS);
       if (NTS != TS) {
         IS->setThenStmt(NTS);
       }
     }
 
     if (Stmt *ES = IS->getElseStmt()) {
-      Stmt *NES = transformStmt(ES);
+      Stmt *NES = transformStmt(ES, IS);
       if (NES != ES) {
         IS->setElseStmt(NES);
       }
@@ -223,13 +223,13 @@ public:
 
   GuardStmt *transformGuardStmt(GuardStmt *GS) {
     if (BraceStmt *BS = GS->getBody())
-      GS->setBody(transformBraceStmt(BS));
+      GS->setBody(transformBraceStmt(BS, GS));
     return GS;
   }
 
   WhileStmt *transformWhileStmt(WhileStmt *WS) {
     if (Stmt *B = WS->getBody()) {
-      Stmt *NB = transformStmt(B);
+      Stmt *NB = transformStmt(B, WS);
       if (NB != B) {
         WS->setBody(NB);
       }
@@ -240,7 +240,7 @@ public:
 
   RepeatWhileStmt *transformRepeatWhileStmt(RepeatWhileStmt *RWS) {
     if (Stmt *B = RWS->getBody()) {
-      Stmt *NB = transformStmt(B);
+      Stmt *NB = transformStmt(B, RWS);
       if (NB != B) {
         RWS->setBody(NB);
       }
@@ -251,7 +251,7 @@ public:
 
   ForEachStmt *transformForEachStmt(ForEachStmt *FES) {
     if (BraceStmt *B = FES->getBody()) {
-      BraceStmt *NB = transformBraceStmt(B);
+      BraceStmt *NB = transformBraceStmt(B, FES);
       if (NB != B) {
         FES->setBody(NB);
       }
@@ -264,7 +264,7 @@ public:
     for (CaseStmt *CS : SS->getCases()) {
       if (Stmt *S = CS->getBody()) {
         if (auto *B = dyn_cast<BraceStmt>(S)) {
-          BraceStmt *NB = transformBraceStmt(B);
+          BraceStmt *NB = transformBraceStmt(B, SS);
           if (NB != B) {
             CS->setBody(NB);
           }
@@ -277,7 +277,7 @@ public:
 
   DoStmt *transformDoStmt(DoStmt *DS) {
     if (auto *B = dyn_cast_or_null<BraceStmt>(DS->getBody())) {
-      BraceStmt *NB = transformBraceStmt(B);
+      BraceStmt *NB = transformBraceStmt(B, DS);
       if (NB != B) {
         DS->setBody(NB);
       }
@@ -287,14 +287,14 @@ public:
 
   DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
     if (auto *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
-      BraceStmt *NB = transformBraceStmt(B);
+      BraceStmt *NB = transformBraceStmt(B, DCS);
       if (NB != B) {
         DCS->setBody(NB);
       }
     }
     for (CaseStmt *C : DCS->getCatches()) {
       if (auto *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
-        BraceStmt *NCB = transformBraceStmt(CB);
+        BraceStmt *NCB = transformBraceStmt(CB, DCS);
         if (NCB != CB) {
           C->setBody(NCB);
         }
@@ -308,9 +308,8 @@ public:
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
-        const ParameterList *PL = FD->getParameters();
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
-        BraceStmt *NB = transformBraceStmt(B, PL);
+        BraceStmt *NB = transformBraceStmt(B, FD);
         if (NB != B) {
           FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
           TypeChecker::checkFunctionEffects(FD);
@@ -399,9 +398,7 @@ public:
     return uniqueRef;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS,
-                                const ParameterList *PL = nullptr,
-                                bool TopLevel = false) override {
+  BraceStmt *transformBraceStmt(BraceStmt *BS, ASTNode Parent) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     using ElementVector = SmallVector<swift::ASTNode, 3>;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
@@ -589,7 +586,7 @@ public:
             EI = escapeToTarget(BracePair::TargetKinds::Fallthrough, Elements,
                                 EI);
           }
-          Stmt *NS = transformStmt(S);
+          Stmt *NS = transformStmt(S, BS);
           if (NS != S) {
             Elements[EI] = NS;
           }
@@ -617,7 +614,15 @@ public:
     // If we were given any parameters that apply to this brace block, we insert
     // log calls for them now (before any of the other statements). We only log
     // named parameters (not `{ _ in ... }`, for example).
-    if (PL && Options.LogFunctionParameters) {
+    const ParameterList *PL = nullptr;
+    if (auto *D = Parent.dyn_cast<Decl *>()) {
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
+        if (Options.LogFunctionParameters) {
+          PL = FD->getParameters();
+        }
+      }
+    }
+    if (PL) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
         if (PD->hasName()) {
@@ -635,7 +640,12 @@ public:
       }
     }
 
-    if (!TopLevel && Options.LogScopeEvents && !BS->isImplicit()) {
+    // Unless we're at the top level, we also log scope entry and exit events.
+    bool IsTopLevel = false;
+    if (auto *D = Parent.dyn_cast<Decl *>()) {
+      IsTopLevel = dyn_cast<TopLevelCodeDecl>(D);
+    }
+    if (!IsTopLevel && Options.LogScopeEvents && !BS->isImplicit()) {
       Elements.insert(Elements.begin(), *buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), *buildScopeExit(BS->getSourceRange()));
     }
@@ -925,9 +935,8 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            const ParameterList *PL = FD->getParameters();
             Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);
-            BraceStmt *NewBody = I.transformBraceStmt(Body, PL);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, FD);
             if (NewBody != Body) {
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
               TypeChecker::checkFunctionEffects(FD);
@@ -939,7 +948,7 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(ctx, TLCD, RNG, Options, TmpNameIndex);
-            BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, TLCD);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
