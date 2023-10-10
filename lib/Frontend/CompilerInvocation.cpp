@@ -717,6 +717,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     // events and function/closure parameters.
     Opts.PlaygroundOptions.insert("scope-events");
     Opts.PlaygroundOptions.insert("function-parameters");
+    Opts.PlaygroundOptions.insert("closure-parameters");
   }
   for (const Arg *A : Args.filtered(OPT_playground_option)) {
     Opts.PlaygroundOptions.insert(A->getValue());

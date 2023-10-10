@@ -39,10 +39,12 @@ namespace {
 struct TransformOptions {
   bool LogScopeEvents;
   bool LogFunctionParameters;
+  bool LogClosureParameters;
 
   TransformOptions(const LangOptions &opts) :
     LogScopeEvents(opts.PlaygroundOptions.contains("scope-events")),
-    LogFunctionParameters(opts.PlaygroundOptions.contains("function-parameters")) {}
+    LogFunctionParameters(opts.PlaygroundOptions.contains("function-parameters")),
+    LogClosureParameters(opts.PlaygroundOptions.contains("closure-parameters")) {}
 };
 
 class Instrumenter : InstrumenterBase {
@@ -619,6 +621,13 @@ public:
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (Options.LogFunctionParameters) {
           PL = FD->getParameters();
+        }
+      }
+    }
+    else if (auto *E = Parent.dyn_cast<Expr *>()) {
+      if (auto *CE = dyn_cast<ClosureExpr>(E)) {
+        if (Options.LogClosureParameters) {
+          PL = CE->getParameters();
         }
       }
     }
