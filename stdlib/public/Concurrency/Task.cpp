@@ -1236,11 +1236,15 @@ void swift_task_future_wait_throwingImpl(
   }
 
   case FutureFragment::Status::Error: {
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     // Run the task with an error result.
     auto future = task->futureFragment();
     auto error = future->getError();
     swift_errorRetain(error);
     return resumeFunction(callerContext, error);
+    #endif
   }
   }
 }

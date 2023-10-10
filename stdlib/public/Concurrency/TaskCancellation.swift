@@ -93,6 +93,7 @@ extension Task where Success == Never, Failure == Never {
   /// The error is always an instance of `CancellationError`.
   ///
   /// - SeeAlso: `isCancelled()`
+  @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
       throw _Concurrency.CancellationError()
