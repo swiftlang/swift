@@ -7293,7 +7293,7 @@ ERROR(experimental_no_metadata_feature_can_only_be_used_when_enabled,
 ERROR(expected_macro_expansion_expr,PointsToFirstBadToken,
       "expected macro expansion to produce an expression", ())
 ERROR(expected_macro_expansion_decls,PointsToFirstBadToken,
-      "expected macro expansion to produce declarations", ())
+      "expected macro expansion to produce a declaration", ())
 ERROR(macro_undefined,PointsToFirstBadToken,
       "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,

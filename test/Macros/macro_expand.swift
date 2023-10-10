@@ -13,7 +13,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
 
 // RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt
-// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS %s
+// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS -dump-input=always %s
 
 // RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
 
@@ -125,6 +125,24 @@ struct Bad {}
 // CHECK-DIAGS: typealias _ImageLiteralType = Void
 // CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
 // CHECK-DIAGS: END CONTENTS OF FILE
+#endif
+
+@freestanding(declaration)
+macro accidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+@attached(peer)
+macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+#if TEST_DIAGNOSTICS
+func invalidDeclarationMacro() {
+  #accidentalCodeItem
+  // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF18accidentalCodeItemfMf0_.swift:1:1: error: expected macro expansion to produce a declaration
+
+  @AccidentalCodeItem struct S {}
+  // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+  // CHECK-DIAGS: @__swiftmacro_9MacroUser018invalidDeclarationA0yyF1SL_18AccidentalCodeItemfMp_.swift:1:1: error: expected macro expansion to produce a declaration
+}
 #endif
 
 @freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
