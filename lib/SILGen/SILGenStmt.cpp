@@ -1248,10 +1248,36 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  {
-    SGF.emitPatternBinding(S->getIteratorVar(),
-                           /*index=*/0, /*debuginfo*/ true);
+
+  if (auto *expansion =
+          dyn_cast<PackExpansionExpr>(S->getTypeCheckedSequence())) {
+    auto formalPackType = dyn_cast<PackType>(
+        PackType::get(SGF.getASTContext(), expansion->getType())
+            ->getCanonicalType());
+
+    // Create a new basic block and jump into it.
+    JumpDest loopDest = createJumpDest(S->getBody());
+    SGF.B.emitBlock(loopDest.getBlock(), S);
+
+    SGF.emitDynamicPackLoop(
+        SILLocation(expansion), formalPackType, 0,
+        expansion->getGenericEnvironment(),
+        [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+            SILValue packIndex) {
+          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+          auto letValueInit =
+              SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
+
+          SGF.emitExprInto(expansion->getPatternExpr(), letValueInit.get());
+          visit(S->getBody());
+          return;
+        });
+
+    return;
   }
+
+  SGF.emitPatternBinding(S->getIteratorVar(),
+                         /*index=*/0, /*debuginfo*/ true);
 
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
