@@ -513,19 +513,19 @@ static FunctionTest ShrinkBorrowScopeTest(
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
       InstructionDeleter deleter(
           InstModCallbacks().onDelete([&](auto *instruction) {
-            llvm::errs() << "DELETED:\n";
-            instruction->dump();
+            llvm::outs() << "DELETED:\n";
+            instruction->print(llvm::outs());
           }));
       auto shrunk =
           shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
       unsigned index = 0;
       for (auto *cvi : modifiedCopyValueInsts) {
         auto expectedCopy = arguments.takeValue();
-        llvm::errs() << "rewritten copy " << index << ":\n";
-        llvm::errs() << "expected:\n";
-        expectedCopy->print(llvm::errs());
-        llvm::errs() << "got:\n";
-        cvi->dump();
+        llvm::outs() << "rewritten copy " << index << ":\n";
+        llvm::outs() << "expected:\n";
+        expectedCopy->print(llvm::outs());
+        llvm::outs() << "got:\n";
+        cvi->print(llvm::outs());
         assert(cvi == expectedCopy);
         ++index;
       }
