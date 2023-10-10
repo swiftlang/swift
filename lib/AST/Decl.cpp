@@ -11035,8 +11035,24 @@ void MacroExpansionDecl::forEachExpandedNode(
     return;
   auto startLoc = sourceMgr.getLocForBufferStart(*bufferID);
   auto *sourceFile = moduleDecl->getSourceFileContainingLocation(startLoc);
-  for (auto node : sourceFile->getTopLevelItems())
+
+  auto *macro = dyn_cast<MacroDecl>(getMacroRef().getDecl());
+  auto roles = macro->getMacroRoles();
+
+  for (auto node : sourceFile->getTopLevelItems()) {
+    // The assumption here is that macros can only have a single
+    // freestanding macro role. Expression macros can only produce
+    // expressions, declaration macros can only produce declarations,
+    // and code item macros can produce expressions, declarations, and
+    // statements.
+    if (roles.contains(MacroRole::Expression) && !node.is<Expr *>())
+      continue;
+
+    if (roles.contains(MacroRole::Declaration) && !node.is<Decl *>())
+      continue;
+
     callback(node);
+  }
 }
 
 /// Adjust the declaration context to find a point in the context hierarchy
