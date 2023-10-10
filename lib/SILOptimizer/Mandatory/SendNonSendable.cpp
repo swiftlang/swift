@@ -49,16 +49,12 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   return false;
 }
 
-static bool isAddress(SILValue val) {
-  return val->getType() && val->getType().isAddress();
-}
-
 static bool isApplyInst(SILInstruction &inst) {
   return ApplySite::isa(&inst) || isa<BuiltinInst>(inst);
 }
 
 static AccessStorage getAccessStorageFromAddr(SILValue value) {
-  assert(isAddress(value));
+  assert(value->getType().isAddress());
   auto accessStorage = AccessStorage::compute(value);
   if (accessStorage && accessStorage.getRoot()) {
     if (auto definingInst = accessStorage.getRoot().getDefiningInstruction()) {
@@ -72,7 +68,7 @@ static AccessStorage getAccessStorageFromAddr(SILValue value) {
 }
 
 static SILValue getUnderlyingTrackedValue(SILValue value) {
-  if (!isAddress(value)) {
+  if (!value->getType().isAddress()) {
     return getUnderlyingObject(value);
   }
 
@@ -355,9 +351,9 @@ class PartitionOpTranslator {
     self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 #endif
 
-    // Otherwise, we need to compute our true aliased and sendable values. Begi
-    // by seeing if we have a value that we can prove is not aliased.
-    if (isAddress(value)) {
+    // Otherwise, we need to compute our flags. Begin by seeing if we have a
+    // value that we can prove is not aliased.
+    if (value->getType().isAddress()) {
       if (auto accessStorage = AccessStorage::compute(value))
         if (accessStorage.isUniquelyIdentified() &&
             !capturedUIValues.count(value))
