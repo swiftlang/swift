@@ -2,7 +2,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/clang-module-cache)
 // RUN: %empty-directory(%t/PCH)
+// RUN: %empty-directory(%t/HEADER)
 // RUN: %empty-directory(%t/SwiftModules)
+// RUN: %empty-directory(%t/CAS)
 
 // - Set up Foo Swift dependency
 // RUN: echo "extension Profiler {" >> %t/foo.swift
@@ -10,10 +12,10 @@
 // RUN: echo "}" >> %t/foo.swift
 
 // - Set up Foo bridging header
-// RUN: echo "struct Profiler { void* ptr; };" >> %t/foo.h
+// RUN: echo "struct Profiler { void* ptr; };" >> %t/HEADER/foo.h
 
 // - Compile bridging header
-// RUN: %target-swift-frontend -enable-objc-interop -emit-pch %t/foo.h -o %t/PCH/foo.pch -disable-implicit-swift-modules
+// RUN: %target-swift-frontend -enable-objc-interop -emit-pch %t/HEADER/foo.h -o %t/PCH/foo.pch -disable-implicit-swift-modules
 
 // - Set up explicit dependencies for Foo
 // RUN: %target-swift-emit-pcm -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/SwiftShims.pcm
@@ -50,8 +52,12 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/SwiftModules/Foo.swiftmodule %t/foo.swift -module-name Foo -import-objc-header %t/PCH/foo.pch -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -disable-implicit-swift-modules -explicit-swift-module-map-file %t/foo_inputs_map.json 
 
 // - Scan main module
-// RUN: %target-swift-frontend -scan-dependencies %s -I %t/SwiftModules -I %S/Inputs/Swift -o %t/deps.json
+// RUN: %target-swift-frontend -scan-dependencies %s -I %t/SwiftModules -I %S/Inputs/Swift -o %t/deps.json -cache-compile-job -cas-path %t/cas
 // RUN: %validate-json %t/deps.json | %FileCheck %s
+
+// - Scan main module without a CAS and ensure no headerDependencies are emitted
+// RUN: %target-swift-frontend -scan-dependencies %s -I %t/SwiftModules -I %S/Inputs/Swift -o %t/deps_nocas.json
+// RUN: %validate-json %t/deps_nocas.json | %FileCheck %s --check-prefix=CHECK-NO-HEADERS
 
 // CHECK: "swift": "FooClient"
 // CHECK: "swift": "FooClient"
@@ -59,12 +65,14 @@
 // CHECK:     "commandLine": [
 // CHECK:            "-include-pch",
 // CHECK-NEXT:       "-Xcc",
-// CHECK-NEXT:       "{{.*}}{{/|\\}}PCH{{/|\\}}foo.pch"
+// CHECK-NEXT:       "{{.*}}{{/|\\}}HEADER{{/|\\}}foo.h"
 
 
 // CHECK: "swiftPrebuiltExternal": "Foo"
 // CHECK:   "headerDependencies": [
-// CHECK:      "{{.*}}{{/|\\}}PCH{{/|\\}}foo.pch"
+// CHECK:      "{{.*}}{{/|\\}}HEADER{{/|\\}}foo.h"
 // CHECK:   ],
+
+// CHECK-NO-HEADERS-NOT: "headerDependencies"
 
 import FooClient
