@@ -143,8 +143,8 @@ public func registerOptimizerTests() {
 
 
 private func registerFunctionTest(_ test: FunctionTest) {
-  test.name._withStringRef { ref in
-    registerFunctionTest(ref, eraseInvocation(test.invocation))
+  test.name._withBridgedStringRef { ref in
+    registerFunctionTest(ref, castToOpaquePointer(fromInvocation: test.invocation))
   }
 }
 
@@ -161,7 +161,7 @@ private func functionTestThunk(
   _ function: BridgedFunction, 
   _ arguments: BridgedTestArguments, 
   _ passInvocation: BridgedSwiftPassInvocation) {
-  let invocation = uneraseInvocation(erasedInvocation)
+  let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
   let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
   invocation(function.function, arguments.native, context)
 }
@@ -170,7 +170,7 @@ private func functionTestThunk(
 ///
 /// Needed so that the closure can be represented in C++ for storage in the test
 /// registry.
-private func eraseInvocation(_ invocation: FunctionTestInvocation) -> UnsafeMutableRawPointer {
+private func castToOpaquePointer(fromInvocation invocation: FunctionTestInvocation) -> UnsafeMutableRawPointer {
   return unsafeBitCast(invocation, to: UnsafeMutableRawPointer.self)
 }
 
@@ -178,7 +178,7 @@ private func eraseInvocation(_ invocation: FunctionTestInvocation) -> UnsafeMuta
 ///
 /// Needed so that the closure stored in the C++ test registry can be invoked
 /// via the functionTestThunk.
-private func uneraseInvocation(_ erasedInvocation: UnsafeMutableRawPointer) -> FunctionTestInvocation {
+private func castToInvocation(fromOpaquePointer erasedInvocation: UnsafeMutableRawPointer) -> FunctionTestInvocation {
   return unsafeBitCast(erasedInvocation, to: FunctionTestInvocation.self)
 }
 
@@ -207,7 +207,7 @@ FunctionTest(name: "test_specification_parsing") { function, arguments, context 
 
     public mutating func write(_ string: String) {
       for c in string.utf8 {
-        _swift_stdlib_putc_stderr(CInt(c))
+        writeCharToStderr(CInt(c))
       }
     }
   }

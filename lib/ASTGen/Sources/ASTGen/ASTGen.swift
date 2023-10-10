@@ -2,7 +2,7 @@ import CASTBridging
 import CBasicBridging
 
 // Needed to use BumpPtrAllocator
-@_spi(RawSyntax)
+@_spi(BumpPtrAllocator)
 import SwiftSyntax
 import struct SwiftDiagnostics.Diagnostic
 

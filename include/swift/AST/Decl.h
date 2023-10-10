@@ -26,6 +26,8 @@
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/ForeignAsyncConvention.h"
+#include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
@@ -72,8 +74,6 @@ namespace swift {
   struct ExternalSourceLocs;
   class CaptureListExpr;
   class DeclRefExpr;
-  class ForeignAsyncConvention;
-  class ForeignErrorConvention;
   class LiteralExpr;
   class BraceStmt;
   class DeclAttributes;

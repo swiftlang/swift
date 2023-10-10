@@ -134,12 +134,6 @@ extension TuplePackExtractInst {
   }
 }
 
-extension SelectEnumInst {
-  public var singleForwardedOperand: Operand {
-    return enumOperand
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                         forwardedResults
 //===----------------------------------------------------------------------===//
@@ -243,10 +237,6 @@ extension MarkUnresolvedNonCopyableValueInst {
 }
 
 extension MarkUninitializedInst {
-  public var preservesRepresentation: Bool { true }
-}
-
-extension SelectEnumInst {
   public var preservesRepresentation: Bool { true }
 }
 

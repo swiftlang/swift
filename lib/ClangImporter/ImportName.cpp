@@ -2215,7 +2215,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                             version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
       auto getSwiftBuiltinTypeName =
-          [&](const clang::BuiltinType *builtin) -> std::optional<StringRef> {
+          [&](const clang::BuiltinType *builtin) -> std::optional<std::string> {
         Type swiftType = nullptr;
         switch (builtin->getKind()) {
         case clang::BuiltinType::Void:
@@ -2238,8 +2238,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         }
 
         if (swiftType) {
-          if (auto nominal = swiftType->getAs<NominalType>()) {
-            return nominal->getDecl()->getNameStr();
+          if (swiftType->is<NominalType>()) {
+            return swiftType->getStringAsComponent();
           }
         }
         return std::nullopt;

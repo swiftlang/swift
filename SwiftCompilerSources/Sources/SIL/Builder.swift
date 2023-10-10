@@ -65,7 +65,7 @@ public struct Builder {
   public func createBuiltinBinaryFunction(name: String,
       operandType: Type, resultType: Type, arguments: [Value]) -> BuiltinInst {
     return arguments.withBridgedValues { valuesRef in
-      return name._withStringRef { nameStr in
+      return name._withBridgedStringRef { nameStr in
         let bi = bridged.createBuiltinBinaryFunction(
           nameStr, operandType.bridged, resultType.bridged, valuesRef)
         return notifyNew(bi.getAs(BuiltinInst.self))
@@ -74,7 +74,7 @@ public struct Builder {
   }
 
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
-    return message._withStringRef { messageStr in
+    return message._withBridgedStringRef { messageStr in
       let cf = bridged.createCondFail(condition.bridged, messageStr)
       return notifyNew(cf.getAs(CondFailInst.self))
     }
@@ -199,7 +199,7 @@ public struct Builder {
     arguments: [Value],
     isNonThrowing: Bool = false,
     isNonAsync: Bool = false,
-    specializationInfo: ApplyInst.SpecializationInfo = nil
+    specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
   ) -> ApplyInst {
     let apply = arguments.withBridgedValues { valuesRef in
       bridged.createApply(function.bridged, substitutionMap.bridged, valuesRef,
@@ -314,7 +314,7 @@ public struct Builder {
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
-  public func createMetatype(of type: Type, representation: swift.MetatypeRepresentation) -> MetatypeInst {
+  public func createMetatype(of type: Type, representation: Type.MetatypeRepresentation) -> MetatypeInst {
     let metatype = bridged.createMetatype(type.bridged, representation)
     return notifyNew(metatype.getAs(MetatypeInst.self))
   }

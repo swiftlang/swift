@@ -23,8 +23,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
     public var function: Function { bridged.getImplementation().function }
 
     public var description: String {
-      let stdString = bridged.getDebugDescription()
-      return String(_cxxString: stdString)
+      return String(taking: bridged.getDebugDescription())
     }
   }
 
@@ -37,7 +36,7 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
     
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: BridgedVTableEntry(entry: base.entry + index))
+      return Entry(bridged: base.advanceBy(index))
     }
   }
 
@@ -47,7 +46,6 @@ public struct VTable : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }

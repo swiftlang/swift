@@ -21,8 +21,9 @@ extension CondFailInst : OnoneSimplifyable {
     ///   cond_fail %0, "message"
     /// ```
     if let literal = condition as? IntegerLiteralInst,
-       literal.value.isZero() {
-
+       let value = literal.value,
+       value == 0
+    {
       context.erase(instruction: self)
     }
   }

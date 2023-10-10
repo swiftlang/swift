@@ -284,10 +284,11 @@ private extension Value {
   func getBaseAddressAndOffset() -> (baseAddress: Value, offset: Int)? {
     if let indexAddr = self as? IndexAddrInst {
       guard let indexLiteral = indexAddr.index as? IntegerLiteralInst,
-            indexLiteral.value.getActiveBits() <= 32 else {
+            let indexValue = indexLiteral.value else
+      {
         return nil
       }
-      return (baseAddress: indexAddr.base, offset: Int(indexLiteral.value.getZExtValue()))
+      return (baseAddress: indexAddr.base, offset: indexValue)
     }
     return (baseAddress: self, offset: 0)
   }
@@ -297,9 +298,11 @@ private extension Instruction {
   var isShiftRightByAtLeastOne: Bool {
     guard let bi = self as? BuiltinInst,
           bi.id == .LShr,
-          let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst else {
+          let shiftLiteral = bi.operands[1].value as? IntegerLiteralInst,
+          let shiftValue = shiftLiteral.value else
+    {
       return false
     }
-    return shiftLiteral.value.isStrictlyPositive()
+    return shiftValue > 0
   }
 }

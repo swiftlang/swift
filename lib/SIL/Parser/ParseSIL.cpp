@@ -6040,8 +6040,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
       if (Opcode == SILInstructionKind::SelectEnumInst) {
         ResultVal = B.createSelectEnum(InstLoc, Val, ResultType, DefaultValue,
-                                       CaseValues, llvm::None, ProfileCounter(),
-                                       forwardingOwnership);
+                                       CaseValues, llvm::None,
+                                       ProfileCounter());
       } else
         ResultVal = B.createSelectEnumAddr(InstLoc, Val, ResultType,
                                            DefaultValue, CaseValues);
