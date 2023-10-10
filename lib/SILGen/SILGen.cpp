@@ -801,6 +801,10 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return true;
 
+  if (getASTContext().SILOpts.SkipNonExportableDecls &&
+      !D->isExposedToClients())
+    return true;
+
   return false;
 }
 
@@ -1419,6 +1423,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
+  assert(!shouldSkipDecl(fd));
+
   Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
 
   SILDeclRef::Loc decl = fd;
