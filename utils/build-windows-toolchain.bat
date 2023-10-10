@@ -766,6 +766,7 @@ cmake ^
   -D IndexStoreDB_DIR=%BuildRoot%\17\cmake\modules ^
   -D SwiftCollections_DIR=%BuildRoot%\13\cmake\modules ^
   -D SwiftSyntax_DIR=%BuildRoot%\18\cmake\modules ^
+  -D SwiftCrypto_DIR=%BuildRoot%\12\cmake\modules ^
 
   -G Ninja ^
   -S %SourceRoot%\sourcekit-lsp || (exit /b)
