@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
-// RUN: %FileCheck %s < %t/functions.h
+// RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
 
@@ -67,7 +67,8 @@
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK wchar_t passThroughCWideChar(wchar_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::$s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(x);
+// CHECK-SYSV:   return _impl::$s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF(x);
+// CHECK-WIN:   return _impl::$s9Functions20passThroughCWideCharys6UInt16VADF(x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK double passThroughDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
