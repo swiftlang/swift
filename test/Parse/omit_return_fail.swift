@@ -2,6 +2,7 @@
 
 func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
     value is type // expected-error {{type-casting operator expects a type on its right-hand side (got: 'type')}}
+    // expected-note@-2 {{declared here}}
 }
 
 func foo() -> Int {
@@ -11,6 +12,7 @@ func foo() -> Int {
 func badIs_ifdecl<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
     #if true
     value is type // expected-error {{type-casting operator expects a type on its right-hand side (got: 'type')}}
+    // expected-note@-3 {{declared here}}
     #endif
 }
 

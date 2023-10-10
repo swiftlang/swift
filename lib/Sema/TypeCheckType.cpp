@@ -1388,8 +1388,10 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       auto lookupResult = TypeChecker::lookupUnqualified(
           dc, repr->getNameRef(), repr->getLoc(), lookupOptions);
       if (!lookupResult.empty()) {
-        diags.diagnose(L, diag::cannot_find_type_in_cast_expression, repr->getNameRef())
+        auto first = lookupResult.front().getValueDecl();
+        diags.diagnose(L, diag::cannot_find_type_in_cast_expression, first)
           .highlight(R);
+        diags.diagnose(first->getNameLoc(), diag::note_declared_here);
         return ErrorType::get(ctx);
       }
     }
