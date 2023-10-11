@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-irgen -I %S/Inputs -enable-experimental-cxx-interop %s -validate-tbd-against-ir=none -Xcc -fignore-exceptions | %FileCheck %s
 
-import FunctionInheritance
+import MemberInheritance
 
 func testGetX() -> CInt {
     let derivedDerived = makeCopyTrackedDerivedDerivedClass(42)!
