@@ -2876,29 +2876,17 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
     return nullptr;
   }
 
-  llvm::SmallVector<const void *, 8> extraArguments;
+  DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
 
-  for (size_t i = 0; i != genericArgsSize; i += 1) {
-    extraArguments.push_back(genericArgs[i]);
-  }
+  llvm::ArrayRef<MetadataOrPack> genericArgsRef(
+      reinterpret_cast<const MetadataOrPack *>(genericArgs), genericArgsSize);
+  llvm::SmallVector<unsigned, 8> genericParamCounts;
+  llvm::SmallVector<const void *, 8> allGenericArgs;
 
-  // Check whether the generic requirements are satisfied, collecting
-  // any extra arguments we need for the instantiation function.
-  //
-  // Note: The extra arguemnts provided are not complete and do not include
-  // witness tables. This is fine for _checkGenericRequirements because it does
-  // not look for any of those.
-  SubstGenericParametersFromMetadata substitutions(context, extraArguments.data());
-
-  auto result = _checkGenericRequirements(
-      context->getGenericContext()->getGenericRequirements(), extraArguments,
-      [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index).Ptr;
-      },
-      [](const Metadata *type, unsigned index) {
-        // In fact, just don't offer any witness tables if asked for one.
-        return nullptr;
-      }, /* allowsUnresolvedSubject */ true);
+  auto result = _gatherGenericParameters(context, genericArgsRef,
+                                         /* parent */ nullptr,
+                                         genericParamCounts, allGenericArgs,
+                                         demangler);
 
   // _gatherGenericParameters returns llvm::None on success.
   if (result.hasValue()) {
@@ -2907,7 +2895,7 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
 
   auto accessFunction = context->getAccessFunction();
 
-  return accessFunction(MetadataState::Complete, extraArguments).Value;
+  return accessFunction(MetadataState::Complete, allGenericArgs).Value;
 }
 
 #if SWIFT_OBJC_INTEROP
