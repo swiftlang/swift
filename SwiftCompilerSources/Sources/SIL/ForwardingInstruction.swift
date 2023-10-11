@@ -79,8 +79,8 @@ extension ForwardingInstruction {
   // See ForwardingOperation::getSingleForwardingOperand().
   public var singleForwardedOperand: Operand? {
     let definedOps = self.definedOperands
-    assert(definedOps.count == 1);
-    return definedOps[0];
+    assert(definedOps.count == 1, "expected single operand for forwarding")
+    return definedOps[0]
   }
 }
 
@@ -117,19 +117,19 @@ extension DifferentiableFunctionInst {
 // Instructions with a singleForwardedOperand and additional operands.
 
 extension MarkDependenceInst {
-  public var singleForwardedOperand: Operand {
+  public var singleForwardedOperand: Operand? {
     return valueOperand
   }
 }
 
 extension RefToBridgeObjectInst {
-  public var singleForwardedOperand: Operand {
+  public var singleForwardedOperand: Operand? {
     return convertedOperand
   }
 }
 
 extension TuplePackExtractInst {
-  public var singleForwardedOperand: Operand {
+  public var singleForwardedOperand: Operand? {
     return tupleOperand
   }
 }

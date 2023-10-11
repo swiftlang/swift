@@ -99,6 +99,10 @@ public:
                          SILCombiner *silCombiner) :
     passManager(passManager), function(function), silCombiner(silCombiner) {}
 
+  SwiftPassInvocation(SILPassManager *passManager, SILTransform *transform,
+                      SILFunction *function) :
+    passManager(passManager), transform(transform), function(function) {}
+
   SwiftPassInvocation(SILPassManager *passManager) :
     passManager(passManager) {}
 
