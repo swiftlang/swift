@@ -38,6 +38,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -667,6 +668,51 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   llvm_unreachable("invalid requirement check type");
 }
 
+void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
+                                            ValueDecl *decl,
+                                            unsigned argCount,
+                                            unsigned paramCount,
+                                            bool hasParameterPack,
+                                            GenericIdentTypeRepr *generic) {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+
+  if (!hasParameterPack) {
+    // For generic types without type parameter packs, we require
+    // the number of declared generic parameters match the number of
+    // arguments.
+    if (argCount < paramCount) {
+      auto diag = diags
+          .diagnose(loc, diag::too_few_generic_arguments, decl->getBaseIdentifier(),
+                    argCount, paramCount);
+      if (generic)
+        diag.highlight(generic->getAngleBrackets());
+    } else {
+      auto diag = diags
+          .diagnose(loc, diag::too_many_generic_arguments, decl->getBaseIdentifier(),
+                    argCount, paramCount);
+      if (generic)
+        diag.highlight(generic->getAngleBrackets());
+    }
+  } else {
+    if (argCount < paramCount - 1) {
+      auto diag = diags
+          .diagnose(loc, diag::too_few_generic_arguments_pack, decl->getBaseIdentifier(),
+                    argCount, paramCount - 1);
+      if (generic)
+        diag.highlight(generic->getAngleBrackets());
+    } else {
+      auto diag = diags
+          .diagnose(loc, diag::generic_argument_pack_mismatch, decl->getBaseIdentifier());
+      if (generic)
+        diag.highlight(generic->getAngleBrackets());
+    }
+  }
+
+  decl->diagnose(diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::GenericType, decl->getName());
+}
+
 /// Apply generic arguments to the given type.
 ///
 /// If the type is itself not generic, this does nothing.
@@ -834,7 +880,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
           return paramDecl->isParameterPack();
       });
 
-  // Resolve the types of the generic arguments.
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::GenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
@@ -848,6 +893,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     }
   }
 
+  // Resolve the types of the generic arguments.
   SmallVector<Type, 2> args;
   for (auto tyR : genericArgs) {
     // Propagate failure.
@@ -864,15 +910,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     // arguments.
     if (genericArgs.size() != genericParams->size()) {
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-        diags
-            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                      genericParams->size(),
-                      genericArgs.size(),
-                      genericArgs.size() < genericParams->size(),
-                      /*hasParameterPack=*/0)
-            .highlight(generic->getAngleBrackets());
-        decl->diagnose(diag::kind_declname_declared_here,
-                       DescriptiveDeclKind::GenericType, decl->getName());
+        diagnoseInvalidGenericArguments(
+            loc, decl, genericArgs.size(), genericParams->size(),
+            /*hasParameterPack=*/false, generic);
       }
       return ErrorType::get(ctx);
     }
@@ -890,17 +930,11 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     }
 
     PackMatcher matcher(params, args, ctx);
-    if (matcher.match()) {
+    if (matcher.match() || matcher.pairs.size() != params.size()) {
       if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-        diags
-            .diagnose(loc, diag::type_parameter_count_mismatch, decl->getName(),
-                      genericParams->size() - 1,
-                      genericArgs.size(),
-                      genericArgs.size() < genericParams->size(),
-                      /*hasParameterPack=*/1)
-            .highlight(generic->getAngleBrackets());
-        decl->diagnose(diag::kind_declname_declared_here,
-                       DescriptiveDeclKind::GenericType, decl->getName());
+        diagnoseInvalidGenericArguments(
+            loc, decl, genericArgs.size(), genericParams->size(),
+            /*hasParameterPack=*/true, generic);
       }
       return ErrorType::get(ctx);
     }

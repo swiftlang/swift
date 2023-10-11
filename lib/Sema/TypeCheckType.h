@@ -31,6 +31,7 @@ class PackElementTypeRepr;
 class GenericEnvironment;
 class GenericSignature;
 class SILTypeResolutionContext;
+class GenericIdentTypeRepr;
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -654,6 +655,13 @@ public:
                                     SourceLoc loc,
                                     ArrayRef<Type> genericArgs) const;
 };
+
+void diagnoseInvalidGenericArguments(SourceLoc loc,
+                                     ValueDecl *decl,
+                                     unsigned argCount,
+                                     unsigned paramCount,
+                                     bool hasParameterPack,
+                                     GenericIdentTypeRepr *generic);
 
 } // end namespace swift
 
