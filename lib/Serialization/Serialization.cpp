@@ -4863,12 +4863,11 @@ static bool canSkipWhenInvalid(const Decl *D) {
 }
 
 bool Serializer::shouldSkipDecl(const Decl *D) const {
-  // The presence of -experimental-serialize-external-decls-only is the only
+  // The presence of -experimental-skip-non-exportable-decls is the only
   // reason to omit decls during serialization.
-  if (!Options.SerializeExternalDeclsOnly)
+  if (!Options.SkipNonExportableDecls)
     return false;
 
-  // For our purposes, "deserialization safe" is the same thing as "external".
   if (DeclSerializer::isDeserializationSafe(D))
     return false;
 

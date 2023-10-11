@@ -197,10 +197,6 @@ def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
-def experimental_serialize_external_decls_only
-  : Flag<["-"], "experimental-serialize-external-decls-only">,
-  HelpText<"Only serialize decls that should be exposed to clients">;
-
 def empty_abi_descriptor : Flag<["-"], "empty-abi-descriptor">,
   HelpText<"Avoid printing actual module content into ABI descriptor file">;
 
@@ -1134,6 +1130,10 @@ def experimental_allow_module_with_compiler_errors:
   Flag<["-"], "experimental-allow-module-with-compiler-errors">,
   Flags<[HelpHidden]>,
   HelpText<"Attempt to output .swiftmodule, regardless of compilation errors">;
+
+def experimental_skip_non_exportable_decls
+  : Flag<["-"], "experimental-skip-non-exportable-decls">,
+  HelpText<"Skip decls that are not exported to clients">;
 
 def bad_file_descriptor_retry_count:
   Separate<["-"], "bad-file-descriptor-retry-count">,

@@ -324,9 +324,8 @@ public:
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
 
-  /// Should we only serialize decls that may be referenced externally in the
-  /// binary module?
-  bool SerializeExternalDeclsOnly = false;
+  /// Should we skip decls that cannot be referenced externally?
+  bool SkipNonExportableDecls = false;
 
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?

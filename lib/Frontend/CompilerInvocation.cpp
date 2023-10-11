@@ -2000,6 +2000,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -experimental-skip-*-function-bodies to SIL.
   Opts.SkipFunctionBodies = TCOpts.SkipFunctionBodies;
 
+  // Propagate -experimental-skip-non-exportable-decls to SIL.
+  Opts.SkipNonExportableDecls = FEOpts.SkipNonExportableDecls;
+
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   Opts.OptMode = OptimizationMode::NoOptimization;

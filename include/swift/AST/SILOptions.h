@@ -183,8 +183,11 @@ public:
   /// when possible.
   bool EnablePackMetadataStackPromotion = true;
 
-  // The kind of function bodies to skip emitting.
+  /// The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
+
+  /// Whether to skip declarations that are internal to the module.
+  bool SkipNonExportableDecls = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;

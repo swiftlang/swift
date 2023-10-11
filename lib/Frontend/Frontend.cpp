@@ -238,8 +238,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.IsOSSA = getSILOptions().EnableOSSAModules;
 
-  serializationOpts.SerializeExternalDeclsOnly =
-      opts.SerializeExternalDeclsOnly;
+  serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
 
   return serializationOpts;
 }
