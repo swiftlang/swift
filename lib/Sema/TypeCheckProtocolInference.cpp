@@ -751,6 +751,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
                   TypeBase *secondType, Type sugaredFirstType) {
       return true;
     }
+
+    bool considerThrownErrorTypes(Type errorType1, Type errorType2) const {
+      return errorType1->hasTypeParameter();
+    }
   };
 
   // Match a requirement and witness type.

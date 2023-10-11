@@ -7129,7 +7129,7 @@ public:
   ///
   /// Functions with untyped throws will produce "any Error", functions that
   /// cannot throw or are specified to throw "Never" will return llvm::None.
-  llvm::Optional<Type> getEffectiveThrownInterfaceType() const;
+  llvm::Optional<Type> getEffectiveThrownErrorType() const;
 
   /// Returns if the function throws or is async.
   bool hasEffect(EffectKind kind) const;

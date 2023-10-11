@@ -238,7 +238,7 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   }
 
   prepareEpilog(getResultInterfaceType(AFD),
-                AFD->getEffectiveThrownInterfaceType(),
+                AFD->getEffectiveThrownErrorType(),
                 CleanupLocation(AFD));
 
   SILBasicBlock *availableBB = createBasicBlock("availableBB");
