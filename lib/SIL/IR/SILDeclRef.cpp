@@ -538,8 +538,13 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // The main entry-point is public.
   if (kind == Kind::EntryPoint)
     return SILLinkage::Public;
-  if (kind == Kind::AsyncEntryPoint)
-    return SILLinkage::Hidden;
+  if (kind == Kind::AsyncEntryPoint) {
+    // async main entrypoint is referenced only from @main and
+    // they are in the same SIL module. Hiding this entrypoint
+    // from other object file makes it possible to link multiple
+    // executable targets for SwiftPM testing with -entry-point-function-name
+    return SILLinkage::Private;
+  }
 
   // Calling convention thunks have shared linkage.
   if (isForeignToNativeThunk())

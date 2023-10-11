@@ -3,7 +3,7 @@
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
 
-// CHECK-LABEL: sil hidden [ossa] @async_Main
+// CHECK-LABEL: sil private [ossa] @async_Main
 // CHECK: bb0:
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[GET_MAIN:%.*]] = function_ref @swift_task_getMainExecutor
