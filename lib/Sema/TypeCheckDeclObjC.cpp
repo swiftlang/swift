@@ -3553,9 +3553,15 @@ public:
                                  "private ");
       }
 
-      diagnose(cand, diag::fixit_add_final_for_objc_implementation,
-               cand->getDescriptiveKind())
-          .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
+      // Initializers can't be 'final', but they can be '@nonobjc'
+      if (isa<ConstructorDecl>(cand))
+        diagnose(cand, diag::fixit_add_nonobjc_for_objc_implementation,
+                 cand->getDescriptiveKind())
+            .fixItInsert(cand->getAttributeInsertionLoc(false), "@nonobjc ");
+      else
+        diagnose(cand, diag::fixit_add_final_for_objc_implementation,
+                 cand->getDescriptiveKind())
+            .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
     }
   }
 };

@@ -4300,6 +4300,7 @@ isObjCMemberImplementation(const ValueDecl *VD,
                     ? cast<AccessorDecl>(VD)->getStorage()
                     : VD;
       return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<NonObjCAttr>()
                   && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
                   && getAccessLevel() >= AccessLevel::Internal;
     }

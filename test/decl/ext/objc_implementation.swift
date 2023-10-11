@@ -183,6 +183,36 @@ protocol EmptySwiftProto {}
   class func instanceMethod2(_: CInt) {
     // expected-warning@-1 {{class method 'instanceMethod2' does not match instance method declared in header; this will become an error before '@_objcImplementation' is stabilized}} {{3-9=}}
   }
+
+  public init(notFromHeader1: CInt) {
+    // expected-warning@-1 {{initializer 'init(notFromHeader1:)' does not match any initializer declared in the headers for 'ObjCClass'; did you use the initializer's Swift name?}}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible initializer not declared in the header}} {{3-9=private}}
+    // expected-note@-3 {{add '@nonobjc' to define a Swift-only initializer}} {{3-3=@nonobjc }}
+  }
+
+  public required init(notFromHeader2: CInt) {
+    // expected-warning@-1 {{initializer 'init(notFromHeader2:)' does not match any initializer declared in the headers for 'ObjCClass'; did you use the initializer's Swift name?}}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible initializer not declared in the header}} {{3-9=private}}
+    // expected-note@-3 {{add '@nonobjc' to define a Swift-only initializer}} {{3-3=@nonobjc }}
+  }
+
+  public convenience init(notFromHeader3: CInt) {
+    // expected-warning@-1 {{initializer 'init(notFromHeader3:)' does not match any initializer declared in the headers for 'ObjCClass'; did you use the initializer's Swift name?}}
+    // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible initializer not declared in the header}} {{3-9=private}}
+    // expected-note@-3 {{add '@nonobjc' to define a Swift-only initializer}} {{3-3=@nonobjc }}
+  }
+
+  @nonobjc public init(notFromHeader4: CInt) {
+    // FIXME: Should be an error; requires a vtable entry
+  }
+
+  @nonobjc public required init(notFromHeader5: CInt) {
+    // FIXME: Should be an error; requires a vtable entry
+  }
+
+  @nonobjc public convenience init(notFromHeader6: CInt) {
+    // OK
+  }
 }
 
 @_objcImplementation(PresentAdditions) extension ObjCClass {
