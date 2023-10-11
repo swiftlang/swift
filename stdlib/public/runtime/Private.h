@@ -523,8 +523,7 @@ public:
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
-      SubstDependentWitnessTableFn substWitnessTable,
-      bool allowsUnresolvedSubject = false);
+      SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when

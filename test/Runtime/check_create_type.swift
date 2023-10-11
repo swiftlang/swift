@@ -30,7 +30,7 @@ func metaPointer(_ x: Any.Type) -> UnsafeRawPointer {
   unsafeBitCast(x, to: UnsafeRawPointer.self)
 }
 
-testSuite.test("_swift_instantiateCheckedGenericMetadata non-variadic") {
+testSuite.test("_swift_checkedCreateType non-variadic") {
   let dictMeta = unsafeBitCast(
     [Int: Int].self as Any.Type,
     to: UnsafeRawPointer.self
@@ -53,7 +53,7 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata non-variadic") {
   }
 }
 
-testSuite.test("_swift_instantiateCheckedGenericMetadata variadic") {
+testSuite.test("_swift_checkedCreateType variadic") {
   let variMeta = unsafeBitCast(
     Variadic< >.self as Any.Type,
     to: UnsafeRawPointer.self
@@ -70,9 +70,7 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata variadic") {
       UnsafeRawPointer(pack.baseAddress!),
       UInt(pack.count)
     )
-
-    // The 3 is the shape of the pack
-    let genericArgs = [UnsafeRawPointer(bitPattern: 3)!, packPointer]
+    let genericArgs = [packPointer]
 
     genericArgs.withUnsafeBufferPointer { genericArgs in
       let newVari = _instantiateCheckedGenericMetadata(
@@ -86,7 +84,7 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata variadic") {
   }
 }
 
-testSuite.test("_swift_instantiateCheckedGenericMetadata variadic nested with requirements") {
+testSuite.test("_swift_checkedCreateType variadic nested with requirements") {
   let nestedMeta = unsafeBitCast(
     Variadic< >.Nested<()>.self as Any.Type,
     to: UnsafeRawPointer.self
@@ -103,10 +101,6 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata variadic nested with re
   nestedPack.withUnsafeBufferPointer { nestedPack in
     variPack.withUnsafeBufferPointer { variPack in
       let nestedGenericArgs = [
-        // First shape class
-        UnsafeRawPointer(bitPattern: 3)!,
-        // Second shape class
-        UnsafeRawPointer(bitPattern: 3)!,
         allocateMetadataPack(
           UnsafeRawPointer(variPack.baseAddress!),
           UInt(variPack.count)
@@ -129,55 +123,6 @@ testSuite.test("_swift_instantiateCheckedGenericMetadata variadic nested with re
         expectTrue(newNested == Variadic<String, [Int], UInt64>.Nested<Int16, Int, Substring, Bool>.self)
       }
     }
-  }
-}
-
-struct Generic<T> {}
-struct Generic2<T, U> {}
-
-extension Generic where T == Int {
-  struct Nested {}
-}
-
-extension Generic2 where T == U? {
-  struct Nested {}
-}
-
-testSuite.test("_swift_instantiateCheckedGenericMetadata concrete generic types (same type conretized)") {
-  let nestedMeta1 = metaPointer(Generic<Int>.Nested.self)
-  let nestedDesc1 = nestedMeta1.load(
-    fromByteOffset: MemoryLayout<Int>.size,
-    as: UnsafeRawPointer.self
-  )
-
-  let genericArgs1: [UnsafeRawPointer?] = []
-
-  genericArgs1.withUnsafeBufferPointer {
-    let nested = _instantiateCheckedGenericMetadata(
-      nestedDesc1,
-      UnsafeRawPointer($0.baseAddress!),
-      UInt($0.count)
-    )
-
-    expectTrue(nested == Generic<Int>.Nested.self)
-  }
-
-  let nestedMeta2 = metaPointer(Generic2<Int?, Int>.Nested.self)
-  let nestedDesc2 = nestedMeta2.load(
-    fromByteOffset: MemoryLayout<Int>.size,
-    as: UnsafeRawPointer.self
-  )
-
-  let genericArgs2 = [metaPointer(String.self)]
-
-  genericArgs2.withUnsafeBufferPointer {
-    let nested = _instantiateCheckedGenericMetadata(
-      nestedDesc2,
-      UnsafeRawPointer($0.baseAddress!),
-      UInt($0.count)
-    )
-
-    expectTrue(nested == Generic2<String?, String>.Nested.self)
   }
 }
 
