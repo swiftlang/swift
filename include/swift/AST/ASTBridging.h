@@ -67,7 +67,7 @@ public:
 };
 
 class BridgedDiagnosticFixIt {
-  int64_t storage[6];
+  int64_t storage[7];
 
 public:
 #ifdef USED_IN_CPP_SOURCE

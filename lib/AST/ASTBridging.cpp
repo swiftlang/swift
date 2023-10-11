@@ -35,7 +35,7 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
   : BridgedDiagnosticArgument(DiagnosticArgument(s.get())) {}
 
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
-              "BridgedDiagnosticArgument has wrong size");
+              "BridgedDiagnosticFixIt has wrong size");
 
 static SourceLoc getSourceLoc(BridgedSourceLoc bridgedLoc) {
   return SourceLoc(llvm::SMLoc::getFromPointer(bridgedLoc.getLoc()));
