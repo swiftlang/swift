@@ -40,10 +40,10 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-// Must match the definition of BridgedDiagnosticEngine in CASTBridging.h.
-typedef struct {
+// The name must not collide with BridgedDiagnosticEngine in CASTBridging.h.
+struct BridgedDiagEngine {
   void * _Nonnull object;
-} BridgedDiagnosticEngine;
+};
 
 struct BridgedOptionalDiagnosticEngine {
   void *_Nullable object;
@@ -83,12 +83,12 @@ public:
 };
 
 // FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
+void DiagnosticEngine_diagnose(BridgedDiagEngine, BridgedSourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
                                BridgedSourceLoc highlightStart, uint32_t hightlightLength,
                                BridgedArrayRef fixIts);
 
-bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
+bool DiagnosticEngine_hadAnyError(BridgedDiagEngine);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

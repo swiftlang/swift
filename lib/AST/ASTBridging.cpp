@@ -18,8 +18,8 @@
 using namespace swift;
 
 namespace {
-/// BridgedDiagnosticEngine -> DiagnosticEngine *.
-DiagnosticEngine *getDiagnosticEngine(const BridgedDiagnosticEngine &bridged) {
+/// BridgedDiagEngine -> DiagnosticEngine *.
+DiagnosticEngine *getDiagnosticEngine(const BridgedDiagEngine &bridged) {
   return static_cast<DiagnosticEngine *>(bridged.object);
 }
 
@@ -48,7 +48,7 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t 
       llvm::ArrayRef<DiagnosticArgument>())) {}
 
 void DiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
+    BridgedDiagEngine bridgedEngine, BridgedSourceLoc loc,
     BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     BridgedSourceLoc highlightStart, uint32_t hightlightLength,
@@ -76,7 +76,7 @@ void DiagnosticEngine_diagnose(
   }
 }
 
-bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine bridgedEngine) {
+bool DiagnosticEngine_hadAnyError(BridgedDiagEngine bridgedEngine) {
   auto *D = getDiagnosticEngine(bridgedEngine);
   return D->hadAnyError();
 }

@@ -93,7 +93,7 @@ public func _RegexLiteralParsingFn(
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: CUnsignedInt,
   _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
-  _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
+  _ bridgedDiagnosticEngine: BridgedDiagEngine
 ) -> Bool {
   let str = String(cString: inputPtr)
   let captureBuffer = UnsafeMutableRawBufferPointer(

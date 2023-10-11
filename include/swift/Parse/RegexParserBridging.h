@@ -58,7 +58,7 @@ typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
                                       /*CaptureStructureOut*/ void *_Nonnull,
                                       /*CaptureStructureSize*/ unsigned,
                                       /*DiagnosticBaseLoc*/ BridgedSourceLoc,
-                                      BridgedDiagnosticEngine);
+                                      BridgedDiagEngine);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
 
 #endif // REGEX_PARSER_BRIDGING
