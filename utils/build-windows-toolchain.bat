@@ -12,7 +12,7 @@ setlocal enableextensions enabledelayedexpansion
 path %PATH%;%PYTHON_HOME%
 
 :: Versioning
-set ProductVersion=5.9.0
+set ProductVersion=5.9.1
 set ProductTag=
 
 :: Identify the SourceRoot
@@ -160,7 +160,7 @@ cmake ^
   -D CMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO" ^
   -D CMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO" ^
 
-  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\curl-7.77.0\usr ^
+  -D CMAKE_INSTALL_PREFIX=%BuildRoot%\Library\curl-8.4.0\usr ^
 
   -D BUILD_CURL_EXE=NO ^
   -D CMAKE_USE_OPENSSL=NO ^
@@ -350,7 +350,7 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CURL_DIR=%BuildRoot%\Library\curl-8.4.0\usr\lib\cmake\CURL ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_UC_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuuc69.lib ^
@@ -849,7 +849,7 @@ git clone --quiet --no-tags --depth 1 --branch v1.2.11 https://github.com/madler
 git clone --quiet --no-tags --depth 1 --branch v2.9.12 https://github.com/gnome/libxml2
 git clone --quiet --no-tags --depth 1 --branch version-3.36.0 https://github.com/sqlite/sqlite
 git clone --quiet --no-tags --depth 1 --branch maint/maint-69 https://github.com/unicode-org/icu
-git clone --quiet --no-tags --depth 1 --branch curl-7_77_0 https://github.com/curl/curl
+git clone --quiet --no-tags --depth 1 --branch curl-8_4_0 https://github.com/curl/curl
 
 goto :eof
 endlocal
@@ -922,7 +922,7 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX=%SDKInstallRoot%\usr ^
 
-  -D CURL_DIR=%BuildRoot%\Library\curl-7.77.0\usr\lib\cmake\CURL ^
+  -D CURL_DIR=%BuildRoot%\Library\curl-8.4.0\usr\lib\cmake\CURL ^
   -D ICU_ROOT=%BuildRoot%\Library\icu-69.1\usr ^
   -D ICU_DATA_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicudt69.lib ^
   -D ICU_I18N_LIBRARY_RELEASE=%BuildRoot%\Library\icu-69.1\usr\lib\sicuin69.lib ^
