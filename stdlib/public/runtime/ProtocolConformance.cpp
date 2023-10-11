@@ -1344,37 +1344,24 @@ static llvm::Optional<TypeLookupError>
 checkGenericRequirement(const GenericRequirementDescriptor &req,
                         llvm::SmallVectorImpl<const void *> &extraArguments,
                         SubstGenericParameterFn substGenericParam,
-                        SubstDependentWitnessTableFn substWitnessTable,
-                        bool allowsUnresolvedSubject) {
+                        SubstDependentWitnessTableFn substWitnessTable) {
   assert(!req.getFlags().isPackRequirement());
 
   // Make sure we understand the requirement we're dealing with.
   if (!req.hasKnownKind())
     return TypeLookupError("unknown kind");
 
-  const Metadata *subjectType = nullptr;
-
   // Resolve the subject generic parameter.
   auto result = swift_getTypeByMangledName(
       MetadataState::Abstract, req.getParam(), extraArguments.data(),
       substGenericParam, substWitnessTable);
-
-  if (!allowsUnresolvedSubject && result.isError()) {
+  if (result.getError())
     return *result.getError();
-  }
-
-  if (!result.isError()) {
-    subjectType = result.getType().getMetadata();
-  }
+  const Metadata *subjectType = result.getType().getMetadata();
 
   // Check the requirement.
   switch (req.getKind()) {
   case GenericRequirementKind::Protocol: {
-    // Protocol requirements _require_ a subject type.
-    if (result.isError()) {
-      return *result.getError();
-    }
-
     const WitnessTable *witnessTable = nullptr;
     if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
                              &witnessTable)) {
@@ -1395,37 +1382,16 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::SameType: {
-    // Same type requirements don't require a valid subject.
-
-    const Metadata *sameType = nullptr;
-
     // Demangle the second type under the given substitutions.
     auto result = swift_getTypeByMangledName(
         MetadataState::Abstract, req.getMangledTypeName(),
         extraArguments.data(), substGenericParam, substWitnessTable);
-
-    if (!allowsUnresolvedSubject && result.isError()) {
+    if (result.getError())
       return *result.getError();
-    }
-
-    if (!result.isError()) {
-      sameType = result.getType().getMetadata();
-    }
-
-    // If we don't have one of either the subject type or the same type and we
-    // have the other, then return this as a success. This assumes the given
-    // extra arguments have provided only the required key arguments in which
-    // case some same type constraints may concretize some generic arguments
-    // making them non-key.
-    //
-    // Note: We don't need to check for allowsUnresolvedSubject here because
-    // these can only be null in the case where we do allow it.
-    if ((!subjectType && sameType) || (subjectType && !sameType)) {
-      return llvm::None;
-    }
+    auto otherType = result.getType().getMetadata();
 
     // Check that the types are equivalent.
-    if (subjectType != sameType) {
+    if (subjectType != otherType) {
       return TYPE_LOOKUP_ERROR_FMT(
           "subject type %.*s does not match %.*s", (int)req.getParam().size(),
           req.getParam().data(), (int)req.getMangledTypeName().size(),
@@ -1436,20 +1402,10 @@ checkGenericRequirement(const GenericRequirementDescriptor &req,
   }
 
   case GenericRequirementKind::Layout: {
-    // Layout requirements _require_ a subject type.
-    if (result.isError()) {
-      return *result.getError();
-    }
-
     return satisfiesLayoutConstraint(req, subjectType);
   }
 
   case GenericRequirementKind::BaseClass: {
-    // Base class requirements _require_ a subject type.
-    if (result.isError()) {
-      return *result.getError();
-    }
-
     // Demangle the base type under the given substitutions.
     auto result = swift_getTypeByMangledName(
         MetadataState::Abstract, req.getMangledTypeName(),
@@ -1638,8 +1594,7 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
     llvm::SmallVectorImpl<const void *> &extraArguments,
     SubstGenericParameterFn substGenericParam,
-    SubstDependentWitnessTableFn substWitnessTable,
-    bool allowsUnresolvedSubject) {
+    SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
     if (req.getFlags().isPackRequirement()) {
       auto error = checkGenericPackRequirement(req, extraArguments,
@@ -1650,8 +1605,7 @@ llvm::Optional<TypeLookupError> swift::_checkGenericRequirements(
     } else {
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
-                                           substWitnessTable,
-                                           allowsUnresolvedSubject);
+                                           substWitnessTable);
       if (error)
         return error;
     }
