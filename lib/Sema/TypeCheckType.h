@@ -92,11 +92,17 @@ enum class TypeResolverContext : uint8_t {
   /// No special type handling is required.
   None,
 
-  /// Whether we are checking generic arguments of a bound generic type.
-  GenericArgument,
+  /// Whether we are checking generic arguments of a non-variadic bound generic
+  /// type. This includes parameterized protocol types. We don't allow pack
+  /// expansions here.
+  ScalarGenericArgument,
 
-  /// Whether we are checking generic arguments of a parameterized protocol type.
-  ProtocolGenericArgument,
+  /// Whether we are checking generic arguments of a variadic generic type.
+  /// We allow pack expansions in all argument positions, and then use the
+  /// PackMatcher to ensure that scalar parameters line up with scalar
+  /// arguments, and pack expansion parameters line up with pack expansion
+  /// arguments.
+  VariadicGenericArgument,
 
   /// Whether we are checking a tuple element type.
   TupleElement,
@@ -262,8 +268,8 @@ public:
     case Context::ClosureExpr:
       return true;
     case Context::None:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::TupleElement:
     case Context::PackElement:
     case Context::FunctionInput:
@@ -308,8 +314,8 @@ public:
     case Context::MetatypeBase:
       return false;
     case Context::None:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::PackElement:
     case Context::TupleElement:
     case Context::InExpression:
@@ -342,11 +348,11 @@ public:
     case Context::VariadicFunctionInput:
     case Context::PackElement:
     case Context::TupleElement:
-    case Context::GenericArgument:
+    case Context::VariadicGenericArgument:
       return true;
-    case Context::PatternBindingDecl:
     case Context::None:
-    case Context::ProtocolGenericArgument:
+    case Context::PatternBindingDecl:
+    case Context::ScalarGenericArgument:
     case Context::Inherited:
     case Context::GenericParameterInherited:
     case Context::AssociatedTypeInherited:
@@ -391,8 +397,8 @@ public:
     case Context::FunctionInput:
     case Context::PackElement:
     case Context::TupleElement:
-    case Context::GenericArgument:
-    case Context::ProtocolGenericArgument:
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
     case Context::ExtensionBinding:
     case Context::TypeAliasDecl:
     case Context::GenericTypeAliasDecl:
