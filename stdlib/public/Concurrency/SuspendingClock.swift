@@ -93,7 +93,7 @@ extension SuspendingClock: Clock {
   ) async throws {
     let (seconds, attoseconds) = deadline._value.components
     let nanoseconds = attoseconds / 1_000_000_000
-    try await Task._sleep(until:seconds, nanoseconds,
+    try await Task._sleep(until: seconds, nanoseconds,
       tolerance: tolerance,
       clock: .suspending)
   }

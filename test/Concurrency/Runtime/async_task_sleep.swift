@@ -16,9 +16,10 @@ import Dispatch
   static let pause = 500_000_000 // 500ms
   
   static func main() async {
-//    await testSleepDuration()
-//    await testSleepDoesNotBlock()
-    await testSleepForUIntMax()
+    await testSleepDuration()
+    await testSleepDoesNotBlock()
+    await testSleepForUIntMax_nanoseconds()
+    await testSleepForUIntMax_untilDeadline()
   }
 
   static func testSleepDuration() async {
@@ -46,14 +47,33 @@ import Dispatch
     await task.get()
   }
 
-  static func testSleepForUIntMax() async {
+  static func testSleepForUIntMax_nanoseconds() async {
     let t = Task.detached {
-       await Task.sleep(.max)
-      print("INFINITE SLEEP DONE (cancelled: \(Task.isCancelled))")
-      precondition(Task.isCancelled, "Infinite sleep finished?! And task was NOT cancelled")
+      print("Run infinite sleep")
+      try? await Task.sleep(nanoseconds: .max)
+      print("Infinite sleep done (cancelled: \(Task.isCancelled)) @ \(#function)")
+      precondition(Task.isCancelled, "Infinite sleep finished yet task was NOT cancelled! @ \(#function)")
     }
 
-    try? await Task.sleep(for: .milliseconds(100))
+    // CHECK: Infinite sleep done (cancelled: true)
+    try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+    t.cancel()
+
+    await t.value
+  }
+
+  // FIXME: can't quite figure this one out, cc Philippe
+  // Uses a different internal API, so we need to test this separately
+  static func testSleepForUIntMax_untilDeadline() async {
+    let t = Task.detached {
+      print("Run infinite sleep")
+      try? await Task.sleep(for: .nanoseconds(UInt64.max))
+      print("Infinite sleep done (cancelled: \(Task.isCancelled)) @ \(#function)")
+      precondition(Task.isCancelled, "Infinite sleep finished yet task was NOT cancelled! @ \(#function)")
+    }
+
+    // CHECK: Infinite sleep done (cancelled: true)
+    try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
     t.cancel()
 
     await t.value

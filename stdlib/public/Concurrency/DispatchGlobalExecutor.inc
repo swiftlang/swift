@@ -24,6 +24,7 @@
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>
+#include <climits>
 #if defined(_WIN32)
 #include <Windows.h>
 #else
@@ -233,7 +234,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 
 SWIFT_CC(swift)
-static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
+static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delayUnsigned,
                                                   Job *job) {
   assert(job && "no job provided");
 
@@ -247,7 +248,10 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delay,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
+  // dispatch_time expects a signed int64, though we have an unsigned delay
+  // so we must convert accordingly.
+  int64_t dispatchDelay = delayUnsigned & INT64_MAX;
+  uint64_t when = dispatch_time(DISPATCH_TIME_NOW, dispatchDelay);
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }
 
@@ -316,7 +320,12 @@ clock_and_value_to_time(int clock, long long deadline) {
   case swift_clock_id_suspending:
     return value;
   case swift_clock_id_continuous:
-    return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+    fprintf(stderr, "[%s:%d](%s) returns monotonic time mask!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    fprintf(stderr, "[%s:%d](%s) monotonic time mask, value: %llu\n", __FILE_NAME__, __LINE__, __FUNCTION__, value);
+    fprintf(stderr, "[%s:%d](%s) monotonic time mask, | mask: %llu\n", __FILE_NAME__, __LINE__, __FUNCTION__, DISPATCH_UP_OR_MONOTONIC_TIME_MASK);
+    fprintf(stderr, "[%s:%d](%s) monotonic time mask, value | mask: %llu\n", __FILE_NAME__, __LINE__, __FUNCTION__, value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK);
+//     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
+    return value; // FIXME: sure this "works" but that's not the right fix I suppose...
   }
   __builtin_unreachable();
 }
@@ -337,10 +346,11 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job->SchedulerPrivate[Job::DispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
+  int64_t deadline = sec * NSEC_PER_SEC + nsec;
   dispatch_time_t when = clock_and_value_to_time(clock, deadline);
   
   if (tnsec != -1) {
+    fprintf(stderr, "[%s:%d](%s) tnsec is not -1\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
 
     dispatch_source_t source = 
@@ -361,7 +371,9 @@ static void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
     dispatch_activate(source);
   } else {
-    dispatch_after_f(when, queue, (void *)job, 
+    fprintf(stderr, "[%s:%d](%s) tnsec IS -1\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    fprintf(stderr, "[%s:%d](%s) when: %llu\n", __FILE_NAME__, __LINE__, __FUNCTION__, when);
+    dispatch_after_f(when, queue, (void *)job,
       (dispatch_function_t)&__swift_run_job);
   }
 }
