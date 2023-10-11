@@ -746,11 +746,11 @@ do {
 do {
   func x(a: Any) {
     _ = a is a
-    // expected-error@-1 {{type-casting operator expects a type on its right-hand side (got: 'a')}}
-    // expected-note@-3 {{declared here}}
+    // expected-error@-1 {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    // expected-note@-3 {{'a' declared here}}
     _ = a as a
-    // expected-error@-1 {{type-casting operator expects a type on its right-hand side (got: 'a')}}
-    // expected-note@-6 {{declared here}}
+    // expected-error@-1 {{type-casting operator expects a type on its right-hand side (got: parameter 'a')}}
+    // expected-note@-6 {{'a' declared here}}
     _ = a is Issue68825 // expected-error {{cannot find type 'Issue68825' in scope}}
     _ = a is String // OK
   }

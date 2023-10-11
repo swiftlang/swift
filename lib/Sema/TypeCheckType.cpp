@@ -1391,7 +1391,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         auto first = lookupResult.front().getValueDecl();
         diags.diagnose(L, diag::cannot_find_type_in_cast_expression, first)
           .highlight(R);
-        diags.diagnose(first->getNameLoc(), diag::note_declared_here);
+        diags.diagnose(first, diag::decl_declared_here, first);
         return ErrorType::get(ctx);
       }
     }
