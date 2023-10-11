@@ -40,7 +40,7 @@ func asyncFunc() async {
 
 
 // async_Main
-// CHECK-SIL-LABEL: sil hidden @async_Main : $@convention(thin) @async () -> () {
+// CHECK-SIL-LABEL: sil private @async_Main : $@convention(thin) @async () -> () {
 // call main
 // CHECK-SIL:  %0 = metatype $@thin MyProgram.Type             // user: %2
 // CHECK-SIL-NEXT:  // function_ref static MyProgram.$main()
