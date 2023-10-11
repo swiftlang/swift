@@ -2922,17 +2922,6 @@ bool ModuleDecl::isSameModuleLookingThroughOverlays(
   if (this->isClangOverlayOf(other) || other->isClangOverlayOf(this)) {
     return true;
   }
-  
-  // If the type has the @_originallyDefinedIn attribute, check if this is the
-  // "originally defined in" module.
-
-  if (getName().is(other->getAlternateModuleName())) {
-    return true;
-  }
-
-  if (other->getName().is(getAlternateModuleName())) {
-    return true;
-  }
 
   return false;
 }
