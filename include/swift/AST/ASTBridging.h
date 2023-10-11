@@ -40,9 +40,10 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-struct BridgedDiagnosticEngine {
+// Must match the definition of BridgedDiagnosticEngine in CASTBridging.h.
+typedef struct {
   void * _Nonnull object;
-};
+} BridgedDiagnosticEngine;
 
 struct BridgedOptionalDiagnosticEngine {
   void *_Nullable object;
