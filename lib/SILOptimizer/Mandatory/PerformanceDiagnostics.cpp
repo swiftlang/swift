@@ -157,12 +157,11 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  ReachingReturnBlocks rrBlocks(function);
-  NonErrorHandlingBlocks neBlocks(function);
-                                       
   for (SILBasicBlock &block : *function) {
-    if (!rrBlocks.reachesReturn(&block) || !neBlocks.isNonErrorHandling(&block))
+    // Exclude fatal-error blocks.
+    if (isa<UnreachableInst>(block.getTerminator()))
       continue;
+
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, perfConstr, parentLoc))
         return true;
