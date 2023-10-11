@@ -3542,10 +3542,16 @@ public:
       diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
                cand, cand->getDeclContext()->getSelfClassDecl());
 
-      if (canBeRepresentedInObjC(cand))
-        diagnose(cand, diag::fixit_add_private_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(true), "private ");
+      if (canBeRepresentedInObjC(cand)) {
+        auto diagnostic =
+            diagnose(cand, diag::fixit_add_private_for_objc_implementation,
+                     cand->getDescriptiveKind());
+        if (auto modifier = cand->getAttrs().getAttribute<AccessControlAttr>())
+          diagnostic.fixItReplace(modifier->getRange(), "private");
+        else
+          diagnostic.fixItInsert(cand->getAttributeInsertionLoc(true),
+                                 "private ");
+      }
 
       diagnose(cand, diag::fixit_add_final_for_objc_implementation,
                cand->getDescriptiveKind())

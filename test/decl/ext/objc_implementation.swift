@@ -114,7 +114,7 @@ protocol EmptySwiftProto {}
 
   internal var propertyNotFromHeader1: CInt
   // expected-warning@-1 {{property 'propertyNotFromHeader1' does not match any property declared in the headers for 'ObjCClass'; did you use the property's Swift name?; this will become an error before '@_objcImplementation' is stabilized}}
-  // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible property not declared in the header}} {{3-3=private }}
+  // expected-note@-2 {{add 'private' or 'fileprivate' to define an Objective-C-compatible property not declared in the header}} {{3-11=private}}
   // expected-note@-3 {{add 'final' to define a Swift property that cannot be overridden}} {{3-3=final }}
 
   @objc private var propertyNotFromHeader2: CInt
