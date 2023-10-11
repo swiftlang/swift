@@ -105,7 +105,8 @@ static bool requiresFlowIsolation(ActorIsolation typeIso,
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
-      return false;
+    case ActorIsolation::NonisolatedUnsafe:
+    return false;
 
     case ActorIsolation::ActorInstance:
       return !(ctor->hasAsync()); // need flow-isolation for non-async.
@@ -322,13 +323,13 @@ llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc;
-  DeclAttributes *declAttrs;
+  DeclContext *dc = nullptr;
+  DeclAttributes *declAttrs = nullptr;
   SourceLoc loc;
   if (auto decl = subject.dyn_cast<Decl *>()) {
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
-    // HACK: `getLoc`, when querying the attr from  a serialized decl,
+    // HACK: `getLoc`, when querying the attr from a serialized decl,
     // depending on deserialization order, may launch into arbitrary
     // type-checking when querying interface types of such decls. Which,
     // in turn, may do things like query (to print) USRs. This ends up being
@@ -501,6 +502,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
   switch (varIsolation) {
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     // if nonisolated, it's OK
     return true;
@@ -1580,6 +1582,7 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
   // escaping-use restriction
   switch (getActorIsolation(fn).getKind()) {
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
       // convenience inits did not have the restriction.
@@ -1800,6 +1803,7 @@ static ActorIsolation getInnermostIsolatedContext(
               getActorIsolationOfContext(mutableDC, getClosureActorIsolation)) {
   case ActorIsolation::ActorInstance:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return isolation;
 
@@ -1901,6 +1905,7 @@ static void noteGlobalActorOnContext(DeclContext *dc, Type globalActor) {
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         return;
 
       case ActorIsolation::Unspecified:
@@ -2253,6 +2258,7 @@ namespace {
       // default arguments cannot have any async calls.
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         return;
 
       case ActorIsolation::GlobalActor:
@@ -2638,6 +2644,7 @@ namespace {
           switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::NonisolatedUnsafe:
             if (isSendableClosure(closure, /*forActorIsolation=*/true)) {
               return ReferencedActor(var, isPotentiallyIsolated, ReferencedActor::SendableClosure);
             }
@@ -2694,6 +2701,7 @@ namespace {
         switch (auto isolation =
                     getActorIsolationOfContext(dc, getClosureActorIsolation)) {
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
           // Local functions can capture an isolated parameter.
           // FIXME: This really should be modeled by getActorIsolationOfContext.
@@ -3042,7 +3050,8 @@ namespace {
             break;
 
           case ActorReferenceResult::ExitsActorToNonisolated:
-            unsatisfiedIsolation = ActorIsolation::forNonisolated();
+            unsatisfiedIsolation =
+                ActorIsolation::forNonisolated(/*unsafe=*/false);
             break;
 
           case ActorReferenceResult::EntersActor:
@@ -3100,7 +3109,7 @@ namespace {
       // an isolated context, then we're exiting the actor context.
       if (mayExitToNonisolated && fnType->isAsync() &&
           getContextIsolation().isActorIsolated())
-        unsatisfiedIsolation = ActorIsolation::forNonisolated();
+        unsatisfiedIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
@@ -3289,6 +3298,7 @@ namespace {
               decl, getDeclContext());
           switch (isolation) {
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::NonisolatedUnsafe:
           case ActorIsolation::Unspecified:
             break;
 
@@ -3481,6 +3491,7 @@ namespace {
 
           case ActorIsolation::Unspecified:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::NonisolatedUnsafe:
             refKind = ReferencedActor::NonIsolatedContext;
             break;
           }
@@ -3553,7 +3564,7 @@ namespace {
       // Sendable closures are nonisolated unless the closure has
       // specifically opted into inheriting actor isolation.
       if (isSendableClosure(closure, /*forActorIsolation=*/true))
-        return ActorIsolation::forNonisolated()
+        return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
 
       // A non-Sendable closure gets its isolation from its context.
@@ -3564,8 +3575,10 @@ namespace {
       // We must have parent isolation determined to get here.
       switch (parentIsolation) {
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Unspecified:
-        return ActorIsolation::forNonisolated()
+        return ActorIsolation::forNonisolated(parentIsolation ==
+                                              ActorIsolation::NonisolatedUnsafe)
             .withPreconcurrency(preconcurrency);
 
       case ActorIsolation::GlobalActor:
@@ -3581,7 +3594,7 @@ namespace {
           return ActorIsolation::forActorInstanceCapture(param)
             .withPreconcurrency(preconcurrency);
 
-        return ActorIsolation::forNonisolated()
+        return ActorIsolation::forNonisolated(/*unsafe=*/false)
             .withPreconcurrency(preconcurrency);
       }
     }
@@ -3738,7 +3751,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
-    return ActorIsolation::forNonisolated();
+    return ActorIsolation::forNonisolated(nonisolatedAttr->isUnsafe());
   }
 
   // If the declaration is marked with a global actor, report it as being
@@ -3811,6 +3824,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         break;
       }
 
@@ -3835,6 +3849,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         // We only need one nonisolated.
         if (sawActorIndependent)
           return true;
@@ -3885,6 +3900,7 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::GlobalActor:
@@ -3942,6 +3958,7 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::GlobalActor:
@@ -4133,6 +4150,7 @@ static bool checkClassGlobalActorIsolation(
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     downgradeToWarning = true;
     break;
 
@@ -4324,21 +4342,25 @@ ActorIsolation ActorIsolationRequest::evaluate(
                                   ActorIsolation isolation) {
     if (var && var->getLoc() &&
         var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
-        !isolation.isGlobalActor()) {
-      const bool isGlobalState =
-          var->isStatic() || var->getDeclContext()->isModuleScopeContext() ||
-          (var->getDeclContext()->isTypeContext() && !var->isInstanceMember());
+        !isolation.isGlobalActor() &&
+        (isolation != ActorIsolation::NonisolatedUnsafe)) {
       auto *classDecl = var->getDeclContext()->getSelfClassDecl();
       const bool isActorType = classDecl && classDecl->isAnyActor();
-      if (isGlobalState && !isActorType) {
+      if (var->isGlobalStorage() && !isActorType) {
+        auto *diagVar = var;
+        if (auto *originalVar = var->getOriginalWrappedProperty()) {
+          diagVar = originalVar;
+        }
         if (var->isLet()) {
           if (!isSendableType(var->getModuleContext(),
                               var->getInterfaceType())) {
-            var->diagnose(diag::shared_immutable_state_decl, var);
+            diagVar->diagnose(diag::shared_immutable_state_decl, diagVar)
+                .warnUntilSwiftVersion(6);
           }
         } else {
-          var->diagnose(diag::shared_mutable_state_decl, var);
-          var->diagnose(diag::shared_mutable_state_decl_note, var);
+          diagVar->diagnose(diag::shared_mutable_state_decl, diagVar)
+              .warnUntilSwiftVersion(6);
+          diagVar->diagnose(diag::shared_mutable_state_decl_note, diagVar);
         }
       }
     }
@@ -4381,7 +4403,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     // A @Sendable function is assumed to be actor-independent.
     if (func->isSendable()) {
-      defaultIsolation = ActorIsolation::forNonisolated();
+      defaultIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
     }
   }
 
@@ -4390,7 +4412,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (nominal->isAnyActor())
       if (auto ctor = dyn_cast<ConstructorDecl>(value))
         if (!ctor->hasAsync())
-          defaultIsolation = ActorIsolation::forNonisolated();
+          defaultIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
 
   // Look for and remember the overridden declaration's isolation.
   llvm::Optional<ActorIsolation> overriddenIso;
@@ -4428,6 +4450,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       ASTContext &ctx = value->getASTContext();
       switch (inferred) {
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         // Stored properties cannot be non-isolated, so don't infer it.
         if (auto var = dyn_cast<VarDecl>(value)) {
           if (!var->isStatic() && var->hasStorage())
@@ -4440,7 +4463,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
               inferred.preconcurrency());
         }
 
-        value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+        value->getAttrs().add(new (ctx) NonisolatedAttr(
+            inferred == ActorIsolation::NonisolatedUnsafe, /*implicit=*/true));
         break;
 
       case ActorIsolation::GlobalActorUnsafe:
@@ -4487,6 +4511,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       switch (auto enclosingIsolation =
                   getActorIsolationOfContext(func->getDeclContext())) {
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Unspecified:
         // Do nothing.
         break;
@@ -4657,6 +4682,7 @@ bool HasIsolatedSelfRequest::evaluate(
   if (auto var = dyn_cast<VarDecl>(value)) {
     switch (auto isolation = getActorIsolationFromWrappedProperty(var)) {
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       break;
 
@@ -5048,6 +5074,7 @@ bool swift::checkSendableConformance(
   case ActorIsolation::Unspecified:
   case ActorIsolation::ActorInstance:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     break;
 
   case ActorIsolation::GlobalActor:
@@ -5518,6 +5545,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
     switch (auto isolation = getActorIsolation(decl)) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       return fnType;
 
@@ -5803,6 +5831,7 @@ bool swift::isAccessibleAcrossActors(
     switch (isolation) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       return true;
 

@@ -451,7 +451,7 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
   derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
@@ -480,7 +480,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // IMPORTANT: `id` MUST be the first field of a distributed actor, and
   // `actorSystem` MUST be the second field, because for a remote instance
@@ -778,7 +778,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
                                                    /*implicit*/ true));
-  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+  property->getAttrs().add(
+      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // Make the property implicitly final.
   property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
