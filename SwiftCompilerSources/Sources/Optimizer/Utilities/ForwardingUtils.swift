@@ -1,4 +1,4 @@
-//===--- OwnershipUtils.swift - Utilities for ownership -------------------===//
+//===--- ForwardingUtils.swift - Utilities for ownership forwarding -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -29,8 +29,6 @@ import SIL
 //
 // Note: Although move_value conceptually forwards an owned value, it also summarizes lifetime attributes; therefore, it is not formally a ForwardingInstruction.
 //
-// TODO: when phi lifetime flags are implemented, phis will introduce a lifetime in the same way as move_value.
-//
 // The lifetime introducer of a guaranteed value is the borrow introducer:
 //
 //   # lifetime introducer / borrow introducer
@@ -43,11 +41,25 @@ import SIL
 //
 // TODO: When a begin_borrow has no lifetime flags, it can be ignored as a lifetime introducer. In that case, an owned value may introduce guaranteed OSSA lifetimes.
 //
+// Forwarded lifetimes also extend through phis. In this case, however, there is no ForwardingInstruction.
+//
+//   # lifetime introducer
+//   %1 = apply             -+               -+
+//   ...                     | OSSA lifetime  |
+//   # phi operand           |                |
+//   br bbContinue(%1: $S)  -+                | forward-extended lifetime
+//                                            |
+//   bbContinue(%phi : $S): -+ OSSA lifetime  |
+//   ...                     |                |
+//   destroy_value %phi     -+               -+
+//
+// TODO: when phi lifetime flags are implemented, phis will introduce a lifetime in the same way as move_value.
+//
 // This walker is used to query basic lifetime attributes on values, such as "escaping" or "lexical". It must be precise for correctness and is performance critical.
 protocol ForwardingUseDefWalker {
   mutating func introducer(_ value: Value) -> WalkResult
 
-  // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring by default. Implementations may traverse phis.
+  // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring along with phis.
   mutating func needWalk(for value: Value) -> Bool
 
   mutating func walkUp(value: Value) -> WalkResult
@@ -58,14 +70,26 @@ extension ForwardingUseDefWalker {
     walkUpDefault(value: value)
   }
   mutating func walkUpDefault(value: Value) -> WalkResult {
-    if let inst = value.definingInstruction as? ForwardingInstruction
-    {
+    if let inst = value.forwardingInstruction {
       return walkUp(instruction: inst)
+    }
+    if let phi = Phi(value) {
+      return walkUp(phi: phi)
     }
     return introducer(value)
   }
   mutating func walkUp(instruction: ForwardingInstruction) -> WalkResult {
     for operand in instruction.forwardedOperands {
+      if needWalk(for: operand.value) {
+        if walkUp(value: operand.value) == .abortWalk {
+          return .abortWalk
+        }
+      }
+    }
+    return .continueWalk
+  }
+  mutating func walkUp(phi: Phi) -> WalkResult {
+    for operand in phi.incomingOperands {
       if needWalk(for: operand.value) {
         if walkUp(value: operand.value) == .abortWalk {
           return .abortWalk
@@ -103,14 +127,34 @@ private struct GatherLifetimeIntroducers : ForwardingUseDefWalker {
   }
 }
 
+enum ForwardingUseResult: CustomStringConvertible {
+  case operand(Operand)
+  case deadValue(Value)
+
+  var description: String {
+    switch self {
+    case .operand(let operand):
+      return operand.description
+    case .deadValue(let deadValue):
+      return "dead value: " + deadValue.description
+    }
+  }
+}
+
 // Visit all the uses in a forward-extended lifetime (LifetimeIntroducer -> Operand).
 protocol ForwardingDefUseWalker {
   // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring by default. Implementations may handle phis.
   mutating func needWalk(for value: Value) -> Bool
 
-  mutating func leafUse(_ operand: Operand) -> WalkResult
+  // Report any initial or forwarded  with no uses. Only relevant for
+  // guaranteed values or incomplete OSSA. This could be a dead
+  // instruction, a terminator in which the result is dead on one
+  // path, or a dead phi.
+  mutating func deadValue(_: Value) -> WalkResult
+
+  mutating func leafUse(_: Operand) -> WalkResult
   
-  mutating func walkDownUses(of value: Value) -> WalkResult
+  mutating func walkDownUses(of: Value) -> WalkResult
     
   mutating func walkDown(operand: Operand) -> WalkResult
 }
@@ -123,10 +167,15 @@ extension ForwardingDefUseWalker {
   mutating func walkDownUsesDefault(of value: Value) -> WalkResult {
     if !needWalk(for: value) { return .continueWalk }
 
+    var hasUse = false
     for operand in value.uses where !operand.isTypeDependent {
       if walkDown(operand: operand) == .abortWalk {
         return .abortWalk
       }
+      hasUse = true
+    }
+    if !hasUse {
+      deadValue(value)
     }
     return .continueWalk
   }
@@ -138,6 +187,9 @@ extension ForwardingDefUseWalker {
   mutating func walkDownDefault(operand: Operand) -> WalkResult {
     if let inst = operand.instruction as? ForwardingInstruction {
       return walkDownAllResults(of: inst)
+    }
+    if let phi = Phi(using: operand) {
+      return walkDownUses(of: phi.value)
     }
     return leafUse(operand)
   }
@@ -156,9 +208,8 @@ extension ForwardingDefUseWalker {
 // This conveniently allows a closure to be called for each leaf use of a forward-extended lifetime. It should be called on a forward introducer provided by ForwardingDefUseWalker.introducer() or gatherLifetimeIntroducers().
 //
 // TODO: make the visitor non-escaping once Swift supports stored non-escaping closues.
-func visitForwardedUses(introducer: Value,
-  visitor: @escaping (Operand) -> WalkResult,
-  _ context: Context)
+func visitForwardedUses(introducer: Value, _ context: Context,
+  visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {
   var useVisitor = VisitForwardedUses(visitor: visitor, context)
   defer { useVisitor.visitedValues.deinitialize() }
@@ -167,9 +218,10 @@ func visitForwardedUses(introducer: Value,
 
 private struct VisitForwardedUses : ForwardingDefUseWalker {
   var visitedValues: ValueSet
-  var visitor: (Operand) -> WalkResult
+  var visitor: (ForwardingUseResult) -> WalkResult
   
-  init(visitor: @escaping (Operand) -> WalkResult, _ context: Context) {
+  init(visitor: @escaping (ForwardingUseResult) -> WalkResult,
+    _ context: Context) {
     self.visitedValues = ValueSet(context)
     self.visitor = visitor
   }
@@ -179,6 +231,27 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
   }
   
   mutating func leafUse(_ operand: Operand) -> WalkResult {
-    return visitor(operand)
+    return visitor(.operand(operand))
+  }
+
+  mutating func deadValue(_ value: Value) -> WalkResult {
+    return visitor(.deadValue(value))
+  }
+}
+
+let forwardingUseDefTest = FunctionTest("forwarding_use_def_test") {
+  function, arguments, context in
+  let value = arguments.takeValue()
+  for introducer in gatherLifetimeIntroducers(for: value, context) {
+    print("INTRODUCER: \(introducer)")
+  }
+}
+
+let forwardingDefUseTest = FunctionTest("forwarding_def_use_test") {
+  function, arguments, context in
+  let value = arguments.takeValue()
+  _ = visitForwardedUses(introducer: value, context) { operand in
+    print("USE: \(operand)")
+    return .continueWalk
   }
 }

@@ -64,7 +64,19 @@ public struct Phi {
     guard term is BranchInst || term is CondBranchInst else { return nil }
     self.value = argument
   }
-  
+
+  public init?(using operand: Operand) {
+    switch operand.instruction {
+    case let br as BranchInst:
+      self.init(br.getArgument(for: operand))
+    case let condBr as CondBranchInst:
+      guard let arg = condBr.getArgument(for: operand) else { return nil }
+      self.init(arg)
+    default:
+      return nil
+    }
+  }
+
   public var predecessors: PredecessorList {
     return value.parentBlock.predecessors
   }
