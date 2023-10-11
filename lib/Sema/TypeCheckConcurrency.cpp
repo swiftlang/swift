@@ -3936,11 +3936,13 @@ static bool checkClassGlobalActorIsolation(
     return false;
 
   // Check the superclass's isolation.
+  bool downgradeToWarning = false;
   auto superIsolation = getActorIsolation(superclassDecl);
   switch (superIsolation) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-    return false;
+    downgradeToWarning = true;
+    break;
 
   case ActorIsolation::ActorInstance:
     // This is an error that will be diagnosed later. Ignore it here.
@@ -3964,7 +3966,8 @@ static bool checkClassGlobalActorIsolation(
 
   // Complain about the mismatch.
   classDecl->diagnose(diag::actor_isolation_superclass_mismatch, isolation,
-                      classDecl, superIsolation, superclassDecl);
+                      classDecl, superIsolation, superclassDecl)
+      .warnUntilSwiftVersionIf(downgradeToWarning, 6);
   return true;
 }
 
