@@ -70,4 +70,15 @@ func f(_ x: @retroactive Int) {} // expected-error {{'retroactive' attribute onl
 
 var x: @retroactive Int { 0 } // expected-error {{'retroactive' attribute only applies in inheritance clauses in extensions}}
 
+#if os(macOS)
+
+@available(macOS 11, *)
+@_originallyDefinedIn(module: "Library", macOS 14)
+public struct OriginallyDefinedInLibrary {}
+
+@available(macOS 14, *)
+extension OriginallyDefinedInLibrary: SampleProtocol1 {} // ok, @_originallyDefinedIn attribute makes this authoritative
+
+#endif
+
 #endif

@@ -342,7 +342,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
     DAK_ObjCImplementation,
     DAK_StaticInitializeObjCMetadata,
     DAK_RestatedObjCConformance,
-    DAK_NonSendable
+    DAK_NonSendable,
   };
 
   return result;

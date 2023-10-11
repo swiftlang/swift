@@ -1617,8 +1617,7 @@ static void diagnoseRetroactiveConformances(
     return;
   }
 
-  // Don't warn for this if we see it in module interfaces. We shouldn't
-  // write out the `@retroactive` attribute in module interfaces.
+  // Don't warn for this if we see it in module interfaces.
   if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
     return;
   }
