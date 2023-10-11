@@ -94,18 +94,18 @@ func testMemoryLayout() -> Int {
 class MyError : Error {}
 
 @_noLocks
-func noDiagnosticsInThrowPath(_ b: Bool) throws -> Int {
+func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()
+  throw MyError()  // expected-error {{Using type 'MyError' can cause metadata allocation or locks}}
 }
 
 @_noLocks
-func noDiagnosticsInCatch(_ b: Bool) throws -> Int? {
+func testCatch(_ b: Bool) throws -> Int? {
   do {
-    return try noDiagnosticsInThrowPath(true)
-  } catch let e as MyError {
+    return try errorExistential(true)
+  } catch let e as MyError { // expected-error {{this code performs reference counting operations which can cause locking}}
     print(e)
     return nil
   }
@@ -405,3 +405,10 @@ func baz<T>(t: T) -> T {
 func nestedClosures() -> Int {
     return baz(t: 42)
 }
+
+@_noAllocation
+func testInfiniteLoop(_ c: Cl) {
+  c.classMethod() // expected-error {{called function is not known at compile time and can have unpredictable performance}}
+  while true {}
+}
+
