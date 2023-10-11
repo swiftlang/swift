@@ -5196,10 +5196,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     return false;
   });
 
-  for (auto req : proto->getRequirementSignature().getRequirements()) {
-    if (req.getKind() == RequirementKind::Conformance) {
-      auto depTy = req.getFirstType();
-      auto *proto = req.getProtocolDecl();
+  Conformance->forEachAssociatedConformance(
+    [&](Type depTy, ProtocolDecl *proto, unsigned index) {
       auto conformance = Conformance->getAssociatedConformance(depTy, proto);
       if (conformance.isConcrete()) {
         auto *concrete = conformance.getConcrete();
@@ -5208,8 +5206,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
                                         conformance, where,
                                         depTy, replacementTy);
       }
-    }
-  }
+
+      return false;
+    });
 }
 
 #pragma mark Protocol conformance checking
