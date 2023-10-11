@@ -52,16 +52,16 @@ public struct DiagnosticFixIt {
 }
 
 public struct DiagnosticEngine {
-  private let bridged: BridgedDiagnosticEngine
+  private let bridged: BridgedDiagEngine
 
-  public init(bridged: BridgedDiagnosticEngine) {
+  public init(bridged: BridgedDiagEngine) {
     self.bridged = bridged
   }
   public init?(bridged: BridgedOptionalDiagnosticEngine) {
     guard let object = bridged.object else {
       return nil
     }
-    self.bridged = BridgedDiagnosticEngine(object: object)
+    self.bridged = BridgedDiagEngine(object: object)
   }
 
   public func diagnose(_ position: SourceLoc?,
