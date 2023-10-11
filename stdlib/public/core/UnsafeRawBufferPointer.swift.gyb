@@ -1304,6 +1304,14 @@ public func _withUnprotectedUnsafeBytes<T, Result>(
   return try body(buffer)
 }
 
+@available(*, unavailable)
+extension UnsafeRawBufferPointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeRawBufferPointer.Iterator: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutableRawBufferPointer: Sendable { }
+
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

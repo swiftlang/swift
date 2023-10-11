@@ -318,3 +318,36 @@ func testLocalCaptures() {
     // expected-complete-and-sns-warning@-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
   }
 }
+
+func testPointersAreNotSendable() {
+  func testSendable<T: Sendable>(_: T) {}
+
+  func testUnsafePointer(ptr: UnsafePointer<Int>,
+                         mutablePtr: UnsafeMutablePointer<String>) {
+    testSendable(ptr) // expected-warning {{conformance of 'UnsafePointer<Pointee>' to 'Sendable' is unavailable}}
+    testSendable(mutablePtr) // expected-warning {{conformance of 'UnsafeMutablePointer<Pointee>' to 'Sendable' is unavailable}}
+  }
+
+  func testRawPointer(ptr: UnsafeRawPointer,
+                            mutablePtr: UnsafeMutableRawPointer) {
+    testSendable(ptr) // expected-warning {{conformance of 'UnsafeRawPointer' to 'Sendable' is unavailable}}
+    testSendable(mutablePtr) // expected-warning {{conformance of 'UnsafeMutableRawPointer' to 'Sendable' is unavailable}}
+  }
+
+  func testOpaqueAndCPointers(opaquePtr: OpaquePointer, cPtr: CVaListPointer, autoReleasePtr: AutoreleasingUnsafeMutablePointer<Int>) {
+    testSendable(opaquePtr) // expected-warning {{conformance of 'OpaquePointer' to 'Sendable' is unavailable}}
+    testSendable(cPtr) // expected-warning {{conformance of 'CVaListPointer' to 'Sendable' is unavailable}}
+    testSendable(autoReleasePtr) // expected-warning {{conformance of 'AutoreleasingUnsafeMutablePointer<Pointee>' to 'Sendable' is unavailable}}
+  }
+
+  func testBufferPointers(buffer: UnsafeBufferPointer<Int>, mutableBuffer: UnsafeMutableBufferPointer<Int>,
+                          rawBuffer: UnsafeRawBufferPointer, rawMutableBuffer: UnsafeMutableRawBufferPointer) {
+    testSendable(buffer) // expected-warning {{conformance of 'UnsafeBufferPointer<Element>' to 'Sendable' is unavailable}}
+    testSendable(mutableBuffer) // expected-warning {{conformance of 'UnsafeMutableBufferPointer<Element>' to 'Sendable' is unavailable}}
+    testSendable(buffer.makeIterator()) // expected-warning {{conformance of 'UnsafeBufferPointer<Element>.Iterator' to 'Sendable' is unavailable}}
+    testSendable(rawBuffer) // expected-warning {{conformance of 'UnsafeRawBufferPointer' to 'Sendable' is unavailable}}
+    testSendable(rawBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
+    testSendable(rawMutableBuffer) // expected-warning {{conformance of 'UnsafeMutableRawBufferPointer' to 'Sendable' is unavailable}}
+    testSendable(rawMutableBuffer.makeIterator()) // expected-warning {{conformance of 'UnsafeRawBufferPointer.Iterator' to 'Sendable' is unavailable}}
+  }
+}
