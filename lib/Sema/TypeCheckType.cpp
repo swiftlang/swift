@@ -144,8 +144,8 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::FunctionInput:
   case TypeResolverContext::PackElement:
   case TypeResolverContext::TupleElement:
-  case TypeResolverContext::GenericArgument:
-  case TypeResolverContext::ProtocolGenericArgument:
+  case TypeResolverContext::ScalarGenericArgument:
+  case TypeResolverContext::VariadicGenericArgument:
   case TypeResolverContext::ExtensionBinding:
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
@@ -793,6 +793,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 
   auto genericArgs = generic->getGenericArgs();
 
+  // Parameterized protocol types have their own code path.
   if (auto *protoType = type->getAs<ProtocolType>()) {
     auto *protoDecl = protoType->getDecl();
 
@@ -807,6 +808,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       return ErrorType::get(ctx);
     }
 
+    // Make sure we have the right number of generic arguments.
     if (genericArgs.size() != assocTypes.size()) {
       diags.diagnose(loc,
                      diag::parameterized_protocol_type_argument_count_mismatch,
@@ -821,7 +823,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     if (options.is(TypeResolverContext::ExistentialConstraint))
       options |= TypeResolutionFlags::DisallowOpaqueTypes;
     auto argOptions = options.withoutContext().withContext(
-        TypeResolverContext::ProtocolGenericArgument);
+        TypeResolverContext::ScalarGenericArgument);
     auto genericResolution = resolution.withOptions(argOptions);
 
     // Resolve the generic arguments.
@@ -837,8 +839,6 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     auto parameterized =
         ParameterizedProtocolType::get(ctx, protoType, argTys);
 
-    // Build ParameterizedProtocolType if the protocol has primary associated
-    // types and we're in a supported context.
     if (resolution.getOptions().isConstraintImplicitExistential() &&
         !ctx.LangOpts.hasFeature(Feature::ImplicitSome)) {
       diags.diagnose(loc, diag::existential_requires_any, parameterized,
@@ -873,15 +873,20 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
   auto *unboundType = type->castTo<UnboundGenericType>();
   auto *decl = unboundType->getDecl();
 
-  // Make sure we have the right number of generic arguments.
   auto genericParams = decl->getGenericParams();
   auto hasParameterPack = llvm::any_of(
       *genericParams, [](auto *paramDecl) {
           return paramDecl->isParameterPack();
       });
 
+  // If the type declares at least one parameter pack, allow pack expansions
+  // anywhere in the argument list. We'll use the PackMatcher to ensure that
+  // everything lines up. Otherwise, don't allow pack expansions to appear
+  // at all.
   auto argOptions = options.withoutContext().withContext(
-      TypeResolverContext::GenericArgument);
+      hasParameterPack
+      ? TypeResolverContext::VariadicGenericArgument
+      : TypeResolverContext::ScalarGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -904,6 +909,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     args.push_back(substTy);
   }
 
+  // Make sure we have the right number of generic arguments.
   if (!hasParameterPack) {
     // For generic types without type parameter packs, we require
     // the number of declared generic parameters match the number of
@@ -970,6 +976,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     }
   }
 
+  // Construct the substituted type.
   const auto result = resolution.applyUnboundGenericArguments(
       decl, unboundType->getParent(), loc, args);
 
@@ -4466,7 +4473,7 @@ NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
   auto argOptions = options.withoutContext().withContext(
-      TypeResolverContext::GenericArgument);
+      TypeResolverContext::ScalarGenericArgument);
 
   auto keyTy = resolveType(repr->getKey(), argOptions);
   if (keyTy->hasError()) {
@@ -4540,8 +4547,8 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     break;
   case TypeResolverContext::PackElement:
   case TypeResolverContext::TupleElement:
-  case TypeResolverContext::GenericArgument:
-  case TypeResolverContext::ProtocolGenericArgument:
+  case TypeResolverContext::ScalarGenericArgument:
+  case TypeResolverContext::VariadicGenericArgument:
   case TypeResolverContext::VariadicFunctionInput:
   case TypeResolverContext::ForEachStmt:
   case TypeResolverContext::ExtensionBinding:

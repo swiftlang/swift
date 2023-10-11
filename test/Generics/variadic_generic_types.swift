@@ -111,3 +111,8 @@ func invalidPackExpansion<each X, each Y, Z>(x: repeat each X, y: repeat each Y,
   typealias Seven = B<Z, repeat each X> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
   typealias Eight = B<Z, repeat each X, repeat each Y> // expected-error {{generic type 'B' specialized with mismatched type parameter pack}}
 }
+
+func packExpansionInScalarArgument<each T>(_: repeat each T) {
+  typealias A<U> = U
+  typealias One = A<repeat each T> // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
+}

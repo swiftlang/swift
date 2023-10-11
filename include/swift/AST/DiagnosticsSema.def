@@ -5723,7 +5723,7 @@ ERROR(superclass_with_pack,none,
       "cannot inherit from a generic class that declares a type pack", ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
-      "tuple element, or generic argument list", (Type))
+      "tuple element, or generic argument of a variadic type", (Type))
 ERROR(expansion_expr_not_allowed,none,
       "value pack expansion can only appear inside a function argument list "
       "or tuple element", ())
