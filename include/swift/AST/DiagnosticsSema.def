@@ -4420,10 +4420,21 @@ ERROR(cannot_specialize_self,none,
       "cannot specialize 'Self'", ())
 NOTE(specialize_explicit_type_instead,none,
      "did you mean to explicitly reference %0 instead?", (Type))
-ERROR(type_parameter_count_mismatch,none,
-      "generic type %0 specialized with %select{too many|too few}3 type "
-      "parameters (got %2, but expected %select{%1|at least %1}4)",
-      (Identifier, unsigned, unsigned, bool, bool))
+ERROR(too_few_generic_arguments,none,
+      "generic type %0 specialized with too few type parameters "
+      "(got %1, but expected %2)",
+      (Identifier, unsigned, unsigned))
+ERROR(too_few_generic_arguments_pack,none,
+      "generic type %0 specialized with too few type parameters "
+      "(got %1, but expected at least %2)",
+      (Identifier, unsigned, unsigned))
+ERROR(too_many_generic_arguments,none,
+      "generic type %0 specialized with too many type parameters "
+      "(got %1, but expected %2)",
+      (Identifier, unsigned, unsigned))
+ERROR(generic_argument_pack_mismatch,none,
+      "generic type %0 specialized with mismatched type parameter pack",
+      (Identifier))
 ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(descriptive_generic_type_declared_here,none,
@@ -5721,7 +5732,7 @@ ERROR(superclass_with_pack,none,
       "cannot inherit from a generic class that declares a type pack", ())
 ERROR(expansion_not_allowed,none,
       "pack expansion %0 can only appear in a function parameter list, "
-      "tuple element, or generic argument list", (Type))
+      "tuple element, or generic argument of a variadic type", (Type))
 ERROR(expansion_expr_not_allowed,none,
       "value pack expansion can only appear inside a function argument list "
       "or tuple element", ())
