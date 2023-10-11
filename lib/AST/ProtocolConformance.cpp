@@ -789,24 +789,13 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
 
-  // If we've already created this type witness, return it.
+  // If we've already computed this type witness, return it.
   auto known = TypeWitnesses.find(assocType);
   if (known != TypeWitnesses.end()) {
     return known->second;
   }
 
-  // Otherwise, perform substitutions to create this witness now.
-
-  // Local function to determine whether we will end up referring to a
-  // tentative witness that may not be chosen.
-  auto root = GenericConformance->getRootConformance();
-  auto isTentativeWitness = [&] {
-    if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
-      return false;
-
-    return !root->hasTypeWitness(assocType);
-  };
-
+  // Otherwise, perform substitutions to compute this witness.
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessAndDecl(assocType, options);
 
@@ -816,24 +805,18 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   auto *typeDecl = genericWitnessAndDecl.getWitnessDecl();
 
-  // Form the substitution.
   auto substitutionMap = getSubstitutionMap();
-  if (substitutionMap.empty())
-    return TypeWitnessAndDecl();
-
-  // Apply the substitution we computed above
   auto specializedType = genericWitness.subst(substitutionMap, options);
   if (specializedType->hasError()) {
-    if (isTentativeWitness())
+    if (options.getTentativeTypeWitness)
       return { Type(), nullptr };
 
     specializedType = ErrorType::get(genericWitness);
   }
 
-  // If we aren't in a case where we used the tentative type witness
-  // information, cache the result.
+  // Cache the result.
   auto specializedWitnessAndDecl = TypeWitnessAndDecl{specializedType, typeDecl};
-  if (!isTentativeWitness() && !specializedType->hasError())
+  if (!options.getTentativeTypeWitness && !specializedType->hasError())
     TypeWitnesses[assocType] = specializedWitnessAndDecl;
 
   return specializedWitnessAndDecl;
