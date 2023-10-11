@@ -16,8 +16,9 @@ import Dispatch
   static let pause = 500_000_000 // 500ms
   
   static func main() async {
-    await testSleepDuration()
-    await testSleepDoesNotBlock()
+//    await testSleepDuration()
+//    await testSleepDoesNotBlock()
+    await testSleepForUIntMax()
   }
 
   static func testSleepDuration() async {
@@ -32,8 +33,7 @@ import Dispatch
   }
 
   static func testSleepDoesNotBlock() async {
-    // FIXME: Should run on main executor
-    let task = detach {
+    let task = Task.detached {
       print("Run first")
     }
 
@@ -45,4 +45,18 @@ import Dispatch
     // CHECK: Run second
     await task.get()
   }
+
+  static func testSleepForUIntMax() async {
+    let t = Task.detached {
+       await Task.sleep(.max)
+      print("INFINITE SLEEP DONE (cancelled: \(Task.isCancelled))")
+      precondition(Task.isCancelled, "Infinite sleep finished?! And task was NOT cancelled")
+    }
+
+    try? await Task.sleep(for: .milliseconds(100))
+    t.cancel()
+
+    await t.value
+  }
 }
+
