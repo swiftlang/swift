@@ -5530,7 +5530,6 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     switch (member->getKind()) {
     case DeclKind::Import:
     case DeclKind::TopLevelCode:
-    case DeclKind::Protocol:
     case DeclKind::Extension:
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
@@ -5585,6 +5584,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
     case DeclKind::Class:
       emitClassDecl(cast<ClassDecl>(member));
+      continue;
+    case DeclKind::Protocol:
+      emitProtocolDecl(cast<ProtocolDecl>(member));
       continue;
     case DeclKind::MacroExpansion:
       // Expansion already visited as auxiliary decls.

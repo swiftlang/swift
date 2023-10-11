@@ -9241,7 +9241,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
                    Context.AllocateCopy(PrimaryAssociatedTypeNames),
                    Context.AllocateCopy(InheritedProtocols), TrailingWhere);
-  // No need to setLocalDiscriminator: protocols can't appear in local contexts.
+  recordLocalType(Proto);
 
   Proto->getAttrs() = Attributes;
   if (whereClauseHadCodeCompletion && CodeCompletionCallbacks)

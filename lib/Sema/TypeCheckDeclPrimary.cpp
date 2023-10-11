@@ -2675,10 +2675,15 @@ public:
         return;
       }
 
-      // We don't support protocols outside the top level of a file.
-      if (isa<ProtocolDecl>(NTD) &&
-          !DC->isModuleScopeContext()) {
-        NTD->diagnose(diag::unsupported_nested_protocol, NTD);
+      // We don't support protocols nested in generic contexts.
+      // This includes protocols nested in other protocols.
+      if (isa<ProtocolDecl>(NTD) && DC->isGenericContext()) {
+        if (auto *OuterPD = DC->getSelfProtocolDecl())
+          NTD->diagnose(diag::unsupported_nested_protocol_in_protocol, NTD,
+                        OuterPD);
+        else
+          NTD->diagnose(diag::unsupported_nested_protocol_in_generic, NTD);
+
         NTD->setInvalid();
         return;
       }
@@ -2691,6 +2696,7 @@ public:
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_protocol, NTD, proto);
         }
+        NTD->setInvalid();
       }
     }
 
@@ -2704,6 +2710,7 @@ public:
         } else {
           NTD->diagnose(diag::unsupported_type_nested_in_generic_closure, NTD);
         }
+        NTD->setInvalid();
       }
     }
   }
