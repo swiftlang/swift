@@ -610,6 +610,7 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
       return false;
@@ -1554,6 +1555,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // 'nonisolated' expressions can be evaluated from anywhere
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::GlobalActor:

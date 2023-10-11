@@ -789,6 +789,7 @@ void CompletionLookup::analyzeActorIsolation(
   }
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     return;
   }
 

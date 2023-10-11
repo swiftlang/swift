@@ -1417,6 +1417,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(GlobalActorUnsafe)
 #undef CASE
@@ -3169,6 +3170,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
+
+    case DAK_Nonisolated: {
+      auto *theAttr = cast<NonisolatedAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
+      NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            theAttr->isUnsafe(),
+                                            theAttr->isImplicit());
       return;
     }
 

@@ -7844,7 +7844,8 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       // Hard-code @actorIndependent, until Objective-C clients start
       // using nonisolated.
       if (swiftAttr->getAttribute() == "@actorIndependent") {
-        auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
+        auto attr = new (SwiftContext)
+            NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true);
         MappedDecl->getAttrs().add(attr);
         continue;
       }

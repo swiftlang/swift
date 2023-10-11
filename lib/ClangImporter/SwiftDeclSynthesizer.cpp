@@ -422,7 +422,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  auto nonisolatedAttr = new (C) NonisolatedAttr(/*IsImplicit=*/true);
+  auto nonisolatedAttr =
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true);
   var->getAttrs().add(nonisolatedAttr);
 
   // Set the function up as the getter.

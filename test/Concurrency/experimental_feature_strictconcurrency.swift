@@ -45,18 +45,31 @@ final class TestNonsendable {
   init() {}
 }
 
-struct A {
+@propertyWrapper
+public struct TestWrapper {
+  public init() {}
+  public var wrappedValue: Int {
+    return 0
+  }
+}
+
+struct TestStatics {
   static let immutableExplicitSendable = TestSendable()
-  static let immutableNonsendableGlobal = TestNonsendable() // expected-warning{{static property 'immutableNonsendableGlobal' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
+  static let immutableNonsendable = TestNonsendable() // expected-warning{{static property 'immutableNonsendable' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
+  static nonisolated(unsafe) let immutableNonisolatedUnsafe = TestNonsendable()
+  static nonisolated let immutableNonisolated = TestNonsendable() // expected-warning{{static property 'immutableNonisolated' is not concurrency-safe because it is not either conforming to 'Sendable' or isolated to a global actor}}
   static let immutableInferredSendable = 0
   static var mutable = 0 // expected-warning{{static property 'mutable' is not concurrency-safe because it is non-isolated global shared mutable state}}
   // expected-note@-1{{isolate 'mutable' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
   // expected-note@-2{{static property declared here}}
+  static var computedProperty: Int { 0 } // computed property that, though static, has no storage so is not a global
+  @TestWrapper static var wrapped: Int // expected-warning{{static property 'wrapped' is not concurrency-safe because it is non-isolated global shared mutable state}}
+  // expected-note@-1{{isolate 'wrapped' to a global actor, or convert it to a 'let' constant and conform it to 'Sendable'}}
 }
 
 @TestGlobalActor
 func f() {
-  print(A.immutableExplicitSendable)
-  print(A.immutableInferredSendable)
-  print(A.mutable) // expected-warning{{reference to static property 'mutable' is not concurrency-safe because it involves shared mutable state}}
+  print(TestStatics.immutableExplicitSendable)
+  print(TestStatics.immutableInferredSendable)
+  print(TestStatics.mutable) // expected-warning{{reference to static property 'mutable' is not concurrency-safe because it involves shared mutable state}}
 }

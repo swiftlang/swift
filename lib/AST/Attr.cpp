@@ -1401,6 +1401,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Nonisolated: {
+    Printer.printAttrName("nonisolated");
+    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
+      Printer << "(unsafe)";
+    }
+    break;
+  }
+
   case DAK_MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
 
@@ -1721,6 +1729,12 @@ StringRef DeclAttribute::getAttrName() const {
     return "_section";
   case DAK_Documentation:
     return "_documentation";
+  case DAK_Nonisolated:
+    if (cast<NonisolatedAttr>(this)->isUnsafe()) {
+        return "nonisolated(unsafe)";
+    } else {
+        return "nonisolated";
+    }
   case DAK_MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
     case MacroSyntax::Freestanding:

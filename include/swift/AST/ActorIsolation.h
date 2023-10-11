@@ -60,6 +60,9 @@ public:
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
     Nonisolated,
+    /// The declaration is explicitly specified to be not isolated and with the
+    /// "unsafe" annotation, which means that we do not enforce isolation.
+    NonisolatedUnsafe,
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
@@ -97,8 +100,8 @@ public:
     return ActorIsolation(Unspecified, nullptr);
   }
 
-  static ActorIsolation forNonisolated() {
-    return ActorIsolation(Nonisolated, nullptr);
+  static ActorIsolation forNonisolated(bool unsafe) {
+    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
   }
 
   static ActorIsolation forActorInstanceSelf(NominalTypeDecl *actor) {
@@ -124,8 +127,10 @@ public:
   operator Kind() const { return getKind(); }
 
   bool isUnspecified() const { return kind == Unspecified; }
-  
-  bool isNonisolated() const { return kind == Nonisolated; }
+
+  bool isNonisolated() const {
+    return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
+  }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
@@ -144,6 +149,7 @@ public:
 
     case Unspecified:
     case Nonisolated:
+    case NonisolatedUnsafe:
       return false;
     }
   }
@@ -192,6 +198,7 @@ public:
 
     switch (lhs.getKind()) {
     case Nonisolated:
+    case NonisolatedUnsafe:
     case Unspecified:
       return true;
 

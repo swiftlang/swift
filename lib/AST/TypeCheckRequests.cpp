@@ -1741,7 +1741,11 @@ void swift::simple_display(
       break;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       out << "nonisolated";
+      if (state == ActorIsolation::NonisolatedUnsafe) {
+        out << "(unsafe)";
+      }
       break;
 
     case ActorIsolation::Unspecified:
