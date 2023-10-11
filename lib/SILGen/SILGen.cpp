@@ -797,8 +797,15 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
   return emittedFunctions.count(constant);
 }
 
-void SILGenModule::visit(Decl *D) {
+bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
+    return true;
+
+  return false;
+}
+
+void SILGenModule::visit(Decl *D) {
+  if (shouldSkipDecl(D))
     return;
 
   ASTVisitor::visit(D);

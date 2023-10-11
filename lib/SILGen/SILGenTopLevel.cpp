@@ -294,9 +294,16 @@ void SILGenTopLevel::visitTopLevelCodeDecl(TopLevelCodeDecl *TD) {
 SILGenTopLevel::TypeVisitor::TypeVisitor(SILGenFunction &SGF) : SGF(SGF) {}
 
 void SILGenTopLevel::TypeVisitor::emit(IterableDeclContext *Ctx) {
-  for (auto *Member : Ctx->getMembersForLowering()) {
+  for (auto *Member : Ctx->getABIMembers()) {
     visit(Member);
   }
+}
+
+void SILGenTopLevel::TypeVisitor::visit(Decl *D) {
+  if (SGF.SGM.shouldSkipDecl(D))
+    return;
+
+  TypeMemberVisitor::visit(D);
 }
 
 void SILGenTopLevel::TypeVisitor::visitPatternBindingDecl(

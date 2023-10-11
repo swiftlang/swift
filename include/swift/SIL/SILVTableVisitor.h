@@ -105,6 +105,9 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
+    if (!member->isAvailableDuringLowering())
+      return;
+
     if (isa<AccessorDecl>(member))
       /* handled as part of its storage */;
     else if (auto *fd = dyn_cast<FuncDecl>(member))
@@ -141,7 +144,7 @@ protected:
     if (!theClass->hasKnownSwiftImplementation())
       return;
 
-    for (Decl *member : theClass->getMembersForLowering()) {
+    for (Decl *member : theClass->getABIMembers()) {
       maybeAddMember(member);
     }
   }
