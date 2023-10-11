@@ -249,8 +249,15 @@ static void swift_task_enqueueGlobalWithDelayImpl(JobDelay delayUnsigned,
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
   // dispatch_time expects a signed int64, though we have an unsigned delay
-  // so we must convert accordingly.
-  int64_t dispatchDelay = delayUnsigned & INT64_MAX;
+  // so we must convert accordingly. If we got a value larger than INT64_MAX,
+  // we saturate the delay -- with such large delays it matters not that we 
+  // cut it short a bit.
+  int64_t dispatchDelay = 0;
+  if delayUnsigned >= INT64_MAX {
+    dispatchDelay = INT64_MAX;
+  } else {
+    dispatchDelay = (int64_t) delayUnsigned
+  }
   uint64_t when = dispatch_time(DISPATCH_TIME_NOW, dispatchDelay);
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }
