@@ -320,8 +320,8 @@ bool ArgsToFrontendOptionsConverter::convert(
         A->getOption().matches(OPT_serialize_debugging_options);
   }
 
-  Opts.SerializeExternalDeclsOnly |=
-      Args.hasArg(OPT_experimental_serialize_external_decls_only);
+  Opts.SkipNonExportableDecls |=
+      Args.hasArg(OPT_experimental_skip_non_exportable_decls);
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);

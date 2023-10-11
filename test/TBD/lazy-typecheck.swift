@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -target arm64-apple-macosx10.13 -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-tbd-path %t/lazy_typecheck.tbd -enable-library-evolution -parse-as-library -package-name Package -DFLAG -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-serialize-external-decls-only
+// RUN: %target-swift-frontend -target arm64-apple-macosx10.13 -swift-version 5 %S/../Inputs/lazy_typecheck.swift -module-name lazy_typecheck -emit-module -emit-module-path /dev/null -emit-tbd-path %t/lazy_typecheck.tbd -enable-library-evolution -parse-as-library -package-name Package -DFLAG -experimental-lazy-typecheck -experimental-skip-all-function-bodies -experimental-skip-non-exportable-decls
 // RUN: %llvm-readtapi %t/lazy_typecheck.tbd %t/expected.tbd
 
 // REQUIRES: OS=macosx
