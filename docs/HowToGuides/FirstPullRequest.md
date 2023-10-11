@@ -98,16 +98,26 @@ make changes, run tests and debug issues.
 
 ## Submitting a pull request
 
+Alright! You've implemented a change and would like to submit it.
+
 ### Tidying up
 
-Alright! You've implemented a change and would like to submit it.
-Double-check that you've tidied your Git history, such as squashing
-work-in-progress commits, and that your commit messages provide context.
-For example, if a commit fixes a bug, then include a "Fixes SR-NNNNN" with the
-bug number in the commit message.
+> **Note**  
+> If you intend to create a [draft pull request][draft-pr], you can tidy up
+> later *before* marking it as ready for review.
 
-Next, [format your changes](/docs/HowToGuides/FAQ.md#how-do-i-format-my-changes)
-using `clang-format`.
+1. [Tidy up your commit history](FAQ.md#how-do-i-clean-up-my-git-history):
+   * Squash work-in-progress commits.
+   * Break up your changes into as many self-sufficient, meaningful commits as
+     you can, rather than cramming everything into a single commit.
+     For example, a patch that renames a function (1) and modifies an algorithm
+     (2) can be split into two commits.
+     A self-sufficient commit must compile, pass all tests, and contain
+     any associated test changes.
+     This practice is key to efficient and rigorous code review processes,
+     as well as a neat, transparent, and actionable commit history.
+   * [Top off your commit messages](https://swift.org/contributing/#commit-messages).
+1. Tidy up and [format your code changes](FAQ.md#how-do-i-format-my-changes).
 
 ### Pushing and creating a pull request
 
@@ -120,6 +130,7 @@ show a helpful "Compare & Pull Request" button.
 
 ![Compare & Pull Request button in GitHub UI](/docs/GitHubCreatePRScreenshot.png)
 
+[draft-pr]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests#draft-pull-requests
 [create a pull request]: https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request#creating-the-pull-request
 
 ## Asking for code review
