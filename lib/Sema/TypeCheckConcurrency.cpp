@@ -556,20 +556,30 @@ findReference(Expr *expr) {
 ///
 /// Note that this must be called after the implicitlyAsync flag has been set,
 /// or implicitly async calls will not return the correct value.
-static bool isAsyncCall(const ApplyExpr *call) {
-  if (call->isImplicitlyAsync())
+static bool isAsyncCall(
+    llvm::PointerUnion<ApplyExpr *, LookupExpr *> call) {
+
+  if (auto *apply = call.dyn_cast<ApplyExpr *>()) {
+    if (apply->isImplicitlyAsync())
+      return true;
+
+    // Effectively the same as doing a
+    // `cast_or_null<FunctionType>(call->getFn()->getType())`, check the
+    // result of that and then checking `isAsync` if it's defined.
+    Type funcTypeType = apply->getFn()->getType();
+    if (!funcTypeType)
+      return false;
+    AnyFunctionType *funcType = funcTypeType->getAs<AnyFunctionType>();
+    if (!funcType)
+      return false;
+    return funcType->isAsync();
+  }
+
+  auto *lookup = call.get<LookupExpr *>();
+  if (lookup->isImplicitlyAsync())
     return true;
 
-  // Effectively the same as doing a
-  // `cast_or_null<FunctionType>(call->getFn()->getType())`, check the
-  // result of that and then checking `isAsync` if it's defined.
-  Type funcTypeType = call->getFn()->getType();
-  if (!funcTypeType)
-    return false;
-  AnyFunctionType *funcType = funcTypeType->getAs<AnyFunctionType>();
-  if (!funcType)
-    return false;
-  return funcType->isAsync();
+  return isAsyncDecl(lookup->getDecl());
 }
 
 /// Determine whether we should diagnose data races within the current context.
@@ -1932,7 +1942,7 @@ namespace {
   class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
-    SmallVector<ApplyExpr*, 4> applyStack;
+    SmallVector<llvm::PointerUnion<ApplyExpr *, LookupExpr *>, 4> applyStack;
     SmallVector<std::pair<OpaqueValueExpr *, Expr *>, 4> opaqueValues;
     SmallVector<const PatternBindingDecl *, 2> patternBindingStack;
     llvm::function_ref<Type(Expr *)> getType;
@@ -1955,6 +1965,13 @@ namespace {
 
     using MutableVarParent
         = llvm::PointerUnion<InOutExpr *, LoadExpr *, AssignExpr *>;
+
+    ApplyExpr *getImmediateApply() const {
+      if (applyStack.empty())
+        return nullptr;
+
+      return applyStack.back().dyn_cast<ApplyExpr *>();
+    }
 
     const PatternBindingDecl *getTopPatternBindingDecl() const {
       return patternBindingStack.empty() ? nullptr : patternBindingStack.back();
@@ -2312,7 +2329,7 @@ namespace {
 
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
-        if (auto call = dyn_cast<CallExpr>(*I)) {
+        if (auto call = dyn_cast<CallExpr>(I->dyn_cast<ApplyExpr *>())) {
           if (setAsync) {
             call->setImplicitlyAsync(*setAsync);
           }
@@ -2366,6 +2383,11 @@ namespace {
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // Skip expressions that didn't make it to solution application
+      // because the constraint system diagnosed an error.
+      if (!expr->getType())
+        return Action::SkipChildren(expr);
+
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
         opaqueValues.push_back({
             openExistential->getOpaqueValue(),
@@ -2400,6 +2422,7 @@ namespace {
         recordMutableVarParent(load, load->getSubExpr());
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
+        applyStack.push_back(lookup);
         checkReference(lookup->getBase(), lookup->getMember(), lookup->getLoc(),
                        /*partialApply*/ llvm::None, lookup);
         return Action::Continue(expr);
@@ -2442,7 +2465,7 @@ namespace {
           // Self applications are checked as part of the outer call.
           // However, we look for inout issues here.
           if (applyStack.size() >= 2) {
-            ApplyExpr *outerCall = applyStack[applyStack.size() - 2];
+            auto outerCall = applyStack[applyStack.size() - 2];
             if (isAsyncCall(outerCall)) {
               // This call is a partial application within an async call.
               // If the partial application take a value inout, it is bad.
@@ -2500,17 +2523,21 @@ namespace {
       }
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
-        assert(applyStack.back() == apply);
+        assert(applyStack.back().get<ApplyExpr *>() == apply);
         applyStack.pop_back();
       }
 
       // Clear out the mutable local variable parent map on the way out.
-      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr))
+      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
         mutableLocalVarParent.erase(declRefExpr);
-      else if (auto *lookupExpr = dyn_cast<LookupExpr>(expr))
+      } else if (auto *lookupExpr = dyn_cast<LookupExpr>(expr)) {
         mutableLocalVarParent.erase(lookupExpr);
-      else if (auto *inoutExpr = dyn_cast<InOutExpr>(expr))
+
+        assert(applyStack.back().dyn_cast<LookupExpr *>() == lookupExpr);
+        applyStack.pop_back();
+      } else if (auto *inoutExpr = dyn_cast<InOutExpr>(expr)) {
         mutableLocalVarParent.erase(inoutExpr);
+      }
 
       // Remove the tracked capture contexts.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -2725,14 +2752,16 @@ namespace {
     /// Diagnose an inout argument passed into an async call
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
-    bool diagnoseInOutArg(const ApplyExpr *call, const InOutExpr *arg,
-                          bool isPartialApply) {
+    bool diagnoseInOutArg(
+        llvm::PointerUnion<ApplyExpr *, LookupExpr *> call,
+        const InOutExpr *arg,
+        bool isPartialApply) {
       // check that the call is actually async
       if (!isAsyncCall(call))
         return false;
 
       bool result = false;
-      auto checkDiagnostic = [this, call, isPartialApply, &result](
+      auto diagnoseIsolatedInoutState = [this, call, isPartialApply, &result](
           ConcreteDeclRef declRef, SourceLoc argLoc) {
         auto decl = declRef.getDecl();
         auto isolation = getActorIsolationForReference(decl, getDeclContext());
@@ -2740,13 +2769,14 @@ namespace {
           return;
 
         if (isPartialApply) {
+          auto *apply = call.get<ApplyExpr *>();
           // The partially applied InoutArg is a property of actor. This
           // can really only happen when the property is a struct with a
           // mutating async method.
-          if (auto partialApply = dyn_cast<ApplyExpr>(call->getFn())) {
+          if (auto partialApply = dyn_cast<ApplyExpr>(apply->getFn())) {
             if (auto declRef = dyn_cast<DeclRefExpr>(partialApply->getFn())) {
               ValueDecl *fnDecl = declRef->getDecl();
-              ctx.Diags.diagnose(call->getLoc(),
+              ctx.Diags.diagnose(apply->getLoc(),
                                  diag::actor_isolated_mutating_func,
                                  fnDecl->getName(), decl);
               result = true;
@@ -2755,29 +2785,36 @@ namespace {
           }
         }
 
+        bool isImplicitlyAsync;
+        if (auto *apply = call.dyn_cast<ApplyExpr *>()) {
+          isImplicitlyAsync = apply->isImplicitlyAsync().has_value();
+        } else {
+          auto *lookup = call.get<LookupExpr *>();
+          isImplicitlyAsync = lookup->isImplicitlyAsync().has_value();
+        }
+
         ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
-                           decl, call->isImplicitlyAsync().has_value());
+                           decl, isImplicitlyAsync);
         decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
         result = true;
         return;
       };
-      auto expressionWalker = [baseArg = arg->getSubExpr(),
-                               checkDiagnostic](Expr *expr) -> Expr * {
-        if (isa<InOutExpr>(expr))
-          return nullptr; // AST walker will hit this again
+
+      auto findIsolatedState = [&](Expr *expr) -> Expr * {
         if (LookupExpr *lookup = dyn_cast<LookupExpr>(expr)) {
           if (isa<DeclRefExpr>(lookup->getBase())) {
-            checkDiagnostic(lookup->getMember().getDecl(), baseArg->getLoc());
+            diagnoseIsolatedInoutState(lookup->getMember().getDecl(),
+                                       expr->getLoc());
             return nullptr; // Diagnosed. Don't keep walking
           }
         }
         if (DeclRefExpr *declRef = dyn_cast<DeclRefExpr>(expr)) {
-          checkDiagnostic(declRef->getDecl(), baseArg->getLoc());
+          diagnoseIsolatedInoutState(declRef->getDecl(), expr->getLoc());
           return nullptr; // Diagnosed. Don't keep walking
         }
         return expr;
       };
-      arg->getSubExpr()->forEachChildExpr(expressionWalker);
+      arg->getSubExpr()->forEachChildExpr(findIsolatedState);
       return result;
     }
 
@@ -3284,9 +3321,9 @@ namespace {
 
       // If this declaration is a callee from the enclosing application,
       // it's already been checked via the call.
-      if (!applyStack.empty()) {
+      if (auto *apply = getImmediateApply()) {
         auto immediateCallee =
-            applyStack.back()->getCalledValue(/*skipFunctionConversions=*/true);
+            apply->getCalledValue(/*skipFunctionConversions=*/true);
         if (decl == immediateCallee)
           return false;
       }
