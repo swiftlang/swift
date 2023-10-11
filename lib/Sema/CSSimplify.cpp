@@ -2945,23 +2945,139 @@ bool ConstraintSystem::hasPreconcurrencyCallee(
   return calleeOverload->choice.getDecl()->preconcurrency();
 }
 
+namespace {
+  /// Classifies a thrown error kind as Never, a specific type, or 'any Error'.
+  enum class ThrownErrorKind {
+    Never,
+    Specific,
+    AnyError,
+  };
+
+  ThrownErrorKind getThrownErrorKind(Type type) {
+    if (type->isNever())
+      return ThrownErrorKind::Never;
+
+    if (type->isExistentialType()) {
+      Type anyError = type->getASTContext().getErrorExistentialType();
+      if (anyError->isEqual(type))
+        return ThrownErrorKind::AnyError;
+    }
+
+    return ThrownErrorKind::Specific;
+  }
+}
+
+/// Match the throwing specifier of the two function types.
+static ConstraintSystem::TypeMatchResult
+matchFunctionThrowing(ConstraintSystem &cs,
+                      FunctionType *func1, FunctionType *func2,
+                      ConstraintKind kind,
+                      ConstraintSystem::TypeMatchOptions flags,
+                      ConstraintLocatorBuilder locator) {
+  // A function type that throws the error type E1 is a subtype of a function
+  // that throws error type E2 when E1 is a subtype of E2. For the purpose
+  // of this comparison, a non-throwing function has thrown error type 'Never',
+  // and an untyped throwing function has thrown error type 'any Error'.
+  Type neverType = cs.getASTContext().getNeverType();
+  Type thrownError1 = func1->getEffectiveThrownInterfaceType().value_or(neverType);
+  Type thrownError2 = func2->getEffectiveThrownInterfaceType().value_or(neverType);
+  if (!thrownError1 || !thrownError2 || thrownError1->isEqual(thrownError2))
+    return cs.getTypeMatchSuccess();
+
+  auto thrownErrorKind1 = getThrownErrorKind(thrownError1);
+  auto thrownErrorKind2 = getThrownErrorKind(thrownError2);
+
+  bool mustUnify = false;
+  bool dropThrows = false;
+
+  switch (thrownErrorKind1) {
+  case ThrownErrorKind::Specific:
+    // If the specific thrown error contains no type variables and we're
+    // going to try to convert it to \c Never, treat this as dropping throws.
+    if (thrownErrorKind2 == ThrownErrorKind::Never &&
+        !thrownError1->hasTypeVariable()) {
+      dropThrows = true;
+    } else {
+      // We need to unify the thrown error types.
+      mustUnify = true;
+    }
+    break;
+
+  case ThrownErrorKind::Never:
+    switch (thrownErrorKind2) {
+    case ThrownErrorKind::Specific:
+      // We need to unify the thrown error types.
+      mustUnify = true;
+      break;
+
+    case ThrownErrorKind::Never:
+      llvm_unreachable("The thrown error types should have been equal");
+      break;
+
+    case ThrownErrorKind::AnyError:
+      // We have a subtype. If we're not allowed to do the subtype,
+      // then we need to drop "throws".
+      if (kind < ConstraintKind::Subtype)
+        dropThrows = true;
+      break;
+    }
+    break;
+
+  case ThrownErrorKind::AnyError:
+    switch (thrownErrorKind2) {
+    case ThrownErrorKind::Specific:
+      // We need to unify the thrown error types.
+      mustUnify = true;
+      break;
+
+    case ThrownErrorKind::Never:
+      // We're going to have to drop the "throws" entirely.
+      dropThrows = true;
+      break;
+
+    case ThrownErrorKind::AnyError:
+      llvm_unreachable("The thrown error types should have been equal");
+    }
+    break;
+  }
+
+  // If we know we need to drop 'throws', try it now.
+  if (dropThrows) {
+    if (!cs.shouldAttemptFixes())
+      return cs.getTypeMatchFailure(locator);
+
+    auto *fix = DropThrowsAttribute::create(cs, func1, func2,
+                                            cs.getConstraintLocator(locator));
+    if (cs.recordFix(fix))
+      return cs.getTypeMatchFailure(locator);
+  }
+
+  // If we need to unify the thrown error types, do so now.
+  if (mustUnify) {
+    ConstraintKind subKind = (kind < ConstraintKind::Subtype)
+        ? ConstraintKind::Equal
+        : ConstraintKind::Subtype;
+    const auto subflags = getDefaultDecompositionOptions(flags);
+    auto result = cs.matchTypes(
+        thrownError1, thrownError2,
+        subKind, subflags,
+        locator.withPathElement(LocatorPathElt::ThrownErrorType()));
+    if (result == ConstraintSystem::SolutionKind::Error)
+      return cs.getTypeMatchFailure(locator);
+  }
+
+  return cs.getTypeMatchSuccess();
+}
+
 ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // A non-throwing function can be a subtype of a throwing function.
-  if (func1->isThrowing() != func2->isThrowing()) {
-    // Cannot drop 'throws'.
-    if (func1->isThrowing() || kind < ConstraintKind::Subtype) {
-      if (!shouldAttemptFixes())
-        return getTypeMatchFailure(locator);
-
-      auto *fix = DropThrowsAttribute::create(*this, func1, func2,
-                                              getConstraintLocator(locator));
-      if (recordFix(fix))
-        return getTypeMatchFailure(locator);
-    }
-  }
+  // Match the 'throws' effect.
+  TypeMatchResult throwsResult =
+      matchFunctionThrowing(*this, func1, func2, kind, flags, locator);
+  if (throwsResult.isFailure())
+    return throwsResult;
 
   // A synchronous function can be a subtype of an 'async' function.
   if (func1->isAsync() != func2->isAsync()) {
@@ -5152,6 +5268,13 @@ bool ConstraintSystem::repairFailures(
                                          getConstraintLocator(locator)))
     return true;
 
+  if (locator.endsWith<LocatorPathElt::ThrownErrorType>()) {
+    conversionsOrFixes.push_back(
+        IgnoreThrownErrorMismatch::create(*this, lhs, rhs,
+                                          getConstraintLocator(locator)));
+    return true;
+  }
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -5958,14 +6081,6 @@ bool ConstraintSystem::repairFailures(
     if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
       break;
 
-    // If both types are key path, the only differences
-    // between them are mutability and/or root, value type mismatch.
-    if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
-      auto *fix = KeyPathContextualMismatch::create(
-          *this, lhs, rhs, getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-    }
-
     if (lhs->is<FunctionType>() && !rhs->is<AnyFunctionType>() &&
         isExpr<ClosureExpr>(anchor)) {
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
@@ -6608,8 +6723,20 @@ bool ConstraintSystem::repairFailures(
     if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
       return true;
 
+    auto *keyPathLoc = getConstraintLocator(anchor);
+
+    if (hasFixFor(keyPathLoc))
+      return true;
+
+    if (auto contextualInfo = getContextualTypeInfo(anchor)) {
+      if (hasFixFor(getConstraintLocator(
+              keyPathLoc,
+              LocatorPathElt::ContextualType(contextualInfo->purpose))))
+        return true;
+    }
+
     conversionsOrFixes.push_back(IgnoreContextualType::create(
-        *this, lhs, rhs, getConstraintLocator(anchor)));
+        *this, lhs, rhs, keyPathLoc));
     break;
   }
   default:
@@ -10841,6 +10968,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
         return fixMissingMember(origBaseTy, memberTy, locator);
 
+      bool baseIsKeyPathRootType = [&]() {
+        auto keyPathComponent =
+            locator->getLastElementAs<LocatorPathElt::KeyPathComponent>();
+        return keyPathComponent && keyPathComponent->getIndex() == 0;
+      }();
+
       // The result of the member access can either be the expected member type
       // (for '!' or optional members with '?'), or the original member type
       // with one extra level of optionality ('?' with non-optional members).
@@ -10854,13 +10987,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           *this, ConstraintKind::Bind,
           UnwrapOptionalBase::create(*this, member, baseObjTy, locator),
           memberTy, innerTV, locator);
-      auto optionalResult = Constraint::createFixed(
-          *this, ConstraintKind::Bind,
-          UnwrapOptionalBase::createWithOptionalResult(*this, member,
-                                                       baseObjTy, locator),
-          optTy, memberTy, locator);
       optionalities.push_back(nonoptionalResult);
-      optionalities.push_back(optionalResult);
+
+      if (!baseIsKeyPathRootType) {
+        auto optionalResult = Constraint::createFixed(
+            *this, ConstraintKind::Bind,
+            UnwrapOptionalBase::createWithOptionalResult(*this, member,
+                                                         baseObjTy, locator),
+            optTy, memberTy, locator);
+        optionalities.push_back(optionalResult);
+      }
+
       addDisjunctionConstraint(optionalities, locator);
 
       // Look through one level of optional.
@@ -11636,6 +11773,13 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
         contextualType = BoundGenericType::get(
             keyPathTy->getDecl(), keyPathTy->getParent(), {root, value});
       }
+    } else if (contextualType->isPlaceholder()) {
+      auto root = simplifyType(getKeyPathRootType(keyPath));
+      if (!(root->isTypeVariableOrMember() || root->isPlaceholder())) {
+        auto value = getKeyPathValueType(keyPath);
+        contextualType =
+            BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
+      }
     }
   }
 
@@ -12150,12 +12294,14 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
 
     if (boundRoot &&
-        matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+        matchTypes(rootTy, boundRoot, ConstraintKind::Bind, subflags,
+                   locator.withPathElement(ConstraintLocator::KeyPathRoot))
             .isFailure())
       return false;
 
     if (boundValue &&
-        matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags, locator)
+        matchTypes(valueTy, boundValue, ConstraintKind::Bind, subflags,
+                   locator.withPathElement(ConstraintLocator::KeyPathValue))
             .isFailure())
       return false;
 
@@ -12206,6 +12352,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
                  tv->getImpl().canBindToHole();
         })) {
       (void)tryMatchRootAndValueFromType(keyPathTy);
+
+      // If the type of the key path is not yet resolved simplifying this
+      // constraint would disconnect it from root and value, let's bind it
+      // to a placeholder type to make sure this doesn't happen.
+      if (auto *typeVar = keyPathTy->getAs<TypeVariableType>()) {
+        return matchTypes(keyPathTy, PlaceholderType::get(Context, typeVar),
+                          ConstraintKind::Bind, subflags,
+                          locator.getBaseLocator());
+      }
+
       return SolutionKind::Solved;
     }
   }
@@ -12364,21 +12520,58 @@ ConstraintSystem::simplifyKeyPathConstraint(
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
 
+  auto formUnsolved = [&]() {
+    addUnsolvedConstraint(Constraint::create(
+        *this, ConstraintKind::KeyPath, keyPathTy, rootTy, valueTy,
+        locator.getBaseLocator(), componentTypeVars));
+  };
+
   auto loc = locator.getBaseLocator();
   if (definitelyFunctionType) {
     increaseScore(SK_FunctionConversion, locator);
     return SolutionKind::Solved;
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
-    auto resolvedKPTy =
-      BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-    return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                      loc);
+    // If key path is connected to a disjunction (i.e. through coercion
+    // or used as an argument to a function/subscipt call) it cannot be
+    // bound until the choice is selected because it's undetermined
+    // until then whether key path is implicitly converted to a function
+    // type or not.
+    //
+    // \code
+    // struct Data {
+    //   var value: Int = 42
+    // }
+    //
+    // func test<S: Sequence>(_: S, _: (S.Element) -> Int) {}
+    // func test<C: Collection>(_: C, _: (C.Element) -> Int) {}
+    //
+    // func test(arr: [Data]) {
+    //  test(arr, \Data.value)
+    // }
+    // \endcode
+    //
+    // In this example if we did allow to bind the key path before
+    // an overload of `test` is selected, we'd end up with no solutions
+    // because the type of the key path expression is actually: '(Data) -> Int'
+    // and not 'WritableKeyPath<Data, Int>`.
+    auto *typeVar = keyPathTy->getAs<TypeVariableType>();
+    if (typeVar && findConstraintThroughOptionals(
+                       typeVar, OptionalWrappingDirection::Unwrap,
+                       [&](Constraint *match, TypeVariableType *) {
+                         return match->getKind() ==
+                                    ConstraintKind::ApplicableFunction ||
+                                match->getKind() == ConstraintKind::Disjunction;
+                       })) {
+      formUnsolved();
+    } else {
+      auto resolvedKPTy =
+          BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+      return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind,
+                        subflags, loc);
+    }
   } else {
-    addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
-                                             keyPathTy, rootTy, valueTy,
-                                             locator.getBaseLocator(),
-                                             componentTypeVars));
+    formUnsolved();
   }
   return SolutionKind::Solved;
 }
@@ -14987,7 +15180,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveExtraneousArguments:
   case FixKind::SpecifyTypeForPlaceholder:
   case FixKind::AllowAutoClosurePointerConversion:
-  case FixKind::IgnoreKeyPathContextualMismatch:
   case FixKind::NotCompileTimeConst:
   case FixKind::RenameConflictingPatternVariables:
   case FixKind::MustBeCopyable:
@@ -15001,6 +15193,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowConcreteTypeSpecialization:
   case FixKind::IgnoreGenericSpecializationArityMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+  case FixKind::IgnoreThrownErrorMismatch: {
+    return recordFix(fix, 2) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {
     return recordFix(fix, 10) ? SolutionKind::Error : SolutionKind::Solved;

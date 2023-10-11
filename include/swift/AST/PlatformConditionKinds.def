@@ -47,7 +47,7 @@ PLATFORM_CONDITION(TargetEnvironment, "targetEnvironment")
 PLATFORM_CONDITION_(PtrAuth, "ptrauth")
 
 /// The active arch target's max atomic bit width.
-PLATFORM_CONDITION_(AtomicBitWidth, "atomicBitWidth")
+PLATFORM_CONDITION_(HasAtomicBitWidth, "hasAtomicBitWidth")
 
 #undef PLATFORM_CONDITION
 #undef PLATFORM_CONDITION_

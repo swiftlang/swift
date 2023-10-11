@@ -193,8 +193,7 @@ void ASTScopeImpl::lookup(const NullablePtr<const ASTScopeImpl> limit,
   consumer.startingNextLookupStep();
 #endif
 
-  // Certain illegal nestings, e.g. protocol nestled inside a struct,
-  // require that lookup stop at the outer scope.
+  // Certain illegal nestings require that lookup stop at the outer scope.
   if (this == limit.getPtrOrNull()) {
 #ifndef NDEBUG
     consumer.finishingLookup("limit return");
@@ -558,13 +557,13 @@ GenericTypeOrExtensionScope::getLookupLimitForDecl() const {
 
 NullablePtr<const ASTScopeImpl>
 NominalTypeScope::getLookupLimitForDecl() const {
-  if (isa<ProtocolDecl>(decl)) {
-    // ProtocolDecl can only be legally nested in a SourceFile,
-    // so any other kind of Decl is illegal
-    return parentIfNotChildOfTopScope();
-  }
-  // AFAICT, a struct, decl, or enum can be nested inside anything
-  // but a ProtocolDecl.
+  // If a protocol is (invalidly) nested in a generic context,
+  // do not look in to those outer generic contexts,
+  // as types found there may contain implicitly inferred generic parameters.
+  if (isa<ProtocolDecl>(decl) && decl->getDeclContext()->isGenericContext())
+    return getLookupParent();
+
+  // Otherwise, nominals can be nested inside anything but a ProtocolDecl.
   return ancestorWithDeclSatisfying(
       [&](const Decl *const d) { return isa<ProtocolDecl>(d); });
 }

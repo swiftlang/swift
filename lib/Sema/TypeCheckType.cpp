@@ -3646,6 +3646,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (thrownTy->hasError()) {
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
+               !thrownTy->hasTypeParameter() &&
                !TypeChecker::conformsToProtocol(
                   thrownTy, ctx.getErrorDecl(),
                   resolution.getDeclContext()->getParentModule())) {

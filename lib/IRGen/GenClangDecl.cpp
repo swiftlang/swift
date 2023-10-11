@@ -12,6 +12,7 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/IRGenOptions.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"

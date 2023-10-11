@@ -50,12 +50,12 @@
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: struct HasTemplatedIterator<Int32, NoDefinition<Int32>> {
+// CHECK: struct HasTemplatedIterator<CInt, NoDefinition<CInt>> {
 // CHECK-NOT:   typealias Element
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<Int32, NoDefinition<Int32>>
+// CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<CInt, NoDefinition<CInt>>
 
 // CHECK: struct HasInputOutputConstIterator : CxxConvertibleToCollection {
 // CHECK:   typealias Element = InputOutputConstIterator.Pointee

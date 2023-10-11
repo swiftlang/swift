@@ -232,6 +232,9 @@ EXPERIMENTAL_FEATURE(PlaygroundExtendedCallbacks, true)
 /// Enable 'then' statements.
 EXPERIMENTAL_FEATURE(ThenStatements, false)
 
+/// Enable 'do' expressions.
+EXPERIMENTAL_FEATURE(DoExpressions, false)
+
 /// Enable the `@_rawLayout` attribute.
 EXPERIMENTAL_FEATURE(RawLayout, true)
 

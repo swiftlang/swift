@@ -247,7 +247,7 @@ extension Task: Equatable {
   }
 }
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Error {
     @_spi(MainActorUtilities)
@@ -270,7 +270,7 @@ extension Task where Failure == Error {
 }
 #endif
 
-#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.9, *)
 extension Task where Failure == Never {
     @_spi(MainActorUtilities)
@@ -382,6 +382,7 @@ extension TaskPriority: Comparable {
 
 
 @available(SwiftStdlib 5.9, *)
+@_unavailableInEmbedded
 extension TaskPriority: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {
@@ -400,8 +401,10 @@ extension TaskPriority: CustomStringConvertible {
   }
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.1, *)
 extension TaskPriority: Codable { }
+#endif
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
@@ -837,6 +840,7 @@ extension Task where Failure == Error {
 // ==== Voluntary Suspension -----------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
 
   /// Suspends the current task and allows other tasks to execute.
@@ -991,7 +995,7 @@ extension UnsafeCurrentTask: Equatable {
 // ==== Internal ---------------------------------------------------------------
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_getCurrent")
-func _getCurrentAsyncTask() -> Builtin.NativeObject?
+public func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_startOnMainActor")
 fileprivate func _startTaskOnMainActor(_ task: Builtin.NativeObject)
@@ -1035,7 +1039,7 @@ internal func _getMainExecutor() -> Builtin.Executor
 internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> ()) {
   fatalError("Unavailable in task-to-thread concurrency model")
 }
-#else
+#elseif !SWIFT_CONCURRENCY_EMBEDDED
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @preconcurrency
@@ -1072,7 +1076,7 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_cancel")
-func _taskCancel(_ task: Builtin.NativeObject)
+public func _taskCancel(_ task: Builtin.NativeObject)
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")

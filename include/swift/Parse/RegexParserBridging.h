@@ -57,7 +57,7 @@ typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
                                       /*VersionOut*/ unsigned *_Nonnull,
                                       /*CaptureStructureOut*/ void *_Nonnull,
                                       /*CaptureStructureSize*/ unsigned,
-                                      /*DiagnosticBaseLoc*/ swift::SourceLoc,
+                                      /*DiagnosticBaseLoc*/ BridgedSourceLoc,
                                       BridgedDiagnosticEngine);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
 

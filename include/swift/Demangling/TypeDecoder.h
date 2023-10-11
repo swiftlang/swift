@@ -754,6 +754,7 @@ protected:
     case NodeKind::ConstrainedExistentialSelf:
       return Builder.createGenericTypeParameterType(/*depth*/ 0, /*index*/ 0);
 
+    case NodeKind::ObjectiveCProtocolSymbolicReference:
     case NodeKind::Protocol:
     case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node, depth + 1)) {
@@ -1574,8 +1575,9 @@ private:
     if (node->getKind() == NodeKind::Type)
       return decodeMangledProtocolType(node->getChild(0), depth + 1);
 
-    if ((node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
-        && node->getKind() != NodeKind::ProtocolSymbolicReference)
+    if ((node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol) &&
+        node->getKind() != NodeKind::ProtocolSymbolicReference &&
+        node->getKind() != NodeKind::ObjectiveCProtocolSymbolicReference)
       return BuiltProtocolDecl();
 
 #if SWIFT_OBJC_INTEROP

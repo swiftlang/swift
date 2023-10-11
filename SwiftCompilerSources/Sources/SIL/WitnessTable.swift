@@ -20,8 +20,8 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public struct Entry : CustomStringConvertible, NoReflectionChildren {
     fileprivate let bridged: BridgedWitnessTableEntry
     
-    public typealias Kind = swift.SILWitnessTable.WitnessKind
-    
+    public typealias Kind = BridgedWitnessTableEntry.Kind
+
     public var kind: Kind {
       return bridged.getKind()
     }
@@ -32,8 +32,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     }
 
     public var description: String {
-      let stdString = bridged.getDebugDescription()
-      return String(_cxxString: stdString)
+      return String(taking: bridged.getDebugDescription())
     }
   }
 
@@ -46,7 +45,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
     
     public subscript(_ index: Int) -> Entry {
       assert(index >= startIndex && index < endIndex)
-      return Entry(bridged: BridgedWitnessTableEntry(entry: base.entry + index))
+      return Entry(bridged: base.advanceBy(index))
     }
   }
 
@@ -56,8 +55,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }
 
@@ -75,8 +73,7 @@ public struct DefaultWitnessTable : CustomStringConvertible, NoReflectionChildre
   }
 
   public var description: String {
-    let stdString = bridged.getDebugDescription()
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 }
 

@@ -97,6 +97,7 @@ public struct UnownedJob: Sendable {
 }
 
 @available(SwiftStdlib 5.9, *)
+@_unavailableInEmbedded
 extension UnownedJob: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {
@@ -147,6 +148,7 @@ public struct Job: Sendable {
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.
+  @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
     /// Tasks are always assigned an unique ID, however some jobs may not have it set,
@@ -215,6 +217,7 @@ public struct ExecutorJob: Sendable {
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.
+  @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
     /// Tasks are always assigned an unique ID, however some jobs may not have it set,

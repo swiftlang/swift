@@ -22,8 +22,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   let _bridged: BridgedPassContext
 
   public var description: String {
-    let stdString = _bridged.getModuleDescription()
-    return String(_cxxString: stdString)
+    return String(taking: _bridged.getModuleDescription())
   }
 
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
@@ -125,8 +124,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   func mangleAsyncRemoved(from function: Function) -> String {
-    let stdString = _bridged.mangleAsyncRemoved(function.bridged)
-    return String(_cxxString: stdString)
+    return String(taking: _bridged.mangleAsyncRemoved(function.bridged))
   }
 }
 

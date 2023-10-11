@@ -507,6 +507,9 @@ class SyntacticElementConstraintGenerator
   SyntacticElementContext context;
   ConstraintLocator *locator;
 
+  /// Whether a conjunction was generated.
+  bool generatedConjunction = false;
+
 public:
   /// Whether an error was encountered while generating constraints.
   bool hadError = false;
@@ -519,6 +522,16 @@ public:
   void createConjunction(ArrayRef<ElementInfo> elements,
                          ConstraintLocator *locator, bool isIsolated = false,
                          ArrayRef<TypeVariableType *> extraTypeVars = {}) {
+    assert(!generatedConjunction && "Already generated conjunction");
+    generatedConjunction = true;
+
+    // Inject a join if we have one.
+    SmallVector<ElementInfo, 4> scratch;
+    if (auto *join = context.ElementJoin.getPtrOrNull()) {
+      scratch.append(elements.begin(), elements.end());
+      scratch.push_back(makeJoinElement(cs, join, locator));
+      elements = scratch;
+    }
     ::createConjunction(cs, context.getAsDeclContext(), elements, locator,
                         isIsolated, extraTypeVars);
   }
@@ -865,10 +878,6 @@ private:
       elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
     }
 
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, locator));
-
     createConjunction(elements, locator);
   }
 
@@ -1010,10 +1019,6 @@ private:
         elements.push_back(makeElement(rawCase, switchLoc));
     }
 
-    // Inject a join if we have one.
-    if (auto *join = context.ElementJoin.getPtrOrNull())
-      elements.push_back(makeJoinElement(cs, join, switchLoc));
-
     createConjunction(elements, switchLoc);
   }
 
@@ -1023,8 +1028,13 @@ private:
 
     SmallVector<ElementInfo, 4> elements;
 
-    // First, let's record a body of `do` statement.
-    elements.push_back(makeElement(doStmt->getBody(), doLoc));
+    // First, let's record a body of `do` statement. Note we need to add a
+    // SyntaticElement locator path element here to avoid treating the inner
+    // brace conjunction as being isolated if 'doLoc' is for an isolated
+    // conjunction (as is the case with 'do' expressions).
+    auto *doBodyLoc = cs.getConstraintLocator(
+        doLoc, LocatorPathElt::SyntacticElement(doStmt->getBody()));
+    elements.push_back(makeElement(doStmt->getBody(), doBodyLoc));
 
     // After that has been type-checked, let's switch to
     // individual `catch` statements.

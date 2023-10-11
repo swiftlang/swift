@@ -3289,10 +3289,7 @@ SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
       Inst, getBuilder().createSelectEnum(
                 getOpLocation(Inst->getLoc()),
                 getOpValue(Inst->getEnumOperand()), getOpType(Inst->getType()),
-                DefaultResult, CaseResults, llvm::None, ProfileCounter(),
-                getBuilder().hasOwnership()
-                    ? Inst->getForwardingOwnershipKind()
-                    : ValueOwnershipKind(OwnershipKind::None)));
+                DefaultResult, CaseResults, llvm::None, ProfileCounter()));
 }
 
 template<typename ImplClass>

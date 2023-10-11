@@ -1227,6 +1227,7 @@ public:
         break;
       case Kind::UnterminatedBranches:
       case Kind::NonExhaustiveIf:
+      case Kind::NonExhaustiveDoCatch:
       case Kind::UnhandledStmt:
       case Kind::CircularReference:
       case Kind::HasLabel:

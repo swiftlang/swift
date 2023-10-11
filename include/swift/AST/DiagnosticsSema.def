@@ -615,6 +615,9 @@ ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
 
+ERROR(thrown_error_type_mismatch,none,
+      "invalid conversion of thrown error type %0 to %1", (Type, Type))
+
 ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))
@@ -1260,6 +1263,9 @@ ERROR(single_value_stmt_must_be_unlabeled,none,
 ERROR(if_expr_must_be_syntactically_exhaustive,none,
       "'if' must have an unconditional 'else' to be used as expression",
       ())
+ERROR(do_catch_expr_must_be_syntactically_exhaustive,none,
+      "'do catch' must have an unconditional 'catch' to be used as expression",
+      ())
 ERROR(single_value_stmt_branch_empty,none,
       "expected expression in branch of '%0' expression",
       (StmtKind))
@@ -1273,8 +1279,8 @@ ERROR(cannot_jump_in_single_value_stmt,none,
 ERROR(effect_marker_on_single_value_stmt,none,
       "'%0' may not be used on '%1' expression", (StringRef, StmtKind))
 ERROR(out_of_place_then_stmt,none,
-      "'then' may only appear as the last statement in an 'if' or 'switch' "
-      "expression", ())
+      "'then' may only appear as the last statement in an 'if', 'switch', or "
+      "'do' expression", ())
 
 ERROR(did_not_call_function_value,none,
       "function value was used as a property; add () to call it",
@@ -2219,9 +2225,12 @@ ERROR(unsupported_type_nested_in_protocol,none,
 ERROR(unsupported_type_nested_in_protocol_extension,none,
       "type %0 cannot be nested in protocol extension of %1",
       (const NominalTypeDecl *, const ProtocolDecl *))
-ERROR(unsupported_nested_protocol,none,
-      "protocol %0 cannot be nested inside another declaration",
+ERROR(unsupported_nested_protocol_in_generic,none,
+      "protocol %0 cannot be nested in a generic context",
       (const NominalTypeDecl *))
+ERROR(unsupported_nested_protocol_in_protocol,none,
+      "protocol %0 cannot be nested in protocol %1",
+      (const NominalTypeDecl *, const NominalTypeDecl *))
 ERROR(where_nongeneric_ctx,none,
       "'where' clause on non-generic member declaration requires a "
       "generic context", ())

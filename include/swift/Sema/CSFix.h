@@ -375,6 +375,9 @@ enum class FixKind : uint8_t {
   /// `throws` attribute from the source function.
   DropThrowsAttribute,
 
+  /// Ignore a mismatch in the thrown error type.
+  IgnoreThrownErrorMismatch,
+
   /// Fix conversion from async to sync function by removing explicit
   /// `async` attribute from the source function.
   DropAsyncAttribute,
@@ -392,10 +395,6 @@ enum class FixKind : uint8_t {
   /// Allow argument-to-parameter subtyping even when parameter type
   /// is marked as `inout`.
   AllowConversionThroughInOut,
-
-  /// Ignore either capability (read/write) or type mismatch in conversion
-  /// between two key path types.
-  IgnoreKeyPathContextualMismatch,
 
   /// Ignore a type mismatch between deduced element type and externally
   /// imposed one.
@@ -1005,7 +1004,6 @@ class DropThrowsAttribute final : public ContextualMismatch {
                       FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, FixKind::DropThrowsAttribute, fromType, toType,
                            locator) {
-    assert(fromType->isThrowing() != toType->isThrowing());
   }
 
 public:
@@ -1023,6 +1021,30 @@ public:
   }
 };
 
+/// This is a contextual mismatch between the thrown error types of two
+/// function types, which could be repaired by fixing one of the types.
+class IgnoreThrownErrorMismatch final : public ContextualMismatch {
+  IgnoreThrownErrorMismatch(ConstraintSystem &cs, Type fromErrorType,
+                            Type toErrorType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::IgnoreThrownErrorMismatch,
+                           fromErrorType, toErrorType, locator) {
+    assert(!fromErrorType->isEqual(toErrorType));
+  }
+
+public:
+  std::string getName() const override { return "drop 'throws' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreThrownErrorMismatch *create(ConstraintSystem &cs,
+                                           Type fromErrorType,
+                                           Type toErrorType,
+                                           ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::IgnoreThrownErrorMismatch;
+  }
+};
 /// This is a contextual mismatch between async and non-async
 /// function types, repair it by dropping `async` attribute.
 class DropAsyncAttribute final : public ContextualMismatch {
@@ -1164,36 +1186,6 @@ private:
 
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
-  }
-};
-
-/// Detect situations where key path doesn't have capability required
-/// by the context e.g. read-only vs. writable, or either root or value
-/// types are incorrect e.g.
-///
-/// ```swift
-/// struct S { let foo: Int }
-/// let _: WritableKeyPath<S, Int> = \.foo
-/// ```
-///
-/// Here context requires a writable key path but `foo` property is
-/// read-only.
-class KeyPathContextualMismatch final : public ContextualMismatch {
-  KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                            ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::IgnoreKeyPathContextualMismatch, lhs,
-                           rhs, locator) {}
-
-public:
-  std::string getName() const override {
-    return "fix key path contextual mismatch";
-  }
-
-  static KeyPathContextualMismatch *
-  create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::IgnoreKeyPathContextualMismatch;
   }
 };
 
