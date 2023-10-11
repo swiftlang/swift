@@ -397,6 +397,15 @@ private:
             return false;
         }
 
+        // If requested, compare the thrown error types.
+        Type thrownError1 = firstFunc->getEffectiveThrownErrorTypeOrNever();
+        Type thrownError2 = secondFunc->getEffectiveThrownErrorTypeOrNever();
+        if (Matcher.asDerived().considerThrownErrorTypes(thrownError1,
+                                                         thrownError2) &&
+            !this->visit(thrownError1->getCanonicalType(),
+                         thrownError2, thrownError1))
+          return false;
+
         return this->visit(firstFunc.getResult(), secondFunc->getResult(),
                            sugaredFirstFunc->getResult());
       }
@@ -557,6 +566,10 @@ public:
   bool match(Type first, Type second) {
     return MatchVisitor(*this).visit(first->getCanonicalType(), second,
                                      first);
+  }
+
+  bool considerThrownErrorTypes(Type errorType1, Type errorType2) const {
+    return false;
   }
 };
 

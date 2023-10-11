@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEffects.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -761,7 +762,7 @@ public:
 
       if (considerThrows) {
         if (auto thrownInterfaceType =
-                func->getEffectiveThrownInterfaceType()) {
+                func->getEffectiveThrownErrorType()) {
           Type thrownType =
               thrownInterfaceType->subst(declRef.getSubstitutions());
           result.merge(Classification::forThrows(thrownType,
@@ -1659,7 +1660,7 @@ private:
         return Classification();
 
       case EffectKind::Throws:
-        if (auto thrownError = fnType->getEffectiveThrownInterfaceType())
+        if (auto thrownError = fnType->getEffectiveThrownErrorType())
           return Classification::forThrows(*thrownError, conditional, reason);
 
         return Classification();
@@ -3302,4 +3303,123 @@ Type TypeChecker::errorUnion(Type type1, Type type2) {
   // FIXME: When either or both contain type variables, we'll need to form an
   // actual union type here.
   return type1->getASTContext().getErrorExistentialType();
+}
+
+namespace {
+
+/// Classifies a thrown error kind as Never, a specific type, or 'any Error'.
+enum class ThrownErrorClassification {
+  /// The `Never` type, which represents a non-throwing function.
+  Never,
+
+  /// A specific error type that is neither `Never` nor `any Error`.
+  Specific,
+
+  /// A specific error type that depends on a type variable or type parameter,
+  /// and therefore we cannot determine whether it is a subtype of another
+  /// type or not.
+  Dependent,
+
+  /// The type `any Error`, used for untyped throws.
+  AnyError,
+};
+
+}
+
+/// Classify the given thrown error type.
+static ThrownErrorClassification classifyThrownErrorType(Type type) {
+  if (type->isNever())
+    return ThrownErrorClassification::Never;
+
+  if (type->isExistentialType()) {
+    Type anyError = type->getASTContext().getErrorExistentialType();
+    if (anyError->isEqual(type))
+      return ThrownErrorClassification::AnyError;
+  }
+
+  if (type->hasTypeVariable() || type->hasTypeParameter())
+    return ThrownErrorClassification::Dependent;
+
+  return ThrownErrorClassification::Specific;
+}
+
+ThrownErrorSubtyping
+swift::compareThrownErrorsForSubtyping(
+    Type subThrownError, Type superThrownError, DeclContext *dc
+) {
+  // Easy case: exact match.
+  if (superThrownError->isEqual(subThrownError))
+    return ThrownErrorSubtyping::ExactMatch;
+
+  auto superThrownErrorKind = classifyThrownErrorType(superThrownError);
+  auto subThrownErrorKind = classifyThrownErrorType(subThrownError);
+
+  switch (subThrownErrorKind) {
+  case ThrownErrorClassification::Dependent:
+    switch (superThrownErrorKind) {
+    case ThrownErrorClassification::AnyError:
+      // This is a clear subtype relationship, because the supertype throws
+      // anything.
+      return ThrownErrorSubtyping::Subtype;
+
+    case ThrownErrorClassification::Never:
+    case ThrownErrorClassification::Dependent:
+    case ThrownErrorClassification::Specific:
+      // We have to compare the types. Do so below.
+      break;
+    }
+    break;
+
+  case ThrownErrorClassification::Specific:
+    switch (superThrownErrorKind) {
+    case ThrownErrorClassification::AnyError:
+      // This is a clear subtype relationship, because the supertype throws
+      // anything.
+      return ThrownErrorSubtyping::Subtype;
+
+    case ThrownErrorClassification::Never:
+      // The supertype doesn't throw, so this has to drop 'throws' to work.
+      return ThrownErrorSubtyping::DropsThrows;
+
+    case ThrownErrorClassification::Dependent:
+    case ThrownErrorClassification::Specific:
+      // We have to compare the types. Do so below.
+      break;
+    }
+    break;
+
+  case ThrownErrorClassification::Never:
+    // A function type throwing 'Never' is a subtype of all function types.
+    return ThrownErrorSubtyping::Subtype;
+
+  case ThrownErrorClassification::AnyError:
+    switch (superThrownErrorKind) {
+    case ThrownErrorClassification::Dependent:
+    case ThrownErrorClassification::Specific:
+      // We have to compare the types. Do so below.
+      break;
+
+    case ThrownErrorClassification::Never:
+      // We're going to have to drop the "throws" entirely.
+      return ThrownErrorSubtyping::DropsThrows;
+
+    case ThrownErrorClassification::AnyError:
+      llvm_unreachable("The thrown error types should have been equal");
+    }
+    break;
+  }
+
+  // If either of the types was dependent on a type variable or type parameter,
+  // we can't do the comparison at all.
+  if (superThrownErrorKind == ThrownErrorClassification::Dependent ||
+      subThrownErrorKind == ThrownErrorClassification::Dependent)
+    return ThrownErrorSubtyping::Dependent;
+
+  // Check whether the subtype's thrown error type is convertible to the
+  // supertype's thrown error type.
+  if (TypeChecker::isConvertibleTo(subThrownError, superThrownError, dc))
+    return ThrownErrorSubtyping::Subtype;
+
+  // We know it doesn't work.
+  return ThrownErrorSubtyping::Mismatch;
 }

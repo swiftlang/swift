@@ -22,6 +22,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -589,6 +590,8 @@ RequirementMatch swift::matchWitness(
   // Perform basic matching of the requirement and witness.
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
+  Type reqThrownError;
+  Type witnessThrownError;
   if (isa<FuncDecl>(req) && isa<FuncDecl>(witness)) {
     auto funcReq = cast<FuncDecl>(req);
     auto funcWitness = cast<FuncDecl>(witness);
@@ -681,12 +684,36 @@ RequirementMatch swift::matchWitness(
                                 MatchKind::MutatingConflict);
     }
 
+    // Check for async mismatches.
+    if (!witnessASD->isLessEffectfulThan(reqASD, EffectKind::Async)) {
+      return RequirementMatch(
+          getStandinForAccessor(witnessASD, AccessorKind::Get),
+          MatchKind::AsyncConflict);
+    }
+
     // Check that the witness has no more effects than the requirement.
     if (auto problem = checkEffects(witnessASD, reqASD))
       return problem.value();
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
+
+    // Dig out the thrown error types from the getter so we can compare them
+    // later.
+    auto getThrownErrorType = [](AbstractStorageDecl *asd) -> Type {
+      if (auto getter = asd->getEffectfulGetAccessor()) {
+        if (Type thrownErrorType = getter->getThrownInterfaceType()) {
+          return thrownErrorType;
+        } else if (getter->hasThrows()) {
+          return asd->getASTContext().getAnyExistentialType();
+        }
+      }
+
+      return asd->getASTContext().getNeverType();
+    };
+
+    reqThrownError = getThrownErrorType(reqASD);
+    witnessThrownError = getThrownErrorType(witnessASD);
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
@@ -831,10 +858,11 @@ RequirementMatch swift::matchWitness(
         return RequirementMatch(witness, MatchKind::AsyncConflict);
       }
 
-      // If the witness is 'throws', the requirement must be.
-      if (witnessFnType->getExtInfo().isThrowing() &&
-          !reqFnType->getExtInfo().isThrowing()) {
-        return RequirementMatch(witness, MatchKind::ThrowsConflict);
+      if (!reqThrownError) {
+        // Save the thrown error types of the requirement and witness so we
+        // can check them later.
+        reqThrownError = reqFnType->getEffectiveThrownErrorTypeOrNever();
+        witnessThrownError = witnessFnType->getEffectiveThrownErrorTypeOrNever();
       }
     }
   } else {
@@ -854,6 +882,41 @@ RequirementMatch swift::matchWitness(
 
     if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
       return std::move(result.value());
+    }
+  }
+
+  // Check the thrown error types. This includes 'any Error' and 'Never' for
+  // untyped throws and non-throwing cases as well.
+  if (reqThrownError && witnessThrownError) {
+    auto thrownErrorTypes = getTypesToCompare(
+        req, reqThrownError, false, witnessThrownError, false,
+        VarianceKind::None);
+
+    Type reqThrownError = std::get<0>(thrownErrorTypes);
+    Type witnessThrownError = std::get<1>(thrownErrorTypes);
+    switch (compareThrownErrorsForSubtyping(witnessThrownError, reqThrownError,
+                                            dc)) {
+    case ThrownErrorSubtyping::DropsThrows:
+    case ThrownErrorSubtyping::Mismatch:
+      return RequirementMatch(witness, MatchKind::ThrowsConflict);
+
+    case ThrownErrorSubtyping::ExactMatch:
+      // All is well.
+      break;
+
+    case ThrownErrorSubtyping::Subtype:
+      // If there were no type parameters, we're done.
+      if (!reqThrownError->hasTypeParameter())
+        break;
+
+      LLVM_FALLTHROUGH;
+
+    case ThrownErrorSubtyping::Dependent:
+      // We need to perform type matching
+      if (auto result = matchTypes(reqThrownError, witnessThrownError)) {
+        return std::move(result.value());
+      }
+      break;
     }
   }
 

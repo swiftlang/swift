@@ -951,7 +951,7 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
 }
 
 llvm::Optional<Type> 
-AbstractFunctionDecl::getEffectiveThrownInterfaceType() const {
+AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   Type interfaceType = getInterfaceType();
   if (hasImplicitSelfDecl()) {
     if (auto fnType = interfaceType->getAs<AnyFunctionType>())
@@ -959,7 +959,7 @@ AbstractFunctionDecl::getEffectiveThrownInterfaceType() const {
   }
 
   return interfaceType->castTo<AnyFunctionType>()
-      ->getEffectiveThrownInterfaceType();
+      ->getEffectiveThrownErrorType();
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {

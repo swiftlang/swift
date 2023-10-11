@@ -17,6 +17,7 @@
 
 #include "CSDiagnostics.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckEffects.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2945,28 +2946,6 @@ bool ConstraintSystem::hasPreconcurrencyCallee(
   return calleeOverload->choice.getDecl()->preconcurrency();
 }
 
-namespace {
-  /// Classifies a thrown error kind as Never, a specific type, or 'any Error'.
-  enum class ThrownErrorKind {
-    Never,
-    Specific,
-    AnyError,
-  };
-
-  ThrownErrorKind getThrownErrorKind(Type type) {
-    if (type->isNever())
-      return ThrownErrorKind::Never;
-
-    if (type->isExistentialType()) {
-      Type anyError = type->getASTContext().getErrorExistentialType();
-      if (anyError->isEqual(type))
-        return ThrownErrorKind::AnyError;
-    }
-
-    return ThrownErrorKind::Specific;
-  }
-}
-
 /// Match the throwing specifier of the two function types.
 static ConstraintSystem::TypeMatchResult
 matchFunctionThrowing(ConstraintSystem &cs,
@@ -2978,71 +2957,14 @@ matchFunctionThrowing(ConstraintSystem &cs,
   // that throws error type E2 when E1 is a subtype of E2. For the purpose
   // of this comparison, a non-throwing function has thrown error type 'Never',
   // and an untyped throwing function has thrown error type 'any Error'.
-  Type neverType = cs.getASTContext().getNeverType();
-  Type thrownError1 = func1->getEffectiveThrownInterfaceType().value_or(neverType);
-  Type thrownError2 = func2->getEffectiveThrownInterfaceType().value_or(neverType);
-  if (!thrownError1 || !thrownError2 || thrownError1->isEqual(thrownError2))
+  Type thrownError1 = func1->getEffectiveThrownErrorTypeOrNever();
+  Type thrownError2 = func2->getEffectiveThrownErrorTypeOrNever();
+  if (!thrownError1 || !thrownError2)
     return cs.getTypeMatchSuccess();
 
-  auto thrownErrorKind1 = getThrownErrorKind(thrownError1);
-  auto thrownErrorKind2 = getThrownErrorKind(thrownError2);
-
-  bool mustUnify = false;
-  bool dropThrows = false;
-
-  switch (thrownErrorKind1) {
-  case ThrownErrorKind::Specific:
-    // If the specific thrown error contains no type variables and we're
-    // going to try to convert it to \c Never, treat this as dropping throws.
-    if (thrownErrorKind2 == ThrownErrorKind::Never &&
-        !thrownError1->hasTypeVariable()) {
-      dropThrows = true;
-    } else {
-      // We need to unify the thrown error types.
-      mustUnify = true;
-    }
-    break;
-
-  case ThrownErrorKind::Never:
-    switch (thrownErrorKind2) {
-    case ThrownErrorKind::Specific:
-      // We need to unify the thrown error types.
-      mustUnify = true;
-      break;
-
-    case ThrownErrorKind::Never:
-      llvm_unreachable("The thrown error types should have been equal");
-      break;
-
-    case ThrownErrorKind::AnyError:
-      // We have a subtype. If we're not allowed to do the subtype,
-      // then we need to drop "throws".
-      if (kind < ConstraintKind::Subtype)
-        dropThrows = true;
-      break;
-    }
-    break;
-
-  case ThrownErrorKind::AnyError:
-    switch (thrownErrorKind2) {
-    case ThrownErrorKind::Specific:
-      // We need to unify the thrown error types.
-      mustUnify = true;
-      break;
-
-    case ThrownErrorKind::Never:
-      // We're going to have to drop the "throws" entirely.
-      dropThrows = true;
-      break;
-
-    case ThrownErrorKind::AnyError:
-      llvm_unreachable("The thrown error types should have been equal");
-    }
-    break;
-  }
-
-  // If we know we need to drop 'throws', try it now.
-  if (dropThrows) {
+  switch (compareThrownErrorsForSubtyping(thrownError1, thrownError2, cs.DC)) {
+  case ThrownErrorSubtyping::DropsThrows: {
+    // We need to drop 'throws' to make this work.
     if (!cs.shouldAttemptFixes())
       return cs.getTypeMatchFailure(locator);
 
@@ -3050,10 +2972,30 @@ matchFunctionThrowing(ConstraintSystem &cs,
                                             cs.getConstraintLocator(locator));
     if (cs.recordFix(fix))
       return cs.getTypeMatchFailure(locator);
+
+    return cs.getTypeMatchSuccess();
   }
 
-  // If we need to unify the thrown error types, do so now.
-  if (mustUnify) {
+  case ThrownErrorSubtyping::ExactMatch:
+    return cs.getTypeMatchSuccess();
+
+  case ThrownErrorSubtyping::Subtype:
+    // We know this is going to work, but we might still need to generate a
+    // constraint if one of the error types involves type variables.
+    if (thrownError1->hasTypeVariable() || thrownError2->hasTypeVariable()) {
+      // Fall through to the dependent case.
+    } else if (kind < ConstraintKind::Subtype) {
+      // We aren't allowed to have a subtype, so fail here.
+      return cs.getTypeMatchFailure(locator);
+    } else {
+      // We have a subtype. All set!
+      return cs.getTypeMatchSuccess();
+    }
+    LLVM_FALLTHROUGH;
+
+  case ThrownErrorSubtyping::Dependent: {
+    // The presence of type variables in the thrown error types require that
+    // we generate a constraint to unify the thrown error types, so do so now.
     ConstraintKind subKind = (kind < ConstraintKind::Subtype)
         ? ConstraintKind::Equal
         : ConstraintKind::Subtype;
@@ -3064,9 +3006,24 @@ matchFunctionThrowing(ConstraintSystem &cs,
         locator.withPathElement(LocatorPathElt::ThrownErrorType()));
     if (result == ConstraintSystem::SolutionKind::Error)
       return cs.getTypeMatchFailure(locator);
+
+    return cs.getTypeMatchSuccess();
   }
 
-  return cs.getTypeMatchSuccess();
+  case ThrownErrorSubtyping::Mismatch: {
+    auto thrownErrorLocator = cs.getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::ThrownErrorType()));
+    if (!cs.shouldAttemptFixes())
+      return cs.getTypeMatchFailure(thrownErrorLocator);
+
+    auto *fix = IgnoreThrownErrorMismatch::create(
+        cs, thrownError1, thrownError2, thrownErrorLocator);
+    if (cs.recordFix(fix))
+      return cs.getTypeMatchFailure(thrownErrorLocator);
+
+    return cs.getTypeMatchSuccess();
+  }
+  }
 }
 
 ConstraintSystem::TypeMatchResult
