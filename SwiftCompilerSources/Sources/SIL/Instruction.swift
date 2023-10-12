@@ -366,20 +366,22 @@ public struct VarDecl {
 }
 
 // See C++ VarDeclCarryingInst
-public protocol VarDeclInst {
+public protocol VarDeclInstruction {
   var varDecl: VarDecl? { get }
 }
 
-public protocol DebugVariableInst : VarDeclInst {
-  var debugVariable: OptionalBridgedSILDebugVariable { get }
+public protocol DebugVariableInstruction : VarDeclInstruction {
+  typealias DebugVariable = OptionalBridgedSILDebugVariable
+
+  var debugVariable: DebugVariable { get }
 }
 
-final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInst {
+final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction {
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.DebugValue_getDecl())
   }
 
-  public var debugVariable: OptionalBridgedSILDebugVariable {
+  public var debugVariable: DebugVariable {
     return bridged.DebugValue_getVarInfo()
   }
 }
@@ -637,7 +639,7 @@ final public class DynamicFunctionRefInst : FunctionRefBaseInst {
 final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
-final public class GlobalAddrInst : GlobalAccessInst, VarDeclInst {
+final public class GlobalAddrInst : GlobalAccessInst, VarDeclInstruction {
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.GlobalAddr_getDecl())
   }
@@ -744,7 +746,7 @@ final public class SelectEnumInst : SingleValueInstruction {
   public var enumOperand: Operand { operands[0] }
 }
 
-final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction, VarDeclInst {
+final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction, VarDeclInstruction {
   public var instance: Value { operand.value }
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
@@ -979,14 +981,14 @@ final public class LinearFunctionInst: SingleValueInstruction, ForwardingInstruc
 
 public protocol Allocation : SingleValueInstruction { }
 
-final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInst {
+final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
 
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.AllocStack_getDecl())
   }
 
-  public var debugVariable: OptionalBridgedSILDebugVariable {
+  public var debugVariable: DebugVariable {
     return bridged.AllocStack_getVarInfo()
   }
 }
@@ -1018,13 +1020,13 @@ final public class AllocRefDynamicInst : AllocRefInstBase {
   }
 }
 
-final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVariableInst {
+final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
 
   public var varDecl: VarDecl? {
     VarDecl(bridged: bridged.AllocBox_getDecl())
   }
 
-  public var debugVariable: OptionalBridgedSILDebugVariable {
+  public var debugVariable: DebugVariable {
     return bridged.AllocBox_getVarInfo()
   }
 }
@@ -1053,9 +1055,9 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
-  
+
   public var singleDirectResult: Value? { nil }
-  
+
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - 1)
   }
