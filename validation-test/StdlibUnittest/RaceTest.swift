@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out
 // RUN: %target-run %t.out | %FileCheck %s
 // REQUIRES: stress_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 import SwiftPrivate
 import StdlibUnittest
