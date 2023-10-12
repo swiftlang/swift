@@ -150,6 +150,17 @@ bool ClangImporter::Implementation::recordHasReferenceSemantics(
          });
 }
 
+bool ClangImporter::Implementation::instantiateClassTemplate(
+    const clang::ClassTemplateSpecializationDecl *decl) {
+  bool notInstantiated = getClangSema().InstantiateClassTemplateSpecialization(
+      decl->getLocation(),
+      const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
+      clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+      /*Complain*/ false);
+  // If the template can't be instantiated, bail.
+  return !notInstantiated;
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -2946,13 +2957,9 @@ namespace {
       // return its definition afterwards.
       clang::Sema &clangSema = Impl.getClangSema();
       if (!decl->getDefinition()) {
-        bool notInstantiated = clangSema.InstantiateClassTemplateSpecialization(
-            decl->getLocation(),
-            const_cast<clang::ClassTemplateSpecializationDecl *>(decl),
-            clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-            /*Complain*/ false);
+        bool instantiated = Impl.instantiateClassTemplate(decl);
         // If the template can't be instantiated, bail.
-        if (notInstantiated)
+        if (!instantiated)
           return nullptr;
       }
       if (!clangSema.isCompleteType(
@@ -3666,6 +3673,27 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
+      // If the return type is a templated class, instantiate it. This must
+      // happen before we import the name of the method, as the name is affected
+      // by safety/unsafety of the return type. The safety detection logic
+      // (`IsSafeUseOfCxxDecl`) relies on the class being instantiated.
+      clang::QualType returnType = decl->getReturnType();
+      if (auto elaborated = dyn_cast<clang::ElaboratedType>(returnType))
+        returnType = elaborated->desugar();
+      if (auto templateInstType =
+              dyn_cast<clang::TemplateSpecializationType>(returnType)) {
+        if (auto templateInstDecl =
+                dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                    templateInstType->getAsRecordDecl())) {
+          auto def = templateInstDecl->getDefinition();
+          if (!def) {
+            bool instantiated = Impl.instantiateClassTemplate(templateInstDecl);
+            if (!instantiated)
+              return nullptr;
+          }
+        }
+      }
+
       auto method = VisitFunctionDecl(decl);
       if (decl->isVirtual() && isa_and_nonnull<ValueDecl>(method)) {
         Impl.markUnavailable(

@@ -1808,6 +1808,9 @@ public:
   /// type into Swift.
   static bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
                                           ASTContext &ctx);
+
+  bool
+  instantiateClassTemplate(const clang::ClassTemplateSpecializationDecl *decl);
 };
 
 class ImportDiagnosticAdder {

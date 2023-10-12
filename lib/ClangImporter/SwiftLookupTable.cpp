@@ -1922,6 +1922,31 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
     }
   }
 
+  if (auto methodDecl = dyn_cast<clang::CXXMethodDecl>(named)) {
+    clang::QualType returnType = methodDecl->getReturnType();
+    if (auto elaborated = dyn_cast<clang::ElaboratedType>(returnType))
+      returnType = elaborated->desugar();
+    // If the return type is a template instantiation, it is not possible to
+    // determine safety/unsafety of the method without instantiating the
+    // template. Let's add both safe and unsafe versions of the name to the
+    // lookup table.
+    if (isa<clang::TemplateSpecializationType>(returnType)) {
+      auto unsafeName = nameImporter.importName(methodDecl, currentVersion);
+      if (unsafeName) {
+        const DeclName &declName = unsafeName.getDeclName();
+        if (!declName.isSpecial()) {
+          StringRef id = declName.getBaseIdentifier().str();
+          if (id.starts_with("__") && id.ends_with("Unsafe")) {
+            StringRef safeId = id.drop_front(2).drop_back(6);
+            table.addEntry(
+                DeclBaseName(nameImporter.getContext().getIdentifier(safeId)),
+                named, unsafeName.getEffectiveContext());
+          }
+        }
+      }
+    }
+  }
+
   // Class template instantiations are imported lazily, however, the lookup
   // table must include their mangled name (__CxxTemplateInst...) to make it
   // possible to find these decls during deserialization. For any C++ typedef
