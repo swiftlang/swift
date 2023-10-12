@@ -1495,11 +1495,11 @@ SILValue SILGenFunction::emitGetNonisolatedFuncExecutor(SILLocation loc) {
       SILType::getPrimitiveObjectType(
           getASTContext().TheExecutorType));
 
-  FuncDecl *getTaskExecutorPrefFuncDecl = SGM.getPreferredTaskExecutor();
-  assert(getTaskExecutorPrefFuncDecl);
+  FuncDecl *getPreferredExecFuncDecl = SGM.getPreferredTaskExecutor();
+  assert(getPreferredExecFuncDecl);
 
   auto fn = SGM.getFunction(
-      SILDeclRef(getTaskExecutorPrefFuncDecl, SILDeclRef::Kind::Func),
+      SILDeclRef(getPreferredExecFuncDecl, SILDeclRef::Kind::Func),
       NotForDefinition);
   SILValue fnRef = B.createFunctionRefFor(loc, fn);
   auto executor = B.createApply(loc, fnRef, {}, {});
@@ -1573,15 +1573,16 @@ SILGenFunction::emitHopToTargetActor(SILLocation loc,
 
   if (auto executor = emitExecutor(loc, *maybeIso, maybeSelf)) {
     return emitHopToTargetExecutor(loc, *executor);
-  } else {
-    return ExecutorBreadcrumb();
   }
+
+  return ExecutorBreadcrumb();
 }
 
 ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
     SILLocation loc, SILValue executor) {
   // Record that we need to hop back to the current executor.
   auto breadcrumb = ExecutorBreadcrumb(true);
+  fprintf(stderr, "[%s:%d](%s) HOP TO EXECUTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
                         executor, /*mandatory*/ false);
   return breadcrumb;

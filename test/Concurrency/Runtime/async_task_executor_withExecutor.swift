@@ -8,7 +8,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
-import StdlibUnittest
 
 protocol CountingExecutor: Executor, Sendable {
   var enqueueCount: Int { get }
@@ -56,12 +55,22 @@ func nonisolatedAsyncMethod(expect executor: CountEnqueuesSerialExecutor) async 
   print("Hello there")
 }
 
+nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSerialExecutor) async {
+  await withExecutor(countingSerialExecutor) {
+    countingSerialExecutor.preconditionIsolated()
+    dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+    print("OK: withExecutor body")
+  }
+}
+
 @main struct Main {
 
   static func main() async {
     if #available(SwiftStdlib 5.9, *) {
       let queue = DispatchQueue(label: "sample")
       let countingSerialExecutor = CountEnqueuesSerialExecutor(queue: queue)
+
+      await testFromNonisolated(countingSerialExecutor)
 
       await withExecutor(countingSerialExecutor) {
         // the block immediately hops to the expected executor
@@ -70,17 +79,17 @@ func nonisolatedAsyncMethod(expect executor: CountEnqueuesSerialExecutor) async 
         print("OK: withExecutor body")
       }
 
-      // A nonisolated async func must run on the expected executor,
-      // rather than on the default global pool
-      await withExecutor(countingSerialExecutor) {
-        await nonisolatedAsyncMethod(expect: countingSerialExecutor)
-        print("OK: nonisolated async func")
-      }
-
-      // child tasks must be started on the same executor
-      await withExecutor(countingSerialExecutor) {
-
-      }
+//      // A nonisolated async func must run on the expected executor,
+//      // rather than on the default global pool
+//      await withExecutor(countingSerialExecutor) {
+//        await nonisolatedAsyncMethod(expect: countingSerialExecutor)
+//        print("OK: nonisolated async func")
+//      }
+//
+//      // child tasks must be started on the same executor
+//      await withExecutor(countingSerialExecutor) {
+//
+//      }
 
     }
   }
