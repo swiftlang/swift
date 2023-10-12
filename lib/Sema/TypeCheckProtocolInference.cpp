@@ -662,6 +662,18 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
                              genericFn->getExtInfo());
   }
 
+  auto &ctx = conformance->getDeclContext()->getASTContext();
+
+  // Get the reduced type of the witness. This rules our certain tautological
+  // inferences below.
+  if (ctx.LangOpts.EnableExperimentalAssociatedTypeInference) {
+    if (auto genericSig = witness->getInnermostDeclContext()
+            ->getGenericSignatureOfContext()) {
+      type = genericSig.getReducedType(type);
+      type = genericSig->getSugaredType(type);
+    }
+  }
+
   // Remap associated types that reference other protocols into this
   // protocol.
   auto proto = conformance->getProtocol();
