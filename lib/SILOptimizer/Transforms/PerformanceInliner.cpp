@@ -208,6 +208,8 @@ class SILPerformanceInliner {
           llvm::detail::DenseMapPair<swift::SILBasicBlock *, uint64_t>, true>
           &bbIt);
 
+  bool isAutoDiffLinearMapWithControlFlow(FullApplySite AI);
+
   bool isProfitableToInline(
       FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
       int &NumCallerBlocks,
@@ -297,6 +299,69 @@ bool SILPerformanceInliner::profileBasedDecision(
   // We're gonna inline!
   NumCallerBlocks += Callee->size();
   return true;
+}
+
+// Checks if `FAI` can be traced back to a specifically named,
+// input enum function argument. If so, the callsite
+// containing function is a linear map in Swift Autodiff.
+bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
+    FullApplySite FAI) {
+  static const std::string LinearMapBranchTracingEnumPrefix = "_AD__";
+
+  auto val = FAI.getCallee();
+
+  for (;;) {
+    if (auto *inst = dyn_cast<SingleValueInstruction>(val)) {
+      if (auto pi = Projection::isObjectProjection(val)) {
+        // Extract a member from a struct/tuple/enum.
+        val = pi->getOperand(0);
+        continue;
+      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
+        val = ti->getOperand();
+        continue;
+      } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
+        val = cfi->getOperand();
+        continue;
+      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
+        val = cvt->getOperand();
+        continue;
+      }
+      return false;
+    } else if (auto *phiArg = dyn_cast<SILPhiArgument>(val)) {
+      if (auto *predBB = phiArg->getParent()->getSinglePredecessorBlock()) {
+        // The terminator of this predecessor block must either be a
+        // (conditional) branch instruction or a switch_enum.
+        if (auto *bi = dyn_cast<BranchInst>(predBB->getTerminator())) {
+          val = bi->getArg(phiArg->getIndex());
+          continue;
+        } else if (auto *cbi =
+                       dyn_cast<CondBranchInst>(predBB->getTerminator())) {
+          val = cbi->getArgForDestBB(phiArg->getParent(), phiArg->getIndex());
+          continue;
+        } else if (auto *sei =
+                       dyn_cast<SwitchEnumInst>(predBB->getTerminator())) {
+          val = sei->getOperand();
+          continue;
+        }
+        return false;
+      }
+    }
+    break;
+  }
+
+  // If `val` now points to a function argument then we have successfully traced
+  // the callee back to a function argument.
+  //
+  // We now need to check if this argument is an enum and named like an autodiff
+  // branch tracing enum.
+  if (auto *arg = dyn_cast<SILFunctionArgument>(val)) {
+    if (auto *enumDecl = arg->getType().getEnumOrBoundGenericEnum()) {
+      return enumDecl->getName().str().startswith(
+          LinearMapBranchTracingEnumPrefix);
+    }
+  }
+
+  return false;
 }
 
 bool SILPerformanceInliner::isProfitableToInline(
@@ -413,6 +478,19 @@ bool SILPerformanceInliner::isProfitableToInline(
         SILInstruction *def = constTracker.getDefInCaller(FAI.getCallee());
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def)))
           BlockW.updateBenefit(Benefit, RemovedClosureBenefit);
+        else if (isAutoDiffLinearMapWithControlFlow(FAI)) {
+          // For linear maps in Swift Autodiff, callees may be passed as an
+          // argument, however, they may be hidden behind a branch-tracing
+          // enum (tracing execution flow of the original function).
+          //
+          // If we can establish that we are inside of a Swift Autodiff linear
+          // map and that the branch tracing input enum is wrapping pullback
+          // closures, then we can update this function's benefit with
+          // `RemovedClosureBenefit` because inlining will (probably) eliminate
+          // the closure.
+          BlockW.updateBenefit(Benefit, RemovedClosureBenefit);
+        }
+
         // Check if inlining the callee would allow for further
         // optimizations like devirtualization or generic specialization. 
         if (!def)
