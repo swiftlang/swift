@@ -2430,9 +2430,9 @@ class CImplicitIdentityExpr { func gimme() -> CImplicitIdentityExpr { self } }
 
 class CImplicitDotSelfExpr { func gimme() -> CImplicitDotSelfExpr { self.self } }
 
-func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool {
+func badIs<T>(_ value: Any, anInstanceOf type: T.Type) -> Bool { // expected-note {{'type' declared here}}
     #if true
-    value is type // expected-error {{cannot find type 'type' in scope}}
+    value is type // expected-error {{type-casting operator expects a type on its right-hand side (got: parameter 'type')}}
     #endif
 }
 

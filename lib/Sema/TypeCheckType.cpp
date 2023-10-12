@@ -1423,6 +1423,19 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
       return I->second;
     }
+    
+    // type-casting operators such as 'is' and 'as'.
+    if (resolution.getOptions().is(TypeResolverContext::ExplicitCastExpr)) {
+      auto lookupResult = TypeChecker::lookupUnqualified(
+          dc, repr->getNameRef(), repr->getLoc(), lookupOptions);
+      if (!lookupResult.empty()) {
+        auto first = lookupResult.front().getValueDecl();
+        diags.diagnose(L, diag::cannot_find_type_in_cast_expression, first)
+          .highlight(R);
+        diags.diagnose(first, diag::decl_declared_here, first);
+        return ErrorType::get(ctx);
+      }
+    }
 
     diags.diagnose(L, diag::cannot_find_type_in_scope, repr->getNameRef())
         .highlight(R);
