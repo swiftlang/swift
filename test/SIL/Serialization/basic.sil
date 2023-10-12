@@ -161,3 +161,52 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
   return undef : $()
 }
+
+// CHECK-LABEL: sil @throwError : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@out τ_0_1, @error_indirect τ_0_0)
+// CHECK: copy_addr [take] %3 to [init] %1 : $*τ_0_0
+// CHECK: throw %1 : $*τ_0_0
+sil @throwError : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@error_indirect τ_0_0, @out τ_0_1) {
+bb0(%0: $*τ_0_1, %1: $*τ_0_0, %2 : $Builtin.Int64, %3 : $*τ_0_0):
+  copy_addr [take] %3 to [init] %1 : $*τ_0_0
+  throw %1 : $*τ_0_0
+}
+
+// CHECK: sil @throwError_unowned : $@convention(thin) (Builtin.Int64) -> @error_unowned Builtin.Int64 {
+// CHECK: bb0(%0 : $Builtin.Int64):
+// CHECK:  throw %0 : $Builtin.Int64
+sil @throwError_unowned : $@convention(thin) (Builtin.Int64) -> @error_unowned Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  throw %0 : $Builtin.Int64
+}
+
+// CHECK: sil @try_apply : $@convention(thin) <T, V> (@in T) -> @out V
+// CHECK: bb0(%0 : $*V, %1 : $*T):
+// CHECK:   %2 = alloc_stack $T
+// CHECK:   %3 = integer_literal $Builtin.Int64, 0
+// CHECK:   %4 = function_ref @throwError : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@out τ_0_1, @error_indirect τ_0_0)
+// CHECK:   try_apply %4<T, V>(%0, %2, %3, %1) : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@out τ_0_1, @error_indirect τ_0_0), normal bb2, error bb1
+// CHECK: bb1:
+// CHECK:   destroy_addr %2 : $*T
+// CHECK:   br bb3
+// CHECK: bb2(%8 : $()):
+// CHECK:   br bb3
+
+sil @try_apply : $@convention(thin) <T, V> (@in T) -> @out V {
+bb0(%0 : $*V, %1: $*T):
+  %2 = alloc_stack $T
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = function_ref @throwError : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
+  try_apply %4<T, V>(%0, %2, %3, %1) : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V), normal bb1, error bb2
+
+bb1(%5 : $()):
+  br bb3
+
+bb2:
+  destroy_addr %2 : $*T
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*T
+  %6 = tuple ()
+  return %6 : $()
+}

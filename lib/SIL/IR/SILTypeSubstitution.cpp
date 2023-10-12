@@ -225,9 +225,8 @@ public:
     }
 
     auto substErrorResult = origType->getOptionalErrorResult();
-    assert(!substErrorResult ||
-           (!substErrorResult->getInterfaceType()->hasTypeParameter() &&
-            !substErrorResult->getInterfaceType()->hasArchetype()));
+    if (substErrorResult)
+      substErrorResult = substInterface(*substErrorResult);
 
     SmallVector<SILParameterInfo, 8> substParams;
     substParams.reserve(origType->getParameters().size());

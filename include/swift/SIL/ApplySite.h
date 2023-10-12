@@ -679,12 +679,17 @@ public:
     return getSubstCalleeConv().getNumIndirectSILResults();
   }
 
+  unsigned getNumIndirectSILErrorResults() const {
+    return getSubstCalleeConv().getNumIndirectSILErrorResults();
+  }
+
   OperandValueArrayRef getIndirectSILResults() const {
     return getArguments().slice(0, getNumIndirectSILResults());
   }
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
-    return getArguments().slice(getNumIndirectSILResults());
+    return getArguments().slice(getNumIndirectSILResults() +
+                                getNumIndirectSILErrorResults());
   }
 
   InoutArgumentRange getInoutArguments() const {

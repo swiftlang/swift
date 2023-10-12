@@ -67,6 +67,8 @@ TYPE_ATTR(dynamic_self)
 #define REF_STORAGE(Name, name, ...) TYPE_ATTR(sil_##name)
 #include "swift/AST/ReferenceStorage.def"
 TYPE_ATTR(error)
+TYPE_ATTR(error_indirect)
+TYPE_ATTR(error_unowned)
 TYPE_ATTR(out)
 TYPE_ATTR(direct)
 TYPE_ATTR(in)
