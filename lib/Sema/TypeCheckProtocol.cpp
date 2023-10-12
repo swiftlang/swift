@@ -4763,21 +4763,6 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
                 KnownProtocolKind::Sendable))
             .isInvalid())
       return CheckTypeWitnessResult::forConformance(reqProto);
-
-    // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
-    // build unless we fail here while inferring an associated type
-    // somewhere.
-    if (contextType->isSpecialized()) {
-      auto *decl = contextType->getAnyNominal();
-      auto subMap = contextType->getContextSubstitutionMap(
-          module,
-          decl,
-          decl->getGenericEnvironmentOfContext());
-      for (auto replacement : subMap.getReplacementTypes()) {
-        if (replacement->hasError())
-          return CheckTypeWitnessResult::forConformance(reqProto);
-      }
-    }
   }
 
   if (sig->requiresClass(depTy) &&
