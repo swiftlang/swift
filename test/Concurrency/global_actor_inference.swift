@@ -246,8 +246,10 @@ class SuperclassWithGlobalActors {
   func j() { }
 }
 
-@GenericGlobalActor<String> // it's okay to add a global actor to nonisolated
+@GenericGlobalActor<String>
 class SubclassWithGlobalActors : SuperclassWithGlobalActors {
+// expected-warning@-1 {{global actor 'GenericGlobalActor<String>'-isolated class 'SubclassWithGlobalActors' has different actor isolation from nonisolated superclass 'SuperclassWithGlobalActors'; this is an error in Swift 6}}
+
   override func f() { } // okay: inferred to @GenericGlobalActor<Int>
 
   @GenericGlobalActor<String> override func g() { } // expected-error{{global actor 'GenericGlobalActor<String>'-isolated instance method 'g()' has different actor isolation from global actor 'GenericGlobalActor<Int>'-isolated overridden declaration}}

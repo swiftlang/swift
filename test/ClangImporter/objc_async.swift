@@ -298,6 +298,7 @@ class BarFrame: PictureFrame {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrame: NotIsolatedPictureFrame {
+// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'BazFrame' has different actor isolation from nonisolated superclass 'NotIsolatedPictureFrame'; this is an error in Swift 6}}
   init() {
     super.init(size: 0)
   }
