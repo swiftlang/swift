@@ -36,9 +36,9 @@ func coerceExpansion<each T>(_ value: repeat each T) {
 
 func localValuePack<each T>(_ t: repeat each T) -> (repeat each T, repeat each T) {
   let local = repeat each t
-  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
+  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
   let localAnnotated: repeat each T = repeat each t
-  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
+  // expected-error@-1{{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
 
   return (repeat each local, repeat each localAnnotated)
 }
@@ -92,7 +92,7 @@ func sameShapeDiagnostics<each T, each U>(t: repeat each T, u: repeat each U) {
   _ = (repeat (Array<each T>(), each u)) // expected-error {{pack expansion requires that 'each T' and 'each U' have the same shape}}
 }
 
-func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument list}}
+func returnPackExpansionType<each T>(_ t: repeat each T) -> repeat each T { // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
   fatalError()
 }
 
