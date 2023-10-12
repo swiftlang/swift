@@ -1069,6 +1069,8 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
+    (void)param->getInitializerIsolation();
+
     if (!ifacety->hasPlaceholder()) {
       continue;
     }
@@ -1149,8 +1151,6 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   // Walk the checked initializer and contextualize any closures
   // we saw there.
   TypeChecker::contextualizeInitializer(dc, initExpr);
-
-  checkInitializerActorIsolation(dc, initExpr);
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
@@ -2466,7 +2466,7 @@ public:
               PBD->getInitContext(i));
           if (initContext) {
             TypeChecker::contextualizeInitializer(initContext, init);
-            checkInitializerActorIsolation(initContext, init);
+            (void)PBD->getInitializerIsolation(i);
             TypeChecker::checkInitializerEffects(initContext, init);
           }
         }

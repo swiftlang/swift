@@ -3502,6 +3502,10 @@ static bool usesFeatureSendNonSendable(Decl *decl) {
 
 static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
 
+static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
+  return false;
+}
+
 static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;
 }
