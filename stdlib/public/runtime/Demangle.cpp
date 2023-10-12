@@ -343,7 +343,10 @@ static bool _buildDemanglingForGenericArgs(
       auto packDescriptor = packDescriptors[packIndex];
       assert(packDescriptor.Kind == GenericPackKind::Metadata);
       assert(packDescriptor.ShapeClass < packHeader.NumShapeClasses);
-      assert(packDescriptor.Index == argIndex);
+
+      // Arg index is not interested in the shape classes, but the pack
+      // descriptor's index is in terms of the shape classes.
+      assert(packDescriptor.Index == argIndex + packHeader.NumShapeClasses);
 
       MetadataPackPointer pack(genericArg.getMetadataPack());
       size_t count = reinterpret_cast<size_t>(genericArgs[packDescriptor.ShapeClass]);
