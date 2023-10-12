@@ -191,6 +191,27 @@ public:
     return false;
   }
 
+  /// Apply the given function object to each associated conformance requirement
+  /// within this protocol conformance.
+  ///
+  /// \returns true if the function ever returned true
+  template<typename F>
+  bool forEachAssociatedConformance(F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    unsigned index = 0;
+    for (auto req : protocol->getRequirementSignature().getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      if (f(req.getFirstType(), req.getProtocolDecl(), index))
+        return true;
+
+      ++index;
+    }
+
+    return false;
+  }
+
   /// Retrieve the value witness declaration corresponding to the given
   /// requirement.
   ValueDecl *getWitnessDecl(ValueDecl *requirement) const;
@@ -423,13 +444,18 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
     /// The conformance was labeled with @unchecked.
     UncheckedFlag = 0x02,
+
+    /// We have allocated the AssociatedConformances array (but not necessarily
+    /// populated any of its elements).
+    HasComputedAssociatedConformancesFlag = 0x04,
   };
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   ///
-  /// Also stores the "invalid" and "unchecked" bits.
-  llvm::PointerIntPair<DeclContext *, 2, unsigned> ContextAndBits;
+  /// Also stores the "invalid", "unchecked" and "has computed associated
+  /// conformances" bits.
+  llvm::PointerIntPair<DeclContext *, 3, unsigned> ContextAndBits;
 
   /// The reason that this conformance exists.
   ///
@@ -454,7 +480,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
 
   /// Conformances that satisfy each of conformance requirements of the
   /// requirement signature of the protocol.
-  ArrayRef<ProtocolConformanceRef> SignatureConformances;
+  MutableArrayRef<llvm::Optional<ProtocolConformanceRef>> AssociatedConformances;
 
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
@@ -518,7 +544,6 @@ public:
   /// Mark this conformance as invalid.
   void setInvalid() {
     ContextAndBits.setInt(ContextAndBits.getInt() | InvalidFlag);
-    SignatureConformances = {};
   }
 
   /// Whether this is an "unchecked" conformance.
@@ -531,6 +556,17 @@ public:
   void setUnchecked() {
     // OK to mutate because the flags are not part of the folding set node ID.
     ContextAndBits.setInt(ContextAndBits.getInt() | UncheckedFlag);
+  }
+
+  /// Determine whether we've lazily computed the associated conformance array
+  /// already.
+  bool hasComputedAssociatedConformances() const {
+    return ContextAndBits.getInt() & HasComputedAssociatedConformancesFlag;
+  }
+
+  /// Mark this conformance as having computed the assocaited conformance array.
+  void setHasComputedAssociatedConformances() {
+    ContextAndBits.setInt(ContextAndBits.getInt() | HasComputedAssociatedConformancesFlag);
   }
 
   /// Get the kind of source from which this conformance comes.
@@ -599,6 +635,16 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const;
 
+  /// Allocate the backing array if needed, computing its size from the
+  ///protocol's requirement signature.
+  void createAssociatedConformanceArray();
+
+  llvm::Optional<ProtocolConformanceRef>
+  getAssociatedConformance(unsigned index) const;
+
+  void
+  setAssociatedConformance(unsigned index, ProtocolConformanceRef assocConf);
+
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement) const;
 
@@ -617,19 +663,6 @@ public:
 
   /// Override the witness for a given requirement.
   void overrideWitness(ValueDecl *requirement, Witness newWitness);
-
-  /// Retrieve the protocol conformances that satisfy the requirements of the
-  /// protocol, which line up with the conformance constraints in the
-  /// protocol's requirement signature.
-  ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
-    if (Loader)
-      resolveLazyInfo();
-    return SignatureConformances;
-  }
-
-  /// Copy the given protocol conformances for the requirement signature into
-  /// the normal conformance.
-  void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Populate the signature conformances without checking if they satisfy
   /// requirements. Can only be used with parsed or imported conformances.

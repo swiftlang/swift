@@ -219,8 +219,9 @@ extension InheritEqual: P2 where T: P1 {} // expected-note {{requirement from co
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-NEXT:  (normal_conformance type="InheritEqual<T>" protocol="P5"
-// CHECK-NEXT:    (normal_conformance type="InheritEqual<T>" protocol="P2"
-// CHECK-NEXT:      (requirement "T" conforms_to "P1"))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="P2"
+// CHECK-NEXT:      (normal_conformance type="InheritEqual<T>" protocol="P2"
+// CHECK-NEXT:        (requirement "T" conforms_to "P1")))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
 extension InheritEqual: P5 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritEqual<U>' to 'P5'}}
 func inheritequal_good<U: P1>(_: U) {
@@ -251,8 +252,9 @@ extension InheritMore: P2 where T: P1 {} // expected-note {{requirement from con
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-NEXT:  (normal_conformance type="InheritMore<T>" protocol="P5"
-// CHECK-NEXT:    (normal_conformance type="InheritMore<T>" protocol="P2"
-// CHECK-NEXT:      (requirement "T" conforms_to "P1"))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="P2"
+// CHECK-NEXT:      (normal_conformance type="InheritMore<T>" protocol="P2"
+// CHECK-NEXT:        (requirement "T" conforms_to "P1")))
 // CHECK-NEXT:    (requirement "T" conforms_to "P4"))
 extension InheritMore: P5 where T: P4 {} // expected-note 2 {{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
 func inheritequal_good_good<U: P4>(_: U) {
