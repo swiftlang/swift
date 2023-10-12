@@ -47,6 +47,9 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
 
+  if (shouldSkipDecl(baseDecl))
+    return llvm::None;
+
   // Note: We intentionally don't support extension members here.
   //
   // Once extensions can override or introduce new vtable entries, this will
@@ -1098,7 +1101,7 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
-    for (Decl *member : theType->getMembersForLowering()) {
+    for (Decl *member : theType->getABIMembers()) {
       visit(member);
     }
 
@@ -1141,6 +1144,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visit(Decl *D) {
+    if (SGM.shouldSkipDecl(D))
+      return;
+
+    TypeMemberVisitor::visit(D);
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *otd) {}
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}
@@ -1273,7 +1283,7 @@ public:
     // @_objcImplementation extension, but we don't actually need to do any of
     // the stuff that it currently does.
 
-    for (Decl *member : e->getMembersForLowering()) {
+    for (Decl *member : e->getABIMembers()) {
       visit(member);
     }
 
@@ -1300,6 +1310,13 @@ public:
   //===--------------------------------------------------------------------===//
   // Visitors for subdeclarations
   //===--------------------------------------------------------------------===//
+  void visit(Decl *D) {
+    if (SGM.shouldSkipDecl(D))
+      return;
+
+    TypeMemberVisitor::visit(D);
+  }
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *tad) {}
   void visitGenericTypeParamDecl(GenericTypeParamDecl *d) {}

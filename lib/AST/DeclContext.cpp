@@ -914,12 +914,6 @@ ArrayRef<Decl *> IterableDeclContext::getABIMembers() const {
       ArrayRef<Decl *>());
 }
 
-IterableDeclContext::DeclsForLowering
-IterableDeclContext::getMembersForLowering() const {
-  return DeclsForLowering(getABIMembers(),
-                          AvailableDuringLoweringDeclFilter<Decl>());
-}
-
 ArrayRef<Decl *> IterableDeclContext::getAllMembers() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(

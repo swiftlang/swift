@@ -264,6 +264,9 @@ public:
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//
 
+  /// Returns true if SILGen should be skipped for the given decl.
+  bool shouldSkipDecl(Decl *d);
+
   void visit(Decl *D);
 
   // These are either not allowed at global scope or don't require
