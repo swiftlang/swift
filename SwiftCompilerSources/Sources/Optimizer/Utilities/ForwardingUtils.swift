@@ -129,14 +129,18 @@ private struct GatherLifetimeIntroducers : ForwardingUseDefWalker {
 
 enum ForwardingUseResult: CustomStringConvertible {
   case operand(Operand)
-  case deadValue(Value)
+  case deadValue(Value, Operand?)
 
   var description: String {
     switch self {
     case .operand(let operand):
       return operand.description
-    case .deadValue(let deadValue):
-      return "dead value: " + deadValue.description
+    case .deadValue(let deadValue, let operand):
+      var desc = "dead value: \(deadValue.description)"
+      if let operand = operand {
+        desc += "from: \(operand)"
+      }
+      return desc
     }
   }
 }
@@ -146,25 +150,35 @@ protocol ForwardingDefUseWalker {
   // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring by default. Implementations may handle phis.
   mutating func needWalk(for value: Value) -> Bool
 
+  mutating func leafUse(_ operand: Operand) -> WalkResult
+
   // Report any initial or forwarded  with no uses. Only relevant for
   // guaranteed values or incomplete OSSA. This could be a dead
   // instruction, a terminator in which the result is dead on one
   // path, or a dead phi.
-  mutating func deadValue(_: Value) -> WalkResult
+  //
+  // \p operand is nil if \p value is the root.
+  mutating func deadValue(_ value: Value, using operand: Operand?) -> WalkResult
 
-  mutating func leafUse(_: Operand) -> WalkResult
+  mutating func walkDown(root: Value) -> WalkResult
   
-  mutating func walkDownUses(of: Value) -> WalkResult
+  mutating func walkDownUses(of: Value, using: Operand?) -> WalkResult
     
   mutating func walkDown(operand: Operand) -> WalkResult
 }
 
 extension ForwardingDefUseWalker {
-  mutating func walkDownUses(of value: Value) -> WalkResult {
-    return walkDownUsesDefault(of: value)
+  mutating func walkDown(root: Value) -> WalkResult {
+    walkDownUses(of: root, using: nil)
   }
 
-  mutating func walkDownUsesDefault(of value: Value) -> WalkResult {
+  mutating func walkDownUses(of value: Value, using operand: Operand?)
+  -> WalkResult {
+    return walkDownUsesDefault(of: value, using: operand)
+  }
+
+  mutating func walkDownUsesDefault(of value: Value, using operand: Operand?)
+  -> WalkResult {
     if !needWalk(for: value) { return .continueWalk }
 
     var hasUse = false
@@ -175,7 +189,7 @@ extension ForwardingDefUseWalker {
       hasUse = true
     }
     if !hasUse {
-      deadValue(value)
+      return deadValue(value, using: operand)
     }
     return .continueWalk
   }
@@ -186,18 +200,18 @@ extension ForwardingDefUseWalker {
 
   mutating func walkDownDefault(operand: Operand) -> WalkResult {
     if let inst = operand.instruction as? ForwardingInstruction {
-      return walkDownAllResults(of: inst)
+      return walkDownAllResults(of: inst, using: operand)
     }
     if let phi = Phi(using: operand) {
-      return walkDownUses(of: phi.value)
+      return walkDownUses(of: phi.value, using: operand)
     }
     return leafUse(operand)
   }
 
-  private mutating func walkDownAllResults(of inst: ForwardingInstruction)
-  -> WalkResult {
+  private mutating func walkDownAllResults(of inst: ForwardingInstruction,
+    using operand: Operand?) -> WalkResult {
     for result in inst.forwardedResults {
-      if walkDownUses(of: result) == .abortWalk {
+      if walkDownUses(of: result, using: operand) == .abortWalk {
         return .abortWalk
       }
     }
@@ -213,7 +227,7 @@ func visitForwardedUses(introducer: Value, _ context: Context,
 -> WalkResult {
   var useVisitor = VisitForwardedUses(visitor: visitor, context)
   defer { useVisitor.visitedValues.deinitialize() }
-  return useVisitor.walkDownUses(of: introducer)
+  return useVisitor.walkDown(root: introducer)
 }
 
 private struct VisitForwardedUses : ForwardingDefUseWalker {
@@ -234,8 +248,9 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
     return visitor(.operand(operand))
   }
 
-  mutating func deadValue(_ value: Value) -> WalkResult {
-    return visitor(.deadValue(value))
+  mutating func deadValue(_ value: Value, using operand: Operand?)
+  -> WalkResult {
+    return visitor(.deadValue(value, operand))
   }
 }
 
@@ -250,8 +265,8 @@ let forwardingUseDefTest = FunctionTest("forwarding_use_def_test") {
 let forwardingDefUseTest = FunctionTest("forwarding_def_use_test") {
   function, arguments, context in
   let value = arguments.takeValue()
-  _ = visitForwardedUses(introducer: value, context) { operand in
-    print("USE: \(operand)")
+  _ = visitForwardedUses(introducer: value, context) { useResult in
+    print("USE: \(useResult)")
     return .continueWalk
   }
 }
