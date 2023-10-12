@@ -5125,7 +5125,6 @@ static void diagnoseInvariantSelfRequirement(
 }
 
 void ConformanceChecker::ensureRequirementsAreSatisfied() {
-  Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
   auto &diags = proto->getASTContext().Diags;
 
@@ -7069,6 +7068,75 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
     return Witness();
   }
   return known->second;
+}
+
+/// A stripped-down version of Type::subst that only works on the protocol
+/// Self type wrapped in zero or more DependentMemberTypes.
+static Type
+recursivelySubstituteBaseType(ModuleDecl *module,
+                              NormalProtocolConformance *conformance,
+                              DependentMemberType *depMemTy) {
+  Type origBase = depMemTy->getBase();
+
+  // Recursive case.
+  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
+    Type substBase = recursivelySubstituteBaseType(
+        module, conformance, depBase);
+    return depMemTy->substBaseType(module, substBase);
+  }
+
+  // Base case. The associated type's protocol should be either the
+  // conformance protocol or an inherited protocol.
+  auto *reqProto = depMemTy->getAssocType()->getProtocol();
+  assert(origBase->isEqual(reqProto->getSelfInterfaceType()));
+
+  ProtocolConformance *reqConformance = conformance;
+
+  // If we have an inherited protocol just look up the conformance.
+  if (reqProto != conformance->getProtocol()) {
+    reqConformance = module->lookupConformance(conformance->getType(), reqProto)
+                         .getConcrete();
+  }
+
+  return reqConformance->getTypeWitness(depMemTy->getAssocType());
+}
+
+ProtocolConformanceRef
+AssociatedConformanceRequest::evaluate(Evaluator &eval,
+                                       NormalProtocolConformance *conformance,
+                                       CanType origTy, ProtocolDecl *reqProto,
+                                       unsigned index) const {
+  auto *module = conformance->getDeclContext()->getParentModule();
+  Type substTy;
+
+  if (origTy->isEqual(conformance->getProtocol()->getSelfInterfaceType())) {
+    substTy = conformance->getType();
+  } else {
+    auto *depMemTy = origTy->castTo<DependentMemberType>();
+    substTy = recursivelySubstituteBaseType(module, conformance, depMemTy);
+  }
+
+  // Looking up a conformance for a contextual type and mapping the
+  // conformance context produces a more accurate result than looking
+  // up a conformance from an interface type.
+  //
+  // This can happen if the conformance has an associated conformance
+  // depending on an associated type that is made concrete in a
+  // refining protocol.
+  //
+  // That is, the conformance of an interface type G<T> : P really
+  // depends on the generic signature of the current context, because
+  // performing the lookup in a "more" constrained extension than the
+  // one where the conformance was defined must produce concrete
+  // conformances.
+  //
+  // FIXME: Eliminate this, perhaps by adding a variant of
+  // lookupConformance() taking a generic signature.
+  if (substTy->hasTypeParameter())
+    substTy = conformance->getDeclContext()->mapTypeIntoContext(substTy);
+
+  return module->lookupConformance(substTy, reqProto, /*allowMissing=*/true)
+      .mapConformanceOutOfContext();
 }
 
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,

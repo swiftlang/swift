@@ -3414,7 +3414,8 @@ public:
       });
     }
 
-    printRecRange(T->getGenericArguments(), "generic_arguments");
+    for (auto arg : T->getGenericArguments())
+      printRec(arg);
 
     printFoot();
   }
@@ -3549,6 +3550,7 @@ public:
             });
             return false;
           });
+
           normal->forEachValueWitness([&](const ValueDecl *req,
                                           Witness witness) {
             printRecArbitrary([&](StringRef label) {
@@ -3566,9 +3568,17 @@ public:
             });
           });
 
-          for (auto sigConf : normal->getSignatureConformances()) {
-            printRec(sigConf, visited);
-          }
+          normal->forEachAssociatedConformance(
+              [&](Type t, ProtocolDecl *proto, unsigned index) {
+                printRecArbitrary([&](StringRef label) {
+                  printHead("assoc_conformance", ASTNodeColor, label);
+                  printFieldQuoted(t, "type", TypeColor);
+                  printFieldQuoted(proto->getName(), "proto");
+                  printRec(normal->getAssociatedConformance(t, proto), visited);
+                  printFoot();
+                });
+                return false;
+              });
         }
 
         if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
@@ -3886,14 +3896,16 @@ namespace {
 
       printFieldQuoted(T->getDecl()->printRef(), "decl");
       if (auto underlying = T->getSinglyDesugaredType()) {
-        printField(underlying, "underlying", TypeColor);
+        printRec(underlying, "underlying");
       } else {
+        // This can't actually happen
         printFlag("unresolved_underlying");
       }
 
       if (T->getParent())
         printRec(T->getParent(), "parent");
-      printRecRange(T->getDirectGenericArgs(), "direct_generic_args");
+      for (auto arg : T->getDirectGenericArgs())
+        printRec(arg);
 
       printFoot();
     }

@@ -1197,6 +1197,26 @@ void ValueWitnessRequest::cacheResult(Witness type) const {
 }
 
 //----------------------------------------------------------------------------//
+// AssociatedConformanceRequest computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<ProtocolConformanceRef>
+AssociatedConformanceRequest::getCachedResult() const {
+  auto *conformance = std::get<0>(getStorage());
+  unsigned index = std::get<3>(getStorage());
+
+  return conformance->getAssociatedConformance(index);
+}
+
+void AssociatedConformanceRequest::cacheResult(
+    ProtocolConformanceRef assocConf) const {
+  auto *conformance = std::get<0>(getStorage());
+  unsigned index = std::get<3>(getStorage());
+
+  conformance->setAssociatedConformance(index, assocConf);
+}
+
+//----------------------------------------------------------------------------//
 // PreCheckResultBuilderRequest computation.
 //----------------------------------------------------------------------------//
 
