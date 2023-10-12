@@ -337,6 +337,22 @@ bb0:
 // CHECK-s390x-LABEL: declare{{( dllimport)?}} signext i32 @ints(i32 signext)
 // CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i32 @unsigneds(i32 zeroext)
 
+// CHECK-wasm32-LABEL: define swiftcc void @testIntegerExtension(i8 %0, i8 %1, i8 %2, i16 %3, i16 %4, i32 %5, i32 %6) #0 {
+// CHECK-wasm32:         call signext i8 @chareth(i8 signext %0)
+// CHECK-wasm32:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-wasm32:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-wasm32:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-wasm32:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-wasm32:         call i32 @ints(i32 %5)
+// CHECK-wasm32:         call i32 @unsigneds(i32 %6)
+// CHECK-wasm32-LABEL: declare signext i8 @chareth(i8 signext) #0
+// CHECK-wasm32-LABEL: declare signext i8 @signedChareth(i8 signext) #0
+// CHECK-wasm32-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext) #0
+// CHECK-wasm32-LABEL: declare signext i16 @eatMyShorts(i16 signext) #0
+// CHECK-wasm32-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext) #0
+// CHECK-wasm32-LABEL: declare i32 @ints(i32) #0
+// CHECK-wasm32-LABEL: declare i32 @unsigneds(i32) #0
+
 sil @testIntegerExtension : $@convention(thin) (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
 entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $CUnsignedShort, %f : $CInt, %g : $CUnsignedInt):
   %h = function_ref @chareth : $@convention(c) (CChar) -> CChar
