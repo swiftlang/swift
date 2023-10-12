@@ -262,17 +262,16 @@ public func createQueuedDiagnostics() -> UnsafeRawPointer {
 /// Destroy the queued diagnostics.
 @_cdecl("swift_ASTGen_destroyQueuedDiagnostics")
 public func destroyQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer
 ) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    for (_, sourceFileID) in queuedDiagnostics.pointee.sourceFileIDs {
-      sourceFileID.deinitialize(count: 1)
-      sourceFileID.deallocate()
-    }
-
-    queuedDiagnostics.deinitialize(count: 1)
-    queuedDiagnostics.deallocate()
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+  for (_, sourceFileID) in queuedDiagnostics.pointee.sourceFileIDs {
+    sourceFileID.deinitialize(count: 1)
+    sourceFileID.deallocate()
   }
+
+  queuedDiagnostics.deinitialize(count: 1)
+  queuedDiagnostics.deallocate()
 }
 
 /// Diagnostic message used for thrown errors.
@@ -444,17 +443,14 @@ public func addQueuedDiagnostic(
 /// Render the queued diagnostics into a UTF-8 string.
 @_cdecl("swift_ASTGen_renderQueuedDiagnostics")
 public func renderQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>,
+  queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   contextSize: Int,
   colorize: Int,
-  renderedPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  renderedLength: UnsafeMutablePointer<Int>
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedString>
 ) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    let formatter = DiagnosticsFormatter(contextSize: contextSize, colorize: colorize != 0)
-    let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
+  let queuedDiagnostics = queuedDiagnosticsPtr.assumingMemoryBound(to: QueuedDiagnostics.self)
+  let formatter = DiagnosticsFormatter(contextSize: contextSize, colorize: colorize != 0)
+  let renderedStr = formatter.annotateSources(in: queuedDiagnostics.pointee.grouped)
 
-    (renderedPointer.pointee, renderedLength.pointee) =
-        allocateUTF8String(renderedStr)
-  }
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
 }

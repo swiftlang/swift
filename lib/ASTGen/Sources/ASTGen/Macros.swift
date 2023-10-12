@@ -76,13 +76,6 @@ extension MacroRole {
   }
 }
 
-extension String {
-  public init(bufferStart: UnsafePointer<UInt8>?, count: Int) {
-    let buffer = UnsafeBufferPointer(start: bufferStart, count: count)
-    self.init(decoding: buffer, as: UTF8.self)
-  }
-}
-
 /// Resolve a reference to type metadata into a macro, if posible.
 ///
 /// Returns an unmanaged pointer to an ExportedMacro instance that describes
@@ -117,10 +110,8 @@ public func destroyMacro(
 
 @_cdecl("swift_ASTGen_resolveExecutableMacro")
 public func resolveExecutableMacro(
-  moduleName: UnsafePointer<UInt8>,
-  moduleNameLength: Int,
-  typeName: UnsafePointer<UInt8>,
-  typeNameLength: Int,
+  moduleName: UnsafePointer<CChar>,
+  typeName: UnsafePointer<CChar>,
   pluginOpaqueHandle: UnsafeMutableRawPointer
 ) -> UnsafeRawPointer {
   // NOTE: This doesn't actually resolve anything.
@@ -128,8 +119,8 @@ public func resolveExecutableMacro(
   // the actual expansion fails.
   let exportedPtr = UnsafeMutablePointer<ExportedExecutableMacro>.allocate(capacity: 1)
   exportedPtr.initialize(to: .init(
-    moduleName: String(bufferStart: moduleName, count: moduleNameLength),
-    typeName: String(bufferStart: typeName, count: typeNameLength),
+    moduleName: String(cString: moduleName),
+    typeName: String(cString: typeName),
     plugin: CompilerPlugin(opaqueHandle: pluginOpaqueHandle)))
   return UnsafeRawPointer(exportedPtr)
 }
@@ -141,34 +132,6 @@ public func destroyExecutableMacro(
   let macroPtr = macroPtr.assumingMemoryBound(to: ExportedExecutableMacro.self)
   macroPtr.deinitialize(count: 1)
   macroPtr.deallocate()
-}
-
-/// Allocate a copy of the given string as a UTF-8 string.
-func allocateUTF8String(
-  _ string: String,
-  nullTerminated: Bool = false
-) -> (UnsafePointer<UInt8>, Int) {
-  var string = string
-  return string.withUTF8 { utf8 in
-    let capacity = utf8.count + (nullTerminated ? 1 : 0)
-    let ptr = UnsafeMutablePointer<UInt8>.allocate(
-      capacity: capacity
-    )
-    if let baseAddress = utf8.baseAddress {
-      ptr.initialize(from: baseAddress, count: utf8.count)
-    }
-
-    if nullTerminated {
-      ptr[utf8.count] = 0
-    }
-
-    return (UnsafePointer<UInt8>(ptr), utf8.count)
-  }
-}
-
-@_cdecl("swift_ASTGen_freeString")
-public func freeString(pointer: UnsafePointer<UInt8>?) {
-  pointer?.deallocate()
 }
 
 /// Diagnostics produced here.
@@ -251,19 +214,16 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
 /// argument matching the corresponding parameter.
 @_cdecl("swift_ASTGen_checkMacroDefinition")
 func checkMacroDefinition(
-    diagEnginePtr: UnsafeMutablePointer<UInt8>,
+    diagEnginePtr: UnsafeMutableRawPointer,
     sourceFilePtr: UnsafeRawPointer,
     macroLocationPtr: UnsafePointer<UInt8>,
-    externalMacroPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-    externalMacroLength: UnsafeMutablePointer<Int>,
+    externalMacroOutPtr: UnsafeMutablePointer<BridgedString>,
     replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
     numReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
-  // Clear out the "out" parameters.
-  externalMacroPointer.pointee = nil
-  externalMacroLength.pointee = 0
-  replacementsPtr.pointee = nil
-  numReplacementsPtr.pointee = 0
+  // Assert "out" parameters are initialized.
+  assert(externalMacroOutPtr.pointee.isEmptyInitialized)
+  assert(replacementsPtr.pointee == nil && numReplacementsPtr.pointee == 0)
 
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
 
@@ -304,8 +264,8 @@ func checkMacroDefinition(
       }
 
       // Form the "ModuleName.TypeName" result string.
-      (externalMacroPointer.pointee, externalMacroLength.pointee) =
-        allocateUTF8String("\(module).\(type)", nullTerminated: true)
+      externalMacroOutPtr.pointee =
+        allocateBridgedString("\(module).\(type)", nullTerminated: true)
 
       // Translate this into a use of #externalMacro.
       let expansionSourceSyntax: ExprSyntax =
@@ -368,15 +328,15 @@ func checkMacroDefinition(
       }
 
       // Form the "ModuleName.TypeName" result string.
-      (externalMacroPointer.pointee, externalMacroLength.pointee) =
-        allocateUTF8String("\(module).\(type)", nullTerminated: true)
+      externalMacroOutPtr.pointee =
+        allocateBridgedString("\(module).\(type)", nullTerminated: true)
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
     case let .expansion(expansionSyntax, replacements: replacements):
       // Provide the expansion syntax.
-      (externalMacroPointer.pointee, externalMacroLength.pointee) =
-        allocateUTF8String(expansionSyntax.trimmedDescription,
-                           nullTerminated: true)
+      externalMacroOutPtr.pointee =
+        allocateBridgedString(expansionSyntax.trimmedDescription,
+                              nullTerminated: true)
 
 
       // If there are no replacements, we're done.
@@ -429,44 +389,30 @@ public func freeExpansionReplacements(
 // Make an expansion result for '@_cdecl' function caller.
 func makeExpansionOutputResult(
   expandedSource: String?,
-  outputPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  outputLength: UnsafeMutablePointer<Int>
+  outputPointer: UnsafeMutablePointer<BridgedString>
 ) -> Int {
   guard var expandedSource = expandedSource else {
+    outputPointer.pointee = BridgedString()
     return -1
   }
-
-  // Form the result buffer for our caller.
-  expandedSource.withUTF8 { utf8 in
-    let evaluatedResultPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: utf8.count + 1)
-    if let baseAddress = utf8.baseAddress {
-      evaluatedResultPtr.initialize(from: baseAddress, count: utf8.count)
-    }
-    evaluatedResultPtr[utf8.count] = 0
-
-    outputPointer.pointee = UnsafePointer(evaluatedResultPtr)
-    outputLength.pointee = utf8.count
-  }
+  outputPointer.pointee = allocateBridgedString(expandedSource, nullTerminated: true)
   return 0
 }
 
 @_cdecl("swift_ASTGen_expandFreestandingMacro")
 @usableFromInline
 func expandFreestandingMacro(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
   macroKind: UInt8,
-  discriminatorText: UnsafePointer<UInt8>,
-  discriminatorTextLength: Int,
+  discriminatorText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
   sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
 ) -> Int {
   // We didn't expand anything so far.
-  expandedSourcePointer.pointee = nil
-  expandedSourceLength.pointee = 0
+  assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
 
   guard let sourceLocationPtr = sourceLocationPtr else {
     print("NULL source location")
@@ -486,10 +432,8 @@ func expandFreestandingMacro(
     return 1
   }
 
-  let discriminatorBuffer = UnsafeBufferPointer(
-    start: discriminatorText, count: discriminatorTextLength
-  )
-  let discriminator = String(decoding: discriminatorBuffer, as: UTF8.self)
+
+  let discriminator = String(cString: discriminatorText)
 
   let macroRole = MacroRole(rawMacroRole: rawMacroRole)
   let expandedSource: String?
@@ -514,15 +458,14 @@ func expandFreestandingMacro(
 
   return makeExpansionOutputResult(
     expandedSource: expandedSource,
-    outputPointer: expandedSourcePointer,
-    outputLength: expandedSourceLength
+    outputPointer: expandedSourceOutPtr
   )
 }
 
 func expandFreestandingMacroIPC(
   macroPtr: UnsafeRawPointer,
   macroRole: MacroRole,
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   expansionSyntax: FreestandingMacroExpansionSyntax,
   sourceFilePtr: UnsafePointer<ExportedSourceFile>,
   discriminator: String
@@ -597,7 +540,7 @@ func expandFreestandingMacroIPC(
 func expandFreestandingMacroInProcess(
   macroPtr: UnsafeRawPointer,
   macroRole: MacroRole,
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   expansionSyntax: FreestandingMacroExpansionSyntax,
   sourceFilePtr: UnsafePointer<ExportedSourceFile>,
   discriminator: String
@@ -717,15 +660,12 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
 @_cdecl("swift_ASTGen_expandAttachedMacro")
 @usableFromInline
 func expandAttachedMacro(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
   macroKind: UInt8,
-  discriminatorText: UnsafePointer<UInt8>,
-  discriminatorTextLength: Int,
-  qualifiedTypeText: UnsafePointer<UInt8>,
-  qualifiedTypeLength: Int,
-  conformanceListText: UnsafePointer<UInt8>,
-  conformanceListLength: Int,
+  discriminatorText: UnsafePointer<CChar>,
+  qualifiedTypeText: UnsafePointer<CChar>,
+  conformanceListText: UnsafePointer<CChar>,
   rawMacroRole: UInt8,
   customAttrSourceFilePtr: UnsafeRawPointer,
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
@@ -733,12 +673,10 @@ func expandAttachedMacro(
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
   parentDeclSourceFilePtr: UnsafeRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
-  expandedSourcePointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  expandedSourceLength: UnsafeMutablePointer<Int>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
 ) -> Int {
   // We didn't expand anything so far.
-  expandedSourcePointer.pointee = nil
-  expandedSourceLength.pointee = 0
+  assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
 
   // Dig out the custom attribute for the attached macro declarations.
   guard let customAttrNode = findSyntaxNodeInSourceFile(
@@ -772,21 +710,9 @@ func expandAttachedMacro(
   let declarationSourceFilePtr = declarationSourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
   let parentDeclSourceFilePtr = parentDeclSourceFilePtr?.bindMemory(to: ExportedSourceFile.self, capacity: 1)
 
-  let discriminatorBuffer = UnsafeBufferPointer(
-    start: discriminatorText, count: discriminatorTextLength
-  )
-  let discriminator = String(decoding: discriminatorBuffer, as: UTF8.self)
-
-  let qualifiedTypeBuffer = UnsafeBufferPointer(
-    start: qualifiedTypeText, count: qualifiedTypeLength
-  )
-  let qualifiedType = String(decoding: qualifiedTypeBuffer, as: UTF8.self)
-
-  let conformanceListBuffer = UnsafeBufferPointer(
-    start: conformanceListText, count: conformanceListLength
-  )
-  let conformanceList = String(decoding: conformanceListBuffer, as: UTF8.self)
-
+  let discriminator = String(cString: discriminatorText)
+  let qualifiedType = String(cString: qualifiedTypeText)
+  let conformanceList = String(cString: conformanceListText)
 
   let expandedSource: String?
   switch MacroPluginKind(rawValue: macroKind)! {
@@ -822,13 +748,12 @@ func expandAttachedMacro(
 
   return makeExpansionOutputResult(
     expandedSource: expandedSource,
-    outputPointer: expandedSourcePointer,
-    outputLength: expandedSourceLength
+    outputPointer: expandedSourceOutPtr
   )
 }
 
 func expandAttachedMacroIPC(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
   rawMacroRole: UInt8,
   discriminator: String,
@@ -962,7 +887,7 @@ func expandAttachedMacroIPC(
 }
 
 func expandAttachedMacroInProcess(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   macroPtr: UnsafeRawPointer,
   rawMacroRole: UInt8,
   discriminator: String,

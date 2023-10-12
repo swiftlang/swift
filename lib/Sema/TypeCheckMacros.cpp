@@ -49,50 +49,43 @@ using namespace swift;
 extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
 extern "C" void swift_ASTGen_destroyMacro(void *macro);
 
-extern "C" void swift_ASTGen_freeString(const char *str);
+extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
 
-extern "C" void *swift_ASTGen_resolveExecutableMacro(
-    const char *moduleName, ptrdiff_t moduleNameLength,
-    const char *typeName, ptrdiff_t typeNameLength,
-    void * opaquePluginHandle);
+extern "C" void *swift_ASTGen_resolveExecutableMacro(const char *moduleName,
+                                                     const char *typeName,
+                                                     void *opaquePluginHandle);
 extern "C" void swift_ASTGen_destroyExecutableMacro(void *macro);
 
 extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *diagEngine,
-    void *sourceFile,
-    const void *macroSourceLocation,
-    char **expansionSourcePtr,
-    ptrdiff_t *expansionSourceLength,
-    ptrdiff_t **replacementsPtr,
-    ptrdiff_t *numReplacements
-);
+    void *diagEngine, void *sourceFile, const void *macroSourceLocation,
+    BridgedString *expansionSourceOutPtr, ptrdiff_t **replacementsPtr,
+    ptrdiff_t *numReplacements);
 extern "C" void swift_ASTGen_freeExpansionReplacements(
     ptrdiff_t *replacementsPtr,
     ptrdiff_t numReplacements);
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
-    const char *discriminator, ptrdiff_t discriminatorLength,
-    uint8_t rawMacroRole, void *sourceFile,
-    const void *sourceLocation, const char **evaluatedSource,
-    ptrdiff_t *evaluatedSourceLength);
+    const char *discriminator, uint8_t rawMacroRole, void *sourceFile,
+    const void *sourceLocation, BridgedString *evaluatedSourceOut);
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *diagEngine, void *macro, uint8_t externalKind,
-    const char *discriminator, ptrdiff_t discriminatorLength,
-    const char *qualifiedType, ptrdiff_t qualifiedTypeLength,
-    const char *conformances, ptrdiff_t conformancesLength,
-    uint8_t rawMacroRole,
-    void *customAttrSourceFile, const void *customAttrSourceLocation,
-    void *declarationSourceFile, const void *declarationSourceLocation,
-    void *parentDeclSourceFile, const void *parentDeclSourceLocation,
-    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
+    const char *discriminator, const char *qualifiedType,
+    const char *conformances, uint8_t rawMacroRole, void *customAttrSourceFile,
+    const void *customAttrSourceLocation, void *declarationSourceFile,
+    const void *declarationSourceLocation, void *parentDeclSourceFile,
+    const void *parentDeclSourceLocation, BridgedString *evaluatedSourceOut);
 
 extern "C" bool swift_ASTGen_initializePlugin(void *handle, void *diagEngine);
 extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
 extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *handle, const char *libraryPath, const char *moduleName,
     void *diagEngine);
+
+static inline StringRef toStringRef(BridgedString bridged) {
+  return {reinterpret_cast<const char *>(bridged.data), size_t(bridged.length)};
+}
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
 /// Look for macro's type metadata given its external module and type name.
@@ -192,18 +185,17 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   ASTContext &ctx = macro->getASTContext();
   auto sourceFile = macro->getParentSourceFile();
 
-  char *externalMacroNamePtr;
-  ptrdiff_t externalMacroNameLength;
-  ptrdiff_t *replacements;
-  ptrdiff_t numReplacements;
+  BridgedString externalMacroName{nullptr, 0};
+  ptrdiff_t *replacements = nullptr;
+  ptrdiff_t numReplacements = 0;
   auto checkResult = swift_ASTGen_checkMacroDefinition(
       &ctx.Diags, sourceFile->getExportedSourceFile(),
-      macro->getLoc().getOpaquePointerValue(), &externalMacroNamePtr,
-      &externalMacroNameLength, &replacements, &numReplacements);
+      macro->getLoc().getOpaquePointerValue(), &externalMacroName,
+      &replacements, &numReplacements);
 
   // Clean up after the call.
   SWIFT_DEFER {
-    swift_ASTGen_freeString(externalMacroNamePtr);
+    swift_ASTGen_freeBridgedString(externalMacroName);
     swift_ASTGen_freeExpansionReplacements(replacements, numReplacements);
   };
 
@@ -225,7 +217,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   case BridgedExternalMacro: {
     // An external macro described as ModuleName.TypeName. Get both identifiers.
     assert(!replacements && "External macro doesn't have replacements");
-    StringRef externalMacroStr(externalMacroNamePtr, externalMacroNameLength);
+    StringRef externalMacroStr = toStringRef(externalMacroName);
     StringRef externalModuleName, externalTypeName;
     std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
 
@@ -267,7 +259,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     return handleExternalMacroDefinition(ctx, expansion);
 
   // Expansion string text.
-  StringRef expansionText(externalMacroNamePtr, externalMacroNameLength);
+  StringRef expansionText = toStringRef(externalMacroName);
 
   // Copy over the replacements.
   SmallVector<ExpandedMacroReplacement, 2> replacementsVec;
@@ -418,8 +410,7 @@ resolveExecutableMacro(ASTContext &ctx,
                        Identifier moduleName, Identifier typeName) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   if (auto *execMacro = swift_ASTGen_resolveExecutableMacro(
-          moduleName.str().data(), moduleName.str().size(),
-          typeName.str().data(), typeName.str().size(), executablePlugin)) {
+          moduleName.get(), typeName.get(), executablePlugin)) {
     // Make sure we clean up after the macro.
     ctx.addCleanup(
         [execMacro]() { swift_ASTGen_destroyExecutableMacro(execMacro); });
@@ -1070,21 +1061,19 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     if (!astGenSourceFile)
       return nullptr;
 
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
+    BridgedString evaluatedSourceOut{nullptr, 0};
     swift_ASTGen_expandFreestandingMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->data(),
-        discriminator->size(),
+        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
+        &evaluatedSourceOut);
+    if (!evaluatedSourceOut.data)
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
+        toStringRef(evaluatedSourceOut),
         adjustMacroExpansionBufferName(*discriminator));
-    swift_ASTGen_freeString(evaluatedSourceAddress);
+    swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
 #else
     ctx.Diags.diagnose(loc, diag::macro_unsupported);
@@ -1349,25 +1338,20 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
+    BridgedString evaluatedSourceOut{nullptr, 0};
     swift_ASTGen_expandAttachedMacro(
         &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind),
-        discriminator->data(), discriminator->size(),
-        extendedType.data(), extendedType.size(),
-        conformanceList.data(), conformanceList.size(),
-        getRawMacroRole(role),
+        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
+        extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
-        astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceAddress,
-        &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
+        astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
+    if (!evaluatedSourceOut.data)
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        {evaluatedSourceAddress, (size_t)evaluatedSourceLength},
+        toStringRef(evaluatedSourceOut),
         adjustMacroExpansionBufferName(*discriminator));
-    swift_ASTGen_freeString(evaluatedSourceAddress);
+    swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
 #else
     attachedTo->diagnose(diag::macro_unsupported);
