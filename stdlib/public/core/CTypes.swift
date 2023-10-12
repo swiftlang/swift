@@ -207,6 +207,9 @@ extension OpaquePointer: Hashable {
   }
 }
 
+@available(*, unavailable)
+extension OpaquePointer : Sendable { }
+
 extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
@@ -296,6 +299,9 @@ extension CVaListPointer: CustomDebugStringConvertible {
 }
 
 #endif
+
+@available(*, unavailable)
+extension CVaListPointer: Sendable { }
 
 /// Copy `size` bytes of memory from `src` into `dest`.
 ///

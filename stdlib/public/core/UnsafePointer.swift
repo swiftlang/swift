@@ -1172,3 +1172,8 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     )._unsafelyUnwrappedUnchecked
   }
 }
+
+@available(*, unavailable)
+extension UnsafePointer: Sendable { }
+@available(*, unavailable)
+extension UnsafeMutablePointer: Sendable { }
