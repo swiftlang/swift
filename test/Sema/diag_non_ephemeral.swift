@@ -531,7 +531,7 @@ func tuplify<Ts>(_ fn: @escaping (Ts) -> Void) -> (Ts) -> Void { fn }
 
 func testTuplingNonEphemeral(_ ptr: UnsafePointer<Int>) {
   // Make sure we drop @_nonEphemeral when imploding params. This is to ensure
-  // we don't accidently break any potentially valid code.
+  // we don't accidentally break any potentially valid code.
   let fn = tuplify(takesTwoPointers)
   fn((ptr, ptr))
 
