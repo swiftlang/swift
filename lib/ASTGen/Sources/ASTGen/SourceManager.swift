@@ -5,7 +5,7 @@ import SwiftSyntaxMacros
 
 /// A source manager that keeps track of the source files in the program.
 class SourceManager {
-  init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
+  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
     self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 

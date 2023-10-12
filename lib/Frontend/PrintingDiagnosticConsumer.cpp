@@ -51,10 +51,11 @@ extern "C" void swift_ASTGen_addQueuedDiagnostic(
     const void **highlightRanges,
     ptrdiff_t numHighlightRanges
 );
-extern "C" void swift_ASTGen_renderQueuedDiagnostics(
-    void *queued, ssize_t contextSize, ssize_t colorize,
-    char **outBuffer, ssize_t *outBufferLength);
-extern "C" void swift_ASTGen_freeString(const char *str);
+extern "C" void
+swift_ASTGen_renderQueuedDiagnostics(void *queued, ssize_t contextSize,
+                                     ssize_t colorize,
+                                     BridgedString *renderedString);
+extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
 // file from here. Fix this egregious oversight!
@@ -496,14 +497,12 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
-    char *renderedString = nullptr;
-    ssize_t renderedStringLen = 0;
-    swift_ASTGen_renderQueuedDiagnostics(
-        queuedDiagnostics, /*contextSize=*/2, ForceColors ? 1 : 0,
-        &renderedString, &renderedStringLen);
-    if (renderedString) {
-      Stream.write(renderedString, renderedStringLen);
-      swift_ASTGen_freeString(renderedString);
+    BridgedString renderedString{nullptr, 0};
+    swift_ASTGen_renderQueuedDiagnostics(queuedDiagnostics, /*contextSize=*/2,
+                                         ForceColors ? 1 : 0, &renderedString);
+    if (renderedString.data) {
+      Stream.write((const char *)renderedString.data, renderedString.length);
+      swift_ASTGen_freeBridgedString(renderedString);
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);
     queuedDiagnostics = nullptr;

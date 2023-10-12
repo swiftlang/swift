@@ -40,6 +40,40 @@ extension String {
   }
 }
 
+/// Allocate a copy of the given string as a UTF-8 string.
+func allocateBridgedString(
+  _ string: String,
+  nullTerminated: Bool = false
+) -> BridgedString {
+  var string = string
+  return string.withUTF8 { utf8 in
+    let capacity = utf8.count + (nullTerminated ? 1 : 0)
+    let ptr = UnsafeMutablePointer<UInt8>.allocate(
+      capacity: capacity
+    )
+    if let baseAddress = utf8.baseAddress {
+      ptr.initialize(from: baseAddress, count: utf8.count)
+    }
+
+    if nullTerminated {
+      ptr[utf8.count] = 0
+    }
+
+    return BridgedString(data: ptr, length: utf8.count)
+  }
+}
+
+@_cdecl("swift_ASTGen_freeBridgedString")
+public func freeBridgedString(bridged: BridgedString) {
+  bridged.data?.deallocate()
+}
+
+extension BridgedString {
+  var isEmptyInitialized: Bool {
+    return self.data == nil && self.length == 0
+  }
+}
+
 extension SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
