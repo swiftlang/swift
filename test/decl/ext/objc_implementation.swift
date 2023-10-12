@@ -412,8 +412,8 @@ protocol EmptySwiftProto {}
   func nullableResult() -> Any { fatalError() } // expected-warning {{instance method 'nullableResult()' of type '() -> Any' does not match type '() -> Any?' declared by the header}}
   func nullableArgument(_: Any) {} // expected-warning {{instance method 'nullableArgument' of type '(Any) -> ()' does not match type '(Any?) -> Void' declared by the header}}
 
-  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be implicitly @objc because its result type cannot be represented in Objective-C}}
-  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be implicitly @objc because the type of the parameter cannot be represented in Objective-C}}
+  func nonPointerResult() -> CInt! { fatalError() } // expected-error{{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because its result type cannot be represented in Objective-C}}
+  func nonPointerArgument(_: CInt!) {} // expected-error {{method cannot be in an @_objcImplementation extension of a class (without final or @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
 }
 
 @_objcImplementation extension ObjCImplSubclass {

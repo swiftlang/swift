@@ -1818,7 +1818,7 @@ Type ExtensionDecl::getExtendedType() const {
 }
 
 bool ExtensionDecl::isObjCImplementation() const {
-  return getAttrs().hasAttribute<ObjCImplementationAttr>();
+  return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
 llvm::Optional<Identifier>

@@ -51,6 +51,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::MemberOfObjCImplementationExtension:
     return DiagnosticBehavior::Unspecified;
 
   case ObjCReason::ExplicitlyIBInspectable:
@@ -88,6 +89,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::MemberOfObjCImplementationExtension:
   case ObjCReason::ExplicitlyObjCByAccessNote:
     return static_cast<unsigned>(reason);
 
@@ -137,6 +139,7 @@ void ObjCReason::describe(const Decl *D) const {
   case ObjCReason::MemberOfObjCExtension:
   case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCImplementationExtension:
   case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     // No additional note required.
@@ -1463,9 +1466,12 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   }
 
   // A member implementation of an @objcImplementation extension is @objc.
-  if (VD->isObjCMemberImplementation())
-    // FIXME: New ObjCReason::Kind?
-    return ObjCReason(ObjCReason::ImplicitlyObjC);
+  if (VD->isObjCMemberImplementation()) {
+    auto ext = VD->getDeclContext()->getAsDecl();
+    auto attr = ext->getAttrs()
+                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+  }
 
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
