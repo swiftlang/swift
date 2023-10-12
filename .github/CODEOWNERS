@@ -61,6 +61,7 @@
 /include/swift/AST/*Requirement*                   @hborla @slavapestov
 /include/swift/AST/*Substitution*                  @slavapestov
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
+/include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
 /include/swift/ClangImporter                       @zoecarver @hyp @egorzhdan
 /include/swift/DependencyScan                      @artemcm
 /include/swift/Driver                              @artemcm
