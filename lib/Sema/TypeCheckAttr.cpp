@@ -253,6 +253,7 @@ public:
 
   void visitCDeclAttr(CDeclAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
+  void visitExternAttr(ExternAttr *attr);
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
 
@@ -2061,6 +2062,13 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
     }
     break;
   }
+  }
+}
+
+void AttributeChecker::visitExternAttr(ExternAttr *attr) {
+  // Only top-level func decls are currently supported.
+  if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext()) {
+    diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
   }
 }
 

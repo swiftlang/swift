@@ -437,6 +437,18 @@ the export name.
 
 It's the equivalent of clang's `__attribute__((export_name))`.
 
+## `@_extern(<language>)`
+
+Indicates that a particular declaration should be imported
+from the external environment.
+
+### `@_extern(wasm, module: <"moduleName">, name: <"fieldName">)`
+
+Indicates that a particular declaration should be imported
+through WebAssembly's import interface.
+
+It's the equivalent of clang's `__attribute__((import_module("module"), import_name("field")))`.
+
 ## `@_fixed_layout`
 
 Same as `@frozen` but also works for classes.

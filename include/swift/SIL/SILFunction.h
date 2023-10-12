@@ -303,6 +303,9 @@ private:
   /// empty.
   StringRef WasmExportName;
 
+  /// Name of a Wasm import module and field if @_extern(wasm) attribute
+  llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
+
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
   ProfileCounter EntryCount;
@@ -1277,6 +1280,24 @@ public:
   /// Return Wasm export name if @_expose(wasm) was used, otherwise empty
   StringRef wasmExportName() const { return WasmExportName; }
   void setWasmExportName(StringRef value) { WasmExportName = value; }
+
+  /// Return Wasm import module name if @_extern(wasm) was used otherwise empty
+  StringRef wasmImportModuleName() const {
+    if (WasmImportModuleAndField)
+      return WasmImportModuleAndField->first;
+    return StringRef();
+  }
+
+  /// Return Wasm import field name if @_extern(wasm) was used otherwise empty
+  StringRef wasmImportFieldName() const {
+    if (WasmImportModuleAndField)
+      return WasmImportModuleAndField->second;
+    return StringRef();
+  }
+
+  void setWasmImportModuleAndField(StringRef module, StringRef field) {
+    WasmImportModuleAndField = std::make_pair(module, field);
+  }
 
   /// Returns true if this function belongs to a declaration that returns
   /// an opaque result type with one or more availability conditions that are

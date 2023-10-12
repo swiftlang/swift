@@ -180,6 +180,10 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
   }
 
+  if (auto *EA = Attrs.getAttribute<ExternAttr>()) {
+    F->setWasmImportModuleAndField(EA->ModuleName, EA->Name);
+  }
+
   if (Attrs.hasAttribute<UsedAttr>())
     F->setMarkedAsUsed(true);
 
