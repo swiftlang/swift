@@ -3574,11 +3574,18 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
   if (!f->section().empty())
     fn->setSection(f->section());
+
+  llvm::AttrBuilder attrBuilder(getLLVMContext());
   if (!f->wasmExportName().empty()) {
-    llvm::AttrBuilder attrBuilder(getLLVMContext());
     attrBuilder.addAttribute("wasm-export-name", f->wasmExportName());
-    fn->addFnAttrs(attrBuilder);
   }
+  if (!f->wasmImportFieldName().empty()) {
+    attrBuilder.addAttribute("wasm-import-name", f->wasmImportFieldName());
+  }
+  if (!f->wasmImportModuleName().empty()) {
+    attrBuilder.addAttribute("wasm-import-module", f->wasmImportModuleName());
+  }
+  fn->addFnAttrs(attrBuilder);
 
   // Also mark as llvm.used any functions that should be kept for the debugger.
   // Only definitions should be kept.

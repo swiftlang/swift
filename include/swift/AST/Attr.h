@@ -2335,6 +2335,28 @@ public:
   }
 };
 
+/// Define the `@_extern` attribute, used to import external declarations in
+/// the specified way to interoperate with Swift.
+class ExternAttr : public DeclAttribute {
+public:
+  ExternAttr(StringRef ModuleName, StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+    : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
+      ModuleName(ModuleName), Name(Name) {}
+
+  ExternAttr(StringRef ModuleName, StringRef Name, bool Implicit)
+    : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Implicit) {}
+
+  /// The module name to import the named declaration in it
+  const StringRef ModuleName;
+
+  /// The declaration name to import
+  const StringRef Name;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Extern;
+  }
+};
+
 /// The `@_documentation(...)` attribute, used to override a symbol's visibility
 /// in symbol graphs, and/or adding arbitrary metadata to it.
 class DocumentationAttr: public DeclAttribute {
