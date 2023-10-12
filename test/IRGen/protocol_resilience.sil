@@ -55,19 +55,19 @@ import resilient_protocol
 // CHECK-SAME:   %swift.protocol_requirement { i32 {{(-1745420271)|(17)}}, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 {{(-544407535)|(17)}},
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (ptr @defaultC to [[INT]]),
+// CHECK-SAME:     {{(i32( | trunc \(i64 )sub \()?}}[[INT]] ptrtoint (ptr @defaultC to [[INT]])
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 {{(1717370897)|(17)}},
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (ptr @defaultD to [[INT]]),
+// CHECK-SAME:     {{(i32( | trunc \(i64 )sub \()?}}[[INT]] ptrtoint (ptr @defaultD to [[INT]])
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 {{(297926657)|(1)}},
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (ptr @defaultE to [[INT]]),
+// CHECK-SAME:     {{(i32( | trunc \(i64 )sub \()?}}[[INT]] ptrtoint (ptr @defaultE to [[INT]])
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 {{(351797249)|(1)}},
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (ptr @defaultF to [[INT]]),
+// CHECK-SAME:     {{(i32( | trunc \(i64 )sub \()?}}[[INT]] ptrtoint (ptr @defaultF to [[INT]])
 // CHECK-SAME:   }
 // CHECK-SAME: }
 

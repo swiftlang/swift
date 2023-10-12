@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -g -enable-objc-interop  -primary-file %s -emit-irgen -sil-verify-all | %IRGenFileCheck %s
 // RUN: %target-swift-frontend  -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
 
-// REQUIRES: concurrency
+// REQUIRES: concurrency, objc_codegen
 
 import Builtin
 import Swift

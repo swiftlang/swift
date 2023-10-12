@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
+// REQUIRES: objc_codegen
 
 sil_stage canonical
 

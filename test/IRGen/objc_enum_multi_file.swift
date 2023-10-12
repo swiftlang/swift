@@ -3,6 +3,7 @@
 
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
 // RUN: %target-swift-frontend -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
+// REQUIRES: objc_codegen
 
 #if IMPORT
 import objc_enum_multi_file_helper

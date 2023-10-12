@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -enable-objc-interop -import-objc-header %S/Inputs/c_functions.h -primary-file %s -O -emit-ir -disable-llvm-optzns | %FileCheck %s
+// REQUIRES: objc_codegen
 
 func return10() -> UInt32 {
 	return return7() + 3
