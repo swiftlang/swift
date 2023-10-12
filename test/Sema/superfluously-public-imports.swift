@@ -23,11 +23,9 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6
+// RUN:   -package-name pkg -Rmodule-api-import -swift-version 6 -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -swift-version 5
+// RUN:   -swift-version 5 -verify
 
 //--- DepUsedFromInlinableCode.swift
 public struct TypeUsedFromInlinableCode {}

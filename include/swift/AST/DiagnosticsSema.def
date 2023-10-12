@@ -2356,9 +2356,6 @@ ERROR(spi_only_imports_not_enabled, none,
       ())
 
 // Access level on imports
-ERROR(access_level_on_import_not_enabled, none,
-      "Access level on imports require '-enable-experimental-feature AccessLevelOnImport'",
-      ())
 ERROR(access_level_on_import_unsupported, none,
       "The access level %0 is unsupported on imports: "
       "only 'public', 'package', 'internal', 'fileprivate' and 'private' "
