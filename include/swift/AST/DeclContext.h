@@ -877,15 +877,6 @@ public:
   /// The resulting list of members will be stable across translation units.
   ArrayRef<Decl *> getABIMembers() const;
 
-  using DeclsForLowering =
-      OptionalTransformRange<ArrayRef<Decl *>,
-                             AvailableDuringLoweringDeclFilter<Decl>>;
-
-  /// Get all of the members within this context that should be included when
-  /// lowering to SIL/IR, including any implicitly-synthesized members. The
-  /// decls returned by \c getABIMembers() are a superset of these decls.
-  DeclsForLowering getMembersForLowering() const;
-
   /// Get all of the members within this context, including any
   /// implicitly-synthesized members.
   ///

@@ -797,8 +797,19 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
   return emittedFunctions.count(constant);
 }
 
-void SILGenModule::visit(Decl *D) {
+bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
+    return true;
+
+  if (getASTContext().SILOpts.SkipNonExportableDecls &&
+      !D->isExposedToClients())
+    return true;
+
+  return false;
+}
+
+void SILGenModule::visit(Decl *D) {
+  if (shouldSkipDecl(D))
     return;
 
   ASTVisitor::visit(D);
@@ -1412,6 +1423,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
+  assert(!shouldSkipDecl(fd));
+
   Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
 
   SILDeclRef::Loc decl = fd;
