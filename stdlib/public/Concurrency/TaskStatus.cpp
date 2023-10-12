@@ -518,7 +518,6 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
   return foundTaskGroupRecord;
 }
 
-//
 ///**************************************************************************/
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
@@ -526,6 +525,7 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 // SWIFT_CC(swift)
 ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   auto task = swift_task_getCurrent();
+  fprintf(stderr, "[%s:%d](%s) get task executor from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 
   if (!task)
     return ExecutorRef::generic(); // the default executor, meaning no preference

@@ -17,20 +17,21 @@ import Swift
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
-@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
+// @_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
 public func withExecutor<T: Sendable>(
   _ executor: any SerialExecutor, // FIXME: any Executor
-  operation: () async throws -> T
+  operation: @Sendable () async throws -> T
   ) async rethrows -> T {
   let executorBuiltin = executor.asUnownedSerialExecutor().executor
   let record = _pushTaskExecutorPreference(executorBuiltin)
   defer { _popTaskExecutorPreference(record: record) }
 
-#if compiler(>=5.5) && $BuiltinHopToExecutor
-  Builtin.hopToExecutor(executorBuiltin)
-#else
-  fatalError("Swift compiler is incompatible with this SDK version")
-#endif
+//#if compiler(>=5.5) && $BuiltinHopToExecutor
+//  await Builtin.hopToExecutor(executorBuiltin)
+//#else
+//  fatalError("Swift compiler is incompatible with this SDK version")
+//#endif
+//  executor.preconditionIsolated() // TODO: remove this once confident
 
   return try await operation()
 }
@@ -193,7 +194,7 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     let operation: (@Sendable () async -> Success) = {
-      await _operation() // TODO: will cause un-necessary hop instruction? Can be optimized away?
+      await _operation()
     }
 
     // Create the asynchronous task.
@@ -212,9 +213,8 @@ extension Task where Failure == Never {
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
-@usableFromInline
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-internal func _getPreferredTaskExecutor() -> Builtin.Executor
+public func _getPreferredTaskExecutor() -> Builtin.Executor
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
