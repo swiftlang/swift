@@ -136,8 +136,8 @@ extension TestActor {
   func callMutatingFunctionOnStruct() async {
     // expected-targeted-complete-warning @+4 {{passing argument of non-sendable type 'inout Point' outside of actor-isolated context may introduce data races}}
     // expected-error@+3:20{{cannot call mutating async function 'setComponents(x:y:)' on actor-isolated property 'position'}}
-    // expected-error@+2:51{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
-    // expected-error@+1:71{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+2:38{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
+    // expected-error@+1:58{{actor-isolated property 'nextPosition' cannot be passed 'inout' to 'async' function call}}
     await position.setComponents(x: &nextPosition.x, y: &nextPosition.y)
 
     // expected-targeted-complete-warning @+4 {{passing argument of non-sendable type 'inout Point' outside of actor-isolated context may introduce data races}}
@@ -263,5 +263,47 @@ struct Dog {
   mutating func woof() async {
     // This used to cause the compiler to crash, but should be fine
     await cat?.meow()
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func passToAsync(_: Int) async {}
+
+@available(SwiftStdlib 5.1, *)
+func wrapInClosure(
+  @_inheritActorContext _ block: @Sendable () async throws -> Void
+) async {}
+
+@available(SwiftStdlib 5.1, *)
+extension Array {
+  var mutateAsynchronously: Int {
+    mutating get async { 0 }
+  }
+
+  subscript(mutateAsynchronously i: Int) -> Int {
+    mutating get async { 0 }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ProtectArray {
+  var array: [Int] = []
+  // expected-note@-1 {{property declared here}}
+
+  func test() async {
+    // FIXME: this is invalid too!
+    _ = await array.mutateAsynchronously
+    // expected-targeted-complete-sns-warning@-1 {{non-sendable type '@lvalue [Int]' exiting actor-isolated context in call to non-isolated property 'mutateAsynchronously' cannot cross actor boundary}}
+
+    _ = await array[mutateAsynchronously: 0]
+    // expected-error@-1 {{actor-isolated property 'array' cannot be passed 'inout' to 'async' function call}}
+    // expected-targeted-complete-sns-warning@-2 {{non-sendable type 'inout Array<Int>' exiting actor-isolated context in call to non-isolated subscript 'subscript(mutateAsynchronously:)' cannot cross actor boundary}}
+
+    await passToAsync(array[0])
+
+    await wrapInClosure {
+      _ = array[0]
+      array.append(1)
+    }
   }
 }
