@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
+// REQUIRES: objc_codegen
 
 protocol A {}
 
