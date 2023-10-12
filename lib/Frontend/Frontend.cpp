@@ -233,6 +233,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SerializeExternalDeclsOnly =
       opts.SerializeExternalDeclsOnly;
 
+  serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
+
   return serializationOpts;
 }
 
