@@ -28,7 +28,7 @@ enum PluginError: String, Error, CustomStringConvertible {
 @_cdecl("swift_ASTGen_initializePlugin")
 public func _initializePlugin(
   opaqueHandle: UnsafeMutableRawPointer,
-  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
+  cxxDiagnosticEngine: UnsafeMutableRawPointer?
 ) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
   let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
@@ -57,9 +57,9 @@ public func _deinitializePlugin(
 @_cdecl("swift_ASTGen_pluginServerLoadLibraryPlugin")
 func swift_ASTGen_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
-  libraryPath: UnsafePointer<Int8>,
-  moduleName: UnsafePointer<Int8>,
-  cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?
+  libraryPath: UnsafePointer<CChar>,
+  moduleName: UnsafePointer<CChar>,
+  cxxDiagnosticEngine: UnsafeMutableRawPointer?
 ) -> Bool {
   let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
   let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
@@ -206,12 +206,12 @@ class PluginDiagnosticsEngine {
   private let bridgedDiagEngine: BridgedDiagnosticEngine
   private var exportedSourceFileByName: [String: UnsafePointer<ExportedSourceFile>] = [:]
 
-  init(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>) {
+  init(cxxDiagnosticEngine: UnsafeMutableRawPointer) {
     self.bridgedDiagEngine = BridgedDiagnosticEngine(raw: cxxDiagnosticEngine)
   }
 
   /// Failable convenience initializer for optional cxx engine pointer.
-  convenience init?(cxxDiagnosticEngine: UnsafeMutablePointer<UInt8>?) {
+  convenience init?(cxxDiagnosticEngine: UnsafeMutableRawPointer?) {
     guard let cxxDiagnosticEngine = cxxDiagnosticEngine else {
       return nil
     }
