@@ -233,6 +233,7 @@ static void printImports(raw_ostream &out,
                          ModuleDecl *M,
                          const llvm::SmallSet<StringRef, 4>
                            &AliasModuleNamesTargets) {
+  auto &ctx = M->getASTContext();
   // FIXME: This is very similar to what's in Serializer::writeInputBlock, but
   // it's not obvious what higher-level optimization would be factored out here.
   ModuleDecl::ImportFilter allImportFilter = {
@@ -290,7 +291,7 @@ static void printImports(raw_ostream &out,
     M->getMissingImportedModules(allImports);
 
   ImportedModule::removeDuplicates(allImports);
-  diagnoseScopedImports(M->getASTContext().Diags, allImports);
+  diagnoseScopedImports(ctx.Diags, allImports);
 
   // Collect the public imports as a subset so that we can mark them with
   // '@_exported'.
@@ -310,7 +311,7 @@ static void printImports(raw_ostream &out,
     // 'import Builtin' in the interface. '-parse-stdlib' still implicitly
     // imports it however...
     if (importedModule->isBuiltinModule() &&
-        !M->getASTContext().LangOpts.hasFeature(Feature::BuiltinModule)) {
+        !ctx.LangOpts.hasFeature(Feature::BuiltinModule)) {
       continue;
     }
 
@@ -348,7 +349,7 @@ static void printImports(raw_ostream &out,
         out << "@_spi(" << spiName << ") ";
     }
 
-    if (M->getASTContext().LangOpts.isSwiftVersionAtLeast(6)) {
+    if (ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault)) {
       out << "public ";
     }
 

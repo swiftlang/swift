@@ -1,5 +1,6 @@
 /// Check that only public imports are printed in modules interfaces,
 /// package imports and below are not.
+// REQUIRES: asserts
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -21,30 +22,57 @@
 // RUN:   -package-name TestPackage \
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -I %t \
 // RUN:   -module-name Client
 
-// RUN: %FileCheck %s < %t/Client.swiftinterface
-// RUN: %FileCheck %s < %t/Client.private.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-5 %s < %t/Client.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-5 %s < %t/Client.private.swiftinterface
 
 /// Build a client composed of many files.
 // RUN: %target-swift-frontend -typecheck %t/MultiFiles?.swift -I %t \
 // RUN:   -package-name TestPackage \
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -emit-module-interface-path %t/MultiFiles.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/MultiFiles.private.swiftinterface \
-// RUN:   -enable-experimental-feature AccessLevelOnImport
+// RUN:   -emit-private-module-interface-path %t/MultiFiles.private.swiftinterface
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles.swiftinterface) -I %t
 // RUN: %target-swift-typecheck-module-from-interface(%t/MultiFiles.private.swiftinterface) -I %t \
 // RUN:   -module-name MultiFiles
 
-// RUN: %FileCheck %s < %t/MultiFiles.swiftinterface
-// RUN: %FileCheck %s < %t/MultiFiles.private.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-5 %s < %t/MultiFiles.swiftinterface
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-5 %s < %t/MultiFiles.private.swiftinterface
+
+/// Swift 6 mode.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name TestPackage -module-name Client_Swift6 \
+// RUN:   -enable-library-evolution -swift-version 6 \
+// RUN:   -emit-module-interface-path %t/Client_Swift6.swiftinterface \
+// RUN:   -emit-private-module-interface-path %t/Client_Swift6.private.swiftinterface
+
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client_Swift6.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client_Swift6.private.swiftinterface) -I %t \
+// RUN:   -module-name Client_Swift6
+
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6 < %t/Client_Swift6.swiftinterface
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6 < %t/Client_Swift6.private.swiftinterface
+
+/// Feature flag.
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name TestPackage -module-name Client_FeatureFlag \
+// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -emit-module-interface-path %t/Client_FeatureFlag.swiftinterface \
+// RUN:   -emit-private-module-interface-path %t/Client_FeatureFlag.private.swiftinterface \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault
+
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client_FeatureFlag.swiftinterface) -I %t
+// RUN: %target-swift-typecheck-module-from-interface(%t/Client_FeatureFlag.private.swiftinterface) -I %t \
+// RUN:   -module-name Client_FeatureFlag
+
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6,CHECK-FLAG < %t/Client_FeatureFlag.swiftinterface
+// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-6,CHECK-FLAG < %t/Client_FeatureFlag.private.swiftinterface
 
 //--- PublicLib.swift
 //--- PackageLib.swift
@@ -53,6 +81,10 @@
 //--- PrivateLib.swift
 
 //--- Client.swift
+// CHECK-5-NOT: public
+// CHECK-FLAG: -enable-upcoming-feature InternalImportsByDefault
+// CHECK-6: public
+
 public import PublicLib
 // CHECK: PublicLib
 

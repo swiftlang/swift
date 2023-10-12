@@ -4,10 +4,8 @@
 // RUN: split-file --leading-lines %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -package-name pkg
 
 //--- PackageLib.swift

@@ -15,21 +15,17 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/MinimalClient.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -package-name TestPackage -swift-version 5 -verify
 // RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
-// RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -package-name TestPackage -swift-version 5 -verify
 
 /// Check diagnostics with library-evolution.
 // RUN: %target-swift-frontend -typecheck %t/MinimalClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-library-evolution -verify
 // RUN: %target-swift-frontend -typecheck %t/CompletenessClient.swift -I %t \
 // RUN:   -package-name TestPackage -swift-version 5 \
-// RUN:   -enable-library-evolution \
-// RUN:   -enable-experimental-feature AccessLevelOnImport -verify
+// RUN:   -enable-library-evolution -verify
 
 //--- PublicLib.swift
 public protocol PublicImportProto {
