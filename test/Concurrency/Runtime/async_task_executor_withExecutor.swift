@@ -40,10 +40,18 @@ final class CountEnqueuesSerialExecutor: SerialExecutor, CountingExecutor, @unch
 
 final class CountEnqueuesExecutor: CountingExecutor, @unchecked Sendable {
   var enqueueCount = 0
+  let queue: DispatchQueue
+
+  init(queue: DispatchQueue) {
+    self.queue = queue
+  }
 
   func enqueue(_ job: consuming ExecutorJob) {
     enqueueCount += 1
-    print("enqueue job")
+    let job = UnownedJob(job)
+    queue.async {
+     job.runSynchronously(on: self.asUnownedSerialExecutor())
+    }
   }
 }
 
@@ -69,9 +77,11 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
     if #available(SwiftStdlib 5.9, *) {
       let queue = DispatchQueue(label: "sample")
       let countingSerialExecutor = CountEnqueuesSerialExecutor(queue: queue)
+      let countingExecutor = CountEnqueuesExecutor(queue: queue)
 
       await testFromNonisolated(countingSerialExecutor)
 
+      MainActor.preconditionIsolated()
       await withExecutor(countingSerialExecutor) {
         // the block immediately hops to the expected executor
         countingSerialExecutor.preconditionIsolated()
@@ -79,16 +89,19 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
         print("OK: withExecutor body")
       }
 
-//      // A nonisolated async func must run on the expected executor,
-//      // rather than on the default global pool
-//      await withExecutor(countingSerialExecutor) {
-//        await nonisolatedAsyncMethod(expect: countingSerialExecutor)
-//        print("OK: nonisolated async func")
-//      }
-//
+      // A nonisolated async func must run on the expected executor,
+      // rather than on the default global pool
+      await withExecutor(countingSerialExecutor) {
+        await nonisolatedAsyncMethod(expect: countingSerialExecutor)
+        print("OK: nonisolated async func")
+      }
+
 //      // child tasks must be started on the same executor
-//      await withExecutor(countingSerialExecutor) {
-//
+//      await withExecutor(countingExecutor) {
+//        // the block immediately hops to the expected executor
+//        countingSerialExecutor.preconditionIsolated()
+//        dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+//        print("OK: withExecutor body")
 //      }
 
     }

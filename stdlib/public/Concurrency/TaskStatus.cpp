@@ -522,7 +522,6 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-// SWIFT_CC(swift)
 ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   auto task = swift_task_getCurrent();
   fprintf(stderr, "[%s:%d](%s) get task executor from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);

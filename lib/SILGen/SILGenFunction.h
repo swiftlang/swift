@@ -1122,10 +1122,6 @@ public:
   /// executor.
   SILValue emitGenericExecutor(SILLocation loc);
 
-  /// A nonisolated func may execute on a task's preferred executor,
-  /// or on the default generic concurrent executor if no preference is found.
-  SILValue emitGetNonisolatedFuncExecutor(SILLocation loc);
-
   /// Emit the executor value that corresponds to the main actor.
   SILValue emitMainExecutor(SILLocation loc);
 
