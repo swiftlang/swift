@@ -2440,7 +2440,7 @@ void swift::diagnoseUnnecessaryPublicImports(SourceFile &SF) {
         import.accessLevel <= AccessLevel::Internal)
       continue;
 
-    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(import);
+    AccessLevel levelUsed = SF.getMaxAccessLevelUsingImport(import.module.importedModule);
     if (import.accessLevel > levelUsed) {
       auto diagId = import.accessLevel == AccessLevel::Public ?
                                                   diag::remove_public_import :
