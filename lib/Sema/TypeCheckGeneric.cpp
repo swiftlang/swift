@@ -753,6 +753,28 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         inferenceSources.emplace_back(typeRepr, type);
       }
 
+      // Handle the thrown error type.
+      auto effectiveFunc = func ? func
+                                : subscr ? subscr->getEffectfulGetAccessor()
+                                : nullptr;
+      if (effectiveFunc) {
+        if (auto thrownTypeRepr = effectiveFunc->getThrownTypeRepr()) {
+          auto thrownOptions = baseOptions | TypeResolutionFlags::Direct;
+          const auto thrownType = resolution.withOptions(thrownOptions)
+              .resolveType(thrownTypeRepr);
+
+          // Add this type as an inference source.
+          inferenceSources.emplace_back(thrownTypeRepr, thrownType);
+
+          // Add conformance of this type to the Error protocol.
+          if (auto errorProtocol = ctx.getErrorDecl()) {
+            extraReqs.push_back(
+                Requirement(RequirementKind::Conformance, thrownType,
+                            errorProtocol->getDeclaredInterfaceType()));
+          }
+        }
+      }
+
       // Gather requirements from the result type.
       auto *resultTypeRepr = [&subscr, &func, &macro]() -> TypeRepr * {
         if (subscr) {

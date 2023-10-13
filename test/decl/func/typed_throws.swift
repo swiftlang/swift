@@ -33,7 +33,6 @@ func testThrownMyErrorType() {
 func throwsGeneric<T: Error>(errorType: T.Type) throws(T) { }
 
 func throwsBadGeneric<T>(errorType: T.Type) throws(T) { }
-// expected-error@-1{{thrown type 'T' does not conform to the 'Error' protocol}}
 
 func throwsUnusedInSignature<T: Error>() throws(T) { }
 // expected-error@-1{{generic parameter 'T' is not used in function signature}}
@@ -101,5 +100,26 @@ func testMapArray(numbers: [Int]) {
     _ = try mapArray(numbers) { (x) throws(MyError) in try addOrThrowMyError(x, 1) }
   } catch {
     let _: Int = error // expected-error{{cannot convert value of type 'MyError' to specified type 'Int'}}
+  }
+}
+
+// Inference of Error conformance from the use of a generic parameter in typed
+// throws.
+func requiresError<E: Error>(_: E.Type) { }
+
+func infersThrowing<E>(_ error: E.Type) throws(E) {
+  requiresError(error)
+}
+
+func infersThrowingNested<E>(_ body: () throws(E) -> Void) {
+  requiresError(E.self)
+}
+
+struct HasASubscript {
+  subscript<E>(_: E.Type) -> Int {
+    get throws(E) {
+      requiresError(E.self)
+      return 0
+    }
   }
 }
