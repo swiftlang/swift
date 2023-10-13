@@ -53,6 +53,8 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1297,15 +1299,28 @@ void Serializer::writeInputBlock() {
     off_t importedHeaderSize = 0;
     time_t importedHeaderModTime = 0;
     std::string contents;
-    if (!Options.ImportedHeader.empty()) {
+    auto importedHeaderPath = Options.ImportedHeader;
+    // We do not want to serialize the explicitly-specified .pch path if one was
+    // provided. Instead we write out the path to the original header source so
+    // that clients can consume it.
+    if (Options.ExplicitModuleBuild &&
+        llvm::sys::path::extension(importedHeaderPath)
+            .endswith(file_types::getExtension(file_types::TY_PCH)))
+      importedHeaderPath = clangImporter->getClangInstance()
+                               .getASTReader()
+                               ->getModuleManager()
+                               .lookupByFileName(importedHeaderPath)
+                               ->OriginalSourceFileName;
+
+    if (!importedHeaderPath.empty()) {
       contents = clangImporter->getBridgingHeaderContents(
-          Options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
+          importedHeaderPath, importedHeaderSize, importedHeaderModTime);
     }
     assert(publicImportSet.count(bridgingHeaderImport));
     ImportedHeader.emit(ScratchRecord,
                         publicImportSet.count(bridgingHeaderImport),
                         importedHeaderSize, importedHeaderModTime,
-                        Options.ImportedHeader);
+                        importedHeaderPath);
     if (!contents.empty()) {
       contents.push_back('\0');
       ImportedHeaderContents.emit(ScratchRecord, contents);
