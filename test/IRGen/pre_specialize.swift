@@ -168,3 +168,5 @@ public func testPrespecializedUse() {
 
   testSpecialization(AnotherThing())
 }
+// dynamic library with wasm is not supported yet
+// UNSUPPORTED: CPU=wasm32
