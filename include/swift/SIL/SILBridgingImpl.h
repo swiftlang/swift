@@ -140,6 +140,10 @@ bool BridgedType::isMoveOnly() const {
   return get().isMoveOnly();
 }
 
+bool BridgedType::isEscapable() const {
+  return get().isEscapable();
+}
+
 bool BridgedType::isOrContainsObjectiveCClass() const {
   return get().isOrContainsObjectiveCClass();
 }

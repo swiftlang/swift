@@ -1130,6 +1130,13 @@ bool SILType::isMarkedAsImmortal() const {
   return false;
 }
 
+bool SILType::isEscapable() const {
+  if (auto *nom = getASTType().getAnyNominal())
+    return nom->isEscapable();
+
+  return true;
+}
+
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
   auto *nominal = getNominalOrBoundGenericNominal();
   if (!nominal)
