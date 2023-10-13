@@ -81,7 +81,7 @@ extern "C" bool swift_ASTGen_initializePlugin(void *handle, void *diagEngine);
 extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
 extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *handle, const char *libraryPath, const char *moduleName,
-    void *diagEngine);
+    BridgedString *errorOut);
 
 static inline StringRef toStringRef(BridgedString bridged) {
   return {reinterpret_cast<const char *>(bridged.data), size_t(bridged.length)};
@@ -292,9 +292,8 @@ initializeExecutablePlugin(ASTContext &ctx,
 #if SWIFT_BUILD_SWIFT_SYNTAX
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
       return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "failed to initialize executable plugin '" +
-              StringRef(executablePlugin->getExecutablePath()) + "'");
+          llvm::inconvertibleErrorCode(), "'%s' produced malformed response",
+          executablePlugin->getExecutablePath().data());
     }
 
     // Resend the compiler capability on reconnect.
@@ -322,15 +321,20 @@ initializeExecutablePlugin(ASTContext &ctx,
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
+    BridgedString errorOut{nullptr, 0};
     bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
         executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
-        &ctx.Diags);
-    if (!loaded)
+        &errorOut);
+    if (!loaded) {
+      SWIFT_DEFER { swift_ASTGen_freeBridgedString(errorOut); };
       return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
-          "failed to load library plugin '" + resolvedLibraryPathStr +
-              "' in plugin server '" +
-              StringRef(executablePlugin->getExecutablePath()) + "'");
+          "failed to load library plugin '%s' in plugin server '%s'; %s",
+          resolvedLibraryPathStr.c_str(),
+          executablePlugin->getExecutablePath().data(), errorOut.data);
+    }
+
+    assert(errorOut.data == nullptr);
 
     // Set a callback to load the library again on reconnections.
     auto *callback = new std::function<void(void)>(
@@ -338,7 +342,7 @@ initializeExecutablePlugin(ASTContext &ctx,
           (void)swift_ASTGen_pluginServerLoadLibraryPlugin(
               executablePlugin, resolvedLibraryPathStr.c_str(),
               moduleNameStr.c_str(),
-              /*diags=*/nullptr);
+              /*errorOut=*/nullptr);
         });
     executablePlugin->addOnReconnect(callback);
 
@@ -359,7 +363,7 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
   PluginLoader &loader = ctx->getPluginLoader();
   const auto &entry = loader.lookupPluginByModuleName(moduleName);
 
-  std::string errorMessage;
+  SmallString<0> errorMessage;
 
   if (!entry.executablePath.empty()) {
     llvm::Expected<LoadedExecutablePlugin *> executablePlugin =
@@ -376,9 +380,12 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     }
     if (executablePlugin)
       return executablePlugin.get();
-    llvm::handleAllErrors(
-        executablePlugin.takeError(),
-        [&](const llvm::ErrorInfoBase &err) { errorMessage += err.message(); });
+    llvm::handleAllErrors(executablePlugin.takeError(),
+                          [&](const llvm::ErrorInfoBase &err) {
+                            if (!errorMessage.empty())
+                              errorMessage += ", ";
+                            errorMessage += err.message();
+                          });
   } else if (!entry.libraryPath.empty()) {
 
     llvm::Expected<LoadedLibraryPlugin *> libraryPlugin =
@@ -393,6 +400,8 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     } else {
       llvm::handleAllErrors(libraryPlugin.takeError(),
                             [&](const llvm::ErrorInfoBase &err) {
+                              if (!errorMessage.empty())
+                                errorMessage += ", ";
                               errorMessage += err.message();
                             });
     }
@@ -401,9 +410,8 @@ CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
     NullTerminatedStringRef err(errorMessage, *ctx);
     return CompilerPluginLoadResult::error(err);
   } else {
-    NullTerminatedStringRef errMsg("plugin that can handle module '" +
-                                       moduleName.str() + "' not found",
-                                   *ctx);
+    NullTerminatedStringRef errMsg(
+        "plugin for module '" + moduleName.str() + "' not found", *ctx);
     return CompilerPluginLoadResult::error(errMsg);
   }
 }
@@ -427,7 +435,7 @@ resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
           ExternalMacroDefinition::PluginKind::InProcess, inProcess};
     } else {
       NullTerminatedStringRef err(
-          "type '" + moduleName.str() + "." + typeName.str() +
+          "'" + moduleName.str() + "." + typeName.str() +
               "' is not a valid macro implementation type in library plugin '" +
               StringRef(plugin->getLibraryPath()) + "'",
           ctx);
@@ -435,14 +443,14 @@ resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
       return ExternalMacroDefinition::error(err);
     }
   }
-  NullTerminatedStringRef err("macro implementation type '" + moduleName.str() +
-                                  "." + typeName.str() +
+  NullTerminatedStringRef err("'" + moduleName.str() + "." + typeName.str() +
                                   "' could not be found in library plugin '" +
                                   StringRef(plugin->getLibraryPath()) + "'",
                               ctx);
   return ExternalMacroDefinition::error(err);
 #endif
-  return ExternalMacroDefinition::error("macro is not supported");
+  return ExternalMacroDefinition::error(
+      "the current compiler was not built with macro support");
 }
 
 static ExternalMacroDefinition
@@ -461,13 +469,14 @@ resolveExecutableMacro(ASTContext &ctx,
   // NOTE: this is not reachable because executable macro resolution always
   // succeeds.
   NullTerminatedStringRef err(
-      "macro implementation type '" + moduleName.str() + "." + typeName.str() +
+      "'" + moduleName.str() + "." + typeName.str() +
           "' could not be found in executable plugin" +
           StringRef(executablePlugin->getExecutablePath()),
       ctx);
   return ExternalMacroDefinition::error(err);
 #endif
-  return ExternalMacroDefinition::error("macro is not supported");
+  return ExternalMacroDefinition::error(
+      "the current compiler was not built with macro support");
 }
 
 ExternalMacroDefinition

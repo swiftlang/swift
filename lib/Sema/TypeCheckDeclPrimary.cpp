@@ -2075,7 +2075,7 @@ public:
       };
       auto externalDef =
           evaluateOrDefault(Ctx.evaluator, request,
-                            ExternalMacroDefinition::error("failed request"));
+                            ExternalMacroDefinition::error("unknown error"));
       if (externalDef.isError()) {
         MD->diagnose(diag::external_macro_not_found, external.moduleName.str(),
                      external.macroTypeName.str(), MD->getName(),

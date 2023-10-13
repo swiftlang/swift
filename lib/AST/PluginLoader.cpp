@@ -178,7 +178,7 @@ PluginLoader::loadLibraryPlugin(StringRef path) {
         plugin.takeError(), [&](const llvm::ErrorInfoBase &err) {
           return llvm::createStringError(
               err.convertToErrorCode(),
-              "compiler plugin not loaded: %s; loader error: %s",
+              "compiler plugin '%s' could not be loaded;  %s",
               resolvedPath.data(), err.message().data());
         });
   }
@@ -206,7 +206,7 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
         plugin.takeError(), [&](const llvm::ErrorInfoBase &err) {
           return llvm::createStringError(
               err.convertToErrorCode(),
-              "compiler plugin not loaded: %s; loader error: %s",
+              "compiler plugin '%s' could not be loaded: %s",
               resolvedPath.data(), err.message().data());
         });
   }

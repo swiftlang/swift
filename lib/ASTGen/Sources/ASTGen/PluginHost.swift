@@ -58,16 +58,12 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   libraryPath: UnsafePointer<CChar>,
   moduleName: UnsafePointer<CChar>,
-  cxxDiagnosticEngine: UnsafeMutableRawPointer?
+  errorOut: UnsafeMutablePointer<BridgedString>?
 ) -> Bool {
   let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
-  let diagEngine = PluginDiagnosticsEngine(cxxDiagnosticEngine: cxxDiagnosticEngine)
 
   if plugin.capability?.features.contains(.loadPluginLibrary) != true {
-    // This happens only if invalid plugin server was passed to `-external-plugin-path`.
-    diagEngine?.diagnose(
-      message: "compiler plugin not loaded: '\(libraryPath); invalid plugin server",
-      severity: .warning)
+    errorOut?.pointee = allocateBridgedString("compiler plugin not loaded: '\(libraryPath); invalid plugin server")
     return false
   }
   assert(plugin.capability?.features.contains(.loadPluginLibrary) == true)
@@ -81,12 +77,15 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
     guard case .loadPluginLibraryResult(let loaded, let diagnostics) = result else {
       throw PluginError.invalidReponseKind
     }
-    diagEngine?.emit(diagnostics);
-    return loaded
+    if loaded {
+      assert(diagnostics.isEmpty)
+      return true
+    }
+    var errorMsgs = diagnostics.map({$0.message}).joined(separator: ", ");
+    errorOut?.pointee = allocateBridgedString(errorMsgs);
+    return false
   } catch {
-    diagEngine?.diagnose(
-      message: "compiler plugin not loaded: '\(libraryPath); \(error)",
-      severity: .warning)
+    errorOut?.pointee = allocateBridgedString("\(error)")
     return false
   }
 }
