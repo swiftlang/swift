@@ -427,6 +427,27 @@ public:
   void cacheResult(bool value) const;
 };
 
+
+/// Determine whether the given declaration is escapable.
+class IsEscapableRequest
+    : public SimpleRequest<IsEscapableRequest, bool(ValueDecl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// Determine whether the given declaration is 'dynamic''.
 class IsDynamicRequest :
     public SimpleRequest<IsDynamicRequest,

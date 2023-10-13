@@ -2411,7 +2411,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-
+      if (!D->isEscapable()) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
     }

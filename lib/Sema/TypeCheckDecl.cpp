@@ -927,6 +927,13 @@ bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return false;
 }
 
+bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
+    return !decl->getAttrs().hasAttribute<NonEscapableAttr>();
+  }
+  return true;
+}
+
 bool
 IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(decl))
