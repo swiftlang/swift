@@ -3562,6 +3562,12 @@ bool ValueDecl::isMoveOnly() const {
                            getAttrs().hasAttribute<MoveOnlyAttr>());
 }
 
+bool ValueDecl::isEscapable() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsEscapableRequest{const_cast<ValueDecl *>(this)},
+                           !getAttrs().hasAttribute<NonEscapableAttr>());
+}
+
 bool ValueDecl::isDynamic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

@@ -7477,9 +7477,9 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, &isLet, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, &isLet, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           State, M) ||
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7531,7 +7531,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           SP, M))
+                           nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7601,7 +7601,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           VTableState, M))
+                           nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7712,7 +7712,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           moveOnlyDeinitTableState, M))
+                           nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8199,7 +8199,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           WitnessState, M))
+                           nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.
