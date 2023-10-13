@@ -498,6 +498,10 @@ bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
   return getFunction()->hasSemanticsAttr(attrName.get());
 }
 
+bool BridgedFunction::hasUnsafeNonEscapableResult() const {
+  return getFunction()->hasUnsafeNonEscapableResult();
+}
+
 BridgedFunction::EffectsKind BridgedFunction::getEffectAttribute() const {
   return (EffectsKind)getFunction()->getEffectsKind();
 }
