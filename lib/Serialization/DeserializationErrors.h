@@ -269,7 +269,7 @@ public:
 protected:
   DeclName name;
   Flags flags;
-  uint8_t numVTableEntries = 0;
+  uint8_t numTableEntries = 0;
 
 public:
   DeclName getName() const {
@@ -279,8 +279,8 @@ public:
   bool isDesignatedInitializer() const {
     return flags.contains(Flag::DesignatedInitializer);
   }
-  unsigned getNumberOfVTableEntries() const {
-    return numVTableEntries;
+  unsigned getNumberOfTableEntries() const {
+    return numTableEntries;
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
@@ -424,10 +424,10 @@ private:
 
 public:
   explicit OverrideError(DeclName name,
-                         Flags flags={}, unsigned numVTableEntries=0) {
+                         Flags flags={}, unsigned numTableEntries=0) {
     this->name = name;
     this->flags = flags;
-    this->numVTableEntries = numVTableEntries;
+    this->numTableEntries = numTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -489,11 +489,11 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError>,
 
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags={}, unsigned numVTableEntries=0)
+                     Flags flags={}, unsigned numTableEntries=0)
       : ErrorWithUnderlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
-    this->numVTableEntries = numVTableEntries;
+    this->numTableEntries = numTableEntries;
   }
 
   void diagnose(const ModuleFile *MF) const;
