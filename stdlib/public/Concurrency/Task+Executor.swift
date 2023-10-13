@@ -17,7 +17,7 @@ import Swift
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
-// @_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
 public func withExecutor<T: Sendable>(
   _ executor: any SerialExecutor, // FIXME: any Executor
   operation: @Sendable () async throws -> T
@@ -26,15 +26,36 @@ public func withExecutor<T: Sendable>(
   let record = _pushTaskExecutorPreference(executorBuiltin)
   defer { _popTaskExecutorPreference(record: record) }
 
+#if compiler(>=5.5) && $BuiltinHopToExecutor
+  await Builtin.hopToExecutor(executorBuiltin)
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
+  executor.preconditionIsolated() // TODO: remove this once confident
+
+  return try await operation()
+}
+
+//// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+//@available(SwiftStdlib 9999, *)
+//@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
+//public func withExecutor<T: Sendable>(
+//  _ executor: any Executor, // FIXME: any Executor
+//  operation: @Sendable () async throws -> T
+//  ) async rethrows -> T {
+//  let executorBuiltin = executor.asUnownedSerialExecutor().executor
+//  let record = _pushTaskExecutorPreference(executorBuiltin)
+//  defer { _popTaskExecutorPreference(record: record) }
+//
 //#if compiler(>=5.5) && $BuiltinHopToExecutor
 //  await Builtin.hopToExecutor(executorBuiltin)
 //#else
 //  fatalError("Swift compiler is incompatible with this SDK version")
 //#endif
 //  executor.preconditionIsolated() // TODO: remove this once confident
-
-  return try await operation()
-}
+//
+//  return try await operation()
+//}
 
 /// Task with specified executor ----------------------------------------------
 
