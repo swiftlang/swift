@@ -2161,18 +2161,35 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   if (funcTy->hasErrorResult()) {
     auto errorType =
         fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext());
-    auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
+    auto inContextErrorType =
+      IGF.CurSILFn->mapTypeIntoContext(errorType);
     bool isTypedError = fnConv.isTypedError();
-    if (isTypedError) {
+    bool isIndirectError = fnConv.hasIndirectSILErrorResults();
+
+    if (isTypedError && !isIndirectError) {
+      auto &errorTI = cast<FixedTypeInfo>(IGF.getTypeInfo(errorType));
       IGF.setCallerTypedErrorResultSlot(Address(
           emission->getCallerTypedErrorResultArgument(),
           errorTI.getStorageType(),
           errorTI.getFixedAlignment()));
+
+    } else if (isTypedError && isIndirectError) {
+
+      auto &errorTI = IGF.getTypeInfo(inContextErrorType);
+      auto ptr = emission->getCallerTypedErrorResultArgument();
+      auto addr = errorTI.getAddressForPointer(ptr);
+      auto indirectErrorArgIdx = fnConv.getNumIndirectSILResults();
+      auto errorArg = entry->getArguments()[indirectErrorArgIdx];
+      IGF.setLoweredAddress(errorArg, addr);
+      params = params.slice(1);
     }
+
     if (!funcTy->isAsync()) {
+      auto &errorTI = IGF.getTypeInfo(inContextErrorType);
       IGF.setCallerErrorResultSlot(
         Address(emission->getCallerErrorResultArgument(),
-                isTypedError ? IGF.IGM.Int8PtrTy : errorTI.getStorageType(),
+                isTypedError ? IGF.IGM.Int8PtrTy :
+                               cast<FixedTypeInfo>(errorTI).getStorageType(),
                 IGF.IGM.getPointerAlignment()));
     }
   }
@@ -3685,6 +3702,12 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   
   // Turn the formal SIL parameters into IR-gen things.
   for (auto index : indices(args)) {
+    if (origConv.hasIndirectSILErrorResults() &&
+        index == origConv.getNumIndirectSILResults()) {
+      auto addr = getLoweredAddress(args[index]);
+      emission->setIndirectTypedErrorResultSlot(addr.getAddress());
+      continue;
+    }
     emitApplyArgument(*this, args[index], emission->getParameterType(index),
                       llArgs);
   }
@@ -3752,9 +3775,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       // See below.
       Builder.CreateStore(nullError, calleeErrorSlot);
     }
-    auto hasTypedError = substConv.isTypedError();
+    auto hasTypedDirectError = substConv.isTypedError() &&
+      !substConv.hasIndirectSILErrorResults();
     llvm::BasicBlock *typedErrorLoadBB = nullptr;
-    if (hasTypedError) {
+    if (hasTypedDirectError) {
       typedErrorLoadBB = createBasicBlock("typed.error.load");
     }
 
@@ -3771,8 +3795,11 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     // Set up the PHI nodes on the error edge.
     if (!typedErrorLoadBB) {
-      assert(errorDest.phis.size() == 1);
-      errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
+      assert(errorDest.phis.size() == 1 ||
+             (substConv.hasIndirectSILErrorResults() &&
+              errorDest.phis.empty()));
+      if (errorDest.phis.size() == 1)
+        errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
     } else {
       Builder.emitBlock(typedErrorLoadBB);
 
@@ -4226,16 +4253,18 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
                               getSILModule());
   if (!isAsync()) {
-    Explosion errorResult = getLoweredExplosion(i->getOperand());
     if (conv.isTypedError()) {
-      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
-            IGM.getMaximalTypeExpansionContext())));
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
-      Builder.CreateStore(flag,
-                          getCallerErrorResultSlot());
-      ti.initialize(*this, errorResult, getCallerTypedErrorResultSlot(), false);
+      if (!conv.hasIndirectSILErrorResults()) {
+        Explosion errorResult = getLoweredExplosion(i->getOperand());
+        auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+              IGM.getMaximalTypeExpansionContext())));
+        ti.initialize(*this, errorResult, getCallerTypedErrorResultSlot(), false);
+      }
+      Builder.CreateStore(flag, getCallerErrorResultSlot());
     } else {
+      Explosion errorResult = getLoweredExplosion(i->getOperand());
       Builder.CreateStore(errorResult.claimNext(), getCallerErrorResultSlot());
     }
     // Async functions just return to the continuation.
@@ -4248,9 +4277,13 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     if (conv.isTypedError()) {
-      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
-            IGM.getMaximalTypeExpansionContext())));
-      ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
+      if (conv.hasIndirectSILErrorResults()) {
+        (void)exn.claimAll();
+      } else {
+        auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+              IGM.getMaximalTypeExpansionContext())));
+        ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
+      }
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
       assert(exn.empty() && "Unclaimed typed error results");

@@ -79,9 +79,12 @@ SILArgumentConvention
 SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   assert(index < getNumSILArguments());
 
+  auto numIndirectResults = getNumIndirectSILResults()
+    + getNumIndirectSILErrorResults();
+
   // If the argument is a parameter, index into the parameters.
-  if (index >= getNumIndirectSILResults()) {
-    auto param = funcTy->getParameters()[index - getNumIndirectSILResults()];
+  if (index >= numIndirectResults) {
+    auto param = funcTy->getParameters()[index - numIndirectResults];
     return SILArgumentConvention(param.getConvention());
   }
 
@@ -109,7 +112,8 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
     }
     index--;
   }
-  llvm_unreachable("mismatch with getNumIndirectSILResults()?");
+  assert(hasIndirectSILErrorResults());
+  return SILArgumentConvention::Indirect_Out;
 }
 
 //===----------------------------------------------------------------------===//

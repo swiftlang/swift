@@ -1842,12 +1842,17 @@ public:
     auto errorBB = AI->getErrorBB();
     require(calleeConv.funcTy->hasErrorResult(),
             "try_apply must call function with error result");
-    require(errorBB->args_size() == 1,
-            "error destination of try_apply must take one argument");
-    requireSameType((*errorBB->args_begin())->getType(),
-                    calleeConv.getSILErrorType(F.getTypeExpansionContext()),
-                    "error destination of try_apply must take argument "
-                    "of error result type");
+    if (calleeConv.getNumIndirectSILErrorResults()) {
+      require(errorBB->args_size() == 0,
+              "error destination of try_apply must take no argument");
+    } else {
+      require(errorBB->args_size() == 1,
+              "error destination of try_apply must take one argument");
+      requireSameType((*errorBB->args_begin())->getType(),
+                      calleeConv.getSILErrorType(F.getTypeExpansionContext()),
+                      "error destination of try_apply must take argument "
+                      "of error result type");
+    }
   }
 
   void checkBeginApplyInst(BeginApplyInst *AI) {
@@ -6019,6 +6024,7 @@ public:
         });
 
     require(entry->args_size() == (fnConv.getNumIndirectSILResults()
+                                   + fnConv.getNumIndirectSILErrorResults()
                                    + fnConv.getNumParameters()),
             "entry point has wrong number of arguments");
 
@@ -6059,6 +6065,13 @@ public:
       check("indirect result",
             fnConv.getSILType(result, F.getTypeExpansionContext()));
     }
+
+    if (fnConv.hasIndirectSILErrorResults()) {
+      assert(fnConv.isTypedError());
+      auto errorResult = fnConv.getSILErrorType(F.getTypeExpansionContext());
+      check("indirect error result", errorResult);
+    }
+
     for (auto param : F.getLoweredFunctionType()->getParameters()) {
       check("parameter", fnConv.getSILType(param, F.getTypeExpansionContext()));
     }
@@ -6066,7 +6079,8 @@ public:
     require(matched, "entry point argument types do not match function type");
 
     // TBAA requirement for all address arguments.
-    require(std::equal(entry->args_begin() + fnConv.getNumIndirectSILResults(),
+    require(std::equal(entry->args_begin() + fnConv.getNumIndirectSILResults()
+                       + fnConv.getNumIndirectSILErrorResults(),
                        entry->args_end(),
                        fnConv.funcTy->getParameters().begin(),
                        [&](SILArgument *bbarg, SILParameterInfo paramInfo) {

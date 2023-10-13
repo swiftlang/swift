@@ -4090,11 +4090,28 @@ bool TypeResolver::resolveSingleSILResult(
 
     // Recognize @error.
     if (attrs.has(TypeAttrKind::TAK_error)) {
+      assert(!isErrorResult);
       attrs.clearAttribute(TypeAttrKind::TAK_error);
       isErrorResult = true;
 
       // Error results are always implicitly @owned.
       convention = ResultConvention::Owned;
+    }
+    if (attrs.has(TypeAttrKind::TAK_error_indirect)) {
+      assert(!isErrorResult);
+      attrs.clearAttribute(TypeAttrKind::TAK_error_indirect);
+      isErrorResult = true;
+
+      // Indirect error results are always implicitly @out.
+      convention = ResultConvention::Indirect;
+    }
+    if (attrs.has(TypeAttrKind::TAK_error_unowned)) {
+      assert(!isErrorResult);
+      attrs.clearAttribute(TypeAttrKind::TAK_error_unowned);
+      isErrorResult = true;
+
+      // Indirect error results are always implicitly @out.
+      convention = ResultConvention::Unowned;
     }
 
     // Recognize `@noDerivative`.
@@ -4137,7 +4154,6 @@ bool TypeResolver::resolveSingleSILResult(
     return false;
   }
 
-  assert(!isErrorResult || convention == ResultConvention::Owned);
   SILResultInfo resolvedResult(type->getCanonicalType(), convention,
                                differentiability);
 

@@ -241,7 +241,8 @@ extension ASTGenVisitor {
           case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
                .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
                .sil_weak, .sil_unowned, .inout, .block_storage, .box,
-               .dynamic_self, .sil_unmanaged, .error, .direct, .inout_aliasable,
+               .dynamic_self, .sil_unmanaged, .error, .error_indirect,
+               .error_unowned, .direct, .inout_aliasable,
                .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
             fallthrough
 

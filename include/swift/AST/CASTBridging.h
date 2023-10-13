@@ -165,6 +165,8 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_sil_unowned,
   BridgedTypeAttrKind_sil_unmanaged,
   BridgedTypeAttrKind_error,
+  BridgedTypeAttrKind_error_indirect,
+  BridgedTypeAttrKind_error_unowned,
   BridgedTypeAttrKind_out,
   BridgedTypeAttrKind_direct,
   BridgedTypeAttrKind_in,

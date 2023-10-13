@@ -1860,9 +1860,9 @@ void SignatureExpansion::expandParameters(
       recordedABIDetails->hasErrorResult = true;
     if (getSILFuncConventions().isTypedError()) {
       ParamIRTypes.push_back(
-        IGM.getStorageType(getSILFuncConventions().getSILType(
-            FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext())
-          )->getPointerTo());
+          IGM.getStorageType(getSILFuncConventions().getSILType(
+              FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext())
+                            )->getPointerTo());
     }
   }
 
@@ -1962,7 +1962,7 @@ void SignatureExpansion::addIndirectThrowingResult() {
       getSILFuncConventions().isTypedError()) {
     auto resultType = getSILFuncConventions().getSILErrorType(
       IGM.getMaximalTypeExpansionContext());
-    const TypeInfo &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(resultType));
+    const TypeInfo &resultTI = IGM.getTypeInfo(resultType);
     auto storageTy = resultTI.getStorageType();
     ParamIRTypes.push_back(storageTy->getPointerTo());
   }
@@ -2401,17 +2401,24 @@ public:
     if (fnType->hasErrorResult()) {
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.
-      SILFunctionConventions fnConv(fnType, IGF.getSILModule());
+      auto substFnType = CurCallee.getSubstFunctionType();
+      SILFunctionConventions fnConv(substFnType, IGF.getSILModule());
       Address errorResultSlot = IGF.getCalleeErrorResultSlot(
           fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()),
           fnConv.isTypedError());
 
       assert(LastArgWritten > 0);
       if (fnConv.isTypedError()) {
-        // Return the error indirectly.
-        auto buf = IGF.getCalleeTypedErrorResultSlot(
-          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-        Args[--LastArgWritten] = buf.getAddress();
+        if (fnConv.hasIndirectSILErrorResults()) {
+          // We will set the value later when lowering the arguments.
+          setIndirectTypedErrorResultSlotArgsIndex(--LastArgWritten);
+          Args[LastArgWritten] = nullptr;
+        } else {
+          // Return the error indirectly.
+          auto buf = IGF.getCalleeTypedErrorResultSlot(
+            fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+          Args[--LastArgWritten] = buf.getAddress();
+        }
       }
       Args[--LastArgWritten] = errorResultSlot.getAddress();
       addParamAttribute(LastArgWritten, llvm::Attribute::NoCapture);
@@ -2718,9 +2725,15 @@ public:
       // don't need to do anything extra here.
       assert(LastArgWritten > 0);
       // Return the error indirectly.
-      auto buf = IGF.getCalleeTypedErrorResultSlot(
-        fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
-      Args[--LastArgWritten] = buf.getAddress();
+      if (fnConv.hasIndirectSILErrorResults()) {
+          // We will set the value later when lowering the arguments.
+          setIndirectTypedErrorResultSlotArgsIndex(--LastArgWritten);
+          Args[LastArgWritten] = nullptr;
+      } else {
+        auto buf = IGF.getCalleeTypedErrorResultSlot(
+          fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+        Args[--LastArgWritten] = buf.getAddress();
+      }
     }
 
     llvm::Value *contextPtr = CurCallee.getSwiftContext();
@@ -4718,14 +4731,15 @@ Explosion IRGenFunction::collectParameters() {
 Address IRGenFunction::createErrorResultSlot(SILType errorType, bool isAsync,
                                              bool setSwiftErrorFlag,
                                              bool isTypedError) {
-  auto &errorTI = cast<FixedTypeInfo>(getTypeInfo(errorType));
 
   IRBuilder builder(IGM.getLLVMContext(), IGM.DebugInfo != nullptr);
   builder.SetInsertPoint(AllocaIP->getParent(), AllocaIP->getIterator());
+
   auto errorStorageType = isTypedError ? IGM.Int8PtrTy :
-    errorTI.getStorageType();
+    cast<FixedTypeInfo>(getTypeInfo(errorType)).getStorageType();
   auto errorAlignment  = isTypedError ? IGM.getPointerAlignment() :
-    errorTI.getFixedAlignment();
+    cast<FixedTypeInfo>(getTypeInfo(errorType)).getFixedAlignment();
+
   // Create the alloca.  We don't use allocateStack because we're
   // not allocating this in stack order.
   auto addr = createAlloca(errorStorageType,
