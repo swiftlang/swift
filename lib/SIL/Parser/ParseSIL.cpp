@@ -1044,6 +1044,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsRuntimeAccessible_t *isRuntimeAccessible,
                                  ForceEnableLexicalLifetimes_t *forceEnableLexicalLifetimes,
                                  UseStackForPackMetadata_t *useStackForPackMetadata,
+                                 bool *hasUnsafeNonEscapableResult,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  SILFunction **usedAdHocRequirementWitness,
@@ -1089,6 +1090,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *forceEnableLexicalLifetimes = DoForceEnableLexicalLifetimes;
     else if (useStackForPackMetadata &&
              SP.P.Tok.getText() == "no_onstack_pack_metadata")
+      *useStackForPackMetadata = DoNotUseStackForPackMetadata;
+    else if (hasUnsafeNonEscapableResult &&
+             SP.P.Tok.getText() == "unsafe_nonescapable_result")
       *useStackForPackMetadata = DoNotUseStackForPackMetadata;
     else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
       *isExactSelfClass = IsExactSelfClass;
@@ -7201,6 +7205,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes =
       DoNotForceEnableLexicalLifetimes;
   UseStackForPackMetadata_t useStackForPackMetadata = DoUseStackForPackMetadata;
+  bool hasUnsafeNonEscapableResult = false;
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
@@ -7226,6 +7231,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isDistributed, &isRuntimeAccessible,
           &forceEnableLexicalLifetimes, &useStackForPackMetadata,
+          &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, &markedAsUsed,
@@ -7266,6 +7272,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setForceEnableLexicalLifetimes(
         forceEnableLexicalLifetimes);
     FunctionState.F->setUseStackForPackMetadata(useStackForPackMetadata);
+    FunctionState.F->setHasUnsafeNonEscapableResult(
+      hasUnsafeNonEscapableResult);
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
