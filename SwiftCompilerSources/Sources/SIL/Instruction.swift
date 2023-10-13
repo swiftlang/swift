@@ -353,7 +353,38 @@ final public class HopToExecutorInst : Instruction, UnaryInstruction {}
 
 final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 
-final public class DebugValueInst : Instruction, UnaryInstruction {}
+// VarDecl is a struct wrapper around a C++ VarDecl pointer. This insulates the Swift interface from the C++ interface and avoids the need to fake a Swift class. When the AST exposes VarDecl, then this can be replaced whenever it is convenient.
+public struct VarDecl {
+  var bridged: BridgedVarDecl
+  
+  public init?(bridged: OptionalBridgedVarDecl) {
+    guard let decl = bridged.decl else { return nil }
+    self.bridged = BridgedVarDecl(decl: decl)
+  }
+  
+  public var userFacingName: String { String(bridged.getUserFacingName()) }
+}
+
+// See C++ VarDeclCarryingInst
+public protocol VarDeclInstruction {
+  var varDecl: VarDecl? { get }
+}
+
+public protocol DebugVariableInstruction : VarDeclInstruction {
+  typealias DebugVariable = OptionalBridgedSILDebugVariable
+
+  var debugVariable: DebugVariable { get }
+}
+
+final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction {
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.DebugValue_getDecl())
+  }
+
+  public var debugVariable: DebugVariable {
+    return bridged.DebugValue_getVarInfo()
+  }
+}
 
 final public class DebugStepInst : Instruction {}
 
@@ -608,7 +639,11 @@ final public class DynamicFunctionRefInst : FunctionRefBaseInst {
 final public class PreviousDynamicFunctionRefInst : FunctionRefBaseInst {
 }
 
-final public class GlobalAddrInst : GlobalAccessInst {}
+final public class GlobalAddrInst : GlobalAccessInst, VarDeclInstruction {
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.GlobalAddr_getDecl())
+  }
+}
 
 final public class GlobalValueInst : GlobalAccessInst {
   public var isBare: Bool { bridged.GlobalValueInst_isBare() }
@@ -711,13 +746,17 @@ final public class SelectEnumInst : SingleValueInstruction {
   public var enumOperand: Operand { operands[0] }
 }
 
-final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction {
+final public class RefElementAddrInst : SingleValueInstruction, UnaryInstruction, VarDeclInstruction {
   public var instance: Value { operand.value }
   public var fieldIndex: Int { bridged.RefElementAddrInst_fieldIndex() }
 
   public var fieldIsLet: Bool { bridged.RefElementAddrInst_fieldIsLet() }
 
   public var isImmutable: Bool { bridged.RefElementAddrInst_isImmutable() }
+  
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.RefElementAddr_getDecl())
+  }
 }
 
 final public class RefTailAddrInst : SingleValueInstruction, UnaryInstruction {
@@ -942,8 +981,16 @@ final public class LinearFunctionInst: SingleValueInstruction, ForwardingInstruc
 
 public protocol Allocation : SingleValueInstruction { }
 
-final public class AllocStackInst : SingleValueInstruction, Allocation {
+final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
+
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.AllocStack_getDecl())
+  }
+
+  public var debugVariable: DebugVariable {
+    return bridged.AllocStack_getVarInfo()
+  }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
@@ -973,7 +1020,15 @@ final public class AllocRefDynamicInst : AllocRefInstBase {
   }
 }
 
-final public class AllocBoxInst : SingleValueInstruction, Allocation {
+final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVariableInstruction {
+
+  public var varDecl: VarDecl? {
+    VarDecl(bridged: bridged.AllocBox_getDecl())
+  }
+
+  public var debugVariable: DebugVariable {
+    return bridged.AllocBox_getVarInfo()
+  }
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
@@ -1002,6 +1057,10 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { bridged.BeginApplyInst_numArguments() }
 
   public var singleDirectResult: Value? { nil }
+
+  public var yieldedValues: Results {
+    Results(inst: self, numResults: resultCount - 1)
+  }
 }
 
 //===----------------------------------------------------------------------===//

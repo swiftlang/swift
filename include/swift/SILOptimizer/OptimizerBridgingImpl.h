@@ -172,6 +172,14 @@ BridgedNominalTypeDecl BridgedPassContext::getSwiftArrayDecl() const {
   return {mod->getASTContext().getArrayDecl()};
 }
 
+// AST
+
+SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+BridgedDiagEngine BridgedPassContext::getDiagnosticEngine() const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {&mod->getASTContext().Diags};
+}
+
 // SIL modifications
 
 BridgedBasicBlock BridgedPassContext::splitBlock(BridgedInstruction bridgedInst) const {
