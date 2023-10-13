@@ -17,6 +17,7 @@
 // Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
 // (under OptimizerBridging) andrequired header files should be added there.
 //
+#include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -176,6 +177,11 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNominalTypeDecl getSwiftArrayDecl() const;
+
+  // AST
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  BridgedDiagEngine getDiagnosticEngine() const;
 
   // SIL modifications
 
