@@ -5906,7 +5906,14 @@ ASTContext::SILTransformCtors ASTContext::getIRGenSILTransforms() const {
 }
 
 std::string ASTContext::getEntryPointFunctionName() const {
-  return LangOpts.entryPointFunctionName;
+  // Set default entry point name
+  //
+  // Usually the main entrypoint is "main" but WebAssembly's C ABI uses
+  // "__main_argc_argv" for `int (int, char **)` signature and Swift's
+  // main entrypoint always takes argc/argv.
+  // See https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md
+  std::string defaultName = LangOpts.Target.isWasm() ? "__main_argc_argv" :  "main";
+  return LangOpts.entryPointFunctionName.value_or(defaultName);
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

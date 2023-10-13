@@ -37,7 +37,7 @@ class OptionalInoutFuncType {
   }
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32 %0, ptr %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @{{main|__main_argc_argv}}(i32 %0, ptr %1)
 // CHECK: call void @llvm.lifetime.start
 // CHECK: call void @llvm.memcpy
 // CHECK: call void @llvm.lifetime.end
