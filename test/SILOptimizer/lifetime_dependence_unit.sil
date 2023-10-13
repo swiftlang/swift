@@ -44,6 +44,10 @@ struct NE : ~Escapable {
   var d: D
 }
 
+struct NEWrap : ~Escapable {
+  var ne: NE
+}
+
 sil @coroutine : $@yield_once @convention(method) (@guaranteed NE) -> @yields @guaranteed NE
 
 sil @capture : $@convention(thin) (@guaranteed NE) -> ()
@@ -298,4 +302,19 @@ bb0(%0 : @owned $NE):
   destroy_value %closure : $@callee_guaranteed () -> ()
   %99 = tuple ()
   return %99: $()
+}
+
+// CHECK-LABEL: dependence_forward: lifetime_dependence_use with: %0
+// CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NEWrap
+// CHECK-NEXT: dependence_forward: lifetime_dependence_use with: %0
+sil [ossa] @dependence_forward : $@convention(thin) (@owned NE) -> () {
+bb0(%0 : @owned $NE):
+  specify_test "lifetime_dependence_use %0"
+  %1 = struct $NEWrap(%0 : $NE)
+  %2 = copyable_to_moveonlywrapper [owned] %1 : $NEWrap
+  %3 = moveonlywrapper_to_copyable [owned] %2 : $@moveOnly NEWrap
+  destroy_value %3 : $NEWrap
+  %99 = tuple()
+  return %99 : $()
 }

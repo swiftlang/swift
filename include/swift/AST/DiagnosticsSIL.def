@@ -934,11 +934,21 @@ ERROR(deinit_not_visible, none,
 
 ERROR(lifetime_value_outside_scope, none,
       "lifetime-dependent value escapes its scope", ())
+
 ERROR(vector_capacity_not_constant, none,
       "vector capacity needs to be constant", ())
 
 ERROR(fixed_arrays_not_available, none,
       "fixed arrays are only available with -enable-experimental-feature FixedArrays", ())
+
+ERROR(lifetime_variable_outside_scope, none,
+      "lifetime-dependent variable '%0' escapes its scope", (Identifier))
+NOTE(lifetime_outside_scope_parent, none,
+     "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_use, none,
+     "this use of the lifetime-dependent value is out of scope", ())
+NOTE(lifetime_outside_scope_escape, none,
+     "this use causes the lifetime-dependent value to escape", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

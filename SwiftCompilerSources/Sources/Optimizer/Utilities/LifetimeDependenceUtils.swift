@@ -186,6 +186,33 @@ extension LifetimeDependence {
     self.scope = scope
     self.dependentValue = markDep
   }
+
+  /// Compute the range of the dependence scope.
+  ///
+  /// Returns nil if the dependence scope covers the entire function
+  /// or if 'dependentValue' is part of the parent's forwarded
+  /// lifetime.
+  ///
+  /// Note: The caller must deinitialize the returned range.
+  func computeRange(_ context: Context) -> InstructionRange? {
+    if dependentValue.isForwarded(from: parentValue) {
+      return nil
+    }
+    return scope.computeRange(context)
+  }
+}
+
+private extension Value {
+  func isForwarded(from: Value) -> Bool {
+    if self == from {
+      return true
+    }
+    if let forward = self.forwardingInstruction,
+       let singleOp = forward.singleForwardedOperand {
+      return singleOp.value.isForwarded(from: from)
+    }
+    return false
+  }
 }
 
 extension LifetimeDependence.Scope {
@@ -325,6 +352,7 @@ extension LifetimeDependence.Scope {
       }
       return range
     case let .owned(value):
+      // FIXME: This should compute forwarded liveness instead.
       return computeLinearLiveness(for: value, context)
     case let .initialized(value):
       return LifetimeDependence.Scope.computeInitializedRange(value: value,
