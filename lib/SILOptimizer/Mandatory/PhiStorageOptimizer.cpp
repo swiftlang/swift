@@ -168,7 +168,14 @@ void CoalescedPhi::coalesce(PhiValue phi,
 void PhiStorageOptimizer::optimize() {
   // The single incoming value case always projects storage.
   if (auto *predecessor = phi.phiBlock->getSinglePredecessorBlock()) {
-    coalescedPhi.coalescedOperands.push_back(phi.getOperand(predecessor));
+    if (canCoalesceValue(phi.getValue()->getIncomingPhiValue(predecessor))) {
+      // Storage will always be allocated for the phi.  The optimization
+      // attempts to let incoming values reuse the phi's storage.  This isn't
+      // always possible, even in the single incoming value case.  For example,
+      // it isn't possible when the incoming value is a function argument or
+      // when the incoming value is already a projection.
+      coalescedPhi.coalescedOperands.push_back(phi.getOperand(predecessor));
+    }
     return;
   }
   for (auto *incomingPred : phi.phiBlock->getPredecessorBlocks()) {

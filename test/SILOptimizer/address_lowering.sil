@@ -1427,8 +1427,10 @@ nopers(%error : @owned $any Error):
 
 // CHECK-LABEL: sil [ossa] @f262_testTryApplyIntoPhi : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
-// CHECK:         try_apply undef<R>([[ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
-// CHECK:       [[NORMAL]](%2 : $()):                                    
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         try_apply undef<R>([[STACK]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{%[^,]+}} : $()):
+// CHECK:         copy_addr [take] [[STACK]] to [init] [[ADDR]]
 // CHECK:         br [[EXIT:bb[0-9]+]]                                          
 // CHECK:       [[EXIT]]:                                              
 // CHECK:         return {{%[^,]+}} : $()                                 
