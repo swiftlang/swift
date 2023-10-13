@@ -361,7 +361,11 @@ public struct VarDecl {
     guard let decl = bridged.decl else { return nil }
     self.bridged = BridgedVarDecl(decl: decl)
   }
-  
+
+  public var sourceLoc: SourceLoc? {
+    return SourceLoc(bridged: bridged.getSourceLocation())
+  }
+
   public var userFacingName: String { String(bridged.getUserFacingName()) }
 }
 

@@ -144,6 +144,8 @@ struct BridgedNominalTypeDecl {
 struct BridgedVarDecl {
   const swift::VarDecl * _Nonnull decl;
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc getSourceLocation() const;
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getUserFacingName() const;
 };
 

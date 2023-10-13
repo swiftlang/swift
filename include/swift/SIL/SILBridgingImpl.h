@@ -231,6 +231,11 @@ bool BridgedNominalTypeDecl::isGlobalActor() const { return decl->isGlobalActor(
 //                                BridgedVarDecl
 //===----------------------------------------------------------------------===//
 
+BridgedSourceLoc BridgedVarDecl::getSourceLocation() const {
+  swift::SourceLoc sourceLoc = decl->getNameLoc();
+  return BridgedSourceLoc(sourceLoc.getOpaquePointerValue());
+}
+
 BridgedStringRef BridgedVarDecl::getUserFacingName() const {
   return decl->getBaseName().userFacingName();
 }
