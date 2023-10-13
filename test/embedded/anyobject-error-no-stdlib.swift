@@ -13,6 +13,6 @@ public typealias AnyObject = Builtin.AnyObject
 precedencegroup AssignmentPrecedence { assignment: true }
 
 public func foo(_ x: AnyObject) {
-  _ = type(of: x) // expected-error {{Existential type 'AnyObject' is unavailable in embedded Swift}}
+  _ = type(of: x) // expected-error {{using values of protocol type 'AnyObject' is not allowed in embedded Swift}}
   // expected-note@-1 {{called from here}}
 }
