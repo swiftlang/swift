@@ -6614,6 +6614,8 @@ void AttributeChecker::visitKnownToBeLocalAttr(KnownToBeLocalAttr *attr) {
 
 void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
 
+  auto dc = D->getDeclContext();
+
   if ((isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D)) &&
       !isAsyncDecl(cast<ValueDecl>(D))) {
     auto value = cast<ValueDecl>(D);
@@ -6623,6 +6625,15 @@ void AttributeChecker::visitSendableAttr(SendableAttr *attr) {
           attr, diag::sendable_isolated_sync_function,
           isolation, value)
         .warnUntilSwiftVersion(6);
+    }
+  }
+  // Prevent Sendable Attr from being added to methods of non-sendable types
+  if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (auto selfdecl = funcDecl->getImplicitSelfDecl()) {
+      if (!isSendableType(dc->getParentModule(), selfdecl->getTypeInContext())) {
+        diagnose(attr->getLocation(), diag::nonsendable_instance_method)
+        .warnUntilSwiftVersion(6);
+      }
     }
   }
 }
