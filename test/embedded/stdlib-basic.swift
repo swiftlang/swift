@@ -35,7 +35,6 @@ public func checks(n: Int) {
   if n < 0 { assertionFailure("with message") }
 }
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
 // CHECK: define {{.*}}i1 @"$s4main4boolSbyF"()
 // CHECK: define {{.*}}i1 @"$sSb22_builtinBooleanLiteralSbBi1__tcfC"(i1 %0)
 // CHECK: define {{.*}}{{i32|i64}} @"$s4main3intSiyF"()

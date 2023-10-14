@@ -18,6 +18,8 @@ struct MyStruct {}
 
 extension MyStruct: MyProtocol {}
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+public func test() {}
+
+// CHECK: define {{.*}}@"$s4Main4testyyF"()
 // CHECK-NOT: MyStruct
 // CHECK-NOT: MyProtocol

@@ -37,7 +37,6 @@ public func main() {
   moduleMain()
 }
 
-// CHECK: define {{.*}}@main{{.*}} {
 // CHECK: define {{.*}}void @"$s4Main4mainyyF"{{.*}} {
 // CHECK: define {{.*}}void @"$s8MyModule10moduleMainyyF"{{.*}} {
 // CHECK: define {{.*}}void @"$s8MyModule8ConcreteVACycfC"{{.*}} {

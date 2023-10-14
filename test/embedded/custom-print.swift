@@ -23,5 +23,11 @@ public func print(_ s: StaticString, terminator: StaticString = "\n") {
   }
 }
 
-print("Hello, Embedded Swift!")
+@main
+struct Main {
+  static func main() {
+    print("Hello, Embedded Swift!")
+  }
+}
+
 // CHECK: Hello, Embedded Swift!

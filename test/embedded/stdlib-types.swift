@@ -38,6 +38,4 @@ public func test() {
   let o = unmanaged2.takeUnretainedValue()
 }
 
-test()
-
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// CHECK: define {{.*}}@"$s4main4testyyF"()

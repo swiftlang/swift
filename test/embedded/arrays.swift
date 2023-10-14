@@ -52,4 +52,9 @@ func test() {
   print(c) // CHECK: [8, 4, 2]
 }
 
-test()
+@main
+struct Main {
+  static func main() {
+    test()
+  }
+}

@@ -87,4 +87,9 @@ func foo() {
     print(bytes.min()!) // CHECK: -1
 }
 
-foo()
+@main
+struct Main {
+  static func main() {
+    foo()
+  }
+}

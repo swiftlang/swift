@@ -71,4 +71,9 @@ func test() {
   // CHECK-NEXT: [42, 2, 3, 4, 5]
 }
 
-test()
+@main
+struct Main {
+  static func main() {
+    test()
+  }
+}

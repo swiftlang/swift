@@ -42,7 +42,7 @@ extension Bool: Protocol {}
 
 extension GenericType: Protocol {}
 
-public func main() {
+func test() {
   nonGenericFunc()
   _ = genericFunc(Bool())
   _ = NonGenericType()
@@ -51,12 +51,18 @@ public func main() {
   protocolBoundFunc(GenericType<Bool>(Bool()))
 }
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+@main
+struct Main {
+  static func main() {
+    test()
+  }
+}
+
 // CHECK: define {{.*}}void @"$s4Main4BoolVACycfC"()
-// CHECK: define {{.*}}void @"$s4Main4mainyyF"()
 // CHECK: define {{.*}}void @"$s8MyModule14nonGenericFuncyyF"()
 // CHECK: define {{.*}}void @"$s8MyModule11genericFuncyxxlF4Main4BoolV_Tg5"()
 // CHECK: define {{.*}}void @"$s8MyModule14NonGenericTypeVACycfC"()
 // CHECK: define {{.*}}void @"$s8MyModule11GenericTypeVyACyxGxcfC4Main4BoolV_Tgm5"()
 // CHECK: define {{.*}}void @"$s8MyModule17protocolBoundFuncyyxAA8ProtocolRzlF4Main4BoolV_Tg5"()
 // CHECK: define {{.*}}void @"$s8MyModule17protocolBoundFuncyyxAA8ProtocolRzlFAA11GenericTypeVy4Main4BoolVG_Tg5"()
+// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)

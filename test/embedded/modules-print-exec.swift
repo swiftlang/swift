@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
+// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang %t/a.o %t/print.o -o %t/a.out
@@ -46,4 +46,9 @@ func test() {
   print(42, terminator: "\n") // CHECK-NEXT: 42
 }
 
-test()
+@main
+struct Main {
+  static func main() {
+    test()
+  }
+}

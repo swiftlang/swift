@@ -16,4 +16,4 @@ public func baz<T>(n: T) {
     let x: ContiguousArray<Int> = .init(repeating: 0, count: 1)
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: !llvm.module.flags =
