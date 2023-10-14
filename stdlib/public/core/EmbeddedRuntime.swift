@@ -154,12 +154,18 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
 }
 
 @_silgen_name("swift_release")
-public func swift_release(object: UnsafeMutablePointer<HeapObject>?) {
+public func swift_release(object: Builtin.RawPointer) {
   swift_release_n(object: object, n: 1)
 }
 
 @_silgen_name("swift_release_n")
-public func swift_release_n(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
+public func swift_release_n(object: Builtin.RawPointer, n: UInt32) {
+  if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
+  let o = UnsafeMutablePointer<HeapObject>(object)
+  swift_release_n_(object: o, n: n)
+}
+
+public func swift_release_n_(object: UnsafeMutablePointer<HeapObject>?, n: UInt32) {
   guard let object else {
     return
   }
