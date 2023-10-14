@@ -209,7 +209,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency-${mod}
       swift_Concurrency
       STATIC
-      IS_STDLIB
+      IS_STDLIB IS_FRAGILE
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       # TODO: Only a handful of Swift Concurrency .swift sources, for now.
