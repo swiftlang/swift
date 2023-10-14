@@ -353,9 +353,9 @@ ERROR(global_must_be_compile_time_const,none,
 ERROR(non_final_generic_class_function,none,
       "classes cannot have non-final generic fuctions in embedded Swift", ())
 ERROR(embedded_swift_existential_type,none,
-      "using values of protocol type %0 is not allowed in embedded Swift", (Type))
+      "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
-      "using values of protocol types is not allowed in embedded Swift", ())
+      "cannot use a value of protocol type in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 
