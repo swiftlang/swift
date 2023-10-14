@@ -6,7 +6,7 @@
 // REQUIRES: swift_in_compiler
 
 import _Differentiation
-#if os(Linux)
+#if canImport(Glibc)
 import Glibc
 #else
 import Foundation
