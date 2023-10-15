@@ -1195,11 +1195,16 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
+    // Look up the catch node for this "throw" to determine the error type.
+    CatchNode catchNode = ASTScope::lookupCatchNode(
+        DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
-    if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
-      errorType = TheFunc->getThrownErrorType();
+    if (catchNode) {
+      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
+          .value_or(Type());
     }
 
+    // If there was no error type, use 'any Error'. We'll check it later.
     if (!errorType) {
       errorType = getASTContext().getErrorExistentialType();
     }

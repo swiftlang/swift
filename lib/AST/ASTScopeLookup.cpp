@@ -712,3 +712,30 @@ void ASTScopeImpl::lookupEnclosingMacroScope(
 
   } while ((scope = scope->getParent().getPtrOrNull()));
 }
+
+CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
+  auto sourceFile = module->getSourceFileContainingLocation(loc);
+  if (!sourceFile)
+    return nullptr;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(
+      module, loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  // Look for a body scope that's the
+  const BraceStmtScope *innerBodyScope = nullptr;
+  for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
+    // If we are at a catch node and in the body of the region from which that
+    // node catches thrown errors, we have our result.
+    auto caught = scope->getCatchNodeBody();
+    if (caught.first && caught.second == innerBodyScope) {
+      return caught.first;
+    }
+
+    innerBodyScope = scope->getAsBraceStmtScope().getPtrOrNull();
+  }
+
+  return nullptr;
+}

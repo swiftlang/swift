@@ -11398,3 +11398,32 @@ MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
       expansion->getPoundLoc(), expansion->getDeclContext());
 }
+
+llvm::Optional<Type>
+CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
+  if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
+    if (auto thrownError = func->getEffectiveThrownErrorType())
+      return func->mapTypeIntoContext(*thrownError);
+
+    return llvm::None;
+  }
+
+  if (auto closure = dyn_cast<AbstractClosureExpr *>()) {
+    if (closure->getType())
+      return closure->getEffectiveThrownType();
+
+    // FIXME: Should we lazily compute this?
+    return llvm::None;
+  }
+
+  auto doCatch = get<DoCatchStmt *>();
+  if (auto thrownError = doCatch->getCaughtErrorType()) {
+    if (thrownError->isNever())
+      return llvm::None;
+
+    return thrownError;
+  }
+
+  // If we haven't computed the error type yet, do so now.
+  return ctx.getErrorExistentialType();
+}
