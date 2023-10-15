@@ -8973,17 +8973,27 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there are generic params.
     auto genericResults = maybeParseGenericParams()
       .getPtrOrNull();
-    if (genericResults && !genericResults->getParams().empty()) {
-      
+    auto enumDecl = dyn_cast<EnumDecl>(CurDeclContext);
+    if (genericResults && !genericResults->getParams().empty() && enumDecl) {
       auto genericParamDecl = genericResults->getParams().front();
       
-      auto enumDecl = dyn_cast<EnumDecl>(CurDeclContext);
+      std::string fixStr;
+      llvm::raw_string_ostream OS(fixStr);
+      genericResults->print(OS);
       
-      SourceLoc fixLoc = enumDecl->getNameLoc()
-        .getAdvancedLoc(enumDecl->getName().getLength());
-      
-      diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
-        .fixItInsert(fixLoc, "<" + genericParamDecl->getNameStr().str() + ">");
+      // Check if enum is already generic.
+      auto enumGenericParams = enumDecl->getGenericParams();
+      if (enumGenericParams && !enumGenericParams->getParams().empty()) {
+        diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
+          .fixItReplace(enumGenericParams->getSourceRange(), fixStr)
+          .fixItRemove(genericResults->getSourceRange());
+      } else {
+        SourceLoc insertLoc = enumDecl->getNameLoc()
+          .getAdvancedLoc(enumDecl->getName().getLength());
+        diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
+          .fixItInsert(insertLoc, fixStr)
+          .fixItRemove(genericResults->getSourceRange());
+      }
     }
 
     // See if there's a following argument type.
