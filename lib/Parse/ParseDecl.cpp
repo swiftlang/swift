@@ -8974,8 +8974,16 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     auto genericResults = maybeParseGenericParams()
       .getPtrOrNull();
     if (genericResults && !genericResults->getParams().empty()) {
-      auto genericLoc = genericResults->getParams().front()->getStartLoc();
-      diagnose(genericLoc, diag::generic_param_cant_be_used_in_enum_case_decl);
+      
+      auto genericPargit stamDecl = genericResults->getParams().front();
+      
+      auto enumDecl = dyn_cast<EnumDecl>(CurDeclContext);
+      
+      SourceLoc fixLoc = enumDecl->getNameLoc()
+        .getAdvancedLoc(enumDecl->getName().getLength());
+      
+      diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
+        .fixItInsert(fixLoc, "<" + genericParamDecl->getNameStr().str() + ">");
     }
 
     // See if there's a following argument type.
