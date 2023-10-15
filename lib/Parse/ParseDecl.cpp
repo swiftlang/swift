@@ -8975,7 +8975,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       .getPtrOrNull();
     if (genericResults && !genericResults->getParams().empty()) {
       
-      auto genericPargit stamDecl = genericResults->getParams().front();
+      auto genericParamDecl = genericResults->getParams().front();
       
       auto enumDecl = dyn_cast<EnumDecl>(CurDeclContext);
       
