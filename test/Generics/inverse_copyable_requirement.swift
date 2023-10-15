@@ -279,7 +279,7 @@ struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conf
   func give() -> Ty {}
 }
 
-func doBadMetatypeStuff<T>(_ t: T) { // expected-note@:25 {{generic parameter 'T' has an implicit Copyable requirement}}
+func doBadMetatypeStuff<T>(_ t: T) {
   let y = t as! Any.Type
   if let MO_MetaType = y as? MO.Type { // expected-warning {{cast from 'any Any.Type' to unrelated type 'MO.Type' always fails}}
     let x = MO_MetaType.init()
@@ -287,7 +287,7 @@ func doBadMetatypeStuff<T>(_ t: T) { // expected-note@:25 {{generic parameter 'T
   }
 }
 func tryToDoBadMetatypeStuff() {
-  doBadMetatypeStuff(MO.self) // expected-error {{metatype 'MO.Type' of noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'doBadMetatypeStuff'}}
+  doBadMetatypeStuff(MO.self)
 }
 
 func packingHeat<each T>(_ t: repeat each T) {} // expected-note {{generic parameter 'each T' has an implicit Copyable requirement}}
