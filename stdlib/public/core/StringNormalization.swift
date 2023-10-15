@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
-
 extension Unicode.Scalar {
   // Normalization boundary - a place in a string where everything left of the
   // boundary can be normalized independently from everything right of the
