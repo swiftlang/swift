@@ -23,7 +23,7 @@ public func catching1() {
   }
 }
 
-// CHECK-EXISTENTIALS: error: existential can cause metadata allocation or locks
+// CHECK-EXISTENTIALS: error: cannot use a value of protocol type 'any Error' in embedded Swift
 
 // CHECK-TRAPS-SIL:      sil @$s4main9throwing1SiyKF : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK-TRAPS-SIL-NEXT: bb0:

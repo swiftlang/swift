@@ -4,6 +4,6 @@ public protocol Player {}
 struct Concrete: Player {}
 
 public func test() -> any Player {
-  Concrete() // expected-error {{existential can cause metadata allocation or locks}}
+  Concrete() // expected-error {{cannot use a value of protocol type 'any Player' in embedded Swift}}
   // expected-note@-1 {{called from here}}
 }

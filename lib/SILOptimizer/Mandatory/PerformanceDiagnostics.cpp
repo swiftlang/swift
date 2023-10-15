@@ -356,7 +356,11 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   if (module.getOptions().EmbeddedSwift &&
       impact & RuntimeEffect::Existential) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
-    diagnose(loc, diag::performance_metadata, "existential");
+    if (impactType) {
+      diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
+    } else {
+      diagnose(loc, diag::embedded_swift_existential);
+    }
     return true;
   }
 
