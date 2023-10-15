@@ -36,6 +36,7 @@ extension SerialExecutor {
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -72,6 +73,7 @@ extension Actor {
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public nonisolated func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -108,6 +110,7 @@ extension GlobalActor {
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public static func preconditionIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -134,6 +137,7 @@ extension SerialExecutor {
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -167,6 +171,7 @@ extension Actor {
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public nonisolated func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -201,6 +206,7 @@ extension GlobalActor {
   ///   may assume that it *always* evaluates to `true`. Failure to satisfy that
   ///   assumption is a serious programming error.
   @available(SwiftStdlib 5.9, *)
+  @_unavailableInEmbedded
   public static func assertIsolated(
       _ message: @autoclosure () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
@@ -229,6 +235,7 @@ extension Actor {
   /// perspective, the serial executor guarantees mutual exclusion of those two actors.
   @available(SwiftStdlib 5.9, *)
   @_unavailableFromAsync(message: "express the closure as an explicit function declared on the specified 'actor' instead")
+  @_unavailableInEmbedded
   public nonisolated func assumeIsolated<T>(
       _ operation: (isolated Self) throws -> T,
       file: StaticString = #fileID, line: UInt = #line

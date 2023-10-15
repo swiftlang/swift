@@ -4484,44 +4484,9 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
-llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
-                                   llvm::Value *taskGroup,
-                                   llvm::Value *futureResultType,
-                                   llvm::Value *taskFunction,
-                                   llvm::Value *localContextInfo,
-                                   SubstitutionMap subs) {
-  // Start with empty task options.
-  llvm::Value *taskOptions =
-      llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
-
-  // If there is a task group, emit a task group option structure to contain it.
-  if (taskGroup) {
-    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
-    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
-        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
-
-    auto optionsRecord = IGF.createAlloca(
-        IGF.IGM.SwiftTaskGroupTaskOptionRecordTy, Alignment(),
-        "task_group_options");
-    auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
-        optionsRecord, 0, Size());
-
-    // Flags
-    IGF.Builder.CreateStore(
-        optionsFlagsVal,
-        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
-    // Parent
-    IGF.Builder.CreateStore(
-        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
-    // TaskGroup
-    IGF.Builder.CreateStore(
-        taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
-
-    taskOptions = IGF.Builder.CreateBitOrPointerCast(
-        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
-  }
-
-  // In embedded Swift, create and pass result type info.
+llvm::Value *irgen::addEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                                   llvm::Value *taskOptions,
+                                                   SubstitutionMap subs) {
   if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     auto optionsRecord =
         IGF.createAlloca(IGF.IGM.SwiftResultTypeInfoTaskOptionRecordTy,
@@ -4575,6 +4540,48 @@ llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
   }
+  return taskOptions;
+}
+
+llvm::Value *irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+                                   llvm::Value *taskGroup,
+                                   llvm::Value *futureResultType,
+                                   llvm::Value *taskFunction,
+                                   llvm::Value *localContextInfo,
+                                   SubstitutionMap subs) {
+  // Start with empty task options.
+  llvm::Value *taskOptions =
+      llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+
+  // If there is a task group, emit a task group option structure to contain it.
+  if (taskGroup) {
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
+    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
+        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    auto optionsRecord = IGF.createAlloca(
+        IGF.IGM.SwiftTaskGroupTaskOptionRecordTy, Alignment(),
+        "task_group_options");
+    auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
+        optionsRecord, 0, Size());
+
+    // Flags
+    IGF.Builder.CreateStore(
+        optionsFlagsVal,
+        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    // Parent
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+    // TaskGroup
+    IGF.Builder.CreateStore(
+        taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
+  }
+
+  // In embedded Swift, create and pass result type info.
+  taskOptions = addEmbeddedSwiftResultTypeInfo(IGF, taskOptions, subs);
 
   assert(futureResultType && "no future?!");
   llvm::CallInst *result = IGF.Builder.CreateCall(

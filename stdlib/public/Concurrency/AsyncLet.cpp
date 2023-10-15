@@ -393,7 +393,11 @@ static void _asyncLet_finish_continuation(
 
   // Destroy the error, or the result that was stored to the buffer.
   if (error) {
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     swift_errorRelease((SwiftError*)error);
+    #endif
   } else {
     alet->getTask()->futureFragment()->getResultType().vw_destroy(resultBuffer);
   }

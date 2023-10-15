@@ -840,7 +840,6 @@ extension Task where Failure == Error {
 // ==== Voluntary Suspension -----------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
-@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
 
   /// Suspends the current task and allows other tasks to execute.
