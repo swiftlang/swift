@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -c -g -Xllvm -verify-di-holes=true %s
 
 // Every so often this test crashes the linker on Linux
+// REQUIRES: rdar87254800
 
 // https://github.com/apple/swift/issues/57869
 // Differentiable functions with control flow yield an assertion failure
