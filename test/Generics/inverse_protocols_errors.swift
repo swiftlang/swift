@@ -3,7 +3,8 @@
 // REQUIRES: asserts
 
 protocol RegularProto {}
-protocol NCProto: ~Copyable, RegularProto { // FIXME: diagnose the ~Copyable annotation when it's implied.
+protocol NCProto: ~Copyable, RegularProto {
+  // expected-warning@-1 {{protocol 'NCProto' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
   func checkIfCopyableSelf(_ s: Self)
 }
 
@@ -40,3 +41,9 @@ struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 }
+
+struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
+// expected-error@-1 {{duplicate inverse constraint}}
+// expected-note@-2 {{previous inverse constraint here}}
+
+protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}

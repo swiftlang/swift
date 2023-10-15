@@ -1783,11 +1783,13 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
 
     if (EnabledNoncopyableGenerics) {
       // For any protocol 'P', there is an implied requirement 'Self: Copyable',
-      // unless it was suppressed via `Self: ~Copyable`; so skip if present.
+      // unless it was suppressed via `Self: ~Copyable`. So if this suppression
+      // annotation exists yet Copyable was implied anyway, emit a diagnostic.
       if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
-        continue;
+        if (!proto->isNoncopyable())
+          continue; // no ~Copyable annotation
 
-      // TODO: report that something implied Copyable despite writing ~Copyable?
+      // TODO(kavon): emit tailored error diagnostic to remove the ~Copyable
     }
 
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol

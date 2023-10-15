@@ -942,21 +942,6 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
 
   assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
 
-  // For protocols, inspect its generic signature for a Copyable requirement
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    auto *copyableProto = ctx.getProtocol(KnownProtocolKind::Copyable);
-    if (!copyableProto)
-      llvm_unreachable("missing Copyable protocol!");
-
-    auto sig = proto->getGenericSignature();
-    auto requiresCopyable =
-        sig->requiresProtocol(proto->getSelfInterfaceType(), copyableProto);
-
-    // TODO: report that something implied Copyable despite writing ~Copyable?
-
-    return !requiresCopyable;
-  }
-
   // Handle the legacy '@_moveOnly' attribute
   if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
@@ -1006,6 +991,52 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
       continue; // diagnosed elsewhere.
 
     foundInverse(repr->getLoc(), *kp);
+  }
+
+  // Check the where-clause for a constraint Subject: ~Copyable where Subject
+  // refers to the where-clause owner.
+
+  Type owner;
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    owner = proto->getSelfInterfaceType();
+  } else if (auto *nom = dyn_cast<NominalTypeDecl>(decl)) {
+    owner = nom->getDeclaredInterfaceType();
+  }
+  // TODO(kavon): handle other TypeDecls
+
+
+  // Checks a requirement in a where-clause
+  auto checkRequirement = [&](const Requirement &req,
+                              RequirementRepr *repr) -> bool {
+    if (req.getKind() != RequirementKind::Conformance)
+      return false;
+
+    auto constraintTyRepr = repr->getConstraintRepr();
+    if (!dyn_cast_or_null<InverseTypeRepr>(constraintTyRepr))
+      return false;
+
+    auto kp = req.getSecondType()->getKnownProtocol();
+    if (!kp)
+      return false; // diagnosed elsewhere.
+
+    auto subject = req.getFirstType();
+    if (!subject)
+      return false;
+
+    if (subject->getCanonicalType() == owner->getCanonicalType())
+      foundInverse(constraintTyRepr->getLoc(), *kp);
+
+    return false;
+  };
+
+  if (owner) {
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      WhereClauseOwner(nominal).visitRequirements(TypeResolutionStage::Structural,
+                                                  checkRequirement);
+    } else if (auto *assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
+      WhereClauseOwner(assocTy).visitRequirements(TypeResolutionStage::Structural,
+                                                  checkRequirement);
+    }
   }
 
   return !defaults.contains(KnownProtocolKind::Copyable);
