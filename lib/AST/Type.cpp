@@ -523,7 +523,7 @@ bool TypeBase::isDistributedActor() {
 }
 
 llvm::Optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
-  if (auto protoTy = this->castTo<ProtocolType>())
+  if (auto protoTy = this->getAs<ProtocolType>())
     if (auto protoDecl = protoTy->getDecl())
       return protoDecl->getKnownProtocolKind();
 

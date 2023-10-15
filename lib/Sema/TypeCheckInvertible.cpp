@@ -254,6 +254,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
     return false;
   }
 
+  assert(!isa<ProtocolDecl>(nominal) || !isa<BuiltinTupleDecl>(nominal));
   return false;
 }
 
