@@ -8985,14 +8985,14 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       auto enumGenericParams = enumDecl->getGenericParams();
       if (enumGenericParams && !enumGenericParams->getParams().empty()) {
         diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
-          .fixItReplace(enumGenericParams->getSourceRange(), fixStr)
-          .fixItRemove(genericResults->getSourceRange());
+          .fixItRemove(genericResults->getSourceRange())
+          .fixItReplace(enumGenericParams->getSourceRange(), fixStr);
       } else {
         SourceLoc insertLoc = enumDecl->getNameLoc()
           .getAdvancedLoc(enumDecl->getName().getLength());
         diagnose(genericParamDecl->getStartLoc(), diag::generic_param_cant_be_used_in_enum_case_decl)
-          .fixItInsert(insertLoc, fixStr)
-          .fixItRemove(genericResults->getSourceRange());
+          .fixItRemove(genericResults->getSourceRange())
+          .fixItInsert(insertLoc, fixStr);
       }
     }
 
