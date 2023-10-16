@@ -600,6 +600,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginBorrow:
     os << "BeginBorrow";
     return;
+  case Kind::StoreBorrow:
+    os << "StoreBorrow";
+    return;
   case Kind::BeginApply:
     os << "BeginApply";
     return;
@@ -649,6 +652,7 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::Invalid:
     llvm_unreachable("Using invalid case");
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::StoreBorrow:
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack: {
@@ -677,6 +681,20 @@ bool BorrowingOperand::visitScopeEndingUses(
     bool deadBorrow = true;
     for (auto *use : cast<BeginBorrowInst>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
+        deadBorrow = false;
+        if (!func(use))
+          return false;
+      }
+    }
+    // FIXME: special case for dead borrows. This is dangerous because clients
+    // only expect visitScopeEndingUses to return false if the visitor returned
+    // false.
+    return !deadBorrow;
+  }
+  case BorrowingOperandKind::StoreBorrow: {
+    bool deadBorrow = true;
+    for (auto *use : cast<StoreBorrowInst>(op->getUser())->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
         deadBorrow = false;
         if (!func(use))
           return false;
@@ -763,6 +781,7 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() const {
   case BorrowingOperandKind::Yield:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::StoreBorrow:
     return BorrowedValue();
 
   case BorrowingOperandKind::BeginBorrow: {
@@ -792,6 +811,7 @@ SILValue BorrowingOperand::getScopeIntroducingUserResult() {
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::StoreBorrow:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BeginApply:
