@@ -2343,25 +2343,25 @@ public:
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
 public:
-  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+  ExternAttr(llvm::Optional<StringRef> ModuleName, llvm::Optional<StringRef> Name,
              SourceLoc AtLoc, SourceRange Range, ExternKind Kind, bool Implicit)
       : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
         ModuleName(ModuleName), Name(Name) {
     Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
   }
 
-  ExternAttr(std::optional<StringRef> ModuleName, std::optional<StringRef> Name,
+  ExternAttr(llvm::Optional<StringRef> ModuleName, llvm::Optional<StringRef> Name,
              ExternKind Kind, bool Implicit)
       : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Kind,
                    Implicit) {}
 
   /// The module name to import the named declaration in it
   /// Used for Wasm import declaration.
-  const std::optional<StringRef> ModuleName;
+  const llvm::Optional<StringRef> ModuleName;
 
   /// The declaration name to import
   /// std::nullopt if the declaration name is not specified with @_extern(c)
-  const std::optional<StringRef> Name;
+  const llvm::Optional<StringRef> Name;
 
   /// Returns the kind of extern.
   ExternKind getExternKind() const {

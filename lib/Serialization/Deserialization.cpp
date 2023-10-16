@@ -5864,7 +5864,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             scratch, isImplicit, rawKind, moduleNameSize, declNameSize);
 
         ExternKind kind = (ExternKind)rawKind;
-        std::optional<StringRef> moduleName, declName;
+        llvm::Optional<StringRef> moduleName, declName;
 
         switch (kind) {
         case ExternKind::C: {

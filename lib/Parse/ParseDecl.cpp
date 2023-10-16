@@ -1450,7 +1450,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   }
 
   auto parseStringLiteralArgument =
-      [&](std::optional<StringRef> fieldName) -> std::optional<StringRef> {
+      [&](std::optional<StringRef> fieldName) -> llvm::Optional<StringRef> {
     if (!consumeIf(tok::comma)) {
       diagnose(Loc, diag::attr_expected_comma, AttrName,
                DeclAttribute::isDeclModifier(DAK_Extern));
@@ -1489,7 +1489,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
 
   // Parse @_extern(wasm, module: "x", name: "y") or @_extern(c[, "x"])
   ExternKind kind;
-  std::optional<StringRef> importModuleName, importName;
+  llvm::Optional<StringRef> importModuleName, importName;
 
   if (kindTok.getText() == "wasm") {
     kind = ExternKind::Wasm;
