@@ -1605,6 +1605,15 @@ static ValueDecl *getTargetOSVersionAtLeast(ASTContext &Context,
   return getBuiltinFunction(Id, {int32Type, int32Type, int32Type}, int32Type);
 }
 
+static ValueDecl *getBuildOrdinaryExecutorRef(ASTContext &ctx,
+                                                    Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _conformsTo(_typeparam(0), _executorProtocol)),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
 static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2925,6 +2934,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::BuildDefaultActorExecutorRef:
     return getBuildDefaultActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildOrdinaryExecutorRef:
+    return getBuildOrdinaryExecutorRef(Context, Id);
 
   case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     return getBuildOrdinarySerialExecutorRef(Context, Id);

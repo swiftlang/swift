@@ -49,9 +49,9 @@ final class CountEnqueuesExecutor: CountingExecutor, @unchecked Sendable {
   func enqueue(_ job: consuming ExecutorJob) {
     enqueueCount += 1
     let job = UnownedJob(job)
-    queue.async {
-     job.runSynchronously(on: self.asUnownedSerialExecutor())
-    }
+//    queue.async {
+//     job.runSynchronously(on: self.asUnownedSerialExecutor())
+//    }
   }
 }
 
@@ -96,7 +96,7 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
         print("OK: nonisolated async func")
       }
 
-//      // child tasks must be started on the same executor
+      // TODO: implement handling Executor and not just SerialExecutor
 //      await withExecutor(countingExecutor) {
 //        // the block immediately hops to the expected executor
 //        countingSerialExecutor.preconditionIsolated()

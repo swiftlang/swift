@@ -1025,6 +1025,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffP
 // autoDiffAllocateSubcontextWithType: (Builtin.NativeObject, T.Type) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiffAllocateSubcontextWithType", "", Special)
 
+/// Build a Builtin.Executor value from an "ordinary" serial executor reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryExecutorRef,
+                                   "buildOrdinaryExecutorRef", "n", Special)
+
 /// Build a Builtin.Executor value from an "ordinary" serial executor
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
