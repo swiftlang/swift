@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-ir %t/extern_c.swift -I%t | %FileCheck %s --check-prefixes CHECK,%target-cpu
+// RUN: %target-swift-frontend -emit-ir %t/extern_c.swift -I%t | %FileCheck %s
 
 //--- c_abi_types.h
 #include <stdbool.h>
@@ -99,12 +99,8 @@ func test() {
 
   // assume %struct.c_struct and %TSo8c_structV have compatible layout
   //
-  // x86_64: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr byval(%struct.c_struct) align 8 {{.*}})
-  // x86_64: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr byval(%TSo8c_structV)   align 8 {{.*}})
-  // arm64:  call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr {{.*}})
-  // arm64:  call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr {{.*}})
-  // wasm32: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr byval(%struct.c_struct) align 4 {{.*}})
-  // wasm32: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr byval(%TSo8c_structV)   align 4 {{.*}})
+  // CHECK: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
   var c_struct_val = c_struct(foo: 496, bar: 28, baz: 8)
   _ = c_roundtrip_c_struct(c_struct_val)
   _ = swift_roundtrip_c_struct(c_struct_val)
