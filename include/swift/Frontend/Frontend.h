@@ -30,6 +30,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Frontend/CASOutputBackends.h"
 #include "swift/Frontend/CachedDiagnostics.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -483,6 +484,10 @@ class CompilerInstance {
   /// Virtual OutputBackend.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend = nullptr;
 
+  /// CAS OutputBackend.
+  llvm::IntrusiveRefCntPtr<swift::cas::SwiftCASOutputBackend> CASOutputBackend =
+      nullptr;
+
   /// The verification output backend.
   using HashBackendTy = llvm::vfs::HashingOutputBackend<llvm::BLAKE3>;
   llvm::IntrusiveRefCntPtr<HashBackendTy> HashBackend;
@@ -537,6 +542,10 @@ public:
   llvm::vfs::OutputBackend &getOutputBackend() const {
     return *OutputBackend;
   }
+  swift::cas::SwiftCASOutputBackend &getCASOutputBackend() const {
+    return *CASOutputBackend;
+  }
+
   void
   setOutputBackend(llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> Backend) {
     OutputBackend = std::move(Backend);

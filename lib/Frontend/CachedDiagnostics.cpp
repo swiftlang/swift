@@ -774,10 +774,8 @@ CachingDiagnosticsProcessor::CachingDiagnosticsProcessor(
     StringRef Content = Compression.empty() ? Output : toStringRef(Compression);
     // Store CachedDiagnostics in the CAS/Cache. There is no real associated
     // inputs.
-    auto Err = storeCachedCompilerOutput(
-        Instance.getObjectStore(), Instance.getActionCache(),
-        "<cached-diagnostics>", Content, *Instance.getCompilerBaseKey(),
-        "<cached-diagnostics>", file_types::ID::TY_CachedDiagnostics);
+    auto Err = Instance.getCASOutputBackend().storeCachedDiagnostics(
+        "<cached-diagnostics>", Content);
 
     if (Err) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_cas,

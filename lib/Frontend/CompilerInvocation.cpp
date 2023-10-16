@@ -2623,7 +2623,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseProfile = ProfileUse ? ProfileUse->getValue() : "";
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
-  Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files);
+  // Always producing all outputs when caching is enabled.
+  Opts.AlwaysCompile |= Args.hasArg(OPT_always_compile_output_files) ||
+                        Args.hasArg(OPT_cache_compile_job);
 
   Opts.EnableDynamicReplacementChaining |=
       Args.hasArg(OPT_enable_dynamic_replacement_chaining);

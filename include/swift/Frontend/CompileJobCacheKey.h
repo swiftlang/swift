@@ -41,8 +41,7 @@ createCompileJobBaseCacheKey(llvm::cas::ObjectStore &CAS,
 llvm::Expected<llvm::cas::ObjectRef>
 createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
                                   llvm::cas::ObjectRef BaseKey,
-                                  StringRef ProducingInput,
-                                  file_types::ID OutputType);
+                                  StringRef ProducingInput);
 } // namespace swift
 
 #endif
