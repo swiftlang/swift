@@ -117,7 +117,7 @@ func testDoCatchRethrowsTyped() throws(HomeworkError) {
 func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
   try doHomework() // okay
 
-  try doSomething() // FIXME: should error
+  try doSomething() // expected-error{{thrown expression type 'MyError' cannot be converted to error type 'HomeworkError'}}
 
   do {
     if cond {
