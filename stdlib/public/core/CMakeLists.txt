@@ -117,7 +117,7 @@ split_embedded_sources(
     NORMAL NFD.swift
   EMBEDDED ObjectIdentifier.swift
   EMBEDDED Optional.swift
-    NORMAL OptionSet.swift
+  EMBEDDED OptionSet.swift
     NORMAL OutputStream.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
