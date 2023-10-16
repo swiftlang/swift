@@ -4846,6 +4846,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseMethod(
   newMethod->setImplicit();
   newMethod->setImplicitlyInline();
   newMethod->setAccess(clang::AccessSpecifier::AS_public);
+  if (method->hasAttr<clang::CFReturnsRetainedAttr>()) {
+    // Return an FRT field at +1 if the base method also follows this
+    // convention.
+    newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
+  }
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (size_t i = 0; i < method->getNumParams(); ++i) {
@@ -5047,7 +5052,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
 // to the base class while the field is accessed.
 static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
     ClangImporter &impl, const clang::CXXRecordDecl *derivedClass,
-    const clang::CXXRecordDecl *baseClass, const clang::FieldDecl *field) {
+    const clang::CXXRecordDecl *baseClass, const clang::FieldDecl *field,
+    ValueDecl *retainOperationFn) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
 
@@ -5078,6 +5084,10 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   newMethod->setImplicit();
   newMethod->setImplicitlyInline();
   newMethod->setAccess(clang::AccessSpecifier::AS_public);
+  if (retainOperationFn) {
+    // Return an FRT field at +1.
+    newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
+  }
 
   // Create a new Clang diagnostic pool to capture any diagnostics
   // emitted during the construction of the method.
@@ -5085,44 +5095,84 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
       clangSema.DelayedDiagnostics.getCurrentPool()};
   auto diagState = clangSema.DelayedDiagnostics.push(diagPool);
 
-  // Construct the method's body.
-  auto *thisExpr = new (clangCtx) clang::CXXThisExpr(
-      clang::SourceLocation(), newMethod->getThisType(), /*IsImplicit=*/false);
-  clang::QualType baseClassPtr = clangCtx.getRecordType(baseClass);
-  baseClassPtr.addConst();
-  baseClassPtr = clangCtx.getPointerType(baseClassPtr);
+  // Returns the expression that accesses the base field from derived type.
+  auto createFieldAccess = [&]() -> clang::Expr * {
+    auto *thisExpr = new (clangCtx)
+        clang::CXXThisExpr(clang::SourceLocation(), newMethod->getThisType(),
+                           /*IsImplicit=*/false);
+    clang::QualType baseClassPtr = clangCtx.getRecordType(baseClass);
+    baseClassPtr.addConst();
+    baseClassPtr = clangCtx.getPointerType(baseClassPtr);
 
-  clang::CastKind Kind;
-  clang::CXXCastPath Path;
-  clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
-                                   /*IgnoreBaseAccess=*/false,
-                                   /*Diagnose=*/true);
-  auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
-                                          clang::VK_PRValue, &Path);
-  if (!conv.isUsable())
-    return nullptr;
-  auto memberExpr = clangSema.BuildMemberExpr(
-      conv.get(), /*isArrow=*/true, clang::SourceLocation(),
-      clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
-      const_cast<clang::FieldDecl *>(field),
-      clang::DeclAccessPair::make(const_cast<clang::FieldDecl *>(field),
-                                  clang::AS_public),
-      /*HadMultipleCandidates=*/false,
-      clang::DeclarationNameInfo(field->getDeclName(), clang::SourceLocation()),
-      returnType, clang::VK_LValue, clang::OK_Ordinary);
-  auto returnCast = clangSema.ImpCastExprToType(
-      memberExpr, returnType, clang::CK_LValueToRValue, clang::VK_PRValue);
-  if (!returnCast.isUsable())
+    clang::CastKind Kind;
+    clang::CXXCastPath Path;
+    clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
+                                     /*IgnoreBaseAccess=*/false,
+                                     /*Diagnose=*/true);
+    auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
+                                            clang::VK_PRValue, &Path);
+    if (!conv.isUsable())
+      return nullptr;
+    auto memberExpr = clangSema.BuildMemberExpr(
+        conv.get(), /*isArrow=*/true, clang::SourceLocation(),
+        clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+        const_cast<clang::FieldDecl *>(field),
+        clang::DeclAccessPair::make(const_cast<clang::FieldDecl *>(field),
+                                    clang::AS_public),
+        /*HadMultipleCandidates=*/false,
+        clang::DeclarationNameInfo(field->getDeclName(),
+                                   clang::SourceLocation()),
+        returnType, clang::VK_LValue, clang::OK_Ordinary);
+    auto returnCast = clangSema.ImpCastExprToType(
+        memberExpr, returnType, clang::CK_LValueToRValue, clang::VK_PRValue);
+    if (!returnCast.isUsable())
+      return nullptr;
+    return returnCast.get();
+  };
+
+  llvm::SmallVector<clang::Stmt *, 2> body;
+  if (retainOperationFn) {
+    // Check if the returned value needs to be retained. This might occur if the
+    // field getter is returning a shared reference type using, as it needs to
+    // perform the retain to match the expected @owned convention.
+    auto *retainClangFn =
+        dyn_cast<clang::FunctionDecl>(retainOperationFn->getClangDecl());
+    if (!retainClangFn) {
+      return nullptr;
+    }
+    auto *fnRef = new (clangCtx) clang::DeclRefExpr(
+        clangCtx, const_cast<clang::FunctionDecl *>(retainClangFn), false,
+        retainClangFn->getType(), clang::ExprValueKind::VK_LValue,
+        clang::SourceLocation());
+    auto fieldExpr = createFieldAccess();
+    if (!fieldExpr)
+      return nullptr;
+    auto retainCall = clangSema.BuildResolvedCallExpr(
+        fnRef, const_cast<clang::FunctionDecl *>(retainClangFn),
+        clang::SourceLocation(), {fieldExpr}, clang::SourceLocation());
+    if (!retainCall.isUsable())
+      return nullptr;
+    body.push_back(retainCall.get());
+  }
+
+  // Construct the method's body.
+  auto fieldExpr = createFieldAccess();
+  if (!fieldExpr)
     return nullptr;
   auto returnStmt = clang::ReturnStmt::Create(clangCtx, clang::SourceLocation(),
-                                              returnCast.get(), nullptr);
+                                              fieldExpr, nullptr);
+  body.push_back(returnStmt);
 
   // Check if there were any Clang errors during the construction
   // of the method body.
   clangSema.DelayedDiagnostics.popWithoutEmitting(diagState);
   if (!diagPool.empty())
     return nullptr;
-  newMethod->setBody(returnStmt);
+  newMethod->setBody(body.size() > 1
+                         ? clang::CompoundStmt::Create(
+                               clangCtx, body, clang::FPOptionsOverride(),
+                               clang::SourceLocation(), clang::SourceLocation())
+                         : body[0]);
   return newMethod;
 }
 
@@ -5163,12 +5213,28 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
                   RemoveReference,
         /*forceConstQualifier=*/true);
   } else if (auto *fd = dyn_cast_or_null<clang::FieldDecl>(baseClangDecl)) {
+    ValueDecl *retainOperationFn = nullptr;
+    // Check if this field getter is returning a retainable FRT.
+    if (getterDecl->getResultInterfaceType()->isForeignReferenceType()) {
+      auto retainOperation = evaluateOrDefault(
+          ctx.evaluator,
+          CustomRefCountingOperation({getterDecl->getResultInterfaceType()
+                                          ->lookThroughAllOptionalTypes()
+                                          ->getClassOrBoundGenericClass(),
+                                      CustomRefCountingOperationKind::retain}),
+          {});
+      if (retainOperation.kind ==
+          CustomRefCountingOperationResult::foundOperation) {
+        retainOperationFn = retainOperation.operation;
+      }
+    }
     // Field getter is represented through a generated
     // C++ method call that returns the value of the base field.
     baseGetterCxxMethod = synthesizeCxxBaseGetterAccessorMethod(
         *static_cast<ClangImporter *>(ctx.getClangModuleLoader()),
         cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
-        cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd);
+        cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd,
+        retainOperationFn);
   }
 
   if (!baseGetterCxxMethod) {
