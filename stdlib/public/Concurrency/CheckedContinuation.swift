@@ -19,6 +19,7 @@ internal func logFailedCheck(_ message: UnsafeRawPointer)
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 internal final class CheckedContinuationCanary: @unchecked Sendable {
   // The instance state is stored in tail-allocated raw memory, so that
   // we can atomically check the continuation state.
@@ -119,6 +120,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
   
@@ -187,6 +189,7 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
 }
 
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 extension CheckedContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
@@ -281,6 +284,7 @@ extension CheckedContinuation {
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable
+@_unavailableInEmbedded
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Never>) -> Void
@@ -321,6 +325,7 @@ public func withCheckedContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
 @inlinable
+@_unavailableInEmbedded
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Error>) -> Void

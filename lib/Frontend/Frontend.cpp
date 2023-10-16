@@ -240,6 +240,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.SkipNonExportableDecls = opts.SkipNonExportableDecls;
 
+  serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
+
   return serializationOpts;
 }
 

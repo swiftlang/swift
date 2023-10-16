@@ -179,6 +179,8 @@ set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY TRUE)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" swift_optimized)
 if(NOT swift_optimized)
   set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY FALSE)
+elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY FALSE)
 endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency ALL)
@@ -188,6 +190,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_STABLE_ABI OFF)
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
+  set(SWIFT_STDLIB_CONCURRENCY_TRACING FALSE)
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -207,15 +210,36 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency-${mod}
       swift_Concurrency
       STATIC
-      IS_STDLIB
+      IS_STDLIB IS_FRAGILE
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-      # TODO: Only a handful of Swift Concurrency .swift sources, for now.
-      Task.swift
+      # TODO: Only a subset of Swift Concurrency .swift sources, for now.
+      Actor.swift
       AsyncLet.swift
-      Executor.swift
+      CheckedContinuation.swift
       Errors.swift
+      Executor.swift
+      ExecutorAssertions.swift
+      AsyncCompactMapSequence.swift
+      AsyncDropFirstSequence.swift
+      AsyncDropWhileSequence.swift
+      AsyncFilterSequence.swift
+      AsyncFlatMapSequence.swift
+      AsyncIteratorProtocol.swift
+      AsyncMapSequence.swift
+      AsyncPrefixSequence.swift
+      AsyncPrefixWhileSequence.swift
+      AsyncSequence.swift
+      AsyncThrowingCompactMapSequence.swift
+      AsyncThrowingDropWhileSequence.swift
+      AsyncThrowingFilterSequence.swift
+      AsyncThrowingFlatMapSequence.swift
+      AsyncThrowingMapSequence.swift
+      AsyncThrowingPrefixWhileSequence.swift
+      GlobalActor.swift
       PartialAsyncTask.swift
+      Task.swift
+      TaskCancellation.swift
 
       SWIFT_COMPILE_FLAGS
         -Xcc -D__MACH__ -Xcc -D__APPLE__ -Xcc -ffreestanding -enable-experimental-feature Embedded

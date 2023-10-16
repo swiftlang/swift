@@ -37,7 +37,7 @@ struct StructHoldingOutlined<T> {
 }
 
 //   main
-// CHECK-LABEL: define {{.*}} @main(
+// CHECK-LABEL: define {{.*}} @{{main|__main_argc_argv}}(
 // CHECK-SAME: [[ATTRS_SIMPLE:#[0-9]+]]
 
 //   class deinit

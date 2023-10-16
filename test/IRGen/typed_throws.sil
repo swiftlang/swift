@@ -21,11 +21,11 @@ sil @create_error : $@convention(thin) () -> @owned A
 // CHECK: define{{.*}} swiftcc void @throw_error(ptr swiftself %0, ptr noalias nocapture swifterror dereferenceable({{.*}}) %1, ptr %2)
 // CHECK:   [[ERR:%.*]] = call swiftcc ptr @create_error()
 // CHECK:   call ptr @swift_retain(ptr returned [[ERR]])
-// CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %1
 // CHECK:   [[F1:%.*]] = getelementptr inbounds %T12typed_throws1SV, ptr %2, i32 0, i32 0
 // CHECK:   store ptr [[ERR]], ptr [[F1]]
 // CHECK:   [[F2:%.*]] = getelementptr inbounds %T12typed_throws1SV, ptr %2, i32 0, i32 1
 // CHECK:   store ptr [[ERR]], ptr [[F2]]
+// CHECK:   store ptr inttoptr (i64 1 to ptr), ptr %1
 // CHECK:   ret void
 // CHECK: }
 
@@ -271,6 +271,193 @@ bb5(%6 : $S):
   br bb6
 
 bb6:
+  %t = tuple()
+  return %t : $()
+}
+
+// CHECK: define{{.*}} swiftcc void @throwNoError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable({{.*}}) %3, ptr %4)
+// CHECK:  ret void
+
+sil @throwNoError : $@convention(thin) <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
+bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: define{{.*}} swiftcc void @throwNoErrorGenericOut(ptr noalias sret(%swift.opaque) %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %"\CF\84_0_1", ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable({{.*}}) %4, ptr %5)
+
+sil @throwNoErrorGenericOut : $@convention(thin) <τ_0_0, τ_0_1> (Builtin.Int64, @in τ_0_0) -> (@error_indirect τ_0_0, @out τ_0_1) {
+bb0(%0: $*τ_0_1, %1: $*τ_0_0, %2 : $Builtin.Int64, %3 : $*τ_0_0):
+  %5 = tuple ()
+  return %5 : $()
+}
+// CHECK: define{{.*}} swiftcc void @throwError(i64 %0, ptr noalias %1, ptr %"\CF\84_0_0", ptr swiftself %2, ptr noalias nocapture swifterror dereferenceable({{.*}}) %3, ptr %4)
+// CHECK: entry:
+// CHECK:  load ptr, ptr
+// CHECK:  [[VW:%.*]] = load ptr, ptr
+// CHECK:  call ptr [[VW]](ptr noalias %4, ptr noalias %1
+// CHECK:  store ptr inttoptr (i64 1 to ptr), ptr %3
+// CHECK:  ret void
+
+sil @throwError : $@convention(thin) <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
+bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
+  copy_addr [take] %2 to [init] %0 : $*τ_0_0
+  throw %0 : $*τ_0_0
+}
+
+sil @throwError2 : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
+
+// CHECK: define{{.*}} swiftcc void @try_apply_generic(ptr noalias sret(%swift.opaque) %0, ptr noalias %1, ptr %T, ptr %V)
+// CHECK:   [[ERR:%.*]] = alloca swifterror ptr
+// CHECK:   store ptr null, ptr %swifterror
+// CHECK:   [[SIZE:%.*]] = load i64
+// CHECK:   [[TYPEDERR:%.*]] = alloca i8, i64 [[SIZE]]
+// CHECK:   call swiftcc void @throwError2(ptr noalias sret(%swift.opaque) %0, i64 0, ptr noalias %1, ptr %T, ptr %V, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[TYPEDERR]])
+// CHECK:   [[ERR_FLAG:%.*]] = load ptr, ptr %swifterror
+// CHECK:   [[ISERR:%.*]] = icmp ne ptr [[ERR_FLAG]], null
+// CHECK:   br i1 [[ISERR]]
+
+sil @try_apply_generic : $@convention(thin) <T, V> (@in T) -> @out V {
+bb0(%0 : $*V, %1: $*T):
+  %2 = alloc_stack $T
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = function_ref @throwError2 : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
+  try_apply %4<T, V>(%0, %2, %3, %1) : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V), normal bb1, error bb2
+
+bb1(%5 : $()):
+  br bb3
+
+bb2:
+  destroy_addr %2 : $*T
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK: define{{.*}} swifttailcc void @throwNoErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
+// CHECK:  call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwNoErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr null)
+sil @throwNoErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
+bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: define{{.*}} swifttailcc void @throwErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
+// CHECK:   call ptr {{%[0-9]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
+// CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr inttoptr (i64 1 to ptr))
+
+sil @throwErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
+bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
+  copy_addr [take] %2 to [init] %0 : $*τ_0_0
+  throw %0 : $*τ_0_0
+}
+
+sil @throwError2Async : $@convention(thin) @async <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
+
+// CHECK: define{{.*}} swifttailcc void @try_apply_generic_async(ptr noalias %0, ptr swiftasync %1, ptr noalias %2, ptr %T, ptr %V)
+// CHECK:   [[ERR:%.*]] = call swiftcc ptr @swift_task_alloc
+// CHECK:   call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s(i32 256, ptr {{%[0-9]+}}, ptr @__swift_async_resume_project_context, ptr @try_apply_generic_async.0, ptr @throwError2Async, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, i64 0, ptr {{%[0-9]+}}, ptr %T, ptr %V, ptr [[ERR]])
+sil @try_apply_generic_async : $@convention(thin) @async <T, V> (@in T) -> @out V {
+bb0(%0 : $*V, %1: $*T):
+  %2 = alloc_stack $T
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = function_ref @throwError2Async : $@convention(thin) @async <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
+  try_apply %4<T, V>(%0, %2, %3, %1) : $@convention(thin) @async <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V), normal bb1, error bb2
+
+bb1(%5 : $()):
+  br bb3
+
+bb2:
+  destroy_addr %2 : $*T
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*T
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @try_apply_helper_generic : $@convention(thin) <T> (@in T) -> (@out T, @error_indirect T)
+
+// CHECK: define{{.*}} internal swiftcc void @"$s24try_apply_helper_genericTA"(ptr noalias sret(%swift.opaque) %0, ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3)
+// CHECK:   call swiftcc void @try_apply_helper_generic(ptr noalias sret(%swift.opaque) %0, ptr noalias {{%.*}}, ptr %T, ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %2, ptr %3)
+
+sil @partial_apply_test_generic : $@convention(thin) <T> (@in T) -> @owned @callee_guaranteed () ->(@out T, @error_indirect T) {
+entry(%0: $*T):
+  %f = function_ref @try_apply_helper_generic : $@convention(thin) <T> (@in T) -> (@out T, @error_indirect T)
+  %36 = partial_apply [callee_guaranteed] %f<T>(%0) : $@convention(thin) <T> (@in T) -> (@out T, @error_indirect T)
+  return %36 : $@callee_guaranteed () -> (@out T, @error_indirect T)
+}
+
+sil @try_apply_helper_generic_async : $@convention(thin) @async <T> (@in T) -> (@out T, @error_indirect T)
+
+// CHECK: define{{.*}} internal swifttailcc void @"$s30try_apply_helper_generic_asyncTA"(ptr noalias %0, ptr swiftasync %1, ptr swiftself %2, ptr %3)
+// CHECK: call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s({{.*}}, ptr @try_apply_helper_generic_async, ptr %0, {{.*}}, ptr %T, ptr %3)
+sil @partial_apply_test_generic_async : $@convention(thin) @async <T> (@in T) -> @owned @callee_guaranteed @async () -> (@out T, @error_indirect T) {
+entry(%0: $*T):
+  %f = function_ref @try_apply_helper_generic_async : $@convention(thin) @async <T> (@in T) -> (@out T, @error_indirect T)
+  %36 = partial_apply [callee_guaranteed] %f<T>(%0) : $@convention(thin) @async <T> (@in T) -> (@out T, @error_indirect T)
+  return %36 : $@callee_guaranteed @async () -> (@out T, @error_indirect T)
+}
+
+// CHECK: define{{.*}} swiftcc void @apply_closure_generic(ptr %0, ptr %1, ptr %T, ptr %V)
+// CHECK:  [[T0:%.*]] = getelementptr inbounds ptr, ptr %T
+// CHECK:  [[T1:%.*]] = load ptr, ptr [[T0]]
+// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T1]]
+// CHECK:  [[T3:%.*]] = load i64, ptr [[T2]]
+// CHECK:  [[T4:%.*]] = alloca i8, i64 [[T3]]
+// CHECK:  [[V0:%.*]] = getelementptr inbounds ptr, ptr %V
+// CHECK:  [[V1:%.*]] = load ptr, ptr [[V0]]
+// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[V1]]
+// CHECK:  [[V3:%.*]] = load i64, ptr [[V2]]
+// CHECK:  [[V4:%.*]] = alloca i8, i64 [[V3]]
+// CHECK: call swiftcc void %0(ptr noalias sret(%swift.opaque) [[T4]], ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[V4]])
+sil @apply_closure_generic : $@convention(thin) <T, V> (@guaranteed @callee_guaranteed () ->(@out T, @error_indirect V)) -> () {
+entry(%0 : $@callee_guaranteed () ->(@out T, @error_indirect V)):
+  %err = alloc_stack $V
+  %res = alloc_stack $T
+  try_apply %0(%res, %err) : $@callee_guaranteed () ->(@out T, @error_indirect V), normal bb4, error bb5
+
+bb4(%5 : $()):
+  destroy_addr %res : $*T
+  br bb6
+
+bb5:
+  destroy_addr %err : $*V
+  br bb6
+
+bb6:
+  dealloc_stack %res : $*T
+  dealloc_stack %err : $*V
+  %t = tuple()
+  return %t : $()
+}
+
+// CHECK: define{{.*}} swifttailcc void @apply_closure_generic_async(ptr swiftasync %0, ptr %1, ptr %2, ptr %T, ptr %V)
+// CHECK: [[RES:%.*]] = call swiftcc ptr @swift_task_alloc
+// CHECK: [[ERR:%.*]] = call swiftcc ptr @swift_task_alloc
+// CHECK: call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s(i32 256, ptr {{.*}}, ptr @__swift_async_resume_project_context, ptr @apply_closure_generic_async.0, ptr {{%[0-9]+}},{{( i64 [0-9]+,)?}} ptr [[RES]], ptr {{%[0-9]+}}, ptr %2, ptr [[ERR]])
+
+sil @apply_closure_generic_async : $@convention(thin) @async <T, V> (@guaranteed @callee_guaranteed @async () ->(@out T, @error_indirect V)) -> () {
+entry(%0 : $@callee_guaranteed @async () -> (@out T, @error_indirect V)):
+  %err = alloc_stack $V
+  %res = alloc_stack $T
+  try_apply %0(%res, %err) : $@callee_guaranteed @async () ->(@out T, @error_indirect V), normal bb4, error bb5
+
+bb4(%5 : $()):
+  destroy_addr %res : $*T
+  br bb6
+
+bb5:
+  destroy_addr %err : $*V
+  br bb6
+
+bb6:
+  dealloc_stack %res : $*T
+  dealloc_stack %err : $*V
   %t = tuple()
   return %t : $()
 }

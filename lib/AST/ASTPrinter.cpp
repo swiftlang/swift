@@ -6952,10 +6952,18 @@ public:
       }
 
       if (T->hasErrorResult()) {
-        // The error result is implicitly @owned; don't print that.
-        assert(T->getErrorResult().getConvention() == ResultConvention::Owned);
         sub->Printer.printSeparator(first, ", ");
-        sub->Printer << "@error ";
+        if (T->getErrorResult().getConvention() == ResultConvention::Owned)
+          sub->Printer << "@error ";
+        else if (T->getErrorResult().getConvention() == ResultConvention::Indirect)
+          sub->Printer << "@error_indirect ";
+        else if (T->getErrorResult().getConvention() == ResultConvention::Unowned)
+          sub->Printer << "@error_unowned ";
+        else {
+          assert(false && "Should have error, error_indirect, or error_unowned");
+        }
+
+
         T->getErrorResult().getInterfaceType().print(sub->Printer, subOptions);
       }
 

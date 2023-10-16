@@ -562,15 +562,17 @@ struct InferRequirementsWalker : public TypeWalker {
     // - `@differentiable(_linear)`: add
     //   `T: Differentiable`, `T == T.TangentVector` requirements.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      // Add a new conformance constraint for a fixed protocol.
+      auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
+        Requirement req(RequirementKind::Conformance, type,
+                        protocol->getDeclaredInterfaceType());
+        desugarRequirement(req, SourceLoc(), reqs, errors);
+      };
+
       auto &ctx = module->getASTContext();
       auto *differentiableProtocol =
           ctx.getProtocol(KnownProtocolKind::Differentiable);
       if (differentiableProtocol && fnTy->isDifferentiable()) {
-        auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
-          Requirement req(RequirementKind::Conformance, type,
-                          protocol->getDeclaredInterfaceType());
-          desugarRequirement(req, SourceLoc(), reqs, errors);
-        };
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto secondType = assocType->getDeclaredInterfaceType()
@@ -595,6 +597,13 @@ struct InferRequirementsWalker : public TypeWalker {
         // Add requirements.
         constrainParametersAndResult(fnTy->getDifferentiabilityKind() ==
                                      DifferentiabilityKind::Linear);
+      }
+
+      // Infer that the thrown error type conforms to Error.
+      if (auto thrownError = fnTy->getThrownError()) {
+        if (auto errorProtocol = ctx.getErrorDecl()) {
+          addConformanceConstraint(thrownError, errorProtocol);
+        }
       }
     }
 

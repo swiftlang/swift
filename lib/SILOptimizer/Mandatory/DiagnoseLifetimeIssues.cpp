@@ -189,6 +189,8 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         // Try to get information from the called function.
         switch (getArgumentState(ai, use, callDepth)) {
         case DoesNotEscape:
+          if (updateLivenessAndWeakStores)
+            liveness->updateForUse(user, /*lifetimeEnding*/ false);
           break;
         case CanEscape:
           return CanEscape;

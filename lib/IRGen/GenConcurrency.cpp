@@ -19,6 +19,7 @@
 
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
+#include "GenCall.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -226,7 +227,13 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   assert(subs.getReplacementTypes().size() == 1 &&
          "startAsyncLet should have a type substitution");
   auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
-  auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
+
+  llvm::Value *futureResultTypeMetadata =
+      llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    futureResultTypeMetadata =
+        IGF.emitAbstractTypeMetadataRef(futureResultType);
+  }
 
   // The concurrency runtime for older Apple OSes has a bug in task formation
   // for `async let`s that may manifest when trying to use room in the
@@ -269,6 +276,9 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
       IGF.IGM.markAsyncFunctionPointerForPadding(taskAsyncFunctionPointer);
     }
   }
+
+  // In embedded Swift, create and pass result type info.
+  taskOptions = addEmbeddedSwiftResultTypeInfo(IGF, taskOptions, subs);
   
   llvm::CallInst *call;
   if (localResultBuffer) {

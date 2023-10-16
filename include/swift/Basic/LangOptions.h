@@ -177,7 +177,7 @@ namespace swift {
     llvm::VersionTuple MinimumInliningTargetVersion;
 
     /// The alternate name to use for the entry point instead of main.
-    std::string entryPointFunctionName = "main";
+    std::optional<std::string> entryPointFunctionName;
 
     ///
     /// Language features

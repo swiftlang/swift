@@ -77,6 +77,9 @@ protected:
   /// invocation of the call.
   llvm::BasicBlock *invokeUnwindDest = nullptr;
 
+  unsigned IndirectTypedErrorArgIdx = 0;
+
+
   virtual void setFromCallee();
   void emitToUnmappedMemory(Address addr);
   void emitToUnmappedExplosion(Explosion &out);
@@ -141,6 +144,15 @@ public:
 
   virtual llvm::Value *getResumeFunctionPointer() = 0;
   virtual llvm::Value *getAsyncContext() = 0;
+
+  void setIndirectTypedErrorResultSlot(llvm::Value *addr) {
+    Args[IndirectTypedErrorArgIdx] = addr;
+  }
+
+  void setIndirectTypedErrorResultSlotArgsIndex(unsigned idx) {
+    assert(idx != 0);
+    IndirectTypedErrorArgIdx = idx;
+  }
 };
 
 std::unique_ptr<CallEmission>

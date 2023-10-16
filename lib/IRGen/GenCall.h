@@ -217,6 +217,10 @@ namespace irgen {
 
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
+  llvm::Value *addEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                              llvm::Value *taskOptions,
+                                              SubstitutionMap subs);
+
   /// Emit a call to swift_task_create[_f] with the given flags, options, and
   /// task function.
   llvm::Value *emitTaskCreate(
