@@ -4763,21 +4763,6 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
                 KnownProtocolKind::Sendable))
             .isInvalid())
       return CheckTypeWitnessResult::forConformance(reqProto);
-
-    // FIXME: Why is conformsToProtocol() not enough? The stdlib doesn't
-    // build unless we fail here while inferring an associated type
-    // somewhere.
-    if (contextType->isSpecialized()) {
-      auto *decl = contextType->getAnyNominal();
-      auto subMap = contextType->getContextSubstitutionMap(
-          module,
-          decl,
-          decl->getGenericEnvironmentOfContext());
-      for (auto replacement : subMap.getReplacementTypes()) {
-        if (replacement->hasError())
-          return CheckTypeWitnessResult::forConformance(reqProto);
-      }
-    }
   }
 
   if (sig->requiresClass(depTy) &&
@@ -5196,10 +5181,8 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     return false;
   });
 
-  for (auto req : proto->getRequirementSignature().getRequirements()) {
-    if (req.getKind() == RequirementKind::Conformance) {
-      auto depTy = req.getFirstType();
-      auto *proto = req.getProtocolDecl();
+  Conformance->forEachAssociatedConformance(
+    [&](Type depTy, ProtocolDecl *proto, unsigned index) {
       auto conformance = Conformance->getAssociatedConformance(depTy, proto);
       if (conformance.isConcrete()) {
         auto *concrete = conformance.getConcrete();
@@ -5208,8 +5191,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
                                         conformance, where,
                                         depTy, replacementTy);
       }
-    }
-  }
+
+      return false;
+    });
 }
 
 #pragma mark Protocol conformance checking
@@ -7070,51 +7054,18 @@ ValueWitnessRequest::evaluate(Evaluator &eval,
   return known->second;
 }
 
-/// A stripped-down version of Type::subst that only works on the protocol
-/// Self type wrapped in zero or more DependentMemberTypes.
-static Type
-recursivelySubstituteBaseType(ModuleDecl *module,
-                              NormalProtocolConformance *conformance,
-                              DependentMemberType *depMemTy) {
-  Type origBase = depMemTy->getBase();
-
-  // Recursive case.
-  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
-    Type substBase = recursivelySubstituteBaseType(
-        module, conformance, depBase);
-    return depMemTy->substBaseType(module, substBase);
-  }
-
-  // Base case. The associated type's protocol should be either the
-  // conformance protocol or an inherited protocol.
-  auto *reqProto = depMemTy->getAssocType()->getProtocol();
-  assert(origBase->isEqual(reqProto->getSelfInterfaceType()));
-
-  ProtocolConformance *reqConformance = conformance;
-
-  // If we have an inherited protocol just look up the conformance.
-  if (reqProto != conformance->getProtocol()) {
-    reqConformance = module->lookupConformance(conformance->getType(), reqProto)
-                         .getConcrete();
-  }
-
-  return reqConformance->getTypeWitness(depMemTy->getAssocType());
-}
-
 ProtocolConformanceRef
 AssociatedConformanceRequest::evaluate(Evaluator &eval,
                                        NormalProtocolConformance *conformance,
                                        CanType origTy, ProtocolDecl *reqProto,
                                        unsigned index) const {
   auto *module = conformance->getDeclContext()->getParentModule();
-  Type substTy;
 
-  if (origTy->isEqual(conformance->getProtocol()->getSelfInterfaceType())) {
-    substTy = conformance->getType();
-  } else {
-    auto *depMemTy = origTy->castTo<DependentMemberType>();
-    substTy = recursivelySubstituteBaseType(module, conformance, depMemTy);
-  }
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      conformance->getProtocol(),
+      conformance->getType(),
+      ProtocolConformanceRef(conformance));
+  auto substTy = origTy.subst(subMap);
 
   // Looking up a conformance for a contextual type and mapping the
   // conformance context produces a more accurate result than looking
