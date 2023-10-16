@@ -1195,11 +1195,16 @@ public:
     // Coerce the operand to the exception type.
     auto E = TS->getSubExpr();
 
+    // Look up the catch node for this "throw" to determine the error type.
+    CatchNode catchNode = ASTScope::lookupCatchNode(
+        DC->getParentModule(), TS->getThrowLoc());
     Type errorType;
-    if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
-      errorType = TheFunc->getThrownErrorType();
+    if (catchNode) {
+      errorType = catchNode.getThrownErrorTypeInContext(getASTContext())
+          .value_or(Type());
     }
 
+    // If there was no error type, use 'any Error'. We'll check it later.
     if (!errorType) {
       errorType = getASTContext().getErrorExistentialType();
     }
@@ -1683,21 +1688,6 @@ public:
     checkSiblingCaseStmts(catches.begin(), catches.end(),
                           CaseParentKind::DoCatch, limitExhaustivityChecks,
                           caughtErrorType);
-
-    if (!S->isSyntacticallyExhaustive()) {
-      // If we're implicitly rethrowing the error out of this do..catch, make
-      // sure that we can throw an error of this type out of this context.
-      // FIXME: Unify this lookup of the type with that from ThrowStmt.
-      if (auto TheFunc = AnyFunctionRef::fromDeclContext(DC)) {
-        if (Type expectedErrorType = TheFunc->getThrownErrorType()) {
-          OpaqueValueExpr *opaque = new (Ctx) OpaqueValueExpr(
-              catches.back()->getEndLoc(), caughtErrorType);
-          Expr *rethrowExpr = opaque;
-          TypeChecker::typeCheckExpression(
-              rethrowExpr, DC, {expectedErrorType, CTP_ThrowStmt});
-        }
-      }
-    }
 
     return S;
   }

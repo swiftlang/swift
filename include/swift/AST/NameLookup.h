@@ -18,6 +18,7 @@
 #define SWIFT_AST_NAME_LOOKUP_H
 
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
@@ -832,6 +833,25 @@ public:
   static void lookupEnclosingMacroScope(
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(PotentialMacro macro)> consume);
+
+  /// Look up the scope tree for the nearest point at which an error thrown from
+  /// this location can be caught or rethrown.
+  ///
+  /// For example, given this code:
+  ///
+  /// \code
+  /// func f() throws {
+  ///   do {
+  ///     try g() // A
+  ///   } catch {
+  ///     throw ErrorWrapper(error) // B
+  ///   }
+  /// }
+  /// \endcode
+  ///
+  /// At the point marked A, the catch node is the enclosing do...catch
+  /// statement. At the point marked B, the catch node is the function itself.
+  static CatchNode lookupCatchNode(ModuleDecl *module, SourceLoc loc);
 
   SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;

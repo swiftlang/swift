@@ -758,6 +758,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                 : subscr ? subscr->getEffectfulGetAccessor()
                                 : nullptr;
       if (effectiveFunc) {
+        // Infer constraints from the thrown type of a declaration.
         if (auto thrownTypeRepr = effectiveFunc->getThrownTypeRepr()) {
           auto thrownOptions = baseOptions | TypeResolutionFlags::Direct;
           const auto thrownType = resolution.withOptions(thrownOptions)
@@ -767,10 +768,12 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
           inferenceSources.emplace_back(thrownTypeRepr, thrownType);
 
           // Add conformance of this type to the Error protocol.
-          if (auto errorProtocol = ctx.getErrorDecl()) {
-            extraReqs.push_back(
-                Requirement(RequirementKind::Conformance, thrownType,
-                            errorProtocol->getDeclaredInterfaceType()));
+          if (thrownType->isTypeParameter()) {
+            if (auto errorProtocol = ctx.getErrorDecl()) {
+              extraReqs.push_back(
+                  Requirement(RequirementKind::Conformance, thrownType,
+                              errorProtocol->getDeclaredInterfaceType()));
+            }
           }
         }
       }
