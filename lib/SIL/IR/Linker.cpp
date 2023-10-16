@@ -189,6 +189,10 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
       maybeAddFunctionToWorklist(impl, Vtbl->isSerialized());
     }
   }
+
+  if (auto *S = D->getSuperclassDecl()) {
+    linkInVTable(S);
+  }
 }
 
 //===----------------------------------------------------------------------===//
