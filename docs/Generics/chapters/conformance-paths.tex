@@ -19,7 +19,7 @@
 
 \chapter{Conformance Paths}\label{conformance paths}
 
-\lettrine{W}{e now return} to tie up a loose end in \index{type substitution}type substitution. We encountered type substitution in Chapter \ref{substmaps}, first in its most basic form, as a structural mapping of generic parameter types to the replacement types of a substitution map. The next level of detail appeared when we considered type substitution of the other kind of type parameter: the dependent member type. A substitution map can contain conformances in addition to replacement types, and Chapter~\ref{conformances} showed that under type substitution, a \index{dependent member type}dependent member type corresponds to a \index{type witness}type witness of a conformance. To find this conformance, we introduced the so-called local conformance lookup operation, but only defined it in the simplest case, where the conformance is directly stored in the substitution map. Now, we will consider the general case, which entails finding and evaluating a \emph{conformance path}. We're going to build upon associated conformances from Section~\ref{associated conformances}, and the validity results of Section~\ref{generic signature validity}.
+\lettrine{W}{e now return} to tie up a loose end in \index{type substitution}type substitution. We encountered type substitution in Chapter \ref{substmaps}, first in its most basic form, as a structural mapping of generic parameter types to the replacement types of a substitution map. The next level of detail appeared when we considered type substitution of the other kind of type parameter: the dependent member type. A substitution map can contain conformances in addition to replacement types, and Chapter~\ref{conformances} showed that under type substitution, a \index{dependent member type}dependent member type corresponds to a \index{type witness}type witness of a conformance. To find this conformance, we introduced the so-called local conformance lookup operation, but only defined it in the simplest case, where the conformance is directly stored in the substitution map. In this chapter, we consider the general case of recovering the desired conformance by evaluating a \emph{conformance path}. We're going to build upon associated conformances from Section~\ref{associated conformances}, and the validity results of Section~\ref{generic signature validity}.
 
 \begin{listing}\captionabove{Example to motivate conformance paths}\label{conformance paths listing}
 \begin{Verbatim}
@@ -578,8 +578,8 @@ A \IndexDefinition{recursive conformance requirement}\emph{recursive conformance
 \begin{wrapfigure}[11]{l}{4.5cm}
 \begin{tikzpicture}[node distance=1.4cm]
 
-\node (N) [protocol] {$\texttt{N}$};
-\node (Q) [protocol, above left=of N] {$\texttt{Q}$};
+\node (N) [protocol] {$\protosym{N}$};
+\node (Q) [protocol, above left=of N] {$\protosym{Q}$};
 \node (R) [protocol, above right=of N] {$\protosym{R}$};
 \node (O) [protocol, below=of N] {$\protosym{O}$};
 \path [->] (Q) edge [left, bend left] (R)
@@ -624,10 +624,10 @@ Now consider the protocol generic signature $G_\texttt{Q}$ from Listing~\ref{pro
 \[
 \AssocConf{Self.C}{N} \otimes \AssocConf{Self.B}{R} \otimes \AssocConf{Self.D}{Q} \otimes \AssocConf{Self.B}{R} \otimes \ConfReq{Self}{Q}
 \]
-Writing down the list of protocols from each step (remember that conformance paths are read from right to left!) we get a path in the protocol dependency graph; the path visits \texttt{Q} and \texttt{R} twice, exhibiting the existence of a cycle:
-\[\texttt{Q}\longrightarrow\texttt{R}\longrightarrow\texttt{Q}\longrightarrow\texttt{R}\longrightarrow\texttt{N}\]
+Writing down the list of protocols from each step (remember that conformance paths are read from right to left!) we get a path in the protocol dependency graph; the path visits $\protosym{Q}$ and $\protosym{R}$ twice, exhibiting the existence of a cycle:
+\[\protosym{Q}\longrightarrow\protosym{R}\longrightarrow\protosym{Q}\longrightarrow\protosym{R}\longrightarrow\protosym{N}\]
 
-We encounter the protocol dependency graph again in Chapter~\ref{rqm basic operation}, when we describe the construction of the rewrite system for a generic signature.
+We will encounter protocol dependency graphs again in Chapter~\ref{rqm basic operation}, when we describe the construction of the rewrite system for a generic signature.
 
 \begin{figure}\captionabove{Conformance path graph for $G_\texttt{Q}$ from Listing~\ref{protocol dependency graph listing}}\label{infinite tree graph}
 \begin{center}
@@ -664,7 +664,7 @@ Assume an infinite directed graph satisfies two conditions:
 \item Every vertex has finitely many successors (such a graph is said to be locally finite).
 \item Every vertex is reachable by a path from a fixed finite set of root vertices.
 \end{enumerate}
-Then, the graph contains a \index{ray}\emph{ray} \index{infinite path|see{ray}} (or infinite path), an infinite sequence of distinct vertices, where each element is joined to the next by an edge.
+Then the graph must contain a \index{infinite path|see{ray}}\index{ray}\emph{ray}, or infinite path: an infinite sequence of distinct vertices, where each element is joined to the next by an edge.
 \end{theorem}
 \begin{proof}
 To choose the first element of the sequence, note that there are only finitely many roots, but every vertex is reachable from at least one root by assumption, so at least one root must be the origin of infinitely many distinct paths. This root serves as the first element of our sequence. We can then always add another vertex to our sequence, as long as the last vertex is the origin of infinitely many distinct paths, not involving any vertex already in our sequence. However, as each vertex has finitely many successors, so at least one successor of the last vertex has the necessary property. We can iterate this construction arbitrarily in this manner, giving us the desired infinite sequence of vertices.
