@@ -12,6 +12,27 @@ import Glibc
 import Foundation
 #endif
 
+// ======================== VJPs ======================== //
+@differentiable(reverse)
+@_silgen_name("simple_vjp")
+func simple_vjp(x: Float) -> Float {
+    let a = x * x;
+    let b = x + x;
+    let c = x * a;
+    let d = a + b;
+    let e = b * c;
+
+    return a * b / c + d - e ;
+}
+
+@inline(never)
+@_silgen_name("caller_of_simple_vjp")
+func caller_of_simple_vjp() -> Float {
+  gradient(at: Float(4), of: simple_vjp)
+}
+
+// CHECK: decision {{{.*}}, b=30, {{.*}}} simple_vjpTJrSpSr
+// CHECK-NEXT: "simple_vjpTJrSpSr" inlined into "caller_of_simple_vjp"
 
 // ======================== Pullback w/ control-flow ======================== //
 
