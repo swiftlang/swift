@@ -2,6 +2,13 @@ import CASTBridging
 import CBasicBridging
 import SwiftSyntax
 
+import ASTGenBridging
+
+protocol BridgableArrayRefProtocol {
+  associatedtype Element
+  init(_ data: UnsafePointer<Element>?, _ length: Int)
+}
+
 extension BridgedSourceLoc: ExpressibleByNilLiteral {
   public init(nilLiteral: ()) {
     self.init(raw: nil)
@@ -32,10 +39,23 @@ extension BridgedSourceRange {
   }
 }
 
+extension swift.SourceRange {
+  @inline(__always)
+  init(start: TokenSyntax, end: TokenSyntax, in astgen: ASTGenVisitor) {
+    self.init(start.sourceLoc(in: astgen), end.sourceLoc(in: astgen))
+  }
+}
+
 extension String {
   mutating func withBridgedString<R>(_ body: (BridgedString) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedString(data: buffer.baseAddress, length: buffer.count))
+    }
+  }
+
+  mutating func withStringRef<R>(_ body: (llvm.StringRef) throws -> R) rethrows -> R {
+    try withUTF8 { buffer in
+      try body(llvm.StringRef(buffer.baseAddress, buffer.count))
     }
   }
 }
@@ -74,6 +94,13 @@ extension BridgedString {
   }
 }
 
+extension AbsolutePosition {
+  @inline(__always)
+  func sourceLoc(in astgen: ASTGenVisitor) -> swift.SourceLoc {
+    astgen.bufferStartLoc.getAdvancedLoc(Int32(self.utf8Offset))
+  }
+}
+
 extension SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
@@ -81,6 +108,11 @@ extension SyntaxProtocol {
   @inline(__always)
   func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
     return BridgedSourceLoc(at: self.positionAfterSkippingLeadingTrivia, in: astgen.base)
+  }
+
+  @inline(__always)
+  func sourceLoc(in astgen: ASTGenVisitor) -> swift.SourceLoc {
+    positionAfterSkippingLeadingTrivia.sourceLoc(in: astgen)
   }
 }
 
@@ -96,6 +128,14 @@ extension Optional where Wrapped: SyntaxProtocol {
     
     return self.bridgedSourceLoc(in: astgen)
   }
+
+  @inline(__always)
+  func sourceLoc(in astgen: ASTGenVisitor) -> swift.SourceLoc {
+    guard let self else {
+      return swift.SourceLoc()
+    }
+    return self.sourceLoc(in: astgen)
+  }
 }
 
 extension TokenSyntax {
@@ -106,7 +146,15 @@ extension TokenSyntax {
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
     var text = self.text
     return text.withBridgedString { bridged in
-      ASTContext_getIdentifier(astgen.ctx, bridged)
+      ASTContext_getIdentifier(astgen.ctx.bridged, bridged)
+    }
+  }
+
+  @inline(__always)
+  func identifier(in astgen: ASTGenVisitor) -> swift.Identifier {
+    var text = self.text
+    return text.withStringRef { stringRef in
+      astgen.ctx.getIdentifier(stringRef)
     }
   }
 
@@ -117,6 +165,11 @@ extension TokenSyntax {
   @inline(__always)
   func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (BridgedIdentifier, BridgedSourceLoc) {
     return (self.bridgedIdentifier(in: astgen), self.bridgedSourceLoc(in: astgen))
+  }
+
+  @inline(__always)
+  func identifierAndSourceLoc(in astgen: ASTGenVisitor) -> (swift.Identifier, swift.SourceLoc) {
+    (self.identifier(in: astgen), self.sourceLoc(in: astgen))
   }
 
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
@@ -143,6 +196,15 @@ extension Optional<TokenSyntax> {
     return self.bridgedIdentifier(in: astgen)
   }
 
+  @inline(__always)
+  func identifier(in astgen: ASTGenVisitor) -> swift.Identifier {
+    guard let self else {
+      return .init()
+    }
+
+    return self.identifier(in: astgen)
+  }
+
   /// Obtains a bridged, `ASTContext`-owned copy of this token's text, and its bridged start location in the
   /// source buffer provided by `astgen` excluding leading trivia.
   ///
@@ -155,4 +217,19 @@ extension Optional<TokenSyntax> {
 
     return self.bridgedIdentifierAndSourceLoc(in: astgen)
   }
+
+  @inline(__always)
+  func identifierAndSourceLoc(in astgen: ASTGenVisitor) -> (swift.Identifier, swift.SourceLoc) {
+    guard let self else {
+      return (.init(), .init())
+    }
+    return self.identifierAndSourceLoc(in: astgen)
+  }
+}
+
+extension swift.BridgableASTContext {
+  var bridged: BridgedASTContext { .init(raw: .init(self.Ctx)) }
+}
+extension UnsafeMutablePointer where Pointee == swift.DeclContext {
+  var bridged: BridgedDeclContext { .init(raw: self) }
 }
