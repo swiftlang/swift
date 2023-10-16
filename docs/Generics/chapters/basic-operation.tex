@@ -74,7 +74,7 @@ Minimization machines have a temporary lifetime, scoped to one of the requests f
 \end{figure}
 
 \paragraph{Query machines.}
-Figure~\ref{rqm flowchart generic signature} shows the process of query machine construction, beginning with the minimal requirements of a generic signature:
+Figure~\ref{rqm flowchart generic signature} shows how a query machine is constructed from the minimal requirements of a generic signature:
 \begin{enumerate}
 \item The \index{rule builder}\emph{rule builder} lowers the generic signature's minimal requirements to \emph{rewrite rules}; these become the \IndexDefinition{local rule}\emph{local rules} of our new requirement machine.
 
@@ -214,7 +214,7 @@ Now we will give a full account of how imported rules work in the Requirement Ma
 We will show that the protocols that can appear in the \index{derived requirement}derivations of a given generic signature are precisely those reachable from an initial set in the \index{protocol dependency graph}protocol dependency graph. We begin by considering protocol dependencies between protocols first. Along the way, we also introduce the \emph{protocol component graph} to get around complications caused by circular dependencies.
 
 \begin{definition}
-A protocol $\protosym{P}$ \emph{depends on} a protocol $\protosym{Q}$ (or has a \emph{protocol dependency} on~$\protosym{Q}$) if we can derive a conformance to $\protosym{P}$ from the protocol generic signature $G_\texttt{P}$; that is, if $G_\texttt{P}\vDash\ConfReq{T}{P}$ for some type parameter \texttt{T}. We write $\protosym{P}\prec\protosym{Q}$ if this relationship holds. The \emph{protocol dependency set} of a protocol $\protosym{P}$ is then the set of all protocols $\protosym{Q}$ such that $\protosym{P}\prec\protosym{Q}$.
+A protocol $\protosym{P}$ \emph{depends on} a protocol $\protosym{Q}$ (or has a \emph{protocol dependency} on~$\protosym{Q}$) if we can derive a conformance to $\protosym{Q}$ from the protocol generic signature $G_\texttt{P}$; that is, if $G_\texttt{P}\vDash\ConfReq{T}{Q}$ for some type parameter \texttt{T}. We write $\protosym{P}\prec\protosym{Q}$ if this relationship holds. The \emph{protocol dependency set} of a protocol $\protosym{P}$ is then the set of all protocols $\protosym{Q}$ such that $\protosym{P}\prec\protosym{Q}$.
 \end{definition}
 
 Lemma~\ref{subst lemma} implies that $\prec$ is a \index{transitive relation}transitive relation; that is, if $\protosym{P}\prec\protosym{Q}$ and $\protosym{Q}\prec\protosym{R}$, then $\protosym{P}\prec\protosym{R}$. In fact, $\prec$ is the \index{reachability relation}reachability relation in the protocol dependency graph. Before we can prove this, we need a technical result.
@@ -356,7 +356,7 @@ The \index{equivalence class}equivalence classes of $\equiv$ are the \emph{stron
 \end{tikzpicture}
 \end{wrapfigure}
 
-The protocol component graph of Listing~\ref{protocol component listing} is shown on the left. With the exception of $\protosym{Foo}$ and $\protosym{Bar}$, which have collapsed to a single vertex, every protocol is in a protocol component by itself. The protocol component graph is always acyclic. However, it is still not a tree or a forest; as we see in our example, we have two distinct paths with source $\protosym{Top}$ and destination~$\protosym{Bot}$, so components can share ``children.'' To not import duplicate rules, we must take care to visit every downstream protocol machine once, and take only the \emph{local} rules from each. (Every imported rule was local in its original protocol machine, so we import it exactly once from there, never ``transitively.'')
+The protocol component graph of Listing~\ref{protocol component listing} is shown on the left. With the exception of $\protosym{Foo}$ and $\protosym{Bar}$, which have collapsed to a single vertex, every protocol is in a protocol component by itself. The protocol component graph is always acyclic. However, it is still not a tree or a forest; as we see in our example, we have two distinct paths with source $\protosym{Top}$ and destination~$\protosym{Bot}$, so components can share ``children.'' To ensure we do not import duplicate rules, we must be careful to only visit every downstream protocol machine once, and take only the \emph{local} rules from each. (Every imported rule was local in its original protocol machine, so we import it exactly once from there, never ``transitively.'')
 
 A \IndexTwoFlag{debug-requirement-machine}{protocol-dependencies}debugging flag prints out each connected component as it was formed. Let's try with our example:
 \begin{Verbatim}[fontsize=\footnotesize,numbers=none]
@@ -421,13 +421,13 @@ To form the strongly connected component of a vertex $v$, Tarjan's algorithm per
 \end{tikzpicture}
 \end{wrapfigure}
 
-We number vertices in the order they are visited, by assigning an incrementing integer to each vertex~$v$ prior to visiting its successors. We denote this by denoted $\Number{v}$. Our traversal can thus keep track of those vertices that have been visited by checking if $\Number{v}$ is set.
+We number vertices in the order they are visited, by assigning the current value of a counter to each visited vertex $v$, prior to visiting the successors of $v$. We denote the value assigned to a vertex $v$ by $\Number{v}$. Our traversal can determine if a vertex has been previously visited by checking if $\Number{v}$ is set.
 
 We return to the protocol dependency graph from Listing~\ref{protocol component listing}. A depth-first search originating from $\protosym{Top}$ produces the numbering of vertices shown on the right, where the first vertex is assigned the value 1. Here, the entire graph was ultimately reachable from 1; more generally, we get a numbering of the subgraph reachable from the initial vertex.
 
 When looking at a vertex $v$, we consider each edge $e\in E$ with $\Src(e)=v$. Suppose that $\Dst(e)$ is some other vertex~$w$; Tarjan considers the state of $\Number{w}$, and classifies the edge $e$ into one of four kinds: tree edges, ignored edges, fronds, and cross-links.
 
-If $\Number{w}$ has not yet been set, we say that $e$ is a \emph{tree edge}; the tree edges define a \emph{spanning tree} of the subgraph explored by the search. Otherwise, $w$ was visited earlier by the traversal, and we have one of the three remaining kinds. If $\Number{w}\geq\Number{v}$ (with equality corresponding to an edge from $v$ to itself, which we allow), any path from $v$ to $w$ must pass through a common ancestor of $v$ and $w$ in the spanning tree. We say that $e$ is an \emph{ignored edge}, because $e$ cannot not give rise to any new strongly connected components. The final two kinds arise when $\Number{w}<\Number{v}$. We say that $w$ is a \emph{frond} if $w$ is also an ancestor of $v$ in the spanning tree; otherwise, $e$ is a \emph{cross-link}. (While the distinction between the final two kinds plays a role in Tarjan's correctness proof, we'll see that algorithm handles fronds and cross-links uniformly.)
+If $\Number{w}$ has not yet been set, we say that $e$ is a \emph{tree edge}; the tree edges define a \emph{spanning tree} of the subgraph explored by the search. Otherwise, $w$ was visited earlier by the traversal, and we have one of the three remaining kinds. If $\Number{w}\geq\Number{v}$ (with equality corresponding to an edge from $v$ to itself, which we allow), any path from $v$ to $w$ must pass through a common ancestor of $v$ and $w$ in the spanning tree. We say that $e$ is an \emph{ignored edge}, because $e$ cannot not give rise to any new strongly connected components. The final two kinds arise when $\Number{w}<\Number{v}$. We say that $e$ is a \emph{frond} if $w$ is also an ancestor of $v$ in the spanning tree; otherwise, $e$ is a \emph{cross-link}. (While the distinction between the final two kinds plays a role in Tarjan's correctness proof, we'll see that algorithm handles fronds and cross-links uniformly.)
 
 \begin{wrapfigure}[11]{l}{2.9cm}
 \begin{tikzpicture}[x=1cm, y=1.3cm]
@@ -487,7 +487,7 @@ We push each vertex onto the stack before visiting its successors, but we only p
 The algorithm also needs a cheap way to check if a vertex is currently on the stack. We associate one more piece of state with each vertex $v$, a single bit denoted $\OnStack{v}$, to be set when $v$ is pushed and cleared when $v$ is popped.
 
 \begin{algorithm}[Tarjan's algorithm]\label{tarjan}
-Takes a vertex $v$ as input, together with some means of enumerating the successor vertices of $v$. Builds two maps: to each vertex, we assign a component ID, and to each component ID, we assign a list of member vertices. Upon completion, $v$ has a component ID assigned. Maintains a stack, and two global incrementing counters: the next vertex ID, and the next component ID.
+Takes a vertex $v$ as input, together with some means of enumerating the successor vertices of $v$. Builds two maps: to each vertex, we assign a component ID, and to each component ID, we assign a list of member vertices. Upon completion, $v$ has a component ID assigned. Maintains a stack, and two global incrementing counters: the next unused vertex ID, and the next component ID.
 \begin{enumerate}
 \item (Memoize) If $v$ already has a component ID assigned, return this component ID, which can be used to look up its members.
 \item (Invariant) Otherwise, ensure that $\Number{v}$ has not been set. If it is set but $v$ does not have a component ID, we performed an invalid re-entrant call (see below).
@@ -499,9 +499,9 @@ Takes a vertex $v$ as input, together with some means of enumerating the success
 \item Otherwise, $\Number{w}<\Number{v}$, so we have a frond or cross-link. If $\OnStack{w}$ is true, set $\Lowlink{v}\leftarrow\min(\Lowlink{v},\Number{w})$.
 \end{enumerate}
 \item (Not root?) If $\Lowlink{v}\neq\Number{v}$, return.
-\item (Root) Create a new component consisting of $v$, and associate the component ID with $v$.
+\item (Root) Assign the next unused component ID to $v$, and add $v$ to this component ID.
 \item (Add vertex) Pop a vertex $v^\prime$ from the stack (which must be non-empty at this point) and clear $\OnStack{v^\prime}$. Add $v^\prime$ to the component of $v$, and associate the component ID with $v^\prime$.
-\item (Repeat) If the stack is not empty, go back to Step~7.
+\item (Repeat) If the stack is not empty, go back to Step~7. Otherwise, return.
 \end{enumerate}
 \end{algorithm}
 After the outermost recursive call returns, the stack will always be empty. Note that while this algorithm is recursive, it is not re-entrant; in particular, the act of getting the successors of a vertex must not trigger the computation of the same strongly connected components. This is enforced in Step~2. In our case, this can happen because getting the successors of a protocol performs type resolution; in practice this should be extremely difficult to hit, so for simplicity we report a fatal error and exit the compiler instead of attempting to recover.
