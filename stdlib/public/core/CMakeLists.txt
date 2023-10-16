@@ -140,7 +140,7 @@ split_embedded_sources(
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
     NORMAL Set.swift
-    NORMAL SetAlgebra.swift
+  EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
     NORMAL SetBuilder.swift
