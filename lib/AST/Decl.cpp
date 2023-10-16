@@ -963,8 +963,10 @@ AbstractFunctionDecl::getEffectiveThrownErrorType() const {
       interfaceType = fnType->getResult();
   }
 
-  return interfaceType->castTo<AnyFunctionType>()
-      ->getEffectiveThrownErrorType();
+  if (auto fnType = interfaceType->getAs<AnyFunctionType>())
+    return fnType->getEffectiveThrownErrorType();
+
+  return llvm::None;
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
