@@ -3797,12 +3797,29 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
     virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
         return Action::Continue(E);
+
+      // If we have an already-resolved reference to the parameter in question,
+      // we're done.
       if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto decl = DRE->getDecl()) {
           if (decl == OldValueParam) {
             foundOldValueRef = true;
             return Action::Stop();
           }
+        }
+      }
+
+      // If we have an unresolved reference with the same name as the parameter,
+      // perform name lookup to determine whether it refers to this parameter.
+      if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E)) {
+        auto loc = UDRE->getLoc();
+        auto sf = OldValueParam->getDeclContext()
+            ->getOutermostParentSourceFile();
+        auto name = UDRE->getName().getFullName();
+        if (name == OldValueParam->getName() &&
+            ASTScope::lookupSingleLocalDecl(sf, name, loc) == OldValueParam) {
+          foundOldValueRef = true;
+          return Action::Stop();
         }
       }
 
@@ -3838,7 +3855,7 @@ bool SimpleDidSetRequest::evaluate(Evaluator &evaluator,
   // If we find a reference to the implicit 'oldValue' parameter, then it is
   // not a "simple" didSet because we need to fetch it.
   auto walker = OldValueFinder(param);
-  if (auto *body = decl->getTypecheckedBody())
+  if (auto *body = decl->getBody())
     body->walk(walker);
   auto hasOldValueRef = walker.didFindOldValueRef();
   if (!hasOldValueRef) {
