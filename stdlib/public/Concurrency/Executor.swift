@@ -37,6 +37,14 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
+@available(SwiftStdlib 9999, *)
+extension Executor {
+
+  public func asUnownedExecutor() -> UnownedExecutor {
+    return UnownedExecutor(ordinary: self)
+  }
+}
+
 /// A service that executes jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
@@ -225,7 +233,7 @@ public struct UnownedSerialExecutor: Sendable {
   /// actually use the same underlying serialization context and can be therefore
   /// safely treated as the same serial exclusive execution context (e.g. multiple
   /// dispatch queues targeting the same serial queue).
-  @available(SwiftStdlib 5.9, *)
+  @available(SwiftStdlib 9999, *)
   @inlinable
   public init<E: SerialExecutor>(complexEquality executor: __shared E) {
     #if compiler(>=5.9) && $BuiltinBuildComplexEqualityExecutor
@@ -241,6 +249,39 @@ public struct UnownedSerialExecutor: Sendable {
     _executor_isComplexEquality(self)
   }
 
+}
+
+
+@available(SwiftStdlib 9999, *)
+@frozen
+public struct UnownedExecutor: Sendable {
+  // #if compiler(>=5.9) && $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+  @usableFromInline
+  internal var executor: Builtin.Executor
+
+  /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
+  /// which needs to reach for this from an @_transparent function which prevents @_spi use.
+  @available(SwiftStdlib 9999, *)
+  public var _executor: Builtin.Executor {
+    self.executor
+  }
+  // #endif
+
+  @inlinable
+  public init(_ executor: Builtin.Executor) {
+    // #if compiler(>=9999) && $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+    self.executor = executor
+    // #endif
+  }
+
+  @inlinable
+  public init<E: Executor>(ordinary executor: __shared E) {
+    // #if compiler(>=9999) && $BuiltinBuildExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
+    self.executor = Builtin.buildOrdinaryExecutorRef(executor)
+    // #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    // #endif
+  }
 }
 
 /// Checks if the current task is running on the expected executor.
