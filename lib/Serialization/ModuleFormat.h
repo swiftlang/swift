@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 812; // @_extern(wasm)
+const uint16_t SWIFTMODULE_VERSION_MINOR = 813; // VTable bit redefinition
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1524,7 +1524,7 @@ namespace decls_block {
     DeclIDField, // overridden decl
     BCFixed<1>,   // whether the overridden decl affects ABI
     AccessLevelField, // access level
-    BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // requires a new vtable/witness table slot
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
     BCVBR<5>,     // number of parameter name components
     BCArray<IdentifierIDField> // name components,
@@ -1561,7 +1561,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
     BCFixed<2>,  // # of property wrapper backing properties
-    BCVBR<4>,    // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable/witness table entries introduced by all accessors
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1605,7 +1605,7 @@ namespace decls_block {
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
                   // components plus one
     AccessLevelField, // access level
-    BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // requires a new vtable/witness table slot
     DeclIDField,  // opaque result type decl
     BCFixed<1>,   // isUserAccessible?
     BCFixed<1>,   // is distributed thunk
@@ -1666,7 +1666,7 @@ namespace decls_block {
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
     AccessLevelField, // access level
-    BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // requires a new vtable/witness table slot
     BCFixed<1>,   // is transparent
     BCFixed<1>,   // is distributed thunk
     BCArray<IdentifierIDField> // name components,
@@ -1754,7 +1754,7 @@ namespace decls_block {
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
-    BCVBR<4>,    // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable/witness table entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
