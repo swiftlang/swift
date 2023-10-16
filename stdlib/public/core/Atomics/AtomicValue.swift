@@ -29,6 +29,7 @@ where
   Self: AtomicValue,
   RawValue: AtomicValue
 {
+  @available(SwiftStdlib 5.10, *)
   public typealias AtomicRepresentation = RawValue.AtomicRepresentation
 
   @available(SwiftStdlib 5.10, *)
@@ -48,4 +49,24 @@ where
   ) -> Self {
     Self(rawValue: RawValue.decodeAtomicRepresentation(representation))!
   }
+}
+
+@available(SwiftStdlib 5.10, *)
+extension Never: AtomicValue {
+  @available(SwiftStdlib 5.10, *)
+  public typealias AtomicRepresentation = Never
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func encodeAtomicRepresentation(
+    _ value: consuming Never
+  ) -> Never {}
+
+  @available(SwiftStdlib 5.10, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func decodeAtomicRepresentation(
+    _ representation: consuming Never
+  ) -> Never {}
 }

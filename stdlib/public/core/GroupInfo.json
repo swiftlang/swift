@@ -249,5 +249,18 @@
   ],
   "Result": [
     "Result.swift"
+  ],
+  "Atomics": [
+    "Atomic.swift",
+    "AtomicBool.swift",
+    "AtomicFloats.swift",
+    "AtomicIntegers.swift",
+    "AtomicLazyReference.swift",
+    "AtomicMemoryOrderings.swift",
+    "AtomicOptional.swift",
+    "AtomicPointers.swift",
+    "AtomicStorage.swift",
+    "AtomicValue.swift",
+    "WordPair.swift"
   ]
 }

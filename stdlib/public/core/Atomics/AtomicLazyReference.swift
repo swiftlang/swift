@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Builtin
-
 /// A lazily initializable atomic strong reference.
 ///
 /// These values can be set (initialized) exactly once, but read many
@@ -40,8 +38,8 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
 extension AtomicLazyReference {
   /// Atomically initializes this reference if its current value is nil, then
   /// returns the initialized value. If this reference is already initialized,
-  /// then `storeIfNilThenLoad(_:)` discards its supplied argument and returns
-  /// the current value without updating it.
+  /// then `storeIfNil(_:)` discards its supplied argument and returns the
+  /// current value without updating it.
   ///
   /// The following example demonstrates how this can be used to implement a
   /// thread-safe lazily initialized reference:
@@ -57,13 +55,13 @@ extension AtomicLazyReference {
   ///     // multiple threads, but only one of them will get to
   ///     // succeed setting the reference.
   ///     let histogram = ...
-  ///     return _histogram.storeIfNilThenLoad(histogram)
+  ///     return _histogram.storeIfNil(histogram)
   /// }
   /// ```
   ///
   /// This operation uses acquiring-and-releasing memory ordering.
   @available(SwiftStdlib 5.10, *)
-  public func storeIfNilThenLoad(_ desired: consuming Instance) -> Instance {
+  public func storeIfNil(_ desired: consuming Instance) -> Instance {
     let desiredUnmanaged = Unmanaged.passRetained(desired)
     let (exchanged, current) = storage.compareExchange(
       expected: nil,
@@ -91,3 +89,6 @@ extension AtomicLazyReference {
     return value?.takeUnretainedValue()
   }
 }
+
+@available(SwiftStdlib 5.10, *)
+extension AtomicLazyReference: @unchecked Sendable where Instance: Sendable {}

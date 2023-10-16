@@ -11,31 +11,31 @@
 #===-----------------------------------------------------------------------===//
 
 atomicTypes = [
-  # Swift                  Size    Alignment  Builtin
-  ("AtomicInt8Storage",     "8",         "1", "Builtin.Int8"),
-  ("AtomicInt16Storage",   "16",         "2", "Builtin.Int16"),
-  ("AtomicInt32Storage",   "32",         "4", "Builtin.Int32"),
-  ("AtomicInt64Storage",   "64",         "8", "Builtin.Int64"),
-  ("AtomicInt128Storage", "128",        "16", "Builtin.Int128"),
+  # Swift               Size   Alignment  Builtin
+  ("_AtomicStorage8",   "8",   "1",       "Builtin.Int8"),
+  ("_AtomicStorage16",  "16",  "2",       "Builtin.Int16"),
+  ("_AtomicStorage32",  "32",  "4",       "Builtin.Int32"),
+  ("_AtomicStorage64",  "64",  "8",       "Builtin.Int64"),
+  ("_AtomicStorage128", "128", "16",      "Builtin.Int128"),
 ]
 
 intTypes = [
-  # Swift   Storage Type 
-  ("Int8",  "AtomicInt8Storage",   "Int8"),
-  ("Int16", "AtomicInt16Storage",  "Int16"),
-  ("Int32", "AtomicInt32Storage",  "Int32"),
-  ("Int64", "AtomicInt64Storage",  "Int64"),
+  # Swift   Storage Type         Builtin
+  ("Int8",  "_AtomicStorage8",   "Int8"),
+  ("Int16", "_AtomicStorage16",  "Int16"),
+  ("Int32", "_AtomicStorage32",  "Int32"),
+  ("Int64", "_AtomicStorage64",  "Int64"),
 
   # We handle the word type's storage in source.
-  ("Int",   "",                    "Word"),
+  ("Int",    "",                  "Word"),
 
-  ("UInt8",  "AtomicInt8Storage",  "Int8"),
-  ("UInt16", "AtomicInt16Storage", "Int16"),
-  ("UInt32", "AtomicInt32Storage", "Int32"),
-  ("UInt64", "AtomicInt64Storage", "Int64"),
+  ("UInt8",  "_AtomicStorage8",  "Int8"),
+  ("UInt16", "_AtomicStorage16", "Int16"),
+  ("UInt32", "_AtomicStorage32", "Int32"),
+  ("UInt64", "_AtomicStorage64", "Int64"),
 
   # We handle the word type's storage in source.
-  ("UInt",   "",                   "Word"),
+  ("UInt",   "",                 "Word"),
 ]
 
 loadOrderings = [
@@ -63,8 +63,8 @@ updateOrderings = [
 
 integerOperations = [
   # Swift name,         llvm name,  operator, label,  doc name
-  ("WrappingIncrement", "add",      "&+",     "by",   "wrapping add"),
-  ("WrappingDecrement", "sub",      "&-",     "by",   "wrapping subtract"),
+  ("WrappingAdd",       "add",      "&+",     "by",   "wrapping add"),
+  ("WrappingSubtract",  "sub",      "&-",     "by",   "wrapping subtract"),
   ("BitwiseAnd",        "and",      "&",      "with", "bitwise AND"),
   ("BitwiseOr",         "or",       "|",      "with", "bitwise OR"),
   ("BitwiseXor",        "xor",      "^",      "with", "bitwise XOR"),
