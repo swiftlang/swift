@@ -918,12 +918,15 @@ public:
 
   Classification classifyConformance(ProtocolConformanceRef conformanceRef,
                                      EffectKind kind) {
+    if (conformanceRef.isInvalid())
+      return Classification::forInvalidCode();
+
     if (conformanceRef.hasEffect(kind)) {
       assert(kind == EffectKind::Throws); // there is no async
       ASTContext &ctx = conformanceRef.getRequirement()->getASTContext();
       // FIXME: typed throws, if it becomes a thing for conformances
       return Classification::forThrows(
-          ctx.getAnyExistentialType(),
+          ctx.getErrorExistentialType(),
           ConditionalEffectKind::Conditional,
           PotentialEffectReason::forConformance());
     }
