@@ -3575,6 +3575,10 @@ static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
 }
 
+static bool usesFeatureFullTypedThrows(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureTypedThrows(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
     return func->getThrownTypeRepr() != nullptr;
