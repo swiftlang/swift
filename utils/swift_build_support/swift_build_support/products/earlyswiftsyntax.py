@@ -63,6 +63,7 @@ class EarlySwiftSyntax(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', self.args.install_prefix)
         self.cmake_options.define('SWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL',
                                   self.args.assertions)
+        self.cmake_options.define('SWIFT_MODULE_ABI_NAME_PREFIX:STRING', 'Compiler')
         self.build_with_cmake(["all"], self.args.swift_build_variant, [])
 
     def should_test(self, host_target):
