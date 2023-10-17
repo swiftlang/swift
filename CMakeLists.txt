@@ -1353,6 +1353,9 @@ if(SWIFT_INCLUDE_TOOLS)
     if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
       set(SWIFT_HOST_LIBRARIES_RPATH "$ORIGIN;$ORIGIN/../${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
+    # Add unique ABI prefix to swift-syntax libraries so that compiler libraries (e.g. sourcekitdInProc)
+    # can be used from tools that has its own swift-syntax libraries as SwiftPM dependencies.
+    set(SWIFT_MODULE_ABI_NAME_PREFIX "Compiler")
 
     file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
     FetchContent_Declare(SwiftSyntax
