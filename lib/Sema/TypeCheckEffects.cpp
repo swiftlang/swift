@@ -918,12 +918,15 @@ public:
 
   Classification classifyConformance(ProtocolConformanceRef conformanceRef,
                                      EffectKind kind) {
+    if (conformanceRef.isInvalid())
+      return Classification::forInvalidCode();
+
     if (conformanceRef.hasEffect(kind)) {
       assert(kind == EffectKind::Throws); // there is no async
       ASTContext &ctx = conformanceRef.getRequirement()->getASTContext();
       // FIXME: typed throws, if it becomes a thing for conformances
       return Classification::forThrows(
-          ctx.getAnyExistentialType(),
+          ctx.getErrorExistentialType(),
           ConditionalEffectKind::Conditional,
           PotentialEffectReason::forConformance());
     }
@@ -1718,14 +1721,15 @@ public:
 private:
   static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
     if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
-      return Context(Kind::IVarInitializer);
+      return Context(Kind::IVarInitializer, pbd->getDeclContext());
     } else {
-      return Context(Kind::GlobalVarInitializer);
+      return Context(Kind::GlobalVarInitializer, pbd->getDeclContext());
     }
   }
 
   Kind TheKind;
   llvm::Optional<AnyFunctionRef> Function;
+  DeclContext *DC;
   bool HandlesErrors = false;
   bool HandlesAsync = false;
 
@@ -1736,14 +1740,15 @@ private:
   bool DiagnoseErrorOnTry = false;
   InterpolatedStringLiteralExpr *InterpolatedString = nullptr;
 
-  explicit Context(Kind kind)
-      : TheKind(kind), Function(llvm::None), HandlesErrors(false) {
+  explicit Context(Kind kind, DeclContext *dc)
+      : TheKind(kind), Function(llvm::None), DC(dc), HandlesErrors(false) {
     assert(TheKind != Kind::PotentiallyHandled);
   }
 
   explicit Context(bool handlesErrors, bool handlesAsync,
-                   llvm::Optional<AnyFunctionRef> function)
-      : TheKind(Kind::PotentiallyHandled), Function(function),
+                   llvm::Optional<AnyFunctionRef> function,
+                   DeclContext *dc)
+      : TheKind(Kind::PotentiallyHandled), Function(function), DC(dc),
         HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) {}
 
 public:
@@ -1820,7 +1825,7 @@ public:
   static Context forTopLevelCode(TopLevelCodeDecl *D) {
     // Top-level code implicitly handles errors.
     return Context(/*handlesErrors=*/true,
-                   /*handlesAsync=*/D->isAsyncContext(), llvm::None);
+                   /*handlesAsync=*/D->isAsyncContext(), llvm::None, D);
   }
 
   static Context forFunction(AbstractFunctionDecl *D) {
@@ -1840,20 +1845,20 @@ public:
       }
     }
 
-    return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D));
+    return Context(D->hasThrows(), D->isAsyncContext(), AnyFunctionRef(D), D);
   }
 
-  static Context forDeferBody() {
-    return Context(Kind::DeferBody);
+  static Context forDeferBody(DeclContext *dc) {
+    return Context(Kind::DeferBody, dc);
   }
 
   static Context forInitializer(Initializer *init) {
     if (isa<DefaultArgumentInitializer>(init)) {
-      return Context(Kind::DefaultArgument);
+      return Context(Kind::DefaultArgument, init);
     }
 
     if (isa<PropertyWrapperInitializer>(init)) {
-      return Context(Kind::PropertyWrapper);
+      return Context(Kind::PropertyWrapper, init);
     }
 
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
@@ -1863,7 +1868,7 @@ public:
   }
 
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
-    return Context(Kind::EnumElementInitializer);
+    return Context(Kind::EnumElementInitializer, elt);
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
@@ -1877,15 +1882,15 @@ public:
       }
     }
 
-    return Context(closureTypeThrows, closureTypeIsAsync, AnyFunctionRef(E));
+    return Context(closureTypeThrows, closureTypeIsAsync, AnyFunctionRef(E), E);
   }
 
-  static Context forCatchPattern(CaseStmt *S) {
-    return Context(Kind::CatchPattern);
+  static Context forCatchPattern(CaseStmt *S, DeclContext *dc) {
+    return Context(Kind::CatchPattern, dc);
   }
 
-  static Context forCatchGuard(CaseStmt *S) {
-    return Context(Kind::CatchGuard);
+  static Context forCatchGuard(CaseStmt *S, DeclContext *dc) {
+    return Context(Kind::CatchGuard, dc);
   }
 
   static Context forPatternBinding(PatternBindingDecl *binding) {
@@ -1908,6 +1913,8 @@ public:
   }
 
   Kind getKind() const { return TheKind; }
+
+  DeclContext *getDeclContext() const { return DC; }
 
   bool handlesThrows(ConditionalEffectKind errorKind) const {
     switch (errorKind) {
@@ -2587,6 +2594,19 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
   };
 
+  /// Retrieve the type of the error that can be caught when an error is
+  /// thrown from the given location.
+  Type getCaughtErrorTypeAt(SourceLoc loc) {
+    auto module = CurContext.getDeclContext()->getParentModule();
+    if (CatchNode catchNode = ASTScope::lookupCatchNode(module, loc)) {
+      if (auto caughtType = catchNode.getThrownErrorTypeInContext(Ctx))
+        return *caughtType;
+    }
+
+    // Fall back to the error existential.
+    return Ctx.getErrorExistentialType();
+  }
+
 public:
   CheckEffectsCoverage(ASTContext &ctx, Context initialContext)
     : Ctx(ctx), CurContext(initialContext),
@@ -2706,6 +2726,11 @@ private:
     // specialized diagnostic about non-exhaustive catches.
     if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.setNonExhaustiveCatch(true);
+    } else if (Type rethrownErrorType = S->getCaughtErrorType()) {
+      // We're implicitly rethrowing the error out of this do..catch, so make
+      // sure that we can throw an error of this type out of this context.
+      auto catches = S->getCatches();
+      checkThrownErrorType(catches.back()->getEndLoc(), rethrownErrorType);
     }
 
     S->getBody()->walk(*this);
@@ -2727,14 +2752,15 @@ private:
   }
 
   void checkCatch(CaseStmt *S, ConditionalEffectKind doThrowingKind) {
+    auto dc = CurContext.getDeclContext();
     for (auto &LabelItem : S->getMutableCaseLabelItems()) {
       // The pattern and guard aren't allowed to throw.
       {
-        ContextScope scope(*this, Context::forCatchPattern(S));
+        ContextScope scope(*this, Context::forCatchPattern(S, dc));
         LabelItem.getPattern()->walk(*this);
       }
       if (auto guard = LabelItem.getGuardExpr()) {
-        ContextScope scope(*this, Context::forCatchGuard(S));
+        ContextScope scope(*this, Context::forCatchGuard(S, dc));
         guard->walk(*this);
       }
     }
@@ -2943,9 +2969,25 @@ private:
       } else if (!isTryCovered) {
         CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
                                               classification.getThrowReason());
+      } else {
+        checkThrownErrorType(E.getStartLoc(), classification.getThrownError());
       }
       break;
     }
+  }
+
+  /// Check the thrown error type against the type that can be caught or
+  /// rethrown by the context.
+  void checkThrownErrorType(SourceLoc loc, Type thrownErrorType) {
+    Type caughtErrorType = getCaughtErrorTypeAt(loc);
+    if (caughtErrorType->isEqual(thrownErrorType))
+      return;
+
+    OpaqueValueExpr *opaque = new (Ctx) OpaqueValueExpr(loc, thrownErrorType);
+    Expr *rethrowExpr = opaque;
+    TypeChecker::typeCheckExpression(
+        rethrowExpr, CurContext.getDeclContext(),
+        {caughtErrorType, /*FIXME:*/CTP_ThrowStmt});
   }
 
   ShouldRecurse_t checkAwait(AwaitExpr *E) {
@@ -3206,7 +3248,7 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
 
   auto isDeferBody = isa<FuncDecl>(fn) && cast<FuncDecl>(fn)->isDeferBody();
   auto context =
-      isDeferBody ? Context::forDeferBody() : Context::forFunction(fn);
+      isDeferBody ? Context::forDeferBody(fn) : Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
   CheckEffectsCoverage checker(ctx, context);
 

@@ -3426,7 +3426,7 @@ public:
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
-    bool overriddenAffectsABI, needsNewVTableEntry, firstTimeRequired;
+    bool overriddenAffectsABI, needsNewTableEntry, firstTimeRequired;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
@@ -3439,7 +3439,7 @@ public:
                                                overriddenID,
                                                overriddenAffectsABI,
                                                rawAccessLevel,
-                                               needsNewVTableEntry,
+                                               needsNewTableEntry,
                                                firstTimeRequired,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -3455,11 +3455,11 @@ public:
         getActualCtorInitializerKind(storedInitKind);
 
     DeclDeserializationError::Flags errorFlags;
-    unsigned numVTableEntries = 0;
+    unsigned numTableEntries = 0;
     if (initKind == CtorInitializerKind::Designated)
       errorFlags |= DeclDeserializationError::DesignatedInitializer;
-    if (needsNewVTableEntry) {
-      numVTableEntries = 1;
+    if (needsNewTableEntry) {
+      numTableEntries = 1;
       DeclAttributes attrs;
       attrs.setRawAttributeChain(DAttrs);
     }
@@ -3479,7 +3479,7 @@ public:
       MF.diagnoseAndConsumeError(overriddenOrError.takeError());
       if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
         return llvm::make_error<OverrideError>(name, errorFlags,
-                                               numVTableEntries);
+                                               numTableEntries);
       }
 
       overridden = nullptr;
@@ -3490,7 +3490,7 @@ public:
       if (!dependency) {
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            errorFlags, numVTableEntries);
+            errorFlags, numTableEntries);
       }
     }
 
@@ -3545,8 +3545,6 @@ public:
     if (initKind.has_value())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
                                 std::move(initKind.value()));
-    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
-                              std::move(needsNewVTableEntry));
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden));
     if (auto *overridden = ctor->getOverriddenDecl()) {
@@ -3882,7 +3880,7 @@ public:
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool overriddenAffectsABI, needsNewVTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewTableEntry, isTransparent;
     DeclID opaqueReturnTypeID;
     bool isUserAccessible;
     bool isDistributedThunk;
@@ -3901,7 +3899,7 @@ public:
                                           overriddenAffectsABI,
                                           numNameComponentsBiased,
                                           rawAccessLevel,
-                                          needsNewVTableEntry,
+                                          needsNewTableEntry,
                                           opaqueReturnTypeID,
                                           isUserAccessible,
                                           isDistributedThunk,
@@ -3920,14 +3918,14 @@ public:
                                               accessorStorageDeclID,
                                               rawAccessorKind,
                                               rawAccessLevel,
-                                              needsNewVTableEntry,
+                                              needsNewTableEntry,
                                               isTransparent,
                                               isDistributedThunk,
                                               nameAndDependencyIDs);
     }
 
     DeclDeserializationError::Flags errorFlags;
-    unsigned numVTableEntries = needsNewVTableEntry ? 1 : 0;
+    unsigned numTableEntries = needsNewTableEntry ? 1 : 0;
 
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
@@ -3940,7 +3938,7 @@ public:
         // FIXME: "TypeError" isn't exactly correct for this.
         return llvm::make_error<TypeError>(
             DeclName(), takeErrorInfo(storageResult.takeError()),
-            errorFlags, numVTableEntries);
+            errorFlags, numTableEntries);
       }
 
       if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
@@ -3986,7 +3984,7 @@ public:
       if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
         MF.diagnoseAndConsumeError(overriddenOrError.takeError());
         return llvm::make_error<OverrideError>(name, errorFlags,
-                                               numVTableEntries);
+                                               numTableEntries);
       }
       // Pass through deserialization errors.
       if (overriddenOrError.errorIsA<FatalDeserializationError>())
@@ -4001,7 +3999,7 @@ public:
       if (!dependency) {
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            errorFlags, numVTableEntries);
+            errorFlags, numTableEntries);
       }
     }
 
@@ -4098,8 +4096,6 @@ public:
       fn->setImplicit();
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
-    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
-                              std::move(needsNewVTableEntry));
 
     if (opaqueReturnTypeID) {
       auto declOrError = MF.getDeclChecked(opaqueReturnTypeID);
@@ -4799,7 +4795,7 @@ public:
     uint8_t rawAccessLevel, rawSetterAccessLevel, rawStaticSpelling;
     uint8_t opaqueReadOwnership, readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
-    unsigned numVTableEntries;
+    unsigned numTableEntries;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
@@ -4815,7 +4811,7 @@ public:
                                              rawSetterAccessLevel,
                                              rawStaticSpelling, numArgNames,
                                              opaqueReturnTypeID,
-                                             numVTableEntries,
+                                             numTableEntries,
                                              argNameAndDependencyIDs);
     // Resolve the name ids.
     SmallVector<Identifier, 2> argNames;
@@ -4841,7 +4837,7 @@ public:
 
       DeclDeserializationError::Flags errorFlags;
       return llvm::make_error<OverrideError>(
-          name, errorFlags, numVTableEntries);
+          name, errorFlags, numTableEntries);
     }
 
     for (TypeID dependencyID : argNameAndDependencyIDs) {
@@ -4850,7 +4846,7 @@ public:
         DeclDeserializationError::Flags errorFlags;
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            errorFlags, numVTableEntries);
+            errorFlags, numTableEntries);
       }
     }
 
@@ -7611,12 +7607,12 @@ Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
     if (error.isDesignatedInitializer())
       context.evaluator.cacheOutput(
           HasMissingDesignatedInitializersRequest{containingClass}, true);
-    if (error.getNumberOfVTableEntries() > 0)
+    if (error.getNumberOfTableEntries() > 0)
       containingClass->setHasMissingVTableEntries();
 
     suppliedMissingMember = MissingMemberDecl::create(
         context, containingClass, error.getName(),
-        error.getNumberOfVTableEntries(),
+        error.getNumberOfTableEntries(),
         error.needsFieldOffsetVectorEntry());
   };
 
@@ -7651,12 +7647,12 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
       [&](const DeclDeserializationError &error) {
         assert(error.needsFieldOffsetVectorEntry() == 0);
 
-        if (error.getNumberOfVTableEntries() > 0)
+        if (error.getNumberOfTableEntries() > 0)
           containingProto->setHasMissingRequirements(true);
 
         suppliedMissingMember = MissingMemberDecl::create(
             context, containingProto, error.getName(),
-            error.getNumberOfVTableEntries(), 0);
+            error.getNumberOfTableEntries(), 0);
       };
   llvm::handleAllErrors(std::move(error), handleMissingProtocolMember);
   return suppliedMissingMember;

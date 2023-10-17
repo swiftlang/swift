@@ -5304,6 +5304,9 @@ ERROR(local_function_executed_concurrently,none,
 ERROR(sendable_isolated_sync_function,none,
       "%0 synchronous %kind1 cannot be marked as '@Sendable'",
       (ActorIsolation, const ValueDecl *))
+ERROR(nonsendable_instance_method,none,
+      "instance methods of non-Sendable types cannot be marked as '@Sendable'",
+      ())
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %kind1 in "
       "concurrently-executing code",
@@ -7312,7 +7315,7 @@ ERROR(macro_undefined,PointsToFirstBadToken,
       "no macro named %0", (Identifier))
 ERROR(external_macro_not_found,none,
       "external macro implementation type '%0.%1' could not be found for "
-      "macro %2", (StringRef, StringRef, DeclName))
+      "macro %2; %3", (StringRef, StringRef, DeclName, StringRef))
 ERROR(macro_must_be_defined,none,
       "macro %0 requires a definition", (DeclName))
 ERROR(external_macro_outside_macro_definition,none,

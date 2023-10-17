@@ -58,6 +58,9 @@ bool isAfterLLVM(ID Id);
 /// These need to be passed to the Swift frontend
 bool isPartOfSwiftCompilation(ID Id);
 
+/// Returns true of the type of the output is produced from a diagnostic engine.
+bool isProducedFromDiagnostics(ID Id);
+
 static inline void forAllTypes(llvm::function_ref<void(file_types::ID)> fn) {
   for (uint8_t i = 0; i < static_cast<uint8_t>(TY_INVALID); ++i)
     fn(static_cast<ID>(i));

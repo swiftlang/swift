@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 //
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Version.h"
@@ -185,8 +186,11 @@ private:
       llvm::errs() << "missing swift-frontend command-line after --\n";
       return true;
     }
-    // drop swift-frontend executable path from command-line.
+    // drop swift-frontend executable path and leading `-frontend` from
+    // command-line.
     if (StringRef(FrontendArgs[0]).endswith("swift-frontend"))
+      FrontendArgs.erase(FrontendArgs.begin());
+    if (StringRef(FrontendArgs[0]).equals("-frontend"))
       FrontendArgs.erase(FrontendArgs.begin());
 
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4>
@@ -284,7 +288,7 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   auto addOutputKey = [&](StringRef InputPath, file_types::ID OutputKind,
                           StringRef OutputPath) {
     auto OutputKey =
-        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath, OutputKind);
+        createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
     if (!OutputKey) {
       llvm::errs() << "cannot create cache key for " << OutputPath << ": "
                    << toString(OutputKey.takeError()) << "\n";
@@ -306,7 +310,7 @@ int SwiftCacheToolInvocation::printOutputKeys() {
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &File, file_types::ID ID) {
               // Dont print serialized diagnostics.
-              if (ID == file_types::ID::TY_SerializedDiagnostics)
+              if (file_types::isProducedFromDiagnostics(ID))
                 return;
 
               addOutputKey(InputPath, ID, File);
@@ -347,8 +351,7 @@ readOutputEntriesFromFile(StringRef Path) {
 
   auto JSONValue = llvm::json::parse((*JSONContent)->getBuffer());
   if (!JSONValue)
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "failed to parse input file as JSON");
+    return JSONValue.takeError();
 
   auto Keys = JSONValue->getAsArray();
   if (!Keys)
@@ -362,6 +365,8 @@ int SwiftCacheToolInvocation::validateOutputs() {
   auto DB = CASOpts.getOrCreateDatabases();
   if (!DB)
     report_fatal_error(DB.takeError());
+
+  auto &CAS = *DB->first;
 
   PrintingDiagnosticConsumer PDC;
   Instance.getDiags().addConsumer(PDC);
@@ -377,12 +382,38 @@ int SwiftCacheToolInvocation::validateOutputs() {
     for (const auto& Entry : *Keys) {
       if (auto *Obj = Entry.getAsObject()) {
         if (auto Key = Obj->getString("CacheKey")) {
-          if (auto Buffer = loadCachedCompileResultFromCacheKey(
-                  *DB->first, *DB->second, Instance.getDiags(), *Key))
-            continue;
-          llvm::errs() << "failed to find output for cache key " << *Key
-                       << "\n";
-          return true;
+          auto ID = CAS.parseID(*Key);
+          if (!ID) {
+            llvm::errs() << "failed to parse ID " << Key << ": "
+                         << toString(ID.takeError()) << "\n";
+            return true;
+          }
+          auto Ref = CAS.getReference(*ID);
+          if (!Ref) {
+            llvm::errs() << "failed to find output for cache key " << Key
+                         << "\n";
+            return true;
+          }
+          cas::CachedResultLoader Loader(*DB->first, *DB->second, *Ref);
+          auto Result = Loader.replay(
+                  [&](file_types::ID Kind, ObjectRef Ref) -> llvm::Error {
+                    auto Proxy = CAS.getProxy(Ref);
+                    if (!Proxy)
+                      return Proxy.takeError();
+                    return llvm::Error::success();
+                  });
+
+          if (!Result) {
+            llvm::errs() << "failed to find output for cache key " << *Key
+                         << ": " << toString(Result.takeError()) << "\n";
+            return true;
+          }
+          if (!*Result) {
+            llvm::errs() << "failed to load output for cache key " << *Key
+                         << "\n";
+            return true;
+          }
+          continue;
         }
       }
       llvm::errs() << "can't read cache key from " << Path << "\n";
@@ -422,7 +453,8 @@ int SwiftCacheToolInvocation::renderDiags() {
         if (auto Key = Obj->getString("CacheKey")) {
           if (auto Buffer = loadCachedCompileResultFromCacheKey(
                   Instance.getObjectStore(), Instance.getActionCache(),
-                  Instance.getDiags(), *Key)) {
+                  Instance.getDiags(), *Key,
+                  file_types::ID::TY_CachedDiagnostics)) {
             if (auto E = CDP->replayCachedDiagnostics(Buffer->getBuffer())) {
               llvm::errs() << "failed to replay cache: "
                            << toString(std::move(E)) << "\n";

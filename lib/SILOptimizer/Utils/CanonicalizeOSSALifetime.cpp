@@ -129,6 +129,8 @@ static bool isDestroyOfCopyOf(SILInstruction *instruction, SILValue def) {
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
+  LLVM_DEBUG(llvm::dbgs() << "Computing canonical liveness from:\n";
+             getCurrentDef()->print(llvm::dbgs()));
   defUseWorklist.initialize(getCurrentDef());
   // Only the first level of reborrows need to be consider. All nested inner
   // adjacent reborrows and phis are encapsulated within their lifetimes.
@@ -140,7 +142,13 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
     });
   }
   while (SILValue value = defUseWorklist.pop()) {
+    LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
+               value->print(llvm::dbgs()));
+
     for (Operand *use : value->getUses()) {
+      LLVM_DEBUG(llvm::dbgs() << "    Use:\n";
+                 use->getUser()->print(llvm::dbgs()));
+      
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
@@ -169,6 +177,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
+        LLVM_DEBUG(llvm::dbgs() << "      Value escaped! Giving up\n");
         return false;
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -197,7 +206,8 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         break;
       case OperandOwnership::Borrow:
         if (liveness->updateForBorrowingOperand(use)
-            != InnerBorrowKind::Contained) {
+              != InnerBorrowKind::Contained) {
+          LLVM_DEBUG(llvm::dbgs() << "      Inner borrow can't be contained! Giving up\n");
           return false;
         }
         break;
@@ -1136,10 +1146,12 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
 //===----------------------------------------------------------------------===//
 
 bool CanonicalizeOSSALifetime::computeLiveness() {
-  if (currentDef->getOwnershipKind() != OwnershipKind::Owned)
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << currentDef);
+
+  if (currentDef->getOwnershipKind() != OwnershipKind::Owned) {
+    LLVM_DEBUG(llvm::dbgs() << "  not owned, never mind\n");
+    return false;
+  }
 
   // Note: There is no need to register callbacks with this utility. 'onDelete'
   // is the only one in use to handle dangling pointers, which could be done
@@ -1157,7 +1169,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
 
   // Step 1: compute liveness
   if (!computeCanonicalLiveness()) {
-    LLVM_DEBUG(llvm::errs() << "Failed to compute canonical liveness?!\n");
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute canonical liveness?!\n");
     clear();
     return false;
   }

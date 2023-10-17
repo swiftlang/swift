@@ -9,7 +9,7 @@ import Constructors
 import TypeClassification
 
 public func createHasVirtualBase() -> HasVirtualBase {
-  // ITANIUM_ARM: define protected swiftcc void @"$s7MySwift20createHasVirtualBaseSo0deF0VyF"(ptr noalias nocapture sret({{.*}}) %0)
+  // ITANIUM_ARM: define protected swiftcc void @"$s7MySwift20createHasVirtualBaseSo0deF0VyF"(ptr noalias sret({{.*}}) %0)
   // To verify that the thunk is inlined, make sure there's no intervening
   // `define`, i.e. the call to the C++ constructor happens in
   // createHasVirtualBase(), not some later function.

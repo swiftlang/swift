@@ -74,10 +74,10 @@ func testDoCatchMultiErrorType() {
     try doSomething()
     try doHomework()
   } catch .failed { // expected-error{{type 'any Error' has no member 'failed'}}
-    
+
   } catch {
     let _: Int = error // expected-error{{cannot convert value of type 'any Error' to specified type 'Int'}}
-  }  
+  }
 }
 
 func testDoCatchRethrowsUntyped() throws {
@@ -96,7 +96,7 @@ func testDoCatchRethrowsTyped() throws(HomeworkError) {
   do {
     try doSomething()
   } catch .failed {
-    
+
   } // expected-error{{thrown expression type 'MyError' cannot be converted to error type 'HomeworkError'}}
 
   do {
@@ -114,8 +114,20 @@ func testDoCatchRethrowsTyped() throws(HomeworkError) {
   } // okay, the thrown 'any Error' has been caught
 }
 
-func testTryIncompatibleTyped() throws(HomeworkError) {
+func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
   try doHomework() // okay
 
-  try doSomething() // FIXME: should error
+  try doSomething() // expected-error{{thrown expression type 'MyError' cannot be converted to error type 'HomeworkError'}}
+
+  do {
+    if cond {
+      throw .dogAteIt // expected-error{{type 'any Error' has no member 'dogAteIt'}}
+    } else {
+      try doSomething()
+    }
+  } catch let error as Never {
+    // expected-warning@-1{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+    // expected-warning@-2{{'as' test is always true}}
+    throw .forgot
+  }
 }

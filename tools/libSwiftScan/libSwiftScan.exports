@@ -83,5 +83,5 @@ swiftscan_cas_options_set_ondisk_path
 swiftscan_cas_options_set_plugin_path
 swiftscan_cas_options_set_option
 swiftscan_cas_store
-swiftscan_compute_cache_key
+swiftscan_cache_compute_key
 invoke_swift_compiler

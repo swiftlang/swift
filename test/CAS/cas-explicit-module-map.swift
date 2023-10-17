@@ -1,8 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/cas
 // RUN: split-file %s %t
-// RUN: %target-swift-emit-pcm -module-cache-path %t/clang-module-cache -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/SwiftShims.pcm
-// RUN: %target-swift-emit-pcm -module-cache-path %t/clang-module-cache -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/_SwiftConcurrencyShims.pcm
+// RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -Xfrontend -cas-path -Xfrontend %t/cas -module-cache-path %t/clang-module-cache -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/SwiftShims.pcm
+// RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -Xfrontend -cas-path -Xfrontend %t/cas -module-cache-path %t/clang-module-cache -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/SwiftShims.pcm -### > %t/Shims.cmd
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- @%t/Shims.cmd > %t/Shims.key.json
+// RUN: %S/Inputs/ExtractOutputKey.py %t/Shims.key.json %t/SwiftShims.pcm | tr -d '\n' > %t/Shims.key
+
+// RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -module-cache-path %t/clang-module-cache -Xfrontend -cas-path -Xfrontend %t/cas -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/_SwiftConcurrencyShims.pcm
+// RUN: %target-swift-emit-pcm -Xfrontend -cache-compile-job -Xfrontend -allow-unstable-cache-key-for-testing -module-cache-path %t/clang-module-cache -Xfrontend -cas-path -Xfrontend %t/cas -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/_SwiftConcurrencyShims.pcm -### > %t/ConcurrencyShims.cmd
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- @%t/ConcurrencyShims.cmd > %t/ConcurrencyShims.key.json
+// RUN: %S/Inputs/ExtractOutputKey.py %t/ConcurrencyShims.key.json %t/_SwiftConcurrencyShims.pcm | tr -d '\n' > %t/ConcurrencyShims.key
+
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/A.swift -o %t/A.swiftmodule -swift-version 5
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/B.swift -o %t/B.swiftmodule -I %t -swift-version 5
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %t/Test.swift -o %t/deps.json -I %t -swift-version 5 -cache-compile-job -cas-path %t/cas
@@ -32,14 +40,6 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %string_processing_module | tr -d '\n' > %t/String.key
 // RUN: llvm-cas --cas %t/cas --make-node --data %t/kind.blob @%t/String.key @%t/schema.casid > %t/String.casid
 // RUN: llvm-cas --cas %t/cas --put-cache-key @%t/String.key @%t/String.casid
-
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/SwiftShims.pcm | tr -d '\n' > %t/Shims.key
-// RUN: llvm-cas --cas %t/cas --make-node --data %t/kind.blob @%t/Shims.key @%t/schema.casid > %t/Shims.casid
-// RUN: llvm-cas --cas %t/cas --put-cache-key @%t/Shims.key @%t/Shims.casid
-
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/_SwiftConcurrencyShims.pcm | tr -d '\n' > %t/ConcurrencyShims.key
-// RUN: llvm-cas --cas %t/cas --make-node --data %t/kind.blob @%t/ConcurrencyShims.key @%t/schema.casid > %t/ConcurrencyShims.casid
-// RUN: llvm-cas --cas %t/cas --put-cache-key @%t/ConcurrencyShims.key @%t/ConcurrencyShims.casid
 
 // RUN: echo "[{" > %/t/map.json
 // RUN: echo "\"moduleName\": \"A\"," >> %/t/map.json
@@ -133,7 +133,7 @@
 // CHECK-DAG: loaded module '_Concurrency'
 // CHECK-DAG: loaded module 'SwiftOnoneSupport'
 
-// CACHE-MISS: remark: cache miss output file
+// CACHE-MISS: remark: cache miss for input
 // VERIFY-OUTPUT: warning: module 'A' was not compiled with library evolution support
 // CACHE-HIT: remark: replay output file
 

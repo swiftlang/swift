@@ -494,7 +494,7 @@ ERROR(error_caching_no_cas_fs, none,
 ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
-REMARK(output_cache_miss, none, "cache miss output file '%0': key '%1'", (StringRef, StringRef))
+REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
 ERROR(error_invalid_cas_id, none, "invalid CASID '%0' (%1)", (StringRef, StringRef))
@@ -536,9 +536,6 @@ REMARK(warning_in_access_notes_file,none,
        "ignored invalid content in access notes file: %0",
        (StringRef))
 
-WARNING(compiler_plugin_not_loaded,none,
-        "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
-        
 ERROR(dont_enable_interop_and_compat,none,
       "do not pass both '-enable-experimental-cxx-interop' and "
       "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())

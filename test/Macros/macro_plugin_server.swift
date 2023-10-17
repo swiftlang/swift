@@ -64,8 +64,17 @@
 // CHECK-NEXT: ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"stringify","typeName":"StringifyMacro"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{.+}}},"source":"#stringify(b + a)"}}}
 // CHECK-NEXT: <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[],"expandedSource":"(b + a, \"b + a\")"}}
 
+// CHECK-NEXT ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{*}}},"source":" #missing()"}}}
+// CHECK-NEXT <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"macro implementation type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
+// CHECK-NEXT ->(plugin:[[#PID2]]) {"expandFreestandingMacro":{"discriminator":"${{.*}}","macro":{"moduleName":"MacroDefinition","name":"missing","typeName":"TypeDoesNotExist"},"macroRole":"expression","syntax":{"kind":"expression","location":{{{*}}},"source":" #notMacro()"}}}
+// CHECK-NEXT <-(plugin:[[#PID2]]) {"expandMacroResult":{"diagnostics":[{"fixIts":[],"highlights":[{{{.*}}}],"message":"type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '{{.*}}MacroDefinition.{{dylib|so|dll}}'","notes":[],"position":{{{.*}}},"severity":"error"}]}}
+
 @freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 @freestanding(expression) macro evil(_ value: Int) -> String = #externalMacro(module: "EvilMacros", type: "CrashingMacro")
+// FIXME: Diagnose for missing type.
+@freestanding(expression) macro missing() = #externalMacro(module: "MacroDefinition", type: "TypeDoesNotExist")
+// FIXME: Diagnose for non-macro type.
+@freestanding(expression) macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
 
 func testStringify(a: Int, b: Int) {
   let s1: String = #stringify(a + b).1
@@ -77,4 +86,10 @@ func testStringify(a: Int, b: Int) {
 
   let s3: String = #stringify(b + a).1
   print(s3)
+
+  // expected-error @+1 {{macro implementation type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '}}
+  _ = #missing()
+
+  // expected-error @+1 {{type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+  _ = #notMacro()
 }

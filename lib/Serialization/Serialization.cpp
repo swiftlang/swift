@@ -3694,11 +3694,17 @@ private:
     InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
   }
 
-  unsigned getNumberOfRequiredVTableEntries(
+  static bool getNeedsNewTableEntry(const AbstractFunctionDecl *func) {
+    if (isa_and_nonnull<ProtocolDecl>(func->getDeclContext()))
+      return func->requiresNewWitnessTableEntry();
+    return func->needsNewVTableEntry();
+  }
+
+  unsigned getNumberOfRequiredTableEntries(
       const AbstractStorageDecl *storage) const {
     unsigned count = 0;
     for (auto *accessor : storage->getAllAccessors()) {
-      if (accessor->needsNewVTableEntry())
+      if (getNeedsNewTableEntry(accessor))
         count++;
     }
     return count;
@@ -4302,7 +4308,7 @@ public:
 
     auto rawIntroducer = getRawStableVarDeclIntroducer(var->getIntroducer());
 
-    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(var);
+    unsigned numTableEntries = getNumberOfRequiredTableEntries(var);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4328,7 +4334,7 @@ public:
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
                           numBackingProperties,
-                          numVTableEntries,
+                          numTableEntries,
                           arrayFields);
   }
 
@@ -4428,7 +4434,7 @@ public:
                            fn->getName().getArgumentNames().size() +
                              fn->getName().isCompoundName(),
                            rawAccessLevel,
-                           fn->needsNewVTableEntry(),
+                           getNeedsNewTableEntry(fn),
                            S.addDeclRef(fn->getOpaqueResultTypeDecl()),
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
@@ -4545,7 +4551,7 @@ public:
                                S.addDeclRef(fn->getStorage()),
                                rawAccessorKind,
                                rawAccessLevel,
-                               fn->needsNewVTableEntry(),
+                               getNeedsNewTableEntry(fn),
                                fn->isTransparent(),
                                fn->isDistributedThunk(),
                                dependencies);
@@ -4636,7 +4642,7 @@ public:
     uint8_t rawStaticSpelling =
       uint8_t(getStableStaticSpelling(subscript->getStaticSpelling()));
 
-    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(subscript);
+    unsigned numTableEntries = getNumberOfRequiredTableEntries(subscript);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4660,7 +4666,7 @@ public:
                                 rawStaticSpelling,
                                 subscript->getName().getArgumentNames().size(),
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
-                                numVTableEntries,
+                                numTableEntries,
                                 nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
@@ -4709,7 +4715,7 @@ public:
                                   S.addDeclRef(overridden),
                                   overriddenAffectsABI,
                                   rawAccessLevel,
-                                  ctor->needsNewVTableEntry(),
+                                  getNeedsNewTableEntry(ctor),
                                   firstTimeRequired,
                                   ctor->getName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
