@@ -86,8 +86,22 @@ func mixedAttrs_C_Wasm()
 class NonC {}
 @_extern(c)
 func nonCReturnTypes() -> NonC // expected-error {{'NonC' cannot be represented in C}}
+// @_extern(wasm) have no interface limitation
+@_extern(wasm, module: "non-c", name: "return_wasm")
+func nonCReturnTypesWasm() -> NonC
+@_extern(c)
+@_extern(wasm, module: "non-c", name: "return_mixed")
+func nonCReturnTypesMixed() -> NonC // expected-error {{'NonC' cannot be represented in C}}
+
 @_extern(c)
 func nonCParamTypes(_: Int, _: NonC) // expected-error {{'NonC' cannot be represented in C}}
+@_extern(wasm, module: "non-c", name: "param_wasm")
+func nonCParamTypesWasm(_: Int, _: NonC)
+
+@_extern(c)
+@_extern(wasm, module: "non-c", name: "param_mixed")
+func nonCParamTypesMixed(_: Int, _: NonC) // expected-error {{'NonC' cannot be represented in C}}
+
 
 @_extern(c)
 func asyncFuncC() async // expected-error {{async functions cannot be represented in C}}

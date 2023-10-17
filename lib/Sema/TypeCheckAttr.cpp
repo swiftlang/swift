@@ -2135,16 +2135,18 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
       if (cName->empty())
         diagnose(attr->getLocation(), diag::extern_empty_c_name);
     }
+
+    // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.
+    if (!isCCompatibleFuncDecl(FD)) {
+      attr->setInvalid();
+      // Mark the decl itself invalid not to require body even with invalid ExternAttr.
+      FD->setInvalid();
+    }
   }
 
   // @_cdecl cannot be mixed with @_extern since @_cdecl is for definitions
   if (D->getAttrs().hasAttribute<CDeclAttr>())
     diagnose(attr->getLocation(), diag::extern_only_non_other_attr, "@_cdecl");
-
-  if (!isCCompatibleFuncDecl(FD)) {
-    attr->setInvalid();
-    FD->setInvalid();
-  }
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
