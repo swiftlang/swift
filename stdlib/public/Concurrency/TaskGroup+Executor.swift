@@ -28,7 +28,7 @@ extension TaskGroup {
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func addTask(
-    on executor: any Executor,
+    on executor: (any Executor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -47,18 +47,23 @@ extension TaskGroup {
       isDiscardingTask: false)
     #endif
 
-    let executorBuiltin: Builtin.Executor =
+    if let executor {
+      let executorBuiltin: Builtin.Executor =
       if let serialExecutor = executor as? any SerialExecutor {
         // We need to go through the asUnowned... for serial executors,
         // because they encode certain behavior in the reference bits,
         // so we cannot just cast and assume it'll be correct.
         serialExecutor.asUnownedSerialExecutor().executor
       } else {
-        unsafeBitCast(executor, to: Builtin.Executor.self)
+        _task_executor_getExecutorRef(executor)
       }
 
-    // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+      // Create the task in this group with an executor preference.
+      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    } else {
+      // Create the task in this group without executor preference.
+      _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    }
     #else
     fatalError("Unsupported Swift compiler")
     #endif

@@ -522,15 +522,11 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
-  auto task = swift_task_getCurrent();
-  fprintf(stderr, "[%s:%d](%s) get task executor from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
-
-  if (!task)
-    return ExecutorRef::generic(); // the default executor, meaning no preference
+ExecutorRef AsyncTask::getPreferredTaskExecutor() {
+  fprintf(stderr, "[%s:%d](%s) get task executor from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
 
   ExecutorRef preference = ExecutorRef::generic();
-  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto record: status.records()) {
       if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
@@ -541,6 +537,14 @@ ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   });
 
   return preference;
+}
+
+ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+  if (auto task = swift_task_getCurrent()) {
+    return task->getPreferredTaskExecutor();
+  } else {
+    return ExecutorRef::generic(); // the default executor, meaning no preference
+  }
 }
 
 SWIFT_CC(swift)
@@ -560,11 +564,45 @@ swift::swift_task_pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
   return record;
 }
 
+void AsyncTask::pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
+  void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
+  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+  fprintf(stderr, "[%s:%d](%s) create task preference record [%p] for task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          allocation, this);
+  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p", allocation, this);
+
+  addStatusRecord(this, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+    return true;
+  });
+}
+
 SWIFT_CC(swift)
 void swift::swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record) {
-  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task preference record %p from task:%p", allocation, task);
+  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task preference record %p from task:%p", allocation, swift_task_getCurrent());
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
+}
+
+void AsyncTask::dropTaskExecutorPreferenceRecord() {
+  assert(this->hasInitialExecutorPreferenceRecord());
+  fprintf(stderr, "[%s:%d](%s) DROP task executor preference as we destroy [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          this);
+
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto r : status.records()) {
+      fprintf(stderr, "[%s:%d](%s) record kind = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+              r->getKind());
+      if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
+        auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
+        fprintf(stderr, "[%s:%d](%s) removing the record [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, record);
+        removeStatusRecordLocked(status, record);
+        _swift_task_dealloc_specific(this, record);
+        return;
+      }
+    }
+    // This drop mirrors the push during task creation; so it must always reliably be the last drop we do.
+    assert(false && "dropTaskExecutorPreferenceRecord must be guaranteed to drop the last preference");
+  });
 }
 
 /**************************************************************************/
@@ -644,6 +682,7 @@ void swift::_swift_taskGroup_detachChild(TaskGroup *group,
   });
 }
 
+/**************************************************************************/
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 

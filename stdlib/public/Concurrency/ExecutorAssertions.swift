@@ -18,6 +18,7 @@ import SwiftShims
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
+// FIXME: remove this, we need a similar thing on TaskExecutor instead
 @available(SwiftStdlib 9999, *)
 extension Executor {
   /// Unconditionally if the current task is executing on the expected serial executor,
@@ -36,6 +37,7 @@ extension Executor {
   ///   never called. Failure to satisfy that assumption is a serious
   ///   programming error.
   @available(SwiftStdlib 9999, *)
+  @_unavailableInEmbedded
   public func preconditionIsolated(
     _ message: @autoclosure () -> String = String(),
     file: StaticString = #fileID, line: UInt = #line

@@ -141,6 +141,15 @@ SerialExecutorRef _task_serialExecutor_getExecutorRef(
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);
 
+// Implemented in Swift because we need to obtain the user-defined flags on the executor ref.
+//
+// We could inline this with effort, though.
+extern "C" SWIFT_CC(swift)
+ExecutorRef _task_executor_getExecutorRef(
+    HeapObject *executor,
+    const Metadata *selfType,
+    const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static bool swift_task_isOnExecutorImpl(HeapObject *executor,
                                         const Metadata *selfType,
@@ -207,18 +216,18 @@ bool SerialExecutorRef::isMainExecutor() const {
 #endif
 }
 
-//ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
-//  AsyncTask *task = swift_task_getCurrent();
-//  if (!task) {
-//    fprintf(stderr, "[%s:%d](%s) no current task, default executor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//
-//    // If we don't have any task executor, we can't have a task executor preference.
-//    // So, return the "generic" which is "nil" and used as the "default" global executor.
-//    return ExecutorRef::generic();
-//  }
-//
-//  return task->getPreferredTaskExecutor();
-//}
+/*****************************************************************************/
+/************************ GENERIC EXECUTOR ***********************************/
+/*****************************************************************************/
+
+ExecutorRef swift::swift_task_getGenericExecutor() {
+#if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
+  // FIXME: this isn't right for the non-cooperative environment
+  return ExecutorRef::generic();
+#else
+  return ExecutorRef::generic();
+#endif
+}
 
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
