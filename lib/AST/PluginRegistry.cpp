@@ -67,7 +67,7 @@ PluginRegistry::loadLibraryPlugin(StringRef path) {
   }
 #endif
 
-  storage = std::make_unique<LoadedLibraryPlugin>(lib);
+  storage = std::make_unique<LoadedLibraryPlugin>(lib, path);
   return storage.get();
 }
 

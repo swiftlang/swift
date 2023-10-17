@@ -536,9 +536,6 @@ REMARK(warning_in_access_notes_file,none,
        "ignored invalid content in access notes file: %0",
        (StringRef))
 
-WARNING(compiler_plugin_not_loaded,none,
-        "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
-        
 ERROR(dont_enable_interop_and_compat,none,
       "do not pass both '-enable-experimental-cxx-interop' and "
       "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
