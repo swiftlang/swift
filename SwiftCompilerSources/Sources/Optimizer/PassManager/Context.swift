@@ -526,6 +526,13 @@ extension TermInst {
   }
 }
 
+extension ForwardingInstruction {
+  func setForwardingOwnership(to ownership: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.ForwardingInst_setForwardingOwnership(ownership._bridged)
+  }
+}
+
 extension Function {
   func set(needStackProtection: Bool, _ context: FunctionPassContext) {
     context.notifyEffectsChanged()

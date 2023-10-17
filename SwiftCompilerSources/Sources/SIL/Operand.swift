@@ -42,7 +42,9 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   public var isTypeDependent: Bool { bridged.isTypeDependent() }
 
   public var endsLifetime: Bool { bridged.isLifetimeEnding() }
-  
+
+  public func canAccept(ownership: Ownership) -> Bool { bridged.canAcceptOwnership(ownership._bridged) }
+
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 

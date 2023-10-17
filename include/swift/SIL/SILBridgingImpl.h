@@ -269,6 +269,10 @@ bool BridgedOperand::isTypeDependent() const { return op->isTypeDependent(); }
 
 bool BridgedOperand::isLifetimeEnding() const { return op->isLifetimeEnding(); }
 
+bool BridgedOperand::canAcceptOwnership(BridgedValue::Ownership ownership) const {
+  return op->canAcceptKind(BridgedValue::castToOwnership(ownership));
+}
+
 OptionalBridgedOperand BridgedOperand::getNextUse() const {
   return {op->getNextUse()};
 }
@@ -681,6 +685,11 @@ BridgedOperandArray BridgedInstruction::ForwardingInst_forwardedOperands() const
 BridgedValue::Ownership BridgedInstruction::ForwardingInst_forwardingOwnership() const {
   auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
   return castOwnership(forwardingInst->getForwardingOwnershipKind());
+}
+
+void BridgedInstruction::ForwardingInst_setForwardingOwnership(BridgedValue::Ownership ownership) const {
+  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
+  return forwardingInst->setForwardingOwnershipKind(BridgedValue::castToOwnership(ownership));
 }
 
 bool BridgedInstruction::ForwardingInst_preservesOwnership() const {
