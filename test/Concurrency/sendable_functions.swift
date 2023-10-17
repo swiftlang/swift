@@ -23,6 +23,24 @@ actor A {
   }
 }
 
+class NonSendableC {
+    var x: Int = 0
+
+    @Sendable func inc() { // expected-warning{{instance methods of non-Sendable types cannot be marked as '@Sendable'}}
+        x += 1
+    }
+}
+
+struct S<T> {
+  let t: T
+
+  @Sendable func test() {} // expected-warning{{instance methods of non-Sendable types cannot be marked as '@Sendable'}}
+}
+
+extension S: Sendable where T: Sendable {
+  @Sendable func test2() {}
+}
+
 @available(SwiftStdlib 5.1, *)
 @MainActor @Sendable func globalActorFunc() { } // expected-warning{{main actor-isolated synchronous global function 'globalActorFunc()' cannot be marked as '@Sendable'}}
 
