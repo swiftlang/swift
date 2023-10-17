@@ -1061,6 +1061,8 @@ move %PackageRoot%\runtime.msi %BuildRoot%\artifacts || (exit /b)
 move %PackageRoot%\toolchain.msi %BuildRoot%\artifacts || (exit /b)
 :: SDK
 move %PackageRoot%\sdk.msi %BuildRoot%\artifacts || (exit /b)
+:: Developer Tools
+move %PackageRoot%\devtools.msi %BuildRoot%\artifacts || (exit /b)
 :: Installer
 move %PackageRoot%\installer\installer.exe %BuildRoot%\artifacts || (exit /b)
 
