@@ -161,8 +161,6 @@ public:
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
   IGNORED_ATTR(LexicalLifetimes)
-  IGNORED_ATTR(NonEscapable)
-  IGNORED_ATTR(UnsafeNonEscapableResult)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -350,7 +348,9 @@ public:
   
   void visitRawLayoutAttr(RawLayoutAttr *attr);
 
-  void visitNonEscapableAtr(NonEscapableAttr *attr);
+  void visitLifetimeDependenceAttr(DeclAttribute *attr);
+  void visitNonEscapableAttr(NonEscapableAttr *attr);
+  void visitUnsafeNonEscapableResultAttr(UnsafeNonEscapableResultAttr *attr);
 };
 
 } // end anonymous namespace
@@ -7060,6 +7060,19 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
   
   // The storage is not directly referenceable by stored properties.
   sd->setHasUnreferenceableStorage(true);
+}
+
+void AttributeChecker::visitNonEscapableAttr(NonEscapableAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+    diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
+  }
+}
+
+void AttributeChecker::visitUnsafeNonEscapableResultAttr(
+  UnsafeNonEscapableResultAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+    diagnoseAndRemoveAttr(attr, diag::nonescapable_types_attr_disabled);
+  }
 }
 
 namespace {

@@ -1862,7 +1862,8 @@ ERROR(cdecl_throws,none,
       "raising errors from @_cdecl functions is not supported", ())
 
 // @_used and @_section
-ERROR(section_linkage_markers_disabled,none,
+ERROR(
+  section_linkage_markers_disabled,none,
       "attribute requires '-enable-experimental-feature SymbolLinkageMarkers'", ())
 ERROR(used_not_at_top_level,none,
       "@_used can only be applied to global functions and variables", ())
@@ -7535,6 +7536,9 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
+
+ERROR(nonescapable_types_attr_disabled,none,
+      "attribute requires '-enable-experimental-feature NonEscapableTypes'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors
