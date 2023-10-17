@@ -734,7 +734,7 @@ void ModuleDependenciesCache::resolveDependencyImports(ModuleDependencyID module
   updateDependency(moduleID, dependencyInfo);
 }
 
-void ModuleDependenciesCache::setSwiftOverlayDependencues(ModuleDependencyID moduleID,
+void ModuleDependenciesCache::setSwiftOverlayDependencies(ModuleDependencyID moduleID,
                                                           const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto optionalDependencyInfo = findDependency(moduleID);
   assert(optionalDependencyInfo.has_value() && "Resolving unknown dependency");

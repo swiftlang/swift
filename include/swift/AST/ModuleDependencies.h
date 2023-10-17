@@ -160,6 +160,10 @@ public:
   /// to Module IDs, qualified by module kind: Swift, Clang, etc.
   std::vector<ModuleDependencyID> resolvedDirectModuleDependencies;
 
+  /// Dependencies comprised of Swift overlay modules of direct and
+  /// transitive Clang dependencies.
+  std::vector<ModuleDependencyID> swiftOverlayDependencies;
+
   /// The cache key for the produced module.
   std::string moduleCacheKey;
 
@@ -191,10 +195,6 @@ struct CommonSwiftTextualModuleDependencyDetails {
 
   /// (Clang) modules on which the bridging header depends.
   std::vector<std::string> bridgingModuleDependencies;
-
-  /// Dependencies comprised of Swift overlay modules of direct and
-  /// transitive Clang dependencies.
-  std::vector<ModuleDependencyID> swiftOverlayDependencies;
 
   /// The Swift frontend invocation arguments to build the Swift module from the
   /// interface.
@@ -581,29 +581,12 @@ public:
 
   /// Set this module's set of Swift Overlay dependencies
   void setOverlayDependencies(const ArrayRef<ModuleDependencyID> dependencyIDs) {
-    assert(isSwiftSourceModule() || isSwiftInterfaceModule());
-    CommonSwiftTextualModuleDependencyDetails *textualModuleDetails;
-    if (auto sourceDetailsStorage = dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())) {
-      textualModuleDetails = &sourceDetailsStorage->textualModuleDetails;
-    } else if (auto interfaceDetailsStorage = dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())) {
-      textualModuleDetails = &interfaceDetailsStorage->textualModuleDetails;
-    } else {
-      llvm_unreachable("Unknown kind of dependency module info.");
-    }
-    textualModuleDetails->swiftOverlayDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
+    assert(isSwiftModule());
+    storage->swiftOverlayDependencies.assign(dependencyIDs.begin(), dependencyIDs.end());
   }
 
   const ArrayRef<ModuleDependencyID> getSwiftOverlayDependencies() const {
-    CommonSwiftTextualModuleDependencyDetails *textualModuleDetails = nullptr;
-    if (auto sourceDetailsStorage = dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get()))
-      textualModuleDetails = &sourceDetailsStorage->textualModuleDetails;
-    else if (auto interfaceDetailsStorage = dyn_cast<SwiftInterfaceModuleDependenciesStorage>(storage.get()))
-      textualModuleDetails = &interfaceDetailsStorage->textualModuleDetails;
-
-    if (textualModuleDetails)
-      return textualModuleDetails->swiftOverlayDependencies;
-    else
-      return {};
+    return storage->swiftOverlayDependencies;
   }
 
   std::vector<std::string> getCommandline() const {
@@ -1074,7 +1057,7 @@ public:
 
   /// Resolve a dependency module's set of Swift module dependencies
   /// that are Swift overlays of Clang module dependencies.
-  void setSwiftOverlayDependencues(ModuleDependencyID moduleID,
+  void setSwiftOverlayDependencies(ModuleDependencyID moduleID,
                                    const ArrayRef<ModuleDependencyID> dependencyIDs);
   
   StringRef getMainModuleName() const {

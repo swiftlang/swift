@@ -830,6 +830,10 @@ static void writeJSON(llvm::raw_ostream &out,
                              /*indentLevel=*/5,
                              /*trailingComma=*/false);
     } else if (swiftBinaryDeps) {
+      bool hasOverlayDependencies =
+        swiftBinaryDeps->swift_overlay_module_dependencies &&
+        swiftBinaryDeps->swift_overlay_module_dependencies->count > 0;
+
       out << "\"swiftPrebuiltExternal\": {\n";
       assert(swiftBinaryDeps->compiled_module_path.data &&
              get_C_string(swiftBinaryDeps->compiled_module_path)[0] != '\0' &&
@@ -864,6 +868,12 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(out, "headerDependencies",
                              swiftBinaryDeps->header_dependencies, 5,
                              /*trailingComma=*/true);
+
+      if (hasOverlayDependencies) {
+        writeDependencies(out, swiftBinaryDeps->swift_overlay_module_dependencies,
+                          "swiftOverlayDependencies", 5,
+                          /*trailingComma=*/true);
+      }
 
       writeJSONSingleField(out, "isFramework", swiftBinaryDeps->is_framework,
                            5, /*trailingComma=*/false);
@@ -1032,7 +1042,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
         // Create an overlay dependencies set according to the output format
         std::vector<std::string> bridgedOverlayDependencyNames;
-        bridgeDependencyIDs(swiftTextualDeps->textualModuleDetails.swiftOverlayDependencies,
+        bridgeDependencyIDs(swiftTextualDeps->swiftOverlayDependencies,
                             bridgedOverlayDependencyNames);
 
         details->swift_textual_details = {
@@ -1064,7 +1074,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL;
         // Create an overlay dependencies set according to the output format
         std::vector<std::string> bridgedOverlayDependencyNames;
-        bridgeDependencyIDs(swiftSourceDeps->textualModuleDetails.swiftOverlayDependencies,
+        bridgeDependencyIDs(swiftSourceDeps->swiftOverlayDependencies,
                             bridgedOverlayDependencyNames);
 
         details->swift_textual_details = {
@@ -1096,10 +1106,15 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
+        // Create an overlay dependencies set according to the output format
+        std::vector<std::string> bridgedOverlayDependencyNames;
+        bridgeDependencyIDs(swiftBinaryDeps->swiftOverlayDependencies,
+                            bridgedOverlayDependencyNames);
         details->swift_binary_details = {
             create_clone(swiftBinaryDeps->compiledModulePath.c_str()),
             create_clone(swiftBinaryDeps->moduleDocPath.c_str()),
             create_clone(swiftBinaryDeps->sourceInfoPath.c_str()),
+            create_set(bridgedOverlayDependencyNames),
             create_set(swiftBinaryDeps->preCompiledBridgingHeaderPaths),
             swiftBinaryDeps->isFramework,
             create_clone(swiftBinaryDeps->moduleCacheKey.c_str())};
