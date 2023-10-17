@@ -1877,7 +1877,7 @@ ERROR(extern_not_at_top_level_func,none,
 ERROR(extern_empty_c_name,none,
       "expected non-empty C name in @_extern attribute", ())
 ERROR(extern_only_non_other_attr,none,
-      "@_extern attribute cannot be applied to an '%0' declaration", (StringRef))
+      "@_extern attribute cannot be applied to an '@%0' declaration", (StringRef))
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))

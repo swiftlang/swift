@@ -2144,9 +2144,14 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     }
   }
 
-  // @_cdecl cannot be mixed with @_extern since @_cdecl is for definitions
-  if (D->getAttrs().hasAttribute<CDeclAttr>())
-    diagnose(attr->getLocation(), diag::extern_only_non_other_attr, "@_cdecl");
+  for (auto *otherAttr : D->getAttrs()) {
+    // @_cdecl cannot be mixed with @_extern since @_cdecl is for definitions
+    // @_silgen_name cannot be mixed to avoid SIL-level name ambiguity
+    if (isa<CDeclAttr>(otherAttr) || isa<SILGenNameAttr>(otherAttr)) {
+      diagnose(attr->getLocation(), diag::extern_only_non_other_attr,
+               otherAttr->getAttrName());
+    }
+  }
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

@@ -119,3 +119,16 @@ func withAtCDecl_C()
 @_extern(wasm, module: "", name: "") // expected-error {{@_extern attribute cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_Wasm()
+
+@_extern(c) // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}}
+@_silgen_name("another_sil_name")
+func withAtSILGenName_C()
+
+@_extern(wasm, module: "", name: "") // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}}
+@_silgen_name("another_sil_name")
+func withAtSILGenName_Wasm()
+
+@_extern(c) // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}} expected-error {{@_extern attribute cannot be applied to an '@_cdecl' declaration}}
+@_cdecl("another_c_name")
+@_silgen_name("another_sil_name")
+func withAtSILGenName_CDecl_C()
