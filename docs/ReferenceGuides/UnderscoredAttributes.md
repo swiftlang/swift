@@ -453,7 +453,9 @@ It's the equivalent of clang's `__attribute__((import_module("module"), import_n
 
 Indicates that a particular declaration should refer to a
 C declaration with the given name. If the optional "cName"
-string is not specified, the mangled Swift name will be used.
+string is not specified, the Swift function name is used
+without Swift name mangling. Platform-specific mangling
+rules (leading underscore on Darwin) are still applied.
 
 Similar to `@_cdecl`, but this attribute is used to reference
 C declarations from Swift, while `@_cdecl` is used to define
