@@ -10,8 +10,7 @@
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exported.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exported.swiftinterface \
-// RUN:   -emit-private-module-interface-path %t/Exported.private.swiftinterface \
-// RUN:   -enable-experimental-feature ModuleInterfaceExportAs
+// RUN:   -emit-private-module-interface-path %t/Exported.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exported.private.swiftinterface) -module-name Exported -I %t
 // RUN: cat %t/Exported.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTER %s
 // RUN: cat %t/Exported.private.swiftinterface | %FileCheck -check-prefix=CHECK-USE-EXPORTED %s

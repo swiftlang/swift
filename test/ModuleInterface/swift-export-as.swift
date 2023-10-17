@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+/// Make sure the flag `ModuleInterfaceExportAs` doesn't raise an error.
+// RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift \
+// RUN:   -enable-experimental-feature ModuleInterfaceExportAs
+
 /// Build exportee.
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift \
 // RUN:   -swift-version 5 -enable-library-evolution \
