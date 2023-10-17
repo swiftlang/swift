@@ -74,7 +74,7 @@ CompileJobCacheResult::Output CompileJobCacheResult::getOutput(size_t I) const {
   return Output{getOutputObject(I), getOutputKind(I)};
 }
 
-Optional<CompileJobCacheResult::Output>
+std::optional<CompileJobCacheResult::Output>
 CompileJobCacheResult::getOutput(file_types::ID Kind) const {
   size_t Count = getNumOutputs();
   for (size_t I = 0; I < Count; ++I) {
@@ -82,7 +82,7 @@ CompileJobCacheResult::getOutput(file_types::ID Kind) const {
     if (Kind == K)
       return Output{getOutputObject(I), Kind};
   }
-  return None;
+  return {};
 }
 
 Error CompileJobCacheResult::print(llvm::raw_ostream &OS) {
