@@ -410,6 +410,16 @@ public:
   /// Checking this is, of course, inherently race-prone on its own.
   bool isCancelled() const;
 
+  // ==== Task Executor Preference ---------------------------------------------
+
+  ExecutorRef getPreferredTaskExecutor();
+
+  /// Only to be used during task creation.
+  /// Otherwise use `swift_task_pushTaskExecutorPreference` and `swift_task_popTaskExecutorPreference`.
+  void pushTaskExecutorPreference(ExecutorRef preferred);
+
+  void dropTaskExecutorPreferenceRecord();
+
   // ==== Task Local Values ----------------------------------------------------
 
   void localValuePush(const HeapObject *key,
@@ -511,6 +521,17 @@ public:
       offset += sizeof(ChildFragment);
 
     return reinterpret_cast<GroupChildFragment *>(offset);
+  }
+
+  // ==== Task Executor Preference --------------------------------------------
+
+  /// Returns true if the task has a, specifically, *inherited*
+  /// a task executor preference from its parent task.
+  ///
+  /// This means that during task tear down the record should be deallocated
+  /// because it was not set with a
+  bool hasInitialExecutorPreferenceRecord() const {
+    return Flags.task_hasInitialExecutorPreferenceRecord();
   }
 
   // ==== Future ---------------------------------------------------------------

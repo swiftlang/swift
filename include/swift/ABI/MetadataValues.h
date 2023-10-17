@@ -2448,11 +2448,12 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask           = 24,
-    Task_IsFuture              = 25,
-    Task_IsGroupChildTask      = 26,
+    Task_IsChildTask                    = 24,
+    Task_IsFuture                       = 25,
+    Task_IsGroupChildTask               = 26,
     // 27 is currently unused
-    Task_IsAsyncLetTask        = 28,
+    Task_IsAsyncLetTask                 = 28,
+    Task_HasInheritedExecutorPreference = 29,
   };
 
   explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
@@ -2485,6 +2486,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInheritedExecutorPreference,
+                                task_hasInitialExecutorPreferenceRecord,
+                                task_setHasInitialExecutorPreferenceRecord)
 };
 
 /// Kinds of task status record.

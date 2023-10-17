@@ -1095,6 +1095,11 @@ internal func _asyncMainDrainQueue() -> Never
 @_silgen_name("swift_task_getMainExecutor")
 internal func _getMainExecutor() -> Builtin.Executor
 
+@available(SwiftStdlib 5.1, *)
+@usableFromInline
+@_silgen_name("swift_task_getGenericExecutor")
+internal func _getGenericExecutor() -> Builtin.Executor
+
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")

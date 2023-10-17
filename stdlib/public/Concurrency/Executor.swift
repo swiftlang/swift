@@ -343,6 +343,15 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
   return executor.asUnownedSerialExecutor().executor
 }
 
+/// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
+/// The obtained executor ref will have all the user-defined flags set on the executor.
+@available(SwiftStdlib 9999, *)
+@_silgen_name("_task_executor_getExecutorRef")
+public func _task_executor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
+    where E: Executor {
+  executor.asUnownedExecutor().executor
+}
+
 // Used by the concurrency runtime
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")

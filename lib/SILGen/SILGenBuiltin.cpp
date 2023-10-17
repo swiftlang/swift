@@ -1518,7 +1518,7 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
   return function.ensurePlusOne(SGF, loc);
 }
 
-// Emit SIL for the named builtin: createAsyncTask.
+// Emit SIL for the named builtin: createAsyncTask(...) variants.
 ManagedValue emitBuiltinCreateAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C,
@@ -1597,42 +1597,41 @@ ManagedValue emitBuiltinCreateAsyncTask(
 static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskInGroup,
       /*inGroup=*/true, /*withExecutor=*/false);
+}
 
-  // Form the metatype of the result type.
-  CanType futureResultType =
-      Type(MetatypeType::get(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                       /*depth*/ 0, /*index*/ 0,
-                                                       SGF.getASTContext()),
-                             MetatypeRepresentation::Thick))
-          .subst(subs)
-          ->getCanonicalType();
-  CanType anyTypeType =
-      ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
-  auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
-  auto &futureResultTL = SGF.getTypeLowering(futureResultType);
-  auto futureResultMetadata =
-      SGF.emitExistentialErasure(
-             loc, futureResultType, futureResultTL, anyTypeTL, {}, C,
-             [&](SGFContext C) -> ManagedValue {
-               return ManagedValue::forObjectRValueWithoutOwnership(
-                   SGF.B.createMetatype(loc,
-                                        SGF.getLoweredType(futureResultType)));
-             })
-          .borrow(SGF, loc)
-          .forward(SGF);
+// Emit SIL for the named builtin: createAsyncTaskWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncTaskWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskWithExecutor,
+      /*inGroup=*/false, /*withExecutor=*/true);
+}
+// Emit SIL for the named builtin: createAsyncTaskInGroupWithExecutor.
+static ManagedValue emitBuiltinCreateAsyncTaskInGroupWithExecutor(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor,
+      /*inGroup=*/true, /*withExecutor=*/true);
+}
 
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
-                                                             futureResultType);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateAsyncTaskInGroup)),
-      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, group, futureResultMetadata, function.forward(SGF) });
-  return SGF.emitManagedRValueWithCleanup(apply);
+// Emit SIL for the named builtin: createAsyncTask.
+ManagedValue emitBuiltinCreateAsyncTask(
+    SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap subs,
+    ArrayRef<ManagedValue> args,
+    SGFContext C) {
+  return emitBuiltinCreateAsyncTask(
+      SGF, loc, subs, args, C,
+      BuiltinValueKind::CreateAsyncTask,
+      /*inGroup=*/false, /*withExecutor=*/false);
 }
 
 // Shared implementation of withUnsafeContinuation and

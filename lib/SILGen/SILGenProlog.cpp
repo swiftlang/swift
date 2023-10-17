@@ -1565,7 +1565,6 @@ ExecutorBreadcrumb SILGenFunction::emitHopToTargetExecutor(
     SILLocation loc, SILValue executor) {
   // Record that we need to hop back to the current executor.
   auto breadcrumb = ExecutorBreadcrumb(true);
-  fprintf(stderr, "[%s:%d](%s) HOP TO EXECUTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   B.createHopToExecutor(RegularLocation::getDebugOnlyLocation(loc, getModule()),
                         executor, /*mandatory*/ false);
   return breadcrumb;

@@ -27,6 +27,7 @@ class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
+class ExecutorWitnessTable;
 class SerialExecutorWitnessTable;
 class TaskExecutorWitnessTable;
 
@@ -159,6 +160,12 @@ public:
     assert(!isGeneric() && !isDefaultActor());
     auto table = Implementation & WitnessTableMask;
     return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
+  }
+
+  const ExecutorWitnessTable *getExecutorWitnessTable() const {
+    assert(!isGeneric() && !isDefaultActor());
+    auto table = Implementation & WitnessTableMask;
+    return reinterpret_cast<const ExecutorWitnessTable*>(table);
   }
 
   /// Do we have to do any work to start running as the requested

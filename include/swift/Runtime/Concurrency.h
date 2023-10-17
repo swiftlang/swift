@@ -911,8 +911,12 @@ SerialExecutorRef swift_task_getCurrentExecutor(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 SerialExecutorRef swift_task_getMainExecutor(void);
 
+/// Return the generic (default global concurrent) executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getPreferredTaskExecutor();
+ExecutorRef swift_task_getGenericExecutor(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
