@@ -66,6 +66,10 @@ void ASTScope::lookupEnclosingMacroScope(
   return ASTScopeImpl::lookupEnclosingMacroScope(sourceFile, loc, body);
 }
 
+CatchNode ASTScope::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
+  return ASTScopeImpl::lookupCatchNode(module, loc);
+}
+
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -97,8 +101,63 @@ NullablePtr<AbstractClosureExpr> BraceStmtScope::parentClosureIfAny() const {
   return !getParent() ? nullptr : getParent().get()->getClosureIfClosureScope();
 }
 
+NullablePtr<const BraceStmtScope> BraceStmtScope::getAsBraceStmtScope() const {
+  return this;
+}
+
 NullablePtr<AbstractClosureExpr> ASTScopeImpl::getClosureIfClosureScope() const {
   return nullptr;
+}
+
+NullablePtr<const BraceStmtScope> ASTScopeImpl::getAsBraceStmtScope() const {
+  return nullptr;
+}
+
+std::pair<CatchNode, const BraceStmtScope *>
+ASTScopeImpl::getCatchNodeBody() const {
+  return { nullptr, nullptr };
+}
+
+std::pair<CatchNode, const BraceStmtScope *>
+ClosureParametersScope::getCatchNodeBody() const {
+  const BraceStmtScope *body = nullptr;
+  const auto &children = getChildren();
+  if (!children.empty()) {
+    body = children[0]->getAsBraceStmtScope().getPtrOrNull();
+    assert(body && "Not a brace statement?");
+  }
+  return { const_cast<AbstractClosureExpr *>(closureExpr), body };
+}
+
+std::pair<CatchNode, const BraceStmtScope *>
+FunctionBodyScope::getCatchNodeBody() const {
+  const BraceStmtScope *body = nullptr;
+  const auto &children = getChildren();
+  if (!children.empty()) {
+    body = children[0]->getAsBraceStmtScope().getPtrOrNull();
+    assert(body && "Not a brace statement?");
+  }
+  return { const_cast<AbstractFunctionDecl *>(decl), body };
+}
+
+/// Determine whether this is an empty brace statement, which doesn't have a
+/// node associated with it.
+static bool isEmptyBraceStmt(Stmt *stmt) {
+  if (auto braceStmt = dyn_cast_or_null<BraceStmt>(stmt))
+    return braceStmt->empty();
+
+  return false;
+}
+
+std::pair<CatchNode, const BraceStmtScope *>
+DoCatchStmtScope::getCatchNodeBody() const {
+  const BraceStmtScope *body = nullptr;
+  const auto &children = getChildren();
+  if (!children.empty() && !isEmptyBraceStmt(stmt->getBody())) {
+    body = children[0]->getAsBraceStmtScope().getPtrOrNull();
+    assert(body && "Not a brace statement?");
+  }
+  return { const_cast<DoCatchStmt *>(stmt), body };
 }
 
 SourceManager &ASTScopeImpl::getSourceManager() const {

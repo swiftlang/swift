@@ -21,9 +21,11 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <string>
@@ -492,13 +494,21 @@ public:
 
   /// Create a null-terminated string, copying \p Str into \p A .
   template <typename Allocator>
-  NullTerminatedStringRef(StringRef Str, Allocator &A) : Ref("") {
-    if (Str.empty())
+  NullTerminatedStringRef(llvm::Twine Str, Allocator &A) : Ref("") {
+    if (Str.isTriviallyEmpty())
       return;
+    if (Str.isSingleStringLiteral()) {
+      Ref = Str.getSingleStringRef();
+      return;
+    }
+    llvm::SmallString<0> stash;
+    auto _ref = Str.toStringRef(stash);
 
-    size_t size = Str.size();
-    char *memory = A.template Allocate<char>(size + 1);
-    memcpy(memory, Str.data(), size);
+    size_t size = _ref.size();
+    if (size == 0)
+      return;
+    char *memory = static_cast<char *>(A.Allocate(size + 1, alignof(char)));
+    memcpy(memory, _ref.data(), size);
     memory[size] = '\0';
     Ref = {memory, size};
   }

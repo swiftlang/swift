@@ -457,9 +457,10 @@ void CompilerInstance::setupOutputBackend() {
 
   // Mirror the output into CAS.
   if (supportCaching()) {
-    auto CASOutputBackend = createSwiftCachingOutputBackend(
+    CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey,
-        Invocation.getFrontendOptions().InputsAndOutputs);
+        Invocation.getFrontendOptions().InputsAndOutputs,
+        Invocation.getFrontendOptions().RequestedAction);
     OutputBackend =
         llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
   }
@@ -565,15 +566,18 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     if (!ClangOpts.BridgingHeaderPCHCacheKey.empty()) {
       if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
               getObjectStore(), getActionCache(), Diagnostics,
-              ClangOpts.BridgingHeaderPCHCacheKey, ClangOpts.BridgingHeader))
+              ClangOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
+              ClangOpts.BridgingHeader))
         MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
                        std::move(loadedBuffer));
     }
     if (!Opts.InputFileKey.empty()) {
       auto InputPath = Opts.InputsAndOutputs.getFilenameOfFirstInput();
+      auto Type = file_types::lookupTypeForExtension(
+          llvm::sys::path::extension(InputPath));
       if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
               getObjectStore(), getActionCache(), Diagnostics,
-              Opts.InputFileKey, InputPath))
+              Opts.InputFileKey, Type, InputPath))
         MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
     }
     llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =

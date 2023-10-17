@@ -599,7 +599,7 @@ struct InferRequirementsWalker : public TypeWalker {
                                      DifferentiabilityKind::Linear);
       }
 
-      // Infer that the thrown error type conforms to Error.
+      // Infer that the thrown error type of a function type conforms to Error.
       if (auto thrownError = fnTy->getThrownError()) {
         if (auto errorProtocol = ctx.getErrorDecl()) {
           addConformanceConstraint(thrownError, errorProtocol);

@@ -2073,14 +2073,14 @@ public:
       ExternalMacroDefinitionRequest request{
         &Ctx, external.moduleName, external.macroTypeName
       };
-      auto externalDef = evaluateOrDefault(Ctx.evaluator, request, llvm::None);
-      if (!externalDef) {
-        MD->diagnose(
-            diag::external_macro_not_found,
-            external.moduleName.str(),
-            external.macroTypeName.str(),
-            MD->getName()
-        ).limitBehavior(DiagnosticBehavior::Warning);
+      auto externalDef =
+          evaluateOrDefault(Ctx.evaluator, request,
+                            ExternalMacroDefinition::error("unknown error"));
+      if (externalDef.isError()) {
+        MD->diagnose(diag::external_macro_not_found, external.moduleName.str(),
+                     external.macroTypeName.str(), MD->getName(),
+                     externalDef.getErrorMessage())
+            .limitBehavior(DiagnosticBehavior::Warning);
       }
 
       break;

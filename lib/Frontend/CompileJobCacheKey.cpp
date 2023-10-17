@@ -86,11 +86,10 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
 
 llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobCacheKeyForOutput(
     llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef BaseKey,
-    StringRef ProducingInput, file_types::ID OutputType) {
+    StringRef ProducingInput) {
   SmallString<256> OutputInfo;
 
-  // Encode the OutputType as first byte, then append the input file path.
-  OutputInfo.emplace_back((char)OutputType);
+  // CacheKey is the producting input + the base key.
   OutputInfo.append(ProducingInput);
 
   return CAS.storeFromString({BaseKey}, OutputInfo);

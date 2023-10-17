@@ -37,8 +37,7 @@ class SwiftScanCAS {
 public:
   // Compute the CASID for PCH output from invocation.
   llvm::Expected<std::string> computeCacheKey(llvm::ArrayRef<const char *> Args,
-                                              llvm::StringRef InputPath,
-                                              swift::file_types::ID OutputKind);
+                                              llvm::StringRef InputPath);
 
   // Store content into CAS.
   llvm::Expected<std::string> storeContent(llvm::StringRef Content);
@@ -759,34 +758,14 @@ swiftscan_string_ref_t swiftscan_cas_store(swiftscan_cas_t cas, uint8_t *data,
   return swift::c_string_utils::create_clone(ID->c_str());
 }
 
-static swift::file_types::ID
-getFileTypeFromScanOutputKind(swiftscan_output_kind_t kind) {
-  switch (kind) {
-  case SWIFTSCAN_OUTPUT_TYPE_OBJECT:
-    return swift::file_types::ID::TY_Object;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTMODULE:
-    return swift::file_types::ID::TY_SwiftModuleFile;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTINTERFACE:
-    return swift::file_types::ID::TY_SwiftModuleInterfaceFile;
-  case SWIFTSCAN_OUTPUT_TYPE_SWIFTPRIVATEINTERFACE:
-    return swift::file_types::ID::TY_PrivateSwiftModuleInterfaceFile;
-  case SWIFTSCAN_OUTPUT_TYPE_CLANG_MODULE:
-    return swift::file_types::ID::TY_ClangModuleFile;
-  case SWIFTSCAN_OUTPUT_TYPE_CLANG_PCH:
-    return swift::file_types::ID::TY_PCH;
-  }
-}
-
 swiftscan_string_ref_t
-swiftscan_compute_cache_key(swiftscan_cas_t cas, int argc, const char **argv,
-                            const char *input, swiftscan_output_kind_t kind,
-                            swiftscan_string_ref_t *error) {
+swiftscan_cache_compute_key(swiftscan_cas_t cas, int argc, const char **argv,
+                            const char *input, swiftscan_string_ref_t *error) {
   std::vector<const char *> Compilation;
   for (int i = 0; i < argc; ++i)
     Compilation.push_back(argv[i]);
 
-  auto ID = unwrap(cas)->computeCacheKey(Compilation, input,
-                                         getFileTypeFromScanOutputKind(kind));
+  auto ID = unwrap(cas)->computeCacheKey(Compilation, input);
   if (!ID) {
     *error =
         swift::c_string_utils::create_clone(toString(ID.takeError()).c_str());
@@ -814,14 +793,13 @@ SwiftScanCAS::createSwiftScanCAS(clang::CASOptions &CASOpts) {
 
 llvm::Expected<std::string>
 SwiftScanCAS::computeCacheKey(llvm::ArrayRef<const char *> Args,
-                              llvm::StringRef InputPath,
-                              swift::file_types::ID OutputKind) {
+                              llvm::StringRef InputPath) {
   auto BaseKey = swift::createCompileJobBaseCacheKey(*CAS, Args);
   if (!BaseKey)
     return BaseKey.takeError();
 
-  auto Key = swift::createCompileJobCacheKeyForOutput(*CAS, *BaseKey, InputPath,
-                                                      OutputKind);
+  auto Key =
+      swift::createCompileJobCacheKeyForOutput(*CAS, *BaseKey, InputPath);
   if (!Key)
     return Key.takeError();
 

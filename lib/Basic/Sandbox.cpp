@@ -30,7 +30,7 @@ static StringRef sandboxProfile(llvm::BumpPtrAllocator &Alloc) {
   // This is required to launch any processes (execve(2)).
   contents += "(allow process-exec*)\n";
 
-  return NullTerminatedStringRef(contents, Alloc);
+  return NullTerminatedStringRef(StringRef(contents), Alloc);
 }
 #endif
 

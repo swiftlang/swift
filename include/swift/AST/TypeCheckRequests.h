@@ -4238,25 +4238,48 @@ public:
 };
 
 /// Represent a loaded plugin either an in-process library or an executable.
-class LoadedCompilerPlugin {
-  llvm::PointerUnion<LoadedLibraryPlugin *, LoadedExecutablePlugin *> ptr;
+class CompilerPluginLoadResult {
+  enum class PluginKind : uint8_t {
+    Error = 0,
+    Library,
+    Executable,
+  };
+  PluginKind Kind;
+  void *opaqueHandle;
+
+  CompilerPluginLoadResult(PluginKind K, void *opaque)
+      : Kind(K), opaqueHandle(opaque) {}
 
 public:
-  LoadedCompilerPlugin(std::nullptr_t) : ptr(nullptr) {}
-  LoadedCompilerPlugin(LoadedLibraryPlugin *ptr) : ptr(ptr){};
-  LoadedCompilerPlugin(LoadedExecutablePlugin *ptr) : ptr(ptr){};
+  CompilerPluginLoadResult(LoadedLibraryPlugin *ptr)
+      : CompilerPluginLoadResult(PluginKind::Library, ptr){};
+  CompilerPluginLoadResult(LoadedExecutablePlugin *ptr)
+      : CompilerPluginLoadResult(PluginKind::Executable, ptr){};
+  static CompilerPluginLoadResult error(NullTerminatedStringRef message) {
+    return CompilerPluginLoadResult(PluginKind::Error,
+                                    const_cast<char *>(message.data()));
+  }
 
   LoadedLibraryPlugin *getAsLibraryPlugin() const {
-    return ptr.dyn_cast<LoadedLibraryPlugin *>();
+    if (Kind != PluginKind::Library)
+      return nullptr;
+    return static_cast<LoadedLibraryPlugin *>(opaqueHandle);
   }
   LoadedExecutablePlugin *getAsExecutablePlugin() const {
-    return ptr.dyn_cast<LoadedExecutablePlugin *>();
+    if (Kind != PluginKind::Executable)
+      return nullptr;
+    return static_cast<LoadedExecutablePlugin *>(opaqueHandle);
+  }
+  bool isError() const { return Kind == PluginKind::Error; }
+  NullTerminatedStringRef getErrorMessage() const {
+    assert(isError());
+    return static_cast<const char *>(opaqueHandle);
   }
 };
 
 class CompilerPluginLoadRequest
     : public SimpleRequest<CompilerPluginLoadRequest,
-                           LoadedCompilerPlugin(ASTContext *, Identifier),
+                           CompilerPluginLoadResult(ASTContext *, Identifier),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4264,8 +4287,8 @@ public:
 private:
   friend SimpleRequest;
 
-  LoadedCompilerPlugin evaluate(Evaluator &evaluator, ASTContext *ctx,
-                                Identifier moduleName) const;
+  CompilerPluginLoadResult evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                    Identifier moduleName) const;
 
 public:
   // Source location
@@ -4296,8 +4319,8 @@ public:
 /// Resolve an external macro given its module and type name.
 class ExternalMacroDefinitionRequest
     : public SimpleRequest<ExternalMacroDefinitionRequest,
-                           llvm::Optional<ExternalMacroDefinition>(
-                               ASTContext *, Identifier, Identifier),
+                           ExternalMacroDefinition(ASTContext *, Identifier,
+                                                   Identifier),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4305,10 +4328,9 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<ExternalMacroDefinition> evaluate(
-      Evaluator &evaluator, ASTContext *ctx,
-      Identifier moduleName, Identifier typeName
-  ) const;
+  ExternalMacroDefinition evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                   Identifier moduleName,
+                                   Identifier typeName) const;
 
 public:
   // Source location

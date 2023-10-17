@@ -65,12 +65,12 @@ extern "C" void swift_ASTGen_freeExpansionReplacements(
     ptrdiff_t numReplacements);
 
 extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, void *macro, uint8_t externalKind,
+    void *diagEngine, const void *macro, uint8_t externalKind,
     const char *discriminator, uint8_t rawMacroRole, void *sourceFile,
     const void *sourceLocation, BridgedString *evaluatedSourceOut);
 
 extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, void *macro, uint8_t externalKind,
+    void *diagEngine, const void *macro, uint8_t externalKind,
     const char *discriminator, const char *qualifiedType,
     const char *conformances, uint8_t rawMacroRole, void *customAttrSourceFile,
     const void *customAttrSourceLocation, void *declarationSourceFile,
@@ -81,7 +81,7 @@ extern "C" bool swift_ASTGen_initializePlugin(void *handle, void *diagEngine);
 extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
 extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *handle, const char *libraryPath, const char *moduleName,
-    void *diagEngine);
+    BridgedString *errorOut);
 
 static inline StringRef toStringRef(BridgedString bridged) {
   return {reinterpret_cast<const char *>(bridged.data), size_t(bridged.length)};
@@ -277,7 +277,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 #endif
 }
 
-static LoadedExecutablePlugin *
+static llvm::Expected<LoadedExecutablePlugin *>
 initializeExecutablePlugin(ASTContext &ctx,
                            LoadedExecutablePlugin *executablePlugin,
                            StringRef libraryPath, Identifier moduleName) {
@@ -291,7 +291,9 @@ initializeExecutablePlugin(ASTContext &ctx,
   if (!executablePlugin->isInitialized()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     if (!swift_ASTGen_initializePlugin(executablePlugin, &ctx.Diags)) {
-      return nullptr;
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(), "'%s' produced malformed response",
+          executablePlugin->getExecutablePath().data());
     }
 
     // Resend the compiler capability on reconnect.
@@ -314,18 +316,25 @@ initializeExecutablePlugin(ASTContext &ctx,
     llvm::SmallString<128> resolvedLibraryPath;
     auto fs = ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
-      ctx.Diags.diagnose(SourceLoc(), diag::compiler_plugin_not_loaded,
-                         executablePlugin->getExecutablePath(), err.message());
-      return nullptr;
+      return llvm::createStringError(err, err.message());
     }
     std::string resolvedLibraryPathStr(resolvedLibraryPath);
     std::string moduleNameStr(moduleName.str());
 
+    BridgedString errorOut{nullptr, 0};
     bool loaded = swift_ASTGen_pluginServerLoadLibraryPlugin(
         executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
-        &ctx.Diags);
-    if (!loaded)
-      return nullptr;
+        &errorOut);
+    if (!loaded) {
+      SWIFT_DEFER { swift_ASTGen_freeBridgedString(errorOut); };
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "failed to load library plugin '%s' in plugin server '%s'; %s",
+          resolvedLibraryPathStr.c_str(),
+          executablePlugin->getExecutablePath().data(), errorOut.data);
+    }
+
+    assert(errorOut.data == nullptr);
 
     // Set a callback to load the library again on reconnections.
     auto *callback = new std::function<void(void)>(
@@ -333,7 +342,7 @@ initializeExecutablePlugin(ASTContext &ctx,
           (void)swift_ASTGen_pluginServerLoadLibraryPlugin(
               executablePlugin, resolvedLibraryPathStr.c_str(),
               moduleNameStr.c_str(),
-              /*diags=*/nullptr);
+              /*errorOut=*/nullptr);
         });
     executablePlugin->addOnReconnect(callback);
 
@@ -348,40 +357,66 @@ initializeExecutablePlugin(ASTContext &ctx,
   return executablePlugin;
 }
 
-LoadedCompilerPlugin
+CompilerPluginLoadResult
 CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                     Identifier moduleName) const {
   PluginLoader &loader = ctx->getPluginLoader();
   const auto &entry = loader.lookupPluginByModuleName(moduleName);
 
+  SmallString<0> errorMessage;
+
   if (!entry.executablePath.empty()) {
-    if (LoadedExecutablePlugin *executablePlugin =
-            loader.loadExecutablePlugin(entry.executablePath)) {
+    llvm::Expected<LoadedExecutablePlugin *> executablePlugin =
+        loader.loadExecutablePlugin(entry.executablePath);
+    if (executablePlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         unsigned tag = entry.libraryPath.empty() ? 1 : 2;
         ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, tag,
                             entry.executablePath, entry.libraryPath);
       }
 
-      return initializeExecutablePlugin(*ctx, executablePlugin,
-                                        entry.libraryPath, moduleName);
+      executablePlugin = initializeExecutablePlugin(
+          *ctx, executablePlugin.get(), entry.libraryPath, moduleName);
     }
+    if (executablePlugin)
+      return executablePlugin.get();
+    llvm::handleAllErrors(executablePlugin.takeError(),
+                          [&](const llvm::ErrorInfoBase &err) {
+                            if (!errorMessage.empty())
+                              errorMessage += ", ";
+                            errorMessage += err.message();
+                          });
   } else if (!entry.libraryPath.empty()) {
-    if (LoadedLibraryPlugin *libraryPlugin =
-            loader.loadLibraryPlugin(entry.libraryPath)) {
+
+    llvm::Expected<LoadedLibraryPlugin *> libraryPlugin =
+        loader.loadLibraryPlugin(entry.libraryPath);
+    if (libraryPlugin) {
       if (ctx->LangOpts.EnableMacroLoadingRemarks) {
         ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, 0,
                             entry.libraryPath, StringRef());
       }
 
-      return libraryPlugin;
+      return libraryPlugin.get();
+    } else {
+      llvm::handleAllErrors(libraryPlugin.takeError(),
+                            [&](const llvm::ErrorInfoBase &err) {
+                              if (!errorMessage.empty())
+                                errorMessage += ", ";
+                              errorMessage += err.message();
+                            });
     }
   }
-
-  return nullptr;
+  if (!errorMessage.empty()) {
+    NullTerminatedStringRef err(errorMessage, *ctx);
+    return CompilerPluginLoadResult::error(err);
+  } else {
+    NullTerminatedStringRef errMsg(
+        "plugin for module '" + moduleName.str() + "' not found", *ctx);
+    return CompilerPluginLoadResult::error(errMsg);
+  }
 }
 
-static llvm::Optional<ExternalMacroDefinition>
+static ExternalMacroDefinition
 resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
                       Identifier typeName, LoadedLibraryPlugin *plugin) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -398,13 +433,27 @@ resolveInProcessMacro(ASTContext &ctx, Identifier moduleName,
 
       return ExternalMacroDefinition{
           ExternalMacroDefinition::PluginKind::InProcess, inProcess};
+    } else {
+      NullTerminatedStringRef err(
+          "'" + moduleName.str() + "." + typeName.str() +
+              "' is not a valid macro implementation type in library plugin '" +
+              StringRef(plugin->getLibraryPath()) + "'",
+          ctx);
+
+      return ExternalMacroDefinition::error(err);
     }
   }
+  NullTerminatedStringRef err("'" + moduleName.str() + "." + typeName.str() +
+                                  "' could not be found in library plugin '" +
+                                  StringRef(plugin->getLibraryPath()) + "'",
+                              ctx);
+  return ExternalMacroDefinition::error(err);
 #endif
-  return llvm::None;
+  return ExternalMacroDefinition::error(
+      "the current compiler was not built with macro support");
 }
 
-static llvm::Optional<ExternalMacroDefinition>
+static ExternalMacroDefinition
 resolveExecutableMacro(ASTContext &ctx,
                        LoadedExecutablePlugin *executablePlugin,
                        Identifier moduleName, Identifier typeName) {
@@ -417,34 +466,38 @@ resolveExecutableMacro(ASTContext &ctx,
     return ExternalMacroDefinition{
         ExternalMacroDefinition::PluginKind::Executable, execMacro};
   }
+  // NOTE: this is not reachable because executable macro resolution always
+  // succeeds.
+  NullTerminatedStringRef err(
+      "'" + moduleName.str() + "." + typeName.str() +
+          "' could not be found in executable plugin" +
+          StringRef(executablePlugin->getExecutablePath()),
+      ctx);
+  return ExternalMacroDefinition::error(err);
 #endif
-  return llvm::None;
+  return ExternalMacroDefinition::error(
+      "the current compiler was not built with macro support");
 }
 
-llvm::Optional<ExternalMacroDefinition>
+ExternalMacroDefinition
 ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
                                          Identifier moduleName,
                                          Identifier typeName) const {
   // Try to load a plugin module from the plugin search paths. If it
   // succeeds, resolve in-process from that plugin
   CompilerPluginLoadRequest loadRequest{ctx, moduleName};
-  LoadedCompilerPlugin loaded =
-      evaluateOrDefault(evaluator, loadRequest, nullptr);
+  CompilerPluginLoadResult loaded = evaluateOrDefault(
+      evaluator, loadRequest, CompilerPluginLoadResult::error("request error"));
 
   if (auto loadedLibrary = loaded.getAsLibraryPlugin()) {
-    if (auto inProcess = resolveInProcessMacro(
-            *ctx, moduleName, typeName, loadedLibrary))
-      return *inProcess;
+    return resolveInProcessMacro(*ctx, moduleName, typeName, loadedLibrary);
   }
 
   if (auto *executablePlugin = loaded.getAsExecutablePlugin()) {
-    if (auto executableMacro = resolveExecutableMacro(*ctx, executablePlugin,
-                                                      moduleName, typeName)) {
-      return executableMacro;
-    }
+    return resolveExecutableMacro(*ctx, executablePlugin, moduleName, typeName);
   }
 
-  return llvm::None;
+  return ExternalMacroDefinition::error(loaded.getErrorMessage());
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid
@@ -1028,11 +1081,14 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
     auto external = macroDef.getExternalMacro();
     ExternalMacroDefinitionRequest request{&ctx, external.moduleName,
                                            external.macroTypeName};
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
-    if (!externalDef) {
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("request error"));
+    if (externalDef.isError()) {
       ctx.Diags.diagnose(loc, diag::external_macro_not_found,
                          external.moduleName.str(),
-                         external.macroTypeName.str(), macro->getName());
+                         external.macroTypeName.str(), macro->getName(),
+                         externalDef.getErrorMessage());
       macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
@@ -1062,9 +1118,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
       return nullptr;
 
     BridgedString evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
     swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
+        &ctx.Diags, externalDef.opaqueHandle,
+        static_cast<uint32_t>(externalDef.kind), discriminator->c_str(),
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
@@ -1301,13 +1358,14 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(ctx.evaluator, request, llvm::None);
-    if (!externalDef) {
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("failed request"));
+    if (externalDef.isError()) {
       attachedTo->diagnose(diag::external_macro_not_found,
-                        external.moduleName.str(),
-                        external.macroTypeName.str(),
-                        macro->getName()
-      );
+                           external.moduleName.str(),
+                           external.macroTypeName.str(), macro->getName(),
+                           externalDef.getErrorMessage());
       macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
@@ -1339,9 +1397,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
       searchDecl = var->getParentPatternBinding();
 
     BridgedString evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
     swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags, externalDef->opaqueHandle,
-        static_cast<uint32_t>(externalDef->kind), discriminator->c_str(),
+        &ctx.Diags, externalDef.opaqueHandle,
+        static_cast<uint32_t>(externalDef.kind), discriminator->c_str(),
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),

@@ -36,8 +36,8 @@ To follow along with this guide, you'll need:
    instructions in the Swift project README.
 2. The latest build of the Swift compiler for your Linux distro, available at
    https://www.swift.org/download/ or sometimes your distro package manager.
-3. The latest version of the Android LTS NDK (r25c at the time of this writing),
-   available to download here:
+3. The last version of the Android LTS NDK (r25c, the latest LTS NDK 26 at the
+   time of this writing doesn't work yet), available to download here:
    https://developer.android.com/ndk/downloads
 4. An Android device with remote debugging enabled or the emulator. We require
    remote debugging in order to deploy built stdlib products to the device. You

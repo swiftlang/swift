@@ -30,6 +30,10 @@ enum OuterEnum<T> {
   case inner(InnerEnum<T>, AnyObject)
 }
 
+struct Box<T> {
+  var t: T
+}
+
 struct InnerStruct<T> {
   var t: T
   var object: AnyObject
@@ -533,6 +537,65 @@ right:
   br exit(%instance : $T, %s : $S)
 exit(%instance_2 : @owned $T, %s_2 : $S):
   destroy_value %instance_2 : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Check behavior of non-coalesceable single incoming phi.
+// CHECK-LABEL: sil [ossa] @f120_single_phi_argument_forwarded_function_argument : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[STORAGE:%[^,]+]] = alloc_stack
+// CHECK:         copy_addr [take] [[T]] to [init] [[STORAGE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[STORAGE]]
+// CHECK:         dealloc_stack [[STORAGE]]
+// CHECK-LABEL: } // end sil function 'f120_single_phi_argument_forwarded_function_argument'
+sil [ossa]@f120_single_phi_argument_forwarded_function_argument : $@convention(thin) <T> (@in T) -> () {
+entry(%t : @owned $T):
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  destroy_value %t2 : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f121_single_phi_argument_forwarded_function_argument_returned : {{.*}} {
+// CHECK:       bb0([[OUT:%[^,]+]] :
+// CHECK-SAME:      [[IN:%[^,]+]] :
+// CHECK:         copy_addr [take] [[IN]] to [init] [[OUT]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'f121_single_phi_argument_forwarded_function_argument_returned'
+sil [ossa]@f121_single_phi_argument_forwarded_function_argument_returned : $@convention(thin) <T> (@in T) -> @out T {
+entry(%t : @owned $T):
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  return %t2 : $T
+}
+
+// CHECK-LABEL: sil [ossa] @f122_single_phi_argument_destructure : $@convention(thin) <T> () -> () {
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         [[BOX_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         apply undef<T>([[BOX_ADDR]])
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOX_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[BOX_ADDR]]
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK-LABEL: } // end sil function 'f122_single_phi_argument_destructure'
+sil [ossa]@f122_single_phi_argument_destructure : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<T>() : $@convention(thin) <T> () -> (@out Box<T>)
+  %t = destructure_struct %box : $Box<T>
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  destroy_value %t2 : $T
   %retval = tuple ()
   return %retval : $()
 }

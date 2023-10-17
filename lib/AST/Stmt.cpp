@@ -473,12 +473,15 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
 }
 
 Type DoCatchStmt::getCaughtErrorType() const {
-  return getCatches()
+  auto firstPattern = getCatches()
     .front()
     ->getCaseLabelItems()
     .front()
-    .getPattern()
-    ->getType();
+    .getPattern();
+  if (firstPattern->hasType())
+    return firstPattern->getType();
+
+  return Type();
 }
 
 void LabeledConditionalStmt::setCond(StmtCondition e) {

@@ -957,14 +957,24 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
 
 llvm::Optional<Type> 
 AbstractFunctionDecl::getEffectiveThrownErrorType() const {
+  // FIXME: Only getters can have thrown error types right now, and DidSet
+  // has a cyclic reference if we try to get its interface type here. Find a
+  // better way to express this.
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (accessor->getAccessorKind() != AccessorKind::Get)
+      return llvm::None;
+  }
+
   Type interfaceType = getInterfaceType();
   if (hasImplicitSelfDecl()) {
     if (auto fnType = interfaceType->getAs<AnyFunctionType>())
       interfaceType = fnType->getResult();
   }
 
-  return interfaceType->castTo<AnyFunctionType>()
-      ->getEffectiveThrownErrorType();
+  if (auto fnType = interfaceType->getAs<AnyFunctionType>())
+    return fnType->getEffectiveThrownErrorType();
+
+  return llvm::None;
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -11397,4 +11407,33 @@ MacroDiscriminatorContext
 MacroDiscriminatorContext::getParentOf(FreestandingMacroExpansion *expansion) {
   return getParentOf(
       expansion->getPoundLoc(), expansion->getDeclContext());
+}
+
+llvm::Optional<Type>
+CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
+  if (auto func = dyn_cast<AbstractFunctionDecl *>()) {
+    if (auto thrownError = func->getEffectiveThrownErrorType())
+      return func->mapTypeIntoContext(*thrownError);
+
+    return llvm::None;
+  }
+
+  if (auto closure = dyn_cast<AbstractClosureExpr *>()) {
+    if (closure->getType())
+      return closure->getEffectiveThrownType();
+
+    // FIXME: Should we lazily compute this?
+    return llvm::None;
+  }
+
+  auto doCatch = get<DoCatchStmt *>();
+  if (auto thrownError = doCatch->getCaughtErrorType()) {
+    if (thrownError->isNever())
+      return llvm::None;
+
+    return thrownError;
+  }
+
+  // If we haven't computed the error type yet, do so now.
+  return ctx.getErrorExistentialType();
 }

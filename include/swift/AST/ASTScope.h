@@ -29,6 +29,7 @@
 #define SWIFT_AST_AST_SCOPE_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/CatchNode.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
@@ -85,6 +86,7 @@ class SILGenFunction;
 
 namespace ast_scope {
 class ASTScopeImpl;
+class BraceStmtScope;
 class GenericTypeOrExtensionScope;
 class IterableTypeScope;
 class TypeAliasScope;
@@ -211,6 +213,7 @@ private:
 #pragma mark common queries
 public:
   virtual NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const;
+  virtual NullablePtr<const BraceStmtScope> getAsBraceStmtScope() const;
   virtual ASTContext &getASTContext() const;
   virtual NullablePtr<Decl> getDeclIfAny() const { return nullptr; };
   virtual NullablePtr<Stmt> getStmtIfAny() const { return nullptr; };
@@ -287,9 +290,17 @@ public:
       SourceFile *sourceFile, SourceLoc loc,
       llvm::function_ref<bool(ASTScope::PotentialMacro)> consume);
 
+  static CatchNode lookupCatchNode(ModuleDecl *module, SourceLoc loc);
+
   /// Scopes that cannot bind variables may set this to true to create more
   /// compact scope tree in the debug info.
   virtual bool ignoreInDebugInfo() const { return false; }
+
+  /// If this scope node represents a potential catch node, return body the
+  /// AST node describing the catch (a function, closure, or do...catch) and
+  /// the node of it's "body", i.e., the brace statement from which errors
+  /// thrown will be caught by that node.
+  virtual std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const;
 
 #pragma mark - - lookup- starting point
 private:
@@ -824,6 +835,8 @@ public:
   Decl *getDecl() const { return decl; }
   bool ignoreInDebugInfo() const override { return true; }
 
+  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
+
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
 
@@ -1069,6 +1082,8 @@ public:
   NullablePtr<AbstractClosureExpr> getClosureIfClosureScope() const override {
     return closureExpr;
   }
+  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
+
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
   bool ignoreInDebugInfo() const override { return true; }
@@ -1440,6 +1455,8 @@ private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
+  std::pair<CatchNode, const BraceStmtScope *> getCatchNodeBody() const override;
+
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
 };
@@ -1647,6 +1664,8 @@ public:
 
   NullablePtr<AbstractClosureExpr> parentClosureIfAny() const; // public??
   Stmt *getStmt() const override { return stmt; }
+
+  NullablePtr<const BraceStmtScope> getAsBraceStmtScope() const override;
 
 protected:
   bool lookupLocalsOrMembers(DeclConsumer) const override;
