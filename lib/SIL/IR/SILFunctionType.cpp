@@ -3629,6 +3629,10 @@ public:
       // possible to make it easy for LLVM to optimize away the thunk.
       return ResultConvention::Indirect;
     }
+    if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>() &&
+        resultTL.getLoweredType().isForeignReferenceType()) {
+      return ResultConvention::Owned;
+    }
     return CFunctionTypeConventions::getResult(resultTL);
   }
   static bool classof(const Conventions *C) {
