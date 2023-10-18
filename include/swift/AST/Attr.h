@@ -2368,6 +2368,10 @@ public:
     return static_cast<ExternKind>(Bits.ExternAttr.kind);
   }
 
+  /// Returns the C name of the given declaration.
+  /// \p forDecl is the func decl that the attribute belongs to.
+  StringRef getCName(const FuncDecl *forDecl) const;
+
   /// Find an ExternAttr with the given kind in the given DeclAttributes.
   static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
 

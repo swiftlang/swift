@@ -2131,9 +2131,14 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
 
   // C name must not be empty.
   if (attr->getExternKind() == ExternKind::C) {
-    if (auto cName = attr->Name) {
-      if (cName->empty())
-        diagnose(attr->getLocation(), diag::extern_empty_c_name);
+    StringRef cName = attr->getCName(FD);
+    if (cName.empty()) {
+      diagnose(attr->getLocation(), diag::extern_empty_c_name);
+    } else if (!clang::isValidAsciiIdentifier(cName)) {
+      // Conservatively ban non ASCII identifiers. The C standard allows
+      // Universal Character Names in identifiers, but clang doesn't provide
+      // an easy way to validate them, so we don't allow them for now.
+      diagnose(attr->getLocation(), diag::extern_c_invalid_name, cName);
     }
 
     // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.

@@ -1149,12 +1149,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       }
 
     if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      if (auto cName = ExternA->Name)
-        return cName->str();
-      // If no name was specified, fall back on the Swift base name without mangling.
       assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
-      // Base name is always available and non-empty for FuncDecl.
-      return getDecl()->getBaseIdentifier().str().str();
+      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
     }
 
     // Use a given cdecl name for native-to-foreign thunks.
