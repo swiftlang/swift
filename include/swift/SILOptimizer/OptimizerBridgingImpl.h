@@ -145,6 +145,10 @@ bool BridgedPassContext::hadError() const {
   return invocation->getPassManager()->getModule()->getASTContext().hadError();
 }
 
+bool BridgedPassContext::moduleIsSerialized() const {
+  return invocation->getPassManager()->getModule()->isSerialized();
+}
+
 BridgedAliasAnalysis BridgedPassContext::getAliasAnalysis() const {
   return {invocation->getPassManager()->getAnalysis<swift::AliasAnalysis>(invocation->getFunction())};
 }
@@ -204,6 +208,10 @@ void BridgedPassContext::eraseInstruction(BridgedInstruction inst) const {
 
 void BridgedPassContext::eraseBlock(BridgedBasicBlock block) const {
   block.unbridged()->eraseFromParent();
+}
+
+void BridgedPassContext::moveInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst) {
+  swift::SILBasicBlock::moveInstruction(inst.unbridged(), beforeInst.unbridged());
 }
 
 BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
@@ -361,6 +369,11 @@ BridgedSubstitutionMap BridgedPassContext::getContextSubstitutionMap(BridgedType
   auto *ntd = ty.getASTType()->getAnyNominal();
   auto *mod = invocation->getPassManager()->getModule()->getSwiftModule();
   return ty.getASTType()->getContextSubstitutionMap(mod, ntd);
+}
+
+BridgedType BridgedPassContext::getBuiltinIntegerType(SwiftInt bitWidth) const {
+  auto &ctxt = invocation->getPassManager()->getModule()->getASTContext();
+  return swift::SILType::getBuiltinIntegerType(bitWidth, ctxt);
 }
 
 void BridgedPassContext::beginTransformFunction(BridgedFunction function) const {

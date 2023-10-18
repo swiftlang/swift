@@ -251,7 +251,7 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 }
 
 extension BridgedType {
-  var type: Type { Type(bridged: self) }
+  public var type: Type { Type(bridged: self) }
   var typeOrNil: Type? { isNull() ? nil : type }
 }
 
