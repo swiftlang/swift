@@ -156,8 +156,8 @@ private extension Function {
 private func mergeStores(in function: Function, _ context: FunctionPassContext) {
   for inst in function.instructions {
     if let store = inst as? StoreInst {
-      if let elementStores = getSequenceOfElementStores(firstStore: store) {
-        merge(elementStores: elementStores, context)
+      if let (elementStores, lastStore) = getSequenceOfElementStores(firstStore: store) {
+        merge(elementStores: elementStores, lastStore: lastStore, context)
       }
     }
   }
@@ -171,7 +171,7 @@ private func mergeStores(in function: Function, _ context: FunctionPassContext) 
 ///   %addr_n = struct_element_addr %structAddr, #field_n
 ///   store %element_n to %addr_n
 ///
-private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
+private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], lastStore: StoreInst)? {
   guard let elementAddr = firstStore.destination as? StructElementAddrInst else {
     return nil
   }
@@ -195,7 +195,7 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
       numStoresFound += 1
       if numStoresFound == numElements {
         // If we saw  `numElements` distinct stores, it implies that all elements in `elementStores` are not nil.
-        return elementStores.map { $0! }
+        return (elementStores.map { $0! }, lastStore: store)
       }
     default:
       if inst.mayReadOrWriteMemory {
@@ -206,8 +206,7 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> [StoreInst]? {
   return nil
 }
 
-private func merge(elementStores: [StoreInst], _ context: FunctionPassContext) {
-  let lastStore = elementStores.last!
+private func merge(elementStores: [StoreInst], lastStore: StoreInst, _ context: FunctionPassContext) {
   let builder = Builder(after: lastStore, context)
 
   let structAddr = (lastStore.destination as! StructElementAddrInst).struct
