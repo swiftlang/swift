@@ -810,7 +810,7 @@ bool ConformanceLookupTable::resolveConformances(ProtocolDecl *protocol) {
   return anySuperseded;
 }
 
-DeclContext *ConformanceLookupTable:: getConformingContext(
+DeclContext *ConformanceLookupTable::getConformingContext(
                NominalTypeDecl *nominal,
                ConformanceEntry *entry) {
   ProtocolDecl *protocol = entry->getProtocol();
