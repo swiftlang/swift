@@ -202,14 +202,6 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
 
   PipelineTuningOptions PTO;
 
-  bool RunSwiftMergeFunctions = true;
-  // LLVM MergeFunctions and SwiftMergeFunctions don't understand that the
-  // string in the metadata on calls in @llvm.type.checked.load intrinsics is
-  // semantically meaningful, and mis-compile (mis-merge) unrelated functions.
-  if (Opts.VirtualFunctionElimination || Opts.WitnessMethodElimination) {
-    RunSwiftMergeFunctions = false;
-  }
-
   bool RunSwiftSpecificLLVMOptzns =
       !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
 
@@ -222,7 +214,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
     PTO.LoopInterleaving = true;
     PTO.LoopVectorization = true;
     PTO.SLPVectorization = true;
-    PTO.MergeFunctions = RunSwiftMergeFunctions;
+    PTO.MergeFunctions = true;
     level = llvm::OptimizationLevel::Os;
   } else {
     level = llvm::OptimizationLevel::O0;
@@ -310,7 +302,7 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
                                         allowlistFiles, ignorelistFiles));
     });
   }
-  if (RunSwiftSpecificLLVMOptzns && RunSwiftMergeFunctions) {
+  if (RunSwiftSpecificLLVMOptzns) {
     PB.registerOptimizerLastEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel Level) {
           if (Level != OptimizationLevel::O0) {
