@@ -973,6 +973,8 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bundle\installer.
   -p:BaseReleaseDownloadUrl=https://download.swift.org/development/windows ^
   -p:Configuration=Release ^
   -p:BaseOutputPath=%PackageRoot%\online\ ^
+  -p:VCRedistInstaller="%VCToolsRedistDir%\vc_redist.%VSCMD_ARG_TGT_ARCH%.exe" ^
+  -p:VSVersion=%VSCMD_VER% ^
   -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
@@ -987,6 +989,8 @@ msbuild %SourceRoot%\swift-installer-scripts\platforms\Windows\bundle\installer.
   -p:BundleFlavor=offline ^
   -p:Configuration=Release ^
   -p:BaseOutputPath=%PackageRoot%\offline\ ^
+  -p:VCRedistInstaller="%VCToolsRedistDir%\vc_redist.%VSCMD_ARG_TGT_ARCH%.exe" ^
+  -p:VSVersion=%VSCMD_VER% ^
   -p:DEVTOOLS_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:TOOLCHAIN_ROOT=%BuildRoot%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain ^
   -p:PLATFORM_ROOT=%PlatformRoot%\ ^
