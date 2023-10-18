@@ -2611,6 +2611,12 @@ private:
 
     /// Whether this declaration can not be copied and thus is move only.
     unsigned isMoveOnly : 1;
+
+    /// Whether the "isEscapable" bit has been computed yet.
+    unsigned isEscapable : 1;
+
+    /// Whether this declaration is escapable.
+    unsigned isEscapableComputed : 1;
   } LazySemanticInfo = { };
 
   friend class DynamicallyReplacedDeclRequest;
@@ -2618,6 +2624,7 @@ private:
   friend class IsObjCRequest;
   friend class IsFinalRequest;
   friend class IsMoveOnlyRequest;
+  friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
   friend class InterfaceTypeRequest;
@@ -2922,6 +2929,9 @@ public:
 
   /// Is this declaration 'moveOnly'?
   bool isMoveOnly() const;
+
+  /// Is this declaration escapable?
+  bool isEscapable() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;

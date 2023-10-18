@@ -197,6 +197,10 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setForceEnableLexicalLifetimes(DoForceEnableLexicalLifetimes);
   }
 
+  if (Attrs.hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    F->setHasUnsafeNonEscapableResult(true);
+  }
+
   // Validate `@differentiable` attributes by calling `getParameterIndices`.
   // This is important for:
   // - Skipping invalid `@differentiable` attributes in non-primary files.

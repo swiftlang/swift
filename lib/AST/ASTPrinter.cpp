@@ -3508,6 +3508,11 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureNonEscapableTypes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonEscapableAttr>()
+    || decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>();
+}
+
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();

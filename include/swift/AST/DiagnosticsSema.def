@@ -7539,6 +7539,9 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
+ERROR(nonescapable_types_attr_disabled,none,
+      "attribute requires '-enable-experimental-feature NonEscapableTypes'", ())
+
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------

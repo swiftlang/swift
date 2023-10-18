@@ -110,6 +110,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isAsyncFunction() const;
   BRIDGED_INLINE TraitResult canBeClass() const;
   BRIDGED_INLINE bool isMoveOnly() const;
+  BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isOrContainsObjectiveCClass() const;
   BRIDGED_INLINE bool isBuiltinInteger() const;
   BRIDGED_INLINE bool isBuiltinFloat() const;
@@ -328,6 +329,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isDestructor() const;
   BRIDGED_INLINE bool isGenericFunction() const;
   BRIDGED_INLINE bool hasSemanticsAttr(BridgedStringRef attrName) const;
+  BRIDGED_INLINE bool hasUnsafeNonEscapableResult() const;
   BRIDGED_INLINE EffectsKind getEffectAttribute() const;
   BRIDGED_INLINE PerformanceConstraints getPerformanceConstraints() const;
   BRIDGED_INLINE InlineStrategy getInlineStrategy() const;
