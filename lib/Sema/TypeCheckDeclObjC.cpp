@@ -2984,6 +2984,28 @@ private:
     if (attr->isInvalid())
       return;
 
+    if (auto init = dyn_cast<ConstructorDecl>(afd)) {
+      if (!init->isObjC() && (init->isRequired() ||
+                              !init->isConvenienceInit())) {
+        // Swift-only initializers have to be convenience.
+        diagnose(afd, diag::objc_implementation_init_must_be_convenience,
+                 afd, init->isRequired());
+
+        // Add appropriate fix-it to 'convenience'.
+        if (auto requiredMod = init->getAttrs().getAttribute<RequiredAttr>())
+          diagnose(afd,
+                   diag::objc_implementation_init_turn_required_to_convenience)
+            .fixItReplace(requiredMod->getRange(), "convenience");
+        else
+          diagnose(afd,
+                   diag::objc_implementation_init_turn_designated_to_convenience)
+            .fixItInsert(afd->getAttributeInsertionLoc(/*forModifier=*/true),
+                         "convenience ");
+
+        return;
+      }
+    }
+
     // Emit a vague fallback diagnostic.
     diagnose(afd, diag::objc_implementation_member_requires_vtable, afd);
   }

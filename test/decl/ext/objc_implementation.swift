@@ -203,11 +203,13 @@ protocol EmptySwiftProto {}
   }
 
   @nonobjc public init(notFromHeader4: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because it is an overridable Swift-only initializer}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override designated initializers}}
+    // expected-note@-2 {{add 'convenience' keyword to make this a convenience initializer}} {{12-12=convenience }}
   }
 
   @nonobjc public required init(notFromHeader5: CInt) {
-    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because it is an overridable Swift-only initializer}}
+    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because Objective-C subclasses must be able to override required initializers}}
+    // expected-note@-2 {{replace 'required' keyword with 'convenience' to make this a convenience initializer}} {{19-27=convenience}}
   }
 
   @nonobjc public convenience init(notFromHeader6: CInt) {

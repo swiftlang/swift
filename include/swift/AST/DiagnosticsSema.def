@@ -1841,6 +1841,20 @@ NOTE(objc_implementation_requirement_here,none,
      "%kind0 declared in header here",
      (ValueDecl *))
 
+ERROR(objc_implementation_init_must_be_convenience, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because "
+      "Objective-C subclasses must be able to override "
+      "%select{designated|required}1 initializers",
+      (const ValueDecl *, /*isRequired=*/bool))
+NOTE(objc_implementation_init_turn_designated_to_convenience, none,
+     "add 'convenience' keyword to make this a convenience initializer",
+     ())
+NOTE(objc_implementation_init_turn_required_to_convenience, none,
+     "replace 'required' keyword with 'convenience' to make this a convenience "
+     "initializer",
+     ())
+
+// Fallback diagnostic; super-general by nature.
 ERROR(objc_implementation_member_requires_vtable, none,
       "%kind0 is not valid in an '@_objcImplementation' extension because it "
       "is an overridable Swift-only %kindonly0",
