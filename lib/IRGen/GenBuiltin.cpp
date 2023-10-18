@@ -1490,6 +1490,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(pointerSrc);
     return;
   }
-
+  if (Builtin.ID == BuiltinValueKind::AllocVector) {
+    (void)args.claimAll();
+    IGF.emitTrap("escaped vector allocation", /*EmitUnreachable=*/true);
+    out.add(llvm::UndefValue::get(IGF.IGM.Int8PtrTy));
+    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    IGF.Builder.emitBlock(contBB);
+    return;
+  }
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

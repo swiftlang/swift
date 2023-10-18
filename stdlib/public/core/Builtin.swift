@@ -1062,3 +1062,14 @@ public // @SPI(OSLog)
 func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
   return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
 }
+
+@_transparent
+@_alwaysEmitIntoClient
+public
+func _allocateVector<Element>(elementType: Element.Type, capacity: Int) -> UnsafeMutablePointer<Element> {
+#if $BuiltinAllocVector
+  return UnsafeMutablePointer(Builtin.allocVector(elementType, capacity._builtinWordValue))
+#else
+  fatalError("unsupported compiler")
+#endif
+}

@@ -155,6 +155,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
     case BuiltinValueKind::StackDealloc:
+    case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::AssumeAlignment:
       return false;
 
