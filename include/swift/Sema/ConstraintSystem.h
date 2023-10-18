@@ -339,6 +339,12 @@ enum TypeVariableOptions {
   TVO_PackExpansion = 0x40,
 };
 
+enum class KeyPathCapability : uint8_t {
+  ReadOnly,
+  Writable,
+  ReferenceWritable
+};
+
 /// The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -5512,6 +5518,16 @@ public:
   /// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
   bool isMemberAvailableOnExistential(Type baseTy,
                                       const ValueDecl *member) const;
+
+  /// Attempts to infer a capability of a key path (i.e. whether it
+  /// is read-only, writable, etc.) based on the referenced members.
+  ///
+  /// \param keyPathType The type variable that represents the key path literal.
+  ///
+  /// \returns Capability if key path is sufficiently resolved and None
+  /// otherwise.
+  llvm::Optional<KeyPathCapability>
+  inferKeyPathLiteralCapability(TypeVariableType *keyPathType);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

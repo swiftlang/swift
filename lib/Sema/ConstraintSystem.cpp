@@ -7379,6 +7379,111 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
   return conformance;
 }
 
+llvm::Optional<KeyPathCapability>
+ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
+  auto *typeLocator = keyPathType->getImpl().getLocator();
+  assert(typeLocator->isLastElement<LocatorPathElt::KeyPathType>());
+
+  auto *keyPath = castToExpr<KeyPathExpr>(typeLocator->getAnchor());
+
+  auto capability = KeyPathCapability::Writable;
+
+  bool didOptionalChain = false;
+
+  for (unsigned i : indices(keyPath->getComponents())) {
+    auto &component = keyPath->getComponents()[i];
+
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
+      break;
+
+    case KeyPathExpr::Component::Kind::CodeCompletion: {
+      capability = KeyPathCapability::ReadOnly;
+      break;
+    }
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+      auto *componentLoc =
+          getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
+      auto *calleeLoc = getCalleeLocator(componentLoc);
+      auto overload = findSelectedOverloadFor(calleeLoc);
+      if (!overload)
+        return llvm::None;
+
+      // tuple elements do not change the capability of the key path
+      auto choice = overload->choice;
+      if (choice.getKind() == OverloadChoiceKind::TupleIndex) {
+        continue;
+      }
+
+      // Discarded unsupported non-decl member lookups.
+      if (!choice.isDecl())
+        return llvm::None;
+
+      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
+
+      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath)) {
+        if (!shouldAttemptFixes())
+          return llvm::None;
+
+        // If this was a method reference let's mark it as read-only.
+        if (!storage) {
+          capability = KeyPathCapability::ReadOnly;
+          continue;
+        }
+      }
+
+      if (!storage)
+        return llvm::None;
+
+      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
+        capability = KeyPathCapability::ReadOnly;
+        continue;
+      }
+
+      // A nonmutating setter indicates a reference-writable base.
+      if (!storage->isSetterMutating()) {
+        capability = KeyPathCapability::ReferenceWritable;
+        continue;
+      }
+
+      // Otherwise, the key path maintains its current capability.
+      break;
+    }
+
+    case KeyPathExpr::Component::Kind::OptionalChain:
+      didOptionalChain = true;
+      break;
+
+    case KeyPathExpr::Component::Kind::OptionalForce:
+      // Forcing an optional preserves its lvalue-ness.
+      break;
+
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      // An optional chain should already have been recorded.
+      assert(didOptionalChain);
+      break;
+
+    case KeyPathExpr::Component::Kind::TupleElement:
+      llvm_unreachable("not implemented");
+      break;
+
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
+    }
+  }
+
+  // Optional chains force the entire key path to be read-only.
+  if (didOptionalChain)
+    capability = KeyPathCapability::ReadOnly;
+
+  return capability;
+}
+
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
     : BindingProducer(bindings.getConstraintSystem(),
                       bindings.getTypeVariable()->getImpl().getLocator()),
