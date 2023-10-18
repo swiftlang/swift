@@ -131,19 +131,17 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
 
 bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
                                     CanType type) const {
-  assert(!type->hasTypeParameter() // && !type->hasUnboundGenericType()
-             && "forgot to mapTypeIntoContext first");
+  assert(!type->hasTypeParameter() && "forgot to mapTypeIntoContext first");
   auto &ctx = type->getASTContext();
 
-  auto *protocol =
-      TypeChecker::getProtocol(ctx, SourceLoc(), KnownProtocolKind::Copyable);
-  if (!protocol)
+  auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
+  if (!copyable)
     llvm_unreachable("missing Copyable protocol!");
 
   const bool conforms =
       (bool)TypeChecker::conformsToProtocol(type,
-                                            protocol,
-                                            protocol->getParentModule(),
+                                            copyable,
+                                            copyable->getParentModule(),
                                             /*allowMissing=*/false);
 
   return !conforms;

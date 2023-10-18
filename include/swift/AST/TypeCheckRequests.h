@@ -428,8 +428,8 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given type is noncopyable. Assumes type parameters
-/// have become archetypes.
+/// Determine whether the given type is noncopyable.
+/// Assumes a generic signature has been built.
 class IsNoncopyableRequest
     : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
                            RequestFlags::Cached> {
