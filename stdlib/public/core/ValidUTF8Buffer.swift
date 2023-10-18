@@ -127,8 +127,12 @@ extension _ValidUTF8Buffer: RandomAccessCollection {
   @inlinable
   @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
+    // TODO(katei): Remove this #if guard after we will start using
+    // stable/20230725 of llvm-project, which include https://github.com/apple/llvm-project/pull/7563
+    #if !arch(wasm32)
     _debugPrecondition(_isValid(i))
     _debugPrecondition(_isValid(j))
+    #endif
     return (
       i._biasedBits.leadingZeroBitCount - j._biasedBits.leadingZeroBitCount
     ) &>> 3
