@@ -2097,6 +2097,10 @@ bool TypeVarBindingProducer::computeNext() {
   }
 
   if (newBindings.empty()) {
+    // If key path type had contextual types, let's not attempt fallback.
+    if (TypeVar->getImpl().isKeyPathType() && !ExploredTypes.empty())
+      return false;
+
     // Add defaultable constraints (if any).
     for (auto *constraint : DelayedDefaults) {
       if (constraint->getKind() == ConstraintKind::FallbackType) {

@@ -3884,6 +3884,13 @@ namespace {
 
       CS.addKeyPathConstraint(kpTy, root, value, componentTypeVars, locator);
 
+      // Add a fallback constraint so we have an anchor to use for
+      // capability inference when there is no context.
+      CS.addUnsolvedConstraint(Constraint::create(
+          CS, ConstraintKind::FallbackType, kpTy,
+          BoundGenericType::get(kpDecl, /*parent=*/Type(), {root, value}),
+          CS.getConstraintLocator(E, ConstraintLocator::FallbackType)));
+
       return kpTy;
     }
 
