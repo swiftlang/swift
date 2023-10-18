@@ -110,6 +110,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
+  case ConstraintLocator::FallbackType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -522,6 +523,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::ThrownErrorType: {
     out << "thrown error type";
+    break;
+  }
+  case ConstraintLocator::FallbackType: {
+    out << "fallback type";
     break;
   }
   }
