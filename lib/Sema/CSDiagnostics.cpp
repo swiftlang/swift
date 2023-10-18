@@ -217,8 +217,7 @@ bool FailureDiagnostic::conformsToKnownProtocol(
 }
 
 Type RequirementFailure::getOwnerType() const {
-  auto anchor = getRawAnchor();
-
+  auto anchor = getAnchor();
   // If diagnostic is anchored at assignment expression
   // it means that requirement failure happened while trying
   // to convert source to destination, which means that
