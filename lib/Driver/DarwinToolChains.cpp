@@ -625,6 +625,28 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
   }
 }
 
+static unsigned getDWARFVersionForTriple(const llvm::Triple &triple) {
+  llvm::VersionTuple osVersion;
+  const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
+  switch (kind) {
+  case DarwinPlatformKind::MacOS:
+    triple.getMacOSXVersion(osVersion);
+    if (osVersion < llvm::VersionTuple(10, 11))
+      return 2;
+    return 4;
+  case DarwinPlatformKind::IPhoneOSSimulator:
+  case DarwinPlatformKind::IPhoneOS:
+  case DarwinPlatformKind::TvOS:
+  case DarwinPlatformKind::TvOSSimulator:
+    osVersion = triple.getiOSVersion();
+    if (osVersion < llvm::VersionTuple(9))
+      return 2;
+    return 4;
+  default:
+    return 4;
+  }
+}
+
 void toolchains::Darwin::addCommonFrontendArgs(
     const OutputInfo &OI, const CommandOutput &output,
     const llvm::opt::ArgList &inputArgs,
@@ -643,6 +665,16 @@ void toolchains::Darwin::addCommonFrontendArgs(
           inputArgs.MakeArgString(variantSDKVersion->getAsString()));
     }
   }
+  std::string dwarfVersion;
+  {
+    llvm::raw_string_ostream os(dwarfVersion);
+    os << "-dwarf-version=";
+    if (OI.DWARFVersion)
+      os << *OI.DWARFVersion;
+    else
+      os << getDWARFVersionForTriple(getTriple());
+  }
+  arguments.push_back(inputArgs.MakeArgString(dwarfVersion));
 }
 
 /// Add the frontend arguments needed to find external plugins in standard

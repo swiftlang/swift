@@ -2472,7 +2472,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Opts.DebugCompilationDir = std::string(cwd.str());
     }
   }
-
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
     if (A->containsValue("dwarf"))
       Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
@@ -2500,6 +2499,16 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                    Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
                      ? "-gline-tables-only"
                      : "-gdwarf_types");
+  }
+
+  if (auto A = Args.getLastArg(OPT_dwarf_version)) {
+    unsigned vers;
+    if (!StringRef(A->getValue()).getAsInteger(10, vers) && vers >= 2 &&
+        vers <= 5)
+      Opts.DWARFVersion = vers;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   for (auto A : Args.getAllArgValues(options::OPT_file_prefix_map)) {
