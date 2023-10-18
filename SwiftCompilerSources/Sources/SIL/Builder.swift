@@ -73,6 +73,7 @@ public struct Builder {
     }
   }
 
+  @discardableResult
   public func createCondFail(condition: Value, message: String) -> CondFailInst {
     return message._withBridgedStringRef { messageStr in
       let cf = bridged.createCondFail(condition.bridged, messageStr)
@@ -103,6 +104,12 @@ public struct Builder {
     return notifyNew(dr.getAs(DeallocStackRefInst.self))
   }
 
+  public func createAddressToPointer(address: Value, pointerType: Type,
+                                     needStackProtection: Bool) -> AddressToPointerInst {
+    let dr = bridged.createAddressToPointer(address.bridged, pointerType.bridged, needStackProtection)
+    return notifyNew(dr.getAs(AddressToPointerInst.self))
+  }
+
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
     let cast = bridged.createUncheckedRefCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedRefCastInst.self))
@@ -116,6 +123,11 @@ public struct Builder {
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
     return notifyNew(load.getAs(LoadInst.self))
+  }
+
+  public func createLoadBorrow(fromAddress: Value) -> LoadBorrowInst {
+    let load = bridged.createLoadBorrow(fromAddress.bridged)
+    return notifyNew(load.getAs(LoadBorrowInst.self))
   }
 
   public func createBeginDeallocRef(reference: Value, allocation: AllocRefInstBase) -> BeginDeallocRefInst {

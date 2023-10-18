@@ -1271,6 +1271,12 @@ BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) c
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createAddressToPointer(BridgedValue address, BridgedType pointerTy,
+                                                          bool needsStackProtection) const {
+  return {unbridged().createAddressToPointer(regularLoc(), address.getSILValue(), pointerTy.unbridged(),
+                                             needsStackProtection)};
+}
+
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedRefCast(regularLoc(), op.getSILValue(),
                                              type.unbridged())};
@@ -1284,6 +1290,10 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
   return {unbridged().createLoad(regularLoc(), op.getSILValue(),
                                  (swift::LoadOwnershipQualifier)ownership)};
+}
+
+BridgedInstruction BridgedBuilder::createLoadBorrow(BridgedValue op) const {
+  return {unbridged().createLoadBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference, BridgedValue allocation) const {
