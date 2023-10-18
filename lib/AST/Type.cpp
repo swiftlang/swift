@@ -197,9 +197,8 @@ bool TypeBase::isNoncopyable(const DeclContext *dc) {
   }
 
   if (!hasArchetype() || hasOpenedExistential())
-  // TODO: the need for the following test is suspicious.
-    if (dc->getGenericEnvironmentOfContext() || !hasTypeParameter())
-      return dc->mapTypeIntoContext(this)->isNoncopyable();
+    if (auto env = dc->getGenericEnvironmentOfContext())
+      return GenericEnvironment::mapTypeIntoContext(env, this)->isNoncopyable();
 
   return isNoncopyable();
 }
