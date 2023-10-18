@@ -406,6 +406,12 @@ extension AdditiveArithmetic {
   }
 }
 
+#if !$Embedded
+public typealias _CustomStringConvertibleOrNone = CustomStringConvertible
+#else
+public typealias _CustomStringConvertibleOrNone = Any
+#endif
+
 //===----------------------------------------------------------------------===//
 //===--- BinaryInteger ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -566,13 +572,6 @@ extension AdditiveArithmetic {
 ///         print("\(z) is greater than \(x).")
 ///     }
 ///     // Prints "23 is greater than -23."
-
-#if !$Embedded
-public typealias _CustomStringConvertibleOrNone = CustomStringConvertible
-#else
-public typealias _CustomStringConvertibleOrNone = Any
-#endif
-
 public protocol BinaryInteger :
   Hashable, Numeric, _CustomStringConvertibleOrNone, Strideable
   where Magnitude: BinaryInteger, Magnitude.Magnitude == Magnitude
@@ -1831,6 +1830,12 @@ extension BinaryInteger {
   }
 }
 
+#if !$Embedded
+public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
+#else
+public protocol _LosslessStringConvertibleOrNone {}
+#endif
+
 //===----------------------------------------------------------------------===//
 //===--- FixedWidthInteger ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -1899,13 +1904,6 @@ extension BinaryInteger {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-
-#if !$Embedded
-public typealias _LosslessStringConvertibleOrNone = LosslessStringConvertible
-#else
-public protocol _LosslessStringConvertibleOrNone {}
-#endif
-
 public protocol FixedWidthInteger: BinaryInteger, _LosslessStringConvertibleOrNone
 where Magnitude: FixedWidthInteger & UnsignedInteger,
       Stride: FixedWidthInteger & SignedInteger {
