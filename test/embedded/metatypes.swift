@@ -8,7 +8,7 @@ public func sink<T>(t: T) {}
 
 public func test() -> Int {
   let metatype = Int.self
-  sink(t: metatype) // expected-error {{cannot use metatype 'Int' in embedded Swift}}
+  sink(t: metatype) // expected-error {{cannot use metatype of type 'Int' in embedded Swift}}
   // expected-note@-1 {{called from here}}
   return 42
 }
