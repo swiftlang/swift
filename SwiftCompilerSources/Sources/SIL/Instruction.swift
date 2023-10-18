@@ -974,6 +974,9 @@ final public class ObjectInst : SingleValueInstruction {
   }
 }
 
+final public class VectorInst : SingleValueInstruction {
+}
+
 final public class TuplePackExtractInst: SingleValueInstruction, ForwardingInstruction {
   public var indexOperand: Operand { operands[0] }
   public var tupleOperand: Operand { operands[1] }
@@ -999,6 +1002,10 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   public var debugVariable: DebugVariable {
     return bridged.AllocStack_getVarInfo()
   }
+}
+
+final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
+  public var capacity: Value { operand.value }
 }
 
 public class AllocRefInstBase : SingleValueInstruction, Allocation {

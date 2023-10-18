@@ -207,10 +207,10 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
   SILBuilderWithScope B(InsertionPoint);
   switch (Alloc->getKind()) {
     case SILInstructionKind::PartialApplyInst:
+      assert(cast<PartialApplyInst>(Alloc)->isOnStack() && "wrong instruction");
+      LLVM_FALLTHROUGH;
     case SILInstructionKind::AllocStackInst:
-      assert((isa<AllocStackInst>(Alloc) ||
-              cast<PartialApplyInst>(Alloc)->isOnStack()) &&
-             "wrong instruction");
+    case SILInstructionKind::AllocVectorInst:
       return B.createDeallocStack(Location,
                                   cast<SingleValueInstruction>(Alloc));
     case SILInstructionKind::AllocRefDynamicInst:

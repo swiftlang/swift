@@ -36,6 +36,25 @@ sil_global @static_array : $TestArrayStorage = {
   %initval = object $TestArrayStorage (%3 : $Int32, [tail_elems] %4 : $Int64, %5 : $Int64)
 }
 
+// CHECK-LABEL: sil_global @static_global_vector : $Int32 = {
+// CHECK:         %initval = vector (%1 : $Int32, %3 : $Int32)
+// CHECK-NEXT:  }       
+sil_global @static_global_vector : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %initval = vector (%1 : $Int32, %3 : $Int32)
+}
+
+// CHECK-LABEL: sil_global @static_global_uninitialized_vector : $Int = {
+// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
+// CHECK-NEXT:  }       
+sil_global @static_global_uninitialized_vector : $Int = {
+  %0 = integer_literal $Builtin.Word, 10
+  %initval = alloc_vector $Int, %0 : $Builtin.Word
+}
+
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -560,6 +579,17 @@ bb0:
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
+}
+
+// CHECK-LABEL: sil @alloc_vector :
+sil @alloc_vector : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 42
+  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
+  %1 = alloc_vector $Int, %0 : $Builtin.Word
+  dealloc_stack %1 : $*Int
+  %3 = tuple ()
+  return %3 : $()
 }
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()

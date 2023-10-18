@@ -5110,6 +5110,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                      isLexical, usesMoveableValueDebugInfo);
     break;
   }
+  case SILInstructionKind::AllocVectorInst: {
+    SILType Ty;
+    if (parseSILType(Ty))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
+      return true;
+
+    SILValue capacity;
+    if (parseTypedValueRef(capacity, B))
+      return true;
+
+    ResultVal = B.createAllocVector(InstLoc, capacity, Ty);
+    break;
+  }
   case SILInstructionKind::MetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty))
@@ -5860,6 +5875,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         ResultVal = B.createObject(InstLoc, Ty, OpList, NumBaseElems,
                                    forwardingOwnership);
       }
+      break;
+    }
+    case SILInstructionKind::VectorInst: {
+      if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+        return true;
+
+      // Parse a list of SILValue.
+      do {
+        if (parseTypedValueRef(Val, B))
+          return true;
+        OpList.push_back(Val);
+      } while (P.consumeIf(tok::comma));
+
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+      ResultVal = B.createVector(InstLoc, OpList);
       break;
     }
     case SILInstructionKind::StructElementAddrInst:

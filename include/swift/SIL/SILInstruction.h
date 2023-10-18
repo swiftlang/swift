@@ -2115,6 +2115,35 @@ public:
   DeallocStackInst *getSingleDeallocStack() const;
 };
 
+/// AllocVectorInst - Like AllocStackInst, but allocates a vector of elements.
+class AllocVectorInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+           SILInstructionKind::AllocVectorInst, AllocVectorInst, AllocationInst> {
+  friend SILBuilder;
+
+  AllocVectorInst(SILDebugLocation loc, SILValue capacity, SILType resultType,
+                  ArrayRef<SILValue> typeDependentOperands)
+    : UnaryInstructionWithTypeDependentOperandsBase(loc, capacity,
+                                                    typeDependentOperands,
+                                                    resultType) {
+  }
+
+  static AllocVectorInst *create(SILDebugLocation Loc, SILValue capacity,
+                                 SILType elementType, SILFunction &F);
+
+  static AllocVectorInst *createInInitializer(SILDebugLocation Loc,
+                        SILValue capacity, SILType elementType, SILModule &M);
+
+public:
+  /// getElementType - Get the type of the allocated memory (as opposed to the
+  /// type of the instruction itself, which will be an address type).
+  SILType getElementType() const {
+    return getType().getObjectType();
+  }
+
+  SILValue getCapacity() const { return getOperand(); }
+};
+
 /// AllocPackInst - This represents the allocation of a value pack
 /// in stack memory.  The memory is provided uninitialized.
 class AllocPackInst final
@@ -6291,6 +6320,28 @@ public:
   /// The elements which initialize the tail allocated elements.
   OperandValueArrayRef getTailElements() const {
     return OperandValueArrayRef(getAllOperands().slice(numBaseElements));
+  }
+};
+
+/// VectorInst - Represents a vector value type.
+///
+/// This instruction can only appear at the end of a global variable's
+/// static initializer list.
+class VectorInst final : public InstructionBaseWithTrailingOperands<
+                                SILInstructionKind::VectorInst, VectorInst,
+                                SingleValueInstruction> {
+  friend SILBuilder;
+
+  VectorInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elements)
+      : InstructionBaseWithTrailingOperands(Elements, DebugLoc,
+                                            Elements[0]->getType()) {}
+
+  static VectorInst *create(SILDebugLocation DebugLoc,
+                            ArrayRef<SILValue> Elements,
+                            SILModule &M);
+public:
+  OperandValueArrayRef getElements() const {
+    return OperandValueArrayRef(getAllOperands());
   }
 };
 

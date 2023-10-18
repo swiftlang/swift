@@ -1048,6 +1048,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::BeginApplyInst:
@@ -1188,6 +1189,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::MarkUninitializedInst:
     llvm_unreachable("not valid in canonical sil");
   case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::VectorInst:
     llvm_unreachable("not valid in a function");
   }
 

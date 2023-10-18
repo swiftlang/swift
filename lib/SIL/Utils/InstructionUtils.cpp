@@ -509,6 +509,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::ProjectExistentialBoxInst:
   case SILInstructionKind::ObjCProtocolInst:
   case SILInstructionKind::ObjectInst:
+  case SILInstructionKind::VectorInst:
   case SILInstructionKind::TupleInst:
   case SILInstructionKind::TupleExtractInst:
   case SILInstructionKind::StructInst:
@@ -700,6 +701,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst:
     if (!cast<SingleValueInstruction>(inst)->getType().
           isLoadable(*inst->getFunction())) {
