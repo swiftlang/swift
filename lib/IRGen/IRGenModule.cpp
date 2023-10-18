@@ -21,7 +21,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"

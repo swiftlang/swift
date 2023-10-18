@@ -9,10 +9,12 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
 
-/// Represents the nine reflection sections used by Swift
+/// Represents the nine reflection sections used by Swift + the Swift AST
+/// section used by the debugger.
 enum ReflectionSectionKind : uint8_t {
 #define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF) KIND,
 #include "llvm/BinaryFormat/Swift.def"
