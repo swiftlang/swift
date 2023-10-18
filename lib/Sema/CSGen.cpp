@@ -1606,9 +1606,17 @@ namespace {
         addJoinConstraint<Iterator>(
             CS, locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
-              auto *locator = CS.getConstraintLocator(
-                  expr, LocatorPathElt::TupleElement(index++));
-              return std::make_pair(CS.getType(*it), locator);
+              if (auto packExpr = dyn_cast<PackExpansionExpr>(*it)) {
+                auto *locator = CS.getConstraintLocator(
+                    packExpr, LocatorPathElt::TupleElement(index++));
+                auto *eltLocator = CS.getConstraintLocator(packExpr);
+                Type elementType = CS.getType(packExpr->getPatternExpr());
+                return std::make_pair(elementType, locator);
+              } else {
+                auto *locator = CS.getConstraintLocator(
+                    expr, LocatorPathElt::TupleElement(index++));
+                return std::make_pair(CS.getType(*it), locator);
+              }
             });
       };
 
