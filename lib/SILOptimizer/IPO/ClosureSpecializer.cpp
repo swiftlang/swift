@@ -783,7 +783,8 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     return addToOldToNewClosureMap(
         origCalleeValue,
         Builder.createMarkDependence(CallSiteDesc.getLoc(), calleeValue,
-                                     CapturedMap[MD->getBase()]));
+                                     CapturedMap[MD->getBase()],
+                                     /*isNonEscaping*/false));
   }
 
 

@@ -2284,15 +2284,18 @@ public:
                                                        SILValue value);
 
   MarkDependenceInst *createMarkDependence(SILLocation Loc, SILValue value,
-                                           SILValue base) {
-    return createMarkDependence(Loc, value, base, value->getOwnershipKind());
+                                           SILValue base, bool isNonEscaping) {
+    return createMarkDependence(Loc, value, base, value->getOwnershipKind(),
+                                isNonEscaping);
   }
 
   MarkDependenceInst *
   createMarkDependence(SILLocation Loc, SILValue value, SILValue base,
-                       ValueOwnershipKind forwardingOwnershipKind) {
+                       ValueOwnershipKind forwardingOwnershipKind,
+                       bool isNonEscaping) {
     return insert(new (getModule()) MarkDependenceInst(
-        getSILDebugLocation(Loc), value, base, forwardingOwnershipKind));
+                    getSILDebugLocation(Loc), value, base,
+                    forwardingOwnershipKind, isNonEscaping));
   }
 
   IsUniqueInst *createIsUnique(SILLocation Loc, SILValue operand) {

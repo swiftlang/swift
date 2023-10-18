@@ -1024,10 +1024,12 @@ ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
 
 ManagedValue SILGenBuilder::createMarkDependence(SILLocation loc,
                                                  ManagedValue value,
-                                                 ManagedValue base) {
+                                                 ManagedValue base,
+                                                 bool isNonEscaping) {
   CleanupCloner cloner(*this, value);
   auto *mdi = createMarkDependence(loc, value.forward(getSILGenFunction()),
-                                   base.forward(getSILGenFunction()));
+                                   base.forward(getSILGenFunction()),
+                                   isNonEscaping);
   return cloner.clone(mdi);
 }
 

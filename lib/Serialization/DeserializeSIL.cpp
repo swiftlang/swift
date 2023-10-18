@@ -1979,7 +1979,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc,
         getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(ValID2,
-                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
+                      getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
+        /*nonEscaping*/Attr);
     break;
   }
   case SILInstructionKind::BeginDeallocRefInst: {

@@ -2840,7 +2840,8 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   case SILInstructionKind::MarkDependenceInst: {
     auto instr = cast<MarkDependenceInst>(convInstr);
     newInstr = convBuilder.createMarkDependence(
-        instr->getLoc(), instr->getValue(), instr->getBase());
+      instr->getLoc(), instr->getValue(), instr->getBase(),
+      instr->isNonEscaping());
     break;
   }
   case SILInstructionKind::DifferentiableFunctionInst: {
