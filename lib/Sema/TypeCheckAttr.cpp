@@ -2134,11 +2134,14 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
     StringRef cName = attr->getCName(FD);
     if (cName.empty()) {
       diagnose(attr->getLocation(), diag::extern_empty_c_name);
-    } else if (!clang::isValidAsciiIdentifier(cName)) {
-      // Conservatively ban non ASCII identifiers. The C standard allows
+    } else if (!attr->Name.has_value() && !clang::isValidAsciiIdentifier(cName)) {
+      // Warn non ASCII identifiers if it's *implicitly* specified. The C standard allows
       // Universal Character Names in identifiers, but clang doesn't provide
-      // an easy way to validate them, so we don't allow them for now.
-      diagnose(attr->getLocation(), diag::extern_c_invalid_name, cName);
+      // an easy way to validate them, so we warn identifers that is potentially
+      // invalid. If it's explicitly specified, we assume the user knows what
+      // they are doing, and don't warn.
+      diagnose(attr->getLocation(), diag::extern_c_maybe_invalid_name, cName)
+          .fixItInsert(attr->getRParenLoc(), (", \"" + cName + "\"").str());
     }
 
     // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.

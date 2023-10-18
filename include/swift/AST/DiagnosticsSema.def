@@ -1878,8 +1878,10 @@ ERROR(extern_empty_c_name,none,
       "expected non-empty C name in @_extern attribute", ())
 ERROR(extern_only_non_other_attr,none,
       "@_extern attribute cannot be applied to an '@%0' declaration", (StringRef))
-ERROR(extern_c_invalid_name, none,
-      "@_extern attribute has invalid C name '%0'", (StringRef))
+WARNING(extern_c_maybe_invalid_name, none,
+        "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
+        (StringRef))
+
 ERROR(c_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))

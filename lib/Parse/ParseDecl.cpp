@@ -1434,6 +1434,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 bool Parser::parseExternAttribute(DeclAttributes &Attributes,
                                   bool &DiscardAttribute, StringRef AttrName,
                                   SourceLoc AtLoc, SourceLoc Loc) {
+  SourceLoc lParenLoc = Tok.getLoc(), rParenLoc;
 
   // Parse @_extern(<language>, ...)
   if (!consumeIf(tok::l_paren)) {
@@ -1512,6 +1513,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
     }
   }
 
+  rParenLoc = Tok.getLoc();
   if (!consumeIf(tok::r_paren)) {
     diagnose(Loc, diag::attr_expected_rparen, AttrName,
              DeclAttribute::isDeclModifier(DAK_Extern));
@@ -1527,9 +1529,10 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   }
 
   if (!DiscardAttribute) {
-    Attributes.add(new (Context) ExternAttr(importModuleName, importName, AtLoc,
-                                            AttrRange, kind,
-                                            /*Implicit=*/false));
+    Attributes.add(new (Context)
+                       ExternAttr(importModuleName, importName, AtLoc,
+                                  lParenLoc, rParenLoc, AttrRange, kind,
+                                  /*Implicit=*/false));
   }
   return false;
 }

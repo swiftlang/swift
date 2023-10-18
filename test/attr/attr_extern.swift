@@ -49,11 +49,15 @@ func underscoredValid()
 @_extern(c, "") // expected-error {{expected non-empty C name in @_extern attribute}}
 func emptyCName()
 
-@_extern(c, "0start_with_digit") // expected-error {{@_extern attribute has invalid C name '0start_with_digit'}}
-func digitPrefixed()
+// Allow specifying any identifier explicitly
+@_extern(c, "0start_with_digit")
+func explicitDigitPrefixed()
 
-@_extern(c) // expected-error {{@_extern attribute has invalid C name '+'}}
+@_extern(c) // expected-warning {{C name '+' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning}}
 func +(a: Int, b: Bool) -> Bool
+
+@_extern(c) // expected-warning {{C name '🥸_implicitInvalid' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning}}
+func 🥸_implicitInvalid()
 
 @_extern(c)
 func omitCName()

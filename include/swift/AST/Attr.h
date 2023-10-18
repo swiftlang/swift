@@ -2342,18 +2342,22 @@ public:
 /// Define the `@_extern` attribute, used to import external declarations in
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
+  SourceLoc LParenLoc, RParenLoc;
+
 public:
-  ExternAttr(llvm::Optional<StringRef> ModuleName, llvm::Optional<StringRef> Name,
-             SourceLoc AtLoc, SourceRange Range, ExternKind Kind, bool Implicit)
-      : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
-        ModuleName(ModuleName), Name(Name) {
+  ExternAttr(llvm::Optional<StringRef> ModuleName,
+             llvm::Optional<StringRef> Name, SourceLoc AtLoc,
+             SourceLoc LParenLoc, SourceLoc RParenLoc, SourceRange Range,
+             ExternKind Kind, bool Implicit)
+      : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit), LParenLoc(LParenLoc),
+        RParenLoc(RParenLoc), ModuleName(ModuleName), Name(Name) {
     Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
   }
 
-  ExternAttr(llvm::Optional<StringRef> ModuleName, llvm::Optional<StringRef> Name,
-             ExternKind Kind, bool Implicit)
-      : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Kind,
-                   Implicit) {}
+  ExternAttr(llvm::Optional<StringRef> ModuleName,
+             llvm::Optional<StringRef> Name, ExternKind Kind, bool Implicit)
+      : ExternAttr(ModuleName, Name, SourceLoc(), SourceLoc(), SourceLoc(),
+                   SourceRange(), Kind, Implicit) {}
 
   /// The module name to import the named declaration in it
   /// Used for Wasm import declaration.
@@ -2362,6 +2366,9 @@ public:
   /// The declaration name to import
   /// std::nullopt if the declaration name is not specified with @_extern(c)
   const llvm::Optional<StringRef> Name;
+
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
 
   /// Returns the kind of extern.
   ExternKind getExternKind() const {
