@@ -1853,6 +1853,11 @@ def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cach
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
+def experimental_lazy_typecheck :
+  Flag<["-"], "experimental-lazy-typecheck">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Type-check lazily as needed to produce requested outputs">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 
