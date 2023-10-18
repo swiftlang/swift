@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking -disable-objc-interop | %FileCheck %s
 
 // REQUIRES: concurrency
+// LLVM does not support swifttailcc for WebAssembly target for now (rdar://116753879)
+// UNSUPPORTED: CPU=wasm32
 
 public dynamic func number() async -> Int {
     return 100
