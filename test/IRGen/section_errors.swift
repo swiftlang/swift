@@ -9,7 +9,9 @@ struct MyStruct {
 }
 
 struct MyStruct2 {
-	@_section("__TEXT,__mysection") var member0: Int = 1
+	@_section("__TEXT,__mysection") var member0: Int = 1 // expected-error {{properties with attribute '_section' must be static}}
+
+	@_section("__TEXT,__mysection") static var member0: Int { return 1 } // expected-error {{'@_section' must not be used on computed properties}}
 }
 
 struct MyStruct3<T> {

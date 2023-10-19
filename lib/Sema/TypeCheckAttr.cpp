@@ -2084,10 +2084,18 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope,
              attr->getAttrName());
-
-  if (D->getDeclContext()->isGenericContext())
+  else if (D->getDeclContext()->isGenericContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
+  else if (auto *VarD = dyn_cast<VarDecl>(D)) {
+    if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(attr->getLocation(), diag::attr_only_on_static_properties,
+               attr->getAttrName());
+    } else if (!VarD->hasStorageOrWrapsStorage()) {
+      diagnose(attr->getLocation(), diag::attr_not_on_computed_properties,
+               attr);
+    }
+  }
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
@@ -2100,9 +2108,20 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
 
-  if (D->getDeclContext()->isGenericContext())
+  if (D->getDeclContext()->isLocalContext())
+    ; // Already diagnosed in Parse, don't diagnose again
+  else if (D->getDeclContext()->isGenericContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
+  else if (auto *VarD = dyn_cast<VarDecl>(D)) {
+    if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(attr->getLocation(), diag::attr_only_on_static_properties,
+               attr->getAttrName());
+    } else if (!VarD->hasStorageOrWrapsStorage()) {
+      diagnose(attr->getLocation(), diag::attr_not_on_computed_properties,
+               attr);
+    }
+  }
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
