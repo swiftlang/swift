@@ -7058,6 +7058,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::TypeVariable:
       llvm_unreachable("type variables should have already been handled by now");
 
+    case TypeKind::Inverse:
+      llvm_unreachable("unexpected inverse type in constraint solver");
+
     case TypeKind::DependentMember: {
       // If types are identical, let's consider this constraint solved
       // even though they are dependent members, they would be resolved
@@ -8034,6 +8037,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleType in constraint");
+
+  case TypeKind::Inverse:
+    llvm_unreachable("unexpected inverse type in constraint solver");
     
   case TypeKind::Unresolved:
   case TypeKind::Error:

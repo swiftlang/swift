@@ -110,6 +110,10 @@ private:
                                         origType->hasExplicitAnyObject());
   }
 
+  Type visitInverseType(CanInverseType type) {
+    llvm_unreachable("todo: determine how to handle inverses for Generalizer");
+  }
+
   // Generalize the type arguments of nominal types.
   Type visitBoundGenericType(CanBoundGenericType origType) {
     return generalizeGenericArguments(origType->getDecl(), origType);

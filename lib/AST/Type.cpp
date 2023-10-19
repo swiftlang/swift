@@ -299,6 +299,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::Module:
   case TypeKind::LValue:
   case TypeKind::InOut:
+  case TypeKind::Inverse:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BoundGenericEnum:
@@ -1850,6 +1851,12 @@ CanType TypeBase::computeCanonicalType() {
       CanArgs.push_back(t->getCanonicalType());
     auto &C = Base->getASTContext();
     Result = ParameterizedProtocolType::get(C, Base, CanArgs);
+    break;
+  }
+  case TypeKind::Inverse: {
+    auto *inverse = cast<InverseType>(this);
+    auto protocol = inverse->getInvertedProtocol()->getCanonicalType();
+    Result = InverseType::get(protocol).getPointer();
     break;
   }
   case TypeKind::Existential: {
@@ -5107,6 +5114,20 @@ case TypeKind::Id:
     return ExistentialType::get(constraint);
   }
 
+  case TypeKind::Inverse: {
+    auto *inverse = cast<InverseType>(base);
+    auto protocol =
+        inverse->getInvertedProtocol().transformWithPosition(pos, fn);
+    if (!protocol || protocol->hasError())
+      return protocol;
+
+    if (protocol.getPointer() ==
+        inverse->getInvertedProtocol().getPointer())
+      return *this;
+
+    return InverseType::get(protocol);
+  }
+
   case TypeKind::ProtocolComposition: {
     auto pc = cast<ProtocolCompositionType>(base);
     SmallVector<Type, 4> substMembers;
@@ -5367,6 +5388,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Module:
   case TypeKind::LValue:
   case TypeKind::InOut:
+  case TypeKind::Inverse:
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BoundGenericEnum:

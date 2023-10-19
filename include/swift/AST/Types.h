@@ -1528,6 +1528,39 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
+/// InverseType represents the "inverse" of a ProtocolType as a constraint.
+/// An inverse represents the _absence_ of an implicit constraint to the given
+/// protocol. It is not a real type.
+class InverseType final : public TypeBase {
+  Type protocol;
+
+  // The Error type is always canonical.
+  InverseType(Type type,
+              const ASTContext *canonicalContext,
+              RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Inverse, canonicalContext, properties),
+        protocol(type) {
+    assert(protocol->is<ProtocolType>());
+  }
+
+public:
+  /// Produce an inverse constraint type for the given protocol type.
+  static Type get(Type protocolType);
+
+
+  Type getInvertedProtocol() const {
+    return protocol;
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Inverse;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(InverseType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getInvertedProtocol)
+END_CAN_TYPE_WRAPPER(InverseType, Type)
+
 /// ErrorType - Represents the type of an erroneously constructed declaration,
 /// expression, or type. When creating ErrorTypes, an associated error
 /// diagnostic should always be emitted. That way when later stages of
@@ -7217,7 +7250,8 @@ inline bool TypeBase::isConstraintType() const {
 inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
           isa<ProtocolCompositionType>(type) ||
-          isa<ParameterizedProtocolType>(type));
+          isa<ParameterizedProtocolType>(type) ||
+          isa<InverseType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {

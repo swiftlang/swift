@@ -3821,6 +3821,30 @@ Type ExistentialMetatypeType::getExistentialInstanceType() {
   return ExistentialType::get(getInstanceType());
 }
 
+Type InverseType::get(Type protocol) {
+  auto &C = protocol->getASTContext();
+  llvm_unreachable("TODO");
+//  // ExistentialMetatypeType is already an existential type.
+//  if (constraint->is<ExistentialMetatypeType>())
+//    return constraint;
+//
+//  bool printWithAny = true;
+//  if (constraint->isEqual(C.TheAnyType) || constraint->isAnyObject())
+//    printWithAny = false;
+//
+//  auto properties = constraint->getRecursiveProperties();
+//  auto arena = getArena(properties);
+//
+//  auto &entry = C.getImpl().getArena(arena).ExistentialTypes[constraint];
+//  if (entry)
+//    return entry;
+//
+//  const ASTContext *canonicalContext = constraint->isCanonical() ? &C : nullptr;
+//  return entry = new (C, arena) ExistentialType(constraint, printWithAny,
+//                                                canonicalContext,
+//                                                properties);
+}
+
 ModuleType *ModuleType::get(ModuleDecl *M) {
   ASTContext &C = M->getASTContext();
 
