@@ -1747,8 +1747,16 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
     assert(storage.isRewritten && "Source value should be rewritten");
 
-    if (storage.isUseProjection)
-      return;
+    // If the operand projects into one of its users and this user is that one
+    // into which it projects, then the memory was already initialized.  If it's
+    // another user, however, that memory is _not_initialized.
+    if (storage.isUseProjection) {
+      auto *aggregate = dyn_cast<SingleValueInstruction>(operand->getUser());
+      if (aggregate && (storage.projectedStorageID ==
+                        pass.valueStorageMap.getOrdinal(aggregate))) {
+        return;
+      }
+    }
 
     auto destAddr =
         materializeProjectionIntoUse(operand, /*intoPhiOperand*/ false);
