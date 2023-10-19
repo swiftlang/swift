@@ -265,7 +265,7 @@ func checkMacroDefinition(
 
       // Form the "ModuleName.TypeName" result string.
       externalMacroOutPtr.pointee =
-        allocateBridgedString("\(module).\(type)", nullTerminated: true)
+        allocateBridgedString("\(module).\(type)")
 
       // Translate this into a use of #externalMacro.
       let expansionSourceSyntax: ExprSyntax =
@@ -329,14 +329,13 @@ func checkMacroDefinition(
 
       // Form the "ModuleName.TypeName" result string.
       externalMacroOutPtr.pointee =
-        allocateBridgedString("\(module).\(type)", nullTerminated: true)
+        allocateBridgedString("\(module).\(type)")
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
     case let .expansion(expansionSyntax, replacements: replacements):
       // Provide the expansion syntax.
       externalMacroOutPtr.pointee =
-        allocateBridgedString(expansionSyntax.trimmedDescription,
-                              nullTerminated: true)
+        allocateBridgedString(expansionSyntax.trimmedDescription)
 
 
       // If there are no replacements, we're done.
@@ -395,7 +394,7 @@ func makeExpansionOutputResult(
     outputPointer.pointee = BridgedString()
     return -1
   }
-  outputPointer.pointee = allocateBridgedString(expandedSource, nullTerminated: true)
+  outputPointer.pointee = allocateBridgedString(expandedSource)
   return 0
 }
 
