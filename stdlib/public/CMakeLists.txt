@@ -144,6 +144,8 @@ elseif(NOT SWIFT_INCLUDE_TOOLS)
   # Temporarily, only build embedded stdlib when building the compiler, to
   # unblock CI jobs that run against old(er) toolchains.
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
