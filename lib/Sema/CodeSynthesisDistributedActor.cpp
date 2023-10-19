@@ -524,6 +524,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     auto doneRecordingDecl =
         C.getDoneRecordingOnDistributedInvocationEncoder(invocationEncoderDecl);
+    assert(doneRecordingDecl && "Could not find 'doneRecording' ad-hoc requirement witness.");
     auto doneRecordingDeclRef =
         UnresolvedDeclRefExpr::createImplicit(C, doneRecordingDecl->getName());
 
