@@ -10,5 +10,5 @@ func testGetX() -> CInt {
 let _ = testGetX()
 
 // CHECK: define {{.*}}linkonce_odr{{.*}} i32 @{{.*}}__synthesizedBaseCall___synthesizedBaseGetterAccessor{{.*}}(ptr {{.*}} %[[THIS_PTR:.*]])
-// CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i64 4
-// CHECK: call noundef i32 @{{.*}}__synthesizedBaseGetterAccessor{{.*}}(ptr {{.*}} %[[ADD_PTR]])
+// CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i{{32|64}} 4
+// CHECK: call{{.*}} i32 @{{.*}}__synthesizedBaseGetterAccessor{{.*}}(ptr {{.*}} %[[ADD_PTR]])
