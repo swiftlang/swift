@@ -693,7 +693,7 @@ void DistributedAccessor::emit() {
   }
 
   // Add all of the substitutions to the explosion
-  if (auto *genericEnvironment = Target->getGenericEnvironment()) {
+  if (Target->getGenericEnvironment()) {
     // swift.type **
     llvm::Value *substitutionBuffer =
         IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
@@ -817,7 +817,9 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   // is passed indirectly. This is good for structs and enums because
   // `decodeNextArgument` is a mutating method, but not for classes because
   // in that case heap object is mutated directly.
-  if (isa<ClassDecl>(decoderDecl)) {
+  llvm::Function *fnPtr = nullptr;
+  bool usesDispatchThunk = false;
+  if (auto classDecl = dyn_cast<ClassDecl>(decoderDecl)) {
     auto selfTy = methodTy->getSelfParameter().getSILStorageType(
         IGM.getSILModule(), methodTy, expansionContext);
 
@@ -836,15 +838,35 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
                        instance);
 
     decoder = instance.claimNext();
+
+    /// When using library evolution functions have another "dispatch thunk"
+    /// so we must use this instead of the decodeFn directly.
+   if (classDecl->hasResilientMetadata()) {
+      if (getMethodDispatch(decodeFn) == swift::MethodDispatch::Class) {
+        SILDeclRef(decodeFn).getOverriddenVTableEntry().getDecl()->getDeclContext()->dumpContext();
+        fnPtr = IGM.getAddrOfDispatchThunk(SILDeclRef(decodeFn), NotForDefinition);
+        usesDispatchThunk = true;
+      }
+    }
   }
 
-  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-                                         /*isDynamicallyReplaceable=*/false);
+  if (!fnPtr) {
+    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
+        /*isDynamicallyReplaceable=*/false);
+  }
+  assert(fnPtr);
 
-  auto methodPtr = FunctionPointer::forDirect(
-    classifyFunctionPointerKind(decodeSIL), fnPtr,
-    /*secondaryValue=*/nullptr, signature);
+  FunctionPointer methodPtr;
+  if (usesDispatchThunk) {
+    methodPtr = FunctionPointer::createUnsigned(
+        methodTy, fnPtr, signature, /*useSignature=*/true);
+  } else {
+    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    methodPtr = FunctionPointer::forDirect(
+        classifyFunctionPointerKind(decodeSIL), fnPtr,
+        /*secondaryValue=*/nullptr, signature);
+  }
 
   return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
 }
