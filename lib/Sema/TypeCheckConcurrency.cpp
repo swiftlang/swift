@@ -5885,6 +5885,23 @@ ActorReferenceResult ActorReferenceResult::forReference(
     return forSameConcurrencyDomain(declIsolation);
   }
 
+  // Initializing a global actor isolated stored property with a value
+  // effectively passes that value from the init context into the global
+  // actor context. This is only okay to do if the property type is Sendable.
+  if (declIsolation.isGlobalActor() && isStoredProperty(declRef.getDecl())) {
+    auto *init = dyn_cast<ConstructorDecl>(fromDC);
+    if (init && init->isDesignatedInit()) {
+      auto type =
+          fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
+      if (!isSendableType(fromDC->getParentModule(), type)) {
+        // Treat the decl isolation as 'preconcurrency' to downgrade violations
+        // to warnings, because violating Sendable here is accepted by the
+        // Swift 5.9 compiler.
+        return forEntersActor(declIsolation, Flags::Preconcurrency);
+      }
+    }
+  }
+
   // If there is an instance and it is checked by flow isolation, treat it
   // as being in the same concurrency domain.
   if (actorInstance &&
@@ -5903,13 +5920,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
   // If there is an instance that corresponds to 'self',
   // we are in a constructor or destructor, and we have a stored property of
-  // global-actor-qualified type, pretend we are in the same concurrency
-  // domain.
-  // FIXME: This is an odd carve-out that probably shouldn't have been allowed.
-  // It should at the very least be diagnosed, and either subsumed by flow
-  // isolation or banned outright.
-  // FIXME: At the very least, we should consistently use
-  // isActorInitOrDeInitContext here, but it only wants to think about actors.
+  // global-actor-qualified type, then we have problems if the stored property
+  // type is non-Sendable. Note that if we get here, the type must be Sendable.
   if (actorInstance && actorInstance->isSelf() &&
       isNonInheritedStorage(declRef.getDecl(), fromDC) &&
       declIsolation.isGlobalActor() &&
