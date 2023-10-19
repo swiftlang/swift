@@ -216,7 +216,8 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
   };
 
   // This nominal cannot be Copyable if it contains noncopyable storage.
-  return !HasNoncopyable(nom, nom, /*diagnose=*/true).visit();
+  return !HasNoncopyable(nom, conformance->getDeclContext(),
+                         /*diagnose=*/true).visit();
 }
 
 /// Visit the instance storage of the given nominal type as seen through
