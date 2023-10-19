@@ -3145,6 +3145,17 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        // Non-trivial C++ classes and structures are not
+        // supported by @objc attribute, even though they can
+        // be represented in Objective-C++.
+        if (auto *cxxRec = dyn_cast_or_null<clang::CXXRecordDecl>(
+                nominal->getClangDecl())) {
+          if (cxxRec->hasNonTrivialCopyConstructor() ||
+              cxxRec->hasNonTrivialMoveConstructor() ||
+              cxxRec->hasNonTrivialDestructor())
+            return failure();
+        }
+
         // Optional structs are not representable in (Objective-)C if they
         // originally came from C, whether or not they are bridged, unless they
         // came from swift_newtype. If they are defined in Swift, they are only

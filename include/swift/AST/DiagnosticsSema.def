@@ -6088,6 +6088,8 @@ NOTE(not_objc_error_protocol_composition,none,
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())
+NOTE(not_objc_non_trivial_cxx_class,none,
+     "non-trivial C++ classes cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,none,
       "tuples cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_class,none,
