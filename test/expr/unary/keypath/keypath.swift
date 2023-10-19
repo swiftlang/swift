@@ -127,29 +127,29 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
-  //expected-error@-1 {{key path value type 'WritableKeyPath<A, Prop>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, Prop>'}}
+  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
 
   let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
-  //expected-error@-1 {{key path value type 'WritableKeyPath<A, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, A>'}}
+  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>'}}
 
   let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
-  // expected-error@+1{{key path value type 'KeyPath<A, Prop?>' cannot be converted to contextual type 'WritableKeyPath<A, Prop?>'}}
+  // expected-error@+1{{cannot convert value of type 'KeyPath<A, Prop?>' to specified type 'WritableKeyPath<A, Prop?>'}}
   let _: WritableKeyPath<A, Prop?> = \.optProperty?
-  // expected-error@+1{{key path value type 'KeyPath<A, Prop?>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, Prop?>'}}
+  // expected-error@+1{{cannot convert value of type 'KeyPath<A, Prop?>' to specified type 'ReferenceWritableKeyPath<A, Prop?>'}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
   let _: (A) -> A? = \.optProperty?[sub]
   let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
-  // expected-error@+1{{key path value type 'KeyPath<A, A?>' cannot be converted to contextual type 'WritableKeyPath<A, A?>'}}
+  // expected-error@+1{{cannot convert value of type 'KeyPath<A, A?>' to specified type 'WritableKeyPath<A, A?>'}}
   let _: WritableKeyPath<A, A?> = \.optProperty?[sub]
-  // expected-error@+1{{key path value type 'KeyPath<A, A?>' cannot be converted to contextual type 'ReferenceWritableKeyPath<A, A?>'}}
+  // expected-error@+1{{cannot convert value of type 'KeyPath<A, A?>' to specified type 'ReferenceWritableKeyPath<A, A?>'}}
   let _: ReferenceWritableKeyPath<A, A?> = \.optProperty?[sub]
 
   let _: KeyPath<A, Prop> = \.optProperty!
@@ -162,13 +162,13 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
-  // expected-error@-1 {{key path value type 'WritableKeyPath<C<A>, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
+  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
   let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
   let _: WritableKeyPath<C<A>, A> = \C.value
-  // expected-error@+1{{key path value type 'WritableKeyPath<C<A>, A>' cannot be converted to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
+  // expected-error@+1{{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
   let _: (Prop) -> B = \.nonMutatingProperty
@@ -192,7 +192,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: AnyKeyPath = \A.property
   let _: AnyKeyPath = \C<A>.value
   let _: AnyKeyPath = \.property // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
-//  let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
+  let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
   let _: AnyKeyPath = \.value // expected-error {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{24-24=<#Root#>}}
 
   let _ = \Prop.[nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
@@ -692,7 +692,8 @@ func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
 
 func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i)
-  // expected-error@-1 {{value of type 'any PP' has no member 'i'}}
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<any PP, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'any PP') are expected to be equal}}
 }
 
 // rdar://problem/32057712
