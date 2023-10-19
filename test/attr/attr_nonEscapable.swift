@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NonEscapableTypes
 
+// REQUIRES: asserts
+
 @_nonEscapable public struct NES {
   let x: Int
 
