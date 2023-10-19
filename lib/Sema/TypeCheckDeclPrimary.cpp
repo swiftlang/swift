@@ -2758,12 +2758,6 @@ public:
                         ED->getBaseIdentifier());
         }
       }
-
-      if (!ED->getASTContext().LangOpts.hasFeature(
-              Feature::MoveOnlyResilientTypes) &&
-          ED->isResilient()) {
-        ED->diagnose(diag::noncopyable_types_cannot_be_resilient, ED);
-      }
     }
   }
 
@@ -2804,12 +2798,6 @@ public:
     diagnoseCopyableTypeContainingMoveOnlyType(SD);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
-
-    if (!SD->getASTContext().LangOpts.hasFeature(
-            Feature::MoveOnlyResilientTypes) &&
-        SD->isResilient() && SD->isNoncopyable()) {
-      SD->diagnose(diag::noncopyable_types_cannot_be_resilient, SD);
-    }
   }
 
   /// Check whether the given properties can be @NSManaged in this class.

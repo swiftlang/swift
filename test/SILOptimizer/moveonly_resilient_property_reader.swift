@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature MoveOnlyResilientTypes -enable-library-evolution -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -emit-sil %s | %FileCheck %s
 
 public struct ResilientMemberC {}
 public struct ResilientMemberNC: ~Copyable {}

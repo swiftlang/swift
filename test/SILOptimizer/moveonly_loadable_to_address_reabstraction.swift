@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -enable-library-evolution -enable-experimental-feature MoveOnlyResilientTypes %s
+// RUN: %target-swift-frontend -emit-sil -verify -enable-library-evolution %s
 
 // Verify that call sequences that require reabstracting a noncopyable value
 // from a loadable representation to an in-memory one are properly allowed by
