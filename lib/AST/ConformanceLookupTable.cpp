@@ -848,7 +848,8 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     const auto &superclassConformances =
         superclassDecl->ConformanceTable->Conformances[protocol];
     if (superclassConformances.empty()) {
-      assert(protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
+      assert(protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+             protocol->isSpecificProtocol(KnownProtocolKind::Copyable));
 
       // Go dig for a superclass that does conform to Sendable.
       // FIXME: This is a hack because the inherited conformances aren't

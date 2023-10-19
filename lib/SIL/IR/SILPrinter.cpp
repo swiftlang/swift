@@ -3245,6 +3245,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!useStackForPackMetadata()) {
     OS << "[no_onstack_pack_metadata] ";
   }
+  if (hasUnsafeNonEscapableResult()) {
+    OS << "[unsafe_nonescapable_result] ";
+  }
 
   if (isExactSelfClass()) {
     OS << "[exact_self_class] ";

@@ -134,16 +134,19 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-if(SWIFT_BUILD_STDLIB)
-  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB TRUE)
-  if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
-    set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-  elseif(NOT SWIFT_INCLUDE_TOOLS)
-    # Temporarily, only build embedded stdlib when building the compiler, to
-    # unblock CI jobs that run against old(er) toolchains.
-    set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
-  endif()
+option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
+      "Enable build of the embedded Swift standard library and runtime"
+      TRUE)
 
+if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+elseif(NOT SWIFT_INCLUDE_TOOLS)
+  # Temporarily, only build embedded stdlib when building the compiler, to
+  # unblock CI jobs that run against old(er) toolchains.
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(EMBEDDED_STDLIB_TARGET_TRIPLES
     # arch    module_name               target triple
     "armv7    armv7-apple-none-macho    armv7-apple-none-macho"

@@ -325,7 +325,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                 tupleExpr->getElementNames());
                                 
         // Diagnose attempts to form a tuple with any noncopyable elements.
-        if (E->getType()->isNoncopyable()
+        if (E->getType()->isNoncopyable(DC)
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
           auto noncopyableTy = E->getType();
           assert(noncopyableTy->is<TupleType>() && "will use poor wording");
@@ -388,7 +388,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable()) {
+      if (castType->isNoncopyable(DC)) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
@@ -398,7 +398,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // as of now there is no type it could be cast to except itself, so
       // there's no reason for it to happen at runtime.
       if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable()) {
+        if (fromType->isNoncopyable(DC)) {
           // can't cast move-only to anything.
           Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
           return;
@@ -4087,6 +4087,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
 
 static void
 diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
+                                    const DeclContext *DC,
                                     Expr *subjectExpr) {
   // For now, move-only types must use the `consume` operator to be
   // pattern matched. Pattern matching is only implemented as a consuming
@@ -4098,7 +4099,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
   auto subjectType = subjectExpr->getType();
   if (!subjectType
       || subjectType->hasError()
-      || !subjectType->isNoncopyable()) {
+      || !subjectType->isNoncopyable(DC)) {
     return;
   }
 
@@ -4117,7 +4118,7 @@ diagnoseMoveOnlyPatternMatchSubject(ASTContext &C,
 // Perform MiscDiagnostics on Switch Statements.
 static void checkSwitch(ASTContext &ctx, const SwitchStmt *stmt,
                         DeclContext *DC) {
-  diagnoseMoveOnlyPatternMatchSubject(ctx, stmt->getSubjectExpr());
+  diagnoseMoveOnlyPatternMatchSubject(ctx, DC, stmt->getSubjectExpr());
                         
   // We want to warn about "case .Foo, .Bar where 1 != 100:" since the where
   // clause only applies to the second case, and this is surprising.
@@ -4880,7 +4881,7 @@ static void checkLabeledStmtConditions(ASTContext &ctx,
     case StmtConditionElement::CK_Boolean:
       break;
     case StmtConditionElement::CK_PatternBinding:
-      diagnoseMoveOnlyPatternMatchSubject(ctx, elt.getInitializer());
+      diagnoseMoveOnlyPatternMatchSubject(ctx, DC, elt.getInitializer());
       break;
     case StmtConditionElement::CK_Availability: {
       auto info = elt.getAvailability();
@@ -6248,9 +6249,13 @@ bool swift::diagnoseUnhandledThrowsInAsyncContext(DeclContext *dc,
 
 void swift::diagnoseCopyableTypeContainingMoveOnlyType(
     NominalTypeDecl *copyableNominalType) {
+  auto &ctx = copyableNominalType->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return; // taken care of in conformance checking
+
   // If we already have a move only type, just bail, we have no further work to
   // do.
-  if (copyableNominalType->isMoveOnly())
+  if (copyableNominalType->isNoncopyable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "DiagnoseCopyableType for: "

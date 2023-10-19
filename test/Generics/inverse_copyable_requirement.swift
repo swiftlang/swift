@@ -3,11 +3,11 @@
 // REQUIRES: asserts
 
 // a concrete move-only type
-@_moveOnly struct MO {
+struct MO: ~Copyable {
   var x: Int?
 }
 
-@_moveOnly struct Container {
+struct Container: ~Copyable {
   var mo: MO = MO()
 }
 
@@ -267,7 +267,7 @@ class SomeGuy: HasType { // expected-error {{type 'SomeGuy' does not conform to 
 }
 
 struct AnotherGuy: HasType { // expected-error {{type 'AnotherGuy' does not conform to protocol 'HasType'}}
-  @_moveOnly struct Ty {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
+  struct Ty: ~Copyable {} // expected-note {{possibly intended match 'AnotherGuy.Ty' does not conform to 'Copyable'}}
 }
 
 protocol Gives: HasType {
@@ -279,7 +279,7 @@ struct GenerousGuy: Gives { // expected-error {{type 'GenerousGuy' does not conf
   func give() -> Ty {}
 }
 
-func doBadMetatypeStuff<T>(_ t: T) { // expected-note@:25 {{generic parameter 'T' has an implicit Copyable requirement}}
+func doBadMetatypeStuff<T>(_ t: T) {
   let y = t as! Any.Type
   if let MO_MetaType = y as? MO.Type { // expected-warning {{cast from 'any Any.Type' to unrelated type 'MO.Type' always fails}}
     let x = MO_MetaType.init()
@@ -287,7 +287,7 @@ func doBadMetatypeStuff<T>(_ t: T) { // expected-note@:25 {{generic parameter 'T
   }
 }
 func tryToDoBadMetatypeStuff() {
-  doBadMetatypeStuff(MO.self) // expected-error {{metatype 'MO.Type' of noncopyable type 'MO' cannot be substituted for copyable generic parameter 'T' in 'doBadMetatypeStuff'}}
+  doBadMetatypeStuff(MO.self)
 }
 
 func packingHeat<each T>(_ t: repeat each T) {} // expected-note {{generic parameter 'each T' has an implicit Copyable requirement}}

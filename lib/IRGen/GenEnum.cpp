@@ -6597,7 +6597,7 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   llvm::StructType *enumTy) {
   auto deinit = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = theEnum->isMoveOnly()
+  auto copyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   if (ElementsWithPayload.empty()) {
     enumTy->setBody(ArrayRef<llvm::Type*>{}, /*isPacked*/ true);
@@ -6673,7 +6673,7 @@ NoPayloadEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
 
   auto deinit = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = theEnum->isMoveOnly()
+  auto copyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new LoadableEnumTypeInfo(*this,
                               enumTy, tagSize, std::move(spareBits),
@@ -6793,7 +6793,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
 
   auto deinit = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = theEnum->isMoveOnly()
+  auto copyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   getFixedEnumTypeInfo(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
@@ -6828,7 +6828,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
 
   auto deinit = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = theEnum->isMoveOnly()
+  auto copyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
@@ -6864,7 +6864,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   // of the largest payload.
   CommonSpareBits = {};
   Alignment worstAlignment(1);
-  auto isCopyable = theEnum->isMoveOnly()
+  auto isCopyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
@@ -7046,7 +7046,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
 
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
   
-  auto cp = theEnum->isMoveOnly()
+  auto cp = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                                                        alignment, td, bt, cp,
@@ -7070,7 +7070,7 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
   auto abiAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
-  auto copyable = theEnum->isMoveOnly()
+  auto copyable = theEnum->isNoncopyable()
     ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(
                        new ResilientEnumTypeInfo(*this, enumTy, copyable,

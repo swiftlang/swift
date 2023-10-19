@@ -21,6 +21,7 @@
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
+#include "TypeCheckInvertible.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1038,7 +1039,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 static bool didDiagnoseMoveOnlyGenericArgs(ASTContext &ctx,
                                          SourceLoc loc,
                                          Type unboundTy,
-                                         ArrayRef<Type> genericArgs) {
+                                         ArrayRef<Type> genericArgs,
+                                         const DeclContext *dc) {
 
   if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return false;
@@ -1077,7 +1079,7 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // check for generic args that are move-only
   auto &ctx = getASTContext();
-  if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs))
+  if (didDiagnoseMoveOnlyGenericArgs(ctx, loc, resultType, genericArgs, dc))
     return ErrorType::get(ctx);
 
   // Get the substitutions for outer generic parameters from the parent
@@ -2062,6 +2064,11 @@ namespace {
       return resolution.getDeclContext();
     }
 
+    /// Short-hand to query the current stage of type resolution.
+    bool inStage(TypeResolutionStage stage) const {
+      return resolution.getStage() == stage;
+    }
+
   private:
     template<typename ...ArgTypes>
     InFlightDiagnostic diagnose(ArgTypes &&...Args) const {
@@ -2079,8 +2086,8 @@ namespace {
 
     bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                  Type unboundTy, Type genericArgTy);
-    bool diagnoseMoveOnlyMissingOwnership(TypeRepr *repr,
-                                          TypeResolutionOptions options);
+    bool diagnoseMissingOwnership(TypeRepr *repr,
+                                  TypeResolutionOptions options);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2353,15 +2360,14 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
   return false;
 }
 
-/// Assuming this repr has resolved to a move-only / noncopyable type, checks
+/// Assuming this repr has resolved to a noncopyable type, checks
 /// to see if that resolution happened in a context requiring an ownership
 /// annotation. If it did and there was no ownership specified, emits a
 /// diagnostic.
 ///
 /// \returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMoveOnlyMissingOwnership(
-                                              TypeRepr *repr,
-                                              TypeResolutionOptions options) {
+bool TypeResolver::diagnoseMissingOwnership(TypeRepr *repr,
+                                            TypeResolutionOptions options) {
   // Though this is only required on function inputs... we can ignore
   // InoutFunctionInput since it's already got ownership.
   if (!options.is(TypeResolverContext::FunctionInput))
@@ -4365,9 +4371,9 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
   }
 
-  // move-only types must have an ownership specifier when used as a parameter of a function.
-  if (result->isNoncopyable())
-    diagnoseMoveOnlyMissingOwnership(repr, options);
+  // Noncopyable types must have an ownership specifier when used as a parameter
+  if (inStage(TypeResolutionStage::Interface) && result->isNoncopyable(dc))
+      diagnoseMissingOwnership(repr, options);
 
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
@@ -4674,7 +4680,9 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
   }
 
   // do not allow move-only types as the element of a vararg
-  if (element->isNoncopyable()) {
+  if (!element->hasError()
+      && inStage(TypeResolutionStage::Interface)
+      && element->isNoncopyable(getDeclContext())) {
     diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
                     element);
     return ErrorType::get(getASTContext());
@@ -4826,6 +4834,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                              TypeResolutionOptions options) {
   auto &ctx = getASTContext();
+  auto *dc = getDeclContext();
 
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
@@ -4853,8 +4862,8 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // Track the presence of a noncopyable field for diagnostic purposes.
     // We don't need to re-diagnose if a tuple contains another tuple, though,
     // since we should've diagnosed the inner tuple already.
-    if (ty->isNoncopyable() && !moveOnlyElementIndex.has_value()
-        && !isa<TupleTypeRepr>(tyR)) {
+    if (inStage(TypeResolutionStage::Interface) && ty->isNoncopyable(dc)
+        && !moveOnlyElementIndex.has_value() && !isa<TupleTypeRepr>(tyR)) {
       moveOnlyElementIndex = i;
     }
 
@@ -5132,11 +5141,9 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
-  if (auto protoTy = ty->getAs<ProtocolType>())
-    if (auto protoDecl = protoTy->getDecl())
-      if (auto kp = protoDecl->getKnownProtocolKind())
-        if (getInvertibleProtocols().contains(*kp))
-          return ty;
+  if (auto kp = ty->getKnownProtocol())
+    if (getInvertibleProtocols().contains(*kp))
+      return ty; // FIXME: this ought to be wrapped in an InverseType
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());

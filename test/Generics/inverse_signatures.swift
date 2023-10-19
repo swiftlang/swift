@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -verify -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s --implicit-check-not "error:"
 
 // REQUIRES: asserts
 
@@ -8,7 +8,7 @@ func genericFn<T>(_ t: T) {}
 
 // CHECK-LABEL: .withInverse@
 // CHECK: Generic signature: <T>
-func withInverse<T: ~Copyable>(_ t: T) {}
+func withInverse<T: ~Copyable>(_ t: borrowing T) {}
 
 // CHECK-LABEL: .S1@
 // CHECK: Generic signature: <T where T : Copyable>

@@ -181,6 +181,10 @@ swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details);
 
 SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
 swiftscan_swift_binary_detail_get_header_dependencies(
     swiftscan_module_details_t details);
 

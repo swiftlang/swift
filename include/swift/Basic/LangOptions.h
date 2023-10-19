@@ -197,7 +197,7 @@ namespace swift {
 
     /// Optimization mode for unavailable declarations.
     UnavailableDeclOptimization UnavailableDeclOptimizationMode =
-        UnavailableDeclOptimization::None;
+        UnavailableDeclOptimization::Stub;
 
     /// Causes the compiler to use weak linkage for symbols belonging to
     /// declarations introduced at the deployment target.

@@ -166,6 +166,7 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // compiledModulePath
                    FileIDField,                      // moduleDocPath
                    FileIDField,                      // moduleSourceInfoPath
+                   DependencyIDArrayIDField,         // swiftOverlayDependencies
                    ImportArrayIDField,               // headerImports
                    IsFrameworkField,                 // isFramework
                    IdentifierIDField                 // moduleCacheKey

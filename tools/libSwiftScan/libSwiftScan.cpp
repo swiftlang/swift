@@ -81,6 +81,8 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.bridging_module_dependencies);
     swiftscan_string_set_dispose(
+        details_impl->swift_textual_details.swift_overlay_module_dependencies);
+    swiftscan_string_set_dispose(
         details_impl->swift_textual_details.command_line);
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.extra_pcm_args);
@@ -99,6 +101,10 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_binary_details.module_doc_path);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_source_info_path);
+    swiftscan_string_set_dispose(
+        details_impl->swift_binary_details.swift_overlay_module_dependencies);
+    swiftscan_string_set_dispose(
+        details_impl->swift_binary_details.header_dependencies);
     swiftscan_string_dispose(
         details_impl->swift_binary_details.module_cache_key);
     break;
@@ -375,6 +381,12 @@ swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_module_source_info_path(
     swiftscan_module_details_t details) {
   return details->swift_binary_details.module_source_info_path;
+}
+
+swiftscan_string_set_t *
+swiftscan_swift_binary_detail_get_swift_overlay_dependencies(
+    swiftscan_module_details_t details) {
+  return details->swift_binary_details.swift_overlay_module_dependencies;
 }
 
 swiftscan_string_set_t *

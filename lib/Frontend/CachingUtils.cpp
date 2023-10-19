@@ -90,7 +90,7 @@ Expected<bool> cas::CachedResultLoader::replay(CallbackTy Callback) {
               [&](swift::cas::CompileJobCacheResult::Output Output) -> Error {
                 return Callback(Output.Kind, Output.Object);
               }))
-        return Err;
+        return std::move(Err);
 
       return true;
     }
@@ -120,7 +120,7 @@ Expected<bool> cas::CachedResultLoader::replay(CallbackTy Callback) {
                    "Unexpected output kind in clang cached result");
             return Callback(OutputKind, Output.Object);
           }))
-        return Err;
+        return std::move(Err);
 
       return true;
     }

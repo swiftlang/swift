@@ -314,26 +314,51 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isMoveOnly computation.
+// hasNoncopyableAnnotation computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+llvm::Optional<bool> HasNoncopyableAnnotationRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isMoveOnlyComputed)
-    return static_cast<bool>(decl->LazySemanticInfo.isMoveOnly);
+  if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
+    return static_cast<bool>(decl->LazySemanticInfo.hasNoncopyableAnnotation);
 
   return llvm::None;
 }
 
-void IsMoveOnlyRequest::cacheResult(bool value) const {
+void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isMoveOnlyComputed = true;
-  decl->LazySemanticInfo.isMoveOnly = value;
+  decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
+  decl->LazySemanticInfo.hasNoncopyableAnnotation = value;
+
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Add an attribute for printing
+    if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+      decl->getAttrs().add(new(decl->getASTContext())
+                               MoveOnlyAttr(/*Implicit=*/true));
+  }
+}
+
+//----------------------------------------------------------------------------//
+// isEscapable computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<bool> IsEscapableRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isEscapableComputed)
+    return decl->LazySemanticInfo.isEscapable;
+
+  return llvm::None;
+}
+
+void IsEscapableRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.isEscapableComputed = true;
+  decl->LazySemanticInfo.isEscapable = value;
 
   // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+  if (!value && !decl->getAttrs().hasAttribute<NonEscapableAttr>())
     decl->getAttrs().add(new (decl->getASTContext())
-                             MoveOnlyAttr(/*Implicit=*/true));
+                             NonEscapableAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//

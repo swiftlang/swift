@@ -3312,10 +3312,6 @@ static bool usesFeatureLayoutStringValueWitnessesInstantiation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureModuleInterfaceExportAs(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureAccessLevelOnImport(Decl *decl) {
   return false;
 }
@@ -3331,14 +3327,16 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 static bool usesFeatureMoveOnly(Decl *decl) {
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (nominal->isMoveOnly())
+      if (nominal->isNoncopyable())
         return true;
   }
 
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-      if (value->isMoveOnly())
-        return true;
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    if (typeDecl->isNoncopyable())
+      return true;
+  }
 
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
     // Check for move-only types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasMoveOnly = type.findIf([](Type type) {
@@ -3512,6 +3510,11 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureNonEscapableTypes(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonEscapableAttr>()
+    || decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>();
+}
+
 static bool hasParameterPacks(Decl *decl) {
   if (auto genericContext = decl->getAsGenericContext()) {
     auto sig = genericContext->getGenericSignature();
@@ -3573,6 +3576,10 @@ static bool usesFeatureDoExpressions(Decl *decl) {
 
 static bool usesFeatureNewCxxMethodSafetyHeuristics(Decl *decl) {
   return decl->hasClangNode();
+}
+
+static bool usesFeatureFullTypedThrows(Decl *decl) {
+  return false;
 }
 
 static bool usesFeatureTypedThrows(Decl *decl) {

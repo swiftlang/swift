@@ -1027,7 +1027,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (isMoveOnly()) {
+    if (isNoncopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1211,6 +1211,9 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
+
+    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

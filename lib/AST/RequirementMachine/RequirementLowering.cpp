@@ -784,7 +784,7 @@ void swift::rewriting::realizeInheritedRequirements(
     // associated type or generic type param.
     for (auto kp : defaults) {
       ProtocolDecl *decl = ctx.getProtocol(kp);
-      assert(decl && "couldn't load protocol??");
+      if (!decl) llvm_unreachable("missing known protocol!");
 
       SourceLoc loc = decl->getLoc();
       Type protocolType = decl->getDeclaredInterfaceType();

@@ -679,7 +679,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 SILFunction *
 SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
-  assert(nomDecl->isMoveOnly());
+  assert(nomDecl->isNoncopyable());
 
   auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
 
