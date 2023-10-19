@@ -5885,12 +5885,16 @@ ActorReferenceResult ActorReferenceResult::forReference(
     return forSameConcurrencyDomain(declIsolation);
   }
 
-  // Initializing a global actor isolated stored property with a value
-  // effectively passes that value from the init context into the global
-  // actor context. This is only okay to do if the property type is Sendable.
-  if (declIsolation.isGlobalActor() && isStoredProperty(declRef.getDecl())) {
+  // Initializing an actor isolated stored property with a value effectively
+  // passes that value from the init context into the actor isolated context.
+  // It's only okay for the value to cross isolation boundaries if the property
+  // type is Sendable. Note that if the init is a nonisolated actor init,
+  // Sendable checking is already performed on arguments at the call-site.
+  if ((declIsolation.isActorIsolated() && contextIsolation.isGlobalActor()) ||
+      declIsolation.isGlobalActor()) {
     auto *init = dyn_cast<ConstructorDecl>(fromDC);
-    if (init && init->isDesignatedInit()) {
+    auto *decl = declRef.getDecl();
+    if (init && init->isDesignatedInit() && isStoredProperty(decl)) {
       auto type =
           fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
       if (!isSendableType(fromDC->getParentModule(), type)) {
