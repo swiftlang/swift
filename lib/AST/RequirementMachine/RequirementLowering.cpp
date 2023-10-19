@@ -762,10 +762,8 @@ void swift::rewriting::realizeInheritedRequirements(
 
     // For any inverses, we only need to cancel out a default requirement.
     if (dyn_cast_or_null<InverseTypeRepr>(typeRepr)) {
-      if (auto protoTy = inheritedType->getAs<ProtocolType>())
-        if (auto protoDecl = protoTy->getDecl())
-          if (auto kp = protoDecl->getKnownProtocolKind())
-            defaults.remove(*kp);
+      if (auto kp = inheritedType->getKnownProtocol())
+        defaults.remove(*kp);
 
       continue;
     }
