@@ -345,7 +345,7 @@ void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
 llvm::Optional<bool> IsEscapableRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isEscapableComputed)
-    return decl->LazySemanticInfo.isEscapable;
+    return static_cast<bool>(decl->LazySemanticInfo.isEscapable);
 
   return llvm::None;
 }
