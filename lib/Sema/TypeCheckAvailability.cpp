@@ -1199,7 +1199,7 @@ void TypeChecker::buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, Abs
   if(!RootTRC)
     return;
 
-  if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Unparsed)
+  if (AFD->getLoc().isInvalid())
     return;
 
   // Parse the function body.
