@@ -451,12 +451,12 @@ void ValueStorageMap::ValueStoragePair::dump() const {
     llvm::dbgs() << "UNKNOWN!\n";
   storage.dump();
 }
-void ValueStorageMap::dumpProjections(SILValue value) {
+void ValueStorageMap::dumpProjections(SILValue value) const {
   for (auto *pair : getProjections(value)) {
     pair->dump();
   }
 }
-void ValueStorageMap::dump() {
+void ValueStorageMap::dump() const {
   llvm::dbgs() << "ValueStorageMap:\n";
   for (unsigned ordinal : indices(valueVector)) {
     auto &valStoragePair = valueVector[ordinal];
