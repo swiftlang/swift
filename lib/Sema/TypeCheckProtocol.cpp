@@ -23,6 +23,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -4720,9 +4721,10 @@ swift::checkTypeWitness(Type type, AssociatedTypeDecl *assocType,
       proto->isComputingRequirementSignature())
     return CheckTypeWitnessResult::forError();
 
-  // No move-only type can witness an associatedtype requirement.
-  if (type->isNoncopyable()) {
-    // describe the failure reason as it not conforming to Copyable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)
+      && type->isNoncopyable(dc)) {
+    // No move-only type can witness an associatedtype requirement.
+    // Pretend the failure is a lack of Copyable conformance.
     auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
     assert(copyable && "missing _Copyable protocol!");
     return CheckTypeWitnessResult::forConformance(copyable);
@@ -6534,6 +6536,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
+  const bool NoncopyableGenerics =
+      Context.LangOpts.hasFeature(Feature::NoncopyableGenerics);
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
@@ -6561,7 +6565,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
     auto proto = conformance->getProtocol();
     if (proto->isSpecificProtocol(
-            KnownProtocolKind::StringInterpolationProtocol)) {
+        KnownProtocolKind::StringInterpolationProtocol)) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
@@ -6581,19 +6585,19 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
         if (!classDecl->isDistributedActor()) {
           if (classDecl->isActor()) {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
-                       dc->getSelfNominalTypeDecl()->getName())
-                       .fixItInsert(classDecl->getStartLoc(), "distributed ");
+                ->diagnose(diag::actor_cannot_inherit_distributed_actor_protocol,
+                           dc->getSelfNominalTypeDecl()->getName())
+                .fixItInsert(classDecl->getStartLoc(), "distributed ");
           } else {
             dc->getSelfNominalTypeDecl()
-            ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
-                       dc->getSelfNominalTypeDecl()->getName())
-                       .fixItReplace(nominal->getStartLoc(), "distributed actor");
+                ->diagnose(diag::distributed_actor_protocol_illegal_inheritance,
+                           dc->getSelfNominalTypeDecl()->getName())
+                .fixItReplace(nominal->getStartLoc(), "distributed actor");
           }
         }
       }
     } else if (proto->isSpecificProtocol(
-                   KnownProtocolKind::DistributedActorSystem)) {
+        KnownProtocolKind::DistributedActorSystem)) {
       checkDistributedActorSystem(nominal);
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Actor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
@@ -6621,6 +6625,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       sendableConformanceIsUnchecked = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Executor)) {
       tryDiagnoseExecutorConformance(Context, nominal, proto);
+    } else if (NoncopyableGenerics
+        && proto->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+      checkCopyableConformance(conformance);
     }
   }
 

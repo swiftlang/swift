@@ -314,26 +314,28 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isMoveOnly computation.
+// hasNoncopyableAnnotation computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+llvm::Optional<bool> HasNoncopyableAnnotationRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isMoveOnlyComputed)
-    return decl->LazySemanticInfo.isMoveOnly;
+  if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
+    return decl->LazySemanticInfo.hasNoncopyableAnnotation;
 
   return llvm::None;
 }
 
-void IsMoveOnlyRequest::cacheResult(bool value) const {
+void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isMoveOnlyComputed = true;
-  decl->LazySemanticInfo.isMoveOnly = value;
+  decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
+  decl->LazySemanticInfo.hasNoncopyableAnnotation = value;
 
-  // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
-    decl->getAttrs().add(new (decl->getASTContext())
-                             MoveOnlyAttr(/*Implicit=*/true));
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Add an attribute for printing
+    if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+      decl->getAttrs().add(new(decl->getASTContext())
+                               MoveOnlyAttr(/*Implicit=*/true));
+  }
 }
 
 //----------------------------------------------------------------------------//

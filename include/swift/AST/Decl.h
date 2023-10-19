@@ -1596,6 +1596,9 @@ public:
   size_t size() const { return Entries.size(); }
   IntRange<size_t> const getIndices() { return indices(Entries); }
 
+  /// Returns the ASTContext associated with the wrapped declaration.
+  ASTContext &getASTContext() const;
+
   /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
   /// given index.
   TypeRepr *getTypeRepr(unsigned i) const { return Entries[i].getTypeRepr(); }
@@ -1615,6 +1618,10 @@ public:
   /// NOTE: The `Type` associated with the entry may not be resolved yet.
   const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
 
+  // Retrieve the location of the colon character introducing the inheritance
+  // clause.
+  SourceLoc getColonLoc() const;
+
   /// Returns the source location of the beginning of the inheritance clause.
   SourceLoc getStartLoc() const {
     return getEntries().front().getSourceRange().Start;
@@ -1624,6 +1631,10 @@ public:
   SourceLoc getEndLoc() const {
     return getEntries().back().getSourceRange().End;
   }
+
+  /// Compute the SourceRange to be used when removing entry \c i from the
+  /// inheritance clause. Accounts for commas and colons as-needed.
+  SourceRange getRemovalRange(unsigned i) const;
 };
 
 /// ExtensionDecl - This represents a type extension containing methods
@@ -2606,12 +2617,6 @@ private:
     /// optional result.
     unsigned isIUO : 1;
 
-    /// Whether the "isMoveOnly" bit has been computed yet.
-    unsigned isMoveOnlyComputed : 1;
-
-    /// Whether this declaration can not be copied and thus is move only.
-    unsigned isMoveOnly : 1;
-
     /// Whether the "isEscapable" bit has been computed yet.
     unsigned isEscapable : 1;
 
@@ -2623,7 +2628,6 @@ private:
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsMoveOnlyRequest;
   friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
@@ -2927,9 +2931,6 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
-  /// Is this declaration 'moveOnly'?
-  bool isMoveOnly() const;
-
   /// Is this declaration escapable?
   bool isEscapable() const;
 
@@ -3105,7 +3106,17 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
+private:
   ArrayRef<InheritedEntry> Inherited;
+
+  struct {
+    /// Whether the "hasNoncopyableAnnotation" bit has been computed yet.
+    unsigned isNoncopyableAnnotationComputed : 1;
+
+    /// Whether this declaration had a noncopyable inverse written somewhere.
+    unsigned hasNoncopyableAnnotation : 1;
+  } LazySemanticInfo = { };
+  friend class HasNoncopyableAnnotationRequest;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -3133,6 +3144,10 @@ public:
   InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
+
+  /// Is this type _always_ noncopyable? Will answer 'false' if the type is
+  /// conditionally copyable.
+  bool isNoncopyable() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&

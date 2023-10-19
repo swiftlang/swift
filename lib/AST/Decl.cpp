@@ -1585,6 +1585,61 @@ InheritedTypes::InheritedTypes(const class Decl *decl) {
   }
 }
 
+ASTContext &InheritedTypes::getASTContext() const {
+  if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
+    return typeDecl->getASTContext();
+  } else {
+    return Decl.get<const ExtensionDecl *>()->getASTContext();
+  }
+}
+
+SourceLoc InheritedTypes::getColonLoc() const {
+  if (Entries.size() == 0)
+    return SourceLoc();
+
+  SourceLoc precedingTok;
+  if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
+    precedingTok = typeDecl->getNameLoc();
+  } else {
+    auto *ext = Decl.get<const ExtensionDecl *>();
+    precedingTok = ext->getSourceRange().End;
+  }
+
+  auto &ctx = getASTContext();
+  return Lexer::getLocForEndOfToken(ctx.SourceMgr, precedingTok);
+}
+
+SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
+  auto inheritedClause = getEntries();
+  auto &ctx = getASTContext();
+
+  // If there is just one entry, remove the entire inheritance clause.
+  if (inheritedClause.size() == 1) {
+    SourceLoc end = inheritedClause[i].getSourceRange().End;
+    return SourceRange(getColonLoc(),
+                       Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
+  }
+
+  // If we're at the first entry, remove from the start of this entry to the
+  // start of the next entry.
+  if (i == 0) {
+    return SourceRange(inheritedClause[i].getSourceRange().Start,
+                       inheritedClause[i+1].getSourceRange().Start);
+  }
+
+  // Otherwise, remove from the end of the previous entry to the end of this
+  // entry.
+  SourceLoc afterPriorLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                 inheritedClause[i-1].getSourceRange().End);
+
+  SourceLoc afterMyEndLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                 inheritedClause[i].getSourceRange().End);
+
+  return SourceRange(afterPriorLoc, afterMyEndLoc);
+}
+
 InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
   Entries = typeDecl->Inherited;
 }
@@ -3556,12 +3611,6 @@ bool ValueDecl::isFinal() const {
                            getAttrs().hasAttribute<FinalAttr>());
 }
 
-bool ValueDecl::isMoveOnly() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsMoveOnlyRequest{const_cast<ValueDecl *>(this)},
-                           getAttrs().hasAttribute<MoveOnlyAttr>());
-}
-
 bool ValueDecl::isEscapable() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsEscapableRequest{const_cast<ValueDecl *>(this)},
@@ -4784,6 +4833,14 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
   return findGenericParameterReferences(this, sig, genericParam,
                                         treatNonResultCovariantSelfAsInvariant,
                                         llvm::None);
+}
+
+bool TypeDecl::isNoncopyable() const {
+  // NOTE: must answer true iff it is unconditionally noncopyable.
+  return evaluateOrDefault(getASTContext().evaluator,
+                           HasNoncopyableAnnotationRequest{
+                               const_cast<TypeDecl *>(this)},
+                           true); // default to true for safety
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

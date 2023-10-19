@@ -1325,7 +1325,7 @@ private:
   friend class TypeRepr;
 };
 
-/// A type repr represeting the inverse of some constraint. For example,
+/// A type repr representing the inverse of some constraint. For example,
 ///    ~Copyable
 /// where `Copyable` is the constraint type.
 class InverseTypeRepr : public TypeRepr {

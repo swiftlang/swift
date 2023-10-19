@@ -210,8 +210,11 @@ SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsMoveOnlyRequest, bool(ValueDecl *), SeparatelyCached,
+SWIFT_REQUEST(TypeChecker, HasNoncopyableAnnotationRequest, bool(TypeDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsNoncopyableRequest,
+              bool (CanType),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsEscapableRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
@@ -426,8 +429,8 @@ SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest,
               bool(AccessorDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
               FuncDecl *(Decl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
-              ProtocolConformance *(NominalTypeDecl *),
+SWIFT_REQUEST(TypeChecker, ImplicitKnownProtocolConformanceRequest,
+              ProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RenamedDeclRequest,
               ValueDecl *(const ValueDecl *, const AvailableAttr *),

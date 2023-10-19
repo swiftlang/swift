@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -913,18 +914,132 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool IsMoveOnlyRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
-  // TODO: isNoncopyable and isMoveOnly and other checks are all spread out
-  // and need to be merged together.
-  if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
+bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+
+  // ----------------
+  // The legacy check
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    if (isa<ClassDecl>(decl) || isa<StructDecl>(decl) || isa<EnumDecl>(decl)) {
       if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
         if (!decl->getASTContext().supportsMoveOnlyTypes())
-            decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+          decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
         return true;
       }
+    }
+    return false;
   }
-  return false;
+  // ----------------
+
+  // FIXME: just never allow lexical-lifetimes to be disabled?
+  if (!ctx.supportsMoveOnlyTypes())
+    decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
+
+  if (isa<TypeAliasDecl>(decl)) {
+    llvm_unreachable("todo: handle type aliases");
+  }
+
+  assert(isa<NominalTypeDecl>(decl) && "todo: handle non-nominals");
+
+  // Handle the legacy '@_moveOnly' attribute
+  if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
+    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
+    return true;
+  }
+
+  // For all other nominals, we can simply check the inheritance clause.
+
+  // The set of defaults all types start with.
+  auto defaults = getInvertibleProtocols();
+  std::map<KnownProtocolKind, SourceLoc> lastInverse;
+
+  // Does correctness checking after inspecting the inheritance clause.
+  // TODO: we can probably move this to `checkInheritanceClause` instead.
+  auto foundInverse = [&](SourceLoc loc, KnownProtocolKind kind) {
+    // do we still have this default?
+    if (defaults.contains(kind)) {
+      defaults.remove(kind);
+      lastInverse.insert({kind, loc});
+
+      // Classes are always copyable.
+      if (isa<ClassDecl>(decl) && kind == KnownProtocolKind::Copyable) {
+        ctx.Diags.diagnose(loc, diag::noncopyable_class);
+        return;
+      }
+
+      return;
+    }
+
+    // diagnose duplicate inverses
+    ctx.Diags.diagnose(loc, diag::inverse_duplicate);
+    ctx.Diags.diagnose(lastInverse[kind], diag::inverse_duplicate_previous);
+  };
+
+  // Check the inheritance clause for inverses.
+  auto inherited = decl->getInherited();
+  for (size_t i = 0; i < inherited.size(); i++) {
+    auto *repr = inherited.getTypeRepr(i);
+
+    if (!dyn_cast_or_null<InverseTypeRepr>(repr)) {
+      continue;
+    }
+
+    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
+    auto kp = type->getKnownProtocol();
+    if (!kp)
+      continue; // diagnosed elsewhere.
+
+    foundInverse(repr->getLoc(), *kp);
+  }
+
+  // Check the where-clause for a constraint Subject: ~Copyable where Subject
+  // refers to the where-clause owner.
+
+  Type owner;
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    owner = proto->getSelfInterfaceType();
+  } else if (auto *nom = dyn_cast<NominalTypeDecl>(decl)) {
+    owner = nom->getDeclaredInterfaceType();
+  }
+  // TODO(kavon): handle other TypeDecls
+
+
+  // Checks a requirement in a where-clause
+  auto checkRequirement = [&](const Requirement &req,
+                              RequirementRepr *repr) -> bool {
+    if (req.getKind() != RequirementKind::Conformance)
+      return false;
+
+    auto constraintTyRepr = repr->getConstraintRepr();
+    if (!dyn_cast_or_null<InverseTypeRepr>(constraintTyRepr))
+      return false;
+
+    auto kp = req.getSecondType()->getKnownProtocol();
+    if (!kp)
+      return false; // diagnosed elsewhere.
+
+    auto subject = req.getFirstType();
+    if (!subject)
+      return false;
+
+    if (subject->getCanonicalType() == owner->getCanonicalType())
+      foundInverse(constraintTyRepr->getLoc(), *kp);
+
+    return false;
+  };
+
+  if (owner) {
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      WhereClauseOwner(nominal).visitRequirements(TypeResolutionStage::Structural,
+                                                  checkRequirement);
+    } else if (auto *assocTy = dyn_cast<AssociatedTypeDecl>(decl)) {
+      WhereClauseOwner(assocTy).visitRequirements(TypeResolutionStage::Structural,
+                                                  checkRequirement);
+    }
+  }
+
+  return !defaults.contains(KnownProtocolKind::Copyable);
 }
 
 bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
@@ -3067,4 +3182,21 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   return extendedType;
+}
+
+//----------------------------------------------------------------------------//
+// ImplicitKnownProtocolConformanceRequest
+//----------------------------------------------------------------------------//
+ProtocolConformance *
+ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
+                                                  NominalTypeDecl *nominal,
+                                                  KnownProtocolKind kp) const {
+  switch (kp) {
+  case KnownProtocolKind::Sendable:
+    return deriveImplicitSendableConformance(evaluator, nominal);
+  case KnownProtocolKind::Copyable:
+    return deriveConformanceForInvertible(evaluator, nominal, kp);
+  default:
+    llvm_unreachable("non-implicitly derived KnownProtocol");
+  }
 }

@@ -6279,7 +6279,7 @@ bool NotCopyableFailure::diagnoseAsError() {
   }
 
   case NoncopyableMatchFailure::CopyableConstraint: {
-    auto *loc = getLocator();
+    ConstraintLocator *loc = getLocator();
     auto path = loc->getPath();
 
     if (loc->isLastElement<LocatorPathElt::AnyTupleElement>()) {
@@ -6347,11 +6347,27 @@ bool NotCopyableFailure::diagnoseAsError() {
       if (diagnoseGenericTypeParamType(subject->getAs<GenericTypeParamType>()))
         return true;
     }
+
+    if (loc->getLastElementAs<LocatorPathElt::ConditionalRequirement>())
+      return false; // Allow MissingConformanceFailure to diagnose instead.
+
     break;
   }
-  }
+  } // end switch
 
+  // emit catch-all diagnostic
   emitDiagnostic(diag::noncopyable_generics, noncopyableTy);
+
+#ifndef NDEBUG
+  if (getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    getLocator()->dump(&getConstraintSystem());
+#pragma clang diagnostic pop
+    llvm_unreachable("NoncopyableGenerics: vague diagnostic for locator");
+  }
+#endif
+
   return true;
 }
 

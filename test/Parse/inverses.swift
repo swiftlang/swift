@@ -22,17 +22,20 @@ struct S4: ~(Copyable & Equatable) {} // expected-error {{type 'Copyable & Equat
 func blah<T>(_ t: T) where T: ~Copyable,
                            T: ~Hashable {}  // expected-error@:31 {{type 'Hashable' is not invertible}}
 
-func foo<T: ~Copyable>(x: T) {}
+func foo<T: ~Copyable>(x: borrowing T) {}
 
 struct Buurap<T: ~Copyable> {}
 
-protocol Foo where Self: ~Copyable {
+// expected-warning@+1 {{protocol 'Foo' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
+protocol Foo: ~Copyable  // expected-note {{previous inverse constraint here}}
+         where Self: ~Copyable { // expected-error {{duplicate inverse constraint}}
+
     func test<T>(_ t: T) where T: ~Self  // expected-error {{type 'Self' is not invertible}}
 }
 
 protocol Sando { func make() }
 
-class C: ~Copyable,
+class C: ~Copyable,  // expected-error {{classes cannot be noncopyable}}
          ~Sando // expected-error {{type 'Sando' is not invertible}}
          {}
 
@@ -54,6 +57,10 @@ func greenBay<each T: ~Copyable>(_ r: repeat each T) {}
 
 typealias Clone = Copyable
 func dup<D: ~Clone>(_ d: D) {}
+// expected-error@-1 {{noncopyable parameter must specify its ownership}}
+// expected-note@-2 {{add 'borrowing'}}
+// expected-note@-3 {{add 'inout'}}
+// expected-note@-4 {{add 'consuming'}}
 
 func superb(_ thing: some ~Copyable, thing2: some ~Clone) {}
 
