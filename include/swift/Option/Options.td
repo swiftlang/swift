@@ -1887,6 +1887,11 @@ def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
   HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
 
+def experimental_lazy_typecheck :
+  Flag<["-"], "experimental-lazy-typecheck">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Type-check lazily as needed to produce requested outputs">;
+
 // END ONLY SUPPORTED IN NEW DRIVER
 
 
