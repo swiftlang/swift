@@ -5871,6 +5871,27 @@ ActorReferenceResult ActorReferenceResult::forReference(
     return forSameConcurrencyDomain(declIsolation);
   }
 
+  // Initializing an actor isolated stored property with a value effectively
+  // passes that value from the init context into the actor isolated context.
+  // It's only okay for the value to cross isolation boundaries if the property
+  // type is Sendable. Note that if the init is a nonisolated actor init,
+  // Sendable checking is already performed on arguments at the call-site.
+  if ((declIsolation.isActorIsolated() && contextIsolation.isGlobalActor()) ||
+      declIsolation.isGlobalActor()) {
+    auto *init = dyn_cast<ConstructorDecl>(fromDC);
+    auto *decl = declRef.getDecl();
+    if (init && init->isDesignatedInit() && isStoredProperty(decl)) {
+      auto type =
+          fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
+      if (!isSendableType(fromDC->getParentModule(), type)) {
+        // Treat the decl isolation as 'preconcurrency' to downgrade violations
+        // to warnings, because violating Sendable here is accepted by the
+        // Swift 5.9 compiler.
+        return forEntersActor(declIsolation, Flags::Preconcurrency);
+      }
+    }
+  }
+
   // If there is an instance and it is checked by flow isolation, treat it
   // as being in the same concurrency domain.
   if (actorInstance &&
@@ -5889,13 +5910,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
 
   // If there is an instance that corresponds to 'self',
   // we are in a constructor or destructor, and we have a stored property of
-  // global-actor-qualified type, pretend we are in the same concurrency
-  // domain.
-  // FIXME: This is an odd carve-out that probably shouldn't have been allowed.
-  // It should at the very least be diagnosed, and either subsumed by flow
-  // isolation or banned outright.
-  // FIXME: At the very least, we should consistently use
-  // isActorInitOrDeInitContext here, but it only wants to think about actors.
+  // global-actor-qualified type, then we have problems if the stored property
+  // type is non-Sendable. Note that if we get here, the type must be Sendable.
   if (actorInstance && actorInstance->isSelf() &&
       isNonInheritedStorage(declRef.getDecl(), fromDC) &&
       declIsolation.isGlobalActor() &&
