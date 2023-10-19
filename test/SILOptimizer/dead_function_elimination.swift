@@ -1,6 +1,11 @@
 // RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend %s -O -emit-sil -enable-testing | %FileCheck -check-prefix=CHECK-TESTING %s
 
+// Check if a private global is kept alive if it's only reference from another global variable.
+
+private var g1 = 27
+let g2 = UnsafePointer(&g1)
+
 // Check if cycles are removed.
 
 @inline(never)
@@ -183,6 +188,8 @@ struct GFStr {
 public func keepPtrAlive() {
   GFStr.aliveFuncPtr()
 }
+
+// CHECK-LABEL: sil_global private @$s25dead_function_elimination2g1{{.*}}
 
 // CHECK-NOT: sil {{.*}}inCycleA
 // CHECK-NOT: sil {{.*}}inCycleB
