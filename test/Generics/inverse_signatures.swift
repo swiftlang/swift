@@ -10,6 +10,22 @@ func genericFn<T>(_ t: T) {}
 // CHECK: Generic signature: <T>
 func withInverse<T: ~Copyable>(_ t: borrowing T) {}
 
+// CHECK-LABEL: .withSome@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable>
+func withSome(_ t: some Any) {}
+
+// CHECK-LABEL: .withSomeEquatable@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Equatable>
+func withSomeEquatable(_ t: some Equatable) {}
+
+// CHECK-LABEL: .withSomeProto@
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : NoCopyP>
+func withSomeProto(_ t: some NoCopyP) {}
+
+// CHECK-LABEL: .withInverseSome@
+// CHECK: Canonical generic signature: <τ_0_0>
+func withInverseSome(_ t: some ~Copyable) {}
+
 // CHECK-LABEL: .S1@
 // CHECK: Generic signature: <T where T : Copyable>
 struct S1<T> {}
@@ -33,6 +49,10 @@ class C1_CI<T, U: ~Copyable> {}
 // CHECK-LABEL: .C1_II@
 // CHECK: Generic signature: <T, U>
 class C1_II<T: ~Copyable, U: ~Copyable> {}
+
+// CHECK-LABEL: .NoCopyP@
+// CHECK: Requirement signature: <Self>
+protocol NoCopyP: ~Copyable {}
 
 // CHECK-LABEL: .P1@
 // CHECK: Requirement signature: <Self where Self : Copyable>
