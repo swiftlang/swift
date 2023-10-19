@@ -2935,10 +2935,7 @@ public:
   SILGenBorrowedBaseVisitor(SILGenLValue &SGL, SILGenFunction &SGF)
       : SGL(SGL), SGF(SGF) {}
 
-  /// Returns the subexpr
   static bool isNonCopyableBaseBorrow(SILGenFunction &SGF, Expr *e) {
-    if (auto *le = dyn_cast<LoadExpr>(e))
-      return le->getType()->isNoncopyable();
     if (auto *m = dyn_cast<MemberRefExpr>(e)) {
       // If our m is a pure noncopyable type or our base is, we need to perform
       // a noncopyable base borrow.
@@ -2949,8 +2946,39 @@ public:
       return m->getType()->isNoncopyable() ||
           m->getBase()->getType()->isNoncopyable();
     }
-    if (auto *d = dyn_cast<DeclRefExpr>(e))
-      return e->getType()->isNoncopyable();
+
+    if (auto *le = dyn_cast<LoadExpr>(e)) {
+      // Noncopyable type is obviously noncopyable.
+      if (le->getType()->isNoncopyable()) {
+        return true;
+      }
+      // Otherwise, check if the thing we're loading from is a noncopyable
+      // param decl.
+      e = le->getSubExpr();
+      // fall through...
+    }
+    
+    if (auto *de = dyn_cast<DeclRefExpr>(e)) {
+      // Noncopyable type is obviously noncopyable.
+      if (de->getType()->isNoncopyable()) {
+        return true;
+      }
+      // If the decl ref refers to a parameter with an explicit ownership
+      // modifier, it is not implicitly copyable.
+      if (auto pd = dyn_cast<ParamDecl>(de->getDecl())) {
+        switch (pd->getSpecifier()) {
+        case ParamSpecifier::Borrowing:
+        case ParamSpecifier::Consuming:
+          return true;
+        case ParamSpecifier::Default:
+        case ParamSpecifier::InOut:
+        case ParamSpecifier::LegacyShared:
+        case ParamSpecifier::LegacyOwned:
+          return false;
+        }
+        llvm_unreachable("unhandled switch case");
+      }
+    }
     return false;
   }
 
