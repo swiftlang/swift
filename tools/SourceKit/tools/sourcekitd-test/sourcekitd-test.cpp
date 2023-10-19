@@ -1137,6 +1137,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Diagnostics:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestDiagnostics);
     break;
+  case SourceKitRequest::SemanticTokens:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestSemanticTokens);
+    break;
 
   case SourceKitRequest::Compile:
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
@@ -1427,6 +1431,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::ConformingMethodList:
     case SourceKitRequest::DependencyUpdated:
     case SourceKitRequest::Diagnostics:
+    case SourceKitRequest::SemanticTokens:
       printRawResponse(Resp);
       break;
     case SourceKitRequest::Compile:
