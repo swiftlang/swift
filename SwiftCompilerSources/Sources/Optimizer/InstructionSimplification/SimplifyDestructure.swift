@@ -87,7 +87,7 @@ extension DestructureStructInst : OnoneSimplifyable {
 private func tryReplaceConstructDestructPair(construct: SingleValueInstruction,
                                              destruct: MultipleValueInstruction,
                                              _ context: SimplifyContext) {
-  let singleUse = context.preserveDebugInfo ? construct.uses.singleUse : construct.uses.singleNonDebugUse
+  let singleUse = context.preserveDebugInfo ? construct.uses.singleUse : construct.uses.ignoreDebugUses.singleUse
   let canEraseFirst = singleUse?.instruction == destruct
 
   if !canEraseFirst && construct.parentFunction.hasOwnership && construct.ownership == .owned {

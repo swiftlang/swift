@@ -448,7 +448,7 @@ extension AllocRefInstBase {
   }
 }
 
-extension UseList {
+extension Sequence where Element == Operand {
   func replaceAll(with replacement: Value, _ context: some MutatingContext) {
     for use in self {
       use.set(to: replacement, context)

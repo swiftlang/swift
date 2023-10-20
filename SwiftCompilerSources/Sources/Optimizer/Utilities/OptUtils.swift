@@ -14,10 +14,6 @@ import SIL
 import OptimizerBridging
 
 extension Value {
-  var nonDebugUses: LazyFilterSequence<UseList> {
-    uses.lazy.filter { !($0.instruction is DebugValueInst) }
-  }
-
   var lookThroughBorrow: Value {
     if let beginBorrow = self as? BeginBorrowInst {
       return beginBorrow.borrowedValue.lookThroughBorrow
@@ -206,7 +202,7 @@ extension Instruction {
   }
 
   var isTriviallyDeadIgnoringDebugUses: Bool {
-    if results.contains(where: { !$0.uses.isEmptyIgnoringDebugUses }) {
+    if results.contains(where: { !$0.uses.ignoreDebugUses.isEmpty }) {
       return false
     }
     return self.canBeRemovedIfNotUsed
@@ -320,32 +316,6 @@ extension LoadInst {
   }
 }
 
-
-extension UseList {
-  var singleNonDebugUse: Operand? {
-    var singleUse: Operand?
-    for use in self {
-      if use.instruction is DebugValueInst {
-        continue
-      }
-      if singleUse != nil {
-        return nil
-      }
-      singleUse = use
-    }
-    return singleUse
-  }
-
-  var isEmptyIgnoringDebugUses: Bool {
-    for use in self {
-      if !(use.instruction is DebugValueInst) {
-        return false
-      }
-    }
-    return true
-  }
-}
-
 extension SmallProjectionPath {
   /// Returns true if the path only contains projections which can be materialized as
   /// SIL struct or tuple projection instructions - for values or addresses.
@@ -421,7 +391,7 @@ extension SimplifyContext {
   /// The operation is not done if it would require to insert a copy due to keep ownership correct.
   func tryReplaceRedundantInstructionPair(first: SingleValueInstruction, second: SingleValueInstruction,
                                           with replacement: Value) {
-    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.singleNonDebugUse
+    let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
     if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
