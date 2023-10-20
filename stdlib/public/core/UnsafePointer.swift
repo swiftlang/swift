@@ -612,7 +612,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
     self.init(mutating: unwrapped)
   }
   
-  /// Creates an immutable typed pointer referencing the same memory as the
+  /// Creates a mutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert.
@@ -621,7 +621,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
    self._rawValue = other._rawValue
   }
 
-  /// Creates an immutable typed pointer referencing the same memory as the
+  /// Creates a mutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
