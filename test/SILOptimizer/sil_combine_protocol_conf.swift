@@ -124,7 +124,6 @@ public class Other {
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}", any DerivedProtocol) Self, #DerivedProtocol.foo : <Self where Self : DerivedProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}", any DerivedProtocol) Self : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: apply [[W1]]<@opened("{{.*}}", any DerivedProtocol) Self>([[O1]]) : $@convention(witness_method: DerivedProtocol) <τ_0_0 where τ_0_0 : DerivedProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
-// CHECK: integer_literal
 // CHECK: builtin
 // CHECK: tuple_extract 
 // CHECK: tuple_extract 

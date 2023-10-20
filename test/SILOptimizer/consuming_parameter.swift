@@ -18,12 +18,11 @@ public func async_dead_arg_call(o: consuming AnyObject) async {
  
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_lexical @owned
-// CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @async_callee
 // CHECK:         apply [[CALLEE]]()
 // CHECK:         hop_to_executor [[EXECUTOR]]
-// CHECK:         destroy_value [[MOVE]]
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'async_dead_arg_call_lexical'
 @_silgen_name("async_dead_arg_call_lexical")
 public func async_dead_arg_call_lexical(@_noEagerMove o: consuming AnyObject) async {
