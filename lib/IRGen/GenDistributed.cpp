@@ -843,7 +843,6 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     /// so we must use this instead of the decodeFn directly.
    if (classDecl->hasResilientMetadata()) {
       if (getMethodDispatch(decodeFn) == swift::MethodDispatch::Class) {
-        SILDeclRef(decodeFn).getOverriddenVTableEntry().getDecl()->getDeclContext()->dumpContext();
         fnPtr = IGM.getAddrOfDispatchThunk(SILDeclRef(decodeFn), NotForDefinition);
         usesDispatchThunk = true;
       }
