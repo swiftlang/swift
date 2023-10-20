@@ -1417,7 +1417,6 @@ static void handleRequestIndex(const RequestDict &Req,
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
-
     return Rec(indexSource(*PrimaryFilePath, Args));
   });
 }
