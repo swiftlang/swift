@@ -854,12 +854,22 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
   }
 
   // Update main module's dependencies to include these new overlays.
+  auto resolvedDummyDep =
+      *(cache.findDependency(dummyMainName, ModuleDependencyKind::SwiftSource)
+            .value());
   auto mainDep =
       *(cache.findDependency(mainModuleName, ModuleDependencyKind::SwiftSource)
             .value());
-  std::for_each(/* +1 to exclude dummy main*/ allModules.begin() + 1,
-                allModules.end(), [&](ModuleDependencyID dependencyID) {
-                  mainDep.addModuleDependency(dependencyID);
+  auto newOverlayDeps = resolvedDummyDep.getDirectModuleDependencies();
+  auto existingMainDeps = mainDep.getDirectModuleDependencies();
+  ModuleDependencyIDSet existingMainDepsSet(existingMainDeps.begin(),
+                                            existingMainDeps.end());
+  // Ensure we do not add cross-import overlay dependencies in case they
+  // were already explicitly imported
+  std::for_each(newOverlayDeps.begin(), newOverlayDeps.end(),
+                [&](ModuleDependencyID crossImportOverlayModID) {
+                  if (!existingMainDepsSet.count(crossImportOverlayModID))
+                    mainDep.addModuleDependency(crossImportOverlayModID);
                 });
   cache.updateDependency(
       {mainModuleName.str(), ModuleDependencyKind::SwiftSource}, mainDep);
