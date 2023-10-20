@@ -98,14 +98,14 @@ func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()  // expected-error {{Using type 'MyError' can cause metadata allocation or locks}}
+  throw MyError()
 }
 
 @_noLocks
 func testCatch(_ b: Bool) throws -> Int? {
   do {
     return try errorExistential(true)
-  } catch let e as MyError { // expected-error {{this code performs reference counting operations which can cause locking}}
+  } catch let e as MyError {
     print(e)
     return nil
   }
