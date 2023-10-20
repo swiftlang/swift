@@ -57,9 +57,10 @@
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
 
-// Most of the base classes need to be nullable to allow them to be used as
+// Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NONNULL(Decl)
+AST_BRIDGING_WRAPPER_NONNULL(DeclContext)
 AST_BRIDGING_WRAPPER_NULLABLE(Stmt)
 AST_BRIDGING_WRAPPER_NULLABLE(Expr)
 AST_BRIDGING_WRAPPER_NULLABLE(TypeRepr)

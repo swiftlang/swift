@@ -32,10 +32,6 @@
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
-typedef struct BridgedDeclContext {
-  void *_Nonnull raw;
-} BridgedDeclContext;
-
 // Define the bridging wrappers for each AST node.
 #define AST_BRIDGING_WRAPPER_NONNULL(Name)                                     \
   typedef struct {                                                             \
@@ -53,7 +49,8 @@ typedef struct BridgedDeclContext {
 extern "C" {
 #endif
 
-// Declare `.asDecl` on each BridgedXXXDecl type.
+// Declare `.asDecl` on each BridgedXXXDecl type, which upcasts a wrapper for
+// a Decl subclass to a BridgedDecl.
 #define DECL(Id, Parent)                                                       \
   SWIFT_NAME("getter:Bridged" #Id "Decl.asDecl(self:)")                        \
   BridgedDecl Id##Decl_asDecl(Bridged##Id##Decl decl);
@@ -69,21 +66,24 @@ extern "C" {
 #define ABSTRACT_CONTEXT_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
 
-// Declare `.asStmt` on each BridgedXXXStmt type.
+// Declare `.asStmt` on each BridgedXXXStmt type, which upcasts a wrapper for
+// a Stmt subclass to a BridgedStmt.
 #define STMT(Id, Parent)                                                       \
   SWIFT_NAME("getter:Bridged" #Id "Stmt.asStmt(self:)")                        \
   BridgedStmt Id##Stmt_asStmt(Bridged##Id##Stmt stmt);
 #define ABSTRACT_STMT(Id, Parent) STMT(Id, Parent)
 #include "swift/AST/StmtNodes.def"
 
-// Declare `.asExpr` on each BridgedXXXExpr type.
+// Declare `.asExpr` on each BridgedXXXExpr type, which upcasts a wrapper for
+// a Expr subclass to a BridgedExpr.
 #define EXPR(Id, Parent)                                                       \
   SWIFT_NAME("getter:Bridged" #Id "Expr.asExpr(self:)")                        \
   BridgedExpr Id##Expr_asExpr(Bridged##Id##Expr expr);
 #define ABSTRACT_EXPR(Id, Parent) EXPR(Id, Parent)
 #include "swift/AST/ExprNodes.def"
 
-// Declare `.asTypeRepr` on each BridgedXXXTypeRepr type.
+// Declare `.asTypeRepr` on each BridgedXXXTypeRepr type, which upcasts a
+// wrapper for a TypeRepr subclass to a BridgedTypeRepr.
 #define TYPEREPR(Id, Parent)                                                   \
   SWIFT_NAME("getter:Bridged" #Id "TypeRepr.asTypeRepr(self:)")                \
   BridgedTypeRepr Id##TypeRepr_asTypeRepr(Bridged##Id##TypeRepr typeRepr);

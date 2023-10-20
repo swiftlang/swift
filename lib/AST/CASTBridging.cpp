@@ -44,14 +44,6 @@ struct BridgedDiagnosticImpl {
 };
 } // namespace
 
-static inline BridgedDeclContext bridgedDeclContext(DeclContext *declContext) {
-  return {declContext};
-}
-
-static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
-  return static_cast<DeclContext *>(cDeclContext.raw);
-}
-
 // Define `bridged` overloads for each AST node.
 #define AST_BRIDGING_WRAPPER(Name)                                             \
   [[maybe_unused]]                                                             \
@@ -74,7 +66,7 @@ static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
 // Define `.asDecl` on each BridgedXXXDecl type.
 #define DECL(Id, Parent)                                                       \
   BridgedDecl Id##Decl_asDecl(Bridged##Id##Decl decl) {                        \
-    return bridged((Decl *)unbridged(decl));                                   \
+    return bridged(static_cast<Decl *>(unbridged(decl)));                      \
   }
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
@@ -84,7 +76,7 @@ static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
 #define DECL(Id, Parent)
 #define CONTEXT_DECL(Id, Parent)                                               \
   BridgedDeclContext Id##Decl_asDeclContext(Bridged##Id##Decl decl) {          \
-    return bridgedDeclContext(unbridged(decl));                                 \
+    return bridged(static_cast<DeclContext *>(unbridged(decl)));               \
   }
 #define ABSTRACT_CONTEXT_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
@@ -92,7 +84,7 @@ static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
 // Define `.asStmt` on each BridgedXXXStmt type.
 #define STMT(Id, Parent)                                                       \
   BridgedStmt Id##Stmt_asStmt(Bridged##Id##Stmt stmt) {                        \
-    return bridged((Stmt *)unbridged(stmt));                                   \
+    return bridged(static_cast<Stmt *>(unbridged(stmt)));                      \
   }
 #define ABSTRACT_STMT(Id, Parent) STMT(Id, Parent)
 #include "swift/AST/StmtNodes.def"
@@ -100,7 +92,7 @@ static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
 // Define `.asExpr` on each BridgedXXXExpr type.
 #define EXPR(Id, Parent)                                                       \
   BridgedExpr Id##Expr_asExpr(Bridged##Id##Expr expr) {                        \
-    return bridged((Expr *)unbridged(expr));                                   \
+    return bridged(static_cast<Expr *>(unbridged(expr)));                      \
   }
 #define ABSTRACT_EXPR(Id, Parent) EXPR(Id, Parent)
 #include "swift/AST/ExprNodes.def"
@@ -108,7 +100,7 @@ static inline DeclContext *unbridged(BridgedDeclContext cDeclContext) {
 // Define `.asTypeRepr` on each BridgedXXXTypeRepr type.
 #define TYPEREPR(Id, Parent)                                                   \
   BridgedTypeRepr Id##TypeRepr_asTypeRepr(Bridged##Id##TypeRepr typeRepr) {    \
-    return bridged((TypeRepr *)unbridged(typeRepr));                           \
+    return bridged(static_cast<TypeRepr *>(unbridged(typeRepr)));              \
   }
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
@@ -286,8 +278,9 @@ TopLevelCodeDecl_createExpr(BridgedASTContext cContext,
 
 BridgedSequenceExpr SequenceExpr_createParsed(BridgedASTContext cContext,
                                               BridgedArrayRef exprs) {
-  return bridged(SequenceExpr::create(unbridged(cContext),
-                                      unbridgedArrayRef<Expr *>(exprs)));
+  auto *SE = SequenceExpr::create(unbridged(cContext),
+                                  unbridgedArrayRef<Expr *>(exprs));
+  return bridged(SE);
 }
 
 BridgedTupleExpr
@@ -295,11 +288,12 @@ TupleExpr_createParsed(BridgedASTContext cContext, BridgedSourceLoc cLParen,
                        BridgedArrayRef subs, BridgedArrayRef names,
                        BridgedArrayRef cNameLocs, BridgedSourceLoc cRParen) {
   ASTContext &context = unbridged(cContext);
-  return bridged(TupleExpr::create(context, unbridged(cLParen),
-                                   unbridgedArrayRef<Expr *>(subs),
-                                   unbridgedArrayRef<Identifier>(names),
-                                   unbridgedArrayRef<SourceLoc>(cNameLocs),
-                                   unbridged(cRParen), /*Implicit*/ false));
+  auto *TE = TupleExpr::create(context, unbridged(cLParen),
+                               unbridgedArrayRef<Expr *>(subs),
+                               unbridgedArrayRef<Identifier>(names),
+                               unbridgedArrayRef<SourceLoc>(cNameLocs),
+                               unbridged(cRParen), /*Implicit*/ false);
+  return bridged(TE);
 }
 
 BridgedCallExpr CallExpr_createParsed(BridgedASTContext cContext,
@@ -314,8 +308,9 @@ BridgedCallExpr CallExpr_createParsed(BridgedASTContext cContext,
   auto *argList = ArgumentList::create(context, TE->getLParenLoc(), arguments,
                                        TE->getRParenLoc(), llvm::None,
                                        /*isImplicit*/ false);
-  return bridged(CallExpr::create(context, unbridged(fn), argList,
-                                  /*implicit*/ false));
+  auto *CE = CallExpr::create(context, unbridged(fn), argList,
+                              /*implicit*/ false);
+  return bridged(CE);
 }
 
 BridgedUnresolvedDeclRefExpr UnresolvedDeclRefExpr_createParsed(
@@ -349,9 +344,10 @@ BridgedArrayExpr ArrayExpr_createParsed(BridgedASTContext cContext,
                                         BridgedArrayRef commas,
                                         BridgedSourceLoc cRLoc) {
   ASTContext &context = unbridged(cContext);
-  return bridged(ArrayExpr::create(
+  auto *AE = ArrayExpr::create(
       context, unbridged(cLLoc), unbridgedArrayRef<Expr *>(elements),
-      unbridgedArrayRef<SourceLoc>(commas), unbridged(cRLoc)));
+      unbridgedArrayRef<SourceLoc>(commas), unbridged(cRLoc));
+  return bridged(AE);
 }
 
 BridgedBooleanLiteralExpr
@@ -380,13 +376,14 @@ BridgedPatternBindingDecl PatternBindingDecl_createParsed(
       isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
       name->getLoc(), name->getName().getBaseIdentifier(), declContext);
   auto *pattern = new (context) NamedPattern(varDecl);
-  return bridged(PatternBindingDecl::create(
+  auto *PBD = PatternBindingDecl::create(
       context,
       /*StaticLoc=*/SourceLoc(), // FIXME
       isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
       unbridged(cBindingKeywordLoc), pattern,
       /*EqualLoc=*/SourceLoc(), // FIXME
-      unbridged(initExpr), declContext));
+      unbridged(initExpr), declContext);
+  return bridged(PBD);
 }
 
 BridgedSingleValueStmtExpr SingleValueStmtExpr_createWithWrappedBranches(
@@ -394,8 +391,9 @@ BridgedSingleValueStmtExpr SingleValueStmtExpr_createWithWrappedBranches(
     bool mustBeExpr) {
   ASTContext &context = unbridged(cContext);
   DeclContext *declContext = unbridged(cDeclContext);
-  return bridged(SingleValueStmtExpr::createWithWrappedBranches(
-      context, unbridged(S), declContext, mustBeExpr));
+  auto *SVE = SingleValueStmtExpr::createWithWrappedBranches(
+      context, unbridged(S), declContext, mustBeExpr);
+  return bridged(SVE);
 }
 
 BridgedIfStmt IfStmt_createParsed(BridgedASTContext cContext,
@@ -403,9 +401,10 @@ BridgedIfStmt IfStmt_createParsed(BridgedASTContext cContext,
                                   BridgedStmt then, BridgedSourceLoc cElseLoc,
                                   BridgedStmt elseStmt) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) IfStmt(
-      unbridged(cIfLoc), unbridged(cond), unbridged(then), unbridged(cElseLoc),
-      unbridged(elseStmt), llvm::None, context));
+  auto *IS = new (context)
+      IfStmt(unbridged(cIfLoc), unbridged(cond), unbridged(then),
+             unbridged(cElseLoc), unbridged(elseStmt), llvm::None, context);
+  return bridged(IS);
 }
 
 BridgedReturnStmt ReturnStmt_createParsed(BridgedASTContext cContext,
@@ -446,9 +445,9 @@ BridgedBraceStmt BraceStmt_createParsed(BridgedASTContext cContext,
   }
 
   ASTContext &context = unbridged(cContext);
-  return bridged(BraceStmt::create(context, unbridged(cLBLoc),
-                                   context.AllocateCopy(nodes),
-                                   unbridged(cRBLoc)));
+  auto *BS = BraceStmt::create(context, unbridged(cLBLoc),
+                               context.AllocateCopy(nodes), unbridged(cRBLoc));
+  return bridged(BS);
 }
 
 BridgedParamDecl ParamDecl_createParsed(
@@ -572,8 +571,9 @@ BridgedTypeRepr SimpleIdentTypeRepr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cLoc,
                                                  BridgedIdentifier id) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) SimpleIdentTypeRepr(DeclNameLoc(unbridged(cLoc)),
-                                                   DeclNameRef(unbridged(id))));
+  auto *SI = new (context) SimpleIdentTypeRepr(DeclNameLoc(unbridged(cLoc)),
+                                               DeclNameRef(unbridged(id)));
+  return bridged(SI);
 }
 
 BridgedTypeRepr GenericIdentTypeRepr_createParsed(BridgedASTContext cContext,
@@ -587,9 +587,10 @@ BridgedTypeRepr GenericIdentTypeRepr_createParsed(BridgedASTContext cContext,
   auto Name = DeclNameRef(unbridged(name));
   SourceLoc lAngleLoc = unbridged(cLAngleLoc);
   SourceLoc rAngleLoc = unbridged(cRAngleLoc);
-  return bridged(GenericIdentTypeRepr::create(
+  auto *GI = GenericIdentTypeRepr::create(
       context, Loc, Name, unbridgedArrayRef<TypeRepr *>(genericArgs),
-      SourceRange{lAngleLoc, rAngleLoc}));
+      SourceRange{lAngleLoc, rAngleLoc});
+  return bridged(GI);
 }
 
 BridgedUnresolvedDotExpr
@@ -597,9 +598,10 @@ UnresolvedDotExpr_createParsed(BridgedASTContext cContext, BridgedExpr base,
                                BridgedSourceLoc cDotLoc, BridgedIdentifier name,
                                BridgedSourceLoc cNameLoc) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) UnresolvedDotExpr(
+  auto *UDE = new (context) UnresolvedDotExpr(
       unbridged(base), unbridged(cDotLoc), DeclNameRef(unbridged(name)),
-      DeclNameLoc(unbridged(cNameLoc)), false));
+      DeclNameLoc(unbridged(cNameLoc)), false);
+  return bridged(UDE);
 }
 
 BridgedClosureExpr ClosureExpr_createParsed(BridgedASTContext cContext,
@@ -731,9 +733,10 @@ BridgedEnumElementDecl EnumElementDecl_createParsed(
     }
   }
 
-  return bridged(new (context) EnumElementDecl(
+  auto *EED = new (context) EnumElementDecl(
       unbridged(cNameLoc), declName, parameterList, unbridged(cEqualsLoc),
-      cast_or_null<LiteralExpr>(unbridged(rawValue)), unbridged(cDeclContext)));
+      cast_or_null<LiteralExpr>(unbridged(rawValue)), unbridged(cDeclContext));
+  return bridged(EED);
 }
 
 BridgedNominalTypeDecl StructDecl_createParsed(
@@ -943,8 +946,9 @@ BridgedTypeRepr ImplicitlyUnwrappedOptionalTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cExclamationLoc) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) ImplicitlyUnwrappedOptionalTypeRepr(
-      unbridged(base), unbridged(cExclamationLoc)));
+  auto *IUO = new (context) ImplicitlyUnwrappedOptionalTypeRepr(
+      unbridged(base), unbridged(cExclamationLoc));
+  return bridged(IUO);
 }
 
 BridgedTypeRepr ArrayTypeRepr_createParsed(BridgedASTContext cContext,
@@ -954,8 +958,9 @@ BridgedTypeRepr ArrayTypeRepr_createParsed(BridgedASTContext cContext,
   ASTContext &context = unbridged(cContext);
   SourceLoc lSquareLoc = unbridged(cLSquareLoc);
   SourceLoc rSquareLoc = unbridged(cRSquareLoc);
-  return bridged(new (context) ArrayTypeRepr(
-      unbridged(base), SourceRange{lSquareLoc, rSquareLoc}));
+  auto *ATR = new (context)
+      ArrayTypeRepr(unbridged(base), SourceRange{lSquareLoc, rSquareLoc});
+  return bridged(ATR);
 }
 
 BridgedTypeRepr DictionaryTypeRepr_createParsed(BridgedASTContext cContext,
@@ -968,9 +973,10 @@ BridgedTypeRepr DictionaryTypeRepr_createParsed(BridgedASTContext cContext,
   SourceLoc lSquareLoc = unbridged(cLSquareLoc);
   SourceLoc colonLoc = unbridged(cColonloc);
   SourceLoc rSquareLoc = unbridged(cRSquareLoc);
-  return bridged(new (context) DictionaryTypeRepr(
-      unbridged(keyType), unbridged(valueType), colonLoc,
-      SourceRange{lSquareLoc, rSquareLoc}));
+  auto *DTR = new (context)
+      DictionaryTypeRepr(unbridged(keyType), unbridged(valueType), colonLoc,
+                         SourceRange{lSquareLoc, rSquareLoc});
+  return bridged(DTR);
 }
 
 BridgedTypeRepr MetatypeTypeRepr_createParsed(BridgedASTContext cContext,
@@ -994,8 +1000,9 @@ PackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
                                    BridgedTypeRepr base,
                                    BridgedSourceLoc cRepeatLoc) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) PackExpansionTypeRepr(unbridged(cRepeatLoc),
-                                                     unbridged(base)));
+  auto *PE = new (context)
+      PackExpansionTypeRepr(unbridged(cRepeatLoc), unbridged(base));
+  return bridged(PE);
 }
 
 BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr) {
@@ -1042,25 +1049,37 @@ SpecifierTypeRepr_createParsed(BridgedASTContext cContext, BridgedTypeRepr base,
   SourceLoc loc = unbridged(cSpecifierLoc);
   TypeRepr *baseType = unbridged(base);
   switch (specifier) {
-  case BridgedAttributedTypeSpecifierInOut:
-    return bridged(new (context)
-                       OwnershipTypeRepr(baseType, ParamSpecifier::InOut, loc));
-  case BridgedAttributedTypeSpecifierBorrowing:
-    return bridged(new (context) OwnershipTypeRepr(
-        baseType, ParamSpecifier::Borrowing, loc));
-  case BridgedAttributedTypeSpecifierConsuming:
-    return bridged(new (context) OwnershipTypeRepr(
-        baseType, ParamSpecifier::Consuming, loc));
-  case BridgedAttributedTypeSpecifierLegacyShared:
-    return bridged(new (context) OwnershipTypeRepr(
-        baseType, ParamSpecifier::LegacyShared, loc));
-  case BridgedAttributedTypeSpecifierLegacyOwned:
-    return bridged(new (context) OwnershipTypeRepr(
-        baseType, ParamSpecifier::LegacyOwned, loc));
-  case BridgedAttributedTypeSpecifierConst:
+  case BridgedAttributedTypeSpecifierInOut: {
+    auto *OT =
+        new (context) OwnershipTypeRepr(baseType, ParamSpecifier::InOut, loc);
+    return bridged(OT);
+  }
+  case BridgedAttributedTypeSpecifierBorrowing: {
+    auto *OT = new (context)
+        OwnershipTypeRepr(baseType, ParamSpecifier::Borrowing, loc);
+    return bridged(OT);
+  }
+  case BridgedAttributedTypeSpecifierConsuming: {
+    auto *OT = new (context)
+        OwnershipTypeRepr(baseType, ParamSpecifier::Consuming, loc);
+    return bridged(OT);
+  }
+  case BridgedAttributedTypeSpecifierLegacyShared: {
+    auto *OT = new (context)
+        OwnershipTypeRepr(baseType, ParamSpecifier::LegacyShared, loc);
+    return bridged(OT);
+  }
+  case BridgedAttributedTypeSpecifierLegacyOwned: {
+    auto *OT = new (context)
+        OwnershipTypeRepr(baseType, ParamSpecifier::LegacyOwned, loc);
+    return bridged(OT);
+  }
+  case BridgedAttributedTypeSpecifierConst: {
     return bridged(new (context) CompileTimeConstTypeRepr(baseType, loc));
-  case BridgedAttributedTypeSpecifierIsolated:
+  }
+  case BridgedAttributedTypeSpecifierIsolated: {
     return bridged(new (context) IsolatedTypeRepr(baseType, loc));
+  }
   }
 }
 
@@ -1095,8 +1114,9 @@ BridgedTypeRepr TupleTypeRepr_createParsed(BridgedASTContext cContext,
     tupleElements.emplace_back(elementRepr);
   }
 
-  return bridged(TupleTypeRepr::create(context, tupleElements,
-                                       SourceRange{lParen, rParen}));
+  auto *TT = TupleTypeRepr::create(context, tupleElements,
+                                   SourceRange{lParen, rParen});
+  return bridged(TT);
 }
 
 BridgedTypeRepr
@@ -1107,8 +1127,9 @@ MemberTypeRepr_createParsed(BridgedASTContext cContext,
   auto memberComponents =
       unbridgedArrayRef<IdentTypeRepr *>(bridgedMemberComponents);
 
-  return bridged(MemberTypeRepr::create(context, unbridged(baseComponent),
-                                        memberComponents));
+  auto *MT = MemberTypeRepr::create(context, unbridged(baseComponent),
+                                    memberComponents);
+  return bridged(MT);
 }
 
 BridgedTypeRepr CompositionTypeRepr_createEmpty(BridgedASTContext cContext,
@@ -1125,9 +1146,10 @@ CompositionTypeRepr_createParsed(BridgedASTContext cContext,
   ASTContext &context = unbridged(cContext);
   SourceLoc firstAmpLoc = unbridged(cFirstAmpLoc);
   auto types = unbridgedArrayRef<TypeRepr *>(cTypes);
-  return bridged(CompositionTypeRepr::create(
+  auto *CT = CompositionTypeRepr::create(
       context, types, types.front()->getStartLoc(),
-      SourceRange{firstAmpLoc, types.back()->getEndLoc()}));
+      SourceRange{firstAmpLoc, types.back()->getEndLoc()});
+  return bridged(CT);
 }
 
 BridgedTypeRepr FunctionTypeRepr_createParsed(BridgedASTContext cContext,
@@ -1138,33 +1160,37 @@ BridgedTypeRepr FunctionTypeRepr_createParsed(BridgedASTContext cContext,
                                               BridgedSourceLoc cArrowLoc,
                                               BridgedTypeRepr resultType) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) FunctionTypeRepr(
+  auto *FT = new (context) FunctionTypeRepr(
       nullptr, cast<TupleTypeRepr>(unbridged(argsTy)), unbridged(cAsyncLoc),
       unbridged(cThrowsLoc), unbridged(thrownType), unbridged(cArrowLoc),
-      unbridged(resultType)));
+      unbridged(resultType));
+  return bridged(FT);
 }
 
 BridgedTypeRepr
 NamedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
                                        BridgedTypeRepr baseTy) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context)
-                     NamedOpaqueReturnTypeRepr(unbridged(baseTy), nullptr));
+  auto *NR =
+      new (context) NamedOpaqueReturnTypeRepr(unbridged(baseTy), nullptr);
+  return bridged(NR);
 }
 
 BridgedTypeRepr OpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,
                                                   BridgedSourceLoc cOpaqueLoc,
                                                   BridgedTypeRepr baseTy) {
   ASTContext &context = unbridged(cContext);
-  return bridged(new (context) OpaqueReturnTypeRepr(unbridged(cOpaqueLoc),
-                                                    unbridged(baseTy)));
+  auto *OT = new (context)
+      OpaqueReturnTypeRepr(unbridged(cOpaqueLoc), unbridged(baseTy));
+  return bridged(OT);
 }
 BridgedTypeRepr ExistentialTypeRepr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAnyLoc,
                                                  BridgedTypeRepr baseTy) {
   ASTContext &context = unbridged(cContext);
-  return bridged(
-      new (context) ExistentialTypeRepr(unbridged(cAnyLoc), unbridged(baseTy)));
+  auto *ET =
+      new (context) ExistentialTypeRepr(unbridged(cAnyLoc), unbridged(baseTy));
+  return bridged(ET);
 }
 
 BridgedGenericParamList GenericParamList_createParsed(
@@ -1179,10 +1205,11 @@ BridgedGenericParamList GenericParamList_createParsed(
     requirements = genericWhereClause->getRequirements();
   }
 
-  return bridged(GenericParamList::create(
+  auto *GP = GenericParamList::create(
       unbridged(cContext), unbridged(cLeftAngleLoc),
       unbridgedArrayRef<GenericTypeParamDecl *>(cParameters), whereLoc,
-      requirements, unbridged(cRightAngleLoc)));
+      requirements, unbridged(cRightAngleLoc));
+  return bridged(GP);
 }
 
 BridgedGenericTypeParamDecl GenericTypeParamDecl_createParsed(
@@ -1237,17 +1264,19 @@ TrailingWhereClause_createParsed(BridgedASTContext cContext,
     endLoc = requirements.back().getSourceRange().End;
   }
 
-  return bridged(TrailingWhereClause::create(
-      unbridged(cContext), whereKeywordLoc, endLoc, requirements));
+  auto *TW = TrailingWhereClause::create(
+      unbridged(cContext), whereKeywordLoc, endLoc, requirements);
+  return bridged(TW);
 }
 
 BridgedParameterList ParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc) {
   ASTContext &context = unbridged(cContext);
-  return bridged(ParameterList::create(
+  auto *PL = ParameterList::create(
       context, unbridged(cLeftParenLoc),
-      unbridgedArrayRef<ParamDecl *>(cParameters), unbridged(cRightParenLoc)));
+      unbridgedArrayRef<ParamDecl *>(cParameters), unbridged(cRightParenLoc));
+  return bridged(PL);
 }
 
 #pragma clang diagnostic push

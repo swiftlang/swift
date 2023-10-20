@@ -320,7 +320,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: TypeSyntax?) -> BridgedTypeRepr {
     guard let node else {
-      return .init(raw: nil)
+      return BridgedTypeRepr(raw: nil)
     }
 
     return self.generate(node)
@@ -329,7 +329,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: ExprSyntax?) -> BridgedExpr {
     guard let node else {
-      return .init(raw: nil)
+      return BridgedExpr(raw: nil)
     }
 
     return self.generate(node)
@@ -348,7 +348,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: GenericParameterClauseSyntax?) -> BridgedGenericParamList {
     guard let node else {
-      return .init(raw: nil)
+      return BridgedGenericParamList(raw: nil)
     }
 
     return self.generate(node)
@@ -357,7 +357,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause {
     guard let node else {
-      return .init(raw: nil)
+      return BridgedTrailingWhereClause(raw: nil)
     }
 
     return self.generate(node)
@@ -366,7 +366,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList {
     guard let node else {
-      return .init(raw: nil)
+      return BridgedParameterList(raw: nil)
     }
 
     return self.generate(node)
