@@ -38,8 +38,7 @@ static UIdent getUIDForDependencyKind(bool isClangModule) {
 
 class SKIndexDataConsumer : public IndexDataConsumer {
 public:
-  SKIndexDataConsumer(IndexingConsumer &C, IndexSourceOptions Opts)
-      : impl(C), Opts(Opts) {}
+  SKIndexDataConsumer(IndexingConsumer &C) : impl(C) {}
 
 private:
   void failed(StringRef error) override { impl.failed(error); }
@@ -52,8 +51,6 @@ private:
     return Logger::isLoggingEnabledForLevel(Logger::Level::Warning);
   }
 
-  virtual bool indexLocals() override { return Opts.IndexLocals; }
-
   bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     auto kindUID = getUIDForDependencyKind(isClangModule);
     return impl.startDependency(kindUID, name, path, isSystem);
@@ -64,7 +61,7 @@ private:
   }
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
-    if (!indexLocals() && symbol.symInfo.Kind == SymbolKind::Parameter)
+    if (symbol.symInfo.Kind == SymbolKind::Parameter)
       return Skip;
 
     // report any parent relations to this reference
@@ -207,15 +204,13 @@ private:
 
 private:
   IndexingConsumer &impl;
-  IndexSourceOptions Opts;
 };
 
 static void indexModule(llvm::MemoryBuffer *Input,
                         StringRef ModuleName,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
-                        ArrayRef<const char *> Args,
-                        IndexSourceOptions Opts) {
+                        ArrayRef<const char *> Args) {
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<ImplicitSerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
@@ -250,7 +245,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     Mod->setHasResolvedImports();
   }
 
-  SKIndexDataConsumer IdxDataConsumer(IdxConsumer, Opts);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexModule(Mod, IdxDataConsumer);
 }
 
@@ -282,8 +277,7 @@ void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
-                                   ArrayRef<const char *> OrigArgs,
-                                   IndexSourceOptions Opts) {
+                                   ArrayRef<const char *> OrigArgs) {
   std::string Error;
   auto InputBuf =
       ASTMgr->getMemoryBuffer(InputFile, llvm::vfs::getRealFileSystem(), Error);
@@ -339,7 +333,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     }
 
     indexModule(InputBuf.get(), llvm::sys::path::stem(Filename),
-                IdxConsumer, CI, Args, Opts);
+                IdxConsumer, CI, Args);
     return;
   }
 
@@ -371,13 +365,14 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     return;
   }
   
-  SKIndexDataConsumer IdxDataConsumer(IdxConsumer, Opts);
+  SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }
 
 static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
                                        StringRef IndexStorePath,
                                        StringRef IndexUnitOutputPath,
+                                       bool IncludeLocals,
                                        const CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &Opts = Invocation.getFrontendOptions();
@@ -399,7 +394,7 @@ static void emitIndexDataForSourceFile(SourceFile &PrimarySourceFile,
                                !Opts.IndexIgnoreClangModules,
                                Opts.IndexSystemModules,
                                Opts.IndexIgnoreStdlib,
-                               Opts.IndexIncludeLocals,
+                               IncludeLocals,
                                isDebugCompilation,
                                Opts.DisableImplicitModules,
                                Invocation.getTargetTriple(),
@@ -431,8 +426,9 @@ void SwiftLangSupport::indexToStore(
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
       auto &CI = AstUnit->getCompilerInstance();
-      emitIndexDataForSourceFile(
-          SF, Opts.IndexStorePath, Opts.IndexUnitOutputPath, CI);
+      emitIndexDataForSourceFile(SF, Opts.IndexStorePath,
+                                 Opts.IndexUnitOutputPath, Opts.IncludeLocals,
+                                 CI);
       Receiver(RequestResult<IndexStoreInfo>::fromResult(IndexStoreInfo{}));
     }
 

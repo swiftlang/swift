@@ -214,7 +214,7 @@ UID_KEYS = [
     KEY('ExpandedMacroReplacements', 'key.expanded_macro_replacements'),
     KEY('IndexStorePath', 'key.index_store_path'),
     KEY('IndexUnitOutputPath', 'key.index_unit_output_path'),
-    KEY('ShouldIndexLocals', 'key.should_index_locals'),
+    KEY('IncludeLocals', 'key.include_locals'),
 ]
 
 

@@ -163,14 +163,13 @@ that have already been returned.
 ```
 {
     <key.request>:          (UID) <source.request.indexsource>
-    [opt] <key.sourcetext>: (string)         // Source contents.
-    [opt] <key.sourcefile>: (string)         // Absolute path to the file.
-    [opt] <key.compilerargs> [string*]       // Array of zero or more strings for the compiler arguments
-                                             // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
-                                             // these must include the path to that file.
-    [opt] <key.hash>: (string)               // Known hash for the indexed file, used to determine whether
-                                             // the file has changed since the last time it was indexed.
-    [opt] <key.should_index_locals>: (bool)  // If True, the returned index includes both local and global symbols. If False, only global symbols are included. Defaults to False.
+    [opt] <key.sourcetext>: (string)   // Source contents.
+    [opt] <key.sourcefile>: (string)   // Absolute path to the file.
+    [opt] <key.compilerargs> [string*] // Array of zero or more strings for the compiler arguments
+                                       // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                       // these must include the path to that file.
+    [opt] <key.hash>: (string)         // Known hash for the indexed file, used to determine whether
+                                       // the file has changed since the last time it was indexed.
 }
 ```
 

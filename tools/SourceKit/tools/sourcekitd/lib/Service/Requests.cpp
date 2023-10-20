@@ -183,8 +183,7 @@ static SourceKit::Context &getGlobalContext() {
 }
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args,
-                                         IndexSourceOptions Opts);
+                                         ArrayRef<const char *> Args);
 
 static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
@@ -1419,11 +1418,7 @@ static void handleRequestIndex(const RequestDict &Req,
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
 
-    int64_t ShouldIndexLocals = false;
-    Req.getInt64(KeyShouldIndexLocals, ShouldIndexLocals, /*isOptional*/true);
-    IndexSourceOptions Opts{.IndexLocals = ShouldIndexLocals > 0};
-
-    return Rec(indexSource(*PrimaryFilePath, Args, Opts));
+    return Rec(indexSource(*PrimaryFilePath, Args));
   });
 }
 
@@ -1449,6 +1444,10 @@ static void handleRequestIndexToStore(
       Opts.IndexUnitOutputPath = IndexUnitOutputPath->str();
     else
       return Rec(createErrorRequestInvalid("'key.index_unit_output_path' is required"));
+
+    if (auto IncludeLocals = Req.getOptionalInt64(KeyIncludeLocals)) {
+      Opts.IncludeLocals = IncludeLocals.value() > 0;
+    }
 
     SmallVector<const char *, 0> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
@@ -2180,12 +2179,11 @@ public:
 } // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args,
-                                         IndexSourceOptions Opts) {
+                                         ArrayRef<const char *> Args) {
   ResponseBuilder RespBuilder;
   SKIndexingConsumer IdxConsumer(RespBuilder);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.indexSource(Filename, IdxConsumer, Args, Opts);
+  Lang.indexSource(Filename, IdxConsumer, Args);
 
   if (!IdxConsumer.ErrorDescription.empty())
     return createErrorRequestFailed(IdxConsumer.ErrorDescription.c_str());
