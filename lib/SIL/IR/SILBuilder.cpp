@@ -758,3 +758,7 @@ void SILBuilderWithScope::insertAfter(SILInstruction *inst,
     func(builder);
   }
 }
+
+// C++ interop workaround for Ubuntu 22.04 and UBI 9 due to undefined reference in
+// SILBuilder::substituteAnonymousArgs
+template void std::_Construct<SILDebugVariable, SILDebugVariable>(SILDebugVariable *, SILDebugVariable &&);
