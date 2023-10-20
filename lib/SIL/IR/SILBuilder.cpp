@@ -254,6 +254,24 @@ SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   return NewBB;
 }
 
+llvm::Optional<SILDebugVariable>
+SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
+                                    llvm::Optional<SILDebugVariable> Var,
+                                    SILLocation Loc) {
+  if (Var && shouldDropVariable(*Var, Loc))
+    return {};
+  if (!Var || !Var->ArgNo || !Var->Name.empty())
+    return Var;
+
+  auto *VD = Loc.getAsASTNode<VarDecl>();
+  if (VD && !VD->getName().empty())
+    return Var;
+
+  llvm::raw_svector_ostream(Name) << '_' << (Var->ArgNo - 1);
+  Var->Name = Name;
+  return Var;
+}
+
 static bool setAccessToDeinit(BeginAccessInst *beginAccess) {
   // It's possible that AllocBoxToStack could catch some cases that
   // AccessEnforcementSelection does not promote to [static]. Ultimately, this
