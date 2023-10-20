@@ -817,8 +817,8 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   // is passed indirectly. This is good for structs and enums because
   // `decodeNextArgument` is a mutating method, but not for classes because
   // in that case heap object is mutated directly.
-  llvm::Function *fnPtr = nullptr;
   bool usesDispatchThunk = false;
+
   if (auto classDecl = dyn_cast<ClassDecl>(decoderDecl)) {
     auto selfTy = methodTy->getSelfParameter().getSILStorageType(
         IGM.getSILModule(), methodTy, expansionContext);
@@ -841,29 +841,23 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
 
     /// When using library evolution functions have another "dispatch thunk"
     /// so we must use this instead of the decodeFn directly.
-   if (classDecl->hasResilientMetadata()) {
-      if (getMethodDispatch(decodeFn) == swift::MethodDispatch::Class) {
-        fnPtr = IGM.getAddrOfDispatchThunk(SILDeclRef(decodeFn), NotForDefinition);
-        usesDispatchThunk = true;
-      }
-    }
+    usesDispatchThunk =
+        getMethodDispatch(decodeFn) == swift::MethodDispatch::Class &&
+        classDecl->hasResilientMetadata();
   }
-
-  if (!fnPtr) {
-    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-    fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-        /*isDynamicallyReplaceable=*/false);
-  }
-  assert(fnPtr);
 
   FunctionPointer methodPtr;
+
   if (usesDispatchThunk) {
+    auto fnPtr = IGM.getAddrOfDispatchThunk(SILDeclRef(decodeFn), NotForDefinition);
     methodPtr = FunctionPointer::createUnsigned(
         methodTy, fnPtr, signature, /*useSignature=*/true);
   } else {
-    auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    SILFunction *decodeSILFn = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    auto fnPtr = IGM.getAddrOfSILFunction(decodeSILFn, NotForDefinition,
+        /*isDynamicallyReplaceable=*/false);
     methodPtr = FunctionPointer::forDirect(
-        classifyFunctionPointerKind(decodeSIL), fnPtr,
+        classifyFunctionPointerKind(decodeSILFn), fnPtr,
         /*secondaryValue=*/nullptr, signature);
   }
 
