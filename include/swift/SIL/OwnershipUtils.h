@@ -254,6 +254,7 @@ public:
   enum Kind : uint8_t {
     Invalid = 0,
     BeginBorrow,
+    StoreBorrow,
     BeginApply,
     Branch,
     Apply,
@@ -277,6 +278,8 @@ public:
       return Kind::Invalid;
     case SILInstructionKind::BeginBorrowInst:
       return Kind::BeginBorrow;
+    case SILInstructionKind::StoreBorrowInst:
+      return Kind::StoreBorrow;
     case SILInstructionKind::BeginApplyInst:
       return Kind::BeginApply;
     case SILInstructionKind::BranchInst:
@@ -386,6 +389,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::Invalid:
       llvm_unreachable("Using invalid case?!");
     case BorrowingOperandKind::BeginBorrow:
+    case BorrowingOperandKind::StoreBorrow:
     case BorrowingOperandKind::BeginApply:
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
@@ -418,6 +422,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::BeginBorrow:
     case BorrowingOperandKind::Branch:
       return true;
+    case BorrowingOperandKind::StoreBorrow:
     case BorrowingOperandKind::BeginApply:
     case BorrowingOperandKind::Apply:
     case BorrowingOperandKind::TryApply:
@@ -790,7 +795,6 @@ public:
     RefTailAddr,
     OpenExistentialBox,
     ProjectBox,
-    StoreBorrow,
   };
 
 private:
@@ -819,8 +823,6 @@ public:
       return Kind::OpenExistentialBox;
     case SILInstructionKind::ProjectBoxInst:
       return Kind::ProjectBox;
-    case SILInstructionKind::StoreBorrowInst:
-      return Kind::StoreBorrow;
     }
   }
 
@@ -839,8 +841,6 @@ public:
       return Kind::OpenExistentialBox;
     case ValueKind::ProjectBoxInst:
       return Kind::ProjectBox;
-    case ValueKind::StoreBorrowInst:
-      return Kind::StoreBorrow;
     }
   }
 
@@ -897,8 +897,7 @@ struct InteriorPointerOperand {
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
     case InteriorPointerOperandKind::OpenExistentialBox:
-    case InteriorPointerOperandKind::ProjectBox:
-    case InteriorPointerOperandKind::StoreBorrow: {
+    case InteriorPointerOperandKind::ProjectBox: {
       // Ok, we have a valid instruction. Return the relevant operand.
       auto *op =
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
@@ -941,8 +940,6 @@ struct InteriorPointerOperand {
       return cast<OpenExistentialBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::ProjectBox:
       return cast<ProjectBoxInst>(operand->getUser());
-    case InteriorPointerOperandKind::StoreBorrow:
-      return cast<StoreBorrowInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
