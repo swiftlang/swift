@@ -274,10 +274,12 @@ class PluginDiagnosticsEngine {
     // Emit the diagnostic
     var mutableMessage = message
     let diag = mutableMessage.withBridgedString { bridgedMessage in
-      Diagnostic_create(
-        bridgedDiagEngine, bridgedSeverity,
-        bridgedSourceLoc(at: position),
-        bridgedMessage)
+      BridgedDiagnostic(
+        at: bridgedSourceLoc(at: position),
+        message: bridgedMessage,
+        severity: bridgedSeverity,
+        engine: bridgedDiagEngine
+      )
     }
 
     // Emit highlights
@@ -285,7 +287,7 @@ class PluginDiagnosticsEngine {
       guard let (startLoc, endLoc) = bridgedSourceRange(for: highlight) else {
         continue
       }
-      Diagnostic_highlight(diag, startLoc, endLoc)
+      diag.highlight(start: startLoc, end: endLoc)
     }
 
     // Emit changes for a Fix-It.
@@ -295,12 +297,12 @@ class PluginDiagnosticsEngine {
       }
       var newText = change.newText
       newText.withBridgedString { bridgedFixItText in
-        Diagnostic_fixItReplace(
-          diag, startLoc, endLoc, bridgedFixItText)
+        diag.fixItReplace(
+          start: startLoc, end: endLoc, replacement: bridgedFixItText)
       }
     }
 
-    Diagnostic_finish(diag)
+    diag.finish()
   }
 
   /// Emit diagnostics.
@@ -339,7 +341,7 @@ class PluginDiagnosticsEngine {
     guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
-    return SourceLoc_advanced(BridgedSourceLoc(raw: bufferBaseAddress), offset)
+    return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.

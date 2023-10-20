@@ -167,10 +167,9 @@ static TypeAttrKind convertTypeAttrKind(BridgedTypeAttrKind kind) {
   }
 }
 
-BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
+BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc, BridgedString cText,
                                     BridgedDiagnosticSeverity severity,
-                                    BridgedSourceLoc cLoc,
-                                    BridgedString cText) {
+                                    BridgedDiagnosticEngine cDiags) {
   StringRef origText = convertString(cText);
   BridgedDiagnosticImpl::Allocator alloc;
   StringRef text = origText.copy(alloc);

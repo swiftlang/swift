@@ -291,26 +291,32 @@ extern "C" {
 ///
 /// \returns a diagnostic instance that can be extended with additional
 /// information and then must be finished via \c SwiftDiagnostic_finish.
-BridgedDiagnostic Diagnostic_create(BridgedDiagnosticEngine cDiags,
+SWIFT_NAME("BridgedDiagnostic.init(at:message:severity:engine:)")
+BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc, BridgedString cText,
                                     BridgedDiagnosticSeverity severity,
-                                    BridgedSourceLoc cLoc, BridgedString cText);
+                                    BridgedDiagnosticEngine cDiags);
 
 /// Highlight a source range as part of the diagnostic.
+SWIFT_NAME("BridgedDiagnostic.highlight(self:start:end:)")
 void Diagnostic_highlight(BridgedDiagnostic cDiag, BridgedSourceLoc cStartLoc,
                           BridgedSourceLoc cEndLoc);
 
 /// Add a Fix-It to replace a source range as part of the diagnostic.
+SWIFT_NAME("BridgedDiagnostic.fixItReplace(self:start:end:replacement:)")
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
                              BridgedString cReplaceText);
 
 /// Finish the given diagnostic and emit it.
+SWIFT_NAME("BridgedDiagnostic.finish(self:)")
 void Diagnostic_finish(BridgedDiagnostic cDiag);
 
+SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
                                            BridgedString cStr);
 
+SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
 _Bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                     BridgedFeature feature);
 
@@ -339,6 +345,7 @@ SWIFT_NAME("BridgedSequenceExpr.createParsed(_:exprs:)")
 BridgedSequenceExpr SequenceExpr_createParsed(BridgedASTContext cContext,
                                               BridgedArrayRef exprs);
 
+SWIFT_NAME("BridgedSourceLoc.advanced(self:by:)")
 BridgedSourceLoc SourceLoc_advanced(BridgedSourceLoc cLoc, size_t len);
 
 SWIFT_NAME("BridgedTupleExpr.createParsed(_:leftParenLoc:exprs:labels:"
