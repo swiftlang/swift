@@ -4,6 +4,7 @@
 // RUN: %target-clang %t/a.o %t/print.o -o %t/a.out %swift_obj_root/lib/swift/embedded/%target-cpu-apple-macos/libswift_Concurrency.a -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: executable_test
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: VENDOR=apple
