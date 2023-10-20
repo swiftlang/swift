@@ -420,7 +420,7 @@ DECL_ATTR(_section, Section,
 DECL_ATTR(_rawLayout, RawLayout,
   OnStruct | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   146)
-DECL_ATTR(_extern, Extern,
+DECL_ATTR(extern, Extern,
   OnFunc | AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   147)
 SIMPLE_DECL_ATTR(_nonEscapable, NonEscapable,

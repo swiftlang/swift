@@ -2339,7 +2339,7 @@ public:
   }
 };
 
-/// Define the `@_extern` attribute, used to import external declarations in
+/// Define the `@extern` attribute, used to import external declarations in
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
   SourceLoc LParenLoc, RParenLoc;
@@ -2364,7 +2364,7 @@ public:
   const llvm::Optional<StringRef> ModuleName;
 
   /// The declaration name to import
-  /// std::nullopt if the declaration name is not specified with @_extern(c)
+  /// std::nullopt if the declaration name is not specified with @extern(c)
   const llvm::Optional<StringRef> Name;
 
   SourceLoc getLParenLoc() const { return LParenLoc; }

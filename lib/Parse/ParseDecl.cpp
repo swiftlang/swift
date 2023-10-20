@@ -1436,7 +1436,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
                                   SourceLoc AtLoc, SourceLoc Loc) {
   SourceLoc lParenLoc = Tok.getLoc(), rParenLoc;
 
-  // Parse @_extern(<language>, ...)
+  // Parse @extern(<language>, ...)
   if (!consumeIf(tok::l_paren)) {
     diagnose(Loc, diag::attr_expected_lparen, AttrName,
              DeclAttribute::isDeclModifier(DAK_Extern));
@@ -1488,7 +1488,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto kindTok = Tok;
   consumeToken(tok::identifier);
 
-  // Parse @_extern(wasm, module: "x", name: "y") or @_extern(c[, "x"])
+  // Parse @extern(wasm, module: "x", name: "y") or @extern(c[, "x"])
   ExternKind kind;
   llvm::Optional<StringRef> importModuleName, importName;
 

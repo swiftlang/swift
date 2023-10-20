@@ -34,25 +34,25 @@ module c_abi_types {
 
 import c_abi_types
 
-@_extern(c, "swift_roundtrip_void")
+@extern(c, "swift_roundtrip_void")
 func swift_roundtrip_void()
-@_extern(c, "swift_roundtrip_bool")
+@extern(c, "swift_roundtrip_bool")
 func swift_roundtrip_bool(_: Bool) -> Bool
-@_extern(c, "swift_roundtrip_char")
+@extern(c, "swift_roundtrip_char")
 func swift_roundtrip_char(_: CChar) -> CChar
-@_extern(c, "swift_roundtrip_int")
+@extern(c, "swift_roundtrip_int")
 func swift_roundtrip_int(_: CInt) -> CInt
-@_extern(c, "swift_roundtrip_float")
+@extern(c, "swift_roundtrip_float")
 func swift_roundtrip_float(_: CFloat) -> CFloat
-@_extern(c, "swift_roundtrip_double")
+@extern(c, "swift_roundtrip_double")
 func swift_roundtrip_double(_: CDouble) -> CDouble
-@_extern(c, "swift_roundtrip_opaque_ptr")
+@extern(c, "swift_roundtrip_opaque_ptr")
 func swift_roundtrip_opaque_ptr(_: OpaquePointer!) -> OpaquePointer!
-@_extern(c, "swift_roundtrip_void_star")
+@extern(c, "swift_roundtrip_void_star")
 func swift_roundtrip_void_star(_: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer!
-@_extern(c, "swift_roundtrip_c_struct")
+@extern(c, "swift_roundtrip_c_struct")
 func swift_roundtrip_c_struct(_: c_struct) -> c_struct
-@_extern(c, "swift_roundtrip_c_struct_ptr")
+@extern(c, "swift_roundtrip_c_struct_ptr")
 func swift_roundtrip_c_struct_ptr(_: UnsafeMutablePointer<c_struct>!) -> UnsafeMutablePointer<c_struct>!
 
 func test() {
