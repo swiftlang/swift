@@ -1446,7 +1446,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   // The phi operand projections are computed first to give them priority. Then
   // we determine if the phi itself can share storage with one of its users.
   CoalescedPhi coalescedPhi;
-  coalescedPhi.coalesce(phi, pass.valueStorageMap);
+  coalescedPhi.coalesce(phi, pass.valueStorageMap, pass.domInfo);
 
   SmallVector<SILValue, 4> coalescedValues;
   coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
