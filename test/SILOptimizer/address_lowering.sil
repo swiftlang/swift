@@ -60,6 +60,10 @@ struct Pair<T> {
   var y : T
 }
 
+struct Box<T> {
+  var t: T
+}
+
 struct Box2<T, U> {
     var v1: T
     var v2: U
@@ -2708,6 +2712,44 @@ entry:
   end_borrow %lifetime : $T
   dealloc_stack %addr : $*T
   destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_1_two_use_projections : {{.*}} {
+// CHECK:         [[S_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
+// CHECK:         [[S_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S_ADDR]] : $*Box<T>, #Box.t  
+// CHECK:         apply undef<T>([[S_FIELD_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
+// CHECK:       [[RIGHT]]:                                              
+// CHECK:         destroy_addr [[S_ADDR]] : $*Box<T>                      
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[LEFT]]:                                              
+// CHECK:         [[S2_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Box<T>, #Box.t  
+// CHECK:         copy_addr [take] [[S_FIELD_ADDR]] to [init] [[S2_FIELD_ADDR]]
+// CHECK:         destroy_addr [[S2_ADDR]] : $*Box<T>                      
+// CHECK:         br [[EXIT]]                                          
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         dealloc_stack [[S2_ADDR]] : $*Box<T>                     
+// CHECK:         dealloc_stack [[S_ADDR]] : $*Box<T>                     
+// CHECK-LABEL: } // end sil function 'test_struct_1_two_use_projections'
+sil [ossa] @test_struct_1_two_use_projections : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %s2 = struct $Box<T>(%box : $T)
+  destroy_value %s2 : $Box<T>
+  br exit
+
+right:
+  %s = struct $Box<T>(%box : $T)
+  destroy_value %s : $Box<T>
+  br exit
+
+exit:
   %retval = tuple ()
   return %retval : $()
 }

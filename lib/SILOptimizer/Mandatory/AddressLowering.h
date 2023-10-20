@@ -396,8 +396,8 @@ public:
   bool isComposingUseProjection(Operand *oper) const;
 
 #ifndef NDEBUG
-  void dumpProjections(SILValue value);
-  void dump();
+  void dumpProjections(SILValue value) const;
+  void dump() const;
 #endif
 };
 
