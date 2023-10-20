@@ -1474,7 +1474,11 @@ AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResult
 
 FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
-  for (auto result : nominal->lookupDirect(Id_doneRecording)) {
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  nominal->lookupQualified(nominal, DeclNameRef(Id_doneRecording),
+                           SourceLoc(), NL_QualifiedDefault, results);
+  for (auto result : results) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
       continue;
