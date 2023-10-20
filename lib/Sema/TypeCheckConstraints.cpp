@@ -1679,8 +1679,8 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   // Thus, right now, a move-only type is only a subtype of itself.
   // We also want to prevent conversions of a move-only type's metatype.
-  if (fromType->getMetatypeInstanceType()->isNoncopyable()
-      || toType->getMetatypeInstanceType()->isNoncopyable())
+  if (fromType->getMetatypeInstanceType()->isNoncopyable(dc)
+      || toType->getMetatypeInstanceType()->isNoncopyable(dc))
     return CheckedCastKind::Unresolved;
   
   // Check for a bridging conversion.

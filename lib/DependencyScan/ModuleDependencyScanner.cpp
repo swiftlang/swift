@@ -529,7 +529,7 @@ ModuleDependencyScanner::resolveDirectModuleDependencies(
   cache.resolveDependencyImports(moduleID, directDependencies.getArrayRef());
   // Resolve the dependency info with Swift overlay dependency information.
   if (!swiftOverlayDependencies.empty())
-    cache.setSwiftOverlayDependencues(moduleID,
+    cache.setSwiftOverlayDependencies(moduleID,
                                       swiftOverlayDependencies.getArrayRef());
 
   ModuleDependencyIDSetVector result = directDependencies;

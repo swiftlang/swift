@@ -24,7 +24,7 @@ add_dependencies(compiler CxxStdlib-apinotes)
 # is built with a different (older) version of the compiler. To workaround this,
 # declare the Darwin overlay as a dependency of CxxStdlib.
 set(swift_cxxstdlib_darwin_dependencies)
-if(SWIFT_BUILD_STDLIB AND (SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES))
+if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
   set(swift_cxxstdlib_darwin_dependencies Darwin)
 endif()
 

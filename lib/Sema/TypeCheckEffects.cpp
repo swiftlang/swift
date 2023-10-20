@@ -616,6 +616,27 @@ static void simple_display(llvm::raw_ostream &out, ConditionalEffectKind kind) {
   llvm_unreachable("Bad conditional effect kind");
 }
 
+/// Remove the type erasure to an existential error, to extract the
+/// underlying error.
+static Expr *removeErasureToExistentialError(Expr *expr) {
+  Type type = expr->getType();
+  if (!type)
+    return expr;
+
+  ASTContext &ctx = type->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::FullTypedThrows) ||
+      !ctx.LangOpts.hasFeature(Feature::TypedThrows))
+    return expr;
+
+  // Look for an outer erasure expression.
+  if (auto erasure = dyn_cast<ErasureExpr>(expr)) {
+    if (type->isEqual(ctx.getErrorExistentialType()))
+      return erasure->getSubExpr();
+  }
+
+  return expr;
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -988,6 +1009,10 @@ public:
     Expr *thrownValue = S->getSubExpr();
     if (!thrownValue)
       return Classification::forInvalidCode();
+
+    // If we are doing full typed throws, look through an existential
+    // conversion to find the underlying type.
+    thrownValue = removeErasureToExistentialError(thrownValue);
 
     Type thrownType = thrownValue->getType();
     if (!thrownType)
@@ -2893,6 +2918,18 @@ private:
 
       if (!CurContext.handlesThrows(ConditionalEffectKind::Always))
         CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
+      else {
+        SourceLoc loc = S->getThrowLoc();
+        Expr *thrownValue = S->getSubExpr();
+        Type thrownErrorType = thrownValue->getType();
+        Type caughtErrorType = getCaughtErrorTypeAt(loc);
+        if (!caughtErrorType->isEqual(thrownErrorType)) {
+          thrownValue = removeErasureToExistentialError(thrownValue);
+          Type thrownErrorType = thrownValue->getType();
+          if (!checkThrownErrorType(loc, thrownErrorType))
+            S->setSubExpr(thrownValue);
+        }
+      }
     }
 
     return ShouldRecurse;
@@ -2978,16 +3015,19 @@ private:
 
   /// Check the thrown error type against the type that can be caught or
   /// rethrown by the context.
-  void checkThrownErrorType(SourceLoc loc, Type thrownErrorType) {
+  ///
+  /// Returns \c true if an error occurred, false otherwise.
+  bool checkThrownErrorType(SourceLoc loc, Type thrownErrorType) {
     Type caughtErrorType = getCaughtErrorTypeAt(loc);
     if (caughtErrorType->isEqual(thrownErrorType))
-      return;
+      return false ;
 
     OpaqueValueExpr *opaque = new (Ctx) OpaqueValueExpr(loc, thrownErrorType);
     Expr *rethrowExpr = opaque;
-    TypeChecker::typeCheckExpression(
+    Type resultType = TypeChecker::typeCheckExpression(
         rethrowExpr, CurContext.getDeclContext(),
         {caughtErrorType, /*FIXME:*/CTP_ThrowStmt});
+    return resultType.isNull();
   }
 
   ShouldRecurse_t checkAwait(AwaitExpr *E) {

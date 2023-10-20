@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypedThrows
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TypedThrows -enable-upcoming-feature FullTypedThrows
 
 enum MyError: Error {
 case failed
@@ -15,16 +15,23 @@ func processMyError(_: MyError) { }
 func doSomething() throws(MyError) { }
 func doHomework() throws(HomeworkError) { }
 
-func testDoCatchErrorTyped() {
-  #if false
-  // FIXME: Deal with throws directly in the do...catch blocks.
+func testDoCatchErrorTyped(cond: Bool) {
   do {
     throw MyError.failed
   } catch {
     assert(error == .failed)
     processMyError(error)
   }
-  #endif
+
+  do {
+    if cond {
+      throw MyError.failed
+    } else {
+      throw HomeworkError.dogAteIt
+    }
+  } catch {
+    processMyError(error) // expected-error{{cannot convert value of type 'any Error' to expected argument type 'MyError'}}
+  }
 
   // Throwing a typed error in a do...catch catches the error with that type.
   do {

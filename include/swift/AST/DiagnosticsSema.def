@@ -2392,6 +2392,10 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 is not invertible", (Type))
+ERROR(inverse_duplicate,none,
+      "duplicate inverse constraint", ())
+NOTE(inverse_duplicate_previous,none,
+      "previous inverse constraint here", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -6084,6 +6088,8 @@ NOTE(not_objc_error_protocol_composition,none,
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())
+NOTE(not_objc_non_trivial_cxx_class,none,
+     "non-trivial C++ classes cannot be represented in Objective-C", ())
 NOTE(not_objc_tuple,none,
       "tuples cannot be represented in Objective-C", ())
 NOTE(not_objc_swift_class,none,
@@ -7445,6 +7451,28 @@ ERROR(accessor_macro_not_single_var, none,
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(noncopyable_class, none,
+      "classes cannot be noncopyable",
+      ())
+ERROR(noncopyable_type_member_in_copyable,none,
+      "%select{stored property %2|associated value %2}1 of "
+      "'Copyable'-conforming %kind3 has noncopyable type %0",
+      (Type, bool, DeclName, const ValueDecl *))
+NOTE(add_inverse_for_containment,none,
+     "consider removing implicit '%1' conformance from %kind0",
+     (const ValueDecl *, StringRef))
+NOTE(remove_inverse_on_generic_parameter_for_conformance,none,
+     "consider removing '~%1' from generic parameter %0 so it conforms to the '%1' protocol",
+     (Type, StringRef))
+NOTE(remove_inverse_on_nominal_for_conformance,none,
+     "consider removing '~%1' from %kind0 so it conforms to the '%1' protocol",
+     (const ValueDecl *, StringRef))
+NOTE(add_explicit_protocol_for_conformance,none,
+     "consider making %kind0 explicitly conform to the '%1' protocol",
+     (const ValueDecl *, StringRef))
+
+// -- older ones below --
+
 ERROR(noncopyable_within_copyable, none,
       "%kind0 cannot contain a noncopyable type without also being noncopyable",
       (const ValueDecl *))
@@ -7460,11 +7488,6 @@ ERROR(noncopyable_parameter_subscript_unsupported, none,
       "subscripts cannot have noncopyable parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
-ERROR(ownership_specifier_copyable,none,
-      "copyable types cannot be 'consuming' or 'borrowing' yet", ())
-ERROR(self_ownership_specifier_copyable,none,
-      "%0 is not yet valid on %1s of a copyable type",
-      (SelfAccessKind, DescriptiveDeclKind))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
 ERROR(noncopyable_generics, none,
@@ -7538,6 +7561,9 @@ ERROR(noncopyable_types_cannot_be_resilient, none,
 ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
+
+ERROR(nonescapable_types_attr_disabled,none,
+      "attribute requires '-enable-experimental-feature NonEscapableTypes'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Init accessors

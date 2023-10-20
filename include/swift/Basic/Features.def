@@ -118,6 +118,7 @@ UPCOMING_FEATURE(ExistentialAny, 335, 6)
 UPCOMING_FEATURE(ImportObjcForwardDeclarations, 384, 6)
 UPCOMING_FEATURE(DisableOutwardActorInference, 401, 6)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 6)
+UPCOMING_FEATURE(FullTypedThrows, 410, 6)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
@@ -148,7 +149,6 @@ EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(TypeWitnessSystemInference, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
-EXPERIMENTAL_FEATURE(ModuleInterfaceExportAs, true)
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Whether to enable experimental layout string value witnesses
@@ -251,6 +251,10 @@ EXPERIMENTAL_FEATURE(TypedThrows, true)
 
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
+
+/// Enable non-escapable type attributes and function attributes that support
+/// lifetime-dependent results.
+EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

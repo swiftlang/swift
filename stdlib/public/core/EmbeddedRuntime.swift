@@ -131,7 +131,9 @@ public func swift_isUniquelyReferenced_nonNull_native(object: UnsafeMutablePoint
 
 @_silgen_name("swift_retain")
 public func swift_retain(object: Builtin.RawPointer) -> Builtin.RawPointer {
-  return swift_retain_n(object: object, n: 1)
+  if Int(Builtin.ptrtoint_Word(object)) == 0 { return object }
+  let o = UnsafeMutablePointer<HeapObject>(object)
+  return swift_retain_n_(object: o, n: 1)._rawValue
 }
 
 // Cannot use UnsafeMutablePointer<HeapObject>? directly in the function argument or return value as it causes IRGen crashes
@@ -155,7 +157,9 @@ func swift_retain_n_(object: UnsafeMutablePointer<HeapObject>, n: UInt32) -> Uns
 
 @_silgen_name("swift_release")
 public func swift_release(object: Builtin.RawPointer) {
-  swift_release_n(object: object, n: 1)
+  if Int(Builtin.ptrtoint_Word(object)) == 0 { return }
+  let o = UnsafeMutablePointer<HeapObject>(object)
+  swift_release_n_(object: o, n: 1)
 }
 
 @_silgen_name("swift_release_n")

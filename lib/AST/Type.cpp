@@ -157,22 +157,63 @@ bool TypeBase::isMarkerExistential() {
   return true;
 }
 
-bool TypeBase::isNoncopyable() {
-  if (auto *nom = getAnyNominal())
-    return nom->isMoveOnly();
+/// Returns true if this type is _always_ Copyable using the legacy check
+/// that does not rely on conformances.
+static bool alwaysNoncopyable(Type ty) {
+  if (auto *nominal = ty->getNominalOrBoundGenericNominal())
+    return nominal->isNoncopyable();
 
-  if (auto *expansion = getAs<PackExpansionType>()) {
-    return expansion->getPatternType()->isNoncopyable();
+  if (auto *expansion = ty->getAs<PackExpansionType>()) {
+    return alwaysNoncopyable(expansion->getPatternType());
   }
 
   // if any components of the tuple are move-only, then the tuple is move-only.
-  if (auto *tupl = getCanonicalType()->getAs<TupleType>()) {
+  if (auto *tupl = ty->getCanonicalType()->getAs<TupleType>()) {
     for (auto eltTy : tupl->getElementTypes())
-      if (eltTy->isNoncopyable())
+      if (alwaysNoncopyable(eltTy))
         return true;
   }
 
-  return false;
+  return false; // otherwise, the conservative assumption is it's copyable.
+}
+
+/// \returns true iff this type lacks conformance to Copyable, using the given
+/// context to substitute unbound types.
+bool TypeBase::isNoncopyable(const DeclContext *dc) {
+  assert(dc);
+  auto &ctx = dc->getASTContext();
+
+  // Fast-path for type parameters; ask the generic signature directly.
+  if (isTypeParameter() &&
+      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    auto canType = getCanonicalType();
+
+    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
+    if (!copyable)
+      llvm_unreachable("missing Copyable protocol!");
+
+    auto sig = dc->getGenericSignatureOfContext();
+    return !sig->requiresProtocol(canType, copyable);
+  }
+
+  if (!hasArchetype() || hasOpenedExistential())
+    if (auto env = dc->getGenericEnvironmentOfContext())
+      return GenericEnvironment::mapTypeIntoContext(env, this)->isNoncopyable();
+
+  return isNoncopyable();
+}
+
+/// \returns true iff this type lacks conformance to Copyable.
+bool TypeBase::isNoncopyable() {
+  auto canType = getCanonicalType();
+  auto &ctx = canType->getASTContext();
+
+  // for legacy-mode queries that are not dependent on conformances to Copyable
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return alwaysNoncopyable(canType);
+
+  IsNoncopyableRequest request{canType};
+  return evaluateOrDefault(ctx.evaluator, request, /*default=*/true);
 }
 
 bool TypeBase::isPlaceholder() {
@@ -469,6 +510,14 @@ bool TypeBase::isDistributedActor() {
   if (auto actor = getAnyActor())
     return actor->isDistributedActor();
   return false;
+}
+
+llvm::Optional<KnownProtocolKind> TypeBase::getKnownProtocol() {
+  if (auto protoTy = this->getAs<ProtocolType>())
+    if (auto protoDecl = protoTy->getDecl())
+      return protoDecl->getKnownProtocolKind();
+
+  return llvm::None;
 }
 
 bool TypeBase::isSpecialized() {
@@ -3096,6 +3145,17 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
     case ForeignLanguage::ObjectiveC:
       if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+        // Non-trivial C++ classes and structures are not
+        // supported by @objc attribute, even though they can
+        // be represented in Objective-C++.
+        if (auto *cxxRec = dyn_cast_or_null<clang::CXXRecordDecl>(
+                nominal->getClangDecl())) {
+          if (cxxRec->hasNonTrivialCopyConstructor() ||
+              cxxRec->hasNonTrivialMoveConstructor() ||
+              cxxRec->hasNonTrivialDestructor())
+            return failure();
+        }
+
         // Optional structs are not representable in (Objective-)C if they
         // originally came from C, whether or not they are bridged, unless they
         // came from swift_newtype. If they are defined in Swift, they are only

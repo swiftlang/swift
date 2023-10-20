@@ -53,3 +53,7 @@ module Y {
     header "Y_Private.h"
   }
 }
+module ClangModuleWithOverlayedDep {
+  header "ClangModuleWithOverlayedDep.h"
+  export *
+}

@@ -1044,6 +1044,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  IsRuntimeAccessible_t *isRuntimeAccessible,
                                  ForceEnableLexicalLifetimes_t *forceEnableLexicalLifetimes,
                                  UseStackForPackMetadata_t *useStackForPackMetadata,
+                                 bool *hasUnsafeNonEscapableResult,
                                  IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  SILFunction **usedAdHocRequirementWitness,
@@ -1089,6 +1090,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *forceEnableLexicalLifetimes = DoForceEnableLexicalLifetimes;
     else if (useStackForPackMetadata &&
              SP.P.Tok.getText() == "no_onstack_pack_metadata")
+      *useStackForPackMetadata = DoNotUseStackForPackMetadata;
+    else if (hasUnsafeNonEscapableResult &&
+             SP.P.Tok.getText() == "unsafe_nonescapable_result")
       *useStackForPackMetadata = DoNotUseStackForPackMetadata;
     else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
       *isExactSelfClass = IsExactSelfClass;
@@ -7201,6 +7205,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes =
       DoNotForceEnableLexicalLifetimes;
   UseStackForPackMetadata_t useStackForPackMetadata = DoUseStackForPackMetadata;
+  bool hasUnsafeNonEscapableResult = false;
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
@@ -7226,6 +7231,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isDistributed, &isRuntimeAccessible,
           &forceEnableLexicalLifetimes, &useStackForPackMetadata,
+          &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr, &markedAsUsed,
@@ -7266,6 +7272,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setForceEnableLexicalLifetimes(
         forceEnableLexicalLifetimes);
     FunctionState.F->setUseStackForPackMetadata(useStackForPackMetadata);
+    FunctionState.F->setHasUnsafeNonEscapableResult(
+      hasUnsafeNonEscapableResult);
     FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
@@ -7477,9 +7485,9 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, &isLet, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, &isLet, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           State, M) ||
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7531,7 +7539,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           SP, M))
+                           nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7601,7 +7609,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           VTableState, M))
+                           nullptr, VTableState, M))
     return true;
 
   // Parse the class name.
@@ -7712,7 +7720,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           moveOnlyDeinitTableState, M))
+                           nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8199,7 +8207,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           WitnessState, M))
+                           nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.

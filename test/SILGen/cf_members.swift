@@ -124,10 +124,8 @@ public func foo(_ x: Double) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]
   // CHECK: store [[ZVAL]] to [trivial] [[ZTMP:%.*]] :
-  // CHECK: [[ZVAL_2:%.*]] = load [trivial] [[ZTMP]]
-  // CHECK: store [[ZVAL_2]] to [trivial] [[ZTMP_2:%.*]] :
   // CHECK: [[GET:%.*]] = function_ref @IAMStruct1GetRadius : $@convention(c) (@in Struct1) -> Double
-  // CHECK: apply [[GET]]([[ZTMP_2]])
+  // CHECK: apply [[GET]]([[ZTMP]])
   _ = z.radius
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[Z]] : $*Struct1
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[READ]]

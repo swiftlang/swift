@@ -100,6 +100,7 @@ class ProtocolConformance;
 enum PointerTypeKind : unsigned;
 struct ValueOwnershipKind;
 class ErrorExpr;
+enum class KnownProtocolKind : uint8_t;
 
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 
@@ -636,8 +637,11 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this is a noncopyable type.
+  /// DEPRECIATED: Returns true if this is a noncopyable type.
   bool isNoncopyable();
+
+  /// Returns true if this type lacks conformance to Copyable in the context.
+  bool isNoncopyable(const DeclContext *dc);
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -927,6 +931,9 @@ public:
     BufferPointerTypeKind Ignore;
     return getAnyBufferPointerElementType(Ignore);
   }
+
+  /// If this type is a known protocol, return its kind.
+  llvm::Optional<KnownProtocolKind> getKnownProtocol();
 
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
@@ -7332,6 +7339,10 @@ inline Type TypeBase::getNominalParent() {
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
+
+//inline TypeDecl *TypeBase::getAnyTypeDecl() {
+//  return getCanonicalType().getAnyTypeDecl();
+//}
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))

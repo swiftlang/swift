@@ -1,3 +1,9 @@
+if(SWIFT_BUILD_SDK_OVERLAY)
+set(swift_private_thread_extras_darwin_depencencies Darwin)
+else()
+set(swift_private_thread_extras_darwin_depencencies)
+endif()
+
 add_swift_target_library(swiftSwiftPrivateThreadExtras ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
@@ -6,11 +12,11 @@ add_swift_target_library(swiftSwiftPrivateThreadExtras ${SWIFT_STDLIB_LIBRARY_BU
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin
-  SWIFT_MODULE_DEPENDS_OSX Darwin
-  SWIFT_MODULE_DEPENDS_TVOS Darwin
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-  SWIFT_MODULE_DEPENDS_MACCATALYST Darwin
+  SWIFT_MODULE_DEPENDS_IOS ${swift_private_thread_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_private_thread_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_private_thread_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_private_thread_extras_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_MACCATALYST ${swift_private_thread_extras_darwin_depencencies}
   SWIFT_MODULE_DEPENDS_FREESTANDING "${SWIFT_FREESTANDING_TEST_DEPENDENCIES}"
   SWIFT_MODULE_DEPENDS_LINUX Glibc
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc

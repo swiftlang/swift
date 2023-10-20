@@ -356,6 +356,10 @@ ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
       "cannot use a value of protocol type in embedded Swift", ())
+ERROR(embedded_swift_metatype_type,none,
+      "cannot use metatype of type %0 in embedded Swift", (Type))
+ERROR(embedded_swift_metatype,none,
+      "cannot use metatype in embedded Swift", ())
 NOTE(performance_called_from,none,
       "called from here", ())
 

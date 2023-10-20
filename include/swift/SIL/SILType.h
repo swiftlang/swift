@@ -881,6 +881,10 @@ public:
   ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
                                             ProtocolDecl *protocol) const;
 
+  /// False if SILValues of this type cannot be used outside the scope of their
+  /// lifetime dependence.
+  bool isEscapable() const;
+
   //
   // Accessors for types used in SIL instructions:
   //

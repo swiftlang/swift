@@ -140,6 +140,10 @@ bool BridgedType::isMoveOnly() const {
   return get().isMoveOnly();
 }
 
+bool BridgedType::isEscapable() const {
+  return get().isEscapable();
+}
+
 bool BridgedType::isOrContainsObjectiveCClass() const {
   return get().isOrContainsObjectiveCClass();
 }
@@ -492,6 +496,10 @@ bool BridgedFunction::isGenericFunction() const {
 
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
   return getFunction()->hasSemanticsAttr(attrName.get());
+}
+
+bool BridgedFunction::hasUnsafeNonEscapableResult() const {
+  return getFunction()->hasUnsafeNonEscapableResult();
 }
 
 BridgedFunction::EffectsKind BridgedFunction::getEffectAttribute() const {

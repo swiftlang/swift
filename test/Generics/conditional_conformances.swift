@@ -355,7 +355,7 @@ func existential_good<T: P1>(_: T.Type) {
 }
 
 func existential_bad<T>(_: T.Type) {
-  _ = Free<T>() as P2 // expected-error{{protocol 'P2' requires that 'T' conform to 'P1'}}
+  _ = Free<T>() as P2 // expected-error{{generic struct 'Free' requires that 'T' conform to 'P1'}}
 }
 
 // rdar://problem/35837054

@@ -117,7 +117,7 @@ split_embedded_sources(
     NORMAL NFD.swift
   EMBEDDED ObjectIdentifier.swift
   EMBEDDED Optional.swift
-    NORMAL OptionSet.swift
+  EMBEDDED OptionSet.swift
     NORMAL OutputStream.swift
   EMBEDDED Pointer.swift
   EMBEDDED Policy.swift
@@ -140,7 +140,7 @@ split_embedded_sources(
   EMBEDDED Sequence.swift
   EMBEDDED SequenceAlgorithms.swift
     NORMAL Set.swift
-    NORMAL SetAlgebra.swift
+  EMBEDDED SetAlgebra.swift
     NORMAL SetAnyHashableExtensions.swift
     NORMAL SetBridging.swift
     NORMAL SetBuilder.swift

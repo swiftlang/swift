@@ -434,6 +434,10 @@ private:
   /// from running with pack metadata markers in place.
   unsigned UseStackForPackMetadata : 1;
 
+  /// If true, the function returns a non-escapable value without any
+  /// lifetime-dependence on an argument.
+  unsigned HasUnsafeNonEscapableResult : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -714,6 +718,14 @@ public:
 
   void setUseStackForPackMetadata(UseStackForPackMetadata_t value) {
     UseStackForPackMetadata = value;
+  }
+
+  bool hasUnsafeNonEscapableResult() const {
+    return HasUnsafeNonEscapableResult;
+  }
+
+  void setHasUnsafeNonEscapableResult(bool value) {
+    HasUnsafeNonEscapableResult = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type

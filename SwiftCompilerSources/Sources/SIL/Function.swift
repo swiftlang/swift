@@ -116,6 +116,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  public var hasUnsafeNonEscapableResult: Bool {
+    return bridged.hasUnsafeNonEscapableResult()
+  }
+
   /// True if the callee function is annotated with @_semantics("programtermination_point").
   /// This means that the function terminates the program.
   public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }

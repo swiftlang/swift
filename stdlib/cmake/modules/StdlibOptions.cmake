@@ -95,6 +95,10 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
+option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
+        "Emit api descriptors for the standard library"
+        FALSE)
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")

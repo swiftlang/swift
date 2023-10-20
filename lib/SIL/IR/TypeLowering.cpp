@@ -2403,7 +2403,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->isMoveOnly()) {
+      if (D->isNoncopyable()) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2411,7 +2411,9 @@ namespace {
         return new (TC) MoveOnlyLoadableStructTypeLowering(
             structType, properties, Expansion);
       }
-
+      if (!D->isEscapable()) {
+        properties.setNonTrivial();
+      }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
     }
@@ -2485,7 +2487,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->isMoveOnly()) {
+      if (D->isNoncopyable()) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
