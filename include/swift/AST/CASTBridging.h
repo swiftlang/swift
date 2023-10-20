@@ -154,6 +154,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_noDerivative,
   BridgedTypeAttrKind_async,
   BridgedTypeAttrKind_Sendable,
+  BridgedTypeAttrKind_retroactive,
   BridgedTypeAttrKind_unchecked,
   BridgedTypeAttrKind__local,
   BridgedTypeAttrKind__noMetadata,

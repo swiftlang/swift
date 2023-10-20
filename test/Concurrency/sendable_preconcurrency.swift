@@ -41,7 +41,7 @@ func testA(ns: NS, mt: MyType, mt2: MyType2, mt3: MyType3, sc: StrictClass, nsc:
   }
 }
 
-extension NonStrictStruct: @unchecked Sendable { }
+extension NonStrictStruct: @retroactive @unchecked Swift.Sendable { }
 
 class StrictSubclass: StrictClass {
   override func send(_ body: () -> ()) {}

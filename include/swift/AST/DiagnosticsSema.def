@@ -2454,6 +2454,23 @@ NOTE(invalid_extension_rewrite,none,
 ERROR(synthesized_nominal_extension,none,
       "cannot extend synthesized type %0", (Type))
 
+ERROR(retroactive_not_in_extension_inheritance_clause,none,
+      "'retroactive' attribute only applies in inheritance clauses in "
+      "extensions", ())
+
+ERROR(retroactive_attr_does_not_apply,none,
+      "'retroactive' attribute does not apply; %0 is declared in this module",
+      (Identifier))
+
+WARNING(extension_retroactive_conformance,none,
+       "extension declares a conformance of imported type %0 to imported "
+       "%select{protocols|protocol}1 %2; this will not behave correctly if "
+       "the owners of %3 introduce this conformance in the future",
+       (Identifier, bool, StringRef, Identifier))
+
+NOTE(extension_retroactive_conformance_silence,none,
+     "add '@retroactive' to silence this warning", ())
+
 // Protocols
 ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))

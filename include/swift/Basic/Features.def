@@ -111,6 +111,7 @@ LANGUAGE_FEATURE(MoveOnlyResilientTypes, 390, "non-@frozen noncopyable types wit
 LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations", true)
 LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)

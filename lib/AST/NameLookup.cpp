@@ -3664,7 +3664,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   auto inheritedTypes = InheritedTypes(decl);
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
-    uncheckedLoc = typeRepr->findUncheckedAttrLoc();
+    uncheckedLoc = typeRepr->findAttrLoc(TAK_unchecked);
   }
 
   // Form the result.

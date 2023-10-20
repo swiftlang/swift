@@ -2579,6 +2579,9 @@ void PrintAST::printInherited(const Decl *decl) {
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
     if (inherited.isUnchecked)
       Printer << "@unchecked ";
+    if (inherited.isRetroactive &&
+        !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
+      Printer << "@retroactive ";
 
     printTypeLoc(inherited);
   }, [&]() {
@@ -3049,6 +3052,18 @@ static bool usesFeatureGlobalActors(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureRetroactiveAttribute(Decl *decl) {
+  auto ext = dyn_cast<ExtensionDecl>(decl);
+  if (!ext)
+    return false;
+
+  ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
+  return std::find_if(entries.begin(), entries.end(), 
+    [](const InheritedEntry &entry) {
+      return entry.isRetroactive;
+    }) != entries.end();
+}
+
 static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
   auto typeMatches = [kind](Type type) {
     return type.findIf([&](Type type) {
@@ -3474,6 +3489,14 @@ suppressingFeatureNoAsyncAvailability(PrintOptions &options,
                                       llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<PrintOptions> originalOptions(options);
   options.SuppressNoAsyncAvailabilityAttr = true;
+  action();
+}
+
+static void suppressingFeatureRetroactiveAttribute(
+  PrintOptions &options,
+  llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
+  options.ExcludeAttrList.push_back(TAK_retroactive);
   action();
 }
 
@@ -7894,7 +7917,8 @@ swift::getInheritedForPrinting(
     }
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked});
+                       isUnchecked,
+                       /*isRetroactive=*/false});
   }
 }
 

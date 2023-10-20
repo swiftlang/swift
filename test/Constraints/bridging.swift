@@ -15,7 +15,7 @@ public class BridgedClassSub : BridgedClass { }
 
 // Attempt to bridge to a type from another module. We only allow this for a
 // few specific types, like String.
-extension LazyFilterSequence.Iterator : _ObjectiveCBridgeable { // expected-error{{conformance of 'Iterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
+extension LazyFilterSequence.Iterator : @retroactive _ObjectiveCBridgeable { // expected-error{{conformance of 'Iterator' to '_ObjectiveCBridgeable' can only be written in module 'Swift'}}
   public typealias _ObjectiveCType = BridgedClassSub
 
   public func _bridgeToObjectiveC() -> _ObjectiveCType {

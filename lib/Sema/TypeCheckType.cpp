@@ -3256,6 +3256,24 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     attrs.clearAttribute(TAK_unchecked);
   }
 
+  if (attrs.has(TAK_retroactive)) {
+    ty = resolveType(repr, options);
+    if (!ty || ty->hasError()) return ty;
+
+    SourceLoc loc = attrs.getLoc(TAK_retroactive);
+
+    auto extension = dyn_cast_or_null<ExtensionDecl>(getDeclContext());
+    bool isInInheritanceClause = options.is(TypeResolverContext::Inherited);
+    if (!isInInheritanceClause || !extension) {
+      diagnoseInvalid(repr, loc,
+                      diag::retroactive_not_in_extension_inheritance_clause)
+          .fixItRemove(getTypeAttrRangeWithAt(getASTContext(), loc));
+      ty = ErrorType::get(getASTContext());
+    }
+    
+    attrs.clearAttribute(TAK_retroactive);
+  }
+
   if (attrs.has(TAK_opened)) {
     ty = resolveOpenedExistentialArchetype(attrs, repr, options);
   } else if (attrs.has(TAK_pack_element)) {

@@ -3149,7 +3149,8 @@ class DeclDeserializer {
         continue;
       }
       inheritedTypes.push_back(
-          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked));
+          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
+                         /*isRetroactive=*/false));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);

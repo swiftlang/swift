@@ -2927,6 +2927,23 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   return *(declaringModuleAndBystander = {nullptr, Identifier()});
 }
 
+bool ModuleDecl::isClangOverlayOf(ModuleDecl *potentialUnderlying) {
+  return getUnderlyingModuleIfOverlay() == potentialUnderlying;
+}
+
+bool ModuleDecl::isSameModuleLookingThroughOverlays(
+  ModuleDecl *other) {
+  if (this == other) {
+    return true;
+  }
+
+  if (this->isClangOverlayOf(other) || other->isClangOverlayOf(this)) {
+    return true;
+  }
+
+  return false;
+}
+
 bool ModuleDecl::isCrossImportOverlayOf(ModuleDecl *other) {
   ModuleDecl *current = this;
   ModuleDecl *otherClang = other->getUnderlyingModuleIfOverlay();

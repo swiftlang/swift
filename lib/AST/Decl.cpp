@@ -1558,8 +1558,10 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     : TypeLoc(typeLoc), isUnchecked(false) {
-  if (auto typeRepr = typeLoc.getTypeRepr())
-    isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    isUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
+    isRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
+  }
 }
 
 InheritedTypes::InheritedTypes(
