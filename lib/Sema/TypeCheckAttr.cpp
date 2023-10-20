@@ -2123,6 +2123,10 @@ static bool isCCompatibleFuncDecl(FuncDecl *FD) {
 }
 
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Extern)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
+    return;
+  }
   // Only top-level func or static func decls are currently supported.
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {

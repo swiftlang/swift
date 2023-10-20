@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-ir -module-name Extern | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -enable-experimental-feature Extern -module-name Extern | %FileCheck %s
 
 // CHECK: declare void @import1() [[EA1:#[0-9]+]]
 @_extern(c)

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-ir -module-name Extern | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-experimental-feature Extern -emit-ir -module-name Extern | %FileCheck %s
 
 // CHECK: declare {{.*}} void @"$s6Extern7import1yyF"() [[EA1:#[0-9]+]]
 @_extern(wasm, module: "m0", name: "import1")

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-ir %t/extern_c.swift -I%t | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s
 
 //--- c_abi_types.h
 #include <stdbool.h>

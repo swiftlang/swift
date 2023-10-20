@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
 
 @_extern(wasm, module: "m1", name: "f1")
 func f1(x: Int) -> Int

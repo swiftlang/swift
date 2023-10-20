@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %s | %FileCheck %s
 
 func test() {
   // CHECK: call void @explicit_extern_c()

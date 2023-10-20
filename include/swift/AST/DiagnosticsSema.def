@@ -1872,6 +1872,8 @@ ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
 // @_extern
+ERROR(attr_extern_experimental,none,
+      "@_extern requires '-enable-experimental-feature Extern'", ())
 ERROR(extern_not_at_top_level_func,none,
       "@_extern attribute can only be applied to global functions", ())
 ERROR(extern_empty_c_name,none,

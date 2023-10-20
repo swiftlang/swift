@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-feature Extern %s | %FileCheck %s
 
 // CHECK-DAG: sil hidden_external @my_c_name : $@convention(c) (Int) -> Int
 @_extern(c, "my_c_name")
