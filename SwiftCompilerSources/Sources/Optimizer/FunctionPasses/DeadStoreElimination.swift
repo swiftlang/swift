@@ -53,6 +53,10 @@ import SIL
 let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
   (function: Function, context: FunctionPassContext) in
 
+  // Avoid quadratic complexity by limiting the number of visited instructions.
+  // This limit is sufficient for most "real-world" functions, by far.
+  var complexityBudget = 10_000
+
   for block in function.blocks {
 
     // We cannot use for-in iteration here because if the store is split, the new
@@ -63,26 +67,26 @@ let deadStoreElimination = FunctionPass(name: "dead-store-elimination") {
         if !context.continueWithNextSubpassRun(for: store) {
           return
         }
-        tryEliminate(store: store, context)
+        tryEliminate(store: store, complexityBudget: &complexityBudget, context)
       }
       inst = i.next
     }
   }
 }
 
-private func tryEliminate(store: StoreInst, _ context: FunctionPassContext) {
+private func tryEliminate(store: StoreInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
   if !store.hasValidOwnershipForDeadStoreElimination {
     return
   }
 
-  switch store.isDead(context) {
+  switch store.isDead(complexityBudget: &complexityBudget, context) {
     case .alive:
       break
     case .dead:
       context.erase(instruction: store)
     case .maybePartiallyDead(let subPath):
       // Check if the a partial store would really be dead to avoid unnecessary splitting.
-      switch store.isDead(at: subPath, context) {
+      switch store.isDead(at: subPath, complexityBudget: &complexityBudget, context) {
         case .alive, .maybePartiallyDead:
           break
         case .dead:
@@ -109,15 +113,15 @@ private extension StoreInst {
     }
   }
 
-  func isDead( _ context: FunctionPassContext) -> DataflowResult {
-    return isDead(at: destination.accessPath, context)
+  func isDead(complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
+    return isDead(at: destination.accessPath, complexityBudget: &complexityBudget, context)
   }
 
-  func isDead(at accessPath: AccessPath, _ context: FunctionPassContext) -> DataflowResult {
+  func isDead(at accessPath: AccessPath, complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
     var scanner = InstructionScanner(storePath: accessPath, storeAddress: self.destination, context.aliasAnalysis)
     let storageDefBlock = accessPath.base.reference?.referenceRoot.parentBlock
 
-    switch scanner.scan(instructions: InstructionList(first: self.next)) {
+    switch scanner.scan(instructions: InstructionList(first: self.next), complexityBudget: &complexityBudget) {
     case .dead:
       return .dead
 
@@ -145,7 +149,7 @@ private extension StoreInst {
         if let storageDefBlock = storageDefBlock, block == storageDefBlock {
           return DataflowResult(aliveWith: scanner.potentiallyDeadSubpath)
         }
-        switch scanner.scan(instructions: block.instructions) {
+        switch scanner.scan(instructions: block.instructions, complexityBudget: &complexityBudget) {
         case .transparent:
           worklist.pushIfNotVisited(contentsOf: block.successors)
         case .dead:
@@ -177,10 +181,6 @@ private struct InstructionScanner {
 
   private(set) var potentiallyDeadSubpath: AccessPath? = nil
 
-  // Avoid quadratic complexity by limiting the number of visited instructions for each store.
-  // The limit of 1000 instructions is not reached by far in "real-world" functions.
-  private var budget = 1000
-
   init(storePath: AccessPath, storeAddress: Value, _ aliasAnalysis: AliasAnalysis) {
     self.storePath = storePath
     self.storeAddress = storeAddress
@@ -193,7 +193,7 @@ private struct InstructionScanner {
     case transparent
   }
 
-  mutating func scan(instructions: InstructionList) -> Result {
+  mutating func scan(instructions: InstructionList, complexityBudget: inout Int) -> Result {
     for inst in instructions {
       switch inst {
       case let successiveStore as StoreInst:
@@ -226,8 +226,8 @@ private struct InstructionScanner {
         }
         fallthrough
       default:
-        budget -= 1
-        if budget == 0 {
+        complexityBudget -= 1
+        if complexityBudget <= 0 {
           return .alive
         }
         if inst.mayRead(fromAddress: storeAddress, aliasAnalysis) {
