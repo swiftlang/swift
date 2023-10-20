@@ -157,9 +157,20 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
+  NonErrorHandlingBlocks neBlocks(function);
+
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
+      continue;
+
+    // TODO: it's not yet clear how to deal with error existentials.
+    // Ignore them for now. If we have typed throws we could ban error existentials
+    // because typed throws would provide and alternative.
+    if (isa<ThrowInst>(block.getTerminator()))
+      continue;
+
+    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
