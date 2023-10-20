@@ -115,6 +115,11 @@ func nonCParamTypesWasm(_: Int, _: NonC)
 @_extern(wasm, module: "non-c", name: "param_mixed")
 func nonCParamTypesMixed(_: Int, _: NonC) // expected-error {{'NonC' cannot be represented in C}}
 
+@_extern(c)
+func defaultArgValue_C(_: Int = 42)
+
+@_extern(wasm, module: "", name: "")
+func defaultArgValue_Wasm(_: Int = 24)
 
 @_extern(c)
 func asyncFuncC() async // expected-error {{async functions cannot be represented in C}}
