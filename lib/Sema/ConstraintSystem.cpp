@@ -2426,6 +2426,41 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
+
+bool isPartialApplication(ConstraintSystem &cs,
+                            const AbstractFunctionDecl *member,
+                            ConstraintLocator *locator) {
+  // If this is a compiler synthesized implicit conversion, let's skip
+  // the check because the base of `UDE` is not the base of the injected
+  // initializer.
+  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
+      locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return false;
+
+  auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
+  if (UDE == nullptr)
+    return false;
+
+  auto baseTy =
+      cs.simplifyType(cs.getType(UDE->getBase()))->getWithoutSpecifierType();
+
+  // If base is a metatype it would be ignored (unless this is an initializer
+  // call), but if it is some other type it means that we have a single
+  // application level already.
+  unsigned level = 0;
+  if (!baseTy->is<MetatypeType>())
+    ++level;
+
+  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
+    level += 1;
+  }
+
+  if (level == 2)
+    return false;
+
+  return true;
+}
+
 DeclReferenceType
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -2636,36 +2671,21 @@ ConstraintSystem::getTypeOfMemberReference(
                                                        functionType, locator);
     auto &ctx = DC->getASTContext();
     auto *parentModule = useDC->getParentModule();
-    bool baseTypeSendable = isSendableType(parentModule, baseOpenedTy);
     bool inferredSendable =
         ctx.LangOpts.hasFeature(Feature::InferSendableMethods);
 
-    if (inferredSendable) {
-      auto sendableProtocol = parentModule->getASTContext().getProtocol(
-          KnownProtocolKind::Sendable);
-      auto baseConformance =
-          parentModule->lookupConformance(baseOpenedTy, sendableProtocol);
-
-      if (baseTypeSendable) {
+    bool isPartialApply;
+    isPartialApply = isPartialApplication(*this, funcDecl, locator);
+   
+    if (inferredSendable && isPartialApply) {
+//      auto sendableProtocol = parentModule->getASTContext().getProtocol(
+//          KnownProtocolKind::Sendable);
+//      auto baseConformance =
+//          parentModule->lookupConformance(baseOpenedTy, sendableProtocol);
+      
+      if (isSendableType(parentModule, baseOpenedTy)) {
         // Add @Sendable to functions without conditional conformances
-        if (baseConformance.getConditionalRequirements().empty()) {
-          functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
-        } else {
-          // Handle Conditional Conformances
-          auto substitutionMap = SubstitutionMap::getProtocolSubstitutions(
-              sendableProtocol, baseOpenedTy, baseConformance);
-
-          auto result = TypeChecker::checkGenericArguments(
-              parentModule, baseConformance.getConditionalRequirements(),
-              QuerySubstitutionMap{substitutionMap});
-
-          if (result == CheckGenericArgumentsResult::Success) {
-            functionType =
-                functionType
-                    ->withExtInfo(functionType->getExtInfo().withConcurrent())
-                    ->getAs<FunctionType>();
-          }
-        }
+        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
       }
     }
 
