@@ -609,14 +609,19 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // We already visited the children.
     return doSkipChildren();
   } else if (auto ME = dyn_cast<MacroExpansionExpr>(E)) {
-    // Add a reference to the macro
-    auto macroRef = ME->getMacroRef();
-    if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroRef.getDecl())) {
-      auto macroRefType = macroDecl->getDeclaredInterfaceType();
-      if (!passReference(
-              macroDecl, macroRefType, ME->getMacroNameLoc(),
-              ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
-        return Action::Stop();
+    // Add a reference to the macro if this is a true macro expansion *expression*.
+    // If this is a `MacroExpansionExpr` that expands a declaration macro, the
+    // substitute decl will be visited by ASTWalker and we would be passing its
+    // reference if we didn't have this check.
+    if (!ME->getSubstituteDecl()) {
+      auto macroRef = ME->getMacroRef();
+      if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroRef.getDecl())) {
+        auto macroRefType = macroDecl->getDeclaredInterfaceType();
+        if (!passReference(
+                           macroDecl, macroRefType, ME->getMacroNameLoc(),
+                           ReferenceMetaData(SemaReferenceKind::DeclRef, llvm::None)))
+          return Action::Stop();
+      }
     }
   }
 

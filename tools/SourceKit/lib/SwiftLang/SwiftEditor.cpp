@@ -952,9 +952,39 @@ class SemanticAnnotator : public SourceEntityWalker {
 public:
 
   std::vector<SwiftSemanticToken> SemaToks;
+  bool IsWalkingMacroExpansionBuffer = false;
 
   SemanticAnnotator(SourceManager &SM, unsigned BufferID)
-    : SM(SM), BufferID(BufferID) {}
+      : SM(SM), BufferID(BufferID) {
+    if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(BufferID)) {
+      switch (GeneratedSourceInfo->kind) {
+      case GeneratedSourceInfo::ExpressionMacroExpansion:
+      case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+      case GeneratedSourceInfo::AccessorMacroExpansion:
+      case GeneratedSourceInfo::MemberAttributeMacroExpansion:
+      case GeneratedSourceInfo::MemberMacroExpansion:
+      case GeneratedSourceInfo::PeerMacroExpansion:
+      case GeneratedSourceInfo::ConformanceMacroExpansion:
+      case GeneratedSourceInfo::ExtensionMacroExpansion:
+        IsWalkingMacroExpansionBuffer = true;
+        break;
+      case GeneratedSourceInfo::ReplacedFunctionBody:
+      case GeneratedSourceInfo::PrettyPrinted:
+        break;
+      }
+    }
+  }
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    if (IsWalkingMacroExpansionBuffer) {
+      // When we are walking a macro expansion buffer, we need to set the macro
+      // walking behavior to walk the expansion, otherwise we skip over all the
+      // declarations in the buffer.
+      return MacroWalking::ArgumentsAndExpansion;
+    } else {
+      return SourceEntityWalker::getMacroWalkingBehavior();
+    }
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
@@ -996,6 +1026,12 @@ public:
     if (!Range.isValid())
       return;
 
+    // If we are walking into macro expansions, make sure we only report ranges
+    // from the requested buffer, not any buffers of child macro expansions.
+    if (IsWalkingMacroExpansionBuffer &&
+        SM.findBufferContainingLoc(Range.getStart()) != BufferID) {
+      return;
+    }
     unsigned ByteOffset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
     unsigned Length = Range.getByteLength();
     auto Kind = ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(D);
