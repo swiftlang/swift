@@ -159,6 +159,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "swift/Basic/Defer.h"
 #include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "NameLookup.h"
@@ -364,7 +365,7 @@ static void desugarConformanceRequirement(Requirement req,
     subReqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
                          paramType->getBaseType());
     paramType->getRequirements(req.getFirstType(), subReqs);
-  } else if (auto *compositionType = constraintType->castTo<ProtocolCompositionType>()) {
+  } else if (auto *compositionType = constraintType->getAs<ProtocolCompositionType>()) {
     if (compositionType->hasExplicitAnyObject()) {
       subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
                            LayoutConstraint::getLayoutConstraint(
@@ -378,6 +379,27 @@ static void desugarConformanceRequirement(Requirement req,
             : RequirementKind::Superclass,
           req.getFirstType(), memberType);
     }
+
+    // Add inverses directly as requirements.
+    for (auto ip : compositionType->getInverses()) {
+      // NOTE: perhaps it's better if ProtocolCompositionType just stores
+      // the original InverseType's in its Members array.
+      auto &ctx = compositionType->getASTContext();
+      auto invertedProto =
+        ctx.getProtocol(getKnownProtocolKind(ip))->getDeclaredInterfaceType();
+
+      subReqs.emplace_back(RequirementKind::Conformance, req.getFirstType(),
+                           InverseType::get(invertedProto));
+    }
+
+  } else if (constraintType->is<InverseType>()) {
+    // Fast-path
+    if (req.getFirstType()->isTypeParameter()) {
+      result.push_back(req);
+      return;
+    }
+    // Only permit type-parameter subjects for inverse-conformance requirements.
+    errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
   }
 
   for (auto subReq : subReqs)
@@ -504,6 +526,10 @@ struct InferRequirementsWalker : public TypeWalker {
     // don't have enough info to do any useful substitutions.
     if (ty->is<UnboundGenericType>())
       return Action::Stop;
+
+    // An inverse's children do not contribute any requirements.
+    if (ty->is<InverseType>())
+      return Action::SkipChildren;
 
     return Action::Continue;
   }
@@ -732,6 +758,62 @@ void swift::rewriting::realizeRequirement(
   }
 }
 
+/// Desugars and expands all default conformance requirements on \c subject,
+/// accounting for and eliminating inverse constraints.
+///
+/// \param subjects the subject types for which we should expand defaults.
+void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
+                                 SmallVectorImpl<Type> const& subjects,
+                                 SmallVectorImpl<StructuralRequirement> &result,
+                                 SmallVectorImpl<RequirementError> &errors) {
+  if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+    return;
+
+  llvm::DenseMap<CanType, InvertibleProtocolSet> defaults;
+  for (auto subject : subjects)
+    defaults.insert({ subject->getCanonicalType(),
+                     InvertibleProtocolSet::full() });
+
+  result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
+    auto req = structReq.req;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      return false;
+
+    auto inverse = req.getSecondType()->getAs<InverseType>();
+    if (!inverse)
+      return false;
+
+    auto subject = req.getFirstType()->getCanonicalType();
+
+    if (defaults.count(subject) == 0)
+      return false;
+
+    // TODO: check for redundant inverses.
+
+    // Apply the inverse to the subject's defaults.
+    defaults[subject].remove(inverse->getInverseKind());
+
+    // Remove this inverse conformance requirement.
+    return true;
+  }), result.end());
+
+  for (auto &[subject, remainingDefaults] : defaults) {
+    // Expand the remaining default conformance requirements for this subject.
+    for (auto ip : remainingDefaults) {
+      ProtocolDecl *decl = ctx.getProtocol(getKnownProtocolKind(ip));
+      if (!decl) llvm_unreachable("missing known protocol!");
+
+      SourceLoc loc = decl->getLoc();
+      Type protocolType = decl->getDeclaredInterfaceType();
+
+      // Add the protocol as an "inferred" requirement.
+      Requirement req(RequirementKind::Conformance, subject, protocolType);
+      result.push_back({req, loc, /*wasInferred=*/true});
+    }
+  }
+}
+
 /// Collect structural requirements written in the inheritance clause of an
 /// AssociatedTypeDecl or GenericTypeParamDecl.
 void swift::rewriting::realizeInheritedRequirements(
@@ -741,7 +823,6 @@ void swift::rewriting::realizeInheritedRequirements(
   auto inheritedTypes = decl->getInherited();
   auto *dc = decl->getInnermostDeclContext();
   auto *moduleForInference = dc->getParentModule();
-  auto defaults = getInvertibleProtocols();
 
   for (auto index : inheritedTypes.getIndices()) {
     Type inheritedType =
@@ -760,37 +841,12 @@ void swift::rewriting::realizeInheritedRequirements(
     auto *typeRepr = inheritedTypes.getTypeRepr(index);
     SourceLoc loc = (typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
-    // For any inverses, we only need to cancel out a default requirement.
-    if (dyn_cast_or_null<InverseTypeRepr>(typeRepr)) {
-      if (auto kp = inheritedType->getKnownProtocol())
-        defaults.remove(*kp);
-
-      continue;
-    }
-
     if (shouldInferRequirements) {
       inferRequirements(inheritedType, loc, moduleForInference,
                         decl->getInnermostDeclContext(), result);
     }
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
-  }
-
-  auto &ctx = dc->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Add the remaining default conformance requirements to this
-    // associated type or generic type param.
-    for (auto kp : defaults) {
-      ProtocolDecl *decl = ctx.getProtocol(kp);
-      if (!decl) llvm_unreachable("missing known protocol!");
-
-      SourceLoc loc = decl->getLoc();
-      Type protocolType = decl->getDeclaredInterfaceType();
-
-      // Add the protocol as an "inferred" requirement.
-      Requirement req(RequirementKind::Conformance, type, protocolType);
-      result.push_back({req, loc, /*wasInferred=*/true});
-    }
   }
 }
 
@@ -808,8 +864,9 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
   SmallVector<RequirementError, 4> errors;
 
   auto &ctx = proto->getASTContext();
-
   auto selfTy = proto->getSelfInterfaceType();
+
+  SmallVector<Type, 4> needsDefaultReqirements({selfTy});
 
   unsigned errorCount = errors.size();
   realizeInheritedRequirements(proto, selfTy,
@@ -842,6 +899,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
         return false;
       });
 
+  // Remaining logic is not relevant to @objc protocols.
   if (proto->isObjC()) {
     // @objc protocols have an implicit AnyObject requirement on Self.
     auto layout = LayoutConstraint::getLayoutConstraint(
@@ -849,7 +907,7 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
     result.push_back({Requirement(RequirementKind::Layout, selfTy, layout),
                       proto->getLoc(), /*inferred=*/true});
 
-    // Remaining logic is not relevant to @objc protocols.
+    expandDefaultRequirements(ctx, needsDefaultReqirements, result, errors);
     return ctx.AllocateCopy(result);
   }
 
@@ -874,6 +932,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                              result, errors);
           return false;
         });
+
+    needsDefaultReqirements.push_back(assocType);
   }
 
   // Add requirements for each typealias.
@@ -910,6 +970,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
       }
     }
   }
+
+  expandDefaultRequirements(ctx, needsDefaultReqirements, result, errors);
 
   diagnoseRequirementErrors(ctx, errors,
                             AllowConcreteTypePolicy::NestedAssocTypes);

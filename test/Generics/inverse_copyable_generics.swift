@@ -30,9 +30,8 @@ protocol Plain {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
 }
 
-// FIXME: detection of ~Copyable in where-clauses is half-baked.
-protocol RemovedAgain where Self: ~Copyable { // expected-warning {{protocol 'RemovedAgain' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
-    func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
+protocol RemovedAgain where Self: ~Copyable {
+    func requiresCopyableSelf(_ t: AlwaysCopyable<Self>) // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
 }
 
 struct StructContainment<T: ~Copyable> {

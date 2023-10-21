@@ -347,6 +347,14 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   protocols.push_back(protoDecl);
 }
 
+ExistentialLayout::ExistentialLayout(CanInverseType type) {
+  //  TODO: implement this correctly!!!!!!!!!
+  hasExplicitAnyObject = false;
+  containsNonObjCProtocol = false;
+  containsParameterized = false;
+  llvm_unreachable("FIXME");
+}
+
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
   containsNonObjCProtocol = false;
@@ -404,6 +412,9 @@ ExistentialLayout CanType::getExistentialLayout() {
 
   if (auto param = dyn_cast<ParameterizedProtocolType>(ty))
     return ExistentialLayout(param);
+
+  if (auto inverse = dyn_cast<InverseType>(ty))
+    return ExistentialLayout(inverse);
 
   auto comp = cast<ProtocolCompositionType>(ty);
   return ExistentialLayout(comp);
@@ -1090,7 +1101,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   if (auto protocolType = getAs<ProtocolType>()) {
     if (protocolType->getDecl()->isSpecificProtocol(
             KnownProtocolKind::Sendable))
-      return ProtocolCompositionType::get(getASTContext(), { }, false);
+      return getASTContext().TheAnyType;
 
     return Type(this);
   }
@@ -3870,10 +3881,13 @@ CanExistentialType CanExistentialType::get(CanType constraint) {
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
                                       ArrayRef<Type> Members,
+                                      InvertibleProtocolSet Inverses,
                                       bool HasExplicitAnyObject) {
-  ID.AddInteger(HasExplicitAnyObject);
+  ID.AddBoolean(HasExplicitAnyObject);
   for (auto T : Members)
     ID.AddPointer(T.getPointer());
+  for (auto IP : Inverses)
+    ID.AddInteger((uint8_t)IP);
 }
 
 ParameterizedProtocolType::ParameterizedProtocolType(
@@ -3922,22 +3936,49 @@ bool ProtocolCompositionType::requiresClass() {
   return getExistentialLayout().requiresClass();
 }
 
+/// Constructs a protocol composition corresponding to the `Any` type.
+Type ProtocolCompositionType::theAnyType(const ASTContext &C) {
+  return ProtocolCompositionType::get(C, {}, /*HasExplicitAnyObject=*/false);
+}
+
+/// Constructs a protocol composition containing the `AnyObject` constraint.
+Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
+  return ProtocolCompositionType::get(C, {}, /*HasExplicitAnyObject=*/true);
+}
+
+Type ProtocolCompositionType::get(const ASTContext &C, ArrayRef<Type> Members,
+                                  bool HasExplicitAnyObject) {
+  return ProtocolCompositionType::get(C, Members,
+                                      /*Inverses=*/{},
+                                      HasExplicitAnyObject);
+}
+
 Type ProtocolCompositionType::get(const ASTContext &C,
                                   ArrayRef<Type> Members,
+                                  InvertibleProtocolSet Inverses,
                                   bool HasExplicitAnyObject) {
   // Fast path for 'AnyObject' and 'Any'.
   if (Members.empty()) {
-    return build(C, Members, HasExplicitAnyObject);
+    return build(C, Members, Inverses, HasExplicitAnyObject);
   }
 
-  // If there's a single member and no layout constraint, return that type.
-  if (Members.size() == 1 && !HasExplicitAnyObject) {
+  assert(llvm::none_of(Members, [](Type t){return t->is<InverseType>();}));
+
+  // Whether this composition has an `AnyObject` or protocol-inverse member
+  // that is not reflected in the Members array.
+  auto haveExtraMember = [&]{
+    return HasExplicitAnyObject || !Inverses.empty();
+  };
+
+  // If there's a single member and no layout constraint or inverses,
+  // return that type.
+  if (Members.size() == 1 && !haveExtraMember()) {
     return Members.front();
   }
 
   for (Type t : Members) {
     if (!t->isCanonical())
-      return build(C, Members, HasExplicitAnyObject);
+      return build(C, Members, Inverses, HasExplicitAnyObject);
   }
     
   Type Superclass;
@@ -3976,11 +4017,11 @@ Type ProtocolCompositionType::get(const ASTContext &C,
     CanTypes.push_back(proto->getDeclaredInterfaceType());
   }
 
-  // If one member remains and no layout constraint, return that type.
-  if (CanTypes.size() == 1 && !HasExplicitAnyObject)
+  // If one member remains with no extra members, return that type.
+  if (CanTypes.size() == 1 && !haveExtraMember())
     return CanTypes.front();
 
-  return build(C, CanTypes, HasExplicitAnyObject);
+  return build(C, CanTypes, Inverses, HasExplicitAnyObject);
 }
 
 CanType ProtocolCompositionType::getMinimalCanonicalType(
@@ -4017,6 +4058,9 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
     return Reqs.front().getSecondType()->getCanonicalType();
   }
 
+  // The set of inverses is already minimal.
+  auto MinimalInverses = Composition->getInverses();
+
   llvm::SmallVector<Type, 2> MinimalMembers;
   bool MinimalHasExplicitAnyObject = false;
   auto ifaceTy = Sig.getGenericParams().back();
@@ -4048,11 +4092,14 @@ CanType ProtocolCompositionType::getMinimalCanonicalType(
   // If we are left with a single member and no layout constraint, the member
   // is the minimal type. Also, note that a protocol composition cannot be
   // constructed with a single member unless there is a layout constraint.
-  if (MinimalMembers.size() == 1 && !MinimalHasExplicitAnyObject)
+  if (MinimalMembers.size() == 1
+      && !MinimalHasExplicitAnyObject
+      && MinimalInverses.empty())
     return CanType(MinimalMembers.front());
 
   // The resulting composition is necessarily canonical.
-  return CanType(build(Ctx, MinimalMembers, MinimalHasExplicitAnyObject));
+  return CanType(build(Ctx, MinimalMembers, MinimalInverses,
+                       MinimalHasExplicitAnyObject));
 }
 
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {

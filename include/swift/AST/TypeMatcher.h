@@ -500,7 +500,8 @@ private:
     bool visitInverseType(CanInverseType firstInverse,
                           Type secondType,
                           Type sugaredFirstType) {
-      // FIXME: If this visitor is reached, determine whether it should've been.
+      // NOTE: If this visitor is reached, determine whether it should've been
+      // before implementing this.
       llvm_unreachable("Yahaha! You found me!");
     }
 

@@ -4942,6 +4942,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // there is only one superclass.
   Type SuperclassType;
   SmallVector<Type, 4> Members;
+  InvertibleProtocolSet Inverses;
 
   // Whether we saw at least one protocol. A protocol composition
   // must either be empty (in which case it is Any or AnyObject),
@@ -4981,6 +4982,11 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       if (ty->is<ProtocolType>()) {
         HasProtocol = true;
         Members.push_back(ty);
+        continue;
+      }
+
+      if (auto inverse = ty->getAs<InverseType>()) {
+        Inverses.insert(inverse->getInverseKind());
         continue;
       }
 
@@ -5026,7 +5032,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
   auto composition =
-      ProtocolCompositionType::get(getASTContext(), Members,
+      ProtocolCompositionType::get(getASTContext(), Members, Inverses,
                                    /*HasExplicitAnyObject=*/false);
   if (options.isConstraintImplicitExistential()) {
     return ExistentialType::get(composition);
@@ -5147,8 +5153,8 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
     return ErrorType::get(getASTContext());
 
   if (auto kp = ty->getKnownProtocol())
-    if (getInvertibleProtocols().contains(*kp))
-      return ty; // FIXME: this ought to be wrapped in an InverseType
+    if (getInvertibleProtocolKind(*kp))
+      return InverseType::get(ty);
 
   diagnoseInvalid(repr, repr->getLoc(), diag::inverse_type_not_invertible, ty);
   return ErrorType::get(getASTContext());

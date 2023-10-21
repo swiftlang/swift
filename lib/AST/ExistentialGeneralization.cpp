@@ -111,7 +111,8 @@ private:
   }
 
   Type visitInverseType(CanInverseType type) {
-    llvm_unreachable("todo: determine how to handle inverses for Generalizer");
+    // TODO(kavon): determine how to handle inverses for ExistentialGeneralization
+    llvm_unreachable("unimplemented");
   }
 
   // Generalize the type arguments of nominal types.

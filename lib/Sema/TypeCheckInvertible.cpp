@@ -36,14 +36,14 @@ SourceRange findInverseRemovalRange(const TypeDecl *typeDecl,
   for (size_t i = 0; i < entries.size(); i++) {
     auto entry = entries[i];
 
-    auto *repr = entry.getTypeRepr();
-    if (dyn_cast_or_null<InverseTypeRepr>(repr))
-      if (auto kp = entry.getType()->getKnownProtocol())
-        if (kp == targetProto)
+    if (auto inverse = entry.getType()->getAs<InverseType>())
+      if (auto kp = inverse->getInvertedProtocol()->getKnownProtocol())
+        if (*kp == targetProto)
           return inheritedTypes.getRemovalRange(i);
   }
 
-  // TODO: check where clause.
+  // TODO: just ask HasNoncopyableAnnotationRequest for the annotation?
+  // so we can handle where clauses.
 
   return SourceRange();
 }

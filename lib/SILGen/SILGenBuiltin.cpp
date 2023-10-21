@@ -1534,8 +1534,8 @@ ManagedValue emitBuiltinCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                              MetatypeRepresentation::Thick))
           .subst(subs)
           ->getCanonicalType();
-  CanType anyTypeType = ExistentialMetatypeType::get(
-      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
+  CanType anyTypeType =
+      ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
   auto futureResultMetadata =
@@ -1596,8 +1596,8 @@ static ManagedValue emitBuiltinCreateAsyncTaskInGroup(
                              MetatypeRepresentation::Thick))
           .subst(subs)
           ->getCanonicalType();
-  CanType anyTypeType = ExistentialMetatypeType::get(
-      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
+  CanType anyTypeType =
+      ExistentialMetatypeType::get(ctx.TheAnyType)->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
   auto &futureResultTL = SGF.getTypeLowering(futureResultType);
   auto futureResultMetadata =
