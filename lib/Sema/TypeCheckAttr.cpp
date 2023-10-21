@@ -2109,8 +2109,9 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
     diagnose(attr->getLocation(), diag::section_empty_name);
 
   if (D->getDeclContext()->isLocalContext())
-    ; // Already diagnosed in Parse, don't diagnose again
-  else if (D->getDeclContext()->isGenericContext())
+    return; // already diagnosed
+
+  if (D->getDeclContext()->isGenericContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
              attr->getAttrName());
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
