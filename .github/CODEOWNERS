@@ -143,10 +143,12 @@
 
 # stdlib
 # TODO: /stdlib/
+/stdlib/public/core/                      @stephentyrone
 /stdlib/public/Backtracing/               @al45tair
 /stdlib/public/Concurrency/               @ktoso @kavon
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
 /stdlib/public/Distributed/               @ktoso
+/stdlib/public/Observation/               @phausler
 /stdlib/public/Windows/                   @compnerd
 /stdlib/public/libexec/swift-backtrace/   @al45tair
 
