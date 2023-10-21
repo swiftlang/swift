@@ -2443,12 +2443,16 @@ static Type validateParameterType(ParamDecl *decl) {
   Type Ty;
 
   auto *nestedRepr = decl->getTypeRepr();
+  ParamSpecifier ownership = ParamSpecifier::Default;
   while (true) {
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
       nestedRepr = attrTypeRepr->getTypeRepr();
       continue;
     }
     if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      if (specifierTypeRepr->getKind() == TypeReprKind::Ownership)
+        ownership = cast<OwnershipTypeRepr>(specifierTypeRepr)->getSpecifier();
+
       nestedRepr = specifierTypeRepr->getBase();
       continue;
     }
@@ -2490,6 +2494,13 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (Ty->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  // Validate the presence of ownership for a noncopyable parameter.
+  if (diagnoseMissingOwnership(ctx, dc, ownership,
+                               decl->getTypeRepr(), Ty, options)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }

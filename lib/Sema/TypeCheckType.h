@@ -82,9 +82,6 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether this is a resolution based on a pack reference.
   FromPackReference = 1 << 12,
-
-  /// Whether this resolution happens under an explicit ownership specifier.
-  HasOwnership = 1 << 13,
 };
 
 /// Type resolution contexts that require special handling.
@@ -668,6 +665,16 @@ void diagnoseInvalidGenericArguments(SourceLoc loc,
                                      unsigned paramCount,
                                      bool hasParameterPack,
                                      GenericIdentTypeRepr *generic);
+
+/// \param repr the repr for the type of the parameter.
+/// \param ty the non-error resolved type of the repr.
+/// \param ownership the ownership kind of the parameter
+/// \param dc the decl context used for resolving the type
+/// \returns true iff a diagnostic was emitted and the \c repr was invalidated.
+bool diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
+                              ParamSpecifier ownership,
+                              TypeRepr *repr, Type ty,
+                              TypeResolutionOptions options);
 
 } // end namespace swift
 

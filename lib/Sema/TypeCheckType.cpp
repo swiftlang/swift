@@ -2086,8 +2086,6 @@ namespace {
 
     bool diagnoseMoveOnlyGeneric(TypeRepr *repr,
                                  Type unboundTy, Type genericArgTy);
-    bool diagnoseMissingOwnership(TypeRepr *repr,
-                                  TypeResolutionOptions options);
     
     bool diagnoseDisallowedExistential(TypeRepr *repr);
     
@@ -2360,60 +2358,49 @@ bool TypeResolver::diagnoseMoveOnlyGeneric(TypeRepr *repr,
   return false;
 }
 
-/// Assuming this repr has resolved to a noncopyable type, checks
-/// to see if that resolution happened in a context requiring an ownership
-/// annotation. If it did and there was no ownership specified, emits a
-/// diagnostic.
-///
-/// \returns true if an error diagnostic was emitted
-bool TypeResolver::diagnoseMissingOwnership(TypeRepr *repr,
-                                            TypeResolutionOptions options) {
-  // Though this is only required on function inputs... we can ignore
-  // InoutFunctionInput since it's already got ownership.
-  if (!options.is(TypeResolverContext::FunctionInput))
-    return false;
 
-  // Enum cases don't need to specify ownership for associated values
+bool swift::diagnoseMissingOwnership(ASTContext &ctx, DeclContext *dc,
+                                     ParamSpecifier ownership,
+                                     TypeRepr *repr, Type ty,
+                                     TypeResolutionOptions options) {
+  assert(!ty->hasError());
+  assert(!options.contains(TypeResolutionFlags::SILType));
+
   if (options.hasBase(TypeResolverContext::EnumElementDecl))
-    return false;
+    return false; // no need for ownership in enum cases.
 
-  // Otherwise, we require ownership.
-  if (options.contains(TypeResolutionFlags::HasOwnership))
-    return false;
+  if (!ty->isNoncopyable(dc))
+    return false; // copyable types do not need ownership
 
-  // Don't diagnose in SIL; ownership is already required there.
-  if (options.contains(TypeResolutionFlags::SILType))
-    return false;
+  if (ownership != ParamSpecifier::Default)
+    return false; // it has ownership
 
-  //////////////////
-  // At this point, we know we have a noncopyable parameter that is missing an
-  // ownership specifier, so we need to emit an error
+  auto &diags = ctx.Diags;
+  auto loc = repr->getLoc();
+  repr->setInvalid();
 
   // We don't yet support any ownership specifiers for parameters of subscript
   // decls, give a tailored error message saying you simply can't use a
   // noncopyable type here.
   if (options.hasBase(TypeResolverContext::SubscriptDecl)) {
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_subscript_unsupported);
+    diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
   } else {
     // general error diagnostic
-    diagnose(repr->getLoc(),
-             diag::noncopyable_parameter_requires_ownership);
+    diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "borrowing", "for an immutable reference")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "borrowing", "for an immutable reference")
         .fixItInsert(repr->getStartLoc(), "borrowing ");
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "inout", "for a mutable reference")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "inout", "for a mutable reference")
         .fixItInsert(repr->getStartLoc(), "inout ");
 
-    diagnose(repr->getLoc(), diag::noncopyable_parameter_ownership_suggestion,
-             "consuming", "to take the value from the caller")
+    diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
+                   "consuming", "to take the value from the caller")
         .fixItInsert(repr->getStartLoc(), "consuming ");
   }
 
-  // to avoid duplicate diagnostics
-  repr->setInvalid();
   return true;
 }
 
@@ -3473,6 +3460,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
   SmallVector<AnyFunctionType::Param, 8> elements;
   elements.reserve(inputRepr->getNumElements());
 
+  auto *dc = getDeclContext();
+
   auto elementOptions = options.withoutContext(true);
   elementOptions.setContext(TypeResolverContext::FunctionInput);
   for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
@@ -3517,7 +3506,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       if (ATR->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             isDifferentiableProgrammingEnabled(
-                *getDeclContext()->getParentSourceFile()))
+                *dc->getParentSourceFile()))
           diagnose(nestedRepr->getLoc(),
                    diag::attr_only_on_parameters_of_differentiable,
                    "@noDerivative")
@@ -3564,6 +3553,11 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
         continue;
       }
     }
+
+    // Validate the presence of ownership for a noncopyable parameter.
+    if (inStage(TypeResolutionStage::Interface))
+      diagnoseMissingOwnership(getASTContext(), dc, ownership,
+                               eltTypeRepr, ty, options);
 
     Identifier argumentLabel;
     Identifier parameterName;
@@ -4389,10 +4383,6 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     }
   }
 
-  // Noncopyable types must have an ownership specifier when used as a parameter
-  if (inStage(TypeResolutionStage::Interface) && result->isNoncopyable(dc))
-      diagnoseMissingOwnership(repr, options);
-
   // Hack to apply context-specific @escaping to a typealias with an underlying
   // function type.
   if (result->is<FunctionType>())
@@ -4434,9 +4424,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     // Anything within an inout isn't a parameter anymore.
     options.setContext(TypeResolverContext::InoutFunctionInput);
   }
-
-  // Remember that we've seen an ownership specifier for this base type.
-  options |= TypeResolutionFlags::HasOwnership;
 
   auto result = resolveType(repr->getBase(), options);
   if (result->hasError())

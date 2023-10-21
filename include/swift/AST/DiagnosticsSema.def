@@ -7509,7 +7509,7 @@ ERROR(noncopyable_cannot_conform_to_type, none,
      "noncopyable %kind0 cannot conform to %1",
      (const ValueDecl *, Type))
 ERROR(noncopyable_parameter_requires_ownership, none,
-      "noncopyable parameter must specify its ownership", ())
+      "parameter of noncopyable type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,
       "subscripts cannot have noncopyable parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
