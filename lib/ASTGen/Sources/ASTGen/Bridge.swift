@@ -21,7 +21,7 @@ extension BridgedSourceLoc {
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
-    self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), position.utf8Offset)
+    self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
   }
 }
 
@@ -103,7 +103,7 @@ extension TokenSyntax {
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
     var text = self.text
     return text.withBridgedString { bridged in
-      ASTContext_getIdentifier(astgen.ctx, bridged)
+      astgen.ctx.getIdentifier(bridged)
     }
   }
 

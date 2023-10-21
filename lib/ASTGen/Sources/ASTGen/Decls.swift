@@ -7,153 +7,169 @@ import SwiftDiagnostics
 // MARK: - TypeDecl
 
 extension ASTGenVisitor {
-  public func generate(_ node: TypeAliasDeclSyntax) -> ASTNode {
+  public func generate(_ node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    return .decl(
-      TypeAliasDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        typealiasKeywordLoc: node.typealiasKeyword.bridgedSourceLoc(in: self),
-        name: name,
-        nameLoc: nameLoc,
-        genericParamList: self.generate(node.genericParameterClause)?.rawValue,
-        equalLoc: node.initializer.equal.bridgedSourceLoc(in: self),
-        underlyingType: self.generate(node.initializer.value).rawValue,
-        genericWhereClause: self.generate(node.genericWhereClause)?.rawValue
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      typealiasKeywordLoc: node.typealiasKeyword.bridgedSourceLoc(in: self),
+      name: name,
+      nameLoc: nameLoc,
+      genericParamList: self.generate(node.genericParameterClause),
+      equalLoc: node.initializer.equal.bridgedSourceLoc(in: self),
+      underlyingType: self.generate(node.initializer.value),
+      genericWhereClause: self.generate(node.genericWhereClause)
     )
   }
 
-  public func generate(_ node: EnumDeclSyntax) -> ASTNode {
+  public func generate(_ node: EnumDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let decl = EnumDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedEnumDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       enumKeywordLoc: node.enumKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace, 
+        in: self
+      )
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  public func generate(_ node: StructDeclSyntax) -> ASTNode {
+  public func generate(_ node: StructDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let decl = StructDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedStructDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       structKeywordLoc: node.structKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace, 
+        in: self
+      )
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  public func generate(_ node: ClassDeclSyntax) -> ASTNode {
+  public func generate(_ node: ClassDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let decl = ClassDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedClassDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       classKeywordLoc: node.classKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self),
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace,
+        in: self
+      ),
       isActor: false
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  public func generate(_ node: ActorDeclSyntax) -> ASTNode {
+  public func generate(_ node: ActorDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let decl = ClassDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedClassDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       classKeywordLoc: node.actorKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self),
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace,
+        in: self
+      ),
       isActor: true
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  func generate(_ node: ProtocolDeclSyntax) -> ASTNode {
+  func generate(_ node: ProtocolDeclSyntax) -> BridgedNominalTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
     let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
       $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
     }
 
-    let decl = ProtocolDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedProtocolDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       protocolKeywordLoc: node.protocolKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace,
+        in: self
+      )
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  func generate(_ node: AssociatedTypeDeclSyntax) -> ASTNode {
+  func generate(_ node: AssociatedTypeDeclSyntax) -> BridgedAssociatedTypeDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    return .decl(
-      AssociatedTypeDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        associatedtypeKeywordLoc: node.associatedtypeKeyword.bridgedSourceLoc(in: self),
-        name: name,
-        nameLoc: nameLoc,
-        inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-        defaultType: self.generate(node.initializer?.value)?.rawValue,
-        genericWhereClause: self.generate(node.genericWhereClause)?.rawValue
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      associatedtypeKeywordLoc: node.associatedtypeKeyword.bridgedSourceLoc(in: self),
+      name: name,
+      nameLoc: nameLoc,
+      inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
+      defaultType: self.generate(node.initializer?.value),
+      genericWhereClause: self.generate(node.genericWhereClause)
     )
   }
 }
@@ -161,51 +177,51 @@ extension ASTGenVisitor {
 // MARK: - ExtensionDecl
 
 extension ASTGenVisitor {
-  func generate(_ node: ExtensionDeclSyntax) -> ASTNode {
-    let decl = ExtensionDecl_create(
-      astContext: self.ctx,
+  func generate(_ node: ExtensionDeclSyntax) -> BridgedExtensionDecl {
+    let decl = BridgedExtensionDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       extensionKeywordLoc: node.extensionKeyword.bridgedSourceLoc(in: self),
-      extendedType: self.generate(node.extendedType).rawValue,
+      extendedType: self.generate(node.extendedType),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-      braceRange: BridgedSourceRange(startToken: node.memberBlock.leftBrace, endToken: node.memberBlock.rightBrace, in: self)
+      genericWhereClause: self.generate(node.genericWhereClause),
+      braceRange: BridgedSourceRange(
+        startToken: node.memberBlock.leftBrace,
+        endToken: node.memberBlock.rightBrace,
+        in: self
+      )
     )
 
     self.withDeclContext(decl.asDeclContext) {
-      IterableDeclContext_setParsedMembers(self.generate(node.memberBlock.members), ofDecl: decl.asDecl)
+      decl.setParsedMembers(self.generate(node.memberBlock.members))
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 }
 
 // MARK: - EnumCaseDecl
 
 extension ASTGenVisitor {
-  func generate(_ node: EnumCaseElementSyntax) -> ASTNode {
+  func generate(_ node: EnumCaseElementSyntax) -> BridgedEnumElementDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    return .decl(
-      EnumElementDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        name: name,
-        nameLoc: nameLoc,
-        parameterList: self.generate(node.parameterClause)?.rawValue,
-        equalsLoc: (node.rawValue?.equal).bridgedSourceLoc(in: self),
-        rawValue: self.generate(node.rawValue?.value)?.rawValue
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      name: name,
+      nameLoc: nameLoc,
+      parameterList: self.generate(node.parameterClause),
+      equalsLoc: (node.rawValue?.equal).bridgedSourceLoc(in: self),
+      rawValue: self.generate(node.rawValue?.value)
     )
   }
 
-  func generate(_ node: EnumCaseDeclSyntax) -> ASTNode {
-    .decl(
-      EnumCaseDecl_create(
-        declContext: self.declContext,
-        caseKeywordLoc: node.caseKeyword.bridgedSourceLoc(in: self),
-        elements: node.elements.lazy.map { self.generate($0).rawValue }.bridgedArray(in: self)
-      )
+  func generate(_ node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl {
+    .createParsed(
+      declContext: self.declContext,
+      caseKeywordLoc: node.caseKeyword.bridgedSourceLoc(in: self),
+      elements: node.elements.lazy.map(self.generate).bridgedArray(in: self)
     )
   }
 }
@@ -213,23 +229,21 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  public func generate(_ node: VariableDeclSyntax) -> ASTNode {
-    let pattern = generate(node.bindings.first!.pattern).rawValue
-    let initializer = generate(node.bindings.first!.initializer!).rawValue
+  public func generate(_ node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
+    let pattern = generate(node.bindings.first!.pattern)
+    let initializer = generate(node.bindings.first!.initializer!)
 
     let isStatic = false  // TODO: compute this
     let isLet = node.bindingSpecifier.tokenKind == .keyword(.let)
 
-    return .decl(
-      VarDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        bindingKeywordLoc: node.bindingSpecifier.bridgedSourceLoc(in: self),
-        nameExpr: pattern,
-        initializer: initializer,
-        isStatic: isStatic,
-        isLet: isLet
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      bindingKeywordLoc: node.bindingSpecifier.bridgedSourceLoc(in: self),
+      nameExpr: pattern.castToExpr,
+      initializer: initializer,
+      isStatic: isStatic,
+      isLet: isLet
     )
   }
 }
@@ -237,75 +251,75 @@ extension ASTGenVisitor {
 // MARK: - AbstractFunctionDecl
 
 extension ASTGenVisitor {
-  public func generate(_ node: FunctionDeclSyntax) -> ASTNode {
+  public func generate(_ node: FunctionDeclSyntax) -> BridgedFuncDecl {
     // FIXME: Compute this location
     let staticLoc: BridgedSourceLoc = nil
 
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
-    let decl = FuncDecl_create(
-      astContext: self.ctx,
+    let decl = BridgedFuncDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       staticLoc: staticLoc,
       funcKeywordLoc: node.funcKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
-      parameterList: self.generate(node.signature.parameterClause).rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
+      parameterList: self.generate(node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type)?.rawValue,
-      returnType: self.generate(node.signature.returnClause?.type)?.rawValue,
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue
+      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type),
+      returnType: self.generate(node.signature.returnClause?.type),
+      genericWhereClause: self.generate(node.genericWhereClause)
     )
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        AbstractFunctionDecl_setBody(self.generate(body).rawValue, ofDecl: decl.asDecl)
+        decl.setParsedBody(self.generate(body))
       }
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  func generate(_ node: InitializerDeclSyntax) -> ASTNode {
-    let decl = ConstructorDecl_create(
-      astContext: self.ctx,
+  func generate(_ node: InitializerDeclSyntax) -> BridgedConstructorDecl {
+    let decl = BridgedConstructorDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       initKeywordLoc: node.initKeyword.bridgedSourceLoc(in: self),
       failabilityMarkLoc: node.optionalMark.bridgedSourceLoc(in: self),
       isIUO: node.optionalMark?.tokenKind == .exclamationMark,
-      genericParamList: self.generate(node.genericParameterClause)?.rawValue,
-      parameterList: self.generate(node.signature.parameterClause).rawValue,
+      genericParamList: self.generate(node.genericParameterClause),
+      parameterList: self.generate(node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type)?.rawValue,
-      genericWhereClause: self.generate(node.genericWhereClause)?.rawValue
+      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type),
+      genericWhereClause: self.generate(node.genericWhereClause)
     )
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        AbstractFunctionDecl_setBody(self.generate(body).rawValue, ofDecl: decl.asDecl)
+        decl.setParsedBody(self.generate(body))
       }
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 
-  func generate(_ node: DeinitializerDeclSyntax) -> ASTNode {
-    let decl = DestructorDecl_create(
-      astContext: self.ctx,
+  func generate(_ node: DeinitializerDeclSyntax) -> BridgedDestructorDecl {
+    let decl = BridgedDestructorDecl.createParsed(
+      self.ctx,
       declContext: self.declContext,
       deinitKeywordLoc: node.deinitKeyword.bridgedSourceLoc(in: self)
     )
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        AbstractFunctionDecl_setBody(self.generate(body).rawValue, ofDecl: decl.asDecl)
+        decl.setParsedBody(self.generate(body))
       }
     }
 
-    return .decl(decl.asDecl)
+    return decl
   }
 }
 
@@ -323,7 +337,7 @@ extension BridgedOperatorFixity {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: OperatorDeclSyntax) -> ASTNode {
+  func generate(_ node: OperatorDeclSyntax) -> BridgedOperatorDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
     let (precedenceGroupName, precedenceGroupLoc) = (node.operatorPrecedenceAndTypes?.precedenceGroup).bridgedIdentifierAndSourceLoc(in: self)
 
@@ -335,18 +349,16 @@ extension ASTGenVisitor {
       self.diagnose(Diagnostic(node: node.fixitySpecifier, message: UnexpectedTokenKindError(token: node.fixitySpecifier)))
     }
 
-    return .decl(
-      OperatorDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        fixity: fixity,
-        operatorKeywordLoc: node.operatorKeyword.bridgedSourceLoc(in: self),
-        name: name,
-        nameLoc: nameLoc,
-        colonLoc: (node.operatorPrecedenceAndTypes?.colon).bridgedSourceLoc(in: self),
-        precedenceGroupName: precedenceGroupName,
-        PrecedenceGroupLoc: precedenceGroupLoc
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      fixity: fixity,
+      operatorKeywordLoc: node.operatorKeyword.bridgedSourceLoc(in: self),
+      name: name,
+      nameLoc: nameLoc,
+      colonLoc: (node.operatorPrecedenceAndTypes?.colon).bridgedSourceLoc(in: self),
+      precedenceGroupName: precedenceGroupName,
+      precedenceGroupLoc: precedenceGroupLoc
     )
   }
 }
@@ -365,7 +377,7 @@ extension BridgedAssociativity {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: PrecedenceGroupDeclSyntax) -> ASTNode {
+  func generate(_ node: PrecedenceGroupDeclSyntax) -> BridgedPrecedenceGroupDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
     struct PrecedenceGroupBody {
@@ -438,25 +450,23 @@ extension ASTGenVisitor {
       assignmentValue = false
     }
 
-    return .decl(
-      PrecedenceGroupDecl_create(
-        declContext: self.declContext,
-        precedencegroupKeywordLoc: node.precedencegroupKeyword.bridgedSourceLoc(in: self),
-        name: name,
-        nameLoc: nameLoc,
-        leftBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
-        associativityLabelLoc: (body.associativity?.associativityLabel).bridgedSourceLoc(in: self),
-        associativityValueLoc: (body.associativity?.value).bridgedSourceLoc(in: self),
-        associativity: associativityValue,
-        assignmentLabelLoc: (body.assignment?.assignmentLabel).bridgedSourceLoc(in: self),
-        assignmentValueLoc: (body.assignment?.value).bridgedSourceLoc(in: self),
-        isAssignment: assignmentValue,
-        higherThanKeywordLoc: (body.higherThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
-        higherThanNames: self.generate(body.higherThanRelation?.precedenceGroups),
-        lowerThanKeywordLoc: (body.lowerThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
-        lowerThanNames: self.generate(body.lowerThanRelation?.precedenceGroups),
-        rightBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
-      )
+    return .createParsed(
+      declContext: self.declContext,
+      precedencegroupKeywordLoc: node.precedencegroupKeyword.bridgedSourceLoc(in: self),
+      name: name,
+      nameLoc: nameLoc,
+      leftBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
+      associativityLabelLoc: (body.associativity?.associativityLabel).bridgedSourceLoc(in: self),
+      associativityValueLoc: (body.associativity?.value).bridgedSourceLoc(in: self),
+      associativity: associativityValue,
+      assignmentLabelLoc: (body.assignment?.assignmentLabel).bridgedSourceLoc(in: self),
+      assignmentValueLoc: (body.assignment?.value).bridgedSourceLoc(in: self),
+      isAssignment: assignmentValue,
+      higherThanKeywordLoc: (body.higherThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
+      higherThanNames: self.generate(body.higherThanRelation?.precedenceGroups),
+      lowerThanKeywordLoc: (body.lowerThanRelation?.higherThanOrLowerThanLabel).bridgedSourceLoc(in: self),
+      lowerThanNames: self.generate(body.lowerThanRelation?.precedenceGroups),
+      rightBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
     )
   }
 }
@@ -479,7 +489,7 @@ extension BridgedImportKind {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: ImportDeclSyntax) -> ASTNode {
+  func generate(_ node: ImportDeclSyntax) -> BridgedImportDecl {
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {
       if let value = BridgedImportKind(from: specifier.tokenKind) {
@@ -492,17 +502,15 @@ extension ASTGenVisitor {
       importKind = .module
     }
 
-    return .decl(
-      ImportDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        importKeywordLoc: node.importKeyword.bridgedSourceLoc(in: self),
-        importKind: importKind,
-        importKindLoc: node.importKindSpecifier.bridgedSourceLoc(in: self),
-        path: node.path.lazy.map {
-          $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
-        }.bridgedArray(in: self)
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      importKeywordLoc: node.importKeyword.bridgedSourceLoc(in: self),
+      importKind: importKind,
+      importKindLoc: node.importKindSpecifier.bridgedSourceLoc(in: self),
+      path: node.path.lazy.map {
+        $0.name.bridgedIdentifierAndSourceLoc(in: self) as BridgedIdentifierAndSourceLoc
+      }.bridgedArray(in: self)
     )
   }
 }
@@ -510,12 +518,12 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: MemberBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate($0).rawValue }.bridgedArray(in: self)
+    node.lazy.map(self.generate).bridgedArray(in: self)
   }
 
   @inline(__always)
   func generate(_ node: InheritedTypeListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate($0.type).rawValue }.bridgedArray(in: self)
+    node.lazy.map { self.generate($0.type) }.bridgedArray(in: self)
   }
 
   @inline(__always)

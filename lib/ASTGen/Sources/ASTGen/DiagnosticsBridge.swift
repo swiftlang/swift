@@ -21,17 +21,19 @@ fileprivate func emitDiagnosticParts(
   // Emit the diagnostic
   var mutableMessage = message
   let diag = mutableMessage.withBridgedString { bridgedMessage in
-    Diagnostic_create(
-      diagnosticEngine, bridgedSeverity, bridgedSourceLoc(at: position),
-      bridgedMessage
+    BridgedDiagnostic(
+      at: bridgedSourceLoc(at: position),
+      message: bridgedMessage,
+      severity: bridgedSeverity,
+      engine: diagnosticEngine
     )
   }
 
   // Emit highlights
   for highlight in highlights {
-    Diagnostic_highlight(
-      diag, bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
-      bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
+    diag.highlight(
+      start: bridgedSourceLoc(at: highlight.positionAfterSkippingLeadingTrivia),
+      end: bridgedSourceLoc(at: highlight.endPositionBeforeTrailingTrivia)
     )
   }
 
@@ -60,14 +62,14 @@ fileprivate func emitDiagnosticParts(
     }
 
     newText.withBridgedString { bridgedMessage in
-      Diagnostic_fixItReplace(
-        diag, replaceStartLoc, replaceEndLoc,
-        bridgedMessage
+      diag.fixItReplace(
+        start: replaceStartLoc, end: replaceEndLoc,
+        replacement: bridgedMessage
       )
     }
   }
 
-  Diagnostic_finish(diag);
+  diag.finish();
 }
 
 /// Emit the given diagnostic via the diagnostic engine.
@@ -139,19 +141,19 @@ extension SourceManager {
     // Emit the diagnostic
     var mutableMessage = message
     let diag = mutableMessage.withBridgedString { bridgedMessage in
-      Diagnostic_create(
-        bridgedDiagEngine, bridgedSeverity,
-        bridgedSourceLoc(for: node, at: position),
-        bridgedMessage
+      BridgedDiagnostic(
+        at: bridgedSourceLoc(for: node, at: position),
+        message: bridgedMessage,
+        severity: bridgedSeverity,
+        engine: bridgedDiagEngine
       )
     }
 
     // Emit highlights
     for highlight in highlights {
-      Diagnostic_highlight(
-        diag,
-        bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
-        bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
+      diag.highlight(
+        start: bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
+        end: bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
       )
     }
 
@@ -193,14 +195,14 @@ extension SourceManager {
       }
 
       newText.withBridgedString { bridgedMessage in
-        Diagnostic_fixItReplace(
-          diag, replaceStartLoc, replaceEndLoc,
-          bridgedMessage
+        diag.fixItReplace(
+          start: replaceStartLoc, end: replaceEndLoc,
+          replacement: bridgedMessage
         )
       }
     }
 
-    Diagnostic_finish(diag);
+    diag.finish();
   }
 
   /// Emit a diagnostic via the C++ diagnostic engine.

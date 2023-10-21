@@ -31,7 +31,7 @@ extension Parser.ExperimentalFeatures {
     guard let context = context else { return }
 
     func mapFeature(_ bridged: BridgedFeature, to feature: Self) {
-      if ASTContext_langOptsHasFeature(context, bridged) {
+      if context.langOptsHasFeature(bridged) {
         insert(feature)
       }
     }
