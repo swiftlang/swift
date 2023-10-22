@@ -376,7 +376,6 @@ func tryDo29(_ fn: () throws -> Int) rethrows -> Int {
 }
 
 func tryDo30(_ fn: () throws -> Int) rethrows -> Int {
-  // FIXME: This ought to work (https://github.com/apple/swift/issues/68824)
   do {
     let x = do { try fn() } catch { throw error }
     return x
