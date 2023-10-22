@@ -1922,6 +1922,13 @@ ERROR(attr_methods_only,none,
 ERROR(attr_decl_async,none,
       "@%0 %1 cannot be asynchronous", (StringRef, DescriptiveDeclKind))
 
+ERROR(attr_only_at_non_local_scope, none,
+      "attribute '%0' can only be used in a non-local scope", (StringRef))
+ERROR(attr_only_at_non_generic_scope, none,
+      "attribute '%0' cannot be used in a generic context", (StringRef))
+ERROR(attr_only_on_static_properties, none,
+      "properties with attribute '_section' must be static", (StringRef))
+
 ERROR(access_control_in_protocol,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 NOTE(access_control_in_protocol_detail,none,
@@ -3760,6 +3767,8 @@ ERROR(attr_not_on_variadic_parameters,none,
       "'%0' must not be used on variadic parameters", (StringRef))
 ERROR(attr_not_on_stored_properties,none,
       "'%0' must not be used on stored properties", (DeclAttribute))
+ERROR(attr_not_on_computed_properties,none,
+      "'%0' must not be used on computed properties", (DeclAttribute))
 
 WARNING(attr_has_no_effect_on_decl_with_access_level,none,
        "'%0' does not have any effect on "

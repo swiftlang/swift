@@ -1,22 +1,27 @@
-// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
+// RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s
 // REQUIRES: swift_in_compiler
 // UNSUPPORTED: CPU=wasm32
 
-// ASM: .section{{.*}}__TEXT,__mysection
-// ASM-NOT: .section
-// ASM: $s7section3fooyyF:
-// ASM-linux-gnu: .section{{.*}}__TEXT,__mysection
-// ASM-linux-android: .section{{.*}}__TEXT,__mysection
-// ASM-linux-androideabi: .section{{.*}}__TEXT,__mysection
-// ASM-NOT: .section
-// ASM: $s7section2g0Sivp:
-// ASM-NOT: .section
-// ASM: $s7section2g1Si_Sitvp:
-// ASM-NOT: .section
-// ASM: $s7section2g2Sbvp:
-// ASM-NOT: .section
-// ASM: $s7section2g3Sbvp:
-// ASM-NOT: .section
-// ASM: $s7section2g4SpySiGSgvp:
-// ASM-NOT: .section
-// ASM: $s7section2g5SpySiGSgvp:
+// CHECK: .section{{.*}}__TEXT,__mysection
+// CHECK-NOT: .section
+// CHECK: $s7section3fooyyF:
+
+// CHECK: .section{{.*}}__TEXT,__mysection
+// CHECK-NOT: .section
+// CHECK: $s7section8MyStructV3fooyyF:
+
+// CHECK: .section{{.*}}__DATA,__mysection
+// CHECK-NOT: .section
+// CHECK: $s7section2g0Sivp:
+// CHECK-NOT: .section
+// CHECK: $s7section2g1Si_Sitvp:
+// CHECK-NOT: .section
+// CHECK: $s7section2g2Sbvp:
+// CHECK-NOT: .section
+// CHECK: $s7section2g3Sbvp:
+// CHECK-NOT: .section
+// CHECK: $s7section2g4SpySiGSgvp:
+// CHECK-NOT: .section
+// CHECK: $s7section2g5SpySiGSgvp:
+// CHECK-NOT: .section
+// CHECK: $s7section8MyStructV7static0SivpZ:

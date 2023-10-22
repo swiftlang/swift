@@ -2080,10 +2080,22 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::section_linkage_markers_disabled);
     return;
   }
-  
-  // Only top-level func/var decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::used_not_at_top_level);
+
+  if (D->getDeclContext()->isLocalContext())
+    diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope,
+             attr->getAttrName());
+  else if (D->getDeclContext()->isGenericContext())
+    diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
+             attr->getAttrName());
+  else if (auto *VarD = dyn_cast<VarDecl>(D)) {
+    if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(attr->getLocation(), diag::attr_only_on_static_properties,
+               attr->getAttrName());
+    } else if (!VarD->hasStorageOrWrapsStorage()) {
+      diagnose(attr->getLocation(), diag::attr_not_on_computed_properties,
+               attr);
+    }
+  }
 }
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
@@ -2092,13 +2104,25 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
     return;
   }
 
-  // Only top-level func/var decls are currently supported.
-  if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::section_not_at_top_level);
-
   // The name must not be empty.
   if (attr->Name.empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
+
+  if (D->getDeclContext()->isLocalContext())
+    return; // already diagnosed
+
+  if (D->getDeclContext()->isGenericContext())
+    diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope,
+             attr->getAttrName());
+  else if (auto *VarD = dyn_cast<VarDecl>(D)) {
+    if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
+      diagnose(attr->getLocation(), diag::attr_only_on_static_properties,
+               attr->getAttrName());
+    } else if (!VarD->hasStorageOrWrapsStorage()) {
+      diagnose(attr->getLocation(), diag::attr_not_on_computed_properties,
+               attr);
+    }
+  }
 }
 
 void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
