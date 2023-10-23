@@ -113,7 +113,7 @@ struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
-  SmallSetVector<SILInstruction *, 4> originalDestroys;
+  llvm::SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
 
   KnownStorageUses(AccessStorage storage, SILFunction *function)
@@ -199,17 +199,17 @@ class DeinitBarriers final {
 public:
   // Instructions beyond which a destroy_addr cannot be hoisted, reachable from
   // a destroy_addr.  Deinit barriers or storage uses.
-  SmallSetVector<SILInstruction *, 4> barrierInstructions;
+  llvm::SmallSetVector<SILInstruction *, 4> barrierInstructions;
 
   // Phis beyond which a destroy_addr cannot be hoisted, reachable from a
   // destroy_addr.
-  SmallSetVector<SILBasicBlock *, 4> barrierPhis;
+  llvm::SmallSetVector<SILBasicBlock *, 4> barrierPhis;
 
   // Blocks beyond the end of which a destroy_addr cannot be hoisted.
-  SmallSetVector<SILBasicBlock *, 4> barrierBlocks;
+  llvm::SmallSetVector<SILBasicBlock *, 4> barrierBlocks;
 
   // Debug instructions that are no longer within this lifetime after shrinking.
-  SmallSetVector<SILInstruction *, 4> deadUsers;
+  llvm::SmallSetVector<SILInstruction *, 4> deadUsers;
 
   // The access scopes which are hoisting barriers.
   //

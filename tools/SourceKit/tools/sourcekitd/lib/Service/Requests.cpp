@@ -37,6 +37,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -580,12 +581,12 @@ handleRequestGlobalConfiguration(const RequestDict &Req,
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<unsigned> CompletionMaxASTContextReuseCount =
-        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
-            .transform([](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> CompletionCheckDependencyInterval =
-        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval)
-            .transform([](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionMaxASTContextReuseCount = swift::transform(
+        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount),
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionCheckDependencyInterval = swift::transform(
+        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval),
+        [](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
         Config->update(CompletionMaxASTContextReuseCount,
@@ -1674,10 +1675,12 @@ handleRequestCollectVariableType(const RequestDict &Req,
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
 
-    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).transform(
-        [](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).transform(
-        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Offset =
+        swift::transform(Req.getOptionalInt64(KeyOffset),
+                         [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length =
+        swift::transform(Req.getOptionalInt64(KeyLength),
+                         [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     return Lang.collectVariableTypes(

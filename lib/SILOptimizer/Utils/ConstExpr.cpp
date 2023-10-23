@@ -768,7 +768,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
       // Return a statically diagnosed overflow if the operation is supposed to
       // trap on overflow.
-      if (overflowed && !operand2.getIntegerValue().isNullValue())
+      if (overflowed && !operand2.getIntegerValue().isZero())
         return getUnknown(evaluator, SILValue(inst), UnknownReason::Overflow);
 
       auto &allocator = evaluator.getAllocator();

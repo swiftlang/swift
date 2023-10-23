@@ -159,7 +159,7 @@ class ArrayInfo {
   llvm::DenseMap<uint64_t, StoreInst *> elementStoreMap;
 
   /// List of Sequence.forEach calls invoked on the array.
-  SmallSetVector<TryApplyInst *, 4> forEachCalls;
+  llvm::SmallSetVector<TryApplyInst *, 4> forEachCalls;
 
   /// Indicates whether the array could be modified after initialization. Note
   /// that this not include modifications to the elements of the array. When

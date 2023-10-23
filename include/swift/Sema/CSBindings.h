@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "llvm/ADT/APInt.h"
@@ -298,6 +299,69 @@ public:
   void retract(Constraint *constraint);
 };
 
+
+} // end namespace inference
+
+} // end namespace constraints
+
+} // end namespace swift
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
+  using Binding = swift::constraints::inference::PotentialBinding;
+
+  static Binding getEmptyKey() {
+    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
+  }
+
+  static Binding getTombstoneKey() {
+    return placeholderKey(
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const Binding &Val) {
+    return DenseMapInfo<swift::Type>::getHashValue(
+        Val.BindingType->getCanonicalType());
+  }
+
+  static bool isEqual(const Binding &LHS, const Binding &RHS) {
+    auto lhsTy = LHS.BindingType.getPointer();
+    auto rhsTy = RHS.BindingType.getPointer();
+
+    // Fast path: pointer equality.
+    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
+      return true;
+
+    // If either side is empty or tombstone, let's use pointer equality.
+    {
+      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
+      auto tombstoneTy =
+          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
+
+      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+
+      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
+        return lhsTy == rhsTy;
+    }
+
+    // Otherwise let's drop the sugar and check.
+    return LHS.BindingType->isEqual(RHS.BindingType);
+  }
+
+private:
+  static Binding placeholderKey(swift::Type type) {
+    return Binding::forPlaceholder(type);
+  }
+};
+
+} // end namespace llvm
+
+namespace swift {
+namespace constraints {
+namespace inference {
 class BindingSet {
   using BindingScore =
       std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
@@ -311,7 +375,7 @@ class BindingSet {
   llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
 public:
-  llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+  swift::SmallSetVector<PotentialBinding, 4> Bindings;
   llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
   llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
@@ -473,7 +537,8 @@ public:
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
 
-  /// Return a literal requirement that has the most impact on the binding score.
+  /// Return a literal requirement that has the most impact on the binding
+  /// score.
   LiteralBindingKind getLiteralForScore() const;
 
   /// Check if this binding is favored over a disjunction e.g.
@@ -563,77 +628,22 @@ private:
   /// Check whether the given binding set covers any of the
   /// literal protocols associated with this type variable.
   void determineLiteralCoverage();
-  
+
   StringRef getLiteralBindingKind(LiteralBindingKind K) const {
-  #define ENTRY(Kind, String) case LiteralBindingKind::Kind: return String
+#define ENTRY(Kind, String)                                                    \
+  case LiteralBindingKind::Kind:                                               \
+    return String
     switch (K) {
-    ENTRY(None, "none");
-    ENTRY(Collection, "collection");
-    ENTRY(Float, "float");
-    ENTRY(Atom, "atom");
+      ENTRY(None, "none");
+      ENTRY(Collection, "collection");
+      ENTRY(Float, "float");
+      ENTRY(Atom, "atom");
     }
-  #undef ENTRY
-  }
-  
-};
-
-} // end namespace inference
-
-} // end namespace constraints
-
-} // end namespace swift
-
-namespace llvm {
-
-template <>
-struct DenseMapInfo<swift::constraints::inference::PotentialBinding> {
-  using Binding = swift::constraints::inference::PotentialBinding;
-
-  static Binding getEmptyKey() {
-    return placeholderKey(llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey());
-  }
-
-  static Binding getTombstoneKey() {
-    return placeholderKey(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(const Binding &Val) {
-    return DenseMapInfo<swift::Type>::getHashValue(
-        Val.BindingType->getCanonicalType());
-  }
-
-  static bool isEqual(const Binding &LHS, const Binding &RHS) {
-    auto lhsTy = LHS.BindingType.getPointer();
-    auto rhsTy = RHS.BindingType.getPointer();
-
-    // Fast path: pointer equality.
-    if (DenseMapInfo<swift::TypeBase *>::isEqual(lhsTy, rhsTy))
-      return true;
-
-    // If either side is empty or tombstone, let's use pointer equality.
-    {
-      auto emptyTy = llvm::DenseMapInfo<swift::TypeBase *>::getEmptyKey();
-      auto tombstoneTy =
-          llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey();
-
-      if (lhsTy == emptyTy || lhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-
-      if (rhsTy == emptyTy || rhsTy == tombstoneTy)
-        return lhsTy == rhsTy;
-    }
-
-    // Otherwise let's drop the sugar and check.
-    return LHS.BindingType->isEqual(RHS.BindingType);
-  }
-
-private:
-  static Binding placeholderKey(swift::Type type) {
-    return Binding::forPlaceholder(type);
+#undef ENTRY
   }
 };
-
-} // end namespace llvm
+} // namespace inference
+} // namespace constraints
+} // namespace swift
 
 #endif // SWIFT_SEMA_CSBINDINGS_H

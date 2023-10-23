@@ -13,6 +13,7 @@
 #include "swift/Basic/FileSystem.h"
 
 #include "clang/Basic/FileManager.h"
+#include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"

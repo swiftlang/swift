@@ -218,9 +218,8 @@ public:
 
     ValueType operator*() const {
       assert(remainingChunk && "dereferencing a completed iterator");
-      return ValueType(chunkIndex * chunkSize
-                         + llvm::findFirstSet(remainingChunk,
-                                              llvm::ZB_Undefined));
+      return ValueType(chunkIndex * chunkSize +
+                       llvm::countr_zero(remainingChunk));
     }
 
     bool operator==(const iterator &other) const {

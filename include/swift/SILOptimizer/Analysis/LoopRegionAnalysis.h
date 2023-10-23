@@ -219,7 +219,7 @@ public:
           return llvm::None;
         if ((*ID).IsNonLocal)
           return llvm::None;
-        return (*ID).ID;
+        return static_cast<unsigned>((*ID).ID);
       }
     };
 
@@ -230,7 +230,7 @@ public:
           return llvm::None;
         if (!(*ID).IsNonLocal)
           return llvm::None;
-        return (*ID).ID;
+        return static_cast<unsigned>((*ID).ID);
       }
     };
   };

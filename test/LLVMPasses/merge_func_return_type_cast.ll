@@ -1,4 +1,4 @@
-; RUN: %swift-llvm-opt -swift-merge-functions -swiftmergefunc-threshold=4 -opaque-pointers %s | %FileCheck %s
+; RUN: %swift-llvm-opt -passes='swift-merge-functions' -swiftmergefunc-threshold=4 %s | %FileCheck %s
 
 ; REQUIRES: PTRSIZE=64
 

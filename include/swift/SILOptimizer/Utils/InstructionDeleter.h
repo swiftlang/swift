@@ -114,7 +114,7 @@ class InstructionDeleter {
   /// instructions in this set is important as when a dead instruction is
   /// removed, new instructions will be generated to fix the lifetime of the
   /// instruction's operands. This has to be deterministic.
-  SmallSetVector<SILInstruction *, 8> deadInstructions;
+  llvm::SmallSetVector<SILInstruction *, 8> deadInstructions;
 
   /// Callbacks used when adding/deleting instructions.
   InstModCallbacks callbacks;

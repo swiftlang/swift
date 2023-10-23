@@ -97,7 +97,7 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
     borrowtodestructure::IntervalMapAllocator allocator;
 
     unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         moveIntroducersToProcess;
     bool madeChange =
         searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(

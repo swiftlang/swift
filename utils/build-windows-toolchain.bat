@@ -209,6 +209,7 @@ cmake ^
 
   -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe" ^
   -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D SWIFT_CLANG_LOCATION="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 

@@ -155,6 +155,6 @@ func test_computed_key_path_generic_thunks<T: P0 & Hashable>(value: T) -> KeyPat
 //   unlikely that handrolled code generation would think to add one.
 // CHECK: attributes [[ATTRS_SIMPLE]] = { [[CUSTOM_ATTRS:.*target-cpu.*]] }{{$}}
 // CHECK-DAG: attributes [[ATTRS_NOINLINE_NOUNWIND]] = { noinline nounwind {{.*target-cpu.*}} }
-// CHECK-DAG: attributes [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]] = { noinline nounwind readnone {{.*}}"frame-pointer"="non-leaf"{{.*target-cpu.*}} }
-// CHECK-DAG: attributes [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]] = { noinline nounwind readonly willreturn {{.*}}"frame-pointer"="non-leaf"{{.*target-cpu.*}} }
+// CHECK-DAG: attributes [[ATTRS_NOINLINE_READNONE_NOUNWIND_NOFRAME]] = { noinline nounwind memory(none) {{.*}}"frame-pointer"="non-leaf"{{.*target-cpu.*}} }
+// CHECK-DAG: attributes [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME]] = { noinline nounwind willreturn memory(read) {{.*}}"frame-pointer"="non-leaf"{{.*target-cpu.*}} }
 // CHECK-DAG: attributes [[ATTRS_NOUNWIND]] = { nounwind [[CUSTOM_ATTRS]] }{{$}}

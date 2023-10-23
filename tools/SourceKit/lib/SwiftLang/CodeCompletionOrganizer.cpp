@@ -533,7 +533,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getFilterName());
     } else {
-      match = completion->getFilterName().startswith_insensitive(filterText);
+      match = completion->getFilterName().starts_with_insensitive(filterText);
     }
 
     bool isExactMatch =

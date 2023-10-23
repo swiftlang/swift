@@ -51,7 +51,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 
@@ -163,6 +163,10 @@ public:
 
   StringRef getTargetTriple() const {
     return LangOpts.Target.str();
+  }
+
+  bool requiresCAS() const {
+    return FrontendOpts.EnableCaching || FrontendOpts.UseCASBackend;
   }
 
   void setClangModuleCachePath(StringRef Path) {

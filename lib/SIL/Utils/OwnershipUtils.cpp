@@ -490,7 +490,7 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // guaranteedForwardingOps is a collection of all transitive
   // GuaranteedForwarding uses of \p value. It is a set, to avoid repeated
   // processing of structs and tuples which are GuaranteedForwarding.
-  SmallSetVector<Operand *, 4> guaranteedForwardingOps;
+  llvm::SmallSetVector<Operand *, 4> guaranteedForwardingOps;
   // Collect first-level GuaranteedForwarding uses, and call the visitor on any
   // GuaranteedForwardingPhi uses.
   for (auto *use : value->getUses()) {
@@ -1171,7 +1171,7 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
   if (inputValue->getOwnershipKind() != OwnershipKind::Guaranteed)
     return false;
 
-  SmallSetVector<SILValue, 32> worklist;
+  llvm::SmallSetVector<SILValue, 32> worklist;
   worklist.insert(inputValue);
 
   // worklist grows in this loop.
@@ -1566,7 +1566,7 @@ void swift::visitExtendedReborrowPhiBaseValuePairs(
   // paths.
   // For that reason, worklist stores (reborrow, base value) pairs.
   // We need a SetVector to make sure we don't revisit the same pair again.
-  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
+  llvm::SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
 
   // Find all reborrows of value and insert the (reborrow, base value) pair into
   // the worklist.
@@ -1622,7 +1622,7 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
   // value) pairs. We need a SetVector to make sure we don't revisit the same
   // pair again.
-  SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
+  llvm::SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
 
   auto collectGuaranteedForwardingPhis = [&](SILValue value,
                                              SILValue baseValue) {

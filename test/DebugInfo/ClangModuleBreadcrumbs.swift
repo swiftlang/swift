@@ -1,3 +1,5 @@
+// REQUIRES: rdar114728459
+
 // RUN: %target-swift-frontend -emit-ir %s -g -I %S/Inputs \
 // RUN:   -Xcc -DFOO="foo" -Xcc -UBAR -o - | %FileCheck %s
 //

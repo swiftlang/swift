@@ -863,13 +863,13 @@ class DiagnosticPrunedLiveness : public SSAPrunedLiveness {
   /// A side array that stores any non lifetime ending uses we find in live out
   /// blocks. This is used to enable our callers to emit errors on non-lifetime
   /// ending uses that extend liveness into a loop body.
-  SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
+  llvm::SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut;
 
 public:
   DiagnosticPrunedLiveness(
       SILFunction *function,
       SmallVectorImpl<SILBasicBlock *> *discoveredBlocks = nullptr,
-      SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut =
+      llvm::SmallSetVector<SILInstruction *, 8> *nonLifetimeEndingUsesInLiveOut =
           nullptr)
       : SSAPrunedLiveness(function, discoveredBlocks),
         nonLifetimeEndingUsesInLiveOut(nonLifetimeEndingUsesInLiveOut) {}

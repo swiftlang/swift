@@ -182,7 +182,9 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
     return attrs.addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   case ValueWitness::GetEnumTagSinglePayload:
-    return attrs.addFnAttribute(ctx, llvm::Attribute::ReadOnly)
+    return attrs
+        .addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                 ctx, llvm::MemoryEffects::readOnly()))
         .addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
@@ -847,7 +849,7 @@ getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
       true /*noinline*/);
 
   // This function is readonly.
-  cast<llvm::Function>(func)->addFnAttr(llvm::Attribute::ReadOnly);
+  cast<llvm::Function>(func)->setOnlyReadsMemory();
   return func;
 }
 

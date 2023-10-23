@@ -40,6 +40,8 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Alignment.h"
 
 using namespace swift;
 using namespace irgen;
@@ -363,14 +365,14 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
         continue;
     }
 
-    auto offset =
+    Size offset =
         Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-    auto alignment = IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+    llvm::Align alignment = IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
     // Load metadata describing argument value from argument types buffer.
     auto typeLoc = IGF.emitAddressAtOffset(
         argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
-        Alignment(alignment), "arg_type_loc");
+        Alignment(alignment.value()), "arg_type_loc");
 
     auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
@@ -719,12 +721,12 @@ void DistributedAccessor::emit() {
     for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-      auto alignment =
-          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+      llvm::Align alignment =
+          IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
-      auto substitution =
-          IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
-                                  IGM.TypeMetadataPtrTy, Alignment(alignment));
+      auto substitution = IGF.emitAddressAtOffset(
+          substitutionBuffer, Offset(offset), IGM.TypeMetadataPtrTy,
+          Alignment(alignment.value()));
       arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
     }
 

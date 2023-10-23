@@ -381,11 +381,11 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     CCArgs.push_back(Entry);
   }
 
-  if (!ClangInvok->getLangOpts()->isCompilingModule()) {
+  if (!ClangInvok->getLangOpts().isCompilingModule()) {
     CCArgs.push_back("-Xclang");
     llvm::SmallString<64> Str;
     Str += "-fmodule-name=";
-    Str += ClangInvok->getLangOpts()->CurrentModule;
+    Str += ClangInvok->getLangOpts().CurrentModule;
     CCArgs.push_back(std::string(Str.str()));
   }
 

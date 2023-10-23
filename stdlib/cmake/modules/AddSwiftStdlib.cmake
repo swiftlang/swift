@@ -788,6 +788,7 @@ function(add_swift_target_library_single target name)
         LINK_FLAGS
         LINK_LIBRARIES
         PRIVATE_LINK_LIBRARIES
+        PREFIX_INCLUDE_DIRS
         SWIFT_COMPILE_FLAGS
         MODULE_TARGETS)
 
@@ -1075,6 +1076,8 @@ function(add_swift_target_library_single target name)
   # to ensure that the runtime is built with our local copy of LLVMSupport
   target_include_directories(${target} BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/include)
+  target_include_directories(${target} BEFORE PRIVATE
+    ${SWIFTLIB_SINGLE_PREFIX_INCLUDE_DIRS})
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF"))
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
@@ -1789,6 +1792,7 @@ function(add_swift_target_library name)
         INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         LINK_FLAGS
         LINK_LIBRARIES
+        PREFIX_INCLUDE_DIRS
         PRIVATE_LINK_LIBRARIES
         SWIFT_COMPILE_FLAGS
         SWIFT_COMPILE_FLAGS_IOS
@@ -2283,6 +2287,7 @@ function(add_swift_target_library name)
         ${back_deployment_library_option}
         ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
+        PREFIX_INCLUDE_DIRS ${SWIFTLIB_PREFIX_INCLUDE_DIRS}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
       add_dependencies(${VARIANT_NAME} clang)

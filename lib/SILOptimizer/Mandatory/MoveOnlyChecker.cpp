@@ -94,7 +94,7 @@ struct MoveOnlyChecker {
 } // namespace
 
 void MoveOnlyChecker::checkObjects() {
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
   madeChange |= searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
@@ -183,7 +183,7 @@ void MoveOnlyChecker::completeObjectLifetimes(
 
 void MoveOnlyChecker::checkAddresses() {
   unsigned diagCount = diagnosticEmitter.getDiagnosticCount();
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
   searchForCandidateAddressMarkUnresolvedNonCopyableValueInsts(
       fn, moveIntroducersToProcess, diagnosticEmitter);

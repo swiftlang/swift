@@ -122,7 +122,7 @@ public:
   /// collecting the identifiers in \p spiGroups.
   virtual void lookupImportedSPIGroups(
                             const ModuleDecl *importedModule,
-                            SmallSetVector<Identifier, 4> &spiGroups) const {};
+                            llvm::SmallSetVector<Identifier, 4> &spiGroups) const {};
 
   /// Checks whether this file imports \c module as \c @_weakLinked.
   virtual bool importsModuleAsWeakLinked(const ModuleDecl *module) const {

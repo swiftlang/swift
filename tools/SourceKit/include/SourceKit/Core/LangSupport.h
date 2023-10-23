@@ -26,6 +26,7 @@
 #include <functional>
 #include <memory>
 #include <unordered_set>
+#include <variant>
 
 namespace llvm {
   class MemoryBuffer;

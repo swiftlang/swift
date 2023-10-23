@@ -6,9 +6,12 @@ add_swift_target_library(swiftRemoteMirror
                          LINK_LIBRARIES
                            swiftRemoteInspection
                          C_COMPILE_FLAGS
-                           ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftRemoteMirror_EXPORTS -I${LLVM_MAIN_INCLUDE_DIR}
+                           ${SWIFT_RUNTIME_CXX_FLAGS}
+                           -DswiftRemoteMirror_EXPORTS
                          LINK_FLAGS
                            ${SWIFT_RUNTIME_LINK_FLAGS}
+                         PREFIX_INCLUDE_DIRS
+                           ${SWIFT_SOURCE_DIR}/include/swift/RemoteInspection/RuntimeHeaders
                          INCORPORATE_OBJECT_LIBRARIES swiftLLVMSupport
                          SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                          DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"

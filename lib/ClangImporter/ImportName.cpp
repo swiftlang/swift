@@ -26,6 +26,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Parser.h"
@@ -45,6 +46,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Import Name"
@@ -257,10 +259,8 @@ static const char AltErrorSuffix[] = "WithError";
 /// \param method The Clang method.
 static OptionalTypeKind getResultOptionality(
                           const clang::ObjCMethodDecl *method) {
-  auto &clangCtx = method->getASTContext();
-
   // If nullability is available on the type, use it.
-  if (auto nullability = method->getReturnType()->getNullability(clangCtx)) {
+  if (auto nullability = method->getReturnType()->getNullability()) {
     return translateNullability(*nullability);
   }
 
@@ -1226,8 +1226,7 @@ bool swift::isCompletionHandlerParamName(StringRef paramName) {
 }
 
 // Determine whether the given type is a nullable NSError type.
-static bool isNullableNSErrorType(
-    clang::ASTContext &clangCtx, clang::QualType type) {
+static bool isNullableNSErrorType(clang::QualType type) {
   auto objcPtrType = type->getAs<clang::ObjCObjectPointerType>();
   if (!objcPtrType)
     return false;
@@ -1237,7 +1236,7 @@ static bool isNullableNSErrorType(
     return false;
 
   // If nullability is specified, check it.
-  if (auto nullability = type->getNullability(clangCtx)) {
+  if (auto nullability = type->getNullability()) {
     switch (translateNullability(*nullability)) {
     case OTK_None:
       return false;
@@ -1388,12 +1387,11 @@ llvm::Optional<ForeignAsyncConvention::Info> NameImporter::considerAsyncImport(
     completionHandlerParamTypes = prototype->getParamTypes();
   }
 
-  auto &clangCtx = clangDecl->getASTContext();
   for (unsigned paramIdx : indices(completionHandlerParamTypes)) {
     auto paramType = completionHandlerParamTypes[paramIdx];
 
     // We are only interested in nullable NSError parameters.
-    if (!isNullableNSErrorType(clangCtx, paramType))
+    if (!isNullableNSErrorType(paramType))
       continue;
 
     // If this is the first nullable error parameter, note that.
@@ -2393,14 +2391,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
               ? llvm::Optional<unsigned>(
-                    result.getErrorInfo()->ErrorParameterIndex)
+                    static_cast<unsigned int>(result.getErrorInfo()->ErrorParameterIndex))
               : llvm::None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().transform(
+          swift::transform(result.getAsyncInfo(),
               [](const ForeignAsyncConvention::Info &info) {
                 return info.completionHandlerParamIndex();
               }),
-          result.getAsyncInfo().transform(
+          swift::transform(result.getAsyncInfo(),
               [&](const ForeignAsyncConvention::Info &info) {
                 return method->getDeclName().getObjCSelector().getNameForSlot(
                     info.completionHandlerParamIndex());

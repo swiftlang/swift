@@ -44,7 +44,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/CASFileSystem.h"
@@ -425,7 +425,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
 
 bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   const auto &Opts = getInvocation().getFrontendOptions();
-  if (!Opts.EnableCaching)
+  if (!getInvocation().requiresCAS())
     return false;
 
   auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();

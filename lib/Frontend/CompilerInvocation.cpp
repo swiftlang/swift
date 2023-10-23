@@ -23,7 +23,7 @@
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
@@ -268,6 +268,10 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
       return IRGenOutputKind::ObjectFile;
     }
   }(FrontendOpts.RequestedAction);
+
+  IRGenOpts.UseCASBackend = FrontendOpts.UseCASBackend;
+  IRGenOpts.CASObjMode = FrontendOpts.CASObjMode;
+  IRGenOpts.EmitCASIDFile = FrontendOpts.EmitCASIDFile;
 
   // If we're in JIT mode, set the requisite flags.
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate) {
@@ -1484,8 +1488,7 @@ static bool ValidateModulesOnceOptions(const ClangImporterOptions &Opts,
   return false;
 }
 
-static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
-                                   ArgList &Args,
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory,
                                    const LangOptions &LangOpts,

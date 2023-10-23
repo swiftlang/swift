@@ -98,9 +98,11 @@ private:
     llvm::Error
     notifyFailed(llvm::orc::MaterializationResponsibility &MR) override;
 
-    llvm::Error notifyRemovingResources(llvm::orc::ResourceKey K) override;
+    llvm::Error notifyRemovingResources(llvm::orc::JITDylib &JD,
+                                        llvm::orc::ResourceKey K) override;
 
-    void notifyTransferringResources(llvm::orc::ResourceKey DstKey,
+    void notifyTransferringResources(llvm::orc::JITDylib &JD,
+                                     llvm::orc::ResourceKey DstKey,
                                      llvm::orc::ResourceKey SrcKey) override;
   };
 

@@ -776,7 +776,7 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
-                            {}, {}, None,
+                            {}, {}, llvm::None,
                             swift::AccessLevel::Public, {});
   }
   static inline AttributedImport getTombstoneKey() {
@@ -784,7 +784,7 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
-                            {}, {}, None,
+                            {}, {}, llvm::None,
                             swift::AccessLevel::Public, {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {

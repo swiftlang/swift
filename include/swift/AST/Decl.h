@@ -5020,7 +5020,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// \c None if it hasn't yet been computed.
   llvm::Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
     if (Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid)
-      return Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements;
+      return static_cast<bool>(Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements);
 
     return llvm::None;
   }

@@ -82,7 +82,7 @@ SwiftJIT::Create(CompilerInstance &CI) {
     return EPCIU.takeError();
 
   (*EPCIU)->createLazyCallThroughManager(
-      ES, llvm::pointerToJITTargetAddress(&handleLazyCompilationFailure));
+      ES, llvm::orc::ExecutorAddr::fromPtr(&handleLazyCompilationFailure));
 
   if (auto Err = setUpInProcessLCTMReentryViaEPCIU(**EPCIU))
     return std::move(Err);
@@ -199,8 +199,8 @@ renameFunctionBodies(llvm::orc::MaterializationResponsibility &MR,
       if (ToRename.count(Sym->getName())) {
         // FIXME: Get rid of the temporary when Swift's llvm-project is
         // updated to LLVM 17.
-        auto NewName = G.allocateString(mangle(Sym->getName()));
-        Sym->setName({NewName.data(), NewName.size()});
+        auto NewName = G.allocateCString(Twine(mangle(Sym->getName())));
+        Sym->setName({NewName.data(), NewName.size() - 1});
       }
     }
   }
@@ -221,12 +221,14 @@ SwiftJIT::Plugin::notifyFailed(llvm::orc::MaterializationResponsibility &MR) {
 }
 
 llvm::Error
-SwiftJIT::Plugin::notifyRemovingResources(llvm::orc::ResourceKey K) {
+SwiftJIT::Plugin::notifyRemovingResources(llvm::orc::JITDylib &JD,
+                                          llvm::orc::ResourceKey K) {
   return llvm::Error::success();
 }
 
 void SwiftJIT::Plugin::notifyTransferringResources(
-    llvm::orc::ResourceKey DstKey, llvm::orc::ResourceKey SrcKey) {}
+    llvm::orc::JITDylib &JD, llvm::orc::ResourceKey DstKey,
+    llvm::orc::ResourceKey SrcKey) {}
 
 void SwiftJIT::handleLazyCompilationFailure() {
   llvm::errs() << "Lazy compilation error\n";
@@ -393,7 +395,7 @@ void LazySwiftMaterializationUnit::materialize(
       DefinedSymbols.insert(itr->getValue());
     }
   }
-  
+
   llvm::orc::SymbolFlagsMap UnrequestedSymbols;
   for (auto &[Sym, Flags] : MR->getSymbols()) {
     if (!DefinedSymbols.contains(Sym)) {

@@ -70,7 +70,7 @@ using namespace swift::siloptimizer;
 bool swift::siloptimizer::
     searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
         SILFunction *fn,
-        SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+        llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
             &moveIntroducersToProcess,
         DiagnosticEmitter &emitter) {
   bool localChanged = false;

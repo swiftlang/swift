@@ -1252,12 +1252,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   if (f.getDynamicallyReplacedFunction())
     return false;
 
-  // Needed by lldb to print global variables which are propagated by the
-  // mandatory GlobalOpt.
-  if (m.getOptions().OptMode == OptimizationMode::NoOptimization &&
-      f.isGlobalInit())
-    return false;
-
   return true;
 }
 
@@ -2930,8 +2924,10 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   }
 
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
-                                 llvm::Attribute::ReadOnly);
+    auto &ctx = signature.getType()->getContext();
+    attrs =
+        attrs.addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                      ctx, llvm::MemoryEffects::readOnly()));
   }
 }
 
@@ -3570,6 +3566,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // Mark as llvm.used if @_used, set section if @_section
   if (f->markedAsUsed())
     addUsedGlobal(fn);
+
   if (!f->section().empty())
     fn->setSection(f->section());
 
@@ -3584,6 +3581,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     attrBuilder.addAttribute("wasm-import-module", f->wasmImportModuleName());
   }
   fn->addFnAttrs(attrBuilder);
+
+  // Also mark as llvm.used any functions that should be kept for the debugger.
+  // Only definitions should be kept.
+  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+    addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition

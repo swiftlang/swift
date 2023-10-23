@@ -196,7 +196,7 @@ public:
   SILInstruction *beginInstruction;
 
   /// Instructions that mark the end points of constant evaluation.
-  SmallSetVector<SILInstruction *, 2> endInstructions;
+  llvm::SmallSetVector<SILInstruction *, 2> endInstructions;
 
 private:
   /// SIL values that were found to be constants during

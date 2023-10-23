@@ -29,6 +29,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cmath>
 
 using namespace swift;
 using namespace swift::markup;
@@ -436,7 +437,7 @@ void PrintingDiagnosticConsumer::queueBuffer(
       parentID, positionInParent);
   queuedBuffers[bufferID] = sourceFile;
 }
-#endif
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
 // MARK: Main DiagnosticConsumer entrypoint.
 void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,

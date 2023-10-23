@@ -7,8 +7,9 @@
 #ifndef SWIFT_ABI_OBJECTFILE_H
 #define SWIFT_ABI_OBJECTFILE_H
 
-#include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 

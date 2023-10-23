@@ -96,15 +96,20 @@ add_custom_target("copy_shim_headers" ALL
     DEPENDS "${outputs}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
-if ("${LLVM_PACKAGE_VERSION}" STREQUAL "")
-  message(FATAL_ERROR
-          "LLVM_PACKAGE_VERSION must be set before including subdirectories")
+if (NOT CLANG_VERSION_MAJOR)
+  if (NOT LLVM_VERSION_MAJOR)
+    message(FATAL_ERROR
+            "CLANG_VERSION_MAJOR or LLVM_VERSION_MAJOR must be set \
+             in order to infer the path to clang headers")
+  else()
+    message(WARNING
+            "CLANG_VERSION_MAJOR is not defined, falling back to \
+             LLVM_VERSION_MAJOR to infer the path to clang headers")
+    set(CLANG_VERSION_MAJOR "${LLVM_VERSION_MAJOR}")
+  endif()
 endif()
 
-# Symlink in the Clang headers.
-# First extract the "version" used for Clang's resource directory.
-string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
-  "${LLVM_PACKAGE_VERSION}")
+# Symlink in the Clang headers from either the provided clang...
 if(NOT SWIFT_INCLUDE_TOOLS AND
    (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG))
   if(SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -120,7 +125,8 @@ if(NOT SWIFT_INCLUDE_TOOLS AND
   endif()
   message(STATUS "Using clang Resource Directory: ${clang_headers_location}")
 else()
-  set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
+  # ... or the one we just built
+  set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION_MAJOR}")
 endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
@@ -257,7 +263,7 @@ if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER OR SWIFT_PREBUILT_CLANG)
   # toolchain was built with SWIFT_INCLUDE_TOOLS.
   set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default ${clang_headers_location})
 else()
-  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default "../clang/${CLANG_VERSION}")
+  set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET_default "../clang/${CLANG_VERSION_MAJOR}")
 endif()
 
 set(SWIFT_CLANG_RESOURCE_DIR_SYMLINK_INSTALL_TARGET

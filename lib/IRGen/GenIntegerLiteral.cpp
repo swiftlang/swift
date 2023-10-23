@@ -154,7 +154,7 @@ ConstantIntegerLiteralMap::get(IRGenModule &IGM, APInt &&value) {
   auto &entry = map[value];
   if (entry.Data) return entry;
 
-  assert(value.getMinSignedBits() == value.getBitWidth() &&
+  assert(value.getSignificantBits() == value.getBitWidth() &&
          "expected IntegerLiteral value to be maximally compact");
 
   // We're going to break the value down into pointer-sized chunks.

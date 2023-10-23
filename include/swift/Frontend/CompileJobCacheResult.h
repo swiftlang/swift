@@ -50,7 +50,7 @@ public:
   Output getOutput(size_t I) const;
 
   /// Retrieves a specific output specified by \p Kind, if it exists.
-  llvm::Optional<Output> getOutput(file_types::ID Kind) const;
+  std::optional<Output> getOutput(file_types::ID Kind) const;
 
   /// Print this result to \p OS.
   llvm::Error print(llvm::raw_ostream &OS);

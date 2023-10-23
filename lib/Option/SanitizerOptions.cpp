@@ -25,7 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 
@@ -182,36 +182,27 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
   }
 
-  // Scudo can only be run with ubsan.
-  if (sanitizerSet & SanitizerKind::Scudo) {
-    OptionSet<SanitizerKind> allowedSet;
-    allowedSet |= SanitizerKind::Scudo;
-    allowedSet |= SanitizerKind::Undefined;
-
-    auto forbiddenOptions = sanitizerSet - allowedSet;
-
-    if (forbiddenOptions) {
-      SanitizerKind forbidden;
-
-      if (forbiddenOptions & SanitizerKind::Address) {
-        forbidden = SanitizerKind::Address;
-      } else if (forbiddenOptions & SanitizerKind::Thread) {
-          forbidden = SanitizerKind::Thread;
-      } else {
-        assert(forbiddenOptions & SanitizerKind::Fuzzer);
-        forbidden = SanitizerKind::Fuzzer;
+  // Scudo must be run standalone
+  if (sanitizerSet.contains(SanitizerKind::Scudo) &&
+      !sanitizerSet.containsOnly(SanitizerKind::Scudo)) {
+    auto diagnoseSanitizerKind = [&Diags, A, &sanitizerSet](SanitizerKind kind) {
+      // Don't diagnose Scudo, but diagnose anything else
+      if (kind != SanitizerKind::Scudo && sanitizerSet.contains(kind)) {
+        SmallString<128> b1;
+        SmallString<128> b2;
+        Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+            (A->getOption().getPrefixedName()
+             + toStringRef(SanitizerKind::Scudo)).toStringRef(b1),
+            (A->getOption().getPrefixedName()
+             + toStringRef(kind)).toStringRef(b2));
       }
+    };
 
-      SmallString<128> b1;
-      SmallString<128> b2;
-      Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
-          (A->getOption().getPrefixedName()
-              + toStringRef(SanitizerKind::Scudo)).toStringRef(b1),
-          (A->getOption().getPrefixedName()
-              + toStringRef(forbidden)).toStringRef(b2));
-      }
+#define SANITIZER(enm, kind, name, file) \
+    diagnoseSanitizerKind(SanitizerKind::kind);
+#include "swift/Basic/Sanitizers.def"
+
   }
-
   return sanitizerSet;
 }
 

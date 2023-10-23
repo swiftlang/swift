@@ -520,14 +520,14 @@ struct UseState {
   SmallFrozenMultiMap<SILInstruction *, SILValue, 8> reinitToValueMultiMap;
 
   /// The set of drop_deinits of this mark_unresolved_non_copyable_value
-  SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
+  llvm::SmallSetVector<SILInstruction *, 2> dropDeinitInsts;
 
   /// A "inout terminator use" is an implicit liveness use of the entire value
   /// placed on a terminator. We use this both so we add liveness for the
   /// terminator user and so that we can use the set to quickly identify later
   /// while emitting diagnostics that a liveness use is a terminator user and
   /// emit a specific diagnostic message.
-  SmallSetVector<SILInstruction *, 2> implicitEndOfLifetimeLivenessUses;
+  llvm::SmallSetVector<SILInstruction *, 2> implicitEndOfLifetimeLivenessUses;
 
   /// We add debug_values to liveness late after we diagnose, but before we
   /// hoist destroys to ensure that we do not hoist destroys out of access
@@ -600,7 +600,7 @@ struct UseState {
   /// and precedes a reinit instruction in that block.
   bool precedesReinitInSameBlock(SILInstruction *inst) const {
     SILBasicBlock *block = inst->getParent();
-    SmallSetVector<SILInstruction *, 8> sameBlockReinits;
+    llvm::SmallSetVector<SILInstruction *, 8> sameBlockReinits;
 
     // First, search for all reinits that are within the same block.
     for (auto &reinit : reinitInsts) {
@@ -1326,7 +1326,7 @@ struct MoveOnlyAddressCheckerPImpl {
 
   /// A set of mark_unresolved_non_copyable_value that we are actually going to
   /// process.
-  SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+  llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
       moveIntroducersToProcess;
 
   /// The instruction deleter used by \p canonicalizer.
@@ -2633,7 +2633,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     LLVM_DEBUG(llvm::dbgs() << "Performing forward traversal from errorUse "
                                "looking for the cause of liveness!\n");
 
-    SmallSetVector<SILInstruction *, 1> violatingInst;
+    llvm::SmallSetVector<SILInstruction *, 1> violatingInst;
     bool foundSingleBlockError = false;
     while (auto *block = worklist.pop()) {
       LLVM_DEBUG(llvm::dbgs()
@@ -3660,7 +3660,7 @@ static llvm::cl::opt<bool>
         llvm::cl::init(false));
 
 bool MoveOnlyAddressChecker::check(
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         &moveIntroducersToProcess) {
   assert(moveIntroducersToProcess.size() &&
          "Must have checks to process to call this function");

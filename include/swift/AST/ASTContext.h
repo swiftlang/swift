@@ -506,9 +506,9 @@ public:
     return StringRef(Result.data(), Result.size());
   }
 
-  template<typename T, typename Vector, typename Set>
+  template<typename T, typename Vector, typename Set, unsigned N>
   MutableArrayRef<T>
-  AllocateCopy(llvm::SetVector<T, Vector, Set> setVector,
+  AllocateCopy(llvm::SetVector<T, Vector, Set, N> setVector,
                AllocationArena arena = AllocationArena::Permanent) const {
     return MutableArrayRef<T>(AllocateCopy<T>(setVector.begin(),
                                               setVector.end(),
