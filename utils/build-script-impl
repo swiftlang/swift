@@ -284,7 +284,9 @@ components=(
   libdispatch
   libicu
   libxml2
+  liblzma
   zlib
+  zstd
   curl
   llbuild
   lldb
@@ -1206,12 +1208,18 @@ LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
+LIBLZMA_SOURCE_DIR="${WORKSPACE}/liblzma"
+ZLIB_SOURCE_DIR="${WORKSPACE}/zlib"
+ZSTD_SOURCE_DIR="${WORKSPACE}/zstd/build/cmake"
 SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
+[[ "${SKIP_BUILD_LIBLZMA}" ]] || PRODUCTS+=(liblzma)
+[[ "${SKIP_BUILD_ZLIB}" ]] || PRODUCTS+=(zlib)
+[[ "${SKIP_BUILD_ZSTD}" ]] || PRODUCTS+=(zstd)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
@@ -1300,6 +1308,15 @@ function build_directory_bin() {
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
+                ;;
+            liblzma)
+                echo "${root}/${LIBLZMA_BUILD_TYPE}/bin"
+                ;;
+            zlib)
+                echo "${root}/${ZLIB_BUILD_TYPE}/bin"
+                ;;
+            zstd)
+                echo "${root}/${ZSTD_BUILD_TYPE}/bin"
                 ;;
             *)
                 echo "error: unknown product: ${product}"
@@ -1417,6 +1434,15 @@ function cmake_config_opt() {
                 ;;
             libicu)
                 ;;
+            liblzma)
+                echo "--config ${LIBLZMA_BUILD_TYPE}"
+                ;;
+            zlib)
+                echo "--config ${ZLIB_BUILD_TYPE}"
+                ;;
+            zstd)
+                echo "--config ${ZSTD_BUILD_TYPE}"
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -1519,7 +1545,6 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
 #
 # Start with native deployment targets because the resulting tools are used during cross-compilation.
 
-
 for host in "${ALL_HOSTS[@]}"; do
     # Skip this pass when the only action to execute can't match.
     if ! [[ $(should_execute_host_actions_for_phase ${host} build) ]]; then
@@ -1533,14 +1558,20 @@ for host in "${ALL_HOSTS[@]}"; do
     # Don't echo anything if only executing an individual action.
     if [[ "${ONLY_EXECUTE}" = "all" ]]; then
         echo "Building the standard library for: ${SWIFT_STDLIB_TARGETS[@]}"
+
         if [[ "${SWIFT_TEST_TARGETS[@]}" ]] && ! [[ "${SKIP_TEST_SWIFT}" ]]; then
+            echo "1"
             echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
         fi
+
         if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
-             [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]]; then
+                [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]]; then
+            echo "3"
             echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
         fi
+
         if [ $(true_false "${BUILD_SWIFT_LIBEXEC}") == "TRUE" ]; then
+            echo "5"
             echo "Building the auxiliary executables for: ${SWIFT_LIBEXEC_TARGETS[@]}"
         fi
     fi
@@ -2642,6 +2673,48 @@ for host in "${ALL_HOSTS[@]}"; do
                 # libicu builds itself and doesn't use cmake
                 continue
                 ;;
+            liblzma)
+                if [[ "${host}" != "linux-"* ]]; then
+                    break
+                fi
+
+                LIBLZMA_BUILD_DIR=$(build_directory ${host} ${product})
+
+                cmake_options=(
+                    -DCMAKE_BUILD_TYPE:STRING="${LIBLZMA_BUILD_TYPE}"
+                    -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
+                    -DCMAKE_CXX_COMPILER:PATHJ="${CLANG_BIN}/clang++"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                )
+                ;;
+            zlib)
+                if [[ "${host}" != "linux-"* ]]; then
+                    break
+                fi
+
+                ZLIB_BUILD_DIR=$(build_directory ${host} ${product})
+
+                cmake_options=(
+                    -DCMAKE_BUILD_TYPE:STRING="${ZLIB_BUILD_TYPE}"
+                    -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
+                    -DCMAKE_CXX_COMPILER:PATHJ="${CLANG_BIN}/clang++"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                )
+                ;;
+            zstd)
+                if [[ "${host}" != "linux-"* ]]; then
+                    break
+                fi
+
+                ZSTD_BUILD_DIR=$(build_directory ${host} ${product})
+
+                cmake_options=(
+                    -DCMAKE_BUILD_TYPE:STRING="${ZSTD_BUILD_TYPE}"
+                    -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
+                    -DCMAKE_CXX_COMPILER:PATHJ="${CLANG_BIN}/clang++"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                )
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -2969,6 +3042,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
+            liblzma)
+                ;;
+            zlib)
+                ;;
+            zstd)
+                ;;
             *)
                 echo "error: unknown product: ${product}"
                 exit 1
@@ -3165,6 +3244,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 call mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
                 call cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
                 continue
+                ;;
+            liblzma)
+                ;;
+            zlib)
+                ;;
+            zstd)
                 ;;
             *)
                 echo "error: unknown product: ${product}"

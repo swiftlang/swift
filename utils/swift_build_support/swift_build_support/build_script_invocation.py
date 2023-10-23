@@ -258,6 +258,17 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        # Add the paths of the compression libraries
+        zlib_src = os.path.join(self.workspace.source_root, "zlib")
+        zstd_src = os.path.join(self.workspace.source_root, "zstd")
+        liblzma_src = os.path.join(self.workspace.source_root, "liblzma")
+
+        args.extra_cmake_options += [
+            '-DSWIFT_PATH_TO_ZLIB_SOURCE:PATH={}'.format(zlib_src),
+            '-DSWIFT_PATH_TO_ZSTD_SOURCE:PATH={}'.format(zstd_src),
+            '-DSWIFT_PATH_TO_LIBLZMA_SOURCE:PATH={}'.format(liblzma_src),
+        ]
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
@@ -273,7 +284,9 @@ class BuildScriptInvocation(object):
             (args.build_libicu, "libicu"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
-            (args.build_curl, 'curl')
+            (args.build_curl, 'curl'),
+            (args.build_zstd, 'zstd'),
+            (args.build_liblzma, 'liblzma'),
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -604,6 +617,12 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.curl.LibCurl,
                             is_enabled=self.args.build_curl)
+
+        builder.add_product(products.Zstd,
+                            is_enabled=self.args.build_zstd)
+
+        builder.add_product(products.Liblzma,
+                            is_enabled=self.args.build_liblzma)
 
         # Begin a build-script-impl pipeline for handling the compiler toolchain
         # and a subset of the tools that we build. We build these in this manner

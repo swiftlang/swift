@@ -86,7 +86,19 @@
         "swift-llvm-bindings": {
             "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } }
+            "remote": { "id": "apple/llvm-project" } },
+        "liblzma": {
+            "remote": { "id": "tukaani-project/xz" },
+            "platforms": [ "Linux" ]
+        },
+        "zlib": {
+            "remote": { "id": "madler/zlib" },
+            "platforms": [ "Linux" ]
+        },
+        "zstd": {
+            "remote": { "id": "facebook/zstd" },
+            "platforms": [ "Linux" ]
+        }
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
@@ -131,7 +143,10 @@
                 "swift-markdown": "main",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/main"
+                "swift-experimental-string-processing": "swift/main",
+                "liblzma": "v5.4.2",
+                "zlib": "v1.2.13",
+                "zstd": "v1.5.4"
             }
         },
         "release/5.10": {

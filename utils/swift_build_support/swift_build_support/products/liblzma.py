@@ -1,4 +1,4 @@
-# swift_build_support/products/zlib.py ------------------------------------
+# swift_build_support/products/liblzma.py ------------------------------------
 #
 # This source file is part of the Swift.org open source project
 #
@@ -16,7 +16,7 @@ from . import cmake_product
 from . import earlyswiftdriver
 
 
-class Zlib(cmake_product.CMakeProduct):
+class Liblzma(cmake_product.CMakeProduct):
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -44,14 +44,14 @@ class Zlib(cmake_product.CMakeProduct):
     def should_build(self, host_target):
         """should_build() -> Bool
 
-        Return True if zlib should be built
+        Return True if liblzma should be built
         """
-        return self.args.build_zlib
+        return self.args.build_liblzma
 
     def should_test(self, host_target):
         """should_test() -> Bool
 
-        Returns True if zlib should be tested.
+        Returns True if liblzma should be tested.
         Currently is set to false
         """
         return False
@@ -60,35 +60,55 @@ class Zlib(cmake_product.CMakeProduct):
         """should_install() -> Bool
 
         Returns True
-        If we're building zlib, you're going to need it
+        If we're building liblzma, you're going to need it
         """
-        return self.args.build_zlib
+        return self.args.build_liblzma
 
     def install(self, host_target):
         """
-        Install zlib to the target location
+        Install liblzma to the target location
         """
         path = self.host_install_destdir(host_target)
         self.install_with_cmake(['install'], path)
 
-        # Remove the unwanted shared libraries
-        for (root, dirs, files) in os.walk(os.path.join(path, 'usr', 'lib')):
-            for file in files:
-                if file.startswith('libz.so') or (file.startswith('zlib')
-                                                  and file.endswith('.dll')):
-                    os.unlink(os.path.join(root, file))
+        # Remove the binaries (we don't want them and we can't turn them off)
+        try:
+            os.unlink(os.path.join(path, 'usr', 'bin', 'xz'))
+            os.unlink(os.path.join(path, 'usr', 'bin', 'xzdec'))
+        except FileNotFoundError:
+            pass
+
+        try:
+            os.removedirs(os.path.join(path, 'usr', 'bin'))
+        except (FileNotFoundError, OSError):
+            pass
+
+        # Also remove the man pages
+        try:
+            os.unlink(os.path.join(path, 'usr', 'share', 'man1', 'xz.1'))
+            os.unlink(os.path.join(path, 'usr', 'share', 'man1', 'xzdec.1'))
+        except FileNotFoundError:
+            pass
+
+        try:
+            os.removedirs(os.path.join(path, 'usr', 'share', 'man1'))
+        except (FileNotFoundError, OSError):
+            pass
 
     def build(self, host_target):
         self.cmake_options.define('BUILD_SHARED_LIBS', 'NO')
+        self.cmake_options.define('CREATE_XZ_SYMLINKS', 'NO')
+        self.cmake_options.define('CREATE_LZMA_SYMLINKS', 'NO')
         self.cmake_options.define('CMAKE_POSITION_INDEPENDENT_CODE', 'YES')
 
-        if self.args.zlib_build_variant is None:
-            self.args.zlib_build_variant = "Release"
+        if self.args.liblzma_build_variant is None:
+            self.args.liblzma_build_variant = "Release"
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
-                                  self.args.zlib_build_variant)
+                                  self.args.liblzma_build_variant)
         self.cmake_options.define('CMAKE_BUILD_TYPE', 'RELEASE')
         self.cmake_options.define('SKIP_INSTALL_FILES', 'YES')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '/usr')
+        self.cmake_options.define('BUILD_EXECUTABLES', 'NO')
 
         self.generate_toolchain_file_for_darwin_or_linux(host_target)
-        self.build_with_cmake(["all"], self.args.zlib_build_variant, [])
+        self.build_with_cmake(["liblzma"], self.args.liblzma_build_variant, [])

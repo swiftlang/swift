@@ -104,6 +104,12 @@ def _apply_default_arguments(args):
     if args.zlib_build_variant is None:
         args.zlib_build_variant = args.build_variant
 
+    if args.zstd_build_variant is None:
+        args.zstd_build_variant = args.build_variant
+
+    if args.liblzma_build_variant is None:
+        args.liblzma_build_variant = args.build_variant
+
     if args.curl_build_variant is None:
         args.curl_build_variant = args.build_variant
 
@@ -768,9 +774,12 @@ def create_argument_parser():
 
     option('--static-zlib', toggle_true('build_zlib'), default=False,
            help='build static zlib')
-
     option('--static-curl', toggle_true('build_curl'), default=False,
            help='build static curl libraries')
+    option('--static-liblzma', toggle_true('build_liblzma'), default=False,
+           help='build static liblzma')
+    option('--static-zstd', toggle_true('build_zstd'), default=False,
+           help='build static zstd')
 
     option('--playgroundsupport', toggle_true('build_playgroundsupport'),
            help='build PlaygroundSupport')
@@ -899,6 +908,14 @@ def create_argument_parser():
     option('--debug-curl', store('curl_build_variant'),
            const='Debug',
            help='build the Debug variant of libcurl')
+
+    option('--debug-zstd', store('zstd_build_variant'),
+           const='Debug',
+           help='build the Debug variant of zstd')
+
+    option('--debug-liblzma', store('liblzma_build_variant'),
+           const='Debug',
+           help='build the Debug variant of liblzma')
 
     # -------------------------------------------------------------------------
     # Assertions group
@@ -1372,6 +1389,10 @@ def create_argument_parser():
            help='skip building zlib')
     option('--skip-build-curl', toggle_false('build_curl'),
            help='skip building curl')
+    option('--skip-build-liblzma', toggle_false('build_lzma'),
+           help='skip building liblzma')
+    option('--skip-build-zstd', toggle_false('build_zstd'),
+           help='skip building zstd')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known

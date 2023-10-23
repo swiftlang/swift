@@ -40,6 +40,8 @@ from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
 from .xctest import XCTest
 from .zlib import Zlib
+from .zstd import Zstd
+from .liblzma import Liblzma
 
 __all__ = [
     'CMark',
@@ -71,5 +73,7 @@ __all__ = [
     'Benchmarks',
     'TSanLibDispatch',
     'SwiftDocC',
-    'SwiftDocCRender'
+    'SwiftDocCRender',
+    'Zstd',
+    'Liblzma',
 ]
