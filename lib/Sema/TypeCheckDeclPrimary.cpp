@@ -3406,7 +3406,7 @@ public:
   /// Determine whether the given declaration should not have a definition.
   static bool requiresNoDefinition(Decl *decl) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Function with @_extern should not have a body.
+      // Function with @extern should not have a body.
       return func->getAttrs().hasAttribute<ExternAttr>();
     }
     // Everything else can have a definition.

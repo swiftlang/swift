@@ -1871,9 +1871,31 @@ ERROR(section_not_at_top_level,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
-// @_extern
+// @extern
+ERROR(attr_extern_experimental,none,
+      "@extern requires '-enable-experimental-feature Extern'", ())
 ERROR(extern_not_at_top_level_func,none,
-      "@_extern attribute can only be applied to global functions", ())
+      "@extern attribute can only be applied to global functions", ())
+ERROR(extern_empty_c_name,none,
+      "expected non-empty C name in @extern attribute", ())
+ERROR(extern_only_non_other_attr,none,
+      "@extern attribute cannot be applied to an '@%0' declaration", (StringRef))
+WARNING(extern_c_maybe_invalid_name, none,
+        "C name '%0' may be invalid; explicitly specify the name in @extern(c) to suppress this warning",
+        (StringRef))
+
+ERROR(c_func_variadic, none,
+      "cannot declare variadic argument %0 in %kind1",
+      (DeclName, const ValueDecl *))
+ERROR(c_func_unsupported_specifier, none,
+      "cannot declare '%0' argument %1 in %kind2",
+      (StringRef, DeclName, const ValueDecl *))
+ERROR(c_func_unsupported_type, none, "%0 cannot be represented in C",
+      (Type))
+ERROR(c_func_async,none,
+      "async functions cannot be represented in C", ())
+ERROR(c_func_throws,none,
+      "raising errors from C functions is not supported", ())
 
 ERROR(expose_wasm_not_at_top_level_func,none,
       "@_expose attribute with 'wasm' can only be applied to global functions", ())

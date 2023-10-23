@@ -1435,44 +1435,45 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
 bool Parser::parseExternAttribute(DeclAttributes &Attributes,
                                   bool &DiscardAttribute, StringRef AttrName,
                                   SourceLoc AtLoc, SourceLoc Loc) {
+  SourceLoc lParenLoc = Tok.getLoc(), rParenLoc;
 
-  // Parse @_extern(<language>, ...)
+  // Parse @extern(<language>, ...)
   if (!consumeIf(tok::l_paren)) {
     diagnose(Loc, diag::attr_expected_lparen, AttrName,
              DeclAttribute::isDeclModifier(DAK_Extern));
     return false;
   }
   auto diagnoseExpectLanguage = [&]() {
-    diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName,
-             "wasm");
+    diagnose(Tok.getLoc(), diag::attr_expected_option_such_as, AttrName, "c");
   };
   if (Tok.isNot(tok::identifier)) {
     diagnoseExpectLanguage();
     return false;
   }
 
-  if (Tok.getText() != "wasm") {
-    diagnoseExpectLanguage();
-    DiscardAttribute = true;
-  }
-  consumeToken(tok::identifier);
-
-  // Parse @_extern(wasm, module: "x", name: "y")
-  auto parseStringLiteralArgument = [&](StringRef fieldName, StringRef &fieldValue) {
-    if (!consumeIf(tok::comma) || Tok.isNot(tok::identifier) || Tok.getText() != fieldName) {
-      diagnose(Loc, diag::attr_extern_expected_label, fieldName);
-      return false;
+  auto parseStringLiteralArgument =
+      [&](std::optional<StringRef> fieldName) -> llvm::Optional<StringRef> {
+    if (!consumeIf(tok::comma)) {
+      diagnose(Loc, diag::attr_expected_comma, AttrName,
+               DeclAttribute::isDeclModifier(DAK_Extern));
+      return std::nullopt;
     }
-    consumeToken(tok::identifier);
+    if (fieldName) {
+      if (Tok.isNot(tok::identifier) || Tok.getText() != fieldName) {
+        diagnose(Loc, diag::attr_extern_expected_label, *fieldName);
+        return std::nullopt;
+      }
+      consumeToken(tok::identifier);
 
-    if (!consumeIf(tok::colon)) {
-      diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, fieldName);
-      return false;
+      if (!consumeIf(tok::colon)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, *fieldName);
+        return std::nullopt;
+      }
     }
 
     if (Tok.isNot(tok::string_literal)) {
       diagnose(Loc, diag::attr_expected_string_literal, AttrName);
-      return false;
+      return std::nullopt;
     }
     llvm::Optional<StringRef> importModuleName =
         getStringLiteralIfNotInterpolated(Loc, ("'" + AttrName + "'").str());
@@ -1480,19 +1481,40 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
 
     if (!importModuleName.has_value()) {
       DiscardAttribute = true;
-      return false;
+      return std::nullopt;
     }
-    fieldValue = importModuleName.value();
-    return true;
+    return importModuleName.value();
   };
 
-  StringRef importModuleName, importName;
-  if (!parseStringLiteralArgument("module", importModuleName))
-    DiscardAttribute = true;
+  auto kindTok = Tok;
+  consumeToken(tok::identifier);
 
-  if (!parseStringLiteralArgument("name", importName))
-    DiscardAttribute = true;
+  // Parse @extern(wasm, module: "x", name: "y") or @extern(c[, "x"])
+  ExternKind kind;
+  llvm::Optional<StringRef> importModuleName, importName;
 
+  if (kindTok.getText() == "wasm") {
+    kind = ExternKind::Wasm;
+    if (!(importModuleName = parseStringLiteralArgument("module")))
+      DiscardAttribute = true;
+    if (!(importName = parseStringLiteralArgument("name")))
+      DiscardAttribute = true;
+  } else if (kindTok.getText() == "c") {
+    kind = ExternKind::C;
+    if (Tok.is(tok::comma)) {
+      if (!(importName = parseStringLiteralArgument(std::nullopt))) {
+        DiscardAttribute = true;
+      }
+    }
+  } else {
+    diagnoseExpectLanguage();
+    DiscardAttribute = true;
+    while (Tok.isNot(tok::r_paren)) {
+      consumeToken();
+    }
+  }
+
+  rParenLoc = Tok.getLoc();
   if (!consumeIf(tok::r_paren)) {
     diagnose(Loc, diag::attr_expected_rparen, AttrName,
              DeclAttribute::isDeclModifier(DAK_Extern));
@@ -1501,10 +1523,17 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
 
   auto AttrRange = SourceRange(Loc, Tok.getLoc());
 
+  // Reject duplicate attributes with the same kind.
+  if (ExternAttr::find(Attributes, kind)) {
+    diagnose(Loc, diag::duplicate_attribute, false);
+    DiscardAttribute = true;
+  }
+
   if (!DiscardAttribute) {
-    Attributes.add(new (Context) ExternAttr(importModuleName, importName, AtLoc,
-                                            AttrRange,
-                                            /*Implicit=*/false));
+    Attributes.add(new (Context)
+                       ExternAttr(importModuleName, importName, AtLoc,
+                                  lParenLoc, rParenLoc, AttrRange, kind,
+                                  /*Implicit=*/false));
   }
   return false;
 }

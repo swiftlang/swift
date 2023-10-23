@@ -3135,11 +3135,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<ExternAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExternDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->ModuleName);
-      blob.append(theAttr->Name);
+      auto moduleName = theAttr->ModuleName.value_or(StringRef());
+      auto name = theAttr->Name.value_or(StringRef());
+      blob.append(moduleName);
+      blob.append(name);
       ExternDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-          theAttr->ModuleName.size(), theAttr->Name.size(), blob);
+          (unsigned)theAttr->getExternKind(),
+          moduleName.size(), name.size(), blob);
       return;
     }
 

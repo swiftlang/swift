@@ -2068,10 +2068,101 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   }
 }
 
+bool IsCCompatibleFuncDeclRequest::evaluate(Evaluator &evaluator,
+                                            FuncDecl *FD) const {
+  if (FD->isInvalid())
+    return false;
+
+  bool foundError = false;
+
+  if (FD->hasAsync()) {
+    FD->diagnose(diag::c_func_async);
+    foundError = true;
+  }
+
+  if (FD->hasThrows()) {
+    FD->diagnose(diag::c_func_throws);
+    foundError = true;
+  }
+
+  // --- Check for unsupported result types.
+  Type resultTy = FD->getResultInterfaceType();
+  if (!resultTy->isVoid() && !resultTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+    FD->diagnose(diag::c_func_unsupported_type, resultTy);
+    foundError = true;
+  }
+
+  for (auto *param : *FD->getParameters()) {
+    // --- Check for unsupported specifiers.
+    if (param->isVariadic()) {
+      FD->diagnose(diag::c_func_variadic, param->getName(), FD);
+      foundError = true;
+    }
+    if (param->getSpecifier() != ParamSpecifier::Default) {
+      param
+          ->diagnose(diag::c_func_unsupported_specifier,
+                     ParamDecl::getSpecifierSpelling(param->getSpecifier()),
+                     param->getName(), FD)
+          .fixItRemove(param->getSpecifierLoc());
+      foundError = true;
+    }
+
+    // --- Check for unsupported parameter types.
+    auto paramTy = param->getTypeInContext();
+    if (!paramTy->isRepresentableIn(ForeignLanguage::C, FD)) {
+      param->diagnose(diag::c_func_unsupported_type, paramTy);
+      foundError = true;
+    }
+  }
+  return !foundError;
+}
+
+static bool isCCompatibleFuncDecl(FuncDecl *FD) {
+  return evaluateOrDefault(FD->getASTContext().evaluator,
+                           IsCCompatibleFuncDeclRequest{FD}, {});
+}
+
 void AttributeChecker::visitExternAttr(ExternAttr *attr) {
-  // Only top-level func decls are currently supported.
-  if (!isa<FuncDecl>(D) || D->getDeclContext()->isTypeContext()) {
+  if (!Ctx.LangOpts.hasFeature(Feature::Extern)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_extern_experimental);
+    return;
+  }
+  // Only top-level func or static func decls are currently supported.
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || (FD->getDeclContext()->isTypeContext() && !FD->isStatic())) {
     diagnose(attr->getLocation(), diag::extern_not_at_top_level_func);
+  }
+
+  // C name must not be empty.
+  if (attr->getExternKind() == ExternKind::C) {
+    StringRef cName = attr->getCName(FD);
+    if (cName.empty()) {
+      diagnose(attr->getLocation(), diag::extern_empty_c_name);
+    } else if (!attr->Name.has_value() && !clang::isValidAsciiIdentifier(cName)) {
+      // Warn non ASCII identifiers if it's *implicitly* specified. The C standard allows
+      // Universal Character Names in identifiers, but clang doesn't provide
+      // an easy way to validate them, so we warn identifers that is potentially
+      // invalid. If it's explicitly specified, we assume the user knows what
+      // they are doing, and don't warn.
+      diagnose(attr->getLocation(), diag::extern_c_maybe_invalid_name, cName)
+          .fixItInsert(attr->getRParenLoc(), (", \"" + cName + "\"").str());
+    }
+
+    // Ensure the decl has C compatible interface. Otherwise it produces diagnostics.
+    if (!isCCompatibleFuncDecl(FD)) {
+      attr->setInvalid();
+      // Mark the decl itself invalid not to require body even with invalid ExternAttr.
+      FD->setInvalid();
+    }
+  }
+
+  for (auto *otherAttr : D->getAttrs()) {
+    // @_cdecl cannot be mixed with @extern since @_cdecl is for definitions
+    // @_silgen_name cannot be mixed to avoid SIL-level name ambiguity
+    if (isa<CDeclAttr>(otherAttr) || isa<SILGenNameAttr>(otherAttr)) {
+      diagnose(attr->getLocation(), diag::extern_only_non_other_attr,
+               otherAttr->getAttrName());
+    }
   }
 }
 

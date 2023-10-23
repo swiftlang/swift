@@ -1141,9 +1141,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_Extern: {
     auto *Attr = cast<ExternAttr>(this);
-    Printer.printAttrName("@_extern");
-    // For now, it accepts only "wasm" as its kind.
-    Printer << "(wasm, module: \"" << Attr->ModuleName << "\", name: \"" << Attr->Name << "\")";
+    Printer.printAttrName("@extern");
+    Printer << "(";
+    switch (Attr->getExternKind()) {
+    case ExternKind::C:
+      Printer << "c";
+      // Symbol name can be omitted for C.
+      if (auto cName = Attr->Name)
+        Printer << ", \"" << *cName << "\"";
+      break;
+    case ExternKind::Wasm:
+      Printer << "wasm";
+      // @extern(wasm) always has names.
+      Printer << ", module: \"" << *Attr->ModuleName << "\"";
+      Printer << ", name: \"" << *Attr->Name << "\")";
+      break;
+    }
     break;
   }
 
@@ -1718,7 +1731,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_RawLayout:
     return "_rawLayout";
   case DAK_Extern:
-    return "_extern";
+    return "extern";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2636,6 +2649,24 @@ bool MacroRoleAttr::hasNameKind(MacroIntroducedDeclNameKind kind) const {
   return llvm::find_if(getNames(), [kind](MacroIntroducedDeclName name) {
     return name.getKind() == kind;
   }) != getNames().end();
+}
+
+StringRef ExternAttr::getCName(const FuncDecl *D) const {
+  if (auto cName = this->Name)
+    return cName.value();
+  // If no name was specified, fall back on the Swift base name without mangling.
+  // Base name is always available and non-empty for FuncDecl.
+  return D->getBaseIdentifier().str();
+}
+
+ExternAttr *ExternAttr::find(DeclAttributes &attrs, ExternKind kind) {
+  for (DeclAttribute *attr : attrs) {
+    if (auto *externAttr = dyn_cast<ExternAttr>(attr)) {
+      if (externAttr->getExternKind() == kind)
+        return externAttr;
+    }
+  }
+  return nullptr;
 }
 
 const DeclAttribute *

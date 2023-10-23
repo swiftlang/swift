@@ -5858,14 +5858,31 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::Extern_DECL_ATTR: {
+        unsigned rawKind;
         bool isImplicit;
         unsigned moduleNameSize, declNameSize;
         serialization::decls_block::ExternDeclAttrLayout::readRecord(
-            scratch, isImplicit, moduleNameSize, declNameSize);
-        StringRef moduleName = blobData.substr(0, moduleNameSize);
-        blobData = blobData.substr(moduleNameSize);
-        StringRef declName = blobData.substr(0, declNameSize);
-        Attr = new (ctx) ExternAttr(moduleName, declName, isImplicit);
+            scratch, isImplicit, rawKind, moduleNameSize, declNameSize);
+
+        ExternKind kind = (ExternKind)rawKind;
+        llvm::Optional<StringRef> moduleName, declName;
+
+        switch (kind) {
+        case ExternKind::C: {
+          // Empty C name is rejected by typecheck, so serialized zero-length
+          // name is treated as no decl name.
+          if (declNameSize > 0)
+            declName = blobData.substr(0, declNameSize);
+          break;
+        }
+        case ExternKind::Wasm: {
+          moduleName = blobData.substr(0, moduleNameSize);
+          blobData = blobData.substr(moduleNameSize);
+          declName = blobData.substr(0, declNameSize);
+          break;
+        }
+        }
+        Attr = new (ctx) ExternAttr(moduleName, declName, (ExternKind)rawKind, isImplicit);
         break;
       }
 
