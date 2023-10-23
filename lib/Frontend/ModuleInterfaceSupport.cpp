@@ -833,7 +833,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;
-  M->getTopLevelDecls(topLevelDecls);
+  M->getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
     InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
 

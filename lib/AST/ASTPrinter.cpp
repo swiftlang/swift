@@ -1020,12 +1020,6 @@ public:
         Options.TransformContext->isPrintingSynthesizedExtension() &&
         isa<ExtensionDecl>(D);
 
-    SWIFT_DEFER {
-      D->visitAuxiliaryDecls([&](Decl *auxDecl) {
-        visit(auxDecl);
-      });
-    };
-
     if (!shouldPrint(D, true) && !Synthesize)
       return false;
 
@@ -4328,13 +4322,20 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
                              bool NeedIndent) {
   IndentRAII IndentMore(*this, NeedIndent);
   bool PrintedSomething = false;
+
+  std::function<void(Decl *)> printDecl;
+  printDecl = [&](Decl *d) {
+    if (d->shouldPrintInContext(Options))
+      visit(d);
+    d->visitAuxiliaryDecls(printDecl);
+  };
+
   for (auto element : Elements) {
     PrintedSomething = true;
     Printer.printNewline();
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
-      if (decl->shouldPrintInContext(Options))
-        visit(decl);
+      printDecl(decl);
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {

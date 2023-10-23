@@ -217,24 +217,17 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
                                       Type BaseType,
                                       IterableDeclContext *Parent,
                                       SmallVectorImpl<ValueDecl *> &FoundDecls) {
-  auto check = [&](Decl *decl) {
-    auto *VD = dyn_cast<ValueDecl>(decl);
+  for (auto Member : Parent->getAllMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(Member);
     if (!VD)
-      return;
+      continue;
     if (!isDeclVisibleInLookupMode(VD, LS, CurrDC))
-      return;
+      continue;
     if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
         IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType, VD)),
                            false))
-      return;
+      continue;
     FoundDecls.push_back(VD);
-  };
-
-  for (auto Member : Parent->getAllMembers()) {
-    check(Member);
-    Member->visitAuxiliaryDecls([&](Decl *d) {
-      check(d);
-    });
   }
 }
 
