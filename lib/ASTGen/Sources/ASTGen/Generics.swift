@@ -8,7 +8,7 @@ extension ASTGenVisitor {
       self.ctx,
       leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
     )
   }
@@ -33,7 +33,7 @@ extension ASTGenVisitor {
       eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      inheritedType: self.generate(node.inheritedType),
+      inheritedType: self.generate(node.inheritedType).asNullable,
       index: genericParameterIndex
     )
   }

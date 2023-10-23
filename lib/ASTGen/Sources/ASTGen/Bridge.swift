@@ -14,6 +14,42 @@ extension BridgedIdentifier: ExpressibleByNilLiteral {
   }
 }
 
+extension BridgedStmt? {
+  var asNullable: BridgedNullableStmt {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedExpr? {
+  var asNullable: BridgedNullableExpr {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedTypeRepr? {
+  var asNullable: BridgedNullableTypeRepr {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedGenericParamList? {
+  var asNullable: BridgedNullableGenericParamList {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedTrailingWhereClause? {
+  var asNullable: BridgedNullableTrailingWhereClause {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedParameterList? {
+  var asNullable: BridgedNullableParameterList {
+    .init(raw: self?.raw)
+  }
+}
+
 extension BridgedSourceLoc {
   /// Form a source location at the given absolute position in `buffer`.
   init(

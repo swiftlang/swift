@@ -19,15 +19,14 @@
 ///   The default macro to define a bridging wrapper type.
 
 /// AST_BRIDGING_WRAPPER_NULLABLE(Name)
-///   Specifies that the given bridging wrapper should have a
-///   nullable raw value.
+///   Specifies that both a nullable and non-null variant of the wrapper should
+///   be created.
 #ifndef AST_BRIDGING_WRAPPER_NULLABLE
 #define AST_BRIDGING_WRAPPER_NULLABLE(Name) AST_BRIDGING_WRAPPER(Name)
 #endif
 
 /// AST_BRIDGING_WRAPPER_NONNULL(Name)
-///   Specifies that the given bridging wrapper should have a
-///   non-null raw value.
+///   Specifies that only a non-null variant of the wrapper should be created.
 #ifndef AST_BRIDGING_WRAPPER_NONNULL
 #define AST_BRIDGING_WRAPPER_NONNULL(Name) AST_BRIDGING_WRAPPER(Name)
 #endif

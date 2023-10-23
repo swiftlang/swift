@@ -14,10 +14,10 @@ extension ASTGenVisitor {
       typealiasKeywordLoc: node.typealiasKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       equalLoc: node.initializer.equal.bridgedSourceLoc(in: self),
       underlyingType: self.generate(node.initializer.value),
-      genericWhereClause: self.generate(node.genericWhereClause)
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable
     )
   }
 
@@ -30,9 +30,9 @@ extension ASTGenVisitor {
       enumKeywordLoc: node.enumKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -56,9 +56,9 @@ extension ASTGenVisitor {
       structKeywordLoc: node.structKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -82,9 +82,9 @@ extension ASTGenVisitor {
       classKeywordLoc: node.classKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -109,9 +109,9 @@ extension ASTGenVisitor {
       classKeywordLoc: node.actorKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -141,7 +141,7 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -166,8 +166,8 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      defaultType: self.generate(node.initializer?.value),
-      genericWhereClause: self.generate(node.genericWhereClause)
+      defaultType: self.generate(node.initializer?.value).asNullable,
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable
     )
   }
 }
@@ -182,7 +182,7 @@ extension ASTGenVisitor {
       extensionKeywordLoc: node.extensionKeyword.bridgedSourceLoc(in: self),
       extendedType: self.generate(node.extendedType),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(node.genericWhereClause),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
         endToken: node.memberBlock.rightBrace,
@@ -209,9 +209,9 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       name: name,
       nameLoc: nameLoc,
-      parameterList: self.generate(node.parameterClause),
+      parameterList: self.generate(node.parameterClause).asNullable,
       equalsLoc: (node.rawValue?.equal).bridgedSourceLoc(in: self),
-      rawValue: self.generate(node.rawValue?.value)
+      rawValue: self.generate(node.rawValue?.value).asNullable
     )
   }
 
@@ -262,13 +262,13 @@ extension ASTGenVisitor {
       funcKeywordLoc: node.funcKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       parameterList: self.generate(node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type),
-      returnType: self.generate(node.signature.returnClause?.type),
-      genericWhereClause: self.generate(node.genericWhereClause)
+      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type).asNullable,
+      returnType: self.generate(node.signature.returnClause?.type).asNullable,
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable
     )
 
     if let body = node.body {
@@ -287,12 +287,12 @@ extension ASTGenVisitor {
       initKeywordLoc: node.initKeyword.bridgedSourceLoc(in: self),
       failabilityMarkLoc: node.optionalMark.bridgedSourceLoc(in: self),
       isIUO: node.optionalMark?.tokenKind == .exclamationMark,
-      genericParamList: self.generate(node.genericParameterClause),
+      genericParamList: self.generate(node.genericParameterClause).asNullable,
       parameterList: self.generate(node.signature.parameterClause),
       asyncSpecifierLoc: (node.signature.effectSpecifiers?.asyncSpecifier).bridgedSourceLoc(in: self),
       throwsSpecifierLoc: (node.signature.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
-      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type),
-      genericWhereClause: self.generate(node.genericWhereClause)
+      thrownType: self.generate(node.signature.effectSpecifiers?.thrownError?.type).asNullable,
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable
     )
 
     if let body = node.body {
