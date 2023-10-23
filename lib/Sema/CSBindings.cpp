@@ -1080,6 +1080,10 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
 
+  // Don't prioritize type variables that don't have any direct bindings.
+  if (Bindings.empty())
+    return false;
+
   return !involvesTypeVariables();
 }
 
