@@ -1,9 +1,8 @@
 import CASTBridging
 import CBasicBridging
-
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator)
-import SwiftSyntax
+@_spi(BumpPtrAllocator) import SwiftSyntax
+
 import struct SwiftDiagnostics.Diagnostic
 
 extension UnsafePointer {
@@ -107,13 +106,19 @@ struct ASTGenVisitor {
         out.append(d.raw)
       case .stmt(let s):
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx, declContext: self.declContext, startLoc: loc, stmt: s, 
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          stmt: s,
           endLoc: loc
         )
         out.append(topLevelDecl.raw)
       case .expr(let e):
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx, declContext: self.declContext, startLoc: loc, expr: e,
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          expr: e,
           endLoc: loc
         )
         out.append(topLevelDecl.raw)
@@ -174,7 +179,7 @@ extension ASTGenVisitor {
   func generate(_ node: some SyntaxChildChoices) -> ASTNode {
     return self.generate(Syntax(node))
   }
-    
+
   func generate(_ node: Syntax) -> ASTNode {
     switch node.as(SyntaxEnum.self) {
     case .actorDecl(let node):

@@ -52,7 +52,8 @@ fileprivate func emitDiagnosticParts(
     case .replaceLeadingTrivia(let oldToken, let newTrivia):
       replaceStartLoc = bridgedSourceLoc(at: oldToken.position)
       replaceEndLoc = bridgedSourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia)
+        at: oldToken.positionAfterSkippingLeadingTrivia
+      )
       newText = newTrivia.description
 
     case .replaceTrailingTrivia(let oldToken, let newTrivia):
@@ -63,7 +64,8 @@ fileprivate func emitDiagnosticParts(
 
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: replaceStartLoc, end: replaceEndLoc,
+        start: replaceStartLoc,
+        end: replaceEndLoc,
         replacement: bridgedMessage
       )
     }
@@ -117,11 +119,11 @@ func emitDiagnostic(
 extension DiagnosticSeverity {
   var bridged: BridgedDiagnosticSeverity {
     switch self {
-      case .error: return .error
-      case .note: return .note
-      case .warning: return .warning
-      case .remark: return .remark
-      @unknown default: return .error
+    case .error: return .error
+    case .note: return .note
+    case .warning: return .warning
+    case .remark: return .remark
+    @unknown default: return .error
     }
   }
 }
@@ -186,7 +188,8 @@ extension SourceManager {
       case .replaceTrailingTrivia(let oldToken, let newTrivia):
         replaceStartLoc = bridgedSourceLoc(
           for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia)
+          at: oldToken.endPositionBeforeTrailingTrivia
+        )
         replaceEndLoc = bridgedSourceLoc(
           for: oldToken,
           at: oldToken.endPosition
@@ -196,7 +199,8 @@ extension SourceManager {
 
       newText.withBridgedString { bridgedMessage in
         diag.fixItReplace(
-          start: replaceStartLoc, end: replaceEndLoc,
+          start: replaceStartLoc,
+          end: replaceEndLoc,
           replacement: bridgedMessage
         )
       }
@@ -222,11 +226,11 @@ extension SourceManager {
     // Emit Fix-Its.
     for fixIt in diagnostic.fixIts {
       diagnoseSingle(
-          message: fixIt.message.message,
-          severity: .note,
-          node: diagnostic.node,
-          position: diagnostic.position,
-          fixItChanges: fixIt.changes
+        message: fixIt.message.message,
+        severity: .note,
+        node: diagnostic.node,
+        position: diagnostic.position,
+        fixItChanges: fixIt.changes
       )
     }
 
@@ -315,7 +319,8 @@ public func addQueuedSourceFile(
   // Determine the parent link, for a child buffer.
   let parent: (GroupedDiagnostics.SourceFileID, AbsolutePosition)?
   if parentID >= 0,
-      let parentSourceFileID = queuedDiagnostics.pointee.sourceFileIDs[parentID] {
+    let parentSourceFileID = queuedDiagnostics.pointee.sourceFileIDs[parentID]
+  {
     parent = (parentSourceFileID.pointee, AbsolutePosition(utf8Offset: positionInParent))
   } else {
     parent = nil
@@ -387,17 +392,20 @@ public func addQueuedDiagnostic(
   // Map the highlights.
   var highlights: [Syntax] = []
   let highlightRanges = UnsafeBufferPointer<BridgedSourceLoc>(
-    start: highlightRangesPtr, count: numHighlightRanges * 2
+    start: highlightRangesPtr,
+    count: numHighlightRanges * 2
   )
   for index in 0..<numHighlightRanges {
     // Make sure both the start and the end land within this source file.
     guard let start = highlightRanges[index * 2].raw,
-          let end = highlightRanges[index * 2 + 1].raw  else {
+      let end = highlightRanges[index * 2 + 1].raw
+    else {
       continue
     }
 
     guard start >= sourceFileBaseAddress && start < sourceFileEndAddress,
-          end >= sourceFileBaseAddress && end <= sourceFileEndAddress else {
+      end >= sourceFileBaseAddress && end <= sourceFileEndAddress
+    else {
       continue
     }
 
@@ -414,8 +422,9 @@ public func addQueuedDiagnostic(
     while true {
       // If this syntax matches our starting/ending positions, add the
       // highlight and we're done.
-      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos &&
-          highlightSyntax.endPositionBeforeTrailingTrivia == endPos {
+      if highlightSyntax.positionAfterSkippingLeadingTrivia == startPos
+        && highlightSyntax.endPositionBeforeTrailingTrivia == endPos
+      {
         highlights.append(highlightSyntax)
         break
       }

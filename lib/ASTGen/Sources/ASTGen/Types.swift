@@ -1,8 +1,6 @@
 import CASTBridging
-
-@_spi(ExperimentalLanguageFeatures)
-import SwiftSyntax
 import SwiftDiagnostics
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 extension ASTGenVisitor {
   public func generate(_ node: IdentifierTypeSyntax) -> BridgedTypeRepr {
@@ -69,7 +67,9 @@ extension ASTGenVisitor {
     let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
 
     return BridgedMemberTypeRepr.createParsed(
-      self.ctx, base: baseComponent, members: memberComponents
+      self.ctx,
+      base: baseComponent,
+      members: memberComponents
     )
   }
 
@@ -78,7 +78,9 @@ extension ASTGenVisitor {
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
     return BridgedArrayTypeRepr.createParsed(
-      self.ctx, base: elementType, leftSquareLoc: lSquareLoc, 
+      self.ctx,
+      base: elementType,
+      leftSquareLoc: lSquareLoc,
       rightSquareLoc: rSquareLoc
     )
   }
@@ -90,8 +92,12 @@ extension ASTGenVisitor {
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
     return BridgedDictionaryTypeRepr.createParsed(
-      self.ctx, leftSquareLoc: lSquareLoc, keyType: keyType, colonLoc: colonLoc,
-      valueType: valueType, rightSquareLoc: rSquareLoc
+      self.ctx,
+      leftSquareLoc: lSquareLoc,
+      keyType: keyType,
+      colonLoc: colonLoc,
+      valueType: valueType,
+      rightSquareLoc: rSquareLoc
     )
   }
 
@@ -100,12 +106,16 @@ extension ASTGenVisitor {
     let tyLoc = node.metatypeSpecifier.bridgedSourceLoc(in: self)
     if node.metatypeSpecifier.text == "Type" {
       return BridgedMetatypeTypeRepr.createParsed(
-        self.ctx, base: baseType, typeKeywordLoc: tyLoc
+        self.ctx,
+        base: baseType,
+        typeKeywordLoc: tyLoc
       )
     } else {
       assert(node.metatypeSpecifier.text == "Protocol")
       return BridgedProtocolTypeRepr.createParsed(
-        self.ctx, base: baseType, protocolKeywordLoc: tyLoc
+        self.ctx,
+        base: baseType,
+        protocolKeywordLoc: tyLoc
       )
     }
   }
@@ -114,7 +124,9 @@ extension ASTGenVisitor {
     let base = generate(node.wrappedType)
     let exclaimLoc = node.exclamationMark.bridgedSourceLoc(in: self)
     return BridgedImplicitlyUnwrappedOptionalTypeRepr.createParsed(
-      self.ctx, base: base, exclaimLoc: exclaimLoc
+      self.ctx,
+      base: base,
+      exclaimLoc: exclaimLoc
     )
   }
 
@@ -122,7 +134,9 @@ extension ASTGenVisitor {
     let base = generate(node.wrappedType)
     let questionLoc = node.questionMark.bridgedSourceLoc(in: self)
     return BridgedOptionalTypeRepr.createParsed(
-      self.ctx, base: base, questionLoc: questionLoc
+      self.ctx,
+      base: base,
+      questionLoc: questionLoc
     )
   }
 
@@ -130,7 +144,9 @@ extension ASTGenVisitor {
     let base = generate(node.repetitionPattern)
     let repeatLoc = node.repeatKeyword.bridgedSourceLoc(in: self)
     return BridgedPackExpansionTypeRepr.createParsed(
-      self.ctx, base: base, repeatKeywordLoc: repeatLoc
+      self.ctx,
+      base: base,
+      repeatKeywordLoc: repeatLoc
     )
   }
 
@@ -185,12 +201,16 @@ extension ASTGenVisitor {
     let baseTy = generate(node.constraint)
     if node.someOrAnySpecifier.text == "some" {
       return BridgedOpaqueReturnTypeRepr.createParsed(
-        self.ctx, someKeywordLoc: someOrAnyLoc, base: baseTy
+        self.ctx,
+        someKeywordLoc: someOrAnyLoc,
+        base: baseTy
       )
     } else {
       assert(node.someOrAnySpecifier.text == "any")
       return BridgedExistentialTypeRepr.createParsed(
-        self.ctx, anyKeywordLoc: someOrAnyLoc, base: baseTy
+        self.ctx,
+        anyKeywordLoc: someOrAnyLoc,
+        base: baseTy
       )
     }
   }
@@ -221,7 +241,9 @@ extension ASTGenVisitor {
     if let specifier = node.specifier {
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.tokenKind) {
         type = BridgedSpecifierTypeRepr.createParsed(
-          self.ctx, base: type, specifier: kind, 
+          self.ctx,
+          base: type,
+          specifier: kind,
           specifierLoc: specifier.bridgedSourceLoc(in: self)
         )
       } else {
@@ -252,33 +274,35 @@ extension ASTGenVisitor {
         let atLoc = attribute.atSign.bridgedSourceLoc(in: self)
         let attrLoc = nameSyntax.bridgedSourceLoc(in: self)
         switch typeAttrKind {
-          // SIL attributes
-          // FIXME: Diagnose if not in SIL mode? Or should that move to the
-          // type checker?
-          case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
-               .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
-               .sil_weak, .sil_unowned, .inout, .block_storage, .box,
-               .dynamic_self, .sil_unmanaged, .error, .error_indirect,
-               .error_unowned, .direct, .inout_aliasable,
-               .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
-            fallthrough
+        // SIL attributes
+        // FIXME: Diagnose if not in SIL mode? Or should that move to the
+        // type checker?
+        case .out, .in, .owned, .unowned_inner_pointer, .guaranteed,
+          .autoreleased, .callee_owned, .callee_guaranteed, .objc_metatype,
+          .sil_weak, .sil_unowned, .inout, .block_storage, .box,
+          .dynamic_self, .sil_unmanaged, .error, .error_indirect,
+          .error_unowned, .direct, .inout_aliasable,
+          .in_guaranteed, .in_constant, .captures_generics, .moveOnly:
+          fallthrough
 
-          case .autoclosure, .escaping, .noescape, .noDerivative, .async,
-            .sendable, .retroactive, .unchecked, ._local, ._noMetadata,
-            .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
-            .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
-            .count, .unimplementable:
-            TypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
+        case .autoclosure, .escaping, .noescape, .noDerivative, .async,
+          .sendable, .retroactive, .unchecked, ._local, ._noMetadata,
+          .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
+          .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
+          .count, .unimplementable:
+          TypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
 
-          case .opened, .pack_element, .differentiable, .convention,
-            ._opaqueReturnTypeOf:
-            // FIXME: These require more complicated checks
-            break
+        case .opened, .pack_element, .differentiable, .convention,
+          ._opaqueReturnTypeOf:
+          // FIXME: These require more complicated checks
+          break
         }
       }
 
       type = BridgedAttributedTypeRepr.createParsed(
-        self.ctx, base: type, attributes: typeAttributes
+        self.ctx,
+        base: type,
+        attributes: typeAttributes
       )
     }
 
@@ -294,7 +318,9 @@ extension ASTGenVisitor {
       var type = generate(element.type)
       if let ellipsis = element.ellipsis {
         type = BridgedVarargTypeRepr.createParsed(
-          self.ctx, base: type, ellipsisLoc: ellipsis.bridgedSourceLoc(in: self)
+          self.ctx,
+          base: type,
+          ellipsisLoc: ellipsis.bridgedSourceLoc(in: self)
         )
       }
 
@@ -323,16 +349,19 @@ func buildTypeRepr(
   endTypeLocPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>
 ) -> UnsafeMutableRawPointer? {
   let sourceFile = sourceFilePtr.bindMemory(
-    to: ExportedSourceFile.self, capacity: 1
+    to: ExportedSourceFile.self,
+    capacity: 1
   )
 
   // Find the type syntax node.
-  guard let typeSyntax = findSyntaxNodeInSourceFile(
-    sourceFilePtr: sourceFilePtr,
-    sourceLocationPtr: typeLocPtr,
-    type: TypeSyntax.self,
-    wantOutermost: true
-  ) else {
+  guard
+    let typeSyntax = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      sourceLocationPtr: typeLocPtr,
+      type: TypeSyntax.self,
+      wantOutermost: true
+    )
+  else {
     // FIXME: Produce an error
     return nil
   }

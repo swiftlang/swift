@@ -1,8 +1,6 @@
 import CASTBridging
-
-@_spi(ExperimentalLanguageFeatures)
-import SwiftSyntax
 import SwiftDiagnostics
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 // MARK: - TypeDecl
 
@@ -37,7 +35,7 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(node.genericWhereClause),
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
-        endToken: node.memberBlock.rightBrace, 
+        endToken: node.memberBlock.rightBrace,
         in: self
       )
     )
@@ -63,7 +61,7 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(node.genericWhereClause),
       braceRange: BridgedSourceRange(
         startToken: node.memberBlock.leftBrace,
-        endToken: node.memberBlock.rightBrace, 
+        endToken: node.memberBlock.rightBrace,
         in: self
       )
     )
@@ -339,14 +337,17 @@ extension BridgedOperatorFixity {
 extension ASTGenVisitor {
   func generate(_ node: OperatorDeclSyntax) -> BridgedOperatorDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
-    let (precedenceGroupName, precedenceGroupLoc) = (node.operatorPrecedenceAndTypes?.precedenceGroup).bridgedIdentifierAndSourceLoc(in: self)
+    let (precedenceGroupName, precedenceGroupLoc) = (node.operatorPrecedenceAndTypes?.precedenceGroup)
+      .bridgedIdentifierAndSourceLoc(in: self)
 
     let fixity: BridgedOperatorFixity
     if let value = BridgedOperatorFixity(from: node.fixitySpecifier.tokenKind) {
       fixity = value
     } else {
       fixity = .infix
-      self.diagnose(Diagnostic(node: node.fixitySpecifier, message: UnexpectedTokenKindError(token: node.fixitySpecifier)))
+      self.diagnose(
+        Diagnostic(node: node.fixitySpecifier, message: UnexpectedTokenKindError(token: node.fixitySpecifier))
+      )
     }
 
     return .createParsed(
@@ -388,7 +389,9 @@ extension ASTGenVisitor {
     }
 
     func diagnoseDuplicateSyntax(_ duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
-      self.diagnose(Diagnostic(node: duplicate, message: DuplicateSyntaxError(duplicate: duplicate, original: original)))
+      self.diagnose(
+        Diagnostic(node: duplicate, message: DuplicateSyntaxError(duplicate: duplicate, original: original))
+      )
     }
 
     let body = node.groupAttributes.reduce(into: PrecedenceGroupBody()) { body, element in
