@@ -94,6 +94,11 @@ bool BindingSet::isDelayed() const {
     }
   }
 
+  // Delay key path literal type binding until there is at least
+  // one contextual binding (or default is promoted into a binding).
+  if (TypeVar->getImpl().isKeyPathType() && Bindings.empty())
+    return true;
+
   if (isHole()) {
     auto *locator = TypeVar->getImpl().getLocator();
     assert(locator && "a hole without locator?");
@@ -168,6 +173,12 @@ bool BindingSet::isPotentiallyIncomplete() const {
   // Generic parameters are always potentially incomplete.
   if (Info.isGenericParameter())
     return true;
+
+  // Key path literal type is incomplete until there is a
+  // contextual type or key path is resolved enough to infer
+  // capability and promote default into a binding.
+  if (TypeVar->getImpl().isKeyPathType())
+    return Bindings.empty();
 
   // If current type variable is associated with a code completion token
   // it's possible that it doesn't have enough contextual information
@@ -871,6 +882,44 @@ findInferableTypeVars(Type type,
 
 void PotentialBindings::addDefault(Constraint *constraint) {
   Defaults.insert(constraint);
+}
+
+void BindingSet::addDefault(Constraint *constraint) {
+  auto defaultTy = constraint->getSecondType();
+
+  if (TypeVar->getImpl().isKeyPathType() && Bindings.empty()) {
+    if (constraint->getKind() == ConstraintKind::FallbackType) {
+      if (auto capability = CS.inferKeyPathLiteralCapability(TypeVar)) {
+        auto *keyPathType = defaultTy->castTo<BoundGenericType>();
+
+        auto root = keyPathType->getGenericArgs()[0];
+        auto value = keyPathType->getGenericArgs()[1];
+
+        auto &ctx = CS.getASTContext();
+
+        switch (*capability) {
+        case KeyPathCapability::ReadOnly:
+          break;
+
+        case KeyPathCapability::Writable:
+          keyPathType = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
+                                              /*parent=*/Type(), {root, value});
+          break;
+
+        case KeyPathCapability::ReferenceWritable:
+          keyPathType =
+              BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                    /*parent=*/Type(), {root, value});
+          break;
+        }
+
+        addBinding({keyPathType, AllowedBindingKind::Exact, constraint});
+        return;
+      }
+    }
+  }
+
+  Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 
 bool LiteralRequirement::isCoveredBy(Type type, ConstraintSystem &CS) const {
