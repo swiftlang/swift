@@ -11,6 +11,11 @@ module Polymorphism {
   requires cplusplus
 }
 
+module ReferenceToDerived {
+  header "reference-to-derived.h"
+  requires cplusplus
+}
+
 module SubTypes {
   header "sub-types.h"
 }
