@@ -389,9 +389,10 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
     return try decode(type, forKey: key)
   }
 
-  func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<
-    NestedKey
-  > where NestedKey: CodingKey {
+  func nestedContainer<NestedKey: CodingKey>(
+    keyedBy type: NestedKey.Type,
+    forKey key: Key
+  ) throws -> KeyedDecodingContainer<NestedKey> {
     var objectPtr: UnsafeMutableRawPointer? = nil
     if JSON_value_getAsObject(try _getValueOrThrow(forKey: key), &objectPtr) {
       throw _typeMismatchError(KeyedDecodingContainer<NestedKey>.self, forKey: key)
@@ -533,8 +534,9 @@ extension LLVMJSONDecoding.UnkeyedContainer: UnkeyedDecodingContainer {
     )
   }
 
-  mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey>
-  where NestedKey: CodingKey {
+  mutating func nestedContainer<NestedKey: CodingKey>(
+    keyedBy type: NestedKey.Type
+  ) throws -> KeyedDecodingContainer<NestedKey> {
     var objectPtr: UnsafeMutableRawPointer? = nil
     let newPath = codingPath + [IndexKey(intValue: currentIndex)]
     if JSON_value_getAsObject(try _getValueOrThrow(), &objectPtr) {
@@ -672,9 +674,10 @@ extension LLVMJSONEncoding.KeyedContainer: KeyedEncodingContainerProtocol {
     try value.encode(to: encoder)
   }
 
-  mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<
-    NestedKey
-  > where NestedKey: CodingKey {
+  mutating func nestedContainer<NestedKey: CodingKey>(
+    keyedBy keyType: NestedKey.Type,
+    forKey key: Key
+  ) -> KeyedEncodingContainer<NestedKey> {
     let nestedObjectPtr = JSON_object_setNewObject(objectPtr, key.stringValue)
     return KeyedEncodingContainer(KeyedContainer(objectPtr: nestedObjectPtr, codingPath: codingPath + [key]))
   }
