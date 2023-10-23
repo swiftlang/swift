@@ -393,6 +393,12 @@ protocol EmptySwiftProto {}
     }
 }
 
+@_objcImplementation extension ObjCBasicInitClass {
+  init() {
+    // OK
+  }
+}
+
 @_objcImplementation extension ObjCClass {}
 // expected-error@-1 {{duplicate implementation of Objective-C class 'ObjCClass'}}
 
