@@ -48,12 +48,23 @@ class WASILibc(product.Product):
         llvm_build_dir = os.path.join('..', build_root, '%s-%s' % ('llvm', host_target))
         build_jobs = self.args.build_jobs or multiprocessing.cpu_count()
 
+        sysroot_build_dir = WASILibc.sysroot_build_path(build_root, host_target)
+        # FIXME: Manually create an empty dir that is usually created during
+        # check-symbols. The directory is required during sysroot installation step.
+        os.makedirs(os.path.join(sysroot_build_dir, "share"), exist_ok=True)
+
         shell.call([
             'make', 'install',
             '-j', str(build_jobs),
+            # FIXME: wasi-libc's pre-defined macro list does not expect
+            # `__FPCLASS_XXX`, which is introduced by the LLVM 17, yet.
+            # So skip the symbol check step by treating the phony target
+            # as very old file.
+            # https://github.com/llvm/llvm-project/commit/7dd387d2971d7759cadfffeb2082439f6c7ddd49
+            '--old-file=check-symbols',
             '-C', self.source_dir,
             'OBJDIR=' + os.path.join(self.build_dir, 'obj'),
-            'SYSROOT=' + WASILibc.sysroot_build_path(build_root, host_target),
+            'SYSROOT=' + sysroot_build_dir,
             'INSTALL_DIR=' + WASILibc.sysroot_install_path(build_root),
             'CC=' + os.path.join(llvm_build_dir, 'bin', 'clang'),
             'AR=' + os.path.join(llvm_build_dir, 'bin', 'llvm-ar'),
