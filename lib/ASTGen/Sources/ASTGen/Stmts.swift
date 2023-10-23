@@ -21,7 +21,7 @@ extension ASTGenVisitor {
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
-      elseStmt: self.generate(node.elseBody)?.castToStmt ?? .init(raw: nil)
+      elseStmt: (self.generate(node.elseBody)?.castToStmt).asNullable
     )
   }
 
@@ -38,7 +38,7 @@ extension ASTGenVisitor {
     .createParsed(
       self.ctx,
       returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
-      expr: self.generate(node.expression)
+      expr: self.generate(node.expression).asNullable
     )
   }
 }

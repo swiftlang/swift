@@ -57,10 +57,16 @@ struct BridgedDiagnosticImpl {
 
 // Define `unbridged` overloads for each AST node.
 #define AST_BRIDGING_WRAPPER(Name)                                             \
-  [[maybe_unused]]                                                             \
-  static Name *unbridged(Bridged##Name bridged) {                              \
+  [[maybe_unused]] static Name *unbridged(Bridged##Name bridged) {             \
     return static_cast<Name *>(bridged.raw);                                   \
   }
+#include "swift/AST/ASTBridgingWrappers.def"
+
+#define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
+  [[maybe_unused]] static Name *unbridged(BridgedNullable##Name bridged) {     \
+    return static_cast<Name *>(bridged.raw);                                   \
+  }
+#define AST_BRIDGING_WRAPPER_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
 // Define `.asDecl` on each BridgedXXXDecl type.
@@ -399,7 +405,7 @@ BridgedSingleValueStmtExpr SingleValueStmtExpr_createWithWrappedBranches(
 BridgedIfStmt IfStmt_createParsed(BridgedASTContext cContext,
                                   BridgedSourceLoc cIfLoc, BridgedExpr cond,
                                   BridgedStmt then, BridgedSourceLoc cElseLoc,
-                                  BridgedStmt elseStmt) {
+                                  BridgedNullableStmt elseStmt) {
   ASTContext &context = unbridged(cContext);
   auto *IS = new (context)
       IfStmt(unbridged(cIfLoc), unbridged(cond), unbridged(then),
@@ -409,7 +415,7 @@ BridgedIfStmt IfStmt_createParsed(BridgedASTContext cContext,
 
 BridgedReturnStmt ReturnStmt_createParsed(BridgedASTContext cContext,
                                           BridgedSourceLoc cLoc,
-                                          BridgedExpr expr) {
+                                          BridgedNullableExpr expr) {
   ASTContext &context = unbridged(cContext);
   return bridged(new (context) ReturnStmt(unbridged(cLoc), unbridged(expr)));
 }
@@ -454,8 +460,8 @@ BridgedParamDecl ParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cFirstName,
     BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
-    BridgedSourceLoc cSecondNameLoc, BridgedTypeRepr opaqueType,
-    BridgedExpr opaqueDefaultValue) {
+    BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
+    BridgedNullableExpr opaqueDefaultValue) {
   assert((bool)cSecondNameLoc.raw == (bool)cSecondName.raw);
   if (!cSecondName.raw) {
     cSecondName = cFirstName;
@@ -503,10 +509,11 @@ BridgedFuncDecl FuncDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStaticLoc, BridgedSourceLoc cFuncKeywordLoc,
     BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-    BridgedGenericParamList genericParamList,
+    BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, BridgedSourceLoc cAsyncLoc,
-    BridgedSourceLoc cThrowsLoc, BridgedTypeRepr thrownType,
-    BridgedTypeRepr returnType, BridgedTrailingWhereClause genericWhereClause) {
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
+    BridgedNullableTypeRepr returnType,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = unbridged(cContext);
 
   auto *paramList = unbridged(parameterList);
@@ -529,10 +536,10 @@ BridgedFuncDecl FuncDecl_createParsed(
 BridgedConstructorDecl ConstructorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cInitKeywordLoc, BridgedSourceLoc cFailabilityMarkLoc,
-    bool isIUO, BridgedGenericParamList genericParams,
+    bool isIUO, BridgedNullableGenericParamList genericParams,
     BridgedParameterList bridgedParameterList, BridgedSourceLoc cAsyncLoc,
-    BridgedSourceLoc cThrowsLoc, BridgedTypeRepr thrownType,
-    BridgedTrailingWhereClause genericWhereClause) {
+    BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   assert((bool)cFailabilityMarkLoc.raw || !isIUO);
 
   ASTContext &context = unbridged(cContext);
@@ -630,9 +637,9 @@ BridgedClosureExpr ClosureExpr_createParsed(BridgedASTContext cContext,
 BridgedTypeAliasDecl TypeAliasDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedGenericParamList genericParamList,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedSourceLoc cEqualLoc, BridgedTypeRepr opaqueUnderlyingType,
-    BridgedTrailingWhereClause genericWhereClause) {
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = unbridged(cContext);
 
   auto *decl = new (context)
@@ -689,9 +696,9 @@ convertToInheritedEntries(BridgedArrayRef cInheritedTypes) {
 BridgedNominalTypeDecl EnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedGenericParamList genericParamList,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
-    BridgedTrailingWhereClause genericWhereClause,
+    BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = unbridged(cContext);
 
@@ -718,8 +725,8 @@ BridgedEnumCaseDecl EnumCaseDecl_createParsed(BridgedDeclContext cDeclContext,
 BridgedEnumElementDecl EnumElementDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-    BridgedParameterList bridgedParameterList, BridgedSourceLoc cEqualsLoc,
-    BridgedExpr rawValue) {
+    BridgedNullableParameterList bridgedParameterList,
+    BridgedSourceLoc cEqualsLoc, BridgedNullableExpr rawValue) {
   ASTContext &context = unbridged(cContext);
 
   auto *parameterList = unbridged(bridgedParameterList);
@@ -742,9 +749,9 @@ BridgedEnumElementDecl EnumElementDecl_createParsed(
 BridgedNominalTypeDecl StructDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedGenericParamList genericParamList,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
-    BridgedTrailingWhereClause genericWhereClause,
+    BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = unbridged(cContext);
 
@@ -761,9 +768,9 @@ BridgedNominalTypeDecl StructDecl_createParsed(
 BridgedNominalTypeDecl ClassDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedGenericParamList genericParamList,
+    BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
-    BridgedTrailingWhereClause genericWhereClause,
+    BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange, bool isActor) {
   ASTContext &context = unbridged(cContext);
 
@@ -782,7 +789,7 @@ BridgedNominalTypeDecl ProtocolDecl_createParsed(
     BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
     BridgedArrayRef cInheritedTypes,
-    BridgedTrailingWhereClause genericWhereClause,
+    BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
   for (auto &pair : unbridgedArrayRef<BridgedIdentifierAndSourceLoc>(
@@ -807,8 +814,8 @@ BridgedAssociatedTypeDecl AssociatedTypeDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cAssociatedtypeKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cInheritedTypes,
-    BridgedTypeRepr defaultType,
-    BridgedTrailingWhereClause genericWhereClause) {
+    BridgedNullableTypeRepr defaultType,
+    BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = unbridged(cContext);
 
   auto *decl = AssociatedTypeDecl::createParsed(
@@ -825,7 +832,7 @@ BridgedExtensionDecl ExtensionDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cExtensionKeywordLoc, BridgedTypeRepr extendedType,
     BridgedArrayRef cInheritedTypes,
-    BridgedTrailingWhereClause genericWhereClause,
+    BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = unbridged(cContext);
 
@@ -1152,13 +1159,11 @@ CompositionTypeRepr_createParsed(BridgedASTContext cContext,
   return bridged(CT);
 }
 
-BridgedTypeRepr FunctionTypeRepr_createParsed(BridgedASTContext cContext,
-                                              BridgedTypeRepr argsTy,
-                                              BridgedSourceLoc cAsyncLoc,
-                                              BridgedSourceLoc cThrowsLoc,
-                                              BridgedTypeRepr thrownType,
-                                              BridgedSourceLoc cArrowLoc,
-                                              BridgedTypeRepr resultType) {
+BridgedTypeRepr FunctionTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr argsTy,
+    BridgedSourceLoc cAsyncLoc, BridgedSourceLoc cThrowsLoc,
+    BridgedNullableTypeRepr thrownType, BridgedSourceLoc cArrowLoc,
+    BridgedTypeRepr resultType) {
   ASTContext &context = unbridged(cContext);
   auto *FT = new (context) FunctionTypeRepr(
       nullptr, cast<TupleTypeRepr>(unbridged(argsTy)), unbridged(cAsyncLoc),
@@ -1196,7 +1201,7 @@ BridgedTypeRepr ExistentialTypeRepr_createParsed(BridgedASTContext cContext,
 BridgedGenericParamList GenericParamList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftAngleLoc,
     BridgedArrayRef cParameters,
-    BridgedTrailingWhereClause bridgedGenericWhereClause,
+    BridgedNullableTrailingWhereClause bridgedGenericWhereClause,
     BridgedSourceLoc cRightAngleLoc) {
   SourceLoc whereLoc;
   ArrayRef<RequirementRepr> requirements;
@@ -1215,7 +1220,7 @@ BridgedGenericParamList GenericParamList_createParsed(
 BridgedGenericTypeParamDecl GenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cEachLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedTypeRepr bridgedInheritedType,
+    BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr bridgedInheritedType,
     size_t index) {
   auto eachLoc = unbridged(cEachLoc);
   auto *decl = GenericTypeParamDecl::createParsed(
