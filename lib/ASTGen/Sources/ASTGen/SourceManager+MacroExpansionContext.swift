@@ -34,7 +34,8 @@ extension SourceManager {
     discriminator: String = ""
   ) -> MacroExpansionContext {
     return MacroExpansionContext(
-      sourceManager: self, discriminator: discriminator
+      sourceManager: self,
+      discriminator: discriminator
     )
   }
 }
@@ -43,13 +44,15 @@ extension String {
   /// Retrieve the base name of a string that represents a path, removing the
   /// directory.
   var basename: String {
-    guard let lastSlash = lastIndex(where: {
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(Android) || os(Linux)
+    guard
+      let lastSlash = lastIndex(where: {
+        #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(Android) || os(Linux)
         ["/"].contains($0)
-#else
+        #else
         ["/", "\\"].contains($0)
-#endif
-    }) else {
+        #endif
+      })
+    else {
       return self
     }
 
@@ -96,8 +99,8 @@ extension SourceManager.MacroExpansionContext: MacroExpansionContext {
     filePathMode: SourceLocationFilePathMode
   ) -> AbstractSourceLocation? {
     guard let (sourceFile, rootPosition) = sourceManager.rootSourceFile(of: node),
-        let exportedSourceFile =
-            sourceManager.exportedSourceFilesBySyntax[sourceFile]?.pointee
+      let exportedSourceFile =
+        sourceManager.exportedSourceFilesBySyntax[sourceFile]?.pointee
     else {
       return nil
     }

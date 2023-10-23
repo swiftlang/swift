@@ -90,7 +90,7 @@ extension Optional where Wrapped: SyntaxProtocol {
     guard let self else {
       return nil
     }
-    
+
     return self.bridgedSourceLoc(in: astgen)
   }
 }

@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 import CASTBridging
+import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
-import SwiftSyntaxBuilder
-import SwiftSyntaxMacros
-import SwiftSyntaxMacroExpansion
-import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
+import SwiftSyntaxBuilder
+import SwiftSyntaxMacroExpansion
+import SwiftSyntaxMacros
 
 extension SyntaxProtocol {
   func token(at position: AbsolutePosition) -> TokenSyntax? {
@@ -118,10 +118,13 @@ public func resolveExecutableMacro(
   // Executable plugins is "trusted" to have the macro implementation. If not,
   // the actual expansion fails.
   let exportedPtr = UnsafeMutablePointer<ExportedExecutableMacro>.allocate(capacity: 1)
-  exportedPtr.initialize(to: .init(
-    moduleName: String(cString: moduleName),
-    typeName: String(cString: typeName),
-    plugin: CompilerPlugin(opaqueHandle: pluginOpaqueHandle)))
+  exportedPtr.initialize(
+    to: .init(
+      moduleName: String(cString: moduleName),
+      typeName: String(cString: typeName),
+      plugin: CompilerPlugin(opaqueHandle: pluginOpaqueHandle)
+    )
+  )
   return UnsafeRawPointer(exportedPtr)
 }
 
@@ -189,9 +192,10 @@ enum ASTGenMacroDiagnostic: DiagnosticMessage, FixItMessage {
 /// single identifier.
 fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
   guard let stringLiteral = node.as(StringLiteralExprSyntax.self),
-        stringLiteral.segments.count == 1,
-        let segment = stringLiteral.segments.first,
-        case .stringSegment(let stringSegment) = segment else {
+    stringLiteral.segments.count == 1,
+    let segment = stringLiteral.segments.first,
+    case .stringSegment(let stringSegment) = segment
+  else {
     return nil
   }
 
@@ -202,7 +206,7 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
 /// for use in macro expansion.
 ///
 /// When the resulting macro requires expansion, the result will come in
-/// two parts: 
+/// two parts:
 ///
 /// - Returns: -1 on failure, BridgedMacroDefinitionKind on success. When the
 /// successful result is "expanded macro", `replacementsPtr` will point to a
@@ -214,12 +218,12 @@ fileprivate func identifierFromStringLiteral(_ node: ExprSyntax) -> String? {
 /// argument matching the corresponding parameter.
 @_cdecl("swift_ASTGen_checkMacroDefinition")
 func checkMacroDefinition(
-    diagEnginePtr: UnsafeMutableRawPointer,
-    sourceFilePtr: UnsafeRawPointer,
-    macroLocationPtr: UnsafePointer<UInt8>,
-    externalMacroOutPtr: UnsafeMutablePointer<BridgedString>,
-    replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
-    numReplacementsPtr: UnsafeMutablePointer<Int>
+  diagEnginePtr: UnsafeMutableRawPointer,
+  sourceFilePtr: UnsafeRawPointer,
+  macroLocationPtr: UnsafePointer<UInt8>,
+  externalMacroOutPtr: UnsafeMutablePointer<BridgedString>,
+  replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
+  numReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
   // Assert "out" parameters are initialized.
   assert(externalMacroOutPtr.pointee.isEmptyInitialized)
@@ -228,11 +232,13 @@ func checkMacroDefinition(
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
 
   // Find the macro declaration.
-  guard let macroDecl = findSyntaxNodeInSourceFile(
-    sourceFilePtr: sourceFilePtr,
-    sourceLocationPtr: macroLocationPtr,
-    type: MacroDeclSyntax.self
-  ) else {
+  guard
+    let macroDecl = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      sourceLocationPtr: macroLocationPtr,
+      type: MacroDeclSyntax.self
+    )
+  else {
     // FIXME: Produce an error
     return -1
   }
@@ -294,12 +300,13 @@ func checkMacroDefinition(
       return Int(BridgedMacroDefinitionKind.externalMacro.rawValue)
 
     case let .expansion(expansionSyntax, replacements: _)
-        where expansionSyntax.macroName.text == "externalMacro":
+    where expansionSyntax.macroName.text == "externalMacro":
       // Extract the identifier from the "module" argument.
       guard let firstArg = expansionSyntax.arguments.first,
-            let firstArgLabel = firstArg.label?.text,
-            firstArgLabel == "module",
-            let module = identifierFromStringLiteral(firstArg.expression) else {
+        let firstArgLabel = firstArg.label?.text,
+        firstArgLabel == "module",
+        let module = identifierFromStringLiteral(firstArg.expression)
+      else {
         let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
         srcMgr.insert(sourceFilePtr)
         srcMgr.diagnose(
@@ -313,9 +320,10 @@ func checkMacroDefinition(
 
       // Extract the identifier from the "type" argument.
       guard let secondArg = expansionSyntax.arguments.dropFirst().first,
-            let secondArgLabel = secondArg.label?.text,
-            secondArgLabel == "type",
-            let type = identifierFromStringLiteral(secondArg.expression) else {
+        let secondArgLabel = secondArg.label?.text,
+        secondArgLabel == "type",
+        let type = identifierFromStringLiteral(secondArg.expression)
+      else {
         let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)
         srcMgr.insert(sourceFilePtr)
         srcMgr.diagnose(
@@ -337,7 +345,6 @@ func checkMacroDefinition(
       externalMacroOutPtr.pointee =
         allocateBridgedString(expansionSyntax.trimmedDescription)
 
-
       // If there are no replacements, we're done.
       if replacements.isEmpty {
         return Int(BridgedMacroDefinitionKind.expandedMacro.rawValue)
@@ -348,8 +355,10 @@ func checkMacroDefinition(
       for (index, replacement) in replacements.enumerated() {
         let expansionStart = expansionSyntax.positionAfterSkippingLeadingTrivia.utf8Offset
 
-        replacementBuffer[index * 3] = replacement.reference.positionAfterSkippingLeadingTrivia.utf8Offset - expansionStart
-        replacementBuffer[index * 3 + 1] = replacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
+        replacementBuffer[index * 3] =
+          replacement.reference.positionAfterSkippingLeadingTrivia.utf8Offset - expansionStart
+        replacementBuffer[index * 3 + 1] =
+          replacement.reference.endPositionBeforeTrailingTrivia.utf8Offset - expansionStart
         replacementBuffer[index * 3 + 2] = replacement.parameterIndex
       }
 
@@ -420,17 +429,23 @@ func expandFreestandingMacro(
 
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
 
-  guard let macroSyntax = findSyntaxNodeInSourceFile(
-    sourceFilePtr: sourceFilePtr, sourceLocationPtr: sourceLocationPtr, type: Syntax.self) else {
+  guard
+    let macroSyntax = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      sourceLocationPtr: sourceLocationPtr,
+      type: Syntax.self
+    )
+  else {
     return 1
   }
-  guard let expansion = macroSyntax.asProtocol(
-    FreestandingMacroExpansionSyntax.self
-  ) else {
+  guard
+    let expansion = macroSyntax.asProtocol(
+      FreestandingMacroExpansionSyntax.self
+    )
+  else {
     print("not on a macro expansion node: \(macroSyntax.debugDescription)")
     return 1
   }
-
 
   let discriminator = String(cString: discriminatorText)
 
@@ -444,7 +459,8 @@ func expandFreestandingMacro(
       diagEnginePtr: diagEnginePtr,
       expansionSyntax: expansion,
       sourceFilePtr: sourceFilePtr,
-      discriminator: discriminator)
+      discriminator: discriminator
+    )
   case .Executable:
     expandedSource = expandFreestandingMacroIPC(
       macroPtr: macroPtr,
@@ -452,7 +468,8 @@ func expandFreestandingMacro(
       diagEnginePtr: diagEnginePtr,
       expansionSyntax: expansion,
       sourceFilePtr: sourceFilePtr,
-      discriminator: discriminator)
+      discriminator: discriminator
+    )
   }
 
   return makeExpansionOutputResult(
@@ -497,15 +514,15 @@ func expandFreestandingMacroIPC(
     macro: .init(moduleName: macro.moduleName, typeName: macro.typeName, name: macroName),
     macroRole: pluginMacroRole,
     discriminator: discriminator,
-    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!)
+    syntax: PluginMessage.Syntax(syntax: Syntax(expansionSyntax), in: sourceFilePtr)!
+  )
   do {
     let result = try macro.plugin.sendMessageAndWait(message)
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]
     switch result {
-    case
-        .expandMacroResult(let _expandedSource, let _diagnostics),
-        .expandFreestandingMacroResult(let _expandedSource, let _diagnostics):
+    case .expandMacroResult(let _expandedSource, let _diagnostics),
+      .expandFreestandingMacroResult(let _expandedSource, let _diagnostics):
       expandedSource = _expandedSource
       diagnostics = _diagnostics
     default:
@@ -596,7 +613,8 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   let sourceFilePtr = sourceFilePtr.bindMemory(
-    to: ExportedSourceFile.self, capacity: 1
+    to: ExportedSourceFile.self,
+    capacity: 1
   )
 
   // Find the offset.
@@ -638,14 +656,16 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     while let parentSyntax = resultSyntax.parent {
       // Look through type compositions.
       if let compositionElement = parentSyntax.as(CompositionTypeElementSyntax.self),
-         let compositionList = compositionElement.parent?.as(CompositionTypeElementListSyntax.self),
-         let typedParent = compositionList.parent?.as(type) {
+        let compositionList = compositionElement.parent?.as(CompositionTypeElementListSyntax.self),
+        let typedParent = compositionList.parent?.as(type)
+      {
         resultSyntax = typedParent
         continue
       }
 
       guard let typedParent = parentSyntax.as(type),
-            typedParent.position == resultSyntax.position else {
+        typedParent.position == resultSyntax.position
+      else {
         break
       }
 
@@ -678,21 +698,25 @@ func expandAttachedMacro(
   assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
 
   // Dig out the custom attribute for the attached macro declarations.
-  guard let customAttrNode = findSyntaxNodeInSourceFile(
-    sourceFilePtr: customAttrSourceFilePtr,
-    sourceLocationPtr: customAttrSourceLocPointer,
-    type: AttributeSyntax.self
-  ) else {
+  guard
+    let customAttrNode = findSyntaxNodeInSourceFile(
+      sourceFilePtr: customAttrSourceFilePtr,
+      sourceLocationPtr: customAttrSourceLocPointer,
+      type: AttributeSyntax.self
+    )
+  else {
     return 1
   }
 
   // Dig out the node for the declaration to which the custom attribute is
   // attached.
-  guard let declarationNode = findSyntaxNodeInSourceFile(
-    sourceFilePtr: declarationSourceFilePtr,
-    sourceLocationPtr: declarationSourceLocPointer,
-    type: DeclSyntax.self
-  ) else {
+  guard
+    let declarationNode = findSyntaxNodeInSourceFile(
+      sourceFilePtr: declarationSourceFilePtr,
+      sourceLocationPtr: declarationSourceLocPointer,
+      type: DeclSyntax.self
+    )
+  else {
     return 1
   }
 
@@ -728,7 +752,8 @@ func expandAttachedMacro(
       declarationSourceFilePtr: declarationSourceFilePtr,
       attachedTo: declarationNode,
       parentDeclSourceFilePtr: parentDeclSourceFilePtr,
-      parentDeclNode: parentDeclNode)
+      parentDeclNode: parentDeclNode
+    )
   case .InProcess:
     expandedSource = expandAttachedMacroInProcess(
       diagEnginePtr: diagEnginePtr,
@@ -742,7 +767,8 @@ func expandAttachedMacro(
       declarationSourceFilePtr: declarationSourceFilePtr,
       attachedTo: declarationNode,
       parentDeclSourceFilePtr: parentDeclSourceFilePtr,
-      parentDeclNode: parentDeclNode)
+      parentDeclNode: parentDeclNode
+    )
   }
 
   return makeExpansionOutputResult(
@@ -777,19 +803,22 @@ func expandAttachedMacroIPC(
   case .peer: macroRole = .peer
   case .conformance: macroRole = .conformance
   case .extension: macroRole = .`extension`
-  case
-      .expression,
-      .declaration,
-      .codeItem:
+  case .expression,
+    .declaration,
+    .codeItem:
     preconditionFailure("unhandled macro role for attached macro")
   }
 
   // Prepare syntax nodes to transfer.
   let customAttributeSyntax = PluginMessage.Syntax(
-    syntax: Syntax(customAttrNode), in: customAttrSourceFilePtr)!
+    syntax: Syntax(customAttrNode),
+    in: customAttrSourceFilePtr
+  )!
 
   let declSyntax = PluginMessage.Syntax(
-    syntax: Syntax(declarationNode), in: customAttrSourceFilePtr)!
+    syntax: Syntax(declarationNode),
+    in: customAttrSourceFilePtr
+  )!
 
   let parentDeclSyntax: PluginMessage.Syntax?
   if parentDeclNode != nil {
@@ -826,7 +855,8 @@ func expandAttachedMacroIPC(
     declSyntax: declSyntax,
     parentDeclSyntax: parentDeclSyntax,
     extendedTypeSyntax: extendedTypeSyntax,
-    conformanceListSyntax: conformanceListSyntax)
+    conformanceListSyntax: conformanceListSyntax
+  )
   do {
     let expandedSource: String?
     let diagnostics: [PluginMessage.Diagnostic]

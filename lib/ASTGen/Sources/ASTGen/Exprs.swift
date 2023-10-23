@@ -1,6 +1,6 @@
 import CASTBridging
-import SwiftSyntax
 import SwiftDiagnostics
+import SwiftSyntax
 
 extension ASTGenVisitor {
   public func generate(_ node: ClosureExprSyntax) -> BridgedClosureExpr {
@@ -18,10 +18,14 @@ extension ASTGenVisitor {
   public func generate(_ node: FunctionCallExprSyntax) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
-        self.diagnose(Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .leftParen)))
+        self.diagnose(
+          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .leftParen))
+        )
       }
       if node.rightParen == nil {
-        self.diagnose(Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .rightParen)))
+        self.diagnose(
+          Diagnostic(node: node, message: MissingChildTokenError(parent: node, kindOfTokenMissing: .rightParen))
+        )
       }
     }
 
@@ -30,14 +34,20 @@ extension ASTGenVisitor {
     // Transform the trailing closure into an argument.
     if let trailingClosure = node.trailingClosure {
       let tupleElement = LabeledExprSyntax(
-        label: nil, colon: nil, expression: ExprSyntax(trailingClosure), trailingComma: nil)
+        label: nil,
+        colon: nil,
+        expression: ExprSyntax(trailingClosure),
+        trailingComma: nil
+      )
 
       node.arguments.append(tupleElement)
       node.trailingClosure = nil
     }
 
     let argumentTuple = self.generate(
-      node.arguments, leftParen: node.leftParen, rightParen: node.rightParen
+      node.arguments,
+      leftParen: node.leftParen,
+      rightParen: node.rightParen
     )
     let callee = generate(node.calledExpression)
 
@@ -69,7 +79,10 @@ extension ASTGenVisitor {
 
     // Wrap in a SingleValueStmtExpr to embed as an expression.
     return .createWithWrappedBranches(
-      ctx, stmt: stmt, declContext: declContext, mustBeExpr: true
+      ctx,
+      stmt: stmt,
+      declContext: declContext,
+      mustBeExpr: true
     )
   }
 
@@ -94,7 +107,7 @@ extension ASTGenVisitor {
 
       return $0.bridgedSourceLoc(in: self)
     }
-    
+
     return BridgedTupleExpr.createParsed(
       self.ctx,
       leftParenLoc: leftParen.bridgedSourceLoc(in: self),
