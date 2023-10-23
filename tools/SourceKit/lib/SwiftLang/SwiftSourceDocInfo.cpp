@@ -773,6 +773,7 @@ static StringRef getModuleName(const ValueDecl *VD,
 
 struct DeclInfo {
   const ValueDecl *VD;
+  SubstitutionMap Substitutions;
   Type ContainerType;
   bool IsRef;
   bool IsDynamic;
@@ -787,11 +788,12 @@ struct DeclInfo {
   /// Whether the \c VD is in a synthesized extension of \c BaseType
   bool InSynthesizedExtension = false;
 
-  DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
+  DeclInfo(const ValueDecl *VD, SubstitutionMap Substitutions,
+           Type ContainerType, bool IsRef, bool IsDynamic,
            ArrayRef<NominalTypeDecl *> ReceiverTypes,
            const CompilerInvocation &Invoc)
-      : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
-        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+      : VD(VD), Substitutions(Substitutions), ContainerType(ContainerType),
+        IsRef(IsRef), IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
     if (VD == nullptr)
       return;
 
@@ -937,7 +939,8 @@ static void setLocationInfo(const ValueDecl *VD,
 
 static llvm::Error
 fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
-               SourceLoc CursorLoc, bool AddSymbolGraph, SwiftLangSupport &Lang,
+               SourceLoc CursorLoc, bool AddSymbolGraph,
+               bool ExpandSubstitutions, SwiftLangSupport &Lang,
                const CompilerInvocation &Invoc,
                ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
                llvm::BumpPtrAllocator &Allocator) {
@@ -983,6 +986,61 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
   Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
+
+  // Serialize the SubstitutionMap into an array of SubstitutionInfo
+  if (DInfo.IsRef) {
+
+    // Given generic type and its corresponding replacement type, returns their
+    // SubstitutionInfo
+    auto getSubstitutionInfo = [&](GenericTypeParamType *GenericTy, Type Ty) {
+      if (!GenericTy || !Ty) {
+        return SubstitutionInfo();
+      }
+
+      SubstitutionInfo SubstInfo;
+      GenericTy->print(OS);
+      OS << " -> ";
+      Ty->print(OS);
+      SubstInfo.Mapping = copyAndClearString(Allocator, Buffer);
+
+      if (!ExpandSubstitutions) {
+        return SubstInfo;
+      }
+
+      // Get declarations for both types
+      TypeDecl *GenericTyDecl = ide::getDeclFromType(GenericTy);
+      TypeDecl *TyDecl = ide::getDeclFromType(Ty);
+
+      if (GenericTyDecl) {
+        SwiftLangSupport::printUSR(GenericTyDecl, OS);
+        SubstInfo.GenericUSR = copyAndClearString(Allocator, Buffer);
+      }
+      if (TyDecl) {
+        SwiftLangSupport::printUSR(TyDecl, OS);
+        SubstInfo.ReplacementUSR = copyAndClearString(Allocator, Buffer);
+      }
+      return SubstInfo;
+    };
+
+    QuerySubstitutionMap GetType{DInfo.Substitutions};
+    auto Params = DInfo.Substitutions.getGenericSignature().getGenericParams();
+    SmallVector<SubstitutionInfo, 2> Substitutions;
+
+    for (auto *GenericTy : Params) {
+      // Lookup the replacement type
+      Type Ty = GetType(GenericTy);
+
+      // If no replacement type was found, print <error type> instead
+      if (!Ty) {
+        Ty = ErrorType::get(DInfo.VD->getASTContext());
+      }
+
+      Substitutions.push_back(getSubstitutionInfo(GenericTy, Ty));
+    }
+
+    Symbol.Substitutions =
+        copyArray(Allocator, llvm::makeArrayRef(Substitutions));
+  }
 
   if (DInfo.ContainerType && !DInfo.ContainerType->hasArchetype()) {
     SwiftLangSupport::printTypeUSR(DInfo.ContainerType, OS);
@@ -1198,9 +1256,9 @@ static bool addCursorInfoForLiteral(
   }
 
   auto &Symbol = Data.Symbols.emplace_back();
-  DeclInfo Info(Decl, nullptr, true, false, {}, CompInvoc);
-  auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, Lang, CompInvoc,
-                            PreviousSnaps, Data.Allocator);
+  DeclInfo Info(Decl, SubstitutionMap(), nullptr, true, false, {}, CompInvoc);
+  auto Err = fillSymbolInfo(Symbol, Info, CursorLoc, false, false, Lang,
+                            CompInvoc, PreviousSnaps, Data.Allocator);
 
   bool Success = true;
   llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
@@ -1214,57 +1272,93 @@ static bool addCursorInfoForLiteral(
 static bool
 addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
                      bool AddRefactorings, bool AddSymbolGraph,
-                     SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
-                     std::string &Diagnostic,
+                     bool ExpandSubstitutions, SwiftLangSupport &Lang,
+                     const CompilerInvocation &Invoc, std::string &Diagnostic,
                      ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps) {
-  DeclInfo OrigInfo(Info->getValueD(), Info->getContainerType(), Info->isRef(),
-                    Info->isDynamic(), Info->getReceiverTypes(), Invoc);
-  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Type(), true, false,
-                        ArrayRef<NominalTypeDecl *>(), Invoc);
+
+  // Given DeclInfo, fills CursorSymbolInfo and adds it to Data.Symbols.
+  // Returns false on error and sets Diagnostics accordingly.
+  auto addSymbolInfo = [&](const DeclInfo &DInfo, bool IgnoreError) -> bool {
+    if (!DInfo.VD) {
+      return false;
+    }
+
+    CursorSymbolInfo &NewSymbolInfo = Data.Symbols.emplace_back();
+    auto Err = fillSymbolInfo(NewSymbolInfo, DInfo, Info->getLoc(),
+                              AddSymbolGraph, ExpandSubstitutions, Lang, Invoc,
+                              PreviousSnaps, Data.Allocator);
+
+    if (Err) {
+      llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
+        if (!IgnoreError) {
+          Diagnostic = E.message();
+          return;
+        }
+        Data.Symbols.pop_back();
+      });
+      return false;
+    }
+    return true;
+  };
+
+  DeclInfo OrigInfo(Info->getValueD(), Info->getSubstitutionMap(),
+                    Info->getContainerType(), Info->isRef(), Info->isDynamic(),
+                    Info->getReceiverTypes(), Invoc);
+  DeclInfo CtorTypeInfo(Info->getCtorTyRef(), Info->getCtorSubstitutionMap(),
+                        Type(), true, false, ArrayRef<NominalTypeDecl *>(),
+                        Invoc);
   DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
   if (MainInfo.Unavailable) {
     Diagnostic = "Unavailable in the current compilation context.";
     return false;
   }
 
-  CursorSymbolInfo &MainSymbol = Data.Symbols.emplace_back();
   // The primary result for constructor calls, eg. `MyType()` should be
   // the type itself, rather than the constructor. The constructor will be
   // added as a secondary result.
-  if (auto Err =
-          fillSymbolInfo(MainSymbol, MainInfo, Info->getLoc(), AddSymbolGraph,
-                         Lang, Invoc, PreviousSnaps, Data.Allocator)) {
-    llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
-      Diagnostic = E.message();
-    });
+  if (!addSymbolInfo(MainInfo, false)) {
     return false;
   }
 
   if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
-    CursorSymbolInfo &CtorSymbol = Data.Symbols.emplace_back();
-    if (auto Err =
-            fillSymbolInfo(CtorSymbol, OrigInfo, Info->getLoc(), AddSymbolGraph,
-                           Lang, Invoc, PreviousSnaps, Data.Allocator)) {
-      // Ignore but make sure to remove the partially-filled symbol
-      llvm::handleAllErrors(std::move(Err), [](const llvm::StringError &E) {});
-      Data.Symbols.pop_back();
-    }
+    addSymbolInfo(OrigInfo, true);
   }
 
   // Add in shadowed declarations if on a decl. For references just go to the
   // actual declaration.
   if (!Info->isRef()) {
     for (auto D : Info->getShorthandShadowedDecls()) {
-      CursorSymbolInfo &SymbolInfo = Data.Symbols.emplace_back();
-      DeclInfo DInfo(D, Type(), /*IsRef=*/true, /*IsDynamic=*/false,
-                     ArrayRef<NominalTypeDecl *>(), Invoc);
-      if (auto Err =
-              fillSymbolInfo(SymbolInfo, DInfo, Info->getLoc(), AddSymbolGraph,
-                             Lang, Invoc, PreviousSnaps, Data.Allocator)) {
-        // Ignore but make sure to remove the partially-filled symbol
-        llvm::handleAllErrors(std::move(Err),
-                              [](const llvm::StringError &E) {});
-        Data.Symbols.pop_back();
+      DeclInfo DInfo(D, SubstitutionMap(), Type(), /*IsRef=*/true,
+                     /*IsDynamic=*/false, ArrayRef<NominalTypeDecl *>(), Invoc);
+      addSymbolInfo(DInfo, true);
+    }
+  }
+
+  // Add Symbol infos for the substitutions. Add each type only once.
+  if (ExpandSubstitutions) {
+    auto Params =
+        Info->getSubstitutionMap().getGenericSignature().getGenericParams();
+    llvm::DenseSet<CanType> Visited;
+    for (auto *GenericTy : Params) {
+      // Find the replacement type for this generic type
+      QuerySubstitutionMap GetType{Info->getSubstitutionMap()};
+      Type Ty = GetType(GenericTy);
+
+      // Add Symbol info for the replacement type
+      if (!Visited.contains(Ty->getCanonicalType())) {
+        DeclInfo DInfo(ide::getDeclFromType(Ty), SubstitutionMap(), Type(),
+                       true, false, {}, Invoc);
+        addSymbolInfo(DInfo, true);
+        Visited.insert(Ty->getCanonicalType());
+      }
+
+      // Add Symbol info for the generic type
+      if (!Visited.contains(GenericTy->getCanonicalType())) {
+        DeclInfo GenericDInfo(ide::getDeclFromType(GenericTy),
+                              SubstitutionMap(), Type(), true, false, {},
+                              Invoc);
+        addSymbolInfo(GenericDInfo, true);
+        Visited.insert(GenericTy->getCanonicalType());
       }
     }
   }
@@ -1280,16 +1374,16 @@ addCursorInfoForDecl(CursorInfoData &Data, ResolvedValueRefCursorInfoPtr Info,
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
 static bool passCursorInfoForDecl(
     ResolvedValueRefCursorInfoPtr Info, bool AddRefactorings,
-    bool AddSymbolGraph, ArrayRef<RefactoringInfo> KnownRefactoringInfo,
-    SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
-    std::string &Diagnostic, ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
-    bool DidReuseAST,
+    bool AddSymbolGraph, bool ExpandSubstitutions,
+    ArrayRef<RefactoringInfo> KnownRefactoringInfo, SwiftLangSupport &Lang,
+    const CompilerInvocation &Invoc, std::string &Diagnostic,
+    ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps, bool DidReuseAST,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   CursorInfoData Data;
 
-  bool success =
-      addCursorInfoForDecl(Data, Info, AddRefactorings, AddSymbolGraph, Lang,
-                           Invoc, Diagnostic, PreviousSnaps);
+  bool success = addCursorInfoForDecl(Data, Info, AddRefactorings,
+                                      AddSymbolGraph, ExpandSubstitutions, Lang,
+                                      Invoc, Diagnostic, PreviousSnaps);
   if (!success) {
     return false;
   }
@@ -1567,7 +1661,7 @@ static SourceFile *retrieveInputFile(StringRef inputBufferName,
 static void resolveCursor(
     SwiftLangSupport &Lang, StringRef PrimaryFile, StringRef InputBufferName,
     unsigned Offset, unsigned Length, bool Actionables, bool SymbolGraph,
-    SwiftInvocationRef Invok, bool TryExistingAST,
+    bool ExpandSubstitutions, SwiftInvocationRef Invok, bool TryExistingAST,
     bool CancelOnSubsequentRequest,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     SourceKitCancellationToken CancellationToken,
@@ -1578,6 +1672,7 @@ static void resolveCursor(
   class CursorInfoConsumer : public CursorRangeInfoConsumer {
     bool Actionables;
     bool SymbolGraph;
+    bool ExpandSubstitutions;
     SourceKitCancellationToken CancellationToken;
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver;
 
@@ -1585,14 +1680,16 @@ static void resolveCursor(
     CursorInfoConsumer(
         StringRef PrimaryFile, StringRef InputBufferName, unsigned Offset,
         unsigned Length, bool Actionables, bool SymbolGraph,
-        SwiftLangSupport &Lang, SwiftInvocationRef ASTInvok,
-        bool TryExistingAST, bool CancelOnSubsequentRequest,
+        bool ExpandSubstitutions, SwiftLangSupport &Lang,
+        SwiftInvocationRef ASTInvok, bool TryExistingAST,
+        bool CancelOnSubsequentRequest,
         SourceKitCancellationToken CancellationToken,
         std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
         : CursorRangeInfoConsumer(PrimaryFile, InputBufferName, Offset, Length,
                                   Lang, ASTInvok, TryExistingAST,
                                   CancelOnSubsequentRequest),
           Actionables(Actionables), SymbolGraph(SymbolGraph),
+          ExpandSubstitutions(ExpandSubstitutions),
           CancellationToken(CancellationToken), Receiver(std::move(Receiver)) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
@@ -1671,14 +1768,15 @@ static void resolveCursor(
         std::string Diagnostic;
         bool Success = passCursorInfoForDecl(
             cast<ResolvedValueRefCursorInfo>(CursorInfo), Actionables,
-            SymbolGraph, Actions, Lang, CompInvok, Diagnostic,
-            getPreviousASTSnaps(),
+            SymbolGraph, ExpandSubstitutions, Actions, Lang, CompInvok,
+            Diagnostic, getPreviousASTSnaps(),
             /*DidReuseAST=*/!getPreviousASTSnaps().empty(), Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
             resolveCursor(Lang, PrimaryFilePath, InputBufferName, Offset,
-                          Length, Actionables, SymbolGraph, ASTInvok,
+                          Length, Actionables, SymbolGraph, ExpandSubstitutions,
+                          ASTInvok,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
                           SM.getFileSystem(), CancellationToken, Receiver);
           } else {
@@ -1751,8 +1849,8 @@ static void resolveCursor(
 
   auto Consumer = std::make_shared<CursorInfoConsumer>(
       PrimaryFile, InputBufferName, Offset, Length, Actionables, SymbolGraph,
-      Lang, Invok, TryExistingAST, CancelOnSubsequentRequest, CancellationToken,
-      Receiver);
+      ExpandSubstitutions, Lang, Invok, TryExistingAST,
+      CancelOnSubsequentRequest, CancellationToken, Receiver);
 
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
@@ -2021,8 +2119,8 @@ resolveRange(SwiftLangSupport &Lang, StringRef PrimaryFilePath,
 static void deliverCursorInfoResults(
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver,
     CancellableResult<CursorInfoResults> Results, SwiftLangSupport &Lang,
-    const CompilerInvocation &Invoc, bool AddRefactorings,
-    bool AddSymbolGraph) {
+    const CompilerInvocation &Invoc, bool AddRefactorings, bool AddSymbolGraph,
+    bool ExpandSubstitutions) {
   switch (Results.getKind()) {
   case CancellableResultKind::Success: {
     // TODO: Implement delivery of other result types as more cursor info kinds
@@ -2033,7 +2131,8 @@ static void deliverCursorInfoResults(
               ResolvedCursorInfo)) {
         std::string Diagnostic; // Unused
         addCursorInfoForDecl(Data, Result, AddRefactorings, AddSymbolGraph,
-                             Lang, Invoc, Diagnostic, /*PreviousSnaps=*/{});
+                             ExpandSubstitutions, Lang, Invoc, Diagnostic,
+                             /*PreviousSnaps=*/{});
       }
     }
     Data.DidReuseAST = Results->DidReuseAST;
@@ -2054,8 +2153,8 @@ static void deliverCursorInfoResults(
 void SwiftLangSupport::getCursorInfo(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
     unsigned Length, bool Actionables, bool SymbolGraph,
-    bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    llvm::Optional<VFSOptions> vfsOptions,
+    bool ExpandSubstitutions, bool CancelOnSubsequentRequest,
+    ArrayRef<const char *> Args, llvm::Optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string error;
@@ -2065,7 +2164,7 @@ void SwiftLangSupport::getCursorInfo(
 
   if (auto IFaceGenRef = IFaceGenContexts.get(PrimaryFilePath)) {
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables,
-                                 SymbolGraph, Receiver] {
+                                 SymbolGraph, ExpandSubstitutions, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
       if (Entity.isResolved()) {
@@ -2084,14 +2183,16 @@ void SwiftLangSupport::getCursorInfo(
               /*Ty=*/Type(),
               /*ContainerType=*/Type(),
               /*CustomAttrRef=*/llvm::None,
+              /*SubstMap*/SubstitutionMap(),
+              /*CtorSubstMap*/SubstitutionMap(),
               /*IsKeywordArgument=*/false,
               /*IsDynamic=*/false,
               /*ReceiverTypes=*/{},
               /*ShorthandShadowedDecls=*/{});
-          passCursorInfoForDecl(
-              Info, Actionables, SymbolGraph, {}, *this, Invok, Diagnostic,
-              /*PreviousSnaps=*/{},
-              /*DidReuseAST=*/false, Receiver);
+          passCursorInfoForDecl(Info, Actionables, SymbolGraph,
+                                ExpandSubstitutions, {}, *this, Invok,
+                                Diagnostic, /*PreviousSnaps=*/{},
+                                /*DidReuseAST=*/false, Receiver);
         }
       } else {
         CursorInfoData Info;
@@ -2133,7 +2234,7 @@ void SwiftLangSupport::getCursorInfo(
   // improve the solver based so we don't need to run the old.
   auto ASTBasedReceiver = [this, CancellationToken, Invok, InputBuffer,
                            fileSystem, Receiver, Offset, Actionables,
-                           SymbolGraph](
+                           SymbolGraph, ExpandSubstitutions](
                               const RequestResult<CursorInfoData> &Res) {
     if (Res.isCancelled()) {
       // If the AST-based result got cancelled, we don’t want to start
@@ -2180,7 +2281,8 @@ void SwiftLangSupport::getCursorInfo(
               },
               [&](auto Result) {
                 deliverCursorInfoResults(SolverBasedReceiver, Result, *this,
-                                         CompInvok, Actionables, SymbolGraph);
+                                         CompInvok, Actionables, SymbolGraph,
+                                         ExpandSubstitutions);
               });
         });
 
@@ -2192,9 +2294,9 @@ void SwiftLangSupport::getCursorInfo(
   };
 
   resolveCursor(*this, PrimaryFilePath, InputBufferName, Offset, Length,
-                Actionables, SymbolGraph, Invok, /*TryExistingAST=*/true,
-                CancelOnSubsequentRequest, fileSystem, CancellationToken,
-                ASTBasedReceiver);
+                Actionables, SymbolGraph, ExpandSubstitutions, Invok,
+                /*TryExistingAST=*/true, CancelOnSubsequentRequest, fileSystem,
+                CancellationToken, ASTBasedReceiver);
 }
 
 void SwiftLangSupport::getDiagnostics(
@@ -2386,6 +2488,8 @@ static void resolveCursorFromUSR(
             /*IsRef=*/false,
             /*Ty=*/Type(), ContainerType,
             /*CustomAttrRef=*/llvm::None,
+            /*SubstMap*/SubstitutionMap(),
+            /*CtorSubstMap*/SubstitutionMap(),
             /*IsKeywordArgument=*/false,
             /*IsDynamic=*/false,
             /*ReceiverTypes=*/{},
@@ -2396,9 +2500,9 @@ static void resolveCursorFromUSR(
         std::string Diagnostic;
         bool Success = passCursorInfoForDecl(
             Info, /*AddRefactorings*/ false,
-            /*AddSymbolGraph*/ false, {}, Lang, CompInvok, Diagnostic,
-            PreviousASTSnaps,
-            /*DidReuseAST=*/false, Receiver);
+            /*AddSymbolGraph*/ false, /*ExpandSubstitutions*/ false, {}, Lang,
+            CompInvok, Diagnostic, PreviousASTSnaps, /*DidReuseAST=*/false,
+            Receiver);
         if (!Success) {
           if (!PreviousASTSnaps.empty()) {
             // Attempt again using the up-to-date AST.

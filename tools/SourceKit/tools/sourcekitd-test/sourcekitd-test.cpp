@@ -1797,6 +1797,11 @@ struct ResponseSymbolInfo {
     bool IsSPI;
     std::vector<ParentInfo> ParentContexts;
   };
+  struct SubstitutionInfo {
+    const char *Mapping;
+    const char *GenericUSR;
+    const char *ReplacementUSR;
+  };
 
   const char *Kind = nullptr;
   const char *Lang = nullptr;
@@ -1825,6 +1830,7 @@ struct ResponseSymbolInfo {
   std::vector<ReferencedSymbol> ReferencedSymbols;
 
   std::vector<const char *> ReceiverUSRs;
+  std::vector<SubstitutionInfo> Substitutions;
   bool IsSystem = false;
   bool IsDynamic = false;
   bool IsSynthesized = false;
@@ -1915,6 +1921,18 @@ struct ResponseSymbolInfo {
         });
 
     Symbol.ReceiverUSRs = readStringArray(Info, KeyReceivers, KeyUSR);
+
+    Symbol.Substitutions = readArray<SubstitutionInfo>(
+        Info, KeySubstitutions, [&](sourcekitd_variant_t Entry) {
+          return SubstitutionInfo{
+              sourcekitd_variant_dictionary_get_string(Entry,
+                                                       KeySubstitutionMapping),
+              sourcekitd_variant_dictionary_get_string(Entry,
+                                                       KeyGenericTypeUSR),
+              sourcekitd_variant_dictionary_get_string(Entry,
+                                                       KeyReplacementTypeUSR),
+          };
+        });
 
     Symbol.IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
     Symbol.IsDynamic =
@@ -2044,6 +2062,12 @@ struct ResponseSymbolInfo {
     for (auto Receiver : ReceiverUSRs)
       OS << Receiver << '\n';
     OS << "RECEIVERS END\n";
+
+    OS << "SUBSTITUTIONS BEGIN\n";
+    for (auto SubstInfo : Substitutions)
+      OS << SubstInfo.Mapping << " (" << SubstInfo.GenericUSR << " -> "
+         << SubstInfo.ReplacementUSR << ')' << '\n';
+    OS << "SUBSTITUTIONS END\n";
   }
 };
 

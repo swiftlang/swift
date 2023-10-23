@@ -59,6 +59,11 @@ class alignas(1 << TypeReprAlignInBits) TypeRepr
   TypeRepr(const TypeRepr&) = delete;
   void operator=(const TypeRepr&) = delete;
 
+  /// Last type this TypeRepr was resolved to.
+  /// This does not serve as a proper cache: Each type resolution request
+  /// recomputes this, no matter if this is set or not.
+  Type Ty;
+
 protected:
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -122,6 +127,10 @@ private:
   SourceLoc getLocImpl() const { return getStartLoc(); }
 
 public:
+  Type getType() const { return Ty; }
+
+  void setType(Type T) { Ty = T; }
+
   TypeReprKind getKind() const {
     return static_cast<TypeReprKind>(Bits.TypeRepr.Kind);
   }

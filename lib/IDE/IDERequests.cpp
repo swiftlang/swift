@@ -149,6 +149,33 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     }
   }
 
+  // Returns a pair of substitution maps for the primary declaration and the
+  // constructed type declaration (if this is a constructor call reference,
+  // otherwise empty map)
+  auto retrieveSubstitutions =
+      [CtorTyRef, &Data]() -> std::pair<SubstitutionMap, SubstitutionMap> {
+    if (!Data) {
+      return {};
+    }
+    llvm::Optional<SubstitutionMap> SubstMap = Data->getSubstitutions();
+    if (!SubstMap) {
+      return {};
+    }
+
+    // For constructor calls we received substitutions for the called
+    // initializer. Deduce substitutions for the constructed type
+    SubstitutionMap CtorSubstMap;
+    if (CtorTyRef && CtorTyRef->getAsGenericContext()) {
+      CtorSubstMap = SubstitutionMap::get(
+          CtorTyRef->getAsGenericContext()->getGenericSignature(),
+          SubstMap.value());
+    }
+
+    return {SubstMap.value(), CtorSubstMap};
+  };
+
+  auto [Substitutions, CtorTySubstitutions] = retrieveSubstitutions();
+
   SmallVector<NominalTypeDecl *> ReceiverTypes;
   bool IsDynamic = false;
   llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef =
@@ -165,9 +192,9 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
 
   CursorInfo = new ResolvedValueRefCursorInfo(
       CursorInfo->getSourceFile(), CursorInfo->getLoc(), D, CtorTyRef, ExtTyRef,
-      IsRef, Ty, ContainerType, CustomAttrRef,
-      /*IsKeywordArgument=*/false, IsDynamic, ReceiverTypes,
-      /*ShorthandShadowedDecls=*/{});
+      IsRef, Ty, ContainerType, CustomAttrRef, Substitutions,
+      CtorTySubstitutions, /*IsKeywordArgument=*/false, IsDynamic,
+      ReceiverTypes, /*ShorthandShadowedDecls=*/{});
 
   return true;
 }

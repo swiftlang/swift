@@ -1286,7 +1286,9 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                                    typeDecl);
   }
 
-  return applyGenericArguments(type, resolution, silContext, repr);
+  Type SubstTy = applyGenericArguments(type, resolution, silContext, repr);
+  repr->setType(SubstTy);
+  return SubstTy;
 }
 
 static std::string getDeclNameFromContext(DeclContext *dc,
@@ -1850,7 +1852,10 @@ static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
     }
 
     // If there are generic arguments, apply them now.
-    return applyGenericArguments(memberType, resolution, silContext, repr);
+    Type SubstTy =
+        applyGenericArguments(memberType, resolution, silContext, repr);
+    repr->setType(SubstTy);
+    return SubstTy;
   };
 
   // Short-circuiting.
@@ -1867,9 +1872,11 @@ static Type resolveQualifiedIdentTypeRepr(TypeResolution resolution,
       // type later on.
       if (!memberType->is<DependentMemberType>() ||
           memberType->castTo<DependentMemberType>()->getAssocType()) {
-        return applyGenericArguments(memberType, resolution, silContext, repr);
+        memberType =
+            applyGenericArguments(memberType, resolution, silContext, repr);
       }
 
+      repr->setType(memberType);
       return memberType;
     }
   }
@@ -2266,6 +2273,7 @@ Type TypeResolution::resolveType(TypeRepr *TyR,
   auto Ty =
       evaluateOrDefault(ctx.evaluator,
                         ResolveTypeRequest{this, TyR}, Type());
+  TyR->setType(Ty);
   if (!Ty)
     return ErrorType::get(ctx);
   return Ty;
