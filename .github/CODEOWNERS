@@ -198,7 +198,6 @@
 # TODO: /unittests/SIL/
 /unittests/Sema/                          @hborla @xedin
 /unittests/SourceKit/                     @ahoppen @bnbarham @rintaro @hamishknight
-# TODO: /unittests/stdlib/
 
 # userdocs
 # TODO: /userdocs
@@ -224,4 +223,4 @@
 # TODO: /validation-test/SILGen/
 # TODO: /validation-test/SILOptimizer/
 /validation-test/Sema/                    @hborla @slavapestov @xedin
-# TODO: /validation-test/stdlib/
+/validation-test/stdlib/                  @apple/standard-librarians
