@@ -3866,6 +3866,12 @@ namespace {
         base = optTy;
       }
 
+      // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
+      // let's record a AllowKeyPathMissingComponent fix.
+      if (E->hasSingleInvalidComponent()) {
+        (void)CS.recordFix(AllowKeyPathWithoutComponents::create(CS, locator));
+      }
+
       auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
