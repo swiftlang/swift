@@ -142,8 +142,7 @@
 # TODO: /localization
 
 # stdlib
-# TODO: /stdlib/
-/stdlib/public/core/                      @stephentyrone
+/stdlib/                                  @apple/standard-librarians
 /stdlib/public/Backtracing/               @al45tair
 /stdlib/public/Concurrency/               @ktoso @kavon
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
@@ -180,7 +179,7 @@
 # FIXME: This file could have a dedicated directory.
 /test/decl/protocol/special/DistributedActor.swift  @ktoso
 /test/expr/                                         @hborla @slavapestov @xedin
-# TODO: /test/stdlib/
+/test/stdlib/                                       @apple/standard-librarians
 /test/stmt/                                         @hborla @xedin
 /test/type/                                         @hborla @slavapestov @xedin
 
