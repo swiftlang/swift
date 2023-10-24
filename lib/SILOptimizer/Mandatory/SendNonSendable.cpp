@@ -466,12 +466,35 @@ public:
       : function(function),
         sendableProtocol(
             function->getASTContext().getProtocol(KnownProtocolKind::Sendable)),
-        builder() {
+        functionArgPartition(), builder() {
     assert(sendableProtocol && "PartitionOpTranslators should only be created "
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
     builder.translater = this;
     initCapturedUniquelyIdentifiedValues();
+
+    LLVM_DEBUG(llvm::dbgs() << "Initializing Function Args:\n");
+    auto functionArguments = function->getArguments();
+    if (functionArguments.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "    None.\n");
+      functionArgPartition = Partition::singleRegion({});
+      return;
+    }
+
+    llvm::SmallVector<Element, 8> nonSendableIndices;
+    for (SILArgument *arg : functionArguments) {
+      if (auto state = tryToTrackValue(arg)) {
+        // If we have an arg that is an actor, we allow for it to be
+        // consumed... value ids derived from it though cannot be consumed.
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID());
+        neverTransferredValueIDs.push_back(state->getID());
+        nonSendableIndices.push_back(state->getID());
+        LLVM_DEBUG(llvm::dbgs() << *arg);
+      }
+    }
+
+    // All non actor values are in the same partition.
+    functionArgPartition = Partition::singleRegion(nonSendableIndices);
   }
 
   std::optional<TrackableValue> getValueForId(TrackableValueID id) const {
@@ -528,35 +551,7 @@ public:
   // including self if available, into the same region, ensuring those
   // arguments get IDs in doing so. This Partition will be used as the
   // entry point for the full partition analysis.
-  Partition getEntryPartition() const {
-    if (!functionArgPartition) {
-      LLVM_DEBUG(llvm::dbgs() << "Initializing Function Args:\n");
-      auto *self = const_cast<PartitionOpTranslator *>(this);
-      auto functionArguments = function->getArguments();
-      if (functionArguments.empty()) {
-        LLVM_DEBUG(llvm::dbgs() << "    None.\n");
-        self->functionArgPartition = Partition::singleRegion({});
-      } else {
-        llvm::SmallVector<Element, 8> nonSendableIndices;
-        for (SILArgument *arg : functionArguments) {
-          if (auto state = tryToTrackValue(arg)) {
-            // If we have an arg that is an actor, we allow for it to be
-            // consumed... value ids derived from it though cannot be consumed.
-            LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID());
-            self->neverTransferredValueIDs.push_back(state->getID());
-            nonSendableIndices.push_back(state->getID());
-            LLVM_DEBUG(llvm::dbgs() << *arg);
-          }
-        }
-
-        // All non actor values are in the same partition.
-        self->functionArgPartition =
-            Partition::singleRegion(nonSendableIndices);
-      }
-    }
-
-    return *functionArgPartition;
-  }
+  Partition getEntryPartition() const { return *functionArgPartition; }
 
   // Get the vector of IDs that cannot be legally transferred at any point in
   // this function. Since we place all args and self in a single region right
@@ -588,6 +583,21 @@ public:
 
     llvm::report_fatal_error("all apply instructions should be covered");
   }
+
+#ifndef NDEBUG
+  void dumpValues() const {
+    // Since this is just used for debug output, be inefficient to make nicer
+    // output.
+    std::vector<std::pair<unsigned, SILValue>> temp;
+    for (auto p : stateIndexToEquivalenceClass) {
+      temp.emplace_back(p.first, p.second);
+    }
+    std::sort(temp.begin(), temp.end());
+    for (auto p : temp) {
+      LLVM_DEBUG(llvm::dbgs() << "%%" << p.first << ": " << p.second);
+    }
+  }
+#endif
 
   // ===========================================================================
   // The following section of functions wrap the more primitive Assign, Require,
@@ -1102,21 +1112,21 @@ public:
   // translateSILBasicBlock reduces a SIL basic block to the vector of
   // transformations to the non-Sendable partition that it induces.
   // it accomplished this by sequentially calling translateSILInstruction
-  std::vector<PartitionOp> translateSILBasicBlock(SILBasicBlock *basicBlock) {
+  void translateSILBasicBlock(SILBasicBlock *basicBlock,
+                              std::vector<PartitionOp> &foundPartitionOps) {
     LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Compiling basic block for function "
                             << basicBlock->getFunction()->getName() << ": ";
                basicBlock->dumpID(); llvm::dbgs() << SEP_STR;
                basicBlock->print(llvm::dbgs());
                llvm::dbgs() << SEP_STR << "Results:\n";);
-    //translate each SIL instruction to a PartitionOp, if necessary
-    std::vector<PartitionOp> partitionOps;
+    // Translate each SIL instruction to the PartitionOps that it represents if
+    // any.
     for (auto &instruction : *basicBlock) {
       LLVM_DEBUG(llvm::dbgs() << "Visiting: " << instruction);
       translateSILInstruction(&instruction);
-      copy(builder.currentInstPartitionOps, std::back_inserter(partitionOps));
+      copy(builder.currentInstPartitionOps,
+           std::back_inserter(foundPartitionOps));
     }
-
-    return partitionOps;
   }
 };
 
@@ -1199,25 +1209,18 @@ class BlockPartitionState {
   SILBasicBlock *basicBlock;
   PartitionOpTranslator &translator;
 
-  bool blockPartitionOpsPopulated = false;
   std::vector<PartitionOp> blockPartitionOps = {};
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator)
-      : basicBlock(basicBlock), translator(translator) {}
-
-  void ensureBlockPartitionOpsPopulated() {
-    if (blockPartitionOpsPopulated) return;
-    blockPartitionOpsPopulated = true;
-    blockPartitionOps = translator.translateSILBasicBlock(basicBlock);
+      : basicBlock(basicBlock), translator(translator) {
+    translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
   }
 
   // recomputes the exit partition from the entry partition,
   // and returns whether this changed the exit partition.
   // Note that this method ignored errors that arise.
   bool recomputeExitFromEntry() {
-    ensureBlockPartitionOpsPopulated();
-
     Partition workingPartition = entryPartition;
     for (auto partitionOp : blockPartitionOps) {
       // by calling apply without providing a `handleFailure` closure,
@@ -1782,7 +1785,7 @@ class PartitionAnalysis {
                       return BlockPartitionState(block, translator);
                     }),
         raceTracer(fn, blockStates), function(fn), solved(false) {
-    // initialize the entry block as needing an update, and having a partition
+    // Initialize the entry block as needing an update, and having a partition
     // that places all its non-sendable args in a single region
     blockStates[fn->getEntryBlock()].needsUpdate = true;
     blockStates[fn->getEntryBlock()].entryPartition =
@@ -1793,12 +1796,20 @@ class PartitionAnalysis {
     assert(!solved && "solve should only be called once");
     solved = true;
 
+    LLVM_DEBUG(llvm::dbgs() << SEP_STR << "Performing Dataflow!\n" << SEP_STR);
+    LLVM_DEBUG(llvm::dbgs() << "Values!\n"; translator.dumpValues());
+
     bool anyNeedUpdate = true;
     while (anyNeedUpdate) {
       anyNeedUpdate = false;
 
       for (auto [block, blockState] : blockStates) {
-        if (!blockState.needsUpdate) continue;
+
+        LLVM_DEBUG(llvm::dbgs() << "Block: bb" << block.getDebugID() << "\n");
+        if (!blockState.needsUpdate) {
+          LLVM_DEBUG(llvm::dbgs() << "    Doesn't need update! Skipping!\n");
+          continue;
+        }
 
         // mark this block as no longer needing an update
         blockState.needsUpdate = false;
@@ -1810,31 +1821,45 @@ class PartitionAnalysis {
         Partition newEntryPartition;
         bool firstPred = true;
 
-        // this loop computes the join of the exit partitions of all
+        LLVM_DEBUG(llvm::dbgs() << "    Visiting Preds!\n");
+
+        // This loop computes the join of the exit partitions of all
         // predecessors of this block
         for (SILBasicBlock *predBlock : block.getPredecessorBlocks()) {
           BlockPartitionState &predState = blockStates[predBlock];
           // ignore predecessors that haven't been reached by the analysis yet
-          if (!predState.reached) continue;
+          if (!predState.reached)
+            continue;
 
           if (firstPred) {
             firstPred = false;
             newEntryPartition = predState.exitPartition;
+            LLVM_DEBUG(llvm::dbgs() << "    First Pred. bb"
+                                    << predBlock->getDebugID() << ": ";
+                       newEntryPartition.print(llvm::dbgs()));
             continue;
           }
 
-          newEntryPartition = Partition::join(
-              newEntryPartition, predState.exitPartition);
+          LLVM_DEBUG(llvm::dbgs()
+                         << "    Pred. bb" << predBlock->getDebugID() << ": ";
+                     predState.exitPartition.print(llvm::dbgs()));
+          newEntryPartition =
+              Partition::join(newEntryPartition, predState.exitPartition);
+          LLVM_DEBUG(llvm::dbgs() << "        Join: ";
+                     newEntryPartition.print(llvm::dbgs()));
         }
 
-        // if we found predecessor blocks, then attempt to use them to
-        // update the entry partition for this block, and abort this block's
-        // update if the entry partition was not updated
+        // If we found predecessor blocks, then attempt to use them to update
+        // the entry partition for this block, and abort this block's update if
+        // the entry partition was not updated.
         if (!firstPred) {
           // if the recomputed entry partition is the same as the current one,
           // perform no update
-          if (Partition::equals(newEntryPartition, blockState.entryPartition))
+          if (Partition::equals(newEntryPartition, blockState.entryPartition)) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "    Entry partition is the same... skipping!\n");
             continue;
+          }
 
           // otherwise update the entry partition
           blockState.entryPartition = newEntryPartition;
@@ -1882,7 +1907,9 @@ class PartitionAnalysis {
                      << function->getName() << "\n");
     RaceTracer tracer(function, blockStates);
 
-    for (auto [_, blockState] : blockStates) {
+    for (auto [block, blockState] : blockStates) {
+      LLVM_DEBUG(llvm::dbgs() << "Block bb" << block.getDebugID() << "\n");
+
       // populate the raceTracer with all requires of transferred valued found
       // throughout the CFG
       blockState.diagnoseFailures(
