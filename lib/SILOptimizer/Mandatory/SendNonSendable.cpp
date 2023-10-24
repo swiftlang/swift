@@ -1387,15 +1387,12 @@ private:
       // consumption does not correspond to an apply expression
       return false;
     auto isolationCrossing = apply->getIsolationCrossing();
-    if (!isolationCrossing) {
-      assert(false && "ApplyExprs should be transferring only if"
-                      " they are isolation crossing");
-      return false;
-    }
+    assert(isolationCrossing && "ApplyExprs should be transferring only if "
+                                "they are isolation crossing");
+
     auto argExpr = transferOp.getSourceExpr();
-    if (!argExpr)
-      assert(false &&
-             "sourceExpr should be populated for ApplyExpr consumptions");
+    assert(argExpr &&
+           "sourceExpr should be populated for ApplyExpr consumptions");
 
     sourceInst->getFunction()
         ->getASTContext()
