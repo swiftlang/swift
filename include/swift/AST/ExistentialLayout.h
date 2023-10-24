@@ -31,6 +31,7 @@ struct ExistentialLayout {
 
   ExistentialLayout() {
     hasExplicitAnyObject = false;
+    hasInverseCopyable = false;
     containsNonObjCProtocol = false;
     containsParameterized = false;
   }
@@ -45,6 +46,9 @@ struct ExistentialLayout {
 
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
+
+  /// Whether the existential contains an explicit '& ~Copyable' constraint.
+  bool hasInverseCopyable : 1;
 
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;

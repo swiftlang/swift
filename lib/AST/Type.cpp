@@ -341,6 +341,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
   auto *protoDecl = type->getDecl();
 
   hasExplicitAnyObject = false;
+  hasInverseCopyable = false;
   containsNonObjCProtocol = !protoDecl->isObjC();
   containsParameterized = false;
 
@@ -348,17 +349,31 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
 }
 
 ExistentialLayout::ExistentialLayout(CanInverseType type) {
-  //  TODO: implement this correctly!!!!!!!!!
   hasExplicitAnyObject = false;
+  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
-  llvm_unreachable("FIXME");
+
+  // Handle inverse.
+  switch (type->getInverseKind()) {
+  case InvertibleProtocolKind::Copyable:
+    hasInverseCopyable = true;
+  }
 }
 
 ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
   hasExplicitAnyObject = type->hasExplicitAnyObject();
+  hasInverseCopyable = false;
   containsNonObjCProtocol = false;
   containsParameterized = false;
+
+  // Handle inverses.
+  for (auto ip : type->getInverses()) {
+    switch (ip) {
+    case InvertibleProtocolKind::Copyable:
+      hasInverseCopyable = true;
+    }
+  }
 
   auto members = type.getMembers();
   if (!members.empty() &&

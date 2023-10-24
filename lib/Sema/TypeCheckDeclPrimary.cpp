@@ -227,6 +227,12 @@ static void checkInheritanceClause(
         continue;
       }
 
+      // Classes are always copyable.
+      if (layout.hasInverseCopyable && isa<ClassDecl>(decl)) {
+        decl->diagnose(diag::noncopyable_class);
+        continue;
+      }
+
       // If the existential did not have a class constraint, we're done.
       if (!layout.explicitSuperclass)
         continue;

@@ -961,13 +961,6 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
     if (defaults.contains(kind)) {
       defaults.remove(kind);
       lastInverse.insert({kind, loc});
-
-      // Classes are always copyable.
-      if (isa<ClassDecl>(decl) && kind == InvertibleProtocolKind::Copyable) {
-        ctx.Diags.diagnose(loc, diag::noncopyable_class);
-        return;
-      }
-
       return;
     }
 
