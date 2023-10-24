@@ -1154,9 +1154,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "wasm";
       // @extern(wasm) always has names.
       Printer << ", module: \"" << *Attr->ModuleName << "\"";
-      Printer << ", name: \"" << *Attr->Name << "\")";
+      Printer << ", name: \"" << *Attr->Name << "\"";
       break;
     }
+    Printer << ")";
     break;
   }
 
