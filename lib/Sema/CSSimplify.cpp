@@ -12333,16 +12333,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
                  tv->getImpl().canBindToHole();
         })) {
       (void)tryMatchRootAndValueFromType(keyPathTy);
-
-      // If the type of the key path is not yet resolved simplifying this
-      // constraint would disconnect it from root and value, let's bind it
-      // to a placeholder type to make sure this doesn't happen.
-      if (auto *typeVar = keyPathTy->getAs<TypeVariableType>()) {
-        return matchTypes(keyPathTy, PlaceholderType::get(Context, typeVar),
-                          ConstraintKind::Bind, subflags,
-                          locator.getBaseLocator());
-      }
-
       return SolutionKind::Solved;
     }
   }
@@ -12352,12 +12342,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
   if (!tryMatchRootAndValueFromType(keyPathTy, /*allowPartial=*/false))
     return SolutionKind::Error;
-
-  // If the expression has contextual type information, try using that too.
-  if (auto contextualTy = getContextualType(keyPath, /*forConstraint=*/false)) {
-    if (!tryMatchRootAndValueFromType(contextualTy))
-      return SolutionKind::Error;
-  }
 
   // If we fix this keypath as `AllowMultiArgFuncKeyPathMismatch`, just proceed
   if (resolveAsMultiArgFuncFix)
@@ -12422,14 +12406,8 @@ ConstraintSystem::simplifyKeyPathConstraint(
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
       if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath)) {
-        if (!shouldAttemptFixes())
-          return SolutionKind::Error;
-
-        // If this was a method reference let's mark it as read-only.
-        if (!storage) {
-          capability = ReadOnly;
-          continue;
-        }
+        return shouldAttemptFixes() ? SolutionKind::Solved
+                                    : SolutionKind::Error;
       }
 
       if (!storage)
