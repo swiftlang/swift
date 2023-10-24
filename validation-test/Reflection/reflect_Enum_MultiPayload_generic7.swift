@@ -9,7 +9,6 @@
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
-import Darwin
 
 // This will always get treated as a single-payload enum
 enum A<T> {
