@@ -126,3 +126,28 @@ public func hasIfCompilerCheck(_ x: () -> Bool = {
 #endif
   }) {
 }
+
+// CHECK: func hasComments
+// CHECK-NOT: comment!
+public func hasComments(_ x: () -> Bool = {
+  /* comment! */ // comment!
+  #if NOT_PROVIDED
+    // comment!
+    return true
+  #endif
+
+  print(/* 
+    comment! 
+  */"this should show up")
+
+  print(
+    // comment! don't mess up indentation!
+    """
+    """)
+
+  #if !NOT_PROVIDED
+    // comment!
+    return /* comment! */ true /* comment! */
+  #endif
+}) {
+}

@@ -189,20 +189,60 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
+static void appendRange(
+  SourceManager &sourceMgr, SourceLoc start, SourceLoc end,
+  SmallVectorImpl<char> &scratch) {
+  unsigned bufferID = sourceMgr.findBufferContainingLoc(start);
+  unsigned offset = sourceMgr.getLocOffsetInBuffer(start, bufferID);
+  unsigned endOffset = sourceMgr.getLocOffsetInBuffer(end, bufferID);
+
+  // Strip comments from the chunk before adding it by re-lexing the range.
+  LangOptions FakeLangOpts;
+  Lexer lexer(FakeLangOpts, sourceMgr, bufferID, nullptr, LexerMode::Swift,
+    HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+    offset, endOffset);
+
+  SmallVector<SourceRange, 8> nonCommentRanges;
+  SourceLoc nonCommentStart = start;
+  Token token;
+
+  // Re-lex the range, and skip the full text of `tok::comment` tokens.
+  while (true) {
+    lexer.lex(token);
+
+    if (token.is(tok::eof))
+      break;
+
+    if (token.is(tok::comment)) {
+      // Grab the range from the last non-comment token to the beginning of this comment
+      // token.
+      SourceLoc commentLoc = token.getLoc();
+
+      SourceRange range { nonCommentStart, commentLoc };
+      nonCommentRanges.append(1, range);
+
+      // Set the start of the next non-comment range to the end of this token.
+      nonCommentStart = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+    }
+  }
+
+  if (nonCommentStart.isValid() && nonCommentStart != end) {
+    SourceRange range { nonCommentStart, end };
+    nonCommentRanges.append(1, range);
+  }
+
+  for (SourceRange &range : nonCommentRanges) {
+    auto charRange = CharSourceRange(sourceMgr, range.Start, range.End);
+    StringRef text = sourceMgr.extractText(charRange);
+    scratch.append(text.begin(), text.end());
+  }
+}
+
 StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
                                       SmallVectorImpl<char> &scratch) {
   // Extract inactive ranges from the text of the node.
   ExtractInactiveRanges extractor(sourceMgr);
   node.walk(extractor);
-
-  // If there were no inactive ranges, then there were no #if configs.
-  // Return an unowned buffer directly into the source file.
-  if (extractor.ranges.empty()) {
-    auto range =
-      Lexer::getCharSourceRangeFromSourceRange(
-        sourceMgr, node.getSourceRange());
-    return sourceMgr.extractText(range);
-  }
 
   // Begin piecing together active code ranges.
 
@@ -211,9 +251,7 @@ StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
   SourceLoc end = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
   for (auto &range : extractor.getSortedRanges()) {
     // Add the text from the current 'start' to this ignored range's start.
-    auto charRange = CharSourceRange(sourceMgr, start, range.getStart());
-    auto chunk = sourceMgr.extractText(charRange);
-    scratch.append(chunk.begin(), chunk.end());
+    appendRange(sourceMgr, start, range.getStart(), scratch);
 
     // Set 'start' to the end of this range, effectively skipping it.
     start = range.getEnd();
@@ -221,9 +259,8 @@ StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
 
   // If there's leftover unignored text, add it.
   if (start != end) {
-    auto range = CharSourceRange(sourceMgr, start, end);
-    auto chunk = sourceMgr.extractText(range);
-    scratch.append(chunk.begin(), chunk.end());
+    appendRange(sourceMgr, start, end, scratch);
   }
+
   return { scratch.data(), scratch.size() };
 }
