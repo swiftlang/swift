@@ -1184,6 +1184,115 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   }
 }
 
+bool LinkEntity::isText() const {
+  switch (getKind()) {
+  // case Kind::DispatchThunkDerivative:
+  // case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+    return true;
+  case Kind::DispatchThunkAsyncFunctionPointer:
+  case Kind::DistributedThunkAsyncFunctionPointer:
+    return false;
+  // case Kind::DispatchThunkInitializerAsyncFunctionPointer:
+  // case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
+    return true;
+  // case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+    return true;
+  // case Kind::ObjCClass:
+  // case Kind::ObjCClassRef:
+  // case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ObjCResilientClassStub:
+    return false;
+  // case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::OpaqueTypeDescriptor:
+    return true;
+  // case Kind::NominalTypeDescriptorRecord:
+  // case Kind::OpaqueTypeDescriptorRecord:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+    return true;
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    return false;
+  // case Kind::TypeMetadataPattern:
+  // case Kind::TypeMetadataInstantiationCache:
+  // case Kind::TypeMetadataInstantiationFunction:
+  // case Kind::TypeMetadataSingletonInitializationCache:
+  // case Kind::TypeMetadataCompletionFunction:
+  // case Kind::ModuleDescriptor:
+  // case Kind::DefaultAssociatedConformanceAccessor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::BaseConformanceDescriptor:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+    return true;
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  // case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
+  case Kind::AsyncFunctionPointerAST:
+    return false;
+  // case Kind::DynamicallyReplaceableFunctionKey:
+  // case Kind::SILFunction:
+  // case Kind::ExtensionDescriptor:
+  // case Kind::AnonymousDescriptor:
+  // case Kind::SILGlobalVariable:
+  // case Kind::ReadOnlyGlobalObject:
+  case Kind::ProtocolWitnessTable:
+    return false;
+  // case Kind::ProtocolWitnessTablePattern:
+  // case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  // case Kind::AssociatedTypeWitnessTableAccessFunction:
+  // case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::DispatchThunk:
+  case Kind::ProtocolDescriptor:
+  // case Kind::ProtocolDescriptorRecord:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
+    return true;
+  // case Kind::ProtocolWitnessTableLazyAccessFunction:
+  // case Kind::ProtocolWitnessTableLazyCacheVariable:
+  // case Kind::DifferentiabilityWitness:
+  // case Kind::ValueWitness:
+  // case Kind::ValueWitnessTable:
+  case Kind::TypeMetadata:
+    return false;
+  case Kind::TypeMetadataAccessFunction:
+    return true;
+  // case Kind::TypeMetadataLazyCacheVariable:
+  // case Kind::TypeMetadataDemanglingCacheVariable:
+  // case Kind::ReflectionBuiltinDescriptor:
+  // case Kind::ReflectionFieldDescriptor:
+  // case Kind::CoroutineContinuationPrototype:
+  // case Kind::DynamicallyReplaceableFunctionVariable:
+  // case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
+  // case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
+  // case Kind::NoncanonicalSpecializedGenericTypeMetadata:
+  // case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
+  // case Kind::AsyncFunctionPointer:
+  // case Kind::PartialApplyForwarder:
+  // case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  // case Kind::KnownAsyncFunctionPointer:
+  // case Kind::DistributedAccessor:
+  // case Kind::DistributedAccessorAsyncPointer:
+  // case Kind::AccessibleFunctionRecord:
+  // case Kind::ExtendedExistentialTypeShape:
+  //   return false;
+  default:
+    llvm_unreachable("segment kind not specified");
+  }
+}
+
 bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
