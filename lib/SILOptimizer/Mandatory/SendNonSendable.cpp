@@ -885,7 +885,6 @@ public:
     //       treating some of these as lookthroughs in getUnderlyingTrackedValue
     //       instead of as assignments
     case SILInstructionKind::AddressToPointerInst:
-    case SILInstructionKind::BeginAccessInst:
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
     case SILInstructionKind::ConvertFunctionInst:
@@ -1068,6 +1067,25 @@ public:
     case SILInstructionKind::UnreachableInst:
     case SILInstructionKind::UnwindInst:
     case SILInstructionKind::YieldInst: // TODO: yield should be handled
+      return;
+
+    // We ignore begin_access since we look through them. We look through them
+    // since we want to treat the use of the begin_access as the semantic giving
+    // instruction. Otherwise, if we have a store after a consume we will emit
+    // an error on the begin_access rather than allowing for the store to
+    // overwrite the original value. This would then cause an error.
+    //
+    // Example:
+    //
+    //   %0 = alloc_stack
+    //   store %1 to %0
+    //   apply %transfer(%0)
+    //   %2 = begin_access [modify] [static] %0
+    //   store %2 to %0
+    //
+    // If we treated a begin_access as an assign, we would require %0 to not be
+    // transferred at %2 even though we are about to overwrite it.
+    case SILInstructionKind::BeginAccessInst:
       return;
 
     default:

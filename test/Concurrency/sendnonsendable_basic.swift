@@ -174,8 +174,20 @@ extension Actor {
     let closure: () -> () = {
       print(self.klass)
     }
-    let x = (closure, 1)
+    let x = (1, closure)
     await transferToMain(x) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type '(Int, () -> ())' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+
+  func simpleClosureCaptureSelfAndTransferThroughTupleBackwards() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+    // NOTE: We do not error on this today since we assign into 1 and that makes
+    // x assign fresh. It will be fixed in a forthcoming commit.
+    let x = (closure, 1)
+    await transferToMain(x)
     // expected-complete-warning @-1 {{passing argument of non-sendable type '(() -> (), Int)' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
@@ -451,11 +463,11 @@ extension Actor {
 
     // This re-assignment shouldn't error.
     closure = {}
-    await transferToMain(closure)
+    await transferToMain(closure) // expected-sns-warning {{passing argument of non-sendable type '() -> ()' from actor-isolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
     // But this will error since we race.
-    closure()
+    closure() // expected-sns-note {{access here could race}}
   }
 }
