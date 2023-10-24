@@ -128,8 +128,14 @@ public func hasIfCompilerCheck(_ x: () -> Bool = {
 }
 
 // CHECK: func hasComments
+// CHECK: print(
+// CHECK-NOT: comment! don't mess up indentation!
+// CHECK: {{^}}    """
+// CHECK: {{^}}    """
+// CHECK-NOT: #if
 // CHECK-NOT: comment!
-public func hasComments(_ x: () -> Bool = {
+// CHECK: return true
+public func hasComments() -> Bool {
   /* comment! */ // comment!
   #if NOT_PROVIDED
     // comment!
@@ -147,7 +153,6 @@ public func hasComments(_ x: () -> Bool = {
 
   #if !NOT_PROVIDED
     // comment!
-    return /* comment! */ true /* comment! */
+    return/* comment! */true/* comment! */
   #endif
-}) {
 }

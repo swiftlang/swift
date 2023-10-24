@@ -210,10 +210,9 @@ static void appendRange(
     lexer.lex(token);
 
     if (token.is(tok::comment)) {
-      // Grab the range from the last non-comment token to the beginning of this comment
+      // Append the range from the last non-comment token to the beginning of this comment
       // token.
       SourceLoc commentLoc = token.getLoc();
-
       auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
       StringRef text = sourceMgr.extractText(charRange);
       scratch.append(text.begin(), text.end());
