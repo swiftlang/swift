@@ -1612,6 +1612,12 @@ public:
   /// entity.
   llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
 
+  /// Determine whether entity that represents a symbol is in TEXT segment.
+  bool isText() const;
+
+  /// Determine whether entity that represents a symbol is in DATA segment.
+  bool isData() const { return !isText(); }
+
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
