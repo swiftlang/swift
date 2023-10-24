@@ -1025,6 +1025,24 @@ Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
+llvm::Optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+  NodePointer node = getDemangling(Dem);
+  if (!node)
+    return {};
+
+  // The mangled tree stored in this typeref implicitly assumes the type and
+  // global mangling, so add those back in.
+  auto typeMangling = Dem.createNode(Node::Kind::TypeMangling);
+  typeMangling->addChild(node, Dem);
+  auto global = Dem.createNode(Node::Kind::Global);
+  global->addChild(node, Dem);
+
+  auto mangling = mangleNode(global);
+  if (!mangling.isSuccess())
+    return {};
+  return mangling.result();
+}
+
 bool TypeRef::isConcrete() const {
   GenericArgumentMap Subs;
   return TypeRefIsConcrete(Subs).visit(this);
