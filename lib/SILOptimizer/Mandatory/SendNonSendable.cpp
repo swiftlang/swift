@@ -246,7 +246,7 @@ struct PartitionOpBuilder {
 
   void addTransfer(SILValue value, Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
-           "transfered value should already have been encountered");
+           "transferred value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
         PartitionOp::Transfer(lookupValueID(value), currentInst, sourceExpr));

@@ -394,14 +394,14 @@ public:
     return fst_reduced;
   }
 
-  // Apply the passed PartitionOp to this partition, performing its action.
-  // A `handleFailure` closure can optionally be passed in that will be called
-  // if a transferred region is required. The closure is given the PartitionOp
-  // that failed, and the index of the SIL value that was required but
+  // Apply the passed PartitionOp to this partition, performing its action.  A
+  // `handleFailure` closure can optionally be passed in that will be called if
+  // a transferred region is required. The closure is given the PartitionOp that
+  // failed, and the index of the SIL value that was required but
   // transferred. Additionally, a list of "nonconsumable" indices can be passed
   // in along with a handleConsumeNonConsumable closure. In the event that a
   // region containing one of the nonconsumable indices is transferred, the
-  // closure will be called with the offending Consume.
+  // closure will be called with the offending transfer.
   void apply(
       PartitionOp op,
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
