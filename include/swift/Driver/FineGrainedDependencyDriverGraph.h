@@ -53,15 +53,15 @@ class ModuleDepGraphNode : public DepGraphNode {
   /// The swiftDeps file that holds this entity iff this is a provides node.
   /// If more than one source file has the same DependencyKey, then there
   /// will be one node for each in the driver, distinguished by this field.
-  llvm::Optional<std::string> swiftDeps;
+  std::optional<std::string> swiftDeps;
 
   /// When finding transitive dependents, this node has been traversed.
   bool hasBeenTracedAsADependent = false;
 
 public:
   ModuleDepGraphNode(const DependencyKey &key,
-                     llvm::Optional<Fingerprint> fingerprint,
-                     llvm::Optional<std::string> swiftDeps)
+                     std::optional<Fingerprint> fingerprint,
+                     std::optional<std::string> swiftDeps)
       : DepGraphNode(key, fingerprint), swiftDeps(swiftDeps) {}
 
   bool getHasBeenTraced() const { return hasBeenTracedAsADependent; }
@@ -83,7 +83,7 @@ public:
            getSwiftDeps() == other.getSwiftDeps();
   }
 
-  const llvm::Optional<std::string> &getSwiftDeps() const { return swiftDeps; }
+  const std::optional<std::string> &getSwiftDeps() const { return swiftDeps; }
 
   std::string getSwiftDepsOrEmpty() const {
     return getSwiftDeps().value_or(std::string());
@@ -101,7 +101,7 @@ public:
 
   /// Nodes can move from file to file when the driver reads the result of a
   /// compilation.
-  void setSwiftDeps(llvm::Optional<std::string> s) { swiftDeps = s; }
+  void setSwiftDeps(std::optional<std::string> s) { swiftDeps = s; }
 
   bool getIsProvides() const { return getSwiftDeps().has_value(); }
 
@@ -196,7 +196,7 @@ public:
 private:
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
-  llvm::Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
+  std::optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
   /// If tracing dependencies, holds the sequence of defs used to get to the job
   /// that is the key
@@ -227,7 +227,7 @@ private:
   /// which file the name was found.) In such a case, it is necessary to move
   /// the node to the proper collection.
   void moveNodeToDifferentFile(ModuleDepGraphNode *n,
-                               llvm::Optional<std::string> newFile) {
+                               std::optional<std::string> newFile) {
     eraseNodeFromMap(n);
     n->setSwiftDeps(newFile);
     addToMap(n);
@@ -281,7 +281,7 @@ private:
         file_types::TY_SwiftDeps);
   }
 
-  const driver::Job *getJob(llvm::Optional<std::string> swiftDeps) const {
+  const driver::Job *getJob(std::optional<std::string> swiftDeps) const {
     assert(swiftDeps.has_value() && "Don't call me for expats.");
     auto iter = jobsBySwiftDeps.find(swiftDeps.value());
     assert(iter != jobsBySwiftDeps.end() && "All jobs should be tracked.");
@@ -307,9 +307,9 @@ public:
             emitFineGrainedDependencyDotFileAfterEveryImport),
         currentPathIfTracing(
             shouldTraceDependencies
-                ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
+                ? std::optional<std::vector<const ModuleDepGraphNode *>>(
                       std::vector<const ModuleDepGraphNode *>())
-                : llvm::None),
+                : std::nullopt),
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");
 
@@ -328,7 +328,7 @@ public:
   // MARK: ModuleDepGraph - updating from a switdeps file
   //============================================================================
 public:
-  using Changes = llvm::Optional<std::unordered_set<ModuleDepGraphNode *>>;
+  using Changes = std::optional<std::unordered_set<ModuleDepGraphNode *>>;
 
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
@@ -358,7 +358,7 @@ private:
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
-  typedef llvm::Optional<
+  typedef std::optional<
       std::pair<LocationOfPreexistingNode, ModuleDepGraphNode *>>
       PreexistingNodeIfAny;
 
@@ -370,7 +370,7 @@ private:
   /// Integrate the \p integrand into the receiver.
   /// If an illegal value was found, return \c None, otherwise
   /// return the changed node if any..
-  llvm::Optional<NullablePtr<ModuleDepGraphNode>>
+  std::optional<NullablePtr<ModuleDepGraphNode>>
   integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
                                   const SourceFileDepGraphNode *integrand,
                                   const PreexistingNodeIfAny preexistingMatch,
@@ -391,7 +391,7 @@ private:
   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
   ModuleDepGraphNode *
   integrateByCreatingANewNode(const SourceFileDepGraphNode *integrand,
-                              llvm::Optional<std::string> swiftDepsForNewNode);
+                              std::optional<std::string> swiftDepsForNewNode);
 
   /// After importing a provides node from the frontend, record its
   /// dependencies.
@@ -479,7 +479,7 @@ public:
 
   /// Get a printable filename, given a node's swiftDeps.
   StringRef
-  getProvidingFilename(const llvm::Optional<std::string> &swiftDeps) const;
+  getProvidingFilename(const std::optional<std::string> &swiftDeps) const;
 
   /// Print one node on the dependency path.
   static void printOneNodeOfPath(raw_ostream &out, const DependencyKey &key,

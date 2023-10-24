@@ -95,7 +95,7 @@ public:
   /// This is called when a source file is fully parsed. It returns the
   /// finalized vector of tokens, or \c None if the receiver isn't configured to
   /// record them.
-  virtual llvm::Optional<std::vector<Token>> finalize() { return llvm::None; }
+  virtual std::optional<std::vector<Token>> finalize() { return std::nullopt; }
 
   virtual ~ConsumeTokenReceiver() = default;
 };
@@ -137,7 +137,7 @@ public:
 
   /// The current token hash, or \c None if the parser isn't computing a hash
   /// for the token stream.
-  llvm::Optional<StableHasher> CurrentTokenHash;
+  std::optional<StableHasher> CurrentTokenHash;
 
   void recordTokenHash(const Token Tok) {
     if (!Tok.getText().empty())
@@ -305,7 +305,7 @@ public:
 
     /// The leading whitespace for this marker, if it has already been
     /// computed.
-    llvm::Optional<StringRef> LeadingWhitespace;
+    std::optional<StringRef> LeadingWhitespace;
   };
 
   /// An RAII object that notes when we have seen a structure marker.
@@ -428,7 +428,7 @@ public:
       DelayedTokenReceiver(ConsumeTokenReceiver *&receiver):
         savedConsumer(receiver, this) {}
       void receive(const Token &tok) override { delayedTokens.push_back(tok); }
-      llvm::Optional<std::vector<Token>> finalize() override {
+      std::optional<std::vector<Token>> finalize() override {
         llvm_unreachable("Cannot finalize a DelayedTokenReceiver");
       }
       ~DelayedTokenReceiver() {
@@ -700,7 +700,7 @@ public:
   ///
   /// \param Loc where to diagnose.
   /// \param DiagText name for the string literal in the diagnostic.
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   getStringLiteralIfNotInterpolated(SourceLoc Loc, StringRef DiagText);
 
   /// Returns true to indicate that experimental concurrency syntax should be
@@ -927,7 +927,7 @@ public:
   /// Parse the source file via the Swift Parser using the ASTGen library.
   void
   parseSourceFileViaASTGen(SmallVectorImpl<ASTNode> &items,
-                           llvm::Optional<DiagnosticTransaction> &transaction,
+                           std::optional<DiagnosticTransaction> &transaction,
                            bool suppressDiagnostics = false);
 
   /// Parse the top-level SIL decls into the SIL module.
@@ -961,7 +961,7 @@ public:
                                bool IfConfigsAreDeclAttrs,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
+  std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
@@ -1071,8 +1071,8 @@ public:
   /// Parse the arguments inside the @_specialize attribute
   bool parseSpecializeAttributeArguments(
       swift::tok ClosingBrace, bool &DiscardAttribute,
-      llvm::Optional<bool> &Exported,
-      llvm::Optional<SpecializeAttr::SpecializationKind> &Kind,
+      std::optional<bool> &Exported,
+      std::optional<SpecializeAttr::SpecializationKind> &Kind,
       TrailingWhereClause *&TrailingWhereClause, DeclNameRef &targetFunction,
       AvailabilityContext *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
@@ -1133,8 +1133,8 @@ public:
 
   /// Parse a single argument from a @_documentation attribute.
   bool
-  parseDocumentationAttributeArgument(llvm::Optional<StringRef> &Metadata,
-                                      llvm::Optional<AccessLevel> &Visibility);
+  parseDocumentationAttributeArgument(std::optional<StringRef> &Metadata,
+                                      std::optional<AccessLevel> &Visibility);
 
   /// Parse the @attached or @freestanding attribute that specifies a macro
   /// role.
@@ -1237,7 +1237,7 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
+  std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                 ParseDeclOptions Options, IterableDeclContext *IDC,
                 bool &hadError);
@@ -1668,7 +1668,7 @@ public:
   /// \endcode
   ///
   /// \returns The tuple pattern element, if successful.
-  std::pair<ParserStatus, llvm::Optional<TuplePatternElt>>
+  std::pair<ParserStatus, std::optional<TuplePatternElt>>
   parsePatternTupleElement();
   ParserResult<Pattern> parsePatternTuple();
   
@@ -1923,9 +1923,9 @@ public:
   ParserResult<Expr> parseExprMacroExpansion(bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr>
-  parseExprCollectionElement(llvm::Optional<bool> &isDictionary);
+  parseExprCollectionElement(std::optional<bool> &isDictionary);
   ParserResult<Expr>
-  parseExprPoundCodeCompletion(llvm::Optional<StmtKind> ParentKind);
+  parseExprPoundCodeCompletion(std::optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
@@ -2106,7 +2106,7 @@ struct ParsedDeclName {
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  llvm::Optional<unsigned> SelfIndex;
+  std::optional<unsigned> SelfIndex;
 
   /// Determine whether this is a valid name.
   explicit operator bool() const { return !BaseName.empty(); }

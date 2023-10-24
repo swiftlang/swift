@@ -21,11 +21,11 @@
 #include "swift/Remote/RemoteAddress.h"
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 
@@ -150,9 +150,9 @@ public:
     return RemoteAbsolutePointer("", readValue);
   }
 
-  virtual llvm::Optional<RemoteAbsolutePointer>
+  virtual std::optional<RemoteAbsolutePointer>
   resolvePointerAsSymbol(RemoteAddress address) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Lookup a symbol for the given remote address.
@@ -170,7 +170,7 @@ public:
   }
 
   /// Attempt to read and resolve a pointer value at the given remote address.
-  llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
+  std::optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
                                                     unsigned pointerSize) {
     // First, try to lookup the pointer as a dynamic symbol (binding), as
     // reading memory may potentially be expensive.
@@ -179,8 +179,8 @@ public:
 
     auto result = readBytes(address, pointerSize);
     if (!result)
-      return llvm::None;
-    
+      return std::nullopt;
+
     uint64_t pointerData;
     if (pointerSize == 4) {
       uint32_t theData;
@@ -189,9 +189,9 @@ public:
     } else if (pointerSize == 8) {
       memcpy(&pointerData, result.get(), 8);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
-    
+
     return resolvePointer(address, pointerData);
   }
 

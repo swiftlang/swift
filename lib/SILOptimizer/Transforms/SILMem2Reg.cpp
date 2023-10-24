@@ -992,7 +992,7 @@ private:
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB.
-  llvm::Optional<LiveValues> getLiveOutValues(BasicBlockSetVector &phiBlocks,
+  std::optional<LiveValues> getLiveOutValues(BasicBlockSetVector &phiBlocks,
                                               SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing out of
@@ -1001,7 +1001,7 @@ private:
                                        SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing into block.
-  llvm::Optional<LiveValues> getLiveInValues(BasicBlockSetVector &phiBlocks,
+  std::optional<LiveValues> getLiveInValues(BasicBlockSetVector &phiBlocks,
                                              SILBasicBlock *block);
 
   /// Get the values for this AllocStack variable that are flowing into block or
@@ -1036,7 +1036,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
   // - Some + !isStorageValid: a value was encountered but is no longer stored--
   //                           it has been destroy_addr'd, etc
   // - Some + isStorageValid: a value was encountered and is currently stored
-  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
+  std::optional<StorageStateTracking<LiveValues>> runningVals;
   // The most recent StoreInst or StoreBorrowInst that encountered while
   // iterating over the block.  The final value will be returned to the caller
   // which will use it to determine the live-out value of the block.
@@ -1268,7 +1268,7 @@ void StackAllocationPromoter::addBlockArguments(
   }
 }
 
-llvm::Optional<LiveValues>
+std::optional<LiveValues>
 StackAllocationPromoter::getLiveOutValues(BasicBlockSetVector &phiBlocks,
                                           SILBasicBlock *startBlock) {
   LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
@@ -1303,7 +1303,7 @@ StackAllocationPromoter::getLiveOutValues(BasicBlockSetVector &phiBlocks,
     LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return llvm::None;
+  return std::nullopt;
 }
 
 LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
@@ -1315,7 +1315,7 @@ LiveValues StackAllocationPromoter::getEffectiveLiveOutValues(
   return LiveValues::forOwned(undef, undef);
 }
 
-llvm::Optional<LiveValues>
+std::optional<LiveValues>
 StackAllocationPromoter::getLiveInValues(BasicBlockSetVector &phiBlocks,
                                          SILBasicBlock *block) {
   // First, check if there is a Phi value in the current block. We know that
@@ -1330,7 +1330,7 @@ StackAllocationPromoter::getLiveInValues(BasicBlockSetVector &phiBlocks,
   }
 
   if (block->pred_empty() || !domInfo->getNode(block))
-    return llvm::None;
+    return std::nullopt;
 
   // No phi for this value in this block means that the value flowing
   // out of the immediate dominator reaches here.
@@ -1876,7 +1876,7 @@ class MemoryToRegisters {
   /// DomTreeLevelMap is a DenseMap implying that if we initialize it, we always
   /// will initialize a heap object with 64 objects. Thus by using an optional,
   /// computing this lazily, we only do this if we actually need to do so.
-  llvm::Optional<DomTreeLevelMap> domTreeLevels;
+  std::optional<DomTreeLevelMap> domTreeLevels;
 
   /// The function that we are optimizing.
   SILFunction &f;
@@ -1967,7 +1967,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   SILBasicBlock *parentBlock = asi->getParent();
   // The default value of the AllocStack is NULL because we don't have
   // uninitialized variables in Swift.
-  llvm::Optional<StorageStateTracking<LiveValues>> runningVals;
+  std::optional<StorageStateTracking<LiveValues>> runningVals;
 
   // For all instructions in the block.
   for (auto bbi = parentBlock->begin(), bbe = parentBlock->end(); bbi != bbe;) {

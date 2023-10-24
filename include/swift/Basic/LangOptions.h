@@ -27,7 +27,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -148,7 +147,7 @@ namespace swift {
     /// a zippered binary that can be loaded into both macCatalyst and
     /// macOS processes. A value of 'None' means no zippering will be
     /// performed.
-    llvm::Optional<llvm::Triple> TargetVariant;
+    std::optional<llvm::Triple> TargetVariant;
 
     /// The target triple to instantiate the internal clang instance.
     /// When not specified, the compiler will use the value of -target to
@@ -158,13 +157,13 @@ namespace swift {
     /// the loading module.
     /// The lowering triple may result in multiple versions of the same Clang
     /// modules being built.
-    llvm::Optional<llvm::Triple> ClangTarget;
+    std::optional<llvm::Triple> ClangTarget;
 
     /// The SDK version, if known.
-    llvm::Optional<llvm::VersionTuple> SDKVersion;
+    std::optional<llvm::VersionTuple> SDKVersion;
 
     /// The target variant SDK version, if known.
-    llvm::Optional<llvm::VersionTuple> VariantSDKVersion;
+    std::optional<llvm::VersionTuple> VariantSDKVersion;
 
     /// The SDK canonical name, if known.
     std::string SDKName;
@@ -221,7 +220,7 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    llvm::Optional<DiagnosticBehavior> RequireExplicitAvailability = llvm::None;
+    std::optional<DiagnosticBehavior> RequireExplicitAvailability = std::nullopt;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.
@@ -889,7 +888,7 @@ namespace swift {
     std::string Optimization;
 
     /// clang CASOptions.
-    llvm::Optional<clang::CASOptions> CASOpts;
+    std::optional<clang::CASOptions> CASOpts;
 
     /// Cache key for imported bridging header.
     std::string BridgingHeaderPCHCacheKey;

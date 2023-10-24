@@ -115,7 +115,7 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
   Result.push_back(createYAMLTypeInfoNode(NTD, IGM, fixedTI));
 }
 
-static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
+static std::optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
                                                            IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
@@ -137,7 +137,7 @@ static llvm::Optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
   }
 
   if (Nodes.empty())
-    return llvm::None;
+    return std::nullopt;
 
   std::sort(Nodes.begin(), Nodes.end());
 

@@ -32,16 +32,16 @@ static StringRef documentationMetadataForDecl(const Decl *D) {
 }
 
 LLVM_ATTRIBUTE_USED
-static llvm::Optional<AccessLevel>
+static std::optional<AccessLevel>
 documentationVisibilityForDecl(const Decl *D) {
   if (!D)
-    return llvm::None;
+    return std::nullopt;
 
   if (const auto *DC = D->getAttrs().getAttribute<DocumentationAttr>()) {
     return DC->Visibility;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 } // namespace symbolgraphgen

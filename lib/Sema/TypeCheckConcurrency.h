@@ -234,10 +234,10 @@ public:
   /// of a member access or a parameter passed to a function.
   static ActorReferenceResult forReference(
       ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
-      llvm::Optional<VarRefUseEnv> useKind = llvm::None,
-      llvm::Optional<ReferencedActor> actorInstance = llvm::None,
-      llvm::Optional<ActorIsolation> knownDeclIsolation = llvm::None,
-      llvm::Optional<ActorIsolation> knownContextIsolation = llvm::None,
+      std::optional<VarRefUseEnv> useKind = std::nullopt,
+      std::optional<ReferencedActor> actorInstance = std::nullopt,
+      std::optional<ActorIsolation> knownDeclIsolation = std::nullopt,
+      std::optional<ActorIsolation> knownContextIsolation = std::nullopt,
       llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
           getClosureActorIsolation = __AbstractClosureExpr_getActorIsolation);
 
@@ -291,7 +291,7 @@ bool diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef,
     const DeclContext *fromDC, SourceLoc refLoc,
     SendableCheckReason refKind,
-    llvm::Optional<ActorIsolation> knownIsolation = llvm::None,
+    std::optional<ActorIsolation> knownIsolation = std::nullopt,
     FunctionCheckOptions funcCheckOptions =
         (FunctionCheckOptions() |
          FunctionCheckKind::Params |
@@ -346,11 +346,11 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {
   const DeclContext * const fromDC;
-  const llvm::Optional<SendableCheck> conformanceCheck;
+  const std::optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
       const DeclContext *fromDC,
-      llvm::Optional<SendableCheck> conformanceCheck = llvm::None)
+      std::optional<SendableCheck> conformanceCheck = std::nullopt)
       : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
@@ -461,8 +461,8 @@ void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
-/// global actor attribute and type it refers to (or \c llvm::None).
-llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+/// global actor attribute and type it refers to (or \c std::nullopt).
+std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
                            ArrayRef<CustomAttr *> attrs);
 
@@ -497,7 +497,7 @@ enum class DispatchQueueOperation {
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-llvm::Optional<DispatchQueueOperation>
+std::optional<DispatchQueueOperation>
 isDispatchQueueOperationName(StringRef name);
 
 /// Check the correctness of the given Sendable conformance.
@@ -540,7 +540,7 @@ VarDecl *getReferencedParamOrCapture(
 bool isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
     const DeclContext *fromDC,
-    llvm::Optional<ReferencedActor> actorInstance = llvm::None);
+    std::optional<ReferencedActor> actorInstance = std::nullopt);
 
 /// Check whether given variable references to a potentially
 /// isolated actor.

@@ -17,7 +17,6 @@
 #ifndef SWIFT_LEXERSTATE_H
 #define SWIFT_LEXERSTATE_H
 
-#include "llvm/ADT/Optional.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {

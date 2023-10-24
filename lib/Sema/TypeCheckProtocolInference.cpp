@@ -535,7 +535,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
   // Remap associated types that reference other protocols into this
   // protocol.
   auto proto = conformance->getProtocol();
-  type = type.transformRec([proto](TypeBase *type) -> llvm::Optional<Type> {
+  type = type.transformRec([proto](TypeBase *type) -> std::optional<Type> {
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       if (depMemTy->getAssocType() &&
           depMemTy->getAssocType()->getProtocol() != proto) {
@@ -548,7 +548,7 @@ static Type getWitnessTypeForMatching(NormalProtocolConformance *conformance,
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   });
 
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
@@ -681,9 +681,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   }
 
   auto setup =
-      [&]() -> std::tuple<llvm::Optional<RequirementMatch>, Type, Type> {
+      [&]() -> std::tuple<std::optional<RequirementMatch>, Type, Type> {
     fullWitnessType = removeSelfParam(witness, fullWitnessType);
-    return std::make_tuple(llvm::None,
+    return std::make_tuple(std::nullopt,
                            removeSelfParam(req, req->getInterfaceType()),
                            fullWitnessType);
   };
@@ -761,13 +761,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   // Match a requirement and witness type.
   MatchVisitor matchVisitor(conformance, inferred);
   auto matchTypes = [&](Type reqType,
-                        Type witnessType) -> llvm::Optional<RequirementMatch> {
+                        Type witnessType) -> std::optional<RequirementMatch> {
     if (!matchVisitor.match(reqType, witnessType)) {
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               fullWitnessType);
     }
 
-    return llvm::None;
+    return std::nullopt;
   };
 
   // Finalization of the checking is pretty trivial; just bundle up a
@@ -869,21 +869,21 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
   return resultType;
 }
 
-llvm::Optional<AbstractTypeWitness>
+std::optional<AbstractTypeWitness>
 AssociatedTypeInference::computeDefaultTypeWitness(
     AssociatedTypeDecl *assocType) const {
   // Go find a default definition.
   auto *const defaultedAssocType = findDefaultedAssociatedType(assocType);
   if (!defaultedAssocType)
-    return llvm::None;
+    return std::nullopt;
 
   const Type defaultType = defaultedAssocType->getDefaultDefinitionType();
   // FIXME: Circularity
   if (!defaultType)
-    return llvm::None;
+    return std::nullopt;
 
   if (defaultType->hasError())
-    return llvm::None;
+    return std::nullopt;
 
   return AbstractTypeWitness(assocType, defaultType, defaultedAssocType);
 }
@@ -916,7 +916,7 @@ AssociatedTypeInference::computeDerivedTypeWitness(
   return result;
 }
 
-llvm::Optional<AbstractTypeWitness>
+std::optional<AbstractTypeWitness>
 AssociatedTypeInference::computeAbstractTypeWitness(
     AssociatedTypeDecl *assocType) {
   // We don't have a type witness for this associated type, so go
@@ -940,7 +940,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void AssociatedTypeInference::collectAbstractTypeWitnesses(
@@ -1058,7 +1058,7 @@ static void sanitizeProtocolRequirements(
                                      SmallVectorImpl<Requirement> &sanitized) {
   std::function<Type(Type)> sanitizeType;
   sanitizeType = [&](Type outerType) {
-    return outerType.transformRec([&](TypeBase *type) -> llvm::Optional<Type> {
+    return outerType.transformRec([&](TypeBase *type) -> std::optional<Type> {
       if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {
@@ -1076,7 +1076,7 @@ static void sanitizeProtocolRequirements(
         }
       }
 
-      return llvm::None;
+      return std::nullopt;
     });
   };
 
@@ -1110,7 +1110,7 @@ static void sanitizeProtocolRequirements(
 
 SubstOptions
 AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
-  SubstOptions options(llvm::None);
+  SubstOptions options(std::nullopt);
   AssociatedTypeInference *self = this;
   options.getTentativeTypeWitness =
     [self](const NormalProtocolConformance *conformance,
@@ -2294,7 +2294,7 @@ bool AssociatedTypeInference::canAttemptEagerTypeWitnessDerivation(
 }
 
 auto AssociatedTypeInference::solve(ConformanceChecker &checker)
-    -> llvm::Optional<InferredTypeWitnesses> {
+    -> std::optional<InferredTypeWitnesses> {
   LLVM_DEBUG(llvm::dbgs() << "============ Start " << conformance->getType()
                           << ": " << conformance->getProtocol()->getName()
                           << " ============\n";);
@@ -2362,7 +2362,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   }
 
   // Result variable to use for returns so that we get NRVO.
-  llvm::Optional<InferredTypeWitnesses> result = InferredTypeWitnesses();
+  std::optional<InferredTypeWitnesses> result = InferredTypeWitnesses();
 
   // If we resolved everything, we're done.
   if (unresolvedAssocTypes.empty())
@@ -2413,7 +2413,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
       // FIXME: We can end up here with dependent types that were not folded
       // away for some reason.
       if (replacement->hasDependentMember())
-        return llvm::None;
+        return std::nullopt;
 
       if (replacement->hasArchetype()) {
         replacement = replacement->mapTypeOutOfContext();
@@ -2431,20 +2431,20 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   // Diagnose the complete lack of solutions.
   if (solutions.empty() &&
       diagnoseNoSolutions(unresolvedAssocTypes.getArrayRef(), checker))
-    return llvm::None;
+    return std::nullopt;
 
   // Diagnose ambiguous solutions.
   if (!solutions.empty() &&
       diagnoseAmbiguousSolutions(unresolvedAssocTypes.getArrayRef(), checker,
                                  solutions))
-    return llvm::None;
+    return std::nullopt;
 
   // Save the missing type witnesses for later diagnosis.
   for (auto assocType : unresolvedAssocTypes) {
     checker.GlobalMissingWitnesses.insert({assocType, {}});
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void TypeWitnessSystem::EquivalenceClass::setResolvedType(Type ty) {

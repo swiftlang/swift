@@ -179,8 +179,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
     const NominalTypeDecl *typeDecl, llvm::function_ref<void(void)> bodyPrinter,
     DeclAndTypePrinter &declAndTypePrinter) {
   // FIXME: Add support for generic structs.
-  llvm::Optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
-  llvm::Optional<CanGenericSignature> genericSignature;
+  std::optional<IRABIDetailsProvider::SizeAndAlignment> typeSizeAlign;
+  std::optional<CanGenericSignature> genericSignature;
   auto printGenericSignature = [&](raw_ostream &os) {
     if (!genericSignature)
       return;

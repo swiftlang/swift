@@ -224,7 +224,7 @@ public:
       // so allocate a buffer.
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(
-          keyPath->getSubstitutions(), llvm::None);
+          keyPath->getSubstitutions(), std::nullopt);
       SILType type = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       auto addr = builder.createAllocStack(loc, type);
@@ -302,7 +302,7 @@ public:
           // so allocate a writeback buffer.
           auto &function = builder.getFunction();
           auto substType = component.getComponentType().subst(
-              keyPath->getSubstitutions(), llvm::None);
+              keyPath->getSubstitutions(), std::nullopt);
           SILType type = function.getLoweredType(
                         Lowering::AbstractionPattern::getOpaque(), substType);
           auto addr = builder.createAllocStack(loc, type);
@@ -352,7 +352,7 @@ public:
     parent->project(AccessType::Get, [&](SILValue parentValue) {
       auto &function = builder.getFunction();
       auto substType = component.getComponentType().subst(
-          keyPath->getSubstitutions(), llvm::None);
+          keyPath->getSubstitutions(), std::nullopt);
       SILType optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       SILType objType = optType.getOptionalObjectType().getAddressType();
@@ -569,7 +569,7 @@ public:
       auto resultCanType = components.back().getComponentType();
       auto &function = builder.getFunction();
       auto substType =
-          resultCanType.subst(keyPath->getSubstitutions(), llvm::None);
+          resultCanType.subst(keyPath->getSubstitutions(), std::nullopt);
       auto optType = function.getLoweredType(
                          Lowering::AbstractionPattern::getOpaque(), substType);
       

@@ -112,7 +112,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
   llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
   SymbolGraphASTWalker Walker(*MD, {}, QualifiedImports, Options);
   markup::MarkupContext MarkupCtx;
-  SymbolGraph Graph(Walker, *MD, llvm::None, MarkupCtx, llvm::None,
+  SymbolGraph Graph(Walker, *MD, std::nullopt, MarkupCtx, std::nullopt,
                     /*IsForSingleNode=*/true);
   NominalTypeDecl *NTD = InSynthesizedExtension
       ? BaseTy->getAnyNominal()

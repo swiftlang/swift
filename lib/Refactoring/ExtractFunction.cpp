@@ -105,7 +105,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
   auto Resolved =
-      Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
+      Matcher.resolve(llvm::makeArrayRef(UnresoledName), std::nullopt);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,

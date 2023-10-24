@@ -917,13 +917,7 @@ namespace llvm {
           reinterpret_cast<const char *>(~static_cast<uintptr_t>(1)), 0);
     }
 
-    static unsigned getHashValue(StringRef Val) {
-      assert(Val.data() != getEmptyKey().data() &&
-             "Cannot hash the empty key!");
-      assert(Val.data() != getTombstoneKey().data() &&
-             "Cannot hash the tombstone key!");
-      return (unsigned)(hash_value(Val));
-    }
+    static unsigned getHashValue(StringRef Val);
 
     static bool isEqual(StringRef LHS, StringRef RHS) {
       if (RHS.data() == getEmptyKey().data())

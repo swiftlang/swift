@@ -53,11 +53,11 @@ private:
   void addADefinedDecl(StringRef s, NodeKind kind);
   void addAUsedDecl(StringRef s, NodeKind kind);
 
-  llvm::Optional<std::pair<DependencyKey, DependencyKey>>
+  std::optional<std::pair<DependencyKey, DependencyKey>>
   parseAUsedDecl(StringRef s, NodeKind);
 
   /// Parse and return an interface \c DependencyKey
-  llvm::Optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind,
+  std::optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind,
                                                   DeclAspect);
 
   DependencyKey computeUseKey(StringRef s, bool isCascadingUse);
@@ -65,7 +65,7 @@ private:
   /// Return true if when the name appears in a unit test, it represents a
   /// context, not a baseName. Return false if a single name is a baseName,
   /// without context Return None if there should be two names
-  static llvm::Optional<bool> singleNameIsContext(NodeKind kind);
+  static std::optional<bool> singleNameIsContext(NodeKind kind);
 
   static constexpr char nameContextSeparator = ',';
 

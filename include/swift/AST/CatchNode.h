@@ -13,7 +13,6 @@
 #ifndef SWIFT_AST_CATCHNODE_H
 #define SWIFT_AST_CATCHNODE_H
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -33,9 +32,9 @@ public:
   /// where it will catch (and possibly rethrow) errors. All of the errors
   /// thrown from within that region will be converted to this error type.
   ///
-  /// Returns the thrown error type for a throwing context, or \c llvm::None
+  /// Returns the thrown error type for a throwing context, or \c std::nullopt
   /// if this is a non-throwing context.
-  llvm::Optional<Type> getThrownErrorTypeInContext(ASTContext &ctx) const;
+  std::optional<Type> getThrownErrorTypeInContext(ASTContext &ctx) const;
 };
 
 } // end namespace swift

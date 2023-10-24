@@ -20,7 +20,6 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/ImmutablePointerSet.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
 

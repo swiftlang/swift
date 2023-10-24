@@ -59,9 +59,9 @@ public:
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const = 0;
 
-  virtual llvm::Optional<std::pair<ManagedValue, ManagedValue>>
+  virtual std::optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   virtual ManagedValue emitForeignAsyncCompletionHandler(
@@ -99,7 +99,7 @@ struct ResultPlanBuilder {
                               AbstractionPattern origType,
                               CanType substType);
   ResultPlanPtr
-  buildForPackExpansion(llvm::Optional<ArrayRef<Initialization *>> inits,
+  buildForPackExpansion(std::optional<ArrayRef<Initialization *>> inits,
                         AbstractionPattern origExpansionType,
                         CanTupleEltTypeArrayRef substTypes);
   ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,

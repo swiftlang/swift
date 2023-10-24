@@ -573,7 +573,7 @@ public:
     expression.pattern = pattern;
   }
 
-  llvm::Optional<AnyFunctionRef> getAsFunction() const {
+  std::optional<AnyFunctionRef> getAsFunction() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -582,7 +582,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::function:
       return function.function;
@@ -590,7 +590,7 @@ public:
     llvm_unreachable("invalid function kind");
   }
 
-  llvm::Optional<StmtCondition> getAsStmtCondition() const {
+  std::optional<StmtCondition> getAsStmtCondition() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -599,7 +599,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::stmtCondition:
       return stmtCondition.stmtCondition;
@@ -607,7 +607,7 @@ public:
     llvm_unreachable("invalid statement kind");
   }
 
-  llvm::Optional<CaseLabelItem *> getAsCaseLabelItem() const {
+  std::optional<CaseLabelItem *> getAsCaseLabelItem() const {
     switch (kind) {
     case Kind::expression:
     case Kind::closure:
@@ -616,7 +616,7 @@ public:
     case Kind::patternBinding:
     case Kind::uninitializedVar:
     case Kind::forEachStmt:
-      return llvm::None;
+      return std::nullopt;
 
     case Kind::caseLabelItem:
       return caseLabelItem.caseLabelItem;
@@ -848,7 +848,7 @@ public:
   }
 
   /// Walk the contents of the application target.
-  llvm::Optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
+  std::optional<SyntacticElementTarget> walk(ASTWalker &walker) const;
 };
 
 } // namespace constraints

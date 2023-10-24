@@ -43,7 +43,7 @@ static bool requiresHeapHeader(LayoutKind kind) {
 
 /// Perform structure layout on the given types.
 StructLayout::StructLayout(IRGenModule &IGM,
-                           llvm::Optional<CanType> type,
+                           std::optional<CanType> type,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,

@@ -16,7 +16,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "clang/Basic/DarwinSDKInfo.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {
@@ -58,7 +57,7 @@ namespace swift {
 
   /// Returns the VersionTuple at which Swift first became available for the OS
   /// represented by `triple`.
-  const llvm::Optional<llvm::VersionTuple>
+  const std::optional<llvm::VersionTuple>
   minimumAvailableOSVersionForTriple(const llvm::Triple &triple);
 
   /// Returns true if the given triple represents an OS that has all the
@@ -107,7 +106,7 @@ namespace swift {
 
   /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
   /// LLVM target triple.
-  llvm::Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
 
   /// Retrieve the target SDK version for the given SDKInfo and target triple.

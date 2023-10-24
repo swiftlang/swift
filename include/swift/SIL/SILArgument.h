@@ -40,14 +40,14 @@ struct SILArgumentKind {
   SILArgumentKind(innerty value) : value(value) {}
   operator innerty() const { return value; }
 
-  static llvm::Optional<SILArgumentKind> fromValueKind(ValueKind kind) {
+  static std::optional<SILArgumentKind> fromValueKind(ValueKind kind) {
     switch (kind) {
 #define ARGUMENT(ID, PARENT)                                                   \
   case ValueKind::ID:                                                          \
     return SILArgumentKind(ID);
 #include "swift/SIL/SILNodes.def"
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 };

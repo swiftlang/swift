@@ -273,7 +273,7 @@ static bool usesExtendedExistentialMetadata(CanType type) {
   return layout.containsParameterized;
 }
 
-static llvm::Optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
+static std::optional<std::pair<CanExistentialType, /*depth*/ unsigned>>
 usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
   unsigned depth = 1;
   auto cur = type.getInstanceType();
@@ -294,7 +294,7 @@ usesExtendedExistentialMetadata(CanExistentialMetatypeType type) {
     }
     return std::make_pair(cast<ExistentialType>(cur), depth);
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
@@ -1226,7 +1226,7 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   {
     ConditionalDominanceScope scope(IGF);
 
-    llvm::Optional<StackAddress> labelString = emitDynamicTupleTypeLabels(
+    std::optional<StackAddress> labelString = emitDynamicTupleTypeLabels(
         IGF, type, packType, shapeExpression);
 
     // Otherwise, we know that either statically or dynamically, we have more than

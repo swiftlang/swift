@@ -91,7 +91,7 @@ public:
   public:
     const ModuleFileSharedCore::Dependency &Core;
 
-    llvm::Optional<ImportedModule> Import = llvm::None;
+    std::optional<ImportedModule> Import = std::nullopt;
     SmallVector<Identifier, 4> spiGroups;
 
     Dependency(const ModuleFileSharedCore::Dependency &coreDependency)
@@ -919,20 +919,20 @@ public:
       const ProtocolDecl *proto, uint64_t contextData,
       SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) override;
 
-  llvm::Optional<StringRef> getGroupNameById(unsigned Id) const;
-  llvm::Optional<StringRef> getSourceFileNameById(unsigned Id) const;
-  llvm::Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
-  llvm::Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
-  llvm::Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
+  std::optional<StringRef> getGroupNameById(unsigned Id) const;
+  std::optional<StringRef> getSourceFileNameById(unsigned Id) const;
+  std::optional<StringRef> getGroupNameForDecl(const Decl *D) const;
+  std::optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
+  std::optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
-  llvm::Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
+  std::optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   bool hasLoadedSwiftDoc() const;
-  llvm::Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
-  llvm::Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-  llvm::Optional<ExternalSourceLocs::RawLocs>
+  std::optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
+  std::optional<StringRef> getGroupNameByUSR(StringRef USR) const;
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateDecl(const Decl *D);
-  llvm::Optional<Fingerprint>
+  std::optional<Fingerprint>
   loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(
       llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
@@ -1044,16 +1044,16 @@ public:
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
 
   /// Reads a foreign error convention from \c DeclTypeCursor, if present.
-  llvm::Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+  std::optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
 
   /// Reads a foreign async convention from \c DeclTypeCursor, if present.
-  llvm::Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
+  std::optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
-  llvm::Optional<StringRef> maybeReadInlinableBodyText();
+  std::optional<StringRef> maybeReadInlinableBodyText();
 
   /// Reads pattern initializer text from \c DeclTypeCursor, if present.
-  llvm::Optional<StringRef> maybeReadPatternInitializerText();
+  std::optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>

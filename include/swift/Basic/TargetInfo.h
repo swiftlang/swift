@@ -19,7 +19,6 @@
 
 #include "swift/Basic/LLVM.h"
 
-#include "llvm/ADT/Optional.h"
 
 namespace llvm {
 class Triple;
@@ -34,7 +33,7 @@ void printTargetInfo(const CompilerInvocation &invocation,
                      llvm::raw_ostream &out);
 
 void printTripleInfo(const llvm::Triple &triple,
-                     llvm::Optional<llvm::VersionTuple> runtimeVersion,
+                     std::optional<llvm::VersionTuple> runtimeVersion,
                      llvm::raw_ostream &out);
 } // namespace targetinfo
 } // namespace swift

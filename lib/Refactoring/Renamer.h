@@ -50,7 +50,7 @@ public:
   /// Adds replacements to rename the given label ranges
   /// \return true if the label ranges do not match the old name
   bool renameLabels(ArrayRef<CharSourceRange> LabelRanges,
-                    llvm::Optional<unsigned> FirstTrailingLabel,
+                    std::optional<unsigned> FirstTrailingLabel,
                     LabelRangeType RangeType, bool isCallSite);
 
   bool isOperator() const { return Lexer::isOperator(Old.base()); }
@@ -75,7 +75,7 @@ private:
                          StringRef Expected);
 
   bool renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
-                           llvm::Optional<unsigned> FirstTrailingLabel,
+                           std::optional<unsigned> FirstTrailingLabel,
                            LabelRangeType RangeType);
 
   static RegionType getSyntacticRenameRegionType(const ResolvedLoc &Resolved);
@@ -92,7 +92,7 @@ class RenameRangeDetailCollector : public Renamer {
   }
   void doRenameBase(CharSourceRange Range,
                     RefactoringRangeKind RangeKind) override {
-    Ranges.push_back({Range, RangeKind, llvm::None});
+    Ranges.push_back({Range, RangeKind, std::nullopt});
   }
 
 public:

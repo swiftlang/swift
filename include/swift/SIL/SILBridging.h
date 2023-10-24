@@ -479,7 +479,7 @@ struct OptionalBridgedSILDebugVariable {
   uint64_t storage[16];
 
 #ifdef USED_IN_CPP_SOURCE
-  using OptionalSILDebugVariable = llvm::Optional<swift::SILDebugVariable>;
+  using OptionalSILDebugVariable = std::optional<swift::SILDebugVariable>;
 
   OptionalBridgedSILDebugVariable(
     OptionalSILDebugVariable &&debugVariable) {

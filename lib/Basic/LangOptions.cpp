@@ -22,7 +22,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
@@ -598,32 +597,32 @@ bool swift::isFeatureAvailableInProduction(Feature feature) {
   llvm_unreachable("covered switch");
 }
 
-llvm::Optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
+std::optional<Feature> swift::getUpcomingFeature(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
-llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<Feature>>(name)
+std::optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<Feature>>(name)
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd) \
                    .Case(#FeatureName, Feature::FeatureName)
 #include "swift/Basic/Features.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
-llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
+std::optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
   switch (feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
 #define UPCOMING_FEATURE(FeatureName, SENumber, Version) \
   case Feature::FeatureName: return Version;
 #include "swift/Basic/Features.def"
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 

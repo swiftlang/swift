@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -24,7 +23,7 @@ namespace ide {
 /// specified, other source files are considered "dependencies", otherwise all
 /// source files are considered "current"
 void cacheDependencyHashIfNeeded(CompilerInstance &CI,
-                                 llvm::Optional<unsigned> excludeBufferID,
+                                 std::optional<unsigned> excludeBufferID,
                                  llvm::StringMap<llvm::hash_code> &Map);
 
 /// Check if any dependent files are modified since \p timestamp. If
@@ -34,7 +33,7 @@ void cacheDependencyHashIfNeeded(CompilerInstance &CI,
 /// previous dependency checking.
 bool areAnyDependentFilesInvalidated(
     CompilerInstance &CI, llvm::vfs::FileSystem &FS,
-    llvm::Optional<unsigned> excludeBufferID, llvm::sys::TimePoint<> timestamp,
+    std::optional<unsigned> excludeBufferID, llvm::sys::TimePoint<> timestamp,
     const llvm::StringMap<llvm::hash_code> &Map);
 
 } // namespace ide

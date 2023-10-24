@@ -21,7 +21,6 @@
 #ifndef LLVM_SUPPORT_ALIGNMENT_H_
 #define LLVM_SUPPORT_ALIGNMENT_H_
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/MathExtras.h"
 #include <cassert>
 #ifndef NDEBUG
@@ -107,9 +106,9 @@ inline Align assumeAligned(uint64_t Value) {
 
 /// This struct is a compact representation of a valid (power of two) or
 /// undefined (0) alignment.
-struct MaybeAlign : public llvm::Optional<Align> {
+struct MaybeAlign : public std::optional<Align> {
 private:
-  using UP = llvm::Optional<Align>;
+  using UP = std::optional<Align>;
 
 public:
   /// Default is undefined.
@@ -121,7 +120,7 @@ public:
   MaybeAlign(MaybeAlign &&Other) = default;
   MaybeAlign &operator=(MaybeAlign &&Other) = default;
 
-  /// Use llvm::Optional<Align> constructor.
+  /// Use std::optional<Align> constructor.
   using UP::UP;
 
   explicit MaybeAlign(uint64_t Value) {
@@ -132,7 +131,7 @@ public:
   }
 
   /// For convenience, returns a valid alignment or 1 if undefined.
-  Align valueOrOne() const { return hasValue() ? getValue() : Align(); }
+  Align valueOrOne() const { return has_value() ? value() : Align(); }
 };
 
 /// Checks that SizeInBytes is a multiple of the alignment.
@@ -180,7 +179,7 @@ inline uint64_t alignTo(uint64_t Size, Align A, uint64_t Skew) {
 /// Returns a multiple of A needed to store `Size` bytes.
 /// Returns `Size` if current alignment is undefined.
 inline uint64_t alignTo(uint64_t Size, MaybeAlign A) {
-  return A ? alignTo(Size, A.getValue()) : Size;
+  return A ? alignTo(Size, A.value()) : Size;
 }
 
 /// Aligns `Addr` to `Alignment` bytes, rounding up.
@@ -322,7 +321,7 @@ inline Align operator*(Align Lhs, uint64_t Rhs) {
 
 inline MaybeAlign operator*(MaybeAlign Lhs, uint64_t Rhs) {
   assert(Rhs > 0 && "Rhs must be positive");
-  return Lhs ? Lhs.getValue() * Rhs : MaybeAlign();
+  return Lhs ? Lhs.value() * Rhs : MaybeAlign();
 }
 
 inline Align operator/(Align Lhs, uint64_t Divisor) {
@@ -335,7 +334,7 @@ inline Align operator/(Align Lhs, uint64_t Divisor) {
 inline MaybeAlign operator/(MaybeAlign Lhs, uint64_t Divisor) {
   assert(llvm::isPowerOf2_64(Divisor) &&
          "Divisor must be positive and a power of 2");
-  return Lhs ? Lhs.getValue() / Divisor : MaybeAlign();
+  return Lhs ? Lhs.value() / Divisor : MaybeAlign();
 }
 
 inline Align max(MaybeAlign Lhs, Align Rhs) {

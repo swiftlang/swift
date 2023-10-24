@@ -320,7 +320,7 @@ void GenericEnvironment::addMapping(GenericParamKey key,
   getContextTypes()[index] = contextType;
 }
 
-llvm::Optional<Type>
+std::optional<Type>
 GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   // Find the index into the parallel arrays of generic parameters and
   // context types.
@@ -331,7 +331,7 @@ GenericEnvironment::getMappingIfPresent(GenericParamKey key) const {
   if (auto type = getContextTypes()[index])
     return type;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 namespace {
@@ -677,14 +677,14 @@ GenericEnvironment::mapContextualPackTypeIntoElementContext(Type type) const {
     findElementArchetype(this, getOpenedPackParams());
 
   return type.transformTypeParameterPacks(
-      [&](SubstitutableType *ty) -> llvm::Optional<Type> {
+      [&](SubstitutableType *ty) -> std::optional<Type> {
         if (auto *packArchetype = dyn_cast<PackArchetypeType>(ty)) {
           auto interfaceType = packArchetype->getInterfaceType();
           if (sig->haveSameShape(interfaceType, shapeClass))
             return Type(findElementArchetype(interfaceType));
         }
 
-        return llvm::None;
+        return std::nullopt;
       });
 }
 

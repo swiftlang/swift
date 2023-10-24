@@ -91,7 +91,7 @@ valid_type_ref:
 }
 
 /// Load and normalize a mangled name so it can be matched with string equality.
-llvm::Optional<std::string>
+std::optional<std::string>
 TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
   const auto reflectionNameRemoteAddress = reflectionName.getAddressData();
 
@@ -111,13 +111,13 @@ TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
       // Symbolic references cannot be mangled, return a failure.
       NormalizedReflectionNameCache.insert(std::make_pair(
-          reflectionNameRemoteAddress, llvm::Optional<std::string>()));
+          reflectionNameRemoteAddress, std::optional<std::string>()));
       return {};
     default:
       auto mangling = mangleNode(node);
       if (!mangling.isSuccess()) {
         NormalizedReflectionNameCache.insert(std::make_pair(
-            reflectionNameRemoteAddress, llvm::Optional<std::string>()));
+            reflectionNameRemoteAddress, std::optional<std::string>()));
         return {};
       }
       NormalizedReflectionNameCache.insert(
@@ -210,7 +210,7 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, *SubstMap);
 }
 
-static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
+static std::optional<StringRef> FindOutermostModuleName(NodePointer Node) {
   if (!Node)
     return {};
   // Breadth first search until we find the module name so we find the outermost
@@ -261,7 +261,7 @@ void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
+std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::findFieldDescriptorAtIndex(
     size_t Index, const std::string &MangledName) {
   populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
@@ -269,18 +269,18 @@ TypeRefBuilder::findFieldDescriptorAtIndex(
   if (Found != FieldTypeInfoCache.end()) {
     return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
+std::optional<RemoteRef<FieldDescriptor>>
 TypeRefBuilder::getFieldDescriptorFromExternalCache(
     const std::string &MangledName) {
   if (!ExternalTypeRefCache)
-    return llvm::None;
+    return std::nullopt;
 
   if (auto Locator = ExternalTypeRefCache->getFieldDescriptorLocator(MangledName)) {
     if (Locator->InfoID >= ReflectionInfos.size())
-      return llvm::None;
+      return std::nullopt;
 
     auto &Field = ReflectionInfos[Locator->InfoID].Field;
     auto Addr = Field.startAddress().getAddressData() + Locator->Offset;
@@ -304,7 +304,7 @@ TypeRefBuilder::getFieldDescriptorFromExternalCache(
     if (Found != FieldTypeInfoCache.end())
       return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
@@ -583,11 +583,11 @@ void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
 }
 
 FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
-    llvm::Optional<std::string> forMangledTypeName) {
+    std::optional<std::string> forMangledTypeName) {
   FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      llvm::Optional<std::string> optionalMangledTypeName;
+      std::optional<std::string> optionalMangledTypeName;
       std::string typeName;
       {
         ScopedNodeFactoryCheckpoint checkpoint(this);
@@ -639,7 +639,7 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
 
 void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
   auto fieldInfoCollectionResult =
-      collectFieldTypes(llvm::Optional<std::string>());
+      collectFieldTypes(std::optional<std::string>());
   for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
     stream << info.FullyQualifiedName << "\n";
     for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)

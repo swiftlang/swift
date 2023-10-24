@@ -38,7 +38,7 @@ ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
       BadFileDescriptorRetryCountArg(
         args.getLastArg(options::OPT_bad_file_descriptor_retry_count)) {}
 
-llvm::Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
+std::optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
   SWIFT_DEFER {
     if (buffers) {
@@ -52,14 +52,14 @@ llvm::Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
   };
 
   if (enforceFilelistExclusion())
-    return llvm::None;
+    return std::nullopt;
 
   if (FilelistPathArg ? readInputFilesFromFilelist()
                       : readInputFilesFromCommandLine())
-    return llvm::None;
-  llvm::Optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
+    return std::nullopt;
+  std::optional<std::set<StringRef>> primaryFiles = readPrimaryFiles();
   if (!primaryFiles)
-    return llvm::None;
+    return std::nullopt;
 
   FrontendInputsAndOutputs result;
   std::set<StringRef> unusedPrimaryFiles;
@@ -67,7 +67,7 @@ llvm::Optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
       createInputFilesConsumingPrimaries(*primaryFiles);
 
   if (diagnoseUnusedPrimaryFiles(unusedPrimaryFiles))
-    return llvm::None;
+    return std::nullopt;
 
   // Must be set before iterating over inputs needing outputs.
   result.setBypassBatchModeChecks(
@@ -160,7 +160,7 @@ bool ArgsToFrontendInputsConverter::addFile(StringRef file) {
   return true;
 }
 
-llvm::Optional<std::set<StringRef>>
+std::optional<std::set<StringRef>>
 ArgsToFrontendInputsConverter::readPrimaryFiles() {
   std::set<StringRef> primaryFiles;
   for (const Arg *A : Args.filtered(options::OPT_primary_file))
@@ -168,7 +168,7 @@ ArgsToFrontendInputsConverter::readPrimaryFiles() {
   if (forAllFilesInFilelist(
           PrimaryFilelistPathArg,
           [&](StringRef file) -> void { primaryFiles.insert(file); }))
-    return llvm::None;
+    return std::nullopt;
   return primaryFiles;
 }
 
@@ -186,7 +186,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
   }
 
   if (!Files.empty() && !hasAnyPrimaryFiles) {
-    llvm::Optional<std::vector<std::string>> userSuppliedNamesOrErr =
+    std::optional<std::vector<std::string>> userSuppliedNamesOrErr =
         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
             Args, Diags, options::OPT_o, options::OPT_output_filelist);
     if (userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1)

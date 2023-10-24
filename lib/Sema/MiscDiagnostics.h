@@ -21,7 +21,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
   class AbstractFunctionDecl;
@@ -43,7 +42,7 @@ namespace swift {
 /// evaluate its position.
 void diagnoseOutOfPlaceExprs(
     ASTContext &ctx, ASTNode root,
-    llvm::Optional<ContextualTypePurpose> contextualPurpose);
+    std::optional<ContextualTypePurpose> contextualPurpose);
 
 /// Emit diagnostics for syntactic restrictions on a given expression.
 ///
@@ -51,7 +50,7 @@ void diagnoseOutOfPlaceExprs(
 /// \p disableOutOfPlaceExprChecking is set to \c true.
 void performSyntacticExprDiagnostics(
     const Expr *E, const DeclContext *DC,
-    llvm::Optional<ContextualTypePurpose> contextualPurpose,
+    std::optional<ContextualTypePurpose> contextualPurpose,
     bool isExprStmt, bool disableExprAvailabilityChecking = false,
     bool disableOutOfPlaceExprChecking = false);
 
@@ -125,7 +124,7 @@ void diagnoseConstantArgumentRequirement(const Expr *expr,
 /// \returns true iff any fix-its were attached to \p diag.
 bool computeFixitsForOverriddenDeclaration(
     ValueDecl *decl, const ValueDecl *base,
-    llvm::function_ref<llvm::Optional<InFlightDiagnostic>(bool)> diag);
+    llvm::function_ref<std::optional<InFlightDiagnostic>(bool)> diag);
 
 /// Emit fix-its to enclose trailing closure in argument parens.
 void fixItEncloseTrailingClosure(ASTContext &ctx,

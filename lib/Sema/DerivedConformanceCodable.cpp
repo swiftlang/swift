@@ -53,7 +53,7 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
 /// \param paramIndex if set will be used to generate name in the form of
 ///                   '_$paramIndex' when VarDecl has no name.
 static Identifier
-getVarNameForCoding(VarDecl *var, llvm::Optional<int> paramIndex = llvm::None) {
+getVarNameForCoding(VarDecl *var, std::optional<int> paramIndex = std::nullopt) {
   auto &C = var->getASTContext();
   Identifier identifier;
   if (auto *PD = dyn_cast<ParamDecl>(var)) {
@@ -674,7 +674,7 @@ static CallExpr *createNestedContainerKeyedByForKeyCall(
 static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
                                              NominalTypeDecl *errorDecl,
                                              Identifier errorId,
-                                             llvm::Optional<Expr *> argument,
+                                             std::optional<Expr *> argument,
                                              StringRef debugMessage) {
   auto *contextDecl = lookupErrorContext(C, errorDecl);
   assert(contextDecl && "Missing Context decl.");
@@ -938,7 +938,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
     // .<elt>(let a0, let a1, ...)
     SmallVector<VarDecl *, 3> payloadVars;
     Pattern *subpattern = nullptr;
-    llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+    std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
 
     if (createSubpattern) {
       subpattern = DerivedConformance::enumElementPayloadSubpattern(
@@ -984,7 +984,7 @@ createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
           C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
           SourceLoc(), caseBody,
           /*case body vardecls*/
-              createSubpattern ? caseBodyVarDecls : llvm::None);
+              createSubpattern ? caseBodyVarDecls : std::nullopt);
       cases.push_back(stmt);
     }
   }
@@ -1726,7 +1726,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
             //           debugDescription: "...")
             auto *throwStmt = createThrowCodingErrorStmt(
                 C, containerExpr, C.getDecodingErrorDecl(), C.Id_dataCorrupted,
-                llvm::None, "Unavailable enum element encountered.");
+                std::nullopt, "Unavailable enum element encountered.");
 
             auto body =
                 BraceStmt::create(C, SourceLoc(), {throwStmt}, SourceLoc());

@@ -33,7 +33,7 @@ protected:
   void addImpl(unsigned Val);
   void addImpl(llvm::StringRef Val);
   void addImpl(SourceKit::UIdent Val);
-  void addImpl(Optional<llvm::StringRef> Val);
+  void addImpl(std::optional<llvm::StringRef> Val);
 
 private:
   unsigned getOffsetForString(llvm::StringRef Str);

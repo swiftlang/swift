@@ -223,7 +223,7 @@ public:
                        const GenericArgumentMap &Subs,
                        bool &DidSubstitute) const;
 
-  llvm::Optional<GenericArgumentMap> getSubstMap() const;
+  std::optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
 

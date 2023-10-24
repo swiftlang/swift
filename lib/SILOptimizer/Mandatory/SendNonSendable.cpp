@@ -1584,7 +1584,7 @@ class RaceTracer {
       }
       if (!workingPartition.isTransferred(transferredVal) && transferredReason)
         // value is no longer transferred - e.g. reassigned or assigned fresh
-        transferredReason = llvm::None;
+        transferredReason = std::nullopt;
 
       // continue walking block
       i++;

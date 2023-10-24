@@ -84,12 +84,12 @@ private:
 
   /// Returns the EpilogueARCBlockState for \p BB. If \p BB is unreachable,
   /// returns None
-  llvm::Optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
+  std::optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
     // poNumber will be None for unreachable blocks
     auto poNumber = PO->getPONumber(BB);
     if (poNumber.has_value())
       return &IndexToStateMap[*poNumber];
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Return true if this is a function exiting block this epilogue ARC

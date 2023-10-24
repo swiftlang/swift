@@ -128,7 +128,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body var decls*/ llvm::None));
+                                     /*case body var decls*/ std::nullopt));
   }
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
@@ -242,7 +242,7 @@ struct RuntimeVersionCheck {
 /// \c versionCheck and returns true.
 static bool
 checkAvailability(const EnumElementDecl *elt, ASTContext &C,
-                  llvm::Optional<RuntimeVersionCheck> &versionCheck) {
+                  std::optional<RuntimeVersionCheck> &versionCheck) {
   auto *attr = elt->getAttrs().getPotentiallyUnavailable(C);
 
   // Is it always available?
@@ -313,7 +313,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     // unavailable, skip it. If it might be unavailable at runtime, save
     // information about that check in versionCheck and keep processing this
     // element.
-    llvm::Optional<RuntimeVersionCheck> versionCheck(llvm::None);
+    std::optional<RuntimeVersionCheck> versionCheck(std::nullopt);
     if (!checkAvailability(elt, C, versionCheck))
       continue;
 
@@ -359,7 +359,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                      CaseLabelItem(litPat), SourceLoc(),
                                      SourceLoc(), body,
-                                     /*case body var decls*/ llvm::None));
+                                     /*case body var decls*/ std::nullopt));
     ++Idx;
   }
 
@@ -372,7 +372,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
                                    dfltLabelItem, SourceLoc(), SourceLoc(),
                                    dfltBody,
-                                   /*case body var decls*/ llvm::None));
+                                   /*case body var decls*/ std::nullopt));
 
   auto rawDecl = initDecl->getParameters()->get(0);
   auto rawRef = new (C) DeclRefExpr(rawDecl, DeclNameLoc(), /*implicit*/true);

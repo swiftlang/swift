@@ -119,7 +119,7 @@ private:
 struct ConcreteOpenedExistentialInfo {
   OpenedArchetypeInfo OAI;
   // If CEI has a value, it must be valid.
-  llvm::Optional<ConcreteExistentialInfo> CEI;
+  std::optional<ConcreteExistentialInfo> CEI;
 
   ConcreteOpenedExistentialInfo(Operand &use);
 

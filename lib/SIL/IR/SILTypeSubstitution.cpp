@@ -281,7 +281,7 @@ public:
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
       auto substType = IFS.withNewOptions(
-          llvm::None, [&] { return selfType.subst(IFS)->getCanonicalType(); });
+          std::nullopt, [&] { return selfType.subst(IFS)->getCanonicalType(); });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
             substConformance, substType, typeExpansionContext);
@@ -509,7 +509,7 @@ SILType SILType::subst(SILModule &M, TypeSubstitutionFn subs,
 SILType SILType::subst(TypeConverter &tc, SubstitutionMap subs) const {
   auto sig = subs.getGenericSignature();
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
   return subst(tc, IFS, sig.getCanonicalSignature());
 }
 SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
@@ -518,10 +518,10 @@ SILType SILType::subst(SILModule &M, SubstitutionMap subs) const{
 
 SILType SILType::subst(SILModule &M, SubstitutionMap subs,
                        TypeExpansionContext context) const {
-  if (isSubstitutionInvariant(*this, llvm::None))
+  if (isSubstitutionInvariant(*this, std::nullopt))
     return *this;
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
 
   SILTypeSubstituter STST(M.Types, context, IFS,
                           subs.getGenericSignature().getCanonicalSignature());
@@ -542,7 +542,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule, SubstitutionMap subs,
     return CanSILFunctionType(this);
   }
 
-  InFlightSubstitutionViaSubMap IFS(subs, llvm::None);
+  InFlightSubstitutionViaSubMap IFS(subs, std::nullopt);
 
   return substGenericArgs(silModule, IFS, context);
 }
@@ -554,7 +554,7 @@ SILFunctionType::substGenericArgs(SILModule &silModule,
                                   TypeExpansionContext context) {
   if (!isPolymorphic()) return CanSILFunctionType(this);
 
-  InFlightSubstitution IFS(subs, conformances, llvm::None);
+  InFlightSubstitution IFS(subs, conformances, std::nullopt);
   return substGenericArgs(silModule, IFS, context);
 }
 

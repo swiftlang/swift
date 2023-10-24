@@ -43,7 +43,7 @@ Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
                  GenericSignature witnessThunkSig,
                  SubstitutionMap reqToWitnessThunkSigSubs,
                  GenericSignature derivativeGenSig,
-                 llvm::Optional<ActorIsolation> enterIsolation) {
+                 std::optional<ActorIsolation> enterIsolation) {
   if (!witnessThunkSig && substitutions.empty() &&
       reqToWitnessThunkSigSubs.empty() && !enterIsolation) {
     storage = decl;
@@ -337,7 +337,7 @@ bool NormalProtocolConformance::isResilient() const {
   return getDeclContext()->getParentModule()->isResilient();
 }
 
-llvm::Optional<ArrayRef<Requirement>>
+std::optional<ArrayRef<Requirement>>
 ProtocolConformance::getConditionalRequirementsIfAvailable() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());
 }
@@ -346,12 +346,12 @@ ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
 }
 
-llvm::Optional<ArrayRef<Requirement>>
+std::optional<ArrayRef<Requirement>>
 NormalProtocolConformance::getConditionalRequirementsIfAvailable() const {
   const auto &eval = getDeclContext()->getASTContext().evaluator;
   if (eval.hasActiveRequest(ConditionalRequirementsRequest{
           const_cast<NormalProtocolConformance *>(this)})) {
-    return llvm::None;
+    return std::nullopt;
   }
   return getConditionalRequirements();
 }
@@ -538,7 +538,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
-  llvm::Optional<ProtocolConformanceRef> result;
+  std::optional<ProtocolConformanceRef> result;
 
   forEachAssociatedConformance(
       [&](Type t, ProtocolDecl *p, unsigned index) {
@@ -577,13 +577,13 @@ void NormalProtocolConformance::createAssociatedConformanceArray() {
 
   auto &ctx = proto->getASTContext();
   AssociatedConformances =
-      ctx.Allocate<llvm::Optional<ProtocolConformanceRef>>(count);
+      ctx.Allocate<std::optional<ProtocolConformanceRef>>(count);
 }
 
-llvm::Optional<ProtocolConformanceRef>
+std::optional<ProtocolConformanceRef>
 NormalProtocolConformance::getAssociatedConformance(unsigned index) const {
   if (!hasComputedAssociatedConformances())
-    return llvm::None;
+    return std::nullopt;
 
   return AssociatedConformances[index];
 }
@@ -648,7 +648,7 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
   return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap(),
-                 GenericSignature(), llvm::None);
+                 GenericSignature(), std::nullopt);
 }
 
 ConcreteDeclRef

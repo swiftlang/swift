@@ -1189,10 +1189,10 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
-llvm::Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
+std::optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   auto fileUnit = dyn_cast<FileUnit>(getAsGenericContext()->getModuleScopeContext());
   if (!fileUnit)
-    return llvm::None;
+    return std::nullopt;
 
   if (isa<SourceFile>(fileUnit)) {
     auto mutableThis = const_cast<IterableDeclContext *>(this);
@@ -1203,7 +1203,7 @@ llvm::Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
   }
 
   if (getDecl()->isImplicit())
-    return llvm::None;
+    return std::nullopt;
 
   return fileUnit->loadFingerprint(this);
 }

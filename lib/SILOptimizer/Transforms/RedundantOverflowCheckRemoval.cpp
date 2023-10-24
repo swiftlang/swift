@@ -518,11 +518,11 @@ public:
     return false;
   }
 
-  llvm::Optional<ValueRelation> getArithOpRelation(BuiltinInst *BI) {
+  std::optional<ValueRelation> getArithOpRelation(BuiltinInst *BI) {
     ValueRelation Rel;
     switch (BI->getBuiltinInfo().ID) {
     default:
-      return llvm::None;
+      return std::nullopt;
     case BuiltinValueKind::SAddOver:
       Rel = ValueRelation::SAdd;
       break;
@@ -629,7 +629,7 @@ public:
         return;
 
       // The relationship expressed in the builtin.
-      llvm::Optional<ValueRelation> Rel = getArithOpRelation(BI);
+      std::optional<ValueRelation> Rel = getArithOpRelation(BI);
       if (!Rel.has_value())
         return;
 

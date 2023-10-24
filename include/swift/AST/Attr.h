@@ -38,7 +38,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
@@ -656,7 +655,7 @@ enum class PlatformAgnosticAvailabilityKind {
 class AvailableAttr : public DeclAttribute {
 public:
 #define INIT_VER_TUPLE(X)                                                      \
-  X(X.empty() ? llvm::Optional<llvm::VersionTuple>() : X)
+  X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
@@ -700,19 +699,19 @@ public:
   ValueDecl *RenameDecl;
 
   /// Indicates when the symbol was introduced.
-  const llvm::Optional<llvm::VersionTuple> Introduced;
+  const std::optional<llvm::VersionTuple> Introduced;
 
   /// Indicates where the Introduced version was specified.
   const SourceRange IntroducedRange;
 
   /// Indicates when the symbol was deprecated.
-  const llvm::Optional<llvm::VersionTuple> Deprecated;
+  const std::optional<llvm::VersionTuple> Deprecated;
 
   /// Indicates where the Deprecated version was specified.
   const SourceRange DeprecatedRange;
 
   /// Indicates when the symbol was obsoleted.
-  const llvm::Optional<llvm::VersionTuple> Obsoleted;
+  const std::optional<llvm::VersionTuple> Obsoleted;
 
   /// Indicates where the Obsoleted version was specified.
   const SourceRange ObsoletedRange;
@@ -813,7 +812,7 @@ class ObjCAttr final : public DeclAttribute,
   void *NameData;
 
   /// Create an implicit @objc attribute with the given (optional) name.
-  explicit ObjCAttr(llvm::Optional<ObjCSelector> name, bool implicitName)
+  explicit ObjCAttr(std::optional<ObjCSelector> name, bool implicitName)
       : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
         NameData(nullptr) {
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
@@ -827,7 +826,7 @@ class ObjCAttr final : public DeclAttribute,
 
   /// Create an @objc attribute written in the source.
   ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
-           llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+           std::optional<ObjCSelector> name, SourceRange parenRange,
            ArrayRef<SourceLoc> nameLocs);
 
   /// Determine whether this attribute has trailing location information.
@@ -855,7 +854,7 @@ class ObjCAttr final : public DeclAttribute,
 
 public:
   /// Create implicit ObjC attribute with a given (optional) name.
-  static ObjCAttr *create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
+  static ObjCAttr *create(ASTContext &Ctx, std::optional<ObjCSelector> name,
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
@@ -901,9 +900,9 @@ public:
   bool hasName() const { return NameData != nullptr; }
 
   /// Retrieve the name of this entity, if specified.
-  llvm::Optional<ObjCSelector> getName() const {
+  std::optional<ObjCSelector> getName() const {
     if (!hasName())
-      return llvm::None;
+      return std::nullopt;
 
     return ObjCSelector::getFromOpaqueValue(NameData);
   }
@@ -1862,7 +1861,7 @@ public:
 
   /// Returns non-optional if this attribute is active given the current platform.
   /// The value provides more details about the active platform.
-  llvm::Optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
+  std::optional<ActiveVersion> isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -2022,7 +2021,7 @@ struct DeclNameRefWithLoc {
   /// The declaration name location.
   DeclNameLoc Loc;
   /// An optional accessor kind.
-  llvm::Optional<AccessorKind> AccessorKind;
+  std::optional<AccessorKind> AccessorKind;
 
   void print(ASTPrinter &Printer) const;
 };
@@ -2086,7 +2085,7 @@ class DerivativeAttr final
   /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
-  llvm::Optional<AutoDiffDerivativeFunctionKind> Kind = llvm::None;
+  std::optional<AutoDiffDerivativeFunctionKind> Kind = std::nullopt;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                           TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
@@ -2392,17 +2391,17 @@ public:
 class DocumentationAttr: public DeclAttribute {
 public:
   DocumentationAttr(SourceLoc AtLoc, SourceRange Range, StringRef Metadata,
-                    llvm::Optional<AccessLevel> Visibility, bool Implicit)
+                    std::optional<AccessLevel> Visibility, bool Implicit)
       : DeclAttribute(DAK_Documentation, AtLoc, Range, Implicit),
         Metadata(Metadata), Visibility(Visibility) {}
 
-  DocumentationAttr(StringRef Metadata, llvm::Optional<AccessLevel> Visibility,
+  DocumentationAttr(StringRef Metadata, std::optional<AccessLevel> Visibility,
                     bool Implicit)
       : DocumentationAttr(SourceLoc(), SourceRange(), Metadata, Visibility,
                           Implicit) {}
 
   const StringRef Metadata;
-  const llvm::Optional<AccessLevel> Visibility;
+  const std::optional<AccessLevel> Visibility;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Documentation;
@@ -2538,47 +2537,47 @@ public:
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  llvm::Optional<std::pair<TypeRepr *, unsigned>> getArrayLikeTypeAndCount() const {
+  std::optional<std::pair<TypeRepr *, unsigned>> getArrayLikeTypeAndCount() const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment == ~0u)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(LikeType, SizeOrCount);
   }
   
   /// Return the size and alignment of the attributed type. Returns
   /// None if the attribute specifies layout like some other type.
-  llvm::Optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {
+  std::optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {
     if (LikeType)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(SizeOrCount, Alignment);
   }
-  
+
   Type getResolvedLikeType(StructDecl *sd) const;
 
   /// Return the type whose single-element layout the attribute type should get
   /// its layout from. Returns None if the attribute specifies an array or manual
   /// layout.
-  llvm::Optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
+  std::optional<Type> getResolvedScalarLikeType(StructDecl *sd) const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment != ~0u)
-      return llvm::None;
+      return std::nullopt;
     return getResolvedLikeType(sd);
   }
-  
+
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  llvm::Optional<std::pair<Type, unsigned>>
+  std::optional<std::pair<Type, unsigned>>
   getResolvedArrayLikeTypeAndCount(StructDecl *sd) const {
     if (!LikeType)
-      return llvm::None;
+      return std::nullopt;
     if (Alignment == ~0u)
-      return llvm::None;
+      return std::nullopt;
     return std::make_pair(getResolvedLikeType(sd), SizeOrCount);
   }
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_RawLayout;
   }
@@ -2588,10 +2587,10 @@ public:
 template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
   ToAttributeKind() {}
 
-  llvm::Optional<const ATTR *> operator()(const DeclAttribute *Attr) const {
+  std::optional<const ATTR *> operator()(const DeclAttribute *Attr) const {
     if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
       return cast<ATTR>(Attr);
-    return llvm::None;
+    return std::nullopt;
   }
 };
 
@@ -2832,7 +2831,7 @@ public:
 
   OrigDeclAttrFilter(const Decl *decl) : decl(decl) {}
 
-  llvm::Optional<const DeclAttribute *>
+  std::optional<const DeclAttribute *>
   operator()(const DeclAttribute *Attr) const;
 };
 
@@ -2912,16 +2911,16 @@ public:
     }
   };
 
-  llvm::Optional<Convention> ConventionArguments;
+  std::optional<Convention> ConventionArguments;
 
   DifferentiabilityKind differentiabilityKind =
       DifferentiabilityKind::NonDifferentiable;
 
   // For an opened existential type, the known ID.
-  llvm::Optional<UUID> OpenedID;
+  std::optional<UUID> OpenedID;
 
   // For an opened existential type, the constraint type.
-  llvm::Optional<TypeRepr *> ConstraintType;
+  std::optional<TypeRepr *> ConstraintType;
 
   // For a reference to an opaque return type, the mangled name and argument
   // index into the generic signature.
@@ -2929,7 +2928,7 @@ public:
     StringRef mangledName;
     unsigned index;
   };
-  llvm::Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
+  std::optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
 
   TypeAttributes() {}
 

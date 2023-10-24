@@ -30,7 +30,7 @@ CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator,
   return new (CCSMem) CodeCompletionString(Chunks);
 }
 
-llvm::Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
+std::optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     bool includeLeadingPunctuation) const {
   for (auto i : indices(getChunks())) {
     const Chunk &C = getChunks()[i];
@@ -104,12 +104,12 @@ llvm::Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
       llvm_unreachable("should have already extracted the text");
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 StringRef
 CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
-  llvm::Optional<unsigned> Idx =
+  std::optional<unsigned> Idx =
       getFirstTextChunkIndex(includeLeadingPunctuation);
   if (Idx.has_value())
     return getChunks()[*Idx].getText();

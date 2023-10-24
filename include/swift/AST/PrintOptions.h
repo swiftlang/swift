@@ -17,7 +17,6 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include <limits.h>
@@ -513,7 +512,7 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// The information for converting archetypes to specialized types.
-  llvm::Optional<TypeTransformContext> TransformContext;
+  std::optional<TypeTransformContext> TransformContext;
 
   /// Whether to display (Clang-)imported module names;
   bool QualifyImportedTypes = false;

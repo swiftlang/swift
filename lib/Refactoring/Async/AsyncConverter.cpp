@@ -154,7 +154,7 @@ std::string AsyncConverter::getAsyncWrapperCompletionClosure(
     if (SuccessParams.size() > 1)
       SuccessParamNames.back().append(std::to_string(idx + 1));
   }
-  llvm::Optional<SmallString<4>> ErrName;
+  std::optional<SmallString<4>> ErrName;
   if (HandlerDesc.getErrorParam())
     ErrName.emplace("error");
 
@@ -1135,7 +1135,7 @@ void AsyncConverter::addHoistedCallback(
 }
 
 void AsyncConverter::addBoolFlagParamBindingIfNeeded(
-    llvm::Optional<KnownBoolFlagParam> Flag, BlockKind Block) {
+    std::optional<KnownBoolFlagParam> Flag, BlockKind Block) {
   if (!Flag)
     return;
   // Figure out the polarity of the binding based on the block we're in and

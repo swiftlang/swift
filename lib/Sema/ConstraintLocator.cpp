@@ -701,7 +701,7 @@ bool ConstraintLocator::isForSingleValueStmtConjunctionOrBrace() const {
   return ::isForSingleValueStmtConjunction(getAnchor(), path);
 }
 
-llvm::Optional<SingleValueStmtBranchKind>
+std::optional<SingleValueStmtBranchKind>
 ConstraintLocator::isForSingleValueStmtBranch() const {
   // Ignore a trailing ContextualType path element.
   auto path = getPath();
@@ -709,15 +709,15 @@ ConstraintLocator::isForSingleValueStmtBranch() const {
     path = path.drop_back();
 
   if (path.empty())
-    return llvm::None;
+    return std::nullopt;
 
   auto resultElt = path.back().getAs<LocatorPathElt::SingleValueStmtResult>();
   if (!resultElt)
-    return llvm::None;
+    return std::nullopt;
 
   auto *SVE = getAsExpr<SingleValueStmtExpr>(getAnchor());
   if (!SVE)
-    return llvm::None;
+    return std::nullopt;
 
   // Check to see if we have an explicit result, i.e 'then <expr>'.
   SmallVector<ThenStmt *, 4> scratch;

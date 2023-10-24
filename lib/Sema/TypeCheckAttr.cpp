@@ -797,23 +797,23 @@ void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                           attr->getAttrName());
 }
 
-static llvm::Optional<Diag<bool, Type>>
+static std::optional<Diag<bool, Type>>
 isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
   if (type->isObjCExistentialType() || type->isAny())
-    return llvm::None; // @objc existential types are okay
+    return std::nullopt; // @objc existential types are okay
 
   auto nominal = type->getAnyNominal();
 
   if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
-      return llvm::None; // @objc class types are okay.
+      return std::nullopt; // @objc class types are okay.
     return diag::iboutlet_nonobjc_class;
   }
 
   if (type->isString()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (type->isArray()) {
@@ -1309,7 +1309,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   auto behavior = behaviorLimitForObjCReason(reason, Ctx);
 
   // Only certain decls can be ObjC.
-  llvm::Optional<Diag<>> error;
+  std::optional<Diag<>> error;
   if (isa<ClassDecl>(D) ||
       isa<ProtocolDecl>(D)) {
     /* ok */
@@ -1958,7 +1958,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
   // enclosing declaration, then there is nothing to check.
-  llvm::Optional<AvailabilityContext> EnclosingAnnotatedRange;
+  std::optional<AvailabilityContext> EnclosingAnnotatedRange;
   AvailabilityContext AttrRange =
       AvailabilityInference::availableRange(attr, Ctx);
 
@@ -2000,7 +2000,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     }
   }
 
-  llvm::Optional<Diag<>> MaybeNotAllowed =
+  std::optional<Diag<>> MaybeNotAllowed =
       TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
   if (MaybeNotAllowed.has_value()) {
     AvailabilityContext DeploymentRange
@@ -2751,7 +2751,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
 
   auto where = ExportContext::forDeclSignature(D);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
-                           llvm::None);
+                           std::nullopt);
 
   if (mainFunction->hasAsync() &&
       context.LangOpts.isConcurrencyModelTaskToThread() &&
@@ -3027,13 +3027,13 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   return specializedSig;
 }
 
-llvm::Optional<GenericSignature>
+std::optional<GenericSignature>
 SerializeAttrGenericSignatureRequest::getCachedResult() const {
   const auto &storage = getStorage();
   SpecializeAttr *attr = std::get<1>(storage);
   if (auto signature = attr->specializedSignature)
     return signature;
-  return llvm::None;
+  return std::nullopt;
 }
 
 void SerializeAttrGenericSignatureRequest::cacheResult(
@@ -3518,7 +3518,7 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::resolveContextualType(typeEraserRepr, PD, llvm::None,
+    return TypeResolution::resolveContextualType(typeEraserRepr, PD, std::nullopt,
                                                  // Unbound generics and
                                                  // placeholders are not allowed
                                                  // within this attribute.
@@ -3551,7 +3551,7 @@ ResolveRawLayoutLikeTypeRequest::evaluate(Evaluator &evaluator,
 
   // Resolve the like type in the struct's context.
   return TypeResolution::resolveContextualType(
-        attr->LikeType, sd, llvm::None,
+        attr->LikeType, sd, std::nullopt,
         // Unbound generics and placeholders
         // are not allowed within this
         // attribute.
@@ -4583,7 +4583,7 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
 }
 
-llvm::Optional<Diag<>>
+std::optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
@@ -4593,7 +4593,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
-      return llvm::None;
+      return std::nullopt;
 
     // Do not permit potential availability of script-mode global variables;
     // their initializer expression is not lazily evaluated, so this would
@@ -4620,15 +4620,15 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<Diag<>>
+std::optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   auto parentIsUnavailable = [](const Decl *D) -> bool {
     if (auto *parent =
             AvailabilityInference::parentDeclForInferredAvailability(D)) {
-      return parent->getSemanticUnavailableAttr() != llvm::None;
+      return parent->getSemanticUnavailableAttr() != std::nullopt;
     }
     return false;
   };
@@ -4636,17 +4636,17 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   // A destructor is always called if declared.
   if (auto *DD = dyn_cast<DestructorDecl>(D)) {
     if (parentIsUnavailable(D))
-      return llvm::None;
+      return std::nullopt;
 
     return diag::availability_deinit_no_unavailable;
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     if (!VD->hasStorageOrWrapsStorage())
-      return llvm::None;
+      return std::nullopt;
 
     if (parentIsUnavailable(D))
-      return llvm::None;
+      return std::nullopt;
 
     // Do not permit unavailable script-mode global variables; their initializer
     // expression is not lazily evaluated, so this would not be safe.
@@ -4659,7 +4659,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
       return diag::availability_stored_property_no_unavailable;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 static bool shouldBlockImplicitDynamic(Decl *D) {
@@ -5058,7 +5058,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
     const llvm::function_ref<
-        llvm::Optional<AbstractFunctionDeclLookupErrorKind>(
+        std::optional<AbstractFunctionDeclLookupErrorKind>(
             AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
   assert(lookupContext);
@@ -5957,7 +5957,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   };
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
-      -> llvm::Optional<AbstractFunctionDeclLookupErrorKind> {
+      -> std::optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate is a protocol requirement. Derivative
     // registration does not yet support protocol requirements.
     // TODO(TF-982): Allow default derivative implementations for protocol
@@ -5973,13 +5973,13 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
             cast<AnyFunctionType>(originalFnType->getCanonicalType()),
             originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
-    return llvm::None;
+    return std::nullopt;
   };
 
   Type baseType;
   if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
     const auto options =
-        TypeResolutionOptions(llvm::None) | TypeResolutionFlags::AllowModule;
+        TypeResolutionOptions(std::nullopt) | TypeResolutionFlags::AllowModule;
     baseType = TypeResolution::resolveContextualType(
         baseTypeRepr, derivative->getDeclContext(), options,
         /*unboundTyOpener*/ nullptr,
@@ -6559,19 +6559,19 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   }
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
-      -> llvm::Optional<AbstractFunctionDeclLookupErrorKind> {
+      -> std::optional<AbstractFunctionDeclLookupErrorKind> {
     // Error if the original candidate does not have the expected type.
     if (!checkFunctionSignature(
             cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
             originalCandidate->getInterfaceType()->getCanonicalType()))
       return AbstractFunctionDeclLookupErrorKind::CandidateTypeMismatch;
-    return llvm::None;
+    return std::nullopt;
   };
 
   Type baseType;
   if (attr->getBaseTypeRepr()) {
     baseType = TypeResolution::resolveContextualType(
-        attr->getBaseTypeRepr(), transpose->getDeclContext(), llvm::None,
+        attr->getBaseTypeRepr(), transpose->getDeclContext(), std::nullopt,
         /*unboundTyOpener*/ nullptr,
         /*placeholderHandler*/ nullptr,
         /*packElementOpener*/ nullptr);
@@ -7225,7 +7225,7 @@ public:
   void visitCustomAttr(CustomAttr *attr) {
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(
-        ctx.evaluator, GlobalActorAttributeRequest{closure}, llvm::None);
+        ctx.evaluator, GlobalActorAttributeRequest{closure}, std::nullopt);
 
     if (globalActorAttr && globalActorAttr->first == attr) {
       // if there is an `isolated` parameter, then this global-actor attribute
@@ -7407,7 +7407,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   // completion handler has been removed).
   if (!renamedDecl && !asyncResults.empty()) {
     for (AbstractFunctionDecl *candidate : asyncResults) {
-      llvm::Optional<unsigned> completionHandler =
+      std::optional<unsigned> completionHandler =
           attachedFunc->findPotentialCompletionHandlerParam(candidate);
       if (!completionHandler)
         continue;

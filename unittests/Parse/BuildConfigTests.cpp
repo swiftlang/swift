@@ -1,7 +1,6 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/ParseVersion.h"
-#include "llvm/ADT/Optional.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

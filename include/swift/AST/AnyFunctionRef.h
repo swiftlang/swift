@@ -22,7 +22,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
@@ -58,16 +57,12 @@ public:
 
   /// Construct an AnyFunctionRef from a decl context that might be
   /// some sort of function.
-  static llvm::Optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+  static std::optional<AnyFunctionRef> fromDeclContext(DeclContext *dc) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
       return AnyFunctionRef(fn);
-    }
-
-    if (auto ace = dyn_cast<AbstractClosureExpr>(dc)) {
+    if (auto ace = dyn_cast<AbstractClosureExpr>(dc))
       return AnyFunctionRef(ace);
-    }
-
-    return llvm::None;
+    return std::nullopt;
   }
 
   CaptureInfo getCaptureInfo() const {

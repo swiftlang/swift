@@ -353,7 +353,7 @@ using CounterAllocator = llvm::SpecificBumpPtrAllocator<CounterExprStorage>;
 class CounterExpr {
   enum class Kind { Leaf, Add, Sub, Zero };
   Kind K;
-  llvm::Optional<ProfileCounterRef> Counter;
+  std::optional<ProfileCounterRef> Counter;
   const CounterExprStorage *Storage = nullptr;
 
   CounterExpr(Kind K) : K(K) {
@@ -510,18 +510,18 @@ class SourceMappingRegion {
 
   /// The counter for an incomplete region. Note we do not store counters
   /// for nodes, as we need to be able to fix them up after popping the regions.
-  llvm::Optional<CounterExpr> Counter;
+  std::optional<CounterExpr> Counter;
 
   /// The region's starting location.
-  llvm::Optional<SourceLoc> StartLoc;
+  std::optional<SourceLoc> StartLoc;
 
   /// The region's ending location.
-  llvm::Optional<SourceLoc> EndLoc;
+  std::optional<SourceLoc> EndLoc;
 
 public:
-  SourceMappingRegion(ASTNode Node, llvm::Optional<CounterExpr> Counter,
-                      llvm::Optional<SourceLoc> StartLoc,
-                      llvm::Optional<SourceLoc> EndLoc)
+  SourceMappingRegion(ASTNode Node, std::optional<CounterExpr> Counter,
+                      std::optional<SourceLoc> StartLoc,
+                      std::optional<SourceLoc> EndLoc)
       : Node(Node), Counter(std::move(Counter)), StartLoc(StartLoc),
         EndLoc(EndLoc) {
     assert((!StartLoc || StartLoc->isValid()) &&
@@ -823,7 +823,7 @@ private:
   /// A stack of active do-catch statements.
   std::vector<DoCatchStmt *> DoCatchStack;
 
-  llvm::Optional<CounterExpr> ExitCounter;
+  std::optional<CounterExpr> ExitCounter;
 
   Stmt *ImplicitTopLevelBody = nullptr;
 
@@ -911,20 +911,20 @@ private:
   ///
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
-  llvm::Optional<CounterExpr> setExitCount(ASTNode Node) {
+  std::optional<CounterExpr> setExitCount(ASTNode Node) {
     ExitCounter = getCurrentCounter();
     if (hasCounter(Node) && getRegion().getNode() != Node)
       return CounterExpr::Sub(getCounter(Node), *ExitCounter, CounterAlloc);
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope,
-                              llvm::Optional<CounterExpr> ControlFlowAdjust) {
+                              std::optional<CounterExpr> ControlFlowAdjust) {
     if (Parent.getAsDecl())
       return;
 
-    llvm::Optional<CounterExpr> JumpsToLabel;
+    std::optional<CounterExpr> JumpsToLabel;
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
       if (isa<DoCatchStmt>(ParentStmt))
@@ -954,7 +954,7 @@ private:
   void pushRegion(ASTNode Node) {
     // Note we don't store counters for nodes, as we need to be able to fix
     // them up later.
-    RegionStack.emplace_back(Node, /*Counter*/ llvm::None, Node.getStartLoc(),
+    RegionStack.emplace_back(Node, /*Counter*/ std::nullopt, Node.getStartLoc(),
                              getEndLoc(Node));
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
@@ -966,14 +966,14 @@ private:
   /// Replace the current region at \p Start with a new counter. If \p Start is
   /// \c None, or the counter is semantically zero, an 'incomplete' region is
   /// formed, which is not recorded unless followed by additional AST nodes.
-  void replaceCount(CounterExpr Counter, llvm::Optional<SourceLoc> Start) {
+  void replaceCount(CounterExpr Counter, std::optional<SourceLoc> Start) {
     // If the counter is semantically zero, form an 'incomplete' region with
     // no starting location. This prevents forming unreachable regions unless
     // there is a following statement or expression to extend the region.
     if (Start && Counter.isSemanticallyZero())
-      Start = llvm::None;
+      Start = std::nullopt;
 
-    RegionStack.emplace_back(ASTNode(), Counter, Start, llvm::None);
+    RegionStack.emplace_back(ASTNode(), Counter, Start, std::nullopt);
   }
 
   /// Get the location for the end of the last token in \c Node.
@@ -1035,7 +1035,7 @@ private:
     SourceMappingRegion &Region = getRegion();
     if (!Region.hasEndLoc())
       Region.setEndLoc(getEndLoc(S));
-    replaceCount(CounterExpr::Zero(), /*Start*/ llvm::None);
+    replaceCount(CounterExpr::Zero(), /*Start*/ std::nullopt);
   }
 
   Expr *getConditionNode(StmtCondition SC) {
@@ -1446,13 +1446,13 @@ ProfileCounter SILProfiler::getExecutionCount(ASTNode Node) {
   return getExecutionCount(ProfileCounterRef::node(Node));
 }
 
-llvm::Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
+std::optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
   if (!Node || !M.getPGOReader() || !hasRegionCounters()) {
-    return llvm::None;
+    return std::nullopt;
   }
   auto it = RegionCondToParentMap.find(Node);
   if (it == RegionCondToParentMap.end()) {
-    return llvm::None;
+    return std::nullopt;
   }
   return it->getSecond();
 }

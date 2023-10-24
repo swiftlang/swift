@@ -331,10 +331,10 @@ class FindBorrowScopeUses {
 public:
   FindBorrowScopeUses(CanonicalizeBorrowScope &scope) : scope(scope) {}
 
-  llvm::Optional<OuterUsers> findUses() && {
+  std::optional<OuterUsers> findUses() && {
     scope.beginVisitBorrowScopeUses();
     if (!scope.visitBorrowScopeUses(scope.getBorrowedValue().value, *this))
-      return llvm::None;
+      return std::nullopt;
 
     return std::move(useInsts);
   }
@@ -781,7 +781,7 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
 
     // Gather all potential outer uses before rewriting any to avoid scanning
     // any basic block more than once.
-    llvm::Optional<OuterUsers> outerUsers =
+    std::optional<OuterUsers> outerUsers =
         FindBorrowScopeUses(*this).findUses();
     if (!outerUsers)
       return false;

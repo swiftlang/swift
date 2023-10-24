@@ -1295,7 +1295,7 @@ public:
     const ProtocolConformance &ConformanceInContext;
     CanType ConcreteType;
 
-    llvm::Optional<FulfillmentMap> Fulfillments;
+    std::optional<FulfillmentMap> Fulfillments;
 
     WitnessTableBuilderBase(IRGenModule &IGM, SILWitnessTable *SILWT)
         : IGM(IGM), SILWT(SILWT),
@@ -1945,7 +1945,7 @@ namespace {
 
     using PlaceholderPosition =
       ConstantAggregateBuilderBase::PlaceholderPosition;
-    llvm::Optional<PlaceholderPosition> FlagsPP;
+    std::optional<PlaceholderPosition> FlagsPP;
 
   public:
     ProtocolConformanceDescriptorBuilder(
@@ -3631,7 +3631,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
       generics, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
       /*callee*/ ParameterConvention::Direct_Unowned,
       /*params*/ {}, /*yields*/ {},
-      /*results*/ {}, /*error*/ llvm::None,
+      /*results*/ {}, /*error*/ std::nullopt,
       /*pattern subs*/ SubstitutionMap(),
       /*invocation subs*/ SubstitutionMap(), IGM.Context);
 

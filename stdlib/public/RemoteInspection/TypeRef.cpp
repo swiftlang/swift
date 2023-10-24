@@ -1067,7 +1067,7 @@ unsigned NominalTypeTrait::getDepth() const {
   return 0;
 }
 
-llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
+std::optional<GenericArgumentMap> TypeRef::getSubstMap() const {
   GenericArgumentMap Substitutions;
   switch (getKind()) {
     case TypeRefKind::Nominal: {
@@ -1082,13 +1082,13 @@ llvm::Optional<GenericArgumentMap> TypeRef::getSubstMap() const {
       unsigned Index = 0;
       for (auto Param : BG->getGenericParams()) {
         if (!Param->isConcrete())
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert({{Depth, Index++}, Param});
       }
       if (auto Parent = BG->getParent()) {
         auto ParentSubs = Parent->getSubstMap();
         if (!ParentSubs)
-          return llvm::None;
+          return std::nullopt;
         Substitutions.insert(ParentSubs->begin(), ParentSubs->end());
       }
       break;
@@ -1336,11 +1336,11 @@ public:
     return EM;
   }
 
-  llvm::Optional<TypeRefRequirement>
+  std::optional<TypeRefRequirement>
   visitTypeRefRequirement(const TypeRefRequirement &req) {
     auto newFirst = visit(req.getFirstType());
     if (!newFirst)
-      return llvm::None;
+      return std::nullopt;
 
     switch (req.getKind()) {
     case RequirementKind::SameShape:
@@ -1349,7 +1349,7 @@ public:
     case RequirementKind::SameType: {
       auto newSecond = visit(req.getFirstType());
       if (!newSecond)
-        return llvm::None;
+        return std::nullopt;
       return TypeRefRequirement(req.getKind(), newFirst, newSecond);
     }
     case RequirementKind::Layout:

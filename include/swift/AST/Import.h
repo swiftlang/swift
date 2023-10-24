@@ -26,7 +26,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -584,7 +583,7 @@ struct AttributedImport {
 
   /// If the import declaration has a `@_documentation(visibility: <access>)`
   /// attribute, this is the given access level.
-  llvm::Optional<AccessLevel> docVisibility;
+  std::optional<AccessLevel> docVisibility;
 
   /// Access level limiting how imported types can be exported.
   AccessLevel accessLevel;
@@ -597,7 +596,7 @@ struct AttributedImport {
                    ImportOptions options = ImportOptions(),
                    StringRef filename = {}, ArrayRef<Identifier> spiGroups = {},
                    SourceRange preconcurrencyRange = {},
-                   llvm::Optional<AccessLevel> docVisibility = llvm::None,
+                   std::optional<AccessLevel> docVisibility = std::nullopt,
                    AccessLevel accessLevel = AccessLevel::Public,
                    SourceRange accessLevelRange = SourceRange())
       : module(module), importLoc(importLoc), options(options),
@@ -776,7 +775,7 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getEmptyKey(),
                             StringRefDMI::getEmptyKey(),
-                            {}, {}, llvm::None,
+                            {}, {}, std::nullopt,
                             swift::AccessLevel::Public, {});
   }
   static inline AttributedImport getTombstoneKey() {
@@ -784,7 +783,7 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
                             SourceLocDMI::getEmptyKey(),
                             ImportOptionsDMI::getTombstoneKey(),
                             StringRefDMI::getTombstoneKey(),
-                            {}, {}, llvm::None,
+                            {}, {}, std::nullopt,
                             swift::AccessLevel::Public, {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {

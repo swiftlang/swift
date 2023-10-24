@@ -24,6 +24,7 @@
 #include "swift/Runtime/Config.h"
 
 #include <cstdint>
+#include <optional>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -37,7 +38,6 @@
 #include <dlfcn.h>
 #endif
 
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
 struct SymbolInfo {
@@ -72,8 +72,8 @@ public:
   /// \param address The address where the symbol is located.
   ///
   /// \returns On success, an instance of \c SymbolInfo containing information
-  ///   about the symbol at \a address. On failure, \c llvm::None.
-  static llvm::Optional<SymbolInfo> lookup(const void *address);
+  ///   about the symbol at \a address. On failure, \c std::nullopt.
+  static std::optional<SymbolInfo> lookup(const void *address);
 };
 
 } // end namespace swift

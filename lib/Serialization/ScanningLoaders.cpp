@@ -150,7 +150,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   auto realModuleName = Ctx.getRealModuleName(moduleName);
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
-  llvm::Optional<ModuleDependencyInfo> Result;
+  std::optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
       realModuleName.str(), moduleInterfacePath.str(), StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
@@ -309,7 +309,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   ImportPath::Module::Builder builder(Ctx, moduleName, /*separator=*/'.');
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
-  llvm::Optional<SwiftDependencyTracker> tracker = llvm::None;
+  std::optional<SwiftDependencyTracker> tracker = std::nullopt;
   if (CacheFS)
     tracker = SwiftDependencyTracker(*CacheFS, mapper);
 

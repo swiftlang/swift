@@ -493,3 +493,11 @@ bool __swift::__runtime::llvm::getAsSignedInteger(
 hash_code __swift::__runtime::llvm::hash_value(StringRef S) {
   return hash_combine_range(S.begin(), S.end());
 }
+
+unsigned
+__swift::__runtime::llvm::DenseMapInfo<StringRef>::getHashValue(StringRef Val) {
+  assert(Val.data() != getEmptyKey().data() && "Cannot hash the empty key!");
+  assert(Val.data() != getTombstoneKey().data() &&
+         "Cannot hash the tombstone key!");
+  return (unsigned)(hash_value(Val));
+}

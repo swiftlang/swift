@@ -25,7 +25,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
                                              IsSerialized_t isSerialized,
                                              StringRef name,
                                              SILType loweredType,
-                                             llvm::Optional<SILLocation> loc,
+                                             std::optional<SILLocation> loc,
                                              VarDecl *Decl) {
   // Get a StringMapEntry for the variable.
   llvm::StringMapEntry<SILGlobalVariable*> *entry = nullptr;
@@ -45,7 +45,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
-                                     llvm::Optional<SILLocation> Loc,
+                                     std::optional<SILLocation> Loc,
                                      VarDecl *Decl)
     : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
       LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),

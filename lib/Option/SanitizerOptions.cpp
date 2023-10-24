@@ -21,7 +21,6 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -47,11 +46,11 @@ static StringRef toFileName(const SanitizerKind kind) {
   llvm_unreachable("Unknown sanitizer");
 }
 
-static llvm::Optional<SanitizerKind> parse(const char *arg) {
-  return llvm::StringSwitch<llvm::Optional<SanitizerKind>>(arg)
+static std::optional<SanitizerKind> parse(const char *arg) {
+  return llvm::StringSwitch<std::optional<SanitizerKind>>(arg)
 #define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
 #include "swift/Basic/Sanitizers.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
@@ -131,7 +130,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    llvm::Optional<SanitizerKind> optKind = parse(arg);
+    std::optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {
@@ -213,7 +212,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerRecoverArgValues(
 
   // Find the sanitizer kind.
   for (const char *arg : A->getValues()) {
-    llvm::Optional<SanitizerKind> optKind = parse(arg);
+    std::optional<SanitizerKind> optKind = parse(arg);
 
     // Unrecognized sanitizer option
     if (!optKind.has_value()) {

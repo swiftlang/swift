@@ -42,7 +42,7 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
   auto moduleCleanupLoc = CleanupLocation::getModuleCleanupLocation();
 
   TopLevelSGF.prepareEpilog(
-      llvm::None, getASTContext().getErrorExistentialType(), moduleCleanupLoc);
+      std::nullopt, getASTContext().getErrorExistentialType(), moduleCleanupLoc);
 
   auto prologueLoc = RegularLocation::getModuleLocation();
   prologueLoc.markAsPrologue();

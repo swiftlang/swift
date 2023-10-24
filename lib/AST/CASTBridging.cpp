@@ -312,7 +312,7 @@ BridgedCallExpr CallExpr_createParsed(BridgedASTContext cContext,
                            TE->getElement(i));
   }
   auto *argList = ArgumentList::create(context, TE->getLParenLoc(), arguments,
-                                       TE->getRParenLoc(), llvm::None,
+                                       TE->getRParenLoc(), std::nullopt,
                                        /*isImplicit*/ false);
   auto *CE = CallExpr::create(context, unbridged(fn), argList,
                               /*implicit*/ false);
@@ -409,7 +409,7 @@ BridgedIfStmt IfStmt_createParsed(BridgedASTContext cContext,
   ASTContext &context = unbridged(cContext);
   auto *IS = new (context)
       IfStmt(unbridged(cIfLoc), unbridged(cond), unbridged(then),
-             unbridged(cElseLoc), unbridged(elseStmt), llvm::None, context);
+             unbridged(cElseLoc), unbridged(elseStmt), std::nullopt, context);
   return bridged(IS);
 }
 
@@ -670,7 +670,7 @@ static void setParsedMembers(IterableDeclContext *IDC,
 
   ctx.evaluator.cacheOutput(
       ParseMembersRequest{IDC},
-      FingerprintAndMembers{llvm::None, ctx.AllocateCopy(members)});
+      FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
 }
 
 void NominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl bridgedDecl,

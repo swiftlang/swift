@@ -22,8 +22,8 @@ using namespace sourcekitd;
 
 struct DocSupportAnnotationArrayBuilder::Implementation {
   CompactArrayBuilder<UIdent,
-                      Optional<StringRef>,
-                      Optional<StringRef>,
+                      std::optional<StringRef>,
+                      std::optional<StringRef>,
                       unsigned,
                       unsigned> Builder;
 };
@@ -38,10 +38,10 @@ DocSupportAnnotationArrayBuilder::~DocSupportAnnotationArrayBuilder() {
 }
 
 void DocSupportAnnotationArrayBuilder::add(const DocEntityInfo &Info) {
-  Optional<StringRef> NameOpt;
+  std::optional<StringRef> NameOpt;
   if (!Info.Name.empty())
     NameOpt = Info.Name;
-  Optional<StringRef> USROpt;
+  std::optional<StringRef> USROpt;
   if (!Info.USR.empty())
     USROpt = Info.USR;
   Impl.Builder.addEntry(Info.Kind,

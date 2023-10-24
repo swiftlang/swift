@@ -30,7 +30,6 @@
 #define SWIFT_BASIC_CLUSTEREDBITVECTOR_H
 
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Optional.h"
 #include "swift/Basic/Debug.h"
 #include <cassert>
 
@@ -44,7 +43,7 @@ class ClusteredBitVector {
   /// The least-significant bit of the integer corresponds to the bit
   /// at index 0. If the optional does not have a value then the bit
   /// vector has a length of 0 bits.
-  llvm::Optional<APInt> Bits;
+  std::optional<APInt> Bits;
 
   /// Copy constructor from APInt.
   ClusteredBitVector(const APInt &bits) : Bits(bits) {}
@@ -64,12 +63,12 @@ public:
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(const llvm::Optional<APInt> &bits)
+  ClusteredBitVector(const std::optional<APInt> &bits)
     : Bits(bits) {}
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(llvm::Optional<APInt> &&bits)
+  ClusteredBitVector(std::optional<APInt> &&bits)
     : Bits(std::move(bits)) {}
 
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {

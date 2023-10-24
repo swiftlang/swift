@@ -422,12 +422,12 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
-  llvm::Optional<SILLocation>
+  std::optional<SILLocation>
   getSubjectLocationOverride(SILLocation loc) const {
     if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
       if (!Switch->isImplicit())
         return SILLocation(Switch->getSubjectExpr());
-    return llvm::None;
+    return std::nullopt;
   }
 
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
@@ -959,8 +959,8 @@ static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
 /// Select the "necessary column", Maranget's term for the column
 /// most likely to give an optimal decision tree.
 ///
-/// \return llvm::None if we didn't find a meaningful necessary column
-static llvm::Optional<unsigned>
+/// \return std::nullopt if we didn't find a meaningful necessary column
+static std::optional<unsigned>
 chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
   assert(firstRow < matrix.rows() &&
          "choosing necessary column of matrix with no rows remaining?");
@@ -972,7 +972,7 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
     if (numColumns == 1 && !isWildcardPattern(matrix[firstRow][0])) {
       return 0;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Use the "constructor prefix" heuristic from Maranget to pick the
@@ -980,7 +980,7 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
   // wildcard turns out to be a good and cheap-to-calculate heuristic for
   // generating an optimal decision tree.  We ignore patterns that aren't
   // similar to the head pattern.
-  llvm::Optional<unsigned> bestColumn;
+  std::optional<unsigned> bestColumn;
   unsigned longestConstructorPrefix = 0;
   for (unsigned c = 0; c != numColumns; ++c) {
     unsigned constructorPrefix = getConstructorPrefix(matrix, firstRow, c);
@@ -1010,7 +1010,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
     }
     
     // Try to find a "necessary column".
-    llvm::Optional<unsigned> column = chooseNecessaryColumn(clauses, firstRow);
+    std::optional<unsigned> column = chooseNecessaryColumn(clauses, firstRow);
 
     // Emit the subtree in its own scope.
     ExitableFullExpr scope(SGF, CleanupLocation(PatternMatchStmt));
@@ -1753,7 +1753,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
         assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
       },
       // Failure block: branch out to the continuation block.
-      [&](llvm::Optional<ManagedValue> mv) { (*innerFailure)(loc); },
+      [&](std::optional<ManagedValue> mv) { (*innerFailure)(loc); },
       rows[0].Count);
 }
 

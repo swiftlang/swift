@@ -17,7 +17,7 @@
 
 namespace swift {
 
-llvm::Optional<SmallString<128>>
+std::optional<SmallString<128>>
 getCxxShimModuleMapPath(SearchPathOptions &opts, const llvm::Triple &triple);
 
 } // namespace swift

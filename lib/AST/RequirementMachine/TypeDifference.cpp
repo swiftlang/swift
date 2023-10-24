@@ -168,7 +168,7 @@ namespace {
         auto lhsTerm = LHSSubstitutions[lhsIndex];
         auto rhsTerm = RHSSubstitutions[rhsIndex];
 
-        llvm::Optional<int> compare = lhsTerm.compare(rhsTerm, Context);
+        std::optional<int> compare = lhsTerm.compare(rhsTerm, Context);
         if (*compare < 0) {
           SameTypesOnLHS.emplace_back(rhsIndex, lhsTerm);
         } else if (compare > 0) {
@@ -311,7 +311,7 @@ swift::rewriting::buildTypeDifference(
   auto type = symbol.getConcreteType();
   auto substitutions = symbol.getSubstitutions();
 
-  Type resultType = type.transformRec([&](Type t) -> llvm::Optional<Type> {
+  Type resultType = type.transformRec([&](Type t) -> std::optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       unsigned index = RewriteContext::getGenericParamIndex(t);
 
@@ -325,7 +325,7 @@ swift::rewriting::buildTypeDifference(
           auto concreteSymbol = pair.second;
           auto concreteType = concreteSymbol.getConcreteType();
 
-          return concreteType.transformRec([&](Type t) -> llvm::Optional<Type> {
+          return concreteType.transformRec([&](Type t) -> std::optional<Type> {
             if (t->is<GenericTypeParamType>()) {
               unsigned index = RewriteContext::getGenericParamIndex(t);
               Term substitution = concreteSymbol.getSubstitutions()[index];
@@ -333,7 +333,7 @@ swift::rewriting::buildTypeDifference(
             }
 
             assert(!t->is<DependentMemberType>());
-            return llvm::None;
+            return std::nullopt;
           });
         }
       }
@@ -342,7 +342,7 @@ swift::rewriting::buildTypeDifference(
       return nextSubstitution(substitutions[index]);
     }
 
-    return llvm::None;
+    return std::nullopt;
   });
 
   auto resultSymbol = [&]() {
@@ -420,12 +420,12 @@ const TypeDifference &RewriteSystem::getTypeDifference(unsigned index) const {
 /// description of the actual transformations.
 bool RewriteSystem::computeTypeDifference(
     Term baseTerm, Symbol lhs, Symbol rhs,
-    llvm::Optional<unsigned> &lhsDifferenceID,
-    llvm::Optional<unsigned> &rhsDifferenceID) {
+    std::optional<unsigned> &lhsDifferenceID,
+    std::optional<unsigned> &rhsDifferenceID) {
   assert(lhs.getKind() == rhs.getKind());
 
-  lhsDifferenceID = llvm::None;
-  rhsDifferenceID = llvm::None;
+  lhsDifferenceID = std::nullopt;
+  rhsDifferenceID = std::nullopt;
 
   // Fast path if there's nothing to do.
   if (lhs == rhs)

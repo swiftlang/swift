@@ -101,7 +101,7 @@ namespace {
     // added before the class fields, and the tail elements themselves
     // come after. We don't make a ClassLayout in this case, only a
     // StructLayout.
-    llvm::Optional<ArrayRef<SILType>> TailTypes;
+    std::optional<ArrayRef<SILType>> TailTypes;
 
     // Normally, Swift only emits static metadata for a class if it has no
     // generic ancestry and no fields with resilient value types, which
@@ -135,7 +135,7 @@ namespace {
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
                        ReferenceCounting refcounting,
                        bool completelyFragileLayout,
-                       llvm::Optional<ArrayRef<SILType>> tailTypes = llvm::None)
+                       std::optional<ArrayRef<SILType>> tailTypes = std::nullopt)
         : StructLayoutBuilder(IGM), TailTypes(tailTypes),
           CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
@@ -671,7 +671,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::ConstantDirect: {
     Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
-    Address memberAddr = element.project(IGF, baseAddr, llvm::None);
+    Address memberAddr = element.project(IGF, baseAddr, std::nullopt);
     // We may need to bitcast the address if the field is of a generic type.
     if (memberAddr.getElementType() != fieldTI.getStorageType())
       memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
@@ -1126,27 +1126,27 @@ namespace {
       }
       return nullptr;
     }
-    llvm::Optional<CanType> getSpecializedGenericType() const {
+    std::optional<CanType> getSpecializedGenericType() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       const ClassPair *classPair;
       if (!(classPair = classUnion->dyn_cast<ClassPair>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       auto &pair = *classPair;
       return pair.second;
     }
 
-    llvm::Optional<StringRef> getObjCImplCategoryName() const {
+    std::optional<StringRef> getObjCImplCategoryName() const {
       if (!TheExtension || !TheExtension->isObjCImplementation())
-        return llvm::None;
+        return std::nullopt;
       if (auto ident = TheExtension->getCategoryNameForObjCImplementation()) {
         assert(!ident->empty());
         return ident->str();
       }
-      return llvm::None;
+      return std::nullopt;
     }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
@@ -1361,7 +1361,7 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      llvm::Optional<CanType> specializedGenericType =
+      std::optional<CanType> specializedGenericType =
           getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
@@ -1603,7 +1603,7 @@ namespace {
       //     const uint8_t *IvarLayout;
       //     ClassMetadata *NonMetaClass;
       // };
-      llvm::Optional<CanType> specializedGenericType;
+      std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
         b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),

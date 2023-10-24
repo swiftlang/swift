@@ -27,7 +27,6 @@
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -150,7 +149,7 @@ public:
       Demangle::ImplParameterConvention calleeConvention,
       ArrayRef<Demangle::ImplFunctionParam<Type>> params,
       ArrayRef<Demangle::ImplFunctionResult<Type>> results,
-      llvm::Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+      std::optional<Demangle::ImplFunctionResult<Type>> errorResult,
       ImplFunctionTypeFlags flags);
 
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
@@ -168,11 +167,11 @@ public:
 
   Type createExistentialMetatypeType(
       Type instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = llvm::None);
+      std::optional<Demangle::ImplMetatypeRepresentation> repr = std::nullopt);
 
   Type createMetatypeType(
       Type instance,
-      llvm::Optional<Demangle::ImplMetatypeRepresentation> repr = llvm::None);
+      std::optional<Demangle::ImplMetatypeRepresentation> repr = std::nullopt);
 
   void pushGenericParams(ArrayRef<std::pair<unsigned, unsigned>> parameterPacks);
   void popGenericParams();
@@ -251,7 +250,7 @@ private:
     SynthesizedByImporter
   };
 
-  llvm::Optional<ForeignModuleKind> getForeignModuleKind(NodePointer node);
+  std::optional<ForeignModuleKind> getForeignModuleKind(NodePointer node);
 
   GenericTypeDecl *findTypeDecl(DeclContext *dc,
                                 Identifier name,

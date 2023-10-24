@@ -27,7 +27,6 @@
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
@@ -574,7 +573,7 @@ public:
 
   /// Return the instruction that defines this value and the appropriate
   /// result index, or None if it is not defined by an instruction.
-  llvm::Optional<DefiningInstructionResult> getDefiningInstructionResult();
+  std::optional<DefiningInstructionResult> getDefiningInstructionResult();
 
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value

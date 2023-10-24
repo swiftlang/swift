@@ -215,7 +215,7 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     return {Unsupported, UnrepresentableObjC};
   if (getActorIsolation(const_cast<ValueDecl *>(VD)).isActorIsolated())
     return {Unsupported, UnrepresentableIsolatedInActor};
-  llvm::Optional<CanGenericSignature> genericSignature;
+  std::optional<CanGenericSignature> genericSignature;
   // Don't expose @_alwaysEmitIntoClient decls as they require their
   // bodies to be emitted into client.
   if (VD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
@@ -283,7 +283,7 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
   // Generic requirements are not yet supported in C++.
   if (genericSignature && !genericSignature->getRequirements().empty())
     return {Unsupported, UnrepresentableGenericRequirements};
-  return {Representable, llvm::None};
+  return {Representable, std::nullopt};
 }
 
 bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,

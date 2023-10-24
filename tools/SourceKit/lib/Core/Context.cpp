@@ -17,8 +17,8 @@
 using namespace SourceKit;
 
 GlobalConfig::Settings GlobalConfig::update(
-    llvm::Optional<unsigned> CompletionMaxASTContextReuseCount,
-    llvm::Optional<unsigned> CompletionCheckDependencyInterval) {
+    std::optional<unsigned> CompletionMaxASTContextReuseCount,
+    std::optional<unsigned> CompletionCheckDependencyInterval) {
   llvm::sys::ScopedLock L(Mtx);
   if (CompletionMaxASTContextReuseCount.has_value())
     State.IDEInspectionOpts.MaxASTContextReuseCount =

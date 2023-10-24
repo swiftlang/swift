@@ -37,26 +37,26 @@
 using namespace swift;
 using namespace swift::ide;
 
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 swift::ide::parseLineCol(StringRef LineCol) {
   unsigned Line, Col;
   size_t ColonIdx = LineCol.find(':');
   if (ColonIdx == StringRef::npos) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
   if (LineCol.substr(0, ColonIdx).getAsInteger(10, Line)) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
   if (LineCol.substr(ColonIdx+1).getAsInteger(10, Col)) {
     llvm::errs() << "wrong pos format, it should be '<line>:<column>'\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   if (Line == 0 || Col == 0) {
     llvm::errs() << "wrong pos format, line/col should start from 1\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   return std::make_pair(Line, Col);
@@ -106,7 +106,7 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
                                      {ASTWalker::ParentTy(),
                                       CharSourceRange(),
                                       {},
-                                      llvm::None,
+                                      std::nullopt,
                                       LabelRangeType::None,
                                       /*isActice*/ true,
                                       /*isInSelector*/ false});
@@ -187,7 +187,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
       // Note the associated call arguments of the semantic initializer call
       // in case we're resolving an explicit initializer call within the
       // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.
-      SWIFT_DEFER { CustomAttrArgList = llvm::None; };
+      SWIFT_DEFER { CustomAttrArgList = std::nullopt; };
       if (Args && !Args->isImplicit())
         CustomAttrArgList = Located<ArgumentList *>(Args, Repr->getLoc());
       if (!Repr->walk(*this))
@@ -246,16 +246,16 @@ ASTWalker::PreWalkAction NameMatcher::walkToDeclPre(Decl *D) {
       LabelRanges = getLabelRanges(ParamList, getSourceMgr());
     }
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
-               LabelRanges, llvm::None);
+               LabelRanges, std::nullopt);
   } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(),
                LabelRangeType::NoncollapsibleParam,
-               getLabelRanges(SD->getIndices(), getSourceMgr()), llvm::None);
+               getLabelRanges(SD->getIndices(), getSourceMgr()), std::nullopt);
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
     if (auto *ParamList = EED->getParameterList()) {
       auto LabelRanges = getEnumParamListInfo(getSourceMgr(), ParamList);
       tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::CallArg,
-                 LabelRanges, llvm::None);
+                 LabelRanges, std::nullopt);
     } else {
       tryResolve(ASTWalker::ParentTy(D), D->getLoc());
     }
@@ -543,7 +543,7 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
       ResolvedLocs.push_back({ASTWalker::ParentTy(),
                               CharSourceRange(),
                               {},
-                              llvm::None,
+                              std::nullopt,
                               LabelRangeType::None,
                               isActive(),
                               isInSelector()});
@@ -611,7 +611,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
   if (NameLoc.isCompound()) {
     auto Labels = getSelectorLabelRanges(getSourceMgr(), NameLoc);
     bool Resolved = tryResolve(Node, NameLoc.getBaseNameLoc(),
-                               LabelRangeType::Selector, Labels, llvm::None);
+                               LabelRangeType::Selector, Labels, std::nullopt);
     if (!isDone()) {
       for (auto Label: Labels) {
         if (tryResolve(Node, Label.getStart())) {
@@ -638,14 +638,14 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc) {
   assert(!isDone());
-  return tryResolve(Node, NameLoc, LabelRangeType::None, llvm::None,
-                    llvm::None);
+  return tryResolve(Node, NameLoc, LabelRangeType::None, std::nullopt,
+                    std::nullopt);
 }
 
 bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                              LabelRangeType RangeType,
                              ArrayRef<CharSourceRange> LabelRanges,
-                             llvm::Optional<unsigned> FirstTrailingLabel) {
+                             std::optional<unsigned> FirstTrailingLabel) {
   skipLocsBefore(NameLoc);
   if (isDone())
     return false;
@@ -675,7 +675,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
         ResolvedLocs.push_back({Node,
                                 NewRange,
                                 {},
-                                llvm::None,
+                                std::nullopt,
                                 LabelRangeType::None,
                                 isActive(),
                                 isInSelector()});
@@ -856,13 +856,13 @@ getCallArgInfo(SourceManager &SM, ArgumentList *Args, LabelRangeEndAt EndKind) {
   return InfoVec;
 }
 
-std::pair<std::vector<CharSourceRange>, llvm::Optional<unsigned>>
+std::pair<std::vector<CharSourceRange>, std::optional<unsigned>>
 swift::ide::getCallArgLabelRanges(SourceManager &SM, ArgumentList *Args,
                                   LabelRangeEndAt EndKind) {
   std::vector<CharSourceRange> Ranges;
   auto InfoVec = getCallArgInfo(SM, Args, EndKind);
 
-  llvm::Optional<unsigned> FirstTrailing;
+  std::optional<unsigned> FirstTrailing;
   auto I = std::find_if(InfoVec.begin(), InfoVec.end(), [](CallArgInfo &Info) {
     return Info.IsTrailingClosure;
   });

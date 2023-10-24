@@ -239,7 +239,7 @@ struct ModuleRebuildInfo {
   };
   struct CandidateModule {
     std::string path;
-    llvm::Optional<serialization::Status> serializationStatus;
+    std::optional<serialization::Status> serializationStatus;
     ModuleKind kind;
     ReasonIgnored reasonIgnored;
     SmallVector<std::string, 10> outOfDateDependencies;
@@ -252,7 +252,7 @@ struct ModuleRebuildInfo {
       if (mod.path == path) return mod;
     }
     candidateModules.push_back({path.str(),
-                                llvm::None,
+                                std::nullopt,
                                 ModuleKind::Normal,
                                 ReasonIgnored::NotIgnored,
                                 {},
@@ -651,13 +651,13 @@ class ModuleInterfaceLoaderImpl {
     return false;
   }
 
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   computePrebuiltModulePath(llvm::SmallString<256> &scratch) {
     namespace path = llvm::sys::path;
 
     // Check if this is a public interface file from the SDK.
     if (!canInterfaceHavePrebuiltModule())
-      return llvm::None;
+      return std::nullopt;
 
     // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
     // $PREBUILT_CACHE/Foo.swiftmodule/arch.swiftmodule. Note that there's no
@@ -677,7 +677,7 @@ class ModuleInterfaceLoaderImpl {
 
     // If there isn't a file at this location, skip returning a path.
     if (!fs.exists(scratch))
-      return llvm::None;
+      return std::nullopt;
 
     return scratch.str();
   }
@@ -685,7 +685,7 @@ class ModuleInterfaceLoaderImpl {
   /// Hack to deal with build systems (including the Swift standard library, at
   /// the time of this comment) that aren't yet using target-specific names for
   /// multi-target swiftmodules, in case the prebuilt cache is.
-  llvm::Optional<StringRef>
+  std::optional<StringRef>
   computeFallbackPrebuiltModulePath(llvm::SmallString<256> &scratch) {
     namespace path = llvm::sys::path;
     StringRef sdkPath = ctx.SearchPathOpts.getSDKPath();
@@ -695,19 +695,19 @@ class ModuleInterfaceLoaderImpl {
         !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                    path::begin(sdkPath), path::end(sdkPath)) ||
         StringRef(interfacePath).endswith(".private.swiftinterface"))
-      return llvm::None;
+      return std::nullopt;
 
     // If the module isn't target-specific, there's no fallback path.
     StringRef inParentDirName =
         path::filename(path::parent_path(interfacePath));
     if (path::extension(inParentDirName) != ".swiftmodule")
-      return llvm::None;
+      return std::nullopt;
 
     // If the interface is already using the target-specific name, there's
     // nothing else to try.
     auto normalizedTarget = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
     if (path::stem(modulePath) == normalizedTarget.str())
-      return llvm::None;
+      return std::nullopt;
 
     // Assemble the expected path:
     // $PREBUILT_CACHE/Foo.swiftmodule/target.swiftmodule. Note that there's no
@@ -719,7 +719,7 @@ class ModuleInterfaceLoaderImpl {
 
     // If there isn't a file at this location, skip returning a path.
     if (!fs.exists(scratch))
-      return llvm::None;
+      return std::nullopt;
 
     return scratch.str();
   }
@@ -807,7 +807,7 @@ class ModuleInterfaceLoaderImpl {
     if (!prebuiltCacheDir.empty()) {
       llvm::SmallString<256> scratch;
       std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
-      llvm::Optional<StringRef> path = computePrebuiltModulePath(scratch);
+      std::optional<StringRef> path = computePrebuiltModulePath(scratch);
       if (!path) {
         // Hack: deal with prebuilds of modules that still use the target-based
         // names.

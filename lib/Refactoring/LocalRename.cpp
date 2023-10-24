@@ -44,9 +44,9 @@ struct RenameRefInfo {
   bool IsArgLabel; ///< Whether Loc is on an arg label, rather than base name.
 };
 
-static llvm::Optional<RefactorAvailabilityInfo>
+static std::optional<RefactorAvailabilityInfo>
 renameAvailabilityInfo(const ValueDecl *VD,
-                       llvm::Optional<RenameRefInfo> RefInfo) {
+                       std::optional<RenameRefInfo> RefInfo) {
   RefactorAvailableKind AvailKind = RefactorAvailableKind::Available;
   if (getRelatedSystemDecl(VD)) {
     AvailKind = RefactorAvailableKind::Unavailable_system_symbol;
@@ -62,7 +62,7 @@ renameAvailabilityInfo(const ValueDecl *VD,
     if (!file)
       return false;
 
-    return file->getFulfilledMacroRole() != llvm::None;
+    return file->getFulfilledMacroRole() != std::nullopt;
   };
 
   if (AvailKind == RefactorAvailableKind::Available) {
@@ -77,22 +77,22 @@ renameAvailabilityInfo(const ValueDecl *VD,
   if (isa<AbstractFunctionDecl>(VD)) {
     // Disallow renaming accessors.
     if (isa<AccessorDecl>(VD))
-      return llvm::None;
+      return std::nullopt;
 
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
-      return llvm::None;
+      return std::nullopt;
 
     // Disallow renaming init with no arguments.
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
-        return llvm::None;
+        return std::nullopt;
 
       if (RefInfo && !RefInfo->IsArgLabel) {
         NameMatcher Matcher(*(RefInfo->SF));
         auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/ true});
         if (Resolved.LabelRanges.empty())
-          return llvm::None;
+          return std::nullopt;
       }
     }
 
@@ -102,13 +102,13 @@ renameAvailabilityInfo(const ValueDecl *VD,
       // whether it's an instance method, so we do the same here for now.
       if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
         if (!FD->getParameters()->size())
-          return llvm::None;
+          return std::nullopt;
 
         if (RefInfo && !RefInfo->IsArgLabel) {
           NameMatcher Matcher(*(RefInfo->SF));
           auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/ true});
           if (Resolved.LabelRanges.empty())
-            return llvm::None;
+            return std::nullopt;
         }
       }
     }
@@ -128,17 +128,17 @@ renameAvailabilityInfo(const ValueDecl *VD,
 /// Given a cursor, return the decl and its rename availability. \c None if
 /// the cursor did not resolve to a decl or it resolved to a decl that we do
 /// not allow renaming on.
-llvm::Optional<RenameInfo>
+std::optional<RenameInfo>
 swift::refactoring::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
   auto valueCursor = dyn_cast<ResolvedValueRefCursorInfo>(cursorInfo);
   if (!valueCursor)
-    return llvm::None;
+    return std::nullopt;
 
   ValueDecl *VD = valueCursor->typeOrValue();
   if (!VD)
-    return llvm::None;
+    return std::nullopt;
 
-  llvm::Optional<RenameRefInfo> refInfo;
+  std::optional<RenameRefInfo> refInfo;
   if (!valueCursor->getShorthandShadowedDecls().empty()) {
     // Find the outermost decl for a shorthand if let/closure capture
     VD = valueCursor->getShorthandShadowedDecls().back();
@@ -147,10 +147,10 @@ swift::refactoring::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
                valueCursor->isKeywordArgument()};
   }
 
-  llvm::Optional<RefactorAvailabilityInfo> info =
+  std::optional<RefactorAvailabilityInfo> info =
       renameAvailabilityInfo(VD, refInfo);
   if (!info)
-    return llvm::None;
+    return std::nullopt;
 
   return RenameInfo{VD, *info};
 }
@@ -208,7 +208,7 @@ private:
     return true;
   }
 
-  llvm::Optional<RenameLoc>
+  std::optional<RenameLoc>
   indexSymbolToRenameLoc(const index::IndexSymbol &symbol, StringRef NewName);
 
 private:
@@ -218,11 +218,11 @@ private:
   std::vector<RenameLoc> locations;
 };
 
-llvm::Optional<RenameLoc>
+std::optional<RenameLoc>
 RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
                                              StringRef newName) {
   if (symbol.roles & (unsigned)index::SymbolRole::Implicit) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   NameUsage usage = NameUsage::Unknown;
@@ -264,7 +264,7 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
 
 bool RefactoringActionLocalRename::isApplicable(
     ResolvedCursorInfoPtr CursorInfo, DiagnosticEngine &Diag) {
-  llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
+  std::optional<RenameInfo> Info = getRenameInfo(CursorInfo);
   return Info &&
          Info->Availability.AvailableKind == RefactorAvailableKind::Available &&
          Info->Availability.Kind == RefactoringKind::LocalRename;
@@ -296,7 +296,7 @@ static void analyzeRenameScope(ValueDecl *VD,
   Scopes.push_back(Scope);
 }
 
-static llvm::Optional<RenameRangeCollector>
+static std::optional<RenameRangeCollector>
 localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
              DiagnosticEngine &diags) {
   auto cursorInfo =
@@ -304,10 +304,10 @@ localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
                         CursorInfoRequest{CursorInfoOwner(SF, startLoc)},
                         new ResolvedCursorInfo());
 
-  llvm::Optional<RenameInfo> info = getRenameInfo(cursorInfo);
+  std::optional<RenameInfo> info = getRenameInfo(cursorInfo);
   if (!info) {
     diags.diagnose(startLoc, diag::unresolved_location);
-    return llvm::None;
+    return std::nullopt;
   }
 
   switch (info->Availability.AvailableKind) {
@@ -315,28 +315,28 @@ localRenames(SourceFile *SF, SourceLoc startLoc, StringRef preferredName,
     break;
   case RefactorAvailableKind::Unavailable_system_symbol:
     diags.diagnose(startLoc, diag::decl_is_system_symbol, info->VD->getName());
-    return llvm::None;
+    return std::nullopt;
   case RefactorAvailableKind::Unavailable_has_no_location:
     diags.diagnose(startLoc, diag::value_decl_no_loc, info->VD->getName());
-    return llvm::None;
+    return std::nullopt;
   case RefactorAvailableKind::Unavailable_has_no_name:
     diags.diagnose(startLoc, diag::decl_has_no_name);
-    return llvm::None;
+    return std::nullopt;
   case RefactorAvailableKind::Unavailable_has_no_accessibility:
     diags.diagnose(startLoc, diag::decl_no_accessibility);
-    return llvm::None;
+    return std::nullopt;
   case RefactorAvailableKind::Unavailable_decl_from_clang:
     diags.diagnose(startLoc, diag::decl_from_clang);
-    return llvm::None;
+    return std::nullopt;
   case RefactorAvailableKind::Unavailable_decl_in_macro:
     diags.diagnose(startLoc, diag::decl_in_macro);
-    return llvm::None;
+    return std::nullopt;
   }
 
   SmallVector<DeclContext *, 8> scopes;
   analyzeRenameScope(info->VD, scopes);
   if (scopes.empty())
-    return llvm::None;
+    return std::nullopt;
 
   RenameRangeCollector rangeCollector(info->VD, preferredName);
   for (DeclContext *DC : scopes)
@@ -360,7 +360,7 @@ bool RefactoringActionLocalRename::performChange() {
     return true;
   }
 
-  llvm::Optional<RenameRangeCollector> rangeCollector =
+  std::optional<RenameRangeCollector> rangeCollector =
       localRenames(TheFile, StartLoc, PreferredName, DiagEngine);
   if (!rangeCollector)
     return true;
@@ -381,7 +381,7 @@ int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-  llvm::Optional<RenameRangeCollector> RangeCollector =
+  std::optional<RenameRangeCollector> RangeCollector =
       localRenames(SF, StartLoc, StringRef(), Diags);
   if (!RangeCollector)
     return true;

@@ -14,7 +14,6 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DISTRIBUTED_ACTOR_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "swift/AST/Decl.h"
 #include <utility>
 
@@ -51,8 +50,8 @@ SILValue refDistributedActorSystem(SILBuilder &B,
 void emitDistributedActorSystemWitnessCall(
     SILBuilder &B, SILLocation loc, DeclName methodName,
     SILValue base, SILType actorType, llvm::ArrayRef<SILValue> args,
-    llvm::Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
-        llvm::None);
+    std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
+        std::nullopt);
 
 /// Emits code that notifies the distributed actor's actorSystem that the
 /// actor is ready for execution.

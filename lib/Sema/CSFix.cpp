@@ -38,10 +38,10 @@ using namespace constraints;
 
 ConstraintFix::~ConstraintFix() {}
 
-llvm::Optional<ScoreKind> ConstraintFix::impact() const {
+std::optional<ScoreKind> ConstraintFix::impact() const {
   switch (fixBehavior) {
   case FixBehavior::AlwaysWarning:
-    return llvm::None;
+    return std::nullopt;
 
   case FixBehavior::Error:
     return SK_Fix;
@@ -50,7 +50,7 @@ llvm::Optional<ScoreKind> ConstraintFix::impact() const {
     return SK_DisfavoredOverload;
 
   case FixBehavior::Suppress:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -249,7 +249,7 @@ bool MarkGlobalActorFunction::diagnose(const Solution &solution,
 }
 
 /// The fix behavior to apply to a concurrency-related diagnostic.
-static llvm::Optional<FixBehavior>
+static std::optional<FixBehavior>
 getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
                           ConstraintLocatorBuilder locator, bool forSendable) {
   // We can only handle the downgrade for conversions.
@@ -261,7 +261,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
 
   default:
     if (!cs.shouldAttemptFixes())
-      return llvm::None;
+      return std::nullopt;
 
     return FixBehavior::Error;
   }
@@ -552,7 +552,7 @@ AllowWrappedValueMismatch *AllowWrappedValueMismatch::create(ConstraintSystem &c
 ///
 /// \returns A tuple containing the contextual type purpose, the source type,
 /// and the contextual type.
-static llvm::Optional<std::tuple<ContextualTypePurpose, Type, Type>>
+static std::optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
   if (auto contextualTypeElt =
           locator->findLast<LocatorPathElt::ContextualType>()) {
@@ -592,7 +592,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
                            solution.getType(assignExpr->getSrc()),
                            solution.getType(assignExpr->getDest())->getRValueType());
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AllowTupleTypeMismatch::coalesceAndDiagnose(
@@ -638,7 +638,7 @@ bool AllowTupleTypeMismatch::diagnose(const Solution &solution,
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator,
-                               llvm::Optional<unsigned> index) {
+                               std::optional<unsigned> index) {
   return new (cs.getAllocator())
       AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
 }
@@ -2494,11 +2494,11 @@ bool AddExplicitExistentialCoercion::diagnose(const Solution &solution,
 
 bool AddExplicitExistentialCoercion::isRequired(
     ConstraintSystem &cs, Type resultTy,
-    llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
+    llvm::function_ref<std::optional<Type>(TypeVariableType *)>
         findExistentialType,
     ConstraintLocatorBuilder locator) {
   using ExistentialTypeFinder =
-      llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>;
+      llvm::function_ref<std::optional<Type>(TypeVariableType *)>;
 
   struct CoercionChecker : public TypeWalker {
     bool RequiresCoercion = false;
@@ -2716,14 +2716,14 @@ bool AddExplicitExistentialCoercion::isRequired(
     ConstraintLocatorBuilder locator) {
   return isRequired(
       cs, resultTy,
-      [&](TypeVariableType *typeVar) -> llvm::Optional<Type> {
+      [&](TypeVariableType *typeVar) -> std::optional<Type> {
         auto opened =
             llvm::find_if(openedExistentials, [&typeVar](const auto &entry) {
               return typeVar == entry.first;
             });
 
         if (opened == openedExistentials.end())
-          return llvm::None;
+          return std::nullopt;
 
         return opened->second->getExistentialType();
       },

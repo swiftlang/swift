@@ -86,7 +86,7 @@ private:
   SILModule *M;
 
   /// A cache that maps a protocol to its conformances.
-  llvm::Optional<ProtocolConformanceMap> ProtocolConformanceCache;
+  std::optional<ProtocolConformanceMap> ProtocolConformanceCache;
 
   /// A cache that holds SoleConformingType for protocols.
   SoleConformingTypeMap SoleConformingTypeCache;

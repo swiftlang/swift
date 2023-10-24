@@ -19,7 +19,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -40,12 +39,12 @@ StringRef platformString(PlatformKind platform);
   
 /// Returns the platform kind corresponding to the passed-in short platform name
 /// or None if such a platform kind does not exist.
-llvm::Optional<PlatformKind> platformFromString(StringRef Name);
+std::optional<PlatformKind> platformFromString(StringRef Name);
 
 /// Returns a valid platform string that is closest to the candidate string
 /// based on edit distance. Returns \c None if the closest valid platform
 /// distance is not within a minimum threshold.
-llvm::Optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
+std::optional<StringRef> closestCorrectedPlatformString(StringRef candidate);
 
 /// Returns a human-readable version of the platform name as a string, suitable
 /// for emission in diagnostics (e.g., "macOS").

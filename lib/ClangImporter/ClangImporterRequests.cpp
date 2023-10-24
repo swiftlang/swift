@@ -21,7 +21,7 @@
 
 using namespace swift;
 
-llvm::Optional<ObjCInterfaceAndImplementation>
+std::optional<ObjCInterfaceAndImplementation>
 ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   auto passedDecl = std::get<0>(getStorage());
   if (!passedDecl)
@@ -32,7 +32,7 @@ ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   // !cachedDecl means that no decl has been cached and we need to evaluate the
   // request.
   if (!cachedDecl)
-    return llvm::None;
+    return std::nullopt;
 
   // nullptr cachedDecl means that the lack of a decl was cached.
   else if (!*cachedDecl)

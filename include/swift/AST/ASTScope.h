@@ -37,7 +37,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceManager.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -155,7 +154,7 @@ private:
   /// Child scopes, sorted by source range.
   Children storedChildren;
 
-  mutable llvm::Optional<CharSourceRange> cachedCharSourceRange;
+  mutable std::optional<CharSourceRange> cachedCharSourceRange;
 
 #pragma mark - constructor / destructor
 public:
@@ -939,11 +938,11 @@ public:
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
   const bool isLocalBinding;
-  llvm::Optional<SourceLoc> endLoc;
+  std::optional<SourceLoc> endLoc;
 
 public:
   PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
-                        bool isLocalBinding, llvm::Optional<SourceLoc> endLoc)
+                        bool isLocalBinding, std::optional<SourceLoc> endLoc)
       : AbstractPatternEntryScope(pbDecl, entryIndex),
         isLocalBinding(isLocalBinding), endLoc(endLoc) {}
   virtual ~PatternEntryDeclScope() {}

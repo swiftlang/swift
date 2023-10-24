@@ -48,7 +48,7 @@ SemaTest::SemaTest()
       ModuleDecl::create(Context.getIdentifier("SemaTests"), Context);
 
   MainFile = new (Context) SourceFile(*module, SourceFileKind::Main,
-                                      /*buffer=*/llvm::None);
+                                      /*buffer=*/std::nullopt);
 
   AttributedImport<ImportedModule> stdlibImport{{ImportPath::Access(), stdlib},
                                                 /*options=*/{}};

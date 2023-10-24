@@ -632,7 +632,7 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   return cast<TypeAliasDecl>(TD)->getDeclaredInterfaceType();
 }
 
-static llvm::Optional<KnownProtocolKind>
+static std::optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
   if (protocol == TypeChecker::getProtocol(protocol->getASTContext(),          \
@@ -642,7 +642,7 @@ getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
 #include "swift/AST/KnownProtocols.def"
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {

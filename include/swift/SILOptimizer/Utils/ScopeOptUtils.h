@@ -20,7 +20,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILValue.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include <functional>
 
@@ -40,7 +39,7 @@ struct Cleanup {
 template <typename Result, typename... Args>
 class AssertingScope {
   using ScopeCleanup = Cleanup<Result, Args...>;
-  SmallVector<llvm::Optional<ScopeCleanup>, 64> cleanups;
+  SmallVector<std::optional<ScopeCleanup>, 64> cleanups;
   bool didPop = false;
 
 protected:
@@ -62,7 +61,7 @@ protected:
   void invalidateCleanup(unsigned cleanupIndex) {
     assert(!didPop && "Should not invalidate once popped?!");
     assert(cleanups[cleanupIndex].has_value());
-    cleanups[cleanupIndex] = llvm::None;
+    cleanups[cleanupIndex] = std::nullopt;
   }
 
   /// Pop the scope, running all non-Optional cleanups, and setting didPop. Once
@@ -144,7 +143,7 @@ class ScopedValue {
 
   /// The index in our parent scope object of our cleanup. This is used to
   /// enable invalidation.
-  llvm::Optional<unsigned> scopeIndex;
+  std::optional<unsigned> scopeIndex;
 
   /// The underlying SILValue that we are working with.
   SILValue value;
@@ -156,7 +155,7 @@ class ScopedValue {
 
   /// A scoped value that does not have an associated cleanup in the scope.
   ScopedValue(SILOptScopeBase &scope, SILValue value)
-      : scope(&scope), scopeIndex(llvm::None), value(value) {}
+      : scope(&scope), scopeIndex(std::nullopt), value(value) {}
 
 public:
   /// Default empty constructor. Should be used in combination with operator

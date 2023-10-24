@@ -17,7 +17,6 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 
 namespace swift {
@@ -134,7 +133,7 @@ public:
 
   /// Returns the narrowest access scope if this and the specified access scope
   /// have common intersection, or None if scopes don't intersect.
-  const llvm::Optional<AccessScope>
+  const std::optional<AccessScope>
   intersectWith(AccessScope accessScope) const {
     if (hasEqualDeclContextWith(accessScope)) {
       if (isPrivate())
@@ -146,7 +145,7 @@ public:
     if (accessScope.isChildOf(*this))
       return accessScope;
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   SWIFT_DEBUG_DUMP;

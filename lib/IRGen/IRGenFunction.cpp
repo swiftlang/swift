@@ -42,7 +42,7 @@ static llvm::cl::opt<bool> EnableTrapDebugInfo(
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
-                             llvm::Optional<SILLocation> DbgLoc)
+                             std::optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
       OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {

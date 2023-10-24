@@ -67,7 +67,7 @@ namespace mocking_fine_grained_dependency_graphs {
 void simulateLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
-    llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
+    std::optional<Fingerprint> interfaceHashIfNonEmpty = std::nullopt,
     const bool hadCompilationError = false);
 
 /// Same as \ref simulateLoad, but returns the specifically changed nodes or
@@ -76,7 +76,7 @@ void simulateLoad(
 ModuleDepGraph::Changes getChangesForSimulatedLoad(
     ModuleDepGraph &g, const driver::Job *cmd,
     const DependencyDescriptions &dependencyDescriptions,
-    llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
+    std::optional<Fingerprint> interfaceHashIfNonEmpty = std::nullopt,
     const bool hadCompilationError = false);
 
 /// Simulates the driver reloading a swiftdeps file after a job has run.
@@ -88,7 +88,7 @@ ModuleDepGraph::Changes getChangesForSimulatedLoad(
 std::vector<const driver::Job *>
 simulateReload(ModuleDepGraph &g, const driver::Job *cmd,
                const DependencyDescriptions &dependencyDescriptions,
-               llvm::Optional<Fingerprint> interfaceHashIfNonEmpty = llvm::None,
+               std::optional<Fingerprint> interfaceHashIfNonEmpty = std::nullopt,
                const bool hadCompilationError = false);
 
 std::vector<const driver::Job *>
@@ -98,12 +98,12 @@ printJobsForDebugging(const std::vector<const driver::Job *> &jobs);
 } // namespace fine_grained_dependencies
 
 /// Aborts if unconvertible, returns \c None for an empty string.
-inline llvm::Optional<Fingerprint>
+inline std::optional<Fingerprint>
 mockFingerprintFromString(llvm::StringRef value) {
   auto contents = value.str();
   const auto n = value.size();
   if (n == 0 || n > Fingerprint::DIGEST_LENGTH)
-    return llvm::None;
+    return std::nullopt;
   // Insert at start so that "1" and "10" are distinct
   contents.insert(0, Fingerprint::DIGEST_LENGTH - n, '0');
   auto fingerprint = Fingerprint::fromString(contents);

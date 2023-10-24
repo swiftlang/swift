@@ -52,7 +52,7 @@ public:
   constexpr OptionSet() : Storage() {}
 
   /// Create an empty option set.
-  constexpr OptionSet(llvm::NoneType) : Storage() {}
+  constexpr OptionSet(std::nullopt_t) : Storage() {}
 
   /// Create an option set with only the given option set.
   constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}

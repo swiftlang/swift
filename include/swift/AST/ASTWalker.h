@@ -14,7 +14,6 @@
 #define SWIFT_AST_ASTWALKER_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/PointerUnion.h"
 #include <utility>
@@ -48,17 +47,17 @@ enum class SemaReferenceKind : uint8_t {
 
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
-  llvm::Optional<AccessKind> AccKind;
+  std::optional<AccessKind> AccKind;
   bool isImplicit = false;
   bool isImplicitCtorType = false;
 
   /// When non-none, this is a custom attribute reference.
-  llvm::Optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
+  std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
 
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
+  ReferenceMetaData(SemaReferenceKind Kind, std::optional<AccessKind> AccKind,
                     bool isImplicit = false,
-                    llvm::Optional<std::pair<const CustomAttr *, Decl *>>
-                        customAttrRef = llvm::None)
+                    std::optional<std::pair<const CustomAttr *, Decl *>>
+                        customAttrRef = std::nullopt)
       : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
         CustomAttrRef(customAttrRef) {}
 };
@@ -320,7 +319,7 @@ public:
   template <typename T>
   struct PreWalkResult {
     PreWalkAction Action;
-    llvm::Optional<T> Value;
+    std::optional<T> Value;
 
     template <typename U,
               typename std::enable_if<std::is_convertible<U, T>::value>::type
@@ -354,7 +353,7 @@ public:
           Value(std::move(Result.Value)) {}
 
     PreWalkResult(_Detail::StopWalkAction)
-        : Action(PreWalkAction::Stop), Value(llvm::None) {}
+        : Action(PreWalkAction::Stop), Value(std::nullopt) {}
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
@@ -365,7 +364,7 @@ public:
   template <typename T>
   struct PostWalkResult {
     PostWalkAction Action;
-    llvm::Optional<T> Value;
+    std::optional<T> Value;
 
     template <typename U,
               typename std::enable_if<std::is_convertible<U, T>::value>::type
@@ -393,7 +392,7 @@ public:
           Value(std::move(Result.Value)) {}
 
     PostWalkResult(_Detail::StopWalkAction)
-        : Action(PostWalkAction::Stop), Value(llvm::None) {}
+        : Action(PostWalkAction::Stop), Value(std::nullopt) {}
   };
 
   /// This method is called when first visiting an expression

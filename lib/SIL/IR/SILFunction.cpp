@@ -31,7 +31,6 @@
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/BridgingUtils.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -95,7 +94,7 @@ void SILFunction::removeSpecializeAttr(SILSpecializeAttr *attr) {
 SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    llvm::Optional<SILLocation> loc, IsBare_t isBareSILFunction,
+    std::optional<SILLocation> loc, IsBare_t isBareSILFunction,
     IsTransparent_t isTrans, IsSerialized_t isSerialized,
     ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
     IsDistributed_t isDistributed, IsRuntimeAccessible_t isRuntimeAccessible,

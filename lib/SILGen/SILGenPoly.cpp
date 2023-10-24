@@ -790,7 +790,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // If we're emitting to memory, project out this element in the
     // destination buffer, then wrap that in an Initialization to
     // track the cleanup.
-    llvm::Optional<TemporaryInitialization> outputEltTemp;
+    std::optional<TemporaryInitialization> outputEltTemp;
     if (outputAddr) {
       SILValue outputEltAddr =
         SGF.B.createTupleElementAddr(Loc, outputAddr, index);
@@ -4637,7 +4637,7 @@ void ResultPlanner::execute(SmallVectorImpl<SILValue> &innerDirectResultStack,
 
     // Set up the context into which to emit the outer result.
     SGFContext outerResultCtxt;
-    llvm::Optional<TemporaryInitialization> outerResultInit;
+    std::optional<TemporaryInitialization> outerResultInit;
     SILType outerResultTy;
     if (outerIsIndirect) {
       outerResultTy = op.OuterResultAddr->getType();
@@ -6138,7 +6138,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   // Collect the arguments to the implementation.
   SmallVector<SILValue, 8> args;
 
-  llvm::Optional<ResultPlanner> resultPlanner;
+  std::optional<ResultPlanner> resultPlanner;
 
   if (coroutineKind == SILCoroutineKind::None) {
     // First, indirect results.
@@ -6379,7 +6379,7 @@ void SILGenFunction::emitProtocolWitness(
     AbstractionPattern reqtOrigTy, CanAnyFunctionType reqtSubstTy,
     SILDeclRef requirement, SubstitutionMap reqtSubs, SILDeclRef witness,
     SubstitutionMap witnessSubs, IsFreeFunctionWitness_t isFree,
-    bool isSelfConformance, llvm::Optional<ActorIsolation> enterIsolation) {
+    bool isSelfConformance, std::optional<ActorIsolation> enterIsolation) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
   F.setBare(IsBare);
@@ -6405,7 +6405,7 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    llvm::Optional<ManagedValue> actorSelf;
+    std::optional<ManagedValue> actorSelf;
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
@@ -6523,7 +6523,7 @@ void SILGenFunction::emitProtocolWitness(
   // Collect the arguments.
   SmallVector<SILValue, 8> args;
 
-  llvm::Optional<ResultPlanner> resultPlanner;
+  std::optional<ResultPlanner> resultPlanner;
   if (coroutineKind == SILCoroutineKind::None) {
     //   - indirect results
     resultPlanner.emplace(*this, loc, thunkIndirectResults, args);

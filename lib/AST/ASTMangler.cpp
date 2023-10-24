@@ -306,10 +306,10 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
-      sub = sub.transformRec([](Type t) -> llvm::Optional<Type> {
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
           return openedExistential->getInterfaceType();
-        return llvm::None;
+        return std::nullopt;
       });
 
       appendType(sub->getCanonicalType(), signature);
@@ -340,10 +340,10 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
 
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
-      sub = sub.transformRec([](Type t) -> llvm::Optional<Type> {
+      sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
           return openedExistential->getInterfaceType();
-        return llvm::None;
+        return std::nullopt;
       });
 
       appendType(sub->getCanonicalType(), signature);
@@ -444,7 +444,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
     CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
-    llvm::Optional<bool> ErrorOnZero, bool predefined) {
+    std::optional<bool> ErrorOnZero, bool predefined) {
   beginMangling();
   appendType(BlockType, Sig);
   appendType(ResultType, Sig);
@@ -982,18 +982,18 @@ static StringRef getPrivateDiscriminatorIfNecessary(const Decl *decl) {
 /// specified name.
 ///
 /// \param useObjCProtocolNames When false, always returns \c None.
-static llvm::Optional<std::string>
+static std::optional<std::string>
 getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
                                    bool useObjCProtocolNames) {
   if (!useObjCProtocolNames)
-    return llvm::None;
+    return std::nullopt;
 
   auto proto = dyn_cast<ProtocolDecl>(decl);
   if (!proto)
-    return llvm::None;
+    return std::nullopt;
 
   if (!proto->isObjC())
-    return llvm::None;
+    return std::nullopt;
 
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = proto->getAttrs().getAttribute<ObjCAttr>()) {
@@ -1003,7 +1003,7 @@ getOverriddenSwiftProtocolObjCName(const ValueDecl *decl,
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl, DeclBaseName name) {
@@ -1929,11 +1929,11 @@ void ASTMangler::appendSymbolicExtendedExistentialType(
   appendOperator("Xj");
 }
 
-static llvm::Optional<char>
+static std::optional<char>
 getParamDifferentiability(SILParameterDifferentiability diffKind) {
   switch (diffKind) {
   case swift::SILParameterDifferentiability::DifferentiableOrNotApplicable:
-    return llvm::None;
+    return std::nullopt;
   case swift::SILParameterDifferentiability::NotDifferentiable:
     return 'w';
   }
@@ -1952,11 +1952,11 @@ static char getResultConvention(ResultConvention conv) {
   llvm_unreachable("bad result convention");
 }
 
-static llvm::Optional<char>
+static std::optional<char>
 getResultDifferentiability(SILResultDifferentiability diffKind) {
   switch (diffKind) {
   case swift::SILResultDifferentiability::DifferentiableOrNotApplicable:
-    return llvm::None;
+    return std::nullopt;
   case swift::SILResultDifferentiability::NotDifferentiable:
     return 'w';
   }
@@ -2171,7 +2171,7 @@ void ASTMangler::appendOpaqueTypeArchetype(ArchetypeType *archetype,
   addTypeSubstitution(Type(archetype), sig);
 }
 
-llvm::Optional<ASTMangler::SpecialContext>
+std::optional<ASTMangler::SpecialContext>
 ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
                                       bool useObjCProtocolNames) {
   // Declarations provided by a C module have a special context mangling.
@@ -2216,7 +2216,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         // a C++ record, simply treat it like a namespace and exit early.
         if (isa<clang::NamespaceDecl>(clangDC) ||
             isa<clang::CXXRecordDecl>(clangDC))
-          return llvm::None;
+          return std::nullopt;
         assert(clangDC->getRedeclContext()->isTranslationUnit() &&
                "non-top-level Clang types not supported yet");
         return ASTMangler::ObjCContext;
@@ -2237,7 +2237,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
   if (decl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>())
     return ASTMangler::ClangImporterContext;
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Mangle the context of the given declaration as a <context.
@@ -2300,7 +2300,7 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static llvm::Optional<VarDecl *>
+static std::optional<VarDecl *>
 findFirstVariable(PatternBindingDecl *binding) {
   for (auto idx : range(binding->getNumPatternEntries())) {
     auto var = FindFirstVariable().visit(binding->getPattern(idx));
@@ -2308,7 +2308,7 @@ findFirstVariable(PatternBindingDecl *binding) {
   }
   // Pattern-binding bound without variables exists in erroneous code, e.g.
   // during code completion.
-  return llvm::None;
+  return std::nullopt;
 }
 
 void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) {

@@ -505,7 +505,7 @@ const ProtocolDecl *Symbol::getRootProtocol() const {
 ///   the protocols.
 ///
 /// All other symbol kinds are incomparable, in which case we return None.
-llvm::Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
+std::optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
   // Exit early if the symbols are equal.
   if (Ptr == other.Ptr)
     return 0;
@@ -576,7 +576,7 @@ llvm::Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
         auto term = getSubstitutions()[i];
         auto otherTerm = other.getSubstitutions()[i];
 
-        llvm::Optional<int> result = term.compare(otherTerm, ctx);
+        std::optional<int> result = term.compare(otherTerm, ctx);
         if (!result.has_value() || *result != 0)
           return result;
       }
@@ -585,7 +585,7 @@ llvm::Optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
     }
 
     // We don't support comparing arbitrary concrete types.
-    return llvm::None;
+    return std::nullopt;
   }
   }
 

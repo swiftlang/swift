@@ -219,7 +219,7 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
 
   if (shouldCheckDependencies()) {
     if (areAnyDependentFilesInvalidated(
-            *CI, *FS, /*excludeBufferID=*/llvm::None,
+            *CI, *FS, /*excludeBufferID=*/std::nullopt,
             DependencyCheckedTimestamp, InMemoryDependencyHash)) {
       return true;
     }
@@ -345,7 +345,7 @@ bool CompileInstance::performSema(
   CachedArgHash = ArgsHash;
   CachedReuseCount = 0;
   InMemoryDependencyHash.clear();
-  cacheDependencyHashIfNeeded(*CI, /*excludeBufferID=*/llvm::None,
+  cacheDependencyHashIfNeeded(*CI, /*excludeBufferID=*/std::nullopt,
                               InMemoryDependencyHash);
 
   // Perform!

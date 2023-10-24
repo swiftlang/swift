@@ -158,7 +158,7 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 
 const clang::Type *
 ClangTypeConverter::getFunctionType(ArrayRef<SILParameterInfo> params,
-                                    llvm::Optional<SILResultInfo> result,
+                                    std::optional<SILResultInfo> result,
                                     SILFunctionType::Representation repr) {
 
   // Using the interface type is sufficient as type parameters get mapped to
@@ -674,8 +674,8 @@ clang::QualType ClangTypeConverter::visitSILFunctionType(SILFunctionType *type) 
                         : repr);
     auto results = type->getResults();
     auto optionalResult = results.empty()
-                              ? llvm::None
-                              : llvm::Optional<SILResultInfo>(results[0]);
+                              ? std::nullopt
+                              : std::optional<SILResultInfo>(results[0]);
     clangTy = getFunctionType(type->getParameters(), optionalResult, newRepr);
   }
   return clang::QualType(clangTy, 0);

@@ -33,7 +33,7 @@ namespace swift {
 template <typename T, typename Initializer = std::function<T()>>
 class LazyValue {
   Initializer Init;
-  llvm::Optional<T> Value;
+  std::optional<T> Value;
 
 public:
   LazyValue(Initializer Init) : Init(Init){};

@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
-#include "llvm/ADT/Optional.h"
 #include <vector>
 
 namespace swift {
@@ -31,7 +30,7 @@ bool compareKeyAgainstDefaultKey(const std::pair<KeyT, ValueT> &Pair) {
 template <typename KeyT, typename ValueT,
           typename MapT = llvm::DenseMap<KeyT, size_t>,
           typename VectorT =
-              std::vector<llvm::Optional<std::pair<KeyT, ValueT>>>>
+              std::vector<std::optional<std::pair<KeyT, ValueT>>>>
 class BlotMapVector {
   /// Map keys to indices in Vector.
   MapT Map;
@@ -127,7 +126,7 @@ public:
     typename MapT::iterator It = Map.find(Key);
     if (It == Map.end())
       return false;
-    Vector[It->second] = llvm::None;
+    Vector[It->second] = std::nullopt;
     Map.erase(It);
     return true;
   }
@@ -163,7 +162,7 @@ public:
 template <typename KeyT, typename ValueT, unsigned N,
           typename MapT = llvm::SmallDenseMap<KeyT, size_t, N>,
           typename VectorT =
-              llvm::SmallVector<llvm::Optional<std::pair<KeyT, ValueT>>, N>>
+              llvm::SmallVector<std::optional<std::pair<KeyT, ValueT>>, N>>
 class SmallBlotMapVector : public BlotMapVector<KeyT, ValueT, MapT, VectorT> {
 public:
   SmallBlotMapVector() {}

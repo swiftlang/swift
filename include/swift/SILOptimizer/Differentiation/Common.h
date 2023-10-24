@@ -143,7 +143,7 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
   return nullptr;
 }
 
-llvm::Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue);
 
 //===----------------------------------------------------------------------===//
@@ -228,7 +228,7 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
 /// \param minimalASTParameterIndices is an output parameter that is set to the
 /// AST indices of the minimal configuration, or to `nullptr` if no such
 /// configuration exists.
-llvm::Optional<AutoDiffConfig>
+std::optional<AutoDiffConfig>
 findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
                                    IndexSubset *parameterIndices,
                                    IndexSubset *&minimalASTParameterIndices);

@@ -36,7 +36,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
-  mutable llvm::Optional<ArrayRef<ImportedModule>> importedModulesForLookup;
+  mutable std::optional<ArrayRef<ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ASTSourceDescriptor ASTSourceDescriptor;
 
@@ -121,7 +121,7 @@ public:
 
   /// Returns the ASTSourceDescriptor of the associated Clang module if one
   /// exists.
-  llvm::Optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
+  std::optional<clang::ASTSourceDescriptor> getASTSourceDescriptor() const;
 
   virtual StringRef getModuleDefiningPath() const override;
 

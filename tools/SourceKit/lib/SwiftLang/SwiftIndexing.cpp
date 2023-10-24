@@ -229,7 +229,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, llvm::None, /*moduleInterfacePath=*/"",
+    auto FUnit = Loader->loadAST(*Mod, std::nullopt, /*moduleInterfacePath=*/"",
                                  /*moduleInterfaceSourcePath=*/"",
                                  std::move(Buf), nullptr, nullptr,
                                  /*isFramework=*/false);

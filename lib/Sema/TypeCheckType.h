@@ -234,7 +234,7 @@ public:
   TypeResolutionOptions(Context context) : base(context), context(context),
       flags(unsigned(TypeResolutionFlags::Direct)) {}
   // Helper forwarding constructors:
-  TypeResolutionOptions(llvm::NoneType) : TypeResolutionOptions(Context::None){}
+  TypeResolutionOptions(std::nullopt_t) : TypeResolutionOptions(Context::None){}
 
   /// Test the current type resolution base context.
   bool hasBase(Context context) const { return base == context; }
@@ -252,7 +252,7 @@ public:
     context = newContext;
     flags &= ~unsigned(TypeResolutionFlags::Direct);
   }
-  void setContext(llvm::NoneType) { setContext(Context::None); }
+  void setContext(std::nullopt_t) { setContext(Context::None); }
 
   /// Get the current flags.
   TypeResolutionFlags getFlags() const { return TypeResolutionFlags(flags); }
@@ -472,7 +472,7 @@ public:
   /// Strip the contextual options from the given type resolution options.
   inline TypeResolutionOptions withoutContext(bool preserveSIL = false) const {
     auto copy = *this;
-    copy.setContext(llvm::None);
+    copy.setContext(std::nullopt);
     // FIXME: Move SILType to TypeResolverContext.
     if (!preserveSIL) copy -= TypeResolutionFlags::SILType;
     return copy;

@@ -39,9 +39,9 @@ class ModuleDependenciesCacheDeserializer {
   bool readMetadata();
   bool readGraph(SwiftDependencyScanningService &cache);
 
-  llvm::Optional<std::string> getIdentifier(unsigned n);
-  llvm::Optional<std::vector<std::string>> getStringArray(unsigned n);
-  llvm::Optional<std::vector<ModuleDependencyID>> getModuleDependencyIDArray(unsigned n);
+  std::optional<std::string> getIdentifier(unsigned n);
+  std::optional<std::vector<std::string>> getStringArray(unsigned n);
+  std::optional<std::vector<ModuleDependencyID>> getModuleDependencyIDArray(unsigned n);
 
 public:
   ModuleDependenciesCacheDeserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
@@ -154,9 +154,9 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
   bool hasCurrentModule = false;
   std::string currentModuleName;
   unsigned currentContextHashID;
-  llvm::Optional<std::vector<std::string>> currentModuleImports;
-  llvm::Optional<std::vector<std::string>> currentOptionalModuleImports;
-  llvm::Optional<std::vector<ModuleDependencyID>> currentModuleDependencyIDs;
+  std::optional<std::vector<std::string>> currentModuleImports;
+  std::optional<std::vector<std::string>> currentOptionalModuleImports;
+  std::optional<std::vector<ModuleDependencyID>> currentModuleDependencyIDs;
 
   auto getContextHash = [&]() {
     assert(currentContextHashID &&
@@ -258,7 +258,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(SwiftDependencyScanningServi
       auto outputModulePath = getIdentifier(outputPathFileID);
       if (!outputModulePath)
          llvm::report_fatal_error("Bad .swiftmodule output path");
-      llvm::Optional<std::string> optionalSwiftInterfaceFile;
+      std::optional<std::string> optionalSwiftInterfaceFile;
       if (interfaceFileID != 0) {
         auto swiftInterfaceFile = getIdentifier(interfaceFileID);
         if (!swiftInterfaceFile)
@@ -641,24 +641,24 @@ bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
   return false;
 }
 
-llvm::Optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(unsigned n) {
+std::optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(unsigned n) {
   if (n == 0)
     return std::string();
 
   --n;
   if (n >= Identifiers.size())
-    return llvm::None;
+    return std::nullopt;
 
   return Identifiers[n];
 }
 
-llvm::Optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::getStringArray(unsigned n) {
+std::optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::getStringArray(unsigned n) {
   if (n == 0)
     return std::vector<std::string>();
 
   --n;
   if (n >= ArraysOfIdentifierIDs.size())
-    return llvm::None;
+    return std::nullopt;
 
   auto &identifierIDs = ArraysOfIdentifierIDs[n];
 
@@ -675,7 +675,7 @@ llvm::Optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::ge
   return result;
 }
 
-llvm::Optional<std::vector<ModuleDependencyID>> ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
+std::optional<std::vector<ModuleDependencyID>> ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
   auto encodedIdentifierStringArray = getStringArray(n);
   if (encodedIdentifierStringArray.has_value()) {
     static const std::string textualPrefix("swiftTextual");
@@ -703,7 +703,7 @@ llvm::Optional<std::vector<ModuleDependencyID>> ModuleDependenciesCacheDeseriali
     return result;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
@@ -831,7 +831,7 @@ class ModuleDependenciesCacheSerializer {
   void writeArraysOfIdentifiers();
 
   void writeModuleInfo(ModuleDependencyID moduleID,
-                       llvm::Optional<std::string> contextHash,
+                       std::optional<std::string> contextHash,
                        const ModuleDependencyInfo &dependencyInfo);
 
 public:
@@ -921,7 +921,7 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
 }
 
 void ModuleDependenciesCacheSerializer::writeModuleInfo(
-    ModuleDependencyID moduleID, llvm::Optional<std::string> contextHash,
+    ModuleDependencyID moduleID, std::optional<std::string> contextHash,
     const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
   auto contextHashStrID = contextHash.has_value() ? getIdentifier(contextHash.value()) : 0;

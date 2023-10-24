@@ -74,7 +74,7 @@ struct RuleBuilder {
 
   /// New rules derived from requirements written by the user, which can be
   /// eliminated by homotopy reduction.
-  std::vector<std::tuple<MutableTerm, MutableTerm, llvm::Optional<unsigned>>>
+  std::vector<std::tuple<MutableTerm, MutableTerm, std::optional<unsigned>>>
       RequirementRules;
 
   /// Requirements written in source code. The requirement ID in the above
@@ -115,8 +115,8 @@ private:
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
   void addRequirement(const Requirement &req, const ProtocolDecl *proto,
-                      llvm::Optional<ArrayRef<Term>> substitutions = llvm::None,
-                      llvm::Optional<unsigned> requirementID = llvm::None);
+                      std::optional<ArrayRef<Term>> substitutions = std::nullopt,
+                      std::optional<unsigned> requirementID = std::nullopt);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void addTypeAlias(const ProtocolTypeAlias &alias,

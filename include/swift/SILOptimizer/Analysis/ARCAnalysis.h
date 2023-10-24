@@ -87,7 +87,7 @@ bool mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 valueHasARCUsesInInstructionRange(SILValue Op, SILBasicBlock::iterator Start,
                                   SILBasicBlock::iterator End,
                                   AliasAnalysis *AA);
@@ -95,7 +95,7 @@ valueHasARCUsesInInstructionRange(SILValue Op, SILBasicBlock::iterator Start,
 /// If \p Op has arc uses in the instruction range [Start, End), return the last
 /// use of such instruction. Otherwise return None. We assume that Start and End
 /// are both in the same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 valueHasARCUsesInReverseInstructionRange(SILValue Op,
                                          SILBasicBlock::iterator Start,
                                          SILBasicBlock::iterator End,
@@ -105,7 +105,7 @@ valueHasARCUsesInReverseInstructionRange(SILValue Op,
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
@@ -223,9 +223,9 @@ private:
 
     /// If we were able to find a set of releases for this argument that joint
     /// post-dominate the argument, return our release set.
-    llvm::Optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
+    std::optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
       if (releases.empty() || foundSomeButNotAllReleases())
-        return llvm::None;
+        return std::nullopt;
       return ArrayRef<SILInstruction *>(releases);
     }
 
@@ -234,10 +234,10 @@ private:
     /// set.
     ///
     /// *NOTE* This returns none if we did not find any releases.
-    llvm::Optional<ArrayRef<SILInstruction *>>
+    std::optional<ArrayRef<SILInstruction *>>
     getPartiallyPostDomReleases() const {
       if (releases.empty() || !foundSomeButNotAllReleases())
-        return llvm::None;
+        return std::nullopt;
       return ArrayRef<SILInstruction *>(releases);
     }
   };
@@ -331,14 +331,14 @@ public:
     return completeList.value();
   }
 
-  llvm::Optional<ArrayRef<SILInstruction *>>
+  std::optional<ArrayRef<SILInstruction *>>
   getPartiallyPostDomReleaseSet(SILArgument *arg) const {
     auto iter = ArgInstMap.find(arg);
     if (iter == ArgInstMap.end())
-      return llvm::None;
+      return std::nullopt;
     auto partialList = iter->second.getPartiallyPostDomReleases();
     if (!partialList)
-      return llvm::None;
+      return std::nullopt;
     return partialList;
   }
 

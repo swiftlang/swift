@@ -24,7 +24,7 @@ struct RenameInfo {
   RefactorAvailabilityInfo Availability;
 };
 
-llvm::Optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
+std::optional<RenameInfo> getRenameInfo(ResolvedCursorInfoPtr cursorInfo);
 } // namespace refactoring
 } // namespace swift
 

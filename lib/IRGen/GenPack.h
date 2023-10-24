@@ -114,7 +114,7 @@ StackAddress allocatePack(IRGenFunction &IGF, CanSILPackType packType);
 
 void deallocatePack(IRGenFunction &IGF, StackAddress addr, CanSILPackType packType);
 
-llvm::Optional<StackAddress>
+std::optional<StackAddress>
 emitDynamicTupleTypeLabels(IRGenFunction &IGF,
                            CanTupleType tupleType,
                            CanPackType packType,

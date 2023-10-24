@@ -160,13 +160,13 @@ void SwiftLangSupport::getConformingMethodList(
     ArrayRef<const char *> ExpectedTypeNames,
     SourceKitCancellationToken CancellationToken,
     SourceKit::ConformingMethodListConsumer &SKConsumer,
-    llvm::Optional<VFSOptions> vfsOptions) {
+    std::optional<VFSOptions> vfsOptions) {
   std::string error;
 
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
   auto fileSystem =
-      getFileSystem(vfsOptions, /*primaryFile=*/llvm::None, error);
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
   if (!fileSystem) {
     return SKConsumer.failed(error);
   }

@@ -228,7 +228,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
     if (Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
                           Rename.NewName);
-      EditConsumer.accept(SM, Type, llvm::None);
+      EditConsumer.accept(SM, Type, std::nullopt);
     } else {
       EditConsumer.accept(SM, Type, Renamer.getReplacements());
     }
@@ -259,7 +259,7 @@ int swift::ide::findSyntacticRenameRanges(
     if (Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
                           Rename.NewName);
-      RenameConsumer.accept(SM, Type, llvm::None);
+      RenameConsumer.accept(SM, Type, std::nullopt);
     } else {
       RenameConsumer.accept(SM, Type, Renamer.Ranges);
     }

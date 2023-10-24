@@ -303,7 +303,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   return true;
 }
 
-static llvm::Optional<Type>
+static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
@@ -311,7 +311,7 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
           parsedExpr, DC,
           /*replaceInvalidRefsWithErrors=*/true,
           /*leaveClosureBodiesUnchecked=*/true))
-    return llvm::None;
+    return std::nullopt;
 
   switch (kind) {
   case CompletionTypeCheckKind::Normal:
@@ -336,7 +336,7 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
       }
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   Type originalType = parsedExpr->getType();
@@ -354,12 +354,12 @@ getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
     return parsedExpr->getType();
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
-llvm::Optional<Type> swift::getTypeOfCompletionContextExpr(
+std::optional<Type> swift::getTypeOfCompletionContextExpr(
     ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
     Expr *&parsedExpr, ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
@@ -372,6 +372,6 @@ llvm::Optional<Type> swift::getTypeOfCompletionContextExpr(
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
   return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), SourceLoc(),
-                                   llvm::None);
+                                   std::nullopt);
 }
 

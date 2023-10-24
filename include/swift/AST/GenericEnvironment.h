@@ -168,7 +168,7 @@ private:
   /// Retrieve the mapping for the given generic parameter, if present.
   ///
   /// This is only useful when lazily populating a generic environment.
-  llvm::Optional<Type> getMappingIfPresent(GenericParamKey key) const;
+  std::optional<Type> getMappingIfPresent(GenericParamKey key) const;
 
 public:
   GenericSignature getGenericSignature() const {

@@ -484,7 +484,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
 
   return schema.transformWithPosition(
       TypePosition::Invariant,
-      [&](Type t, TypePosition pos) -> llvm::Optional<Type> {
+      [&](Type t, TypePosition pos) -> std::optional<Type> {
     if (t->is<GenericTypeParamType>()) {
       auto index = RewriteContext::getGenericParamIndex(t);
       auto substitution = substitutions[index];
@@ -529,7 +529,7 @@ Type PropertyMap::getTypeFromSubstitutionSchema(
     }
 
     assert(!t->isTypeParameter());
-    return llvm::None;
+    return std::nullopt;
   });
 }
 
@@ -566,10 +566,10 @@ RewriteContext::getRelativeSubstitutionSchemaFromType(
 
   return CanType(concreteType.transformWithPosition(
       TypePosition::Invariant,
-      [&](Type t, TypePosition pos) -> llvm::Optional<Type> {
+      [&](Type t, TypePosition pos) -> std::optional<Type> {
 
     if (!t->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     auto term = getRelativeTermForType(CanType(t), substitutions);
 
@@ -613,10 +613,10 @@ RewriteContext::getSubstitutionSchemaFromType(CanType concreteType,
   return CanType(concreteType.transformWithPosition(
       TypePosition::Invariant,
       [&](Type t, TypePosition pos)
-          -> llvm::Optional<Type> {
+          -> std::optional<Type> {
 
     if (!t->isTypeParameter())
-      return llvm::None;
+      return std::nullopt;
 
     // PackExpansionType(pattern=T, count=U) becomes
     // PackExpansionType(pattern=τ_0_0, count=τ_0_1) with

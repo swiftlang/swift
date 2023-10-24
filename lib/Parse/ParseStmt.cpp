@@ -214,7 +214,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 /// given that we're in the middle of a switch already.
 static bool isAtStartOfSwitchCase(Parser &parser,
                                   bool needsToBacktrack = true) {
-  llvm::Optional<Parser::BacktrackingScope> backtrack;
+  std::optional<Parser::BacktrackingScope> backtrack;
 
   // Check for and consume attributes. The only valid attribute is `@unknown`
   // but that's a semantic restriction.
@@ -376,7 +376,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                           IsFollowingGuard);
         });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
-        consumeDecl(BeginParserPosition, llvm::None, IsTopLevel);
+        consumeDecl(BeginParserPosition, std::nullopt, IsTopLevel);
         return IfConfigResult;
       }
       BraceItemsStatus |= IfConfigResult;
@@ -428,7 +428,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isIDEInspectionFirstPass()) {
-          consumeDecl(BeginParserPosition, llvm::None, IsTopLevel);
+          consumeDecl(BeginParserPosition, std::nullopt, IsTopLevel);
           return DeclResult;
         }
       }
@@ -853,7 +853,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
     auto result = makeParserResult(
       YieldStmt::create(Context, yieldLoc, SourceLoc(), cce, SourceLoc()));
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/llvm::None);
+      CodeCompletionCallbacks->completeYieldStmt(cce, /*index=*/std::nullopt);
     }
     result.setHasCodeCompletionAndIsError();
     consumeToken();
@@ -1096,7 +1096,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     // Change the DeclContext for any variables declared in the defer to be within
     // the defer closure.
     ParseFunctionBody cc(*this, tempDecl);
-    llvm::SaveAndRestore<llvm::Optional<StableHasher>> T(
+    llvm::SaveAndRestore<std::optional<StableHasher>> T(
         CurrentTokenHash, StableHasher::defaultHasher());
 
     ParserResult<BraceStmt> Body =
@@ -1323,7 +1323,7 @@ validateAvailabilitySpecList(Parser &P,
                              SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  llvm::Optional<SourceLoc> OtherPlatformSpecLoc = llvm::None;
+  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
 
   if (Specs.size() == 1 &&
       isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
@@ -1373,7 +1373,7 @@ validateAvailabilitySpecList(Parser &P,
 
   switch (Source) {
   case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == llvm::None) {
+    if (OtherPlatformSpecLoc == std::nullopt) {
       SourceLoc InsertWildcardLoc = P.PreviousLoc;
       P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
@@ -1381,7 +1381,7 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != llvm::None) {
+    if (OtherPlatformSpecLoc != std::nullopt) {
       SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
         .fixItRemove(Loc);
@@ -1389,7 +1389,7 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != llvm::None) {
+    if (OtherPlatformSpecLoc != std::nullopt) {
       SourceLoc Loc = OtherPlatformSpecLoc.value();
       P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
     }
@@ -2281,7 +2281,7 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
 
   SmallVector<VarDecl*, 4> boundDecls;
   ParserStatus status;
-  llvm::Optional<MutableArrayRef<VarDecl *>> caseBodyDecls;
+  std::optional<MutableArrayRef<VarDecl *>> caseBodyDecls;
   SmallVector<CaseLabelItem, 1> caseLabelItems;
 
   {
@@ -2326,7 +2326,7 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
       CaseStmt::create(
           Context, CaseParentKind::DoCatch, catchLoc, caseLabelItems,
           /*UnknownAttrLoc*/ SourceLoc(), bodyResult.get()->getStartLoc(),
-          bodyResult.get(), caseBodyDecls, llvm::None, nullptr));
+          bodyResult.get(), caseBodyDecls, std::nullopt, nullptr));
 }
 
 static bool isStmtForCStyle(Parser &P) {
@@ -2637,7 +2637,7 @@ static ParserStatus
 parseStmtCase(Parser &P, SourceLoc &CaseLoc,
               SmallVectorImpl<CaseLabelItem> &LabelItems,
               SmallVectorImpl<VarDecl *> &BoundDecls, SourceLoc &ColonLoc,
-              llvm::Optional<MutableArrayRef<VarDecl *>> &CaseBodyDecls) {
+              std::optional<MutableArrayRef<VarDecl *>> &CaseBodyDecls) {
   ParserStatus Status;
   bool isFirst = true;
   
@@ -2799,7 +2799,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
-  llvm::Optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
+  std::optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
   if (Tok.is(tok::kw_case)) {
     Status |= ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls,
                               ColonLoc, CaseBodyDecls);
@@ -2835,7 +2835,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       Status,
       CaseStmt::create(Context, CaseParentKind::Switch, CaseLoc, CaseLabelItems,
                        UnknownAttrLoc, ColonLoc, Body, CaseBodyDecls,
-                       llvm::None, FallthroughFinder::findFallthrough(Body)));
+                       std::nullopt, FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:

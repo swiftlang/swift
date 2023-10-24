@@ -140,7 +140,7 @@ public:
   }
 
   void open(const char *DocName, StringRef Text,
-            Optional<ArrayRef<const char *>> CArgs = llvm::None) {
+            Optional<ArrayRef<const char *>> CArgs = std::nullopt) {
     auto Args = CArgs.has_value() ? makeArgs(DocName, *CArgs)
                                   : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);

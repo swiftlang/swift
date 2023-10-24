@@ -233,19 +233,19 @@ public:
 
 private:
   Kind Knd;
-  llvm::Optional<RequirementFailureInfo> ReqFailureInfo;
+  std::optional<RequirementFailureInfo> ReqFailureInfo;
 
   CheckGenericArgumentsResult(
-      Kind Knd, llvm::Optional<RequirementFailureInfo> ReqFailureInfo)
+      Kind Knd, std::optional<RequirementFailureInfo> ReqFailureInfo)
       : Knd(Knd), ReqFailureInfo(ReqFailureInfo) {}
 
 public:
   static CheckGenericArgumentsResult createSuccess() {
-    return CheckGenericArgumentsResult(Success, llvm::None);
+    return CheckGenericArgumentsResult(Success, std::nullopt);
   }
 
   static CheckGenericArgumentsResult createSubstitutionFailure() {
-    return CheckGenericArgumentsResult(SubstitutionFailure, llvm::None);
+    return CheckGenericArgumentsResult(SubstitutionFailure, std::nullopt);
   }
 
   static CheckGenericArgumentsResult createRequirementFailure(
@@ -459,7 +459,7 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// e.g., because of a \c return statement. Otherwise, returns either the
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
-llvm::Optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
+std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                             Type builderType);
 
 /// Find the return statements within the body of the given function.
@@ -532,7 +532,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 CheckGenericArgumentsResult::Kind
 checkGenericArguments(ModuleDecl *module, ArrayRef<Requirement> requirements,
                       TypeSubstitutionFn substitutions,
-                      SubstOptions options = llvm::None);
+                      SubstOptions options = std::nullopt);
 
 /// Check the given requirements without applying substitutions.
 CheckGenericArgumentsResult::Kind
@@ -613,11 +613,11 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
                          constraints::ContextualTypeInfo contextualInfo = {},
                          TypeCheckExprOptions options = TypeCheckExprOptions());
 
-llvm::Optional<constraints::SyntacticElementTarget>
+std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
                     TypeCheckExprOptions options = TypeCheckExprOptions());
 
-llvm::Optional<constraints::SyntacticElementTarget>
+std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
                 TypeCheckExprOptions options = TypeCheckExprOptions());
 
@@ -644,7 +644,7 @@ bool typeCheckForCodeCompletion(
 /// Check the key-path expression.
 ///
 /// Returns the type of the last component of the key-path.
-llvm::Optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
+std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
                                           bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
@@ -742,8 +742,8 @@ NullablePtr<Pattern> trySimplifyExprPattern(ExprPattern *EP, Type patternTy);
 /// \returns the coerced pattern, or nullptr if the coercion failed.
 Pattern *coercePatternToType(
     ContextualPattern pattern, Type type, TypeResolutionOptions options,
-    llvm::function_ref<llvm::Optional<Pattern *>(Pattern *, Type)>
-        tryRewritePattern = [](Pattern *, Type) { return llvm::None; });
+    llvm::function_ref<std::optional<Pattern *>(Pattern *, Type)>
+        tryRewritePattern = [](Pattern *, Type) { return std::nullopt; });
 
 bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
@@ -1068,13 +1068,13 @@ TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
-llvm::Optional<Diag<>>
+std::optional<Diag<>>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-llvm::Optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+std::optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
 /// Same as \c checkDeclarationAvailability but doesn't give a reason for
 /// unavailability.
@@ -1086,14 +1086,14 @@ bool isDeclarationUnavailable(
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
-llvm::Optional<UnavailabilityReason>
+std::optional<UnavailabilityReason>
 checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
 
 /// Checks whether a conformance should be considered unavailable when
 /// referred to at the given location and, if so, returns the reason why the
 /// declaration is unavailable. Returns None is the declaration is
 /// definitely available.
-llvm::Optional<UnavailabilityReason>
+std::optional<UnavailabilityReason>
 checkConformanceAvailability(const RootProtocolConformance *Conf,
                              const ExtensionDecl *Ext,
                              const ExportContext &Where);
@@ -1215,10 +1215,10 @@ bool getDefaultGenericArgumentsString(
         [](const GenericTypeParamDecl *) { return Type(); });
 
 /// Attempt to omit needless words from the name of the given declaration.
-llvm::Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
+std::optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
 
 /// Attempt to omit needless words from the name of the given declaration.
-llvm::Optional<Identifier> omitNeedlessWords(VarDecl *var);
+std::optional<Identifier> omitNeedlessWords(VarDecl *var);
 
 /// Calculate edit distance between declaration names.
 unsigned getCallEditDistance(DeclNameRef writtenName, DeclName correctedName,
@@ -1303,14 +1303,14 @@ void applyAccessNote(ValueDecl *VD);
 /// module of `dc`. If `tangentVectorEqualsSelf` is true, returns true iff
 /// the given type additionally satisfies `Self == Self.TangentVector`.
 bool isDifferentiable(Type type, bool tangentVectorEqualsSelf, DeclContext *dc,
-                      llvm::Optional<TypeResolutionStage> stage);
+                      std::optional<TypeResolutionStage> stage);
 
 /// Emits diagnostics if the given function type's parameter/result types are
 /// not compatible with the ext info. Returns whether an error was diagnosed.
 bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
-                                 llvm::Optional<FunctionTypeRepr *> repr,
+                                 std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
-                                 llvm::Optional<TypeResolutionStage> stage);
+                                 std::optional<TypeResolutionStage> stage);
 
 /// Walk the parallel structure of a type with user-provided placeholders and
 /// an inferred type produced by the type checker. Where placeholders can be
@@ -1375,7 +1375,7 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// \c backingStorageType directly and the maximum is the number of attached property wrappers
 /// (which will produce the original property type). If not specified, defaults to the maximum.
 Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
-                             llvm::Optional<unsigned> limit = llvm::None);
+                             std::optional<unsigned> limit = std::nullopt);
 
 /// Compute the projected value type for the given property that has attached
 /// property wrappers when the backing storage is known to have the given type.
@@ -1511,7 +1511,7 @@ diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
 
   auto &Diags = D->getASTContext().Diags;
 
-  llvm::Optional<InFlightDiagnostic> diag;
+  std::optional<InFlightDiagnostic> diag;
   if (!attr || !attr->getLocation().isValid())
     diag.emplace(Diags.diagnose(D, std::forward<ArgTypes>(Args)...));
   else

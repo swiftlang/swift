@@ -51,7 +51,7 @@ namespace irgen {
   llvm::GlobalVariable *
   createVariable(IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *objectType,
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
-                 llvm::Optional<SILLocation> DebugLoc = llvm::None,
+                 std::optional<SILLocation> DebugLoc = std::nullopt,
                  StringRef DebugName = StringRef());
 
   llvm::GlobalVariable *

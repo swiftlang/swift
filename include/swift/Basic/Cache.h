@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -171,12 +170,12 @@ public:
     releaseValue(CacheValuePtr);
   }
 
-  llvm::Optional<ValueT> get(const KeyT &Key) {
+  std::optional<ValueT> get(const KeyT &Key) {
     const void *CacheKeyPtr = KeyInfoT::getLookupKey(&Key);
     void *CacheValuePtr;
     bool Found = getAndRetain(CacheKeyPtr, &CacheValuePtr);
     if (!Found)
-      return llvm::None;
+      return std::nullopt;
 
     ValueT Val(ValueInfoT::getFromCache(CacheValuePtr));
     releaseValue(CacheValuePtr);

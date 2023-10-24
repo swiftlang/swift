@@ -133,7 +133,7 @@ class IDEInspectionInstance {
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
   void performNewOperation(
-      llvm::Optional<llvm::hash_code> ArgsHash,
+      std::optional<llvm::hash_code> ArgsHash,
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,

@@ -809,8 +809,8 @@ bool CompilerInstance::setUpPluginLoader() {
   return false;
 }
 
-llvm::Optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
-  llvm::Optional<unsigned> ideInspectionTargetBufferID;
+std::optional<unsigned> CompilerInstance::setUpIDEInspectionTargetBuffer() {
+  std::optional<unsigned> ideInspectionTargetBufferID;
   auto ideInspectionTarget = Invocation.getIDEInspectionTarget();
   if (ideInspectionTarget.first) {
     auto memBuf = ideInspectionTarget.first;
@@ -858,7 +858,7 @@ bool CompilerInstance::setUpInputs() {
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
   // per-input setup.
-  const llvm::Optional<unsigned> ideInspectionTargetBufferID =
+  const std::optional<unsigned> ideInspectionTargetBufferID =
       setUpIDEInspectionTargetBuffer();
 
   const auto &Inputs =
@@ -869,7 +869,7 @@ bool CompilerInstance::setUpInputs() {
   bool hasFailed = false;
   for (const InputFile &input : Inputs) {
     bool failed = false;
-    llvm::Optional<unsigned> bufferID =
+    std::optional<unsigned> bufferID =
         getRecordedBufferID(input, shouldRecover, failed);
     hasFailed |= failed;
 
@@ -891,11 +891,11 @@ bool CompilerInstance::setUpInputs() {
   return false;
 }
 
-llvm::Optional<unsigned>
+std::optional<unsigned>
 CompilerInstance::getRecordedBufferID(const InputFile &input,
                                       const bool shouldRecover, bool &failed) {
   if (!input.getBuffer()) {
-    if (llvm::Optional<unsigned> existingBufferID =
+    if (std::optional<unsigned> existingBufferID =
             SourceMgr.getIDForBufferIdentifier(input.getFileName())) {
       return existingBufferID;
     }
@@ -911,14 +911,14 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
 
   if (!buffers.has_value()) {
     failed = true;
-    return llvm::None;
+    return std::nullopt;
   }
 
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
   if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
     PartialModules.push_back(std::move(*buffers));
-    return llvm::None;
+    return std::nullopt;
   }
   assert(buffers->ModuleDocBuffer.get() == nullptr);
   assert(buffers->ModuleSourceInfoBuffer.get() == nullptr);
@@ -929,7 +929,7 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
   return bufferID;
 }
 
-llvm::Optional<ModuleBuffers>
+std::optional<ModuleBuffers>
 CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
   if (auto b = input.getBuffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
@@ -949,7 +949,7 @@ CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                          input.getFileName(),
                          inputFileOrErr.getError().message());
-    return llvm::None;
+    return std::nullopt;
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
     return ModuleBuffers(std::move(*inputFileOrErr));
@@ -961,7 +961,7 @@ CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
                        sourceinfo.has_value() ? std::move(sourceinfo.value()) : nullptr);
 }
 
-llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
+std::optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleSourceInfo(const InputFile &input) {
   llvm::SmallString<128> pathWithoutProjectDir(input.getFileName());
   llvm::sys::path::replace_extension(pathWithoutProjectDir,
@@ -977,10 +977,10 @@ CompilerInstance::openModuleSourceInfo(const InputFile &input) {
   if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
                                                             pathWithoutProjectDir))
     return std::move(*sourceInfoFileOrErr);
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<std::unique_ptr<llvm::MemoryBuffer>>
+std::optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleDoc(const InputFile &input) {
   llvm::SmallString<128> moduleDocFilePath(input.getFileName());
   llvm::sys::path::replace_extension(
@@ -998,7 +998,7 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                        moduleDocFilePath,
                        moduleDocFileOrErr.getError().message());
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Enable Swift concurrency on a per-target basis
@@ -1235,7 +1235,7 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   return imports;
 }
 
-static llvm::Optional<SourceFileKind>
+static std::optional<SourceFileKind>
 tryMatchInputModeToSourceFileKind(FrontendOptions::ParseInputMode mode) {
   switch (mode) {
   case FrontendOptions::ParseInputMode::SwiftLibrary:
@@ -1269,7 +1269,7 @@ CompilerInstance::computeMainSourceFileForModule(ModuleDecl *mod) const {
                llvm::sys::path::filename(input.getFileName()) == "main.swift";
       });
 
-  llvm::Optional<unsigned> MainBufferID = llvm::None;
+  std::optional<unsigned> MainBufferID = std::nullopt;
   if (MainInputIter != Inputs.end()) {
     MainBufferID =
         getSourceMgr().getIDForBufferIdentifier(MainInputIter->getFileName());
@@ -1295,7 +1295,7 @@ bool CompilerInstance::createFilesForMainModule(
     ModuleDecl *mod, SmallVectorImpl<FileUnit *> &files) const {
   // Try to pull out the main source file, if any. This ensures that it
   // is at the start of the list of files.
-  llvm::Optional<unsigned> MainBufferID = llvm::None;
+  std::optional<unsigned> MainBufferID = std::nullopt;
   if (SourceFile *mainSourceFile = computeMainSourceFileForModule(mod)) {
     MainBufferID = mainSourceFile->getBufferID();
     files.push_back(mainSourceFile);
@@ -1622,7 +1622,7 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
-    ModuleDecl *mod, SourceFileKind fileKind, llvm::Optional<unsigned> bufferID,
+    ModuleDecl *mod, SourceFileKind fileKind, std::optional<unsigned> bufferID,
     bool isMainBuffer) const {
   auto isPrimary = bufferID && isPrimaryInput(*bufferID);
   auto opts = getSourceFileParsingOptions(isPrimary);

@@ -543,7 +543,7 @@ static swift_layout_kind_t convertAllocationChunkKind(
 }
 
 static const char *returnableCString(SwiftReflectionContextRef ContextRef,
-                                      llvm::Optional<std::string> String) {
+                                      std::optional<std::string> String) {
   if (String) {
     auto *TmpStr = ContextRef->allocateTemporaryObject<std::string>();
     *TmpStr = *String;
@@ -830,7 +830,7 @@ swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
   unsigned ChildTaskLimit = 0;
   unsigned AsyncBacktraceLimit = 0;
 
-  llvm::Optional<std::string> Error;
+  std::optional<std::string> Error;
   NativeReflectionContext::AsyncTaskInfo TaskInfo;
   std::tie(Error, TaskInfo) =
       Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
@@ -847,7 +847,7 @@ swift_async_task_slab_allocations_return_t
 swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
                                           swift_reflection_ptr_t SlabPtr) {
   auto Context = ContextRef->nativeContext;
-  llvm::Optional<std::string> Error;
+  std::optional<std::string> Error;
   NativeReflectionContext::AsyncTaskSlabInfo Info;
   std::tie(Error, Info) = Context->asyncTaskSlabAllocations(SlabPtr);
 
@@ -887,7 +887,7 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
   unsigned ChildTaskLimit = 1000000;
   unsigned AsyncBacktraceLimit = 1000;
 
-  llvm::Optional<std::string> Error;
+  std::optional<std::string> Error;
   NativeReflectionContext::AsyncTaskInfo TaskInfo;
   std::tie(Error, TaskInfo) =
       Context->asyncTaskInfo(AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
@@ -943,7 +943,7 @@ swift_actor_info_t
 swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
   auto Context = ContextRef->nativeContext;
-  llvm::Optional<std::string> Error;
+  std::optional<std::string> Error;
   NativeReflectionContext::ActorInfo ActorInfo;
   std::tie(Error, ActorInfo) = Context->actorInfo(ActorPtr);
 

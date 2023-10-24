@@ -25,7 +25,6 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -228,7 +227,7 @@ public:
   /// Represents a module version and the source it was parsed from.
   class ModuleVersionInfo {
     llvm::VersionTuple Version;
-    llvm::Optional<ModuleVersionSourceKind> SourceKind;
+    std::optional<ModuleVersionSourceKind> SourceKind;
 
   public:
     /// Returns true if the version has a valid source kind.

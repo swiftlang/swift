@@ -185,7 +185,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   computeDumpScopeMapLocations();
 
-  llvm::Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+  std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
 
   // None here means error, not just "no inputs". Propagate unconditionally.
@@ -334,7 +334,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
     Opts.ClangHeaderExposedDecls =
         llvm::StringSwitch<
-            llvm::Optional<FrontendOptions::ClangHeaderExposeBehavior>>(
+            std::optional<FrontendOptions::ClangHeaderExposeBehavior>>(
             A->getValue())
             .Case("all-public",
                   FrontendOptions::ClangHeaderExposeBehavior::AllPublic)
@@ -343,7 +343,7 @@ bool ArgsToFrontendOptionsConverter::convert(
             .Case("has-expose-attr-or-stdlib",
                   FrontendOptions::ClangHeaderExposeBehavior::
                       HasExposeAttrOrImplicitDeps)
-            .Default(llvm::None);
+            .Default(std::nullopt);
   }
   for (const auto &arg :
        Args.getAllArgValues(options::OPT_clang_header_expose_module)) {
@@ -687,7 +687,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     // selected".
     return false;
   }
-  llvm::Optional<std::vector<std::string>> outputFilenames =
+  std::optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
           Args, Diags, options::OPT_o, options::OPT_output_filelist);
 

@@ -450,7 +450,7 @@ struct UseState {
   using InstToBitMap =
       llvm::SmallMapVector<SILInstruction *, SmallBitVector, 4>;
 
-  llvm::Optional<unsigned> cachedNumSubelements;
+  std::optional<unsigned> cachedNumSubelements;
 
   /// The blocks that consume fields of the value.
   ///
@@ -623,7 +623,7 @@ struct UseState {
 
   void clear() {
     address = nullptr;
-    cachedNumSubelements = llvm::None;
+    cachedNumSubelements = std::nullopt;
     consumingBlocks.clear();
     destroys.clear();
     livenessUses.clear();
@@ -2476,7 +2476,7 @@ namespace {
 
 using InstLeafTypePair = std::pair<SILInstruction *, TypeTreeLeafTypeRange>;
 using InstOptionalLeafTypePair =
-    std::pair<SILInstruction *, llvm::Optional<TypeTreeLeafTypeRange>>;
+    std::pair<SILInstruction *, std::optional<TypeTreeLeafTypeRange>>;
 
 /// Post process the found liveness and emit errors if needed. TODO: Better
 /// name.

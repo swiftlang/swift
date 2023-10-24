@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/EditorPlaceholder.h"
-#include "llvm/ADT/Optional.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -48,7 +47,7 @@ TEST(EditorPlaceholder, EditorPlaceholders) {
 
 TEST(EditorPlaceholder, InvalidEditorPlaceholders) {
   const char *Text = "<#foo";
-  llvm::Optional<EditorPlaceholderData> DataOpt = parseEditorPlaceholder(Text);
+  std::optional<EditorPlaceholderData> DataOpt = parseEditorPlaceholder(Text);
   EXPECT_FALSE(DataOpt.has_value());
 
   Text = "foo#>";

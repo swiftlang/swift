@@ -19,7 +19,6 @@
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 
 namespace swift {
 
@@ -106,8 +105,8 @@ private:
   bool processBBTopDown(ARCBBState &BBState);
   void computePostDominatingConsumedArgMap();
 
-  llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);
-  llvm::Optional<ARCBBStateInfoHandle> getTopDownBBState(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getTopDownBBState(SILBasicBlock *BB);
 
   void dumpDataflowResults();
 };

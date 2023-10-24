@@ -437,7 +437,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
 
   Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
 
-  llvm::Optional<SILDebugVariable> getVarInfo() const {
+  std::optional<SILDebugVariable> getVarInfo() const {
     switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");

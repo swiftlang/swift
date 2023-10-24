@@ -29,13 +29,13 @@ struct Availability {
   StringRef Domain;
 
   /// The domain version at which a symbol was introduced if defined.
-  llvm::Optional<llvm::VersionTuple> Introduced;
+  std::optional<llvm::VersionTuple> Introduced;
 
   /// The domain version at which a symbol was deprecated if defined.
-  llvm::Optional<llvm::VersionTuple> Deprecated;
+  std::optional<llvm::VersionTuple> Deprecated;
 
   /// The domain version at which a symbol was obsoleted if defined.
-  llvm::Optional<llvm::VersionTuple> Obsoleted;
+  std::optional<llvm::VersionTuple> Obsoleted;
 
   /// An optional message regarding a symbol's availability.
   StringRef Message;

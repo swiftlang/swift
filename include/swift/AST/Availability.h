@@ -19,7 +19,6 @@
 
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -229,11 +228,11 @@ public:
 /// to create an \c AvailabilityContext, rather than creating one directly.
 class AvailabilityContext {
   VersionRange OSVersion;
-  llvm::Optional<bool> SPI;
+  std::optional<bool> SPI;
 public:
   /// Creates a context that requires certain versions of the target OS.
   explicit AvailabilityContext(VersionRange OSVersion,
-                               llvm::Optional<bool> SPI = llvm::None)
+                               std::optional<bool> SPI = std::nullopt)
     : OSVersion(OSVersion), SPI(SPI) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
@@ -370,7 +369,7 @@ public:
   /// Returns the context for which the declaration
   /// is annotated as available, or None if the declaration
   /// has no availability annotation.
-  static llvm::Optional<AvailabilityContext>
+  static std::optional<AvailabilityContext>
   annotatedAvailableRange(const Decl *D, ASTContext &C);
 
   static AvailabilityContext

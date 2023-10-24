@@ -44,7 +44,7 @@ protected:
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
   llvm::Type *FragmentStorageType = nullptr;
-  llvm::Optional<Size::int_type> SizeInBits;
+  std::optional<Size::int_type> SizeInBits;
   std::optional<uint32_t> NumExtraInhabitants;
   Alignment Align;
   bool DefaultAlignment = true;
@@ -55,7 +55,7 @@ protected:
 public:
   DebugTypeInfo() = default;
   DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
-                llvm::Optional<Size::int_type> SizeInBits = {},
+                std::optional<Size::int_type> SizeInBits = {},
                 Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
                 bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false,
@@ -110,10 +110,10 @@ public:
       assert(FragmentStorageType && "only defined types may have a size");
     return FragmentStorageType;
   }
-  llvm::Optional<Size::int_type> getTypeSizeInBits() const {
-    return SizeIsFragmentSize ? llvm::None : SizeInBits;
+  std::optional<Size::int_type> getTypeSizeInBits() const {
+    return SizeIsFragmentSize ? std::nullopt : SizeInBits;
   }
-  llvm::Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
+  std::optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return Type == nullptr; }
   bool isForwardDecl() const { return FragmentStorageType == nullptr; }
@@ -137,13 +137,13 @@ class CompletedDebugTypeInfo : public DebugTypeInfo {
   CompletedDebugTypeInfo(DebugTypeInfo DbgTy) : DebugTypeInfo(DbgTy) {}
 
 public:
-  static llvm::Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
+  static std::optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
     if (!DbgTy.getRawSizeInBits() || DbgTy.isSizeFragmentSize())
       return {};
     return CompletedDebugTypeInfo(DbgTy);
   }
 
-  static llvm::Optional<CompletedDebugTypeInfo>
+  static std::optional<CompletedDebugTypeInfo>
   getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM) {
     return CompletedDebugTypeInfo::get(
         DebugTypeInfo::getFromTypeInfo(Ty, Info, IGM, /*IsFragment*/ false));

@@ -168,7 +168,7 @@ extractFunctionArguments(const ArgumentList *args) {
   return parameters;
 }
 
-static llvm::Optional<std::string> extractRawLiteral(Expr *expr) {
+static std::optional<std::string> extractRawLiteral(Expr *expr) {
   if (expr) {
     switch (expr->getKind()) {
     case ExprKind::BooleanLiteral:
@@ -196,7 +196,7 @@ static llvm::Optional<std::string> extractRawLiteral(Expr *expr) {
       break;
     }
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
@@ -246,17 +246,17 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
           auto elementExpr = std::get<0>(pair);
           auto elementName = std::get<1>(pair);
 
-          llvm::Optional<std::string> label =
+          std::optional<std::string> label =
               elementName.empty()
-                  ? llvm::None
-                  : llvm::Optional<std::string>(elementName.str().str());
+                  ? std::nullopt
+                  : std::optional<std::string>(elementName.str().str());
 
           elements.push_back({label, elementExpr->getType(),
                               extractCompileTimeValue(elementExpr)});
         }
       } else {
         for (auto elementExpr : tupleExpr->getElements()) {
-          elements.push_back({llvm::None, elementExpr->getType(),
+          elements.push_back({std::nullopt, elementExpr->getType(),
                               extractCompileTimeValue(elementExpr)});
         }
       }
@@ -295,7 +295,7 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         auto declRefExpr = cast<DeclRefExpr>(fn);
         auto caseName =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
-        return std::make_shared<EnumValue>(caseName, llvm::None);
+        return std::make_shared<EnumValue>(caseName, std::nullopt);
       }
 
       break;
@@ -424,23 +424,23 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
   return {propertyDecl, std::make_shared<RuntimeValue>()};
 }
 
-llvm::Optional<std::vector<EnumElementDeclValue>>
+std::optional<std::vector<EnumElementDeclValue>>
 extractEnumCases(NominalTypeDecl *Decl) {
   if (Decl->getKind() == DeclKind::Enum) {
     std::vector<EnumElementDeclValue> Elements;
     for (EnumCaseDecl *ECD : cast<EnumDecl>(Decl)->getAllCases()) {
       for (EnumElementDecl *EED : ECD->getElements()) {
         std::string Name = EED->getNameStr().str();
-        llvm::Optional<std::string> RawValue =
+        std::optional<std::string> RawValue =
             extractRawLiteral(EED->getRawValueExpr());
 
         std::vector<EnumElementParameterValue> Parameters;
         if (const ParameterList *Params = EED->getParameterList()) {
           for (const ParamDecl *Parameter : Params->getArray()) {
-            llvm::Optional<std::string> Label =
+            std::optional<std::string> Label =
                 Parameter->getParameterName().empty()
-                    ? llvm::None
-                    : llvm::Optional<std::string>(
+                    ? std::nullopt
+                    : std::optional<std::string>(
                           Parameter->getParameterName().str().str());
 
             Parameters.push_back({Label, Parameter->getInterfaceType()});
@@ -448,7 +448,7 @@ extractEnumCases(NominalTypeDecl *Decl) {
         }
 
         if (Parameters.empty()) {
-          Elements.push_back({Name, RawValue, llvm::None});
+          Elements.push_back({Name, RawValue, std::nullopt});
         } else {
           Elements.push_back({Name, RawValue, Parameters});
         }
@@ -457,7 +457,7 @@ extractEnumCases(NominalTypeDecl *Decl) {
     return Elements;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 ConstValueTypeInfo
@@ -678,7 +678,7 @@ void writeAttributeInfo(llvm::json::OStream &JSON,
 
 void writePropertyWrapperAttributes(
     llvm::json::OStream &JSON,
-    llvm::Optional<AttrValueVector> PropertyWrappers,
+    std::optional<AttrValueVector> PropertyWrappers,
     const ASTContext &ctx) {
   if (!PropertyWrappers.has_value()) {
     return;
@@ -692,7 +692,7 @@ void writePropertyWrapperAttributes(
 
 void writeEnumCases(
     llvm::json::OStream &JSON,
-    llvm::Optional<std::vector<EnumElementDeclValue>> EnumElements) {
+    std::optional<std::vector<EnumElementDeclValue>> EnumElements) {
   if (!EnumElements.has_value()) {
     return;
   }

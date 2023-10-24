@@ -104,7 +104,7 @@ public:
 
   // Caching
   bool isCached() const;
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -131,7 +131,7 @@ public:
 public:
   // Separate caching.
   bool isCached() const;
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 
 public:
@@ -180,7 +180,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
+  std::optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
   void cacheResult(llvm::TinyPtrVector<ValueDecl *> value) const;
 };
 
@@ -201,7 +201,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -291,7 +291,7 @@ public:
 
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -317,7 +317,7 @@ public:
 
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -343,7 +343,7 @@ public:
 
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -423,7 +423,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -444,7 +444,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -464,7 +464,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -504,7 +504,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -583,7 +583,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<RequirementSignature> getCachedResult() const;
+  std::optional<RequirementSignature> getCachedResult() const;
   void cacheResult(RequirementSignature value) const;
 };
 
@@ -604,7 +604,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -763,7 +763,7 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -853,7 +853,7 @@ public:
 /// Request information about the mutability of composed property wrappers.
 class PropertyWrapperMutabilityRequest
     : public SimpleRequest<PropertyWrapperMutabilityRequest,
-                           llvm::Optional<PropertyWrapperMutability>(VarDecl *),
+                           std::optional<PropertyWrapperMutability>(VarDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -862,7 +862,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Optional<PropertyWrapperMutability> evaluate(Evaluator &evaluator,
+  std::optional<PropertyWrapperMutability> evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const;
 
 public:
@@ -873,7 +873,7 @@ public:
 /// Request information about the l-valueness of composed property wrappers.
 class PropertyWrapperLValuenessRequest
     : public SimpleRequest<PropertyWrapperLValuenessRequest,
-                           llvm::Optional<PropertyWrapperLValueness>(VarDecl *),
+                           std::optional<PropertyWrapperLValueness>(VarDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -882,7 +882,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Optional<PropertyWrapperLValueness> evaluate(Evaluator &evaluator,
+  std::optional<PropertyWrapperLValueness> evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const;
 
 public:
@@ -1053,7 +1053,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<SelfAccessKind> getCachedResult() const;
+  std::optional<SelfAccessKind> getCachedResult() const;
   void cacheResult(SelfAccessKind value) const;
 };
 
@@ -1439,7 +1439,7 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 /// declaration, with any inference rules applied.
 class GlobalActorAttributeRequest
     : public SimpleRequest<GlobalActorAttributeRequest,
-                           llvm::Optional<CustomAttrNominalPair>(
+                           std::optional<CustomAttrNominalPair>(
                                llvm::PointerUnion<Decl *, ClosureExpr *>),
                            RequestFlags::Cached> {
 public:
@@ -1449,7 +1449,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+  std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
   evaluate(Evaluator &evaluator,
            llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
@@ -1508,7 +1508,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -1530,7 +1530,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -1552,7 +1552,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<OpaqueReadOwnership> getCachedResult() const;
+  std::optional<OpaqueReadOwnership> getCachedResult() const;
   void cacheResult(OpaqueReadOwnership value) const;
 };
 
@@ -1592,7 +1592,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<BraceStmt *> getCachedResult() const;
+  std::optional<BraceStmt *> getCachedResult() const;
   void cacheResult(BraceStmt *body) const;
 
 public:
@@ -1813,7 +1813,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<StorageImplInfo> getCachedResult() const;
+  std::optional<StorageImplInfo> getCachedResult() const;
   void cacheResult(StorageImplInfo value) const;
 };
 
@@ -1834,7 +1834,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -1855,7 +1855,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -1876,7 +1876,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -1899,7 +1899,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<AccessorDecl *> getCachedResult() const;
+  std::optional<AccessorDecl *> getCachedResult() const;
   void cacheResult(AccessorDecl *value) const;
 };
 
@@ -1956,7 +1956,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -2103,7 +2103,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<GenericSignature> getCachedResult() const;
+  std::optional<GenericSignature> getCachedResult() const;
   void cacheResult(GenericSignature value) const;
 
   void diagnoseCycle(DiagnosticEngine &diags) const;
@@ -2126,7 +2126,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
   void diagnoseCycle(DiagnosticEngine &diags) const;
 };
@@ -2173,7 +2173,7 @@ public:
                            
   // Separate caching.
   bool isCached() const;
-  llvm::Optional<evaluator::SideEffect> getCachedResult() const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
   void cacheResult(evaluator::SideEffect value) const;
 };
 
@@ -2232,7 +2232,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -2255,7 +2255,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -2278,7 +2278,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<ParamSpecifier> getCachedResult() const;
+  std::optional<ParamSpecifier> getCachedResult() const;
   void cacheResult(ParamSpecifier value) const;
 };
 
@@ -2299,7 +2299,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -2320,7 +2320,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -2343,7 +2343,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<const PatternBindingEntry *> getCachedResult() const;
+  std::optional<const PatternBindingEntry *> getCachedResult() const;
   void cacheResult(const PatternBindingEntry *value) const;
 };
 
@@ -2362,7 +2362,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<NamedPattern *> getCachedResult() const;
+  std::optional<NamedPattern *> getCachedResult() const;
   void cacheResult(NamedPattern *P) const;
 };
 
@@ -2374,7 +2374,7 @@ class ExprPatternMatchResult {
 
   // Should only be used as the default value for the request, as the caching
   // logic assumes the request always produces a non-null result.
-  ExprPatternMatchResult(llvm::NoneType)
+  ExprPatternMatchResult(std::nullopt_t)
       : MatchVar(nullptr), MatchExpr(nullptr) {}
 
 public:
@@ -2408,7 +2408,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<ExprPatternMatchResult> getCachedResult() const;
+  std::optional<ExprPatternMatchResult> getCachedResult() const;
   void cacheResult(ExprPatternMatchResult result) const;
 };
 
@@ -2451,7 +2451,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -2464,7 +2464,7 @@ struct PrecedenceGroupDescriptor {
   Identifier ident;
   SourceLoc nameLoc;
   // Exists for diagnostics. Does not contribute to the descriptor otherwise.
-  llvm::Optional<PathDirection> pathDirection;
+  std::optional<PathDirection> pathDirection;
 
   SourceLoc getLoc() const;
 
@@ -2714,7 +2714,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -2771,7 +2771,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<TypeWitnessAndDecl> getCachedResult() const;
+  std::optional<TypeWitnessAndDecl> getCachedResult() const;
   void cacheResult(TypeWitnessAndDecl value) const;
 };
 
@@ -2793,7 +2793,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Witness> getCachedResult() const;
+  std::optional<Witness> getCachedResult() const;
   void cacheResult(Witness value) const;
 };
 
@@ -2817,7 +2817,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<ProtocolConformanceRef> getCachedResult() const;
+  std::optional<ProtocolConformanceRef> getCachedResult() const;
   void cacheResult(ProtocolConformanceRef value) const;
 };
 
@@ -2973,7 +2973,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Initializer *> getCachedResult() const;
+  std::optional<Initializer *> getCachedResult() const;
   void cacheResult(Initializer *init) const;
 };
 
@@ -2994,7 +2994,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Expr *> getCachedResult() const;
+  std::optional<Expr *> getCachedResult() const;
   void cacheResult(Expr *expr) const;
 };
 
@@ -3014,7 +3014,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type type) const;
 };
 
@@ -3057,7 +3057,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Expr *> getCachedResult() const;
+  std::optional<Expr *> getCachedResult() const;
   void cacheResult(Expr *expr) const;
 };
 
@@ -3132,7 +3132,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<evaluator::SideEffect> getCachedResult() const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
   void cacheResult(evaluator::SideEffect) const;
 
 public:
@@ -3211,7 +3211,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<IndexSubset *> getCachedResult() const;
+  std::optional<IndexSubset *> getCachedResult() const;
   void cacheResult(IndexSubset *value) const;
 };
 
@@ -3382,7 +3382,7 @@ public:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<evaluator::SideEffect> getCachedResult() const;
+  std::optional<evaluator::SideEffect> getCachedResult() const;
   void cacheResult(evaluator::SideEffect) const;
 
 public:
@@ -3502,7 +3502,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -3524,7 +3524,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -3584,7 +3584,7 @@ private:
 public:
   // Cached.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
 
@@ -3797,7 +3797,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<Type> getCachedResult() const;
+  std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
 };
 
@@ -3878,7 +3878,7 @@ using AvailableAttrDeclPair = std::pair<const AvailableAttr *, const Decl *>;
 
 class SemanticAvailableRangeAttrRequest
     : public SimpleRequest<SemanticAvailableRangeAttrRequest,
-                           llvm::Optional<AvailableAttrDeclPair>(const Decl *),
+                           std::optional<AvailableAttrDeclPair>(const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3886,7 +3886,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+  std::optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
                                                  const Decl *decl) const;
 
 public:
@@ -3895,7 +3895,7 @@ public:
 
 class SemanticUnavailableAttrRequest
     : public SimpleRequest<SemanticUnavailableAttrRequest,
-                           llvm::Optional<AvailableAttrDeclPair>(const Decl *),
+                           std::optional<AvailableAttrDeclPair>(const Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3903,7 +3903,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
+  std::optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
                                                  const Decl *decl) const;
 
 public:
@@ -4173,7 +4173,7 @@ public:
 /// Find the definition of a given macro.
 class ExpandMacroExpansionDeclRequest
     : public SimpleRequest<ExpandMacroExpansionDeclRequest,
-                           llvm::Optional<unsigned>(MacroExpansionDecl *),
+                           std::optional<unsigned>(MacroExpansionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4181,7 +4181,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<unsigned> evaluate(Evaluator &evaluator,
+  std::optional<unsigned> evaluate(Evaluator &evaluator,
                                     MacroExpansionDecl *med) const;
 
 public:
@@ -4193,7 +4193,7 @@ public:
 /// Expand a 'MacroExpansionExpr',
 class ExpandMacroExpansionExprRequest
     : public SimpleRequest<ExpandMacroExpansionExprRequest,
-                           llvm::Optional<unsigned>(MacroExpansionExpr *),
+                           std::optional<unsigned>(MacroExpansionExpr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4201,7 +4201,7 @@ public:
 private:
   friend SimpleRequest;
 
-  llvm::Optional<unsigned> evaluate(Evaluator &evaluator,
+  std::optional<unsigned> evaluate(Evaluator &evaluator,
                                     MacroExpansionExpr *mee) const;
 
 public:
@@ -4577,7 +4577,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<GenericSignature> getCachedResult() const;
+  std::optional<GenericSignature> getCachedResult() const;
   void cacheResult(GenericSignature signature) const;
 };
 
@@ -4596,7 +4596,7 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
+  std::optional<bool> getCachedResult() const;
   void cacheResult(bool isSkipped) const;
 };
 

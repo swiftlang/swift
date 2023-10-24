@@ -23,6 +23,8 @@
 #include "llvm/ADT/PointerUnion.h"  // to define hash_value
 #include "llvm/ADT/TinyPtrVector.h"
 
+#include <optional>
+
 namespace llvm {
   // FIXME: Belongs in LLVM itself
   template<typename PT1, typename PT2>
@@ -49,7 +51,7 @@ namespace llvm {
   }
 
   template<typename T>
-  void simple_display(raw_ostream &out, const Optional<T> &opt) {
+  void simple_display(raw_ostream &out, const std::optional<T> &opt) {
     if (opt) {
       simple_display(out, *opt);
     } else {

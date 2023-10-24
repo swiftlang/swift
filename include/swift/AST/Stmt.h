@@ -28,7 +28,6 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/None.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
@@ -109,7 +108,7 @@ protected:
 
   /// Return the given value for the 'implicit' flag if present, or if None,
   /// return true if the location is invalid.
-  static bool getDefaultImplicitFlag(llvm::Optional<bool> implicit,
+  static bool getDefaultImplicitFlag(std::optional<bool> implicit,
                                      SourceLoc keyLoc) {
     return implicit.has_value() ? *implicit : keyLoc.isInvalid();
   }
@@ -169,12 +168,12 @@ class BraceStmt final : public Stmt,
   SourceLoc RBLoc;
 
   BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elements, SourceLoc rbloc,
-            llvm::Optional<bool> implicit);
+            std::optional<bool> implicit);
 
 public:
   static BraceStmt *create(ASTContext &ctx, SourceLoc lbloc,
                            ArrayRef<ASTNode> elements, SourceLoc rbloc,
-                           llvm::Optional<bool> implicit = llvm::None);
+                           std::optional<bool> implicit = std::nullopt);
 
   static BraceStmt *createImplicit(ASTContext &ctx,
                                    ArrayRef<ASTNode> elements) {
@@ -243,7 +242,7 @@ class ReturnStmt : public Stmt {
   
 public:
   ReturnStmt(SourceLoc ReturnLoc, Expr *Result,
-             llvm::Optional<bool> implicit = llvm::None)
+             std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Return, getDefaultImplicitFlag(implicit, ReturnLoc)),
         ReturnLoc(ReturnLoc), Result(Result) {}
 
@@ -274,7 +273,7 @@ class YieldStmt final
   SourceLoc RPLoc;
 
   YieldStmt(SourceLoc yieldLoc, SourceLoc lpLoc, ArrayRef<Expr *> yields,
-            SourceLoc rpLoc, llvm::Optional<bool> implicit = llvm::None)
+            SourceLoc rpLoc, std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Yield, getDefaultImplicitFlag(implicit, yieldLoc)),
         YieldLoc(yieldLoc), LPLoc(lpLoc), RPLoc(rpLoc) {
     Bits.YieldStmt.NumYields = yields.size();
@@ -285,7 +284,7 @@ class YieldStmt final
 public:
   static YieldStmt *create(const ASTContext &ctx, SourceLoc yieldLoc,
                            SourceLoc lp, ArrayRef<Expr *> yields, SourceLoc rp,
-                           llvm::Optional<bool> implicit = llvm::None);
+                           std::optional<bool> implicit = std::nullopt);
 
   SourceLoc getYieldLoc() const { return YieldLoc; }
   SourceLoc getLParenLoc() const { return LPLoc; }
@@ -697,7 +696,7 @@ class DoStmt : public LabeledStmt {
   
 public:
   DoStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, BraceStmt *body,
-         llvm::Optional<bool> implicit = llvm::None)
+         std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::Do, getDefaultImplicitFlag(implicit, doLoc),
                     labelInfo),
         DoLoc(doLoc), Body(body) {}
@@ -762,14 +761,14 @@ class IfStmt : public LabeledConditionalStmt {
 public:
   IfStmt(LabeledStmtInfo LabelInfo, SourceLoc IfLoc, StmtCondition Cond,
          Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         llvm::Optional<bool> implicit = llvm::None)
+         std::optional<bool> implicit = std::nullopt)
       : LabeledConditionalStmt(StmtKind::If,
                                getDefaultImplicitFlag(implicit, IfLoc),
                                LabelInfo, Cond),
         IfLoc(IfLoc), ElseLoc(ElseLoc), Then(Then), Else(Else) {}
 
   IfStmt(SourceLoc IfLoc, Expr *Cond, Stmt *Then, SourceLoc ElseLoc, Stmt *Else,
-         llvm::Optional<bool> implicit, ASTContext &Ctx);
+         std::optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getIfLoc() const { return IfLoc; }
   SourceLoc getElseLoc() const { return ElseLoc; }
@@ -808,14 +807,14 @@ class GuardStmt : public LabeledConditionalStmt {
   
 public:
   GuardStmt(SourceLoc GuardLoc, StmtCondition Cond, BraceStmt *Body,
-            llvm::Optional<bool> implicit = llvm::None)
+            std::optional<bool> implicit = std::nullopt)
       : LabeledConditionalStmt(StmtKind::Guard,
                                getDefaultImplicitFlag(implicit, GuardLoc),
                                LabeledStmtInfo(), Cond),
         GuardLoc(GuardLoc), Body(Body) {}
 
   GuardStmt(SourceLoc GuardLoc, Expr *Cond, BraceStmt *Body,
-            llvm::Optional<bool> implicit, ASTContext &Ctx);
+            std::optional<bool> implicit, ASTContext &Ctx);
 
   SourceLoc getGuardLoc() const { return GuardLoc; }
   
@@ -842,7 +841,7 @@ class WhileStmt : public LabeledConditionalStmt {
   
 public:
   WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
-            Stmt *Body, llvm::Optional<bool> implicit = llvm::None)
+            Stmt *Body, std::optional<bool> implicit = std::nullopt)
       : LabeledConditionalStmt(StmtKind::While,
                                getDefaultImplicitFlag(implicit, WhileLoc),
                                LabelInfo, Cond),
@@ -868,7 +867,7 @@ class RepeatWhileStmt : public LabeledStmt {
 public:
   RepeatWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc RepeatLoc, Expr *Cond,
                   SourceLoc WhileLoc, Stmt *Body,
-                  llvm::Optional<bool> implicit = llvm::None)
+                  std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::RepeatWhile,
                     getDefaultImplicitFlag(implicit, RepeatLoc), LabelInfo),
         RepeatLoc(RepeatLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
@@ -917,7 +916,7 @@ public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, SourceLoc TryLoc,
               SourceLoc AwaitLoc, Pattern *Pat, SourceLoc InLoc, Expr *Sequence,
               SourceLoc WhereLoc, Expr *WhereExpr, BraceStmt *Body,
-              llvm::Optional<bool> implicit = llvm::None)
+              std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                     LabelInfo),
         ForLoc(ForLoc), TryLoc(TryLoc), AwaitLoc(AwaitLoc), Pat(nullptr),
@@ -1068,7 +1067,7 @@ class FallthroughStmt : public Stmt {
   CaseStmt *FallthroughDest;
 
 public:
-  FallthroughStmt(SourceLoc Loc, llvm::Optional<bool> implicit = llvm::None)
+  FallthroughStmt(SourceLoc Loc, std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
         Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr) {}
 
@@ -1130,13 +1129,13 @@ class CaseStmt final
 
   llvm::PointerIntPair<BraceStmt *, 1, bool> BodyAndHasFallthrough;
 
-  llvm::Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
+  std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
   CaseStmt(CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
            ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
            SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-           llvm::Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-           llvm::Optional<bool> Implicit,
+           std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+           std::optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
 
 public:
@@ -1144,8 +1143,8 @@ public:
   create(ASTContext &C, CaseParentKind ParentKind, SourceLoc ItemIntroducerLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ItemTerminatorLoc, BraceStmt *Body,
-         llvm::Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
-         llvm::Optional<bool> Implicit = llvm::None,
+         std::optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
+         std::optional<bool> Implicit = std::nullopt,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
 
   CaseParentKind getParentKind() const { return ParentKind; }
@@ -1302,7 +1301,7 @@ class SwitchStmt final : public LabeledStmt,
 
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
-             SourceLoc EndLoc, llvm::Optional<bool> implicit = llvm::None)
+             SourceLoc EndLoc, std::optional<bool> implicit = std::nullopt)
       : LabeledStmt(StmtKind::Switch,
                     getDefaultImplicitFlag(implicit, SwitchLoc), LabelInfo),
         SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
@@ -1352,10 +1351,10 @@ public:
 private:
   struct AsCaseStmtWithSkippingNonCaseStmts {
     AsCaseStmtWithSkippingNonCaseStmts() {}
-    llvm::Optional<CaseStmt *> operator()(const ASTNode &N) const {
+    std::optional<CaseStmt *> operator()(const ASTNode &N) const {
       if (auto *CS = llvm::dyn_cast_or_null<CaseStmt>(N.dyn_cast<Stmt*>()))
         return CS;
-      return llvm::None;
+      return std::nullopt;
     }
   };
 
@@ -1387,7 +1386,7 @@ class DoCatchStmt final
   ThrownErrorDestination RethrowDest;
 
   DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
-              ArrayRef<CaseStmt *> catches, llvm::Optional<bool> implicit)
+              ArrayRef<CaseStmt *> catches, std::optional<bool> implicit)
       : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
                     labelInfo),
         DoLoc(doLoc), Body(body) {
@@ -1402,7 +1401,7 @@ public:
   static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                              SourceLoc doLoc, Stmt *body,
                              ArrayRef<CaseStmt *> catches,
-                             llvm::Optional<bool> implicit = llvm::None);
+                             std::optional<bool> implicit = std::nullopt);
 
   SourceLoc getDoLoc() const { return DoLoc; }
 
@@ -1458,7 +1457,7 @@ class BreakStmt : public Stmt {
 
 public:
   BreakStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
-            DeclContext *DC, llvm::Optional<bool> implicit = llvm::None)
+            DeclContext *DC, std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc),
         TargetName(TargetName), TargetLoc(TargetLoc), DC(DC) {}
 
@@ -1493,7 +1492,7 @@ class ContinueStmt : public Stmt {
 
 public:
   ContinueStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
-               DeclContext *DC, llvm::Optional<bool> implicit = llvm::None)
+               DeclContext *DC, std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)),
         Loc(Loc), TargetName(TargetName), TargetLoc(TargetLoc), DC(DC) {}
 
@@ -1527,7 +1526,7 @@ class FailStmt : public Stmt {
 
 public:
   FailStmt(SourceLoc returnLoc, SourceLoc nilLoc,
-           llvm::Optional<bool> implicit = llvm::None)
+           std::optional<bool> implicit = std::nullopt)
       : Stmt(StmtKind::Fail, getDefaultImplicitFlag(implicit, returnLoc)),
         ReturnLoc(returnLoc), NilLoc(nilLoc) {}
 

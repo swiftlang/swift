@@ -903,7 +903,7 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
 
   SourceLoc startLoc = loc;
   unsigned startBufferID = bufferID;
-  while (llvm::Optional<GeneratedSourceInfo> info =
+  while (std::optional<GeneratedSourceInfo> info =
              SM.getGeneratedSourceInfo(bufferID)) {
     switch (info->kind) {
     case GeneratedSourceInfo::ExpressionMacroExpansion:
@@ -1195,9 +1195,9 @@ CustomAttr *SourceFile::getAttachedMacroAttribute() const {
   return genInfo.attachedMacroCustomAttr;
 }
 
-llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
+std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   if (Kind != SourceFileKind::MacroExpansion)
-    return llvm::None;
+    return std::nullopt;
 
   auto genInfo =
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
@@ -1228,7 +1228,7 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -1480,18 +1480,18 @@ TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   return nullptr;
 }
 
-llvm::Optional<ExternalSourceLocs::RawLocs>
+std::optional<ExternalSourceLocs::RawLocs>
 SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   auto *FileCtx = D->getDeclContext()->getModuleScopeContext();
   assert(FileCtx == this && "D doesn't belong to this source file");
   if (FileCtx != this) {
     // D doesn't belong to this file. This shouldn't happen in practice.
-    return llvm::None;
+    return std::nullopt;
   }
 
   SourceLoc MainLoc = D->getLoc(/*SerializedOK=*/false);
   if (MainLoc.isInvalid())
-    return llvm::None;
+    return std::nullopt;
 
   // TODO: Rather than grabbing the location of the macro expansion, we should
   // instead add the generated buffer tree - that would need to include source
@@ -1504,7 +1504,7 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
     std::tie(UnderlyingBufferID, MainLoc) =
         D->getModuleContext()->getOriginalLocation(MainLoc);
     if (BufferID != UnderlyingBufferID)
-      return llvm::None;
+      return std::nullopt;
   }
 
   auto setLoc = [&](ExternalSourceLocs::RawLoc &RawLoc, SourceLoc Loc) {
@@ -2117,7 +2117,7 @@ Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
-  llvm::Optional<StableHasher> interfaceHasher =
+  std::optional<StableHasher> interfaceHasher =
       evaluateOrDefault(eval, ParseSourceFileRequest{mutableThis}, {})
           .InterfaceHasher;
   return Fingerprint{StableHasher{interfaceHasher.value()}.finalize()};
@@ -2504,7 +2504,7 @@ NominalTypeDecl *ModuleDecl::getMainTypeDecl() const {
 
 bool ModuleDecl::registerEntryPointFile(
     FileUnit *file, SourceLoc diagLoc,
-    llvm::Optional<ArtificialMainKind> kind) {
+    std::optional<ArtificialMainKind> kind) {
   if (!EntryPointInfo.hasEntryPoint()) {
     EntryPointInfo.setEntryPointFile(file);
     return false;
@@ -3158,13 +3158,13 @@ bool HasImportsMatchingFlagRequest::evaluate(Evaluator &evaluator,
   return false;
 }
 
-llvm::Optional<bool> HasImportsMatchingFlagRequest::getCachedResult() const {
+std::optional<bool> HasImportsMatchingFlagRequest::getCachedResult() const {
   SourceFile *sourceFile = std::get<0>(getStorage());
   ImportFlags flag = std::get<1>(getStorage());
   if (sourceFile->validCachedImportOptions.contains(flag))
     return sourceFile->cachedImportOptions.contains(flag);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 void HasImportsMatchingFlagRequest::cacheResult(bool value) const {
@@ -3311,7 +3311,7 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
          "getImportAccessLevel doesn't support checking for a self-import");
 
   auto &imports = getASTContext().getImportCache();
-  ImportAccessLevel restrictiveImport = llvm::None;
+  ImportAccessLevel restrictiveImport = std::nullopt;
 
   for (auto &import : *Imports) {
     if ((!restrictiveImport.has_value() ||
@@ -3769,7 +3769,7 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 }
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
-                       llvm::Optional<unsigned> bufferID,
+                       std::optional<unsigned> bufferID,
                        ParsingOptions parsingOpts, bool isPrimary)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
       ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
@@ -3779,7 +3779,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
          "A primary cannot appear outside the main module");
 
   if (isScriptMode()) {
-    bool problem = M.registerEntryPointFile(this, SourceLoc(), llvm::None);
+    bool problem = M.registerEntryPointFile(this, SourceLoc(), std::nullopt);
     assert(!problem && "multiple main files?");
     (void)problem;
   }

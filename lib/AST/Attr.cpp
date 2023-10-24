@@ -306,7 +306,7 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -344,7 +344,7 @@ DeclAttributes::getSoftDeprecated(const ASTContext &ctx) const {
           !AvAttr->isPackageDescriptionVersionSpecific())
         continue;
 
-      llvm::Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      std::optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.has_value())
         continue;
 
@@ -859,7 +859,7 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
   return lastAttr ? lastAttr->getRangeWithAt().Start : SourceLoc();
 }
 
-llvm::Optional<const DeclAttribute *>
+std::optional<const DeclAttribute *>
 OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
@@ -871,7 +871,7 @@ OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
   // Only attributes in the same buffer as the declaration they're attached to
   // are part of the original attribute list.
   if (declFile->getBufferID() != attrFile->getBufferID())
-    return llvm::None;
+    return std::nullopt;
 
   return Attr;
 }
@@ -1738,7 +1738,7 @@ StringRef DeclAttribute::getAttrName() const {
 }
 
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
-                   llvm::Optional<ObjCSelector> name, SourceRange parenRange,
+                   std::optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
     : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
       NameData(nullptr) {
@@ -1761,7 +1761,7 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
   Bits.ObjCAttr.Swift3Inferred = false;
 }
 
-ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
+ObjCAttr *ObjCAttr::create(ASTContext &Ctx, std::optional<ObjCSelector> name,
                            bool isNameImplicit) {
   return new (Ctx) ObjCAttr(name, isNameImplicit);
 }
@@ -1769,11 +1769,11 @@ ObjCAttr *ObjCAttr::create(ASTContext &Ctx, llvm::Optional<ObjCSelector> name,
 ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
   return new (Ctx)
-      ObjCAttr(AtLoc, SourceRange(ObjCLoc), llvm::None, SourceRange(), {});
+      ObjCAttr(AtLoc, SourceRange(ObjCLoc), std::nullopt, SourceRange(), {});
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(llvm::None, false);
+  return new (Ctx) ObjCAttr(std::nullopt, false);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -2002,7 +2002,7 @@ AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
                                IsSPI);
 }
 
-llvm::Optional<OriginallyDefinedInAttr::ActiveVersion>
+std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   OriginallyDefinedInAttr::ActiveVersion Result;
   Result.Platform = Platform;
@@ -2021,7 +2021,7 @@ OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
     Result.IsSimulator = ctx.LangOpts.TargetVariant->isSimulatorEnvironment();
     return Result;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 OriginallyDefinedInAttr *OriginallyDefinedInAttr::clone(ASTContext &C,

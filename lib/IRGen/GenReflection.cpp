@@ -174,7 +174,7 @@ public:
   }
 };
 
-llvm::Optional<llvm::VersionTuple>
+std::optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   // The Swift 5.5 runtime is the first version able to demangle types
   // related to concurrency.
@@ -215,7 +215,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     // involving them.
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 // Produce a fallback mangled type name that uses an open-coded callback
@@ -680,7 +680,7 @@ protected:
   using GetAddrOfEntityFn = llvm::Constant* (IRGenModule &, ConstantInit);
 
   llvm::GlobalVariable *
-  emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
+  emit(std::optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
        const char *section) {
     layout();
 
@@ -714,8 +714,8 @@ protected:
     return var;
   }
 
-  llvm::GlobalVariable *emit(llvm::NoneType none, const char *section) {
-    return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
+  llvm::GlobalVariable *emit(std::nullopt_t none, const char *section) {
+    return emit(std::optional<llvm::function_ref<GetAddrOfEntityFn>>(),
                 section);
   }
 
@@ -1163,7 +1163,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getMultiPayloadEnumDescriptorSectionName();
-    return ReflectionMetadataBuilder::emit(llvm::None, section);
+    return ReflectionMetadataBuilder::emit(std::nullopt, section);
   }
 };
 
@@ -1189,7 +1189,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getCaptureDescriptorMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(llvm::None, section);
+    return ReflectionMetadataBuilder::emit(std::nullopt, section);
   }
 };
 
@@ -1461,7 +1461,7 @@ public:
 
   llvm::GlobalVariable *emit() {
     auto section = IGM.getCaptureDescriptorMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(llvm::None, section);
+    return ReflectionMetadataBuilder::emit(std::nullopt, section);
   }
 };
 

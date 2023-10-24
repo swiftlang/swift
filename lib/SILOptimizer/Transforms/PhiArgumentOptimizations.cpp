@@ -368,7 +368,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
   VarDecl *field = nullptr;
   SILType newType;
-  llvm::Optional<SILLocation> loc;
+  std::optional<SILLocation> loc;
 
   // First step: collect all phi-arguments which can be transformed.
   unsigned workIdx = 0;

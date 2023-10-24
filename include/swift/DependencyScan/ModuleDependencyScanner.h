@@ -73,7 +73,7 @@ public:
   /// Identify the scanner invocation's main module's dependencies
   llvm::ErrorOr<ModuleDependencyInfo> getMainModuleDependencyInfo(
       ModuleDecl *mainModule,
-      llvm::Optional<SwiftDependencyTracker> tracker = llvm::None);
+      std::optional<SwiftDependencyTracker> tracker = std::nullopt);
 
   /// Resolve module dependencies of the given module, computing a full
   /// transitive closure dependency graph.
@@ -83,13 +83,13 @@ public:
 
   /// Query the module dependency info for the Clang module with the given name.
   /// Explicit by-name lookups are useful for batch mode scanning.
-  llvm::Optional<const ModuleDependencyInfo *>
+  std::optional<const ModuleDependencyInfo *>
   getNamedClangModuleDependencyInfo(StringRef moduleName,
                                     ModuleDependenciesCache &cache);
 
   /// Query the module dependency info for the Swift module with the given name.
   /// Explicit by-name lookups are useful for batch mode scanning.
-  llvm::Optional<const ModuleDependencyInfo *>
+  std::optional<const ModuleDependencyInfo *>
   getNamedSwiftModuleDependencyInfo(StringRef moduleName,
                                     ModuleDependenciesCache &cache);
 

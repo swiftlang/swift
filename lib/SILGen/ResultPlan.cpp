@@ -429,7 +429,7 @@ class PackExpansionResultPlan : public ResultPlan {
 
 public:
   PackExpansionResultPlan(ResultPlanBuilder &builder, SILValue packAddr,
-                          llvm::Optional<ArrayRef<Initialization *>> inits,
+                          std::optional<ArrayRef<Initialization *>> inits,
                           AbstractionPattern origExpansionType,
                           CanTupleEltTypeArrayRef substEltTypes)
       : PackAddr(packAddr) {
@@ -601,7 +601,7 @@ public:
           builder.build(nullptr, origEltType, substEltTypes[0]));
       } else {
         origEltPlans.push_back(builder.buildForPackExpansion(
-            llvm::None, origEltType, substEltTypes));
+            std::nullopt, origEltType, substEltTypes));
       }
     });
   }
@@ -1089,7 +1089,7 @@ public:
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(SGFAccessKind::ReadWrite,
                                 ManagedValue::forLValue(errorTemp),
-                                /*TODO: enforcement*/ llvm::None,
+                                /*TODO: enforcement*/ std::nullopt,
                                 AbstractionPattern(errorType), errorType);
   }
 
@@ -1116,7 +1116,7 @@ public:
     return subPlan->emitForeignAsyncCompletionHandler(SGF, origFormalType, loc);
   }
 
-  llvm::Optional<std::pair<ManagedValue, ManagedValue>>
+  std::optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
     SILGenFunction::PointerAccessInfo pointerInfo = {
       unwrappedPtrType, ptrKind, SGFAccessKind::ReadWrite
@@ -1276,7 +1276,7 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForPackExpansion(
-    llvm::Optional<ArrayRef<Initialization *>> inits,
+    std::optional<ArrayRef<Initialization *>> inits,
     AbstractionPattern origExpansionType, CanTupleEltTypeArrayRef substTypes) {
   assert(!inits || inits->size() == substTypes.size());
 

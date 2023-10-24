@@ -281,7 +281,7 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
   return nullptr;
 }
 
-llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
                                   ArrayRef<CustomAttr *> attrs) {
   ASTContext &ctx = dc->getASTContext();
@@ -314,12 +314,12 @@ swift::checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
   }
 
   if (!globalActorAttr)
-    return llvm::None;
+    return std::nullopt;
 
   return std::make_pair(globalActorAttr, globalActorNominal);
 }
 
-llvm::Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
     Evaluator &evaluator,
     llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
@@ -358,7 +358,7 @@ GlobalActorAttributeRequest::evaluate(
   // Look for a global actor attribute.
   auto result = checkGlobalActorAttributes(loc, dc, attrs);
   if (!result)
-    return llvm::None;
+    return std::nullopt;
 
   // Closures can always have a global actor attached.
   if (auto closure = subject.dyn_cast<ClosureExpr *>()) {
@@ -390,7 +390,7 @@ GlobalActorAttributeRequest::evaluate(
         // ... except for actors.
         nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
-        return llvm::None;
+        return std::nullopt;
       }
     }
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
@@ -404,14 +404,14 @@ GlobalActorAttributeRequest::evaluate(
              StrictConcurrency::Complete)) {
         var->diagnose(diag::global_actor_top_level_var)
             .highlight(globalActorAttr->getRangeWithAt());
-        return llvm::None;
+        return std::nullopt;
       }
 
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
         var->diagnose(diag::global_actor_on_local_variable, var->getName())
             .highlight(globalActorAttr->getRangeWithAt());
-        return llvm::None;
+        return std::nullopt;
       }
 
       // ... and not if it's the instance storage of a struct
@@ -423,7 +423,7 @@ GlobalActorAttributeRequest::evaluate(
 
         // In Swift 6, once the diag above is an error, it is disallowed.
         if (var->getASTContext().isSwiftVersionAtLeast(6))
-          return llvm::None;
+          return std::nullopt;
       }
     }
   } else if (isa<ExtensionDecl>(decl)) {
@@ -466,7 +466,7 @@ GlobalActorAttributeRequest::evaluate(
   } else {
     // Everything else is disallowed.
     decl->diagnose(diag::global_actor_disallowed, decl->getDescriptiveKind());
-    return llvm::None;
+    return std::nullopt;
   }
 
   return result;
@@ -476,7 +476,7 @@ Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
   // Look at the explicit attribute.
   auto globalActorAttr =
       evaluateOrDefault(closure->getASTContext().evaluator,
-                        GlobalActorAttributeRequest{closure}, llvm::None);
+                        GlobalActorAttributeRequest{closure}, std::nullopt);
   if (!globalActorAttr)
     return Type();
 
@@ -541,14 +541,14 @@ namespace {
 
 /// Try to decompose a call that might be an invocation of a partial apply
 /// thunk.
-static llvm::Optional<PartialApplyThunkInfo>
+static std::optional<PartialApplyThunkInfo>
 decomposePartialApplyThunk(ApplyExpr *apply, Expr *parent) {
   // Check for a call to the outer closure in the thunk.
   auto outerAutoclosure = dyn_cast<AutoClosureExpr>(apply->getFn());
   if (!outerAutoclosure ||
       outerAutoclosure->getThunkKind()
         != AutoClosureExpr::Kind::DoubleCurryThunk)
-    return llvm::None;
+    return std::nullopt;
 
   auto *unarySelfArg = apply->getArgs()->getUnlabeledUnaryExpr();
   assert(unarySelfArg &&
@@ -556,7 +556,7 @@ decomposePartialApplyThunk(ApplyExpr *apply, Expr *parent) {
 
   auto memberFn = outerAutoclosure->getUnwrappedCurryThunkExpr();
   if (!memberFn)
-    return llvm::None;
+    return std::nullopt;
 
   // Determine whether the partial apply thunk was immediately converted to
   // noescape.
@@ -570,7 +570,7 @@ decomposePartialApplyThunk(ApplyExpr *apply, Expr *parent) {
 }
 
 /// Find the immediate member reference in the given expression.
-static llvm::Optional<std::pair<ConcreteDeclRef, SourceLoc>>
+static std::optional<std::pair<ConcreteDeclRef, SourceLoc>>
 findReference(Expr *expr) {
   // Look through a function conversion.
   if (auto fnConv = dyn_cast<FunctionConversionExpr>(expr))
@@ -587,7 +587,7 @@ findReference(Expr *expr) {
   if (inner != expr)
     return findReference(inner);
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Return true if the callee of an ApplyExpr is async
@@ -794,16 +794,16 @@ static bool hasExplicitSendableConformance(NominalTypeDecl *nominal,
 }
 
 /// Find the import that makes the given nominal declaration available.
-static llvm::Optional<AttributedImport<ImportedModule>>
+static std::optional<AttributedImport<ImportedModule>>
 findImportFor(NominalTypeDecl *nominal, const DeclContext *fromDC) {
   // If the nominal type is from the current module, there's no import.
   auto nominalModule = nominal->getParentModule();
   if (nominalModule == fromDC->getParentModule())
-    return llvm::None;
+    return std::nullopt;
 
   auto fromSourceFile = fromDC->getParentSourceFile();
   if (!fromSourceFile)
-    return llvm::None;
+    return std::nullopt;
 
   // Look to see if the owning module was directly imported.
   for (const auto &import : fromSourceFile->getImports()) {
@@ -822,7 +822,7 @@ findImportFor(NominalTypeDecl *nominal, const DeclContext *fromDC) {
     }
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Determine the diagnostic behavior for a Sendable reference to the given
@@ -915,7 +915,7 @@ bool swift::diagnoseSendabilityErrorBasedOn(
     if (emittedDiagnostics && nominalIsImportedAndHasImplicitSendability) {
       // This type was imported from another module; try to find the
       // corresponding import.
-      llvm::Optional<AttributedImport<swift::ImportedModule>> import =
+      std::optional<AttributedImport<swift::ImportedModule>> import =
           findImportFor(nominal, fromContext.fromDC);
 
       // If we found the import that makes this nominal type visible, remark
@@ -1049,7 +1049,7 @@ bool swift::diagnoseNonSendableTypes(
 bool swift::diagnoseNonSendableTypesInReference(
     Expr *base, ConcreteDeclRef declRef,
     const DeclContext *fromDC, SourceLoc refLoc,
-    SendableCheckReason refKind, llvm::Optional<ActorIsolation> knownIsolation,
+    SendableCheckReason refKind, std::optional<ActorIsolation> knownIsolation,
     FunctionCheckOptions funcCheckOptions, SourceLoc diagnoseLoc) {
   // Retrieve the actor isolation to use in diagnostics.
   auto getActorIsolation = [&] {
@@ -1152,10 +1152,10 @@ void swift::diagnoseMissingSendableConformance(
 
 namespace {
   /// Infer Sendable from the instance storage of the given nominal type.
-  /// \returns \c llvm::None if there is no way to make the type \c Sendable,
+  /// \returns \c std::nullopt if there is no way to make the type \c Sendable,
   /// \c true if \c Sendable needs to be @unchecked, \c false if it can be
   /// \c Sendable without the @unchecked.
-  llvm::Optional<bool>
+  std::optional<bool>
   inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
                                    SmallVectorImpl<Requirement> &requirements) {
     // Raw storage is assumed not to be sendable.
@@ -1607,7 +1607,7 @@ static bool wasLegacyEscapingUseRestriction(AbstractFunctionDecl *fn) {
 
 /// Note that the given actor member is isolated.
 static void noteIsolatedActorMember(ValueDecl const *decl,
-                                    llvm::Optional<VarRefUseEnv> useKind) {
+                                    std::optional<VarRefUseEnv> useKind) {
   // detect if it is a distributed actor, to provide better isolation notes
 
   auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
@@ -1662,7 +1662,7 @@ static void noteIsolatedActorMember(ValueDecl const *decl,
 static bool memberAccessHasSpecialPermissionInSwift5(
     DeclContext const *refCxt, ReferencedActor &baseActor,
     ValueDecl const *member, SourceLoc memberLoc,
-    llvm::Optional<VarRefUseEnv> useKind) {
+    std::optional<VarRefUseEnv> useKind) {
   // no need for this in Swift 6+
   if (refCxt->getASTContext().isSwiftVersionAtLeast(6))
     return false;
@@ -1750,7 +1750,7 @@ static bool memberAccessHasSpecialPermissionInSwift5(
 static bool checkedByFlowIsolation(DeclContext const *refCxt,
                                    ReferencedActor &baseActor,
                                    ValueDecl const *member, SourceLoc memberLoc,
-                                   llvm::Optional<VarRefUseEnv> useKind) {
+                                   std::optional<VarRefUseEnv> useKind) {
 
   // base of member reference must be `self`
   if (!baseActor.isSelf())
@@ -2031,22 +2031,22 @@ namespace {
     ///
     /// @returns None if the context expression is either an InOutExpr,
     ///               not tracked, or if the decl is not a property or subscript
-    llvm::Optional<VarRefUseEnv> kindOfUsage(ValueDecl const *decl,
+    std::optional<VarRefUseEnv> kindOfUsage(ValueDecl const *decl,
                                              Expr *use) const {
       // we need a use for lookup.
       if (!use)
-        return llvm::None;
+        return std::nullopt;
 
       // must be a property or subscript
       if (!isPropOrSubscript(decl))
-        return llvm::None;
+        return std::nullopt;
 
       if (auto lookup = dyn_cast<DeclRefExpr>(use))
         return usageEnv(lookup);
       else if (auto lookup = dyn_cast<LookupExpr>(use))
         return usageEnv(lookup);
 
-      return llvm::None;
+      return std::nullopt;
     }
 
     /// @returns the kind of environment in which this expression appears, as
@@ -2358,7 +2358,7 @@ namespace {
     ///      ...))
     ///
     /// and we reach up to mark the CallExpr.
-    void markNearestCallAsImplicitly(llvm::Optional<ActorIsolation> setAsync,
+    void markNearestCallAsImplicitly(std::optional<ActorIsolation> setAsync,
                                      bool setThrows = false,
                                      bool setDistributedThunk = false) {
       assert(applyStack.size() > 0 && "not contained within an Apply?");
@@ -2460,7 +2460,7 @@ namespace {
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
         applyStack.push_back(lookup);
         checkReference(lookup->getBase(), lookup->getMember(), lookup->getLoc(),
-                       /*partialApply*/ llvm::None, lookup);
+                       /*partialApply*/ std::nullopt, lookup);
         return Action::Continue(expr);
       }
 
@@ -2473,7 +2473,7 @@ namespace {
         if (value->isLocalCapture())
           checkLocalCapture(valueRef, loc, declRef);
         else
-          checkReference(nullptr, valueRef, loc, llvm::None, declRef);
+          checkReference(nullptr, valueRef, loc, std::nullopt, declRef);
         return Action::Continue(expr);
       }
 
@@ -2874,8 +2874,8 @@ namespace {
     ///
     /// \returns the (setThrows, isDistributedThunk) bits to implicitly
     /// mark the access/call with on success, or emits an error and returns
-    /// \c llvm::None.
-    llvm::Optional<std::pair<bool, bool>>
+    /// \c std::nullopt.
+    std::optional<std::pair<bool, bool>>
     checkDistributedAccess(SourceLoc declLoc, ValueDecl *decl, Expr *context) {
       // If the actor itself is, we're not doing any distributed access.
       if (getIsolatedActor(context).isKnownToBeLocal()) {
@@ -2887,7 +2887,7 @@ namespace {
       // If there is no declaration, it can't possibly be distributed.
       if (!decl) {
         ctx.Diags.diagnose(declLoc, diag::distributed_actor_isolated_method);
-        return llvm::None;
+        return std::nullopt;
       }
 
       // Check that we have a distributed function or computed property.
@@ -2898,7 +2898,7 @@ namespace {
                            "distributed ");
 
           noteIsolatedActorMember(decl, context);
-          return llvm::None;
+          return std::nullopt;
         }
 
         return std::make_pair(
@@ -2925,7 +2925,7 @@ namespace {
                          diag::distributed_actor_isolated_non_self_reference,
                          decl);
       noteIsolatedActorMember(decl, context);
-      return llvm::None;
+      return std::nullopt;
     }
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -2997,7 +2997,7 @@ namespace {
         return false;
 
       // The isolation of the context we're in.
-      llvm::Optional<ActorIsolation> contextIsolation;
+      std::optional<ActorIsolation> contextIsolation;
       auto getContextIsolation = [&]() -> ActorIsolation {
         if (contextIsolation)
           return *contextIsolation;
@@ -3015,7 +3015,7 @@ namespace {
         callOptions |= ActorReferenceResult::Flags::AsyncPromotion;
 
       // Determine from the callee whether actor isolation is unsatisfied.
-      llvm::Optional<ActorIsolation> unsatisfiedIsolation;
+      std::optional<ActorIsolation> unsatisfiedIsolation;
       bool mayExitToNonisolated = true;
       Expr *argForIsolatedParam = nullptr;
       auto calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
@@ -3039,7 +3039,7 @@ namespace {
           auto result = ActorReferenceResult::forReference(
               memberRef->first, selfApplyFn->getLoc(), getDeclContext(),
               kindOfUsage(memberRef->first.getDecl(), selfApplyFn),
-              isolatedActor, llvm::None, llvm::None, getClosureActorIsolation);
+              isolatedActor, std::nullopt, std::nullopt, getClosureActorIsolation);
           switch (result) {
           case ActorReferenceResult::SameConcurrencyDomain:
             break;
@@ -3308,7 +3308,7 @@ namespace {
             // If this entity is always accessible across actors, just check
             // Sendable.
             if (isAccessibleAcrossActors(decl, isolation, getDeclContext(),
-                                         llvm::None)) {
+                                         std::nullopt)) {
               if (diagnoseNonSendableTypes(
                              component.getComponentType(), getDeclContext(),
                              component.getLoc(),
@@ -3355,7 +3355,7 @@ namespace {
     /// has already been emitted.
     bool checkReference(
         Expr *base, ConcreteDeclRef declRef, SourceLoc loc,
-        llvm::Optional<PartialApplyThunkInfo> partialApply = llvm::None,
+        std::optional<PartialApplyThunkInfo> partialApply = std::nullopt,
         Expr *context = nullptr) {
       if (!declRef)
         return false;
@@ -3371,12 +3371,12 @@ namespace {
           return false;
       }
 
-      llvm::Optional<ReferencedActor> isolatedActor;
+      std::optional<ReferencedActor> isolatedActor;
       if (base)
         isolatedActor.emplace(getIsolatedActor(base));
       auto result = ActorReferenceResult::forReference(
           declRef, loc, getDeclContext(), kindOfUsage(decl, context),
-          isolatedActor, llvm::None, llvm::None, getClosureActorIsolation);
+          isolatedActor, std::nullopt, std::nullopt, getClosureActorIsolation);
       switch (result) {
       case ActorReferenceResult::SameConcurrencyDomain:
         return diagnoseReferenceToUnsafeGlobal(decl, loc);
@@ -3707,7 +3707,7 @@ static bool hasExplicitIsolationAttribute(const Decl *decl) {
 /// \returns the actor isolation determined from attributes alone (with no
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
-static llvm::Optional<ActorIsolation>
+static std::optional<ActorIsolation>
 getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
                            bool onlyExplicit = false) {
   // Look up attributes on the declaration that can affect its actor isolation.
@@ -3720,13 +3720,13 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     if (nonisolatedAttr && nonisolatedAttr->isImplicit())
       nonisolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
-      globalActorAttr = llvm::None;
+      globalActorAttr = std::nullopt;
   }
 
   unsigned numIsolationAttrs =
     (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
-    return llvm::None;
+    return std::nullopt;
 
   // Only one such attribute is valid, but we only actually care of one of
   // them is a global actor.
@@ -3778,15 +3778,15 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
 }
 
 /// Infer isolation from witnessed protocol requirements.
-static llvm::Optional<ActorIsolation>
+static std::optional<ActorIsolation>
 getIsolationFromWitnessedRequirements(ValueDecl *value) {
   auto dc = value->getDeclContext();
   auto idc = dyn_cast_or_null<IterableDeclContext>(dc->getAsDecl());
   if (!idc)
-    return llvm::None;
+    return std::nullopt;
 
   if (dc->getSelfProtocolDecl())
-    return llvm::None;
+    return std::nullopt;
 
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
@@ -3869,19 +3869,19 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       isolatedRequirements.end());
 
   if (isolatedRequirements.size() != 1)
-    return llvm::None;
+    return std::nullopt;
 
   return std::get<1>(isolatedRequirements.front());
 }
 
 /// Compute the isolation of a nominal type from the conformances that
 /// are directly specified on the type.
-static llvm::Optional<ActorIsolation>
+static std::optional<ActorIsolation>
 getIsolationFromConformances(NominalTypeDecl *nominal) {
   if (isa<ProtocolDecl>(nominal))
-    return llvm::None;
+    return std::nullopt;
 
-  llvm::Optional<ActorIsolation> foundIsolation;
+  std::optional<ActorIsolation> foundIsolation;
   for (auto proto :
        nominal->getLocalProtocols(ConformanceLookupKind::NonStructural)) {
     switch (auto protoIsolation = getActorIsolation(proto)) {
@@ -3898,7 +3898,7 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
       }
 
       if (*foundIsolation != protoIsolation)
-        return llvm::None;
+        return std::nullopt;
 
       break;
     }
@@ -3909,22 +3909,22 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
 
 /// Compute the isolation of a nominal type from the property wrappers on
 /// any stored properties.
-static llvm::Optional<ActorIsolation>
+static std::optional<ActorIsolation>
 getIsolationFromWrappers(NominalTypeDecl *nominal) {
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
-    return llvm::None;
+    return std::nullopt;
 
   if (!nominal->getParentSourceFile())
-    return llvm::None;
+    return std::nullopt;
 
   ASTContext &ctx = nominal->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::DisableOutwardActorInference)) {
     // In Swift 6, we no longer infer isolation of a nominal type
     // based on the property wrappers used in its stored properties
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<ActorIsolation> foundIsolation;
+  std::optional<ActorIsolation> foundIsolation;
   for (auto member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
     if (!var || !var->isInstanceMember())
@@ -3955,7 +3955,7 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
       }
 
       if (*foundIsolation != isolation)
-        return llvm::None;
+        return std::nullopt;
 
       break;
     }
@@ -3975,10 +3975,10 @@ enum class MemberIsolationPropagation {
 }
 /// Determine how the given member can receive its isolation from its type
 /// context.
-static llvm::Optional<MemberIsolationPropagation>
+static std::optional<MemberIsolationPropagation>
 getMemberIsolationPropagation(const ValueDecl *value) {
   if (!value->getDeclContext()->isTypeContext())
-    return llvm::None;
+    return std::nullopt;
 
   switch (value->getKind()) {
   case DeclKind::Import:
@@ -4007,7 +4007,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::EnumElement:
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
-    return llvm::None;
+    return std::nullopt;
 
   case DeclKind::PatternBinding:
     return MemberIsolationPropagation::GlobalActor;
@@ -4071,7 +4071,7 @@ static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
   return ActorIsolation::forUnspecified();
 }
 
-static llvm::Optional<ActorIsolation>
+static std::optional<ActorIsolation>
 getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
   // Ensure that the base type that this function is declared in has @main
   // attribute
@@ -4105,7 +4105,7 @@ getActorIsolationForMainFuncDecl(FuncDecl *fnDecl) {
              ? ActorIsolation::forGlobalActor(
                    ctx.getMainActorType()->mapTypeOutOfContext(),
                    /*isUnsafe*/ false)
-             : llvm::Optional<ActorIsolation>();
+             : std::optional<ActorIsolation>();
 }
 
 /// Check rules related to global actor attributes on a class declaration.
@@ -4217,7 +4217,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto declContext = value->getInnermostDeclContext();
 
   auto refResult = ActorReferenceResult::forReference(
-      valueRef, SourceLoc(), declContext, llvm::None, llvm::None, isolation,
+      valueRef, SourceLoc(), declContext, std::nullopt, std::nullopt, isolation,
       overriddenIsolation);
   switch (refResult) {
   case ActorReferenceResult::SameConcurrencyDomain:
@@ -4247,10 +4247,10 @@ static OverrideIsolationResult validOverrideIsolation(
 
 /// Retrieve the index of the first isolated parameter of the given
 /// declaration, if there is one.
-static llvm::Optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
+static std::optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
   auto params = getParameterList(value);
   if (!params)
-    return llvm::None;
+    return std::nullopt;
 
   for (unsigned paramIdx : range(params->size())) {
     auto param = params->get(paramIdx);
@@ -4258,7 +4258,7 @@ static llvm::Optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
       return paramIdx;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Verifies rules about `isolated` parameters for the given decl. There is more
@@ -4366,7 +4366,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
-    llvm::Optional<ActorIsolation> mainIsolation =
+    std::optional<ActorIsolation> mainIsolation =
         getActorIsolationForMainFuncDecl(fd);
     if (mainIsolation) {
       if (isolationFromAttr && isolationFromAttr->isGlobalActor()) {
@@ -4410,7 +4410,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
           defaultIsolation = ActorIsolation::forNonisolated();
 
   // Look for and remember the overridden declaration's isolation.
-  llvm::Optional<ActorIsolation> overriddenIso;
+  std::optional<ActorIsolation> overriddenIso;
   ValueDecl *overriddenValue = value->getOverriddenDecl();
   if (overriddenValue) {
     // use the overridden decl's iso as the default isolation for this decl.
@@ -5305,15 +5305,15 @@ static Type applyUnsafeConcurrencyToParameterType(
 
 /// Determine whether the given name is that of a DispatchQueue operation that
 /// takes a closure to be executed on the queue.
-llvm::Optional<DispatchQueueOperation>
+std::optional<DispatchQueueOperation>
 swift::isDispatchQueueOperationName(StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<DispatchQueueOperation>>(name)
+  return llvm::StringSwitch<std::optional<DispatchQueueOperation>>(name)
       .Case("sync", DispatchQueueOperation::Normal)
       .Case("async", DispatchQueueOperation::Sendable)
       .Case("asyncAndWait", DispatchQueueOperation::Normal)
       .Case("asyncAfter", DispatchQueueOperation::Sendable)
       .Case("concurrentPerform", DispatchQueueOperation::Sendable)
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 /// Determine whether this function is implicitly known to have its
@@ -5767,7 +5767,7 @@ static bool isNonValueReference(const ValueDecl *value) {
 
 bool swift::isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, llvm::Optional<ReferencedActor> actorInstance) {
+    const DeclContext *fromDC, std::optional<ReferencedActor> actorInstance) {
   // Initializers and enum elements are accessible across actors unless they
   // are global-actor qualified.
   if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
@@ -5794,7 +5794,7 @@ bool swift::isAccessibleAcrossActors(
 
 ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
     ActorIsolation isolation) {
-  return ActorReferenceResult{SameConcurrencyDomain, llvm::None, isolation};
+  return ActorReferenceResult{SameConcurrencyDomain, std::nullopt, isolation};
 }
 
 ActorReferenceResult ActorReferenceResult::forEntersActor(
@@ -5804,7 +5804,7 @@ ActorReferenceResult ActorReferenceResult::forEntersActor(
 
 ActorReferenceResult ActorReferenceResult::forExitsActorToNonisolated(
     ActorIsolation isolation) {
-  return ActorReferenceResult{ExitsActorToNonisolated, llvm::None, isolation};
+  return ActorReferenceResult{ExitsActorToNonisolated, std::nullopt, isolation};
 }
 
 // Determine if two actor isolation contexts are considered to be equivalent.
@@ -5823,10 +5823,10 @@ static bool equivalentIsolationContexts(
 
 ActorReferenceResult ActorReferenceResult::forReference(
     ConcreteDeclRef declRef, SourceLoc declRefLoc, const DeclContext *fromDC,
-    llvm::Optional<VarRefUseEnv> useKind,
-    llvm::Optional<ReferencedActor> actorInstance,
-    llvm::Optional<ActorIsolation> knownDeclIsolation,
-    llvm::Optional<ActorIsolation> knownContextIsolation,
+    std::optional<VarRefUseEnv> useKind,
+    std::optional<ReferencedActor> actorInstance,
+    std::optional<ActorIsolation> knownDeclIsolation,
+    std::optional<ActorIsolation> knownContextIsolation,
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation) {
   // If not provided, compute the isolation of the declaration, adjusted
@@ -5934,11 +5934,11 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // without any kind of promotion.
   if (isAccessibleAcrossActors(
           declRef.getDecl(), declIsolation, fromDC, actorInstance))
-    return forEntersActor(declIsolation, llvm::None);
+    return forEntersActor(declIsolation, std::nullopt);
 
   // This is a cross-actor reference, so determine what adjustments we need
   // to perform.
-  Options options = llvm::None;
+  Options options = std::nullopt;
 
   // Note if the reference originates from a @preconcurrency-isolated context.
   if (contextIsolation.preconcurrency() || declIsolation.preconcurrency())

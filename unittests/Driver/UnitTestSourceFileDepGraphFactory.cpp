@@ -50,12 +50,12 @@ void UnitTestSourceFileDepGraphFactory::addAllUsedDecls() {
 
 void UnitTestSourceFileDepGraphFactory::addADefinedDecl(StringRef s,
                                                         const NodeKind kind) {
-  const llvm::Optional<DependencyKey> key =
+  const std::optional<DependencyKey> key =
       parseADefinedDecl(s, kind, DeclAspect::interface);
   if (!key)
     return;
   auto fingerprintString = s.split(fingerprintSeparator).second.str();
-  const llvm::Optional<Fingerprint> fingerprint =
+  const std::optional<Fingerprint> fingerprint =
       swift::mockFingerprintFromString(fingerprintString);
 
   AbstractSourceFileDepGraphFactory::addADefinedDecl(key.value(),
@@ -97,7 +97,7 @@ bool UnitTestSourceFileDepGraphFactory::isADefinedDecl(StringRef s) {
   return s.find(defUseSeparator) == StringRef::npos;
 }
 
-llvm::Optional<DependencyKey>
+std::optional<DependencyKey>
 UnitTestSourceFileDepGraphFactory::parseADefinedDecl(StringRef s,
                                                      const NodeKind kind,
                                                      const DeclAspect aspect) {
@@ -111,7 +111,7 @@ UnitTestSourceFileDepGraphFactory::parseADefinedDecl(StringRef s,
   return DependencyKey(kind, aspect, context, name);
 }
 
-llvm::Optional<std::pair<DependencyKey, DependencyKey>>
+std::optional<std::pair<DependencyKey, DependencyKey>>
 UnitTestSourceFileDepGraphFactory::parseAUsedDecl(const StringRef argString,
                                                   const NodeKind kind) {
   static const char *noncascadingPrefix = "#";
@@ -134,7 +134,7 @@ UnitTestSourceFileDepGraphFactory::parseAUsedDecl(const StringRef argString,
                         computeUseKey(defUseStrings.second, isCascadingUse));
 }
 
-llvm::Optional<bool>
+std::optional<bool>
 UnitTestSourceFileDepGraphFactory::singleNameIsContext(const NodeKind kind) {
   switch (kind) {
   case NodeKind::nominal:
@@ -146,7 +146,7 @@ UnitTestSourceFileDepGraphFactory::singleNameIsContext(const NodeKind kind) {
   case NodeKind::sourceFileProvide:
     return false;
   case NodeKind::member:
-    return llvm::None;
+    return std::nullopt;
   case NodeKind::kindCount:
     llvm_unreachable("impossible case");
   }

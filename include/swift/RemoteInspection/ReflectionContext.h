@@ -231,7 +231,7 @@ public:
 
   /// On success returns the ID of the newly registered Reflection Info.
   template <typename T>
-  llvm::Optional<uint32_t>
+  std::optional<uint32_t>
   readMachOSections(
       RemoteAddress ImageStart,
       llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
@@ -388,7 +388,7 @@ public:
   }
 
   /// On success returns the ID of the newly registered Reflection Info.
-  llvm::Optional<uint32_t> readPECOFFSections(
+  std::optional<uint32_t> readPECOFFSections(
       RemoteAddress ImageStart,
       llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto DOSHdrBuf = this->getReader().readBytes(
@@ -492,7 +492,7 @@ public:
   }
 
   /// On success returns the ID of the newly registered Reflection Info.
-  llvm::Optional<uint32_t> readPECOFF(RemoteAddress ImageStart,
+  std::optional<uint32_t> readPECOFF(RemoteAddress ImageStart,
                   llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf = this->getReader().readBytes(ImageStart,
                                            sizeof(llvm::object::dos_header));
@@ -517,9 +517,9 @@ public:
 
   /// On success returns the ID of the newly registered Reflection Info.
   template <typename T>
-  llvm::Optional<uint32_t> readELFSections(
+  std::optional<uint32_t> readELFSections(
       RemoteAddress ImageStart,
-      llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+      std::optional<llvm::sys::MemoryBlock> FileBuffer,
       llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // When reading from the FileBuffer we can simply return a pointer to
     // the underlying data.
@@ -705,21 +705,21 @@ public:
   ///
   /// \return
   ///     \b  The newly added reflection info ID if successful,
-  ///     \b llvm::None otherwise.
-  llvm::Optional<uint32_t>
+  ///     \b std::nullopt otherwise.
+  std::optional<uint32_t>
   readELF(RemoteAddress ImageStart,
-          llvm::Optional<llvm::sys::MemoryBlock> FileBuffer,
+          std::optional<llvm::sys::MemoryBlock> FileBuffer,
           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
     if (!Buf)
-      return llvm::None;
+      return std::nullopt;
 
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
 
     if (!Hdr->checkMagic())
-      return llvm::None;
+      return std::nullopt;
 
     // Check if we have a ELFCLASS32 or ELFCLASS64
     unsigned char FileClass = Hdr->getFileClass();
@@ -730,12 +730,12 @@ public:
       return readELFSections<ELFTraits<llvm::ELF::ELFCLASS32>>(
           ImageStart, FileBuffer, PotentialModuleNames);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
   /// On success returns the ID of the newly registered Reflection Info.
-  llvm::Optional<uint32_t>
+  std::optional<uint32_t>
   addImage(RemoteAddress ImageStart,
            llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // Read the first few bytes to look for a magic header.
@@ -768,12 +768,12 @@ public:
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
         && MagicBytes[2] == llvm::ELF::ElfMagic[2]
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
-      return readELF(ImageStart, llvm::Optional<llvm::sys::MemoryBlock>(),
+      return readELF(ImageStart, std::optional<llvm::sys::MemoryBlock>(),
                      PotentialModuleNames);
     }
 
     // We don't recognize the format.
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Adds an image using the FindSection closure to find the swift metadata
@@ -783,8 +783,8 @@ public:
   ///     process.
   /// \return
   ///     \b  The newly added reflection info ID if successful,
-  ///     \b llvm::None otherwise.
-  llvm::Optional<uint32_t>
+  ///     \b std::nullopt otherwise.
+  std::optional<uint32_t>
   addImage(llvm::function_ref<
                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
                FindSection,
@@ -984,7 +984,7 @@ public:
     }
   }
 
-  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  std::optional<std::pair<const TypeRef *, RemoteAddress>>
   getDynamicTypeAndAddressClassExistential(RemoteAddress ExistentialAddress) {
     auto PointerValue =
         readResolvedPointerValue(ExistentialAddress.getAddressData());
@@ -999,7 +999,7 @@ public:
     return {{std::move(TypeResult), RemoteAddress(*PointerValue)}};
   }
 
-  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  std::optional<std::pair<const TypeRef *, RemoteAddress>>
   getDynamicTypeAndAddressErrorExistential(RemoteAddress ExistentialAddress,
                                            bool *IsBridgedError = nullptr) {
     auto Result = readMetadataAndValueErrorExistential(ExistentialAddress);
@@ -1017,7 +1017,7 @@ public:
     return {{TypeResult, Result->PayloadAddress}};
   }
 
-  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  std::optional<std::pair<const TypeRef *, RemoteAddress>>
   getDynamicTypeAndAddressOpaqueExistential(RemoteAddress ExistentialAddress) {
     auto Result = readMetadataAndValueOpaqueExistential(ExistentialAddress);
     if (!Result)
@@ -1096,7 +1096,7 @@ public:
   /// a class type, it also dereferences the input `ExistentialAddress` before
   /// attempting to find its dynamic type and address when dealing with error
   /// existentials.
-  llvm::Optional<std::pair<const TypeRef *, RemoteAddress>>
+  std::optional<std::pair<const TypeRef *, RemoteAddress>>
   projectExistentialAndUnwrapClass(RemoteAddress ExistentialAddress,
                                    const TypeRef &ExistentialTR) {
     auto IsClass = [](const TypeRef *TypeResult) {
@@ -1279,7 +1279,7 @@ public:
   /// Iterate the protocol conformance cache in the target process, calling Call
   /// with the type and protocol of each conformance. Returns None on success,
   /// and a string describing the error on failure.
-  llvm::Optional<std::string> iterateConformances(
+  std::optional<std::string> iterateConformances(
     std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesPointerName =
         "_swift_debug_protocolConformanceStatePointer";
@@ -1294,7 +1294,7 @@ public:
       return "unable to read value of " + ConformancesPointerName;
 
     IterateConformanceTable(ConformancesAddr->getResolvedAddress(), Call);
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Fetch the metadata pointer from a metadata allocation, or 0 if this
@@ -1316,18 +1316,18 @@ public:
   }
 
   /// Get the name of a metadata tag, if known.
-  llvm::Optional<std::string> metadataAllocationTagName(int Tag) {
+  std::optional<std::string> metadataAllocationTagName(int Tag) {
     switch (Tag) {
 #define TAG(name, value)                                                       \
   case value:                                                                  \
     return std::string(#name);
 #include "../../../stdlib/public/runtime/MetadataAllocatorTags.def"
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
-  llvm::Optional<MetadataCacheNode<Runtime>>
+  std::optional<MetadataCacheNode<Runtime>>
   metadataAllocationCacheNode(MetadataAllocation<Runtime> Allocation) {
     switch (Allocation.Tag) {
     case BoxesTag:
@@ -1349,20 +1349,20 @@ public:
       auto NodeBytes = getReader().readBytes(
           RemoteAddress(Allocation.Ptr), sizeof(MetadataCacheNode<Runtime>));
       if (!NodeBytes)
-        return llvm::None;
+        return std::nullopt;
       auto Node =
           reinterpret_cast<const MetadataCacheNode<Runtime> *>(NodeBytes.get());
       return *Node;
     }
     default:
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
   /// Iterate the metadata allocations in the target process, calling Call with
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
-  llvm::Optional<std::string> iterateMetadataAllocations(
+  std::optional<std::string> iterateMetadataAllocations(
     std::function<void (MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
         "_swift_debug_metadataAllocationIterationEnabled";
@@ -1447,10 +1447,10 @@ public:
 
       TrailerPtr = Trailer->PrevTrailer;
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
-  llvm::Optional<std::string> iterateMetadataAllocationBacktraces(
+  std::optional<std::string> iterateMetadataAllocationBacktraces(
       std::function<void(StoredPointer, uint32_t, const StoredPointer *)>
           Call) {
     std::string BacktraceListName =
@@ -1462,7 +1462,7 @@ public:
     auto BacktraceListNextPtr =
         getReader().readPointer(BacktraceListAddr, sizeof(StoredPointer));
     if (!BacktraceListNextPtr)
-      return llvm::None;
+      return std::nullopt;
 
     // Limit how many iterations of this loop we'll do, to avoid potential
     // infinite loops when reading bad data. Limit to 1 billion iterations. In
@@ -1501,10 +1501,10 @@ public:
 
       BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
-    return llvm::None;
+    return std::nullopt;
   }
 
-  std::pair<llvm::Optional<std::string>, AsyncTaskSlabInfo>
+  std::pair<std::optional<std::string>, AsyncTaskSlabInfo>
   asyncTaskSlabAllocations(StoredPointer SlabPtr) {
     using StackAllocator = StackAllocator<Runtime>;
     auto SlabBytes = getReader().readBytes(
@@ -1535,11 +1535,11 @@ public:
     // Total slab size is the slab's capacity plus the header.
     StoredPointer SlabSize = Slab->Capacity + HeaderSize;
 
-    return {llvm::None,
+    return {std::nullopt,
             {Slab->Next, SlabSize, {NextPtrChunk, AllocatedSpaceChunk}}};
   }
 
-  std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
+  std::pair<std::optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(StoredPointer AsyncTaskPtr, unsigned ChildTaskLimit,
                 unsigned AsyncBacktraceLimit) {
     loadTargetPointers();
@@ -1554,7 +1554,7 @@ public:
           AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
   }
 
-  std::pair<llvm::Optional<std::string>, ActorInfo>
+  std::pair<std::optional<std::string>, ActorInfo>
   actorInfo(StoredPointer ActorPtr) {
     if (supportsPriorityEscalation)
       return actorInfo<
@@ -1642,7 +1642,7 @@ private:
   }
 
   template <typename AsyncTaskType>
-  std::pair<llvm::Optional<std::string>, AsyncTaskInfo>
+  std::pair<std::optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(StoredPointer AsyncTaskPtr, unsigned ChildTaskLimit,
                 unsigned AsyncBacktraceLimit) {
     auto AsyncTaskObj = readObj<AsyncTaskType>(AsyncTaskPtr);
@@ -1729,11 +1729,11 @@ private:
       }
     }
 
-    return {llvm::None, Info};
+    return {std::nullopt, Info};
   }
 
   template <typename ActorType>
-  std::pair<llvm::Optional<std::string>, ActorInfo>
+  std::pair<std::optional<std::string>, ActorInfo>
   actorInfo(StoredPointer ActorPtr) {
     auto ActorObj = readObj<ActorType>(ActorPtr);
     if (!ActorObj)
@@ -1759,7 +1759,7 @@ private:
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
         getThreadPort(ActorObj.get());
 
-    return {llvm::None, Info};
+    return {std::nullopt, Info};
   }
 
   // Get the most human meaningful "run job" function pointer from the task,
@@ -1981,7 +1981,7 @@ private:
   /// above.
   ///
   /// \param Builder Used to obtain offsets of elements known so far.
-  llvm::Optional<StoredPointer>
+  std::optional<StoredPointer>
   readMetadataSource(StoredPointer Context,
                      const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
@@ -2053,7 +2053,7 @@ private:
       break;
     }
 
-    return llvm::None;
+    return std::nullopt;
   }
 
   template <typename T>

@@ -566,7 +566,7 @@ struct ASTContext::Implementation {
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
 
-  llvm::Optional<ClangTypeConverter> Converter;
+  std::optional<ClangTypeConverter> Converter;
 
   /// The IRGen specific SIL transforms that have been registered.
   SILTransformCtors IRGenSILPasses;
@@ -2129,11 +2129,11 @@ bool ASTContext::isRecursivelyConstructingRequirementMachine(
   return getRewriteContext().isRecursivelyConstructingRequirementMachine(proto);
 }
 
-llvm::Optional<llvm::TinyPtrVector<ValueDecl *>>
+std::optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (!decl->LazySemanticInfo.hasOverriddenComputed)
-    return llvm::None;
+    return std::nullopt;
 
   // If there are no overridden declarations (the common case), return.
   llvm::TinyPtrVector<ValueDecl *> overridden;
@@ -2446,11 +2446,11 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-llvm::Optional<ExternalSourceLocs *>
+std::optional<ExternalSourceLocs *>
 ASTContext::getExternalSourceLocs(const Decl *D) {
   auto Known = getImpl().ExternalSourceLocs.find(D);
   if (Known == getImpl().ExternalSourceLocs.end())
-    return llvm::None;
+    return std::nullopt;
 
   return Known->second;
 }
@@ -2833,14 +2833,14 @@ void AbstractFunctionDecl::setForeignErrorConvention(
   conventionsMap.insert({this, conv});
 }
 
-llvm::Optional<ForeignErrorConvention>
+std::optional<ForeignErrorConvention>
 AbstractFunctionDecl::getForeignErrorConvention() const {
   if (!hasThrows())
-    return llvm::None;
+    return std::nullopt;
   auto &conventionsMap = getASTContext().getImpl().ForeignErrorConventions;
   auto it = conventionsMap.find(this);
   if (it == conventionsMap.end())
-    return llvm::None;
+    return std::nullopt;
   return it->second;
 }
 
@@ -2852,23 +2852,23 @@ void AbstractFunctionDecl::setForeignAsyncConvention(
   conventionsMap.insert({this, conv});
 }
 
-llvm::Optional<ForeignAsyncConvention>
+std::optional<ForeignAsyncConvention>
 AbstractFunctionDecl::getForeignAsyncConvention() const {
   if (!hasAsync())
-    return llvm::None;
+    return std::nullopt;
   auto &conventionsMap = getASTContext().getImpl().ForeignAsyncConventions;
   auto it = conventionsMap.find(this);
   if (it == conventionsMap.end())
-    return llvm::None;
+    return std::nullopt;
   return it->second;
 }
 
-llvm::Optional<KnownFoundationEntity>
+std::optional<KnownFoundationEntity>
 swift::getKnownFoundationEntity(StringRef name) {
-  return llvm::StringSwitch<llvm::Optional<KnownFoundationEntity>>(name)
+  return llvm::StringSwitch<std::optional<KnownFoundationEntity>>(name)
 #define FOUNDATION_ENTITY(Name) .Case(#Name, KnownFoundationEntity::Name)
 #include "swift/AST/KnownFoundationEntities.def"
-      .Default(llvm::None);
+      .Default(std::nullopt);
 }
 
 StringRef swift::getSwiftName(KnownFoundationEntity kind) {
@@ -3741,7 +3741,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
 AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
                                  RecursiveTypeProperties properties,
                                  Type instanceType,
-                                 llvm::Optional<MetatypeRepresentation> repr)
+                                 std::optional<MetatypeRepresentation> repr)
     : TypeBase(kind, C, properties), InstanceType(instanceType) {
   if (repr) {
     Bits.AnyMetatypeType.Representation = static_cast<char>(*repr) + 1;
@@ -3751,7 +3751,7 @@ AnyMetatypeType::AnyMetatypeType(TypeKind kind, const ASTContext *C,
 }
 
 MetatypeType *MetatypeType::get(Type T,
-                                llvm::Optional<MetatypeRepresentation> Repr,
+                                std::optional<MetatypeRepresentation> Repr,
                                 const ASTContext &Ctx) {
   auto properties = T->getRecursiveProperties();
   auto arena = getArena(properties);
@@ -3774,12 +3774,12 @@ MetatypeType *MetatypeType::get(Type T,
 
 MetatypeType::MetatypeType(Type T, const ASTContext *C,
                            RecursiveTypeProperties properties,
-                           llvm::Optional<MetatypeRepresentation> repr)
+                           std::optional<MetatypeRepresentation> repr)
     : AnyMetatypeType(TypeKind::Metatype, C, properties, T, repr) {}
 
 ExistentialMetatypeType *
 ExistentialMetatypeType::get(Type T,
-                             llvm::Optional<MetatypeRepresentation> repr,
+                             std::optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
   // If we're creating an existential metatype from an
   // existential type, wrap the constraint type direcly.
@@ -3807,7 +3807,7 @@ ExistentialMetatypeType::get(Type T,
 
 ExistentialMetatypeType::ExistentialMetatypeType(
     Type T, const ASTContext *C, RecursiveTypeProperties properties,
-    llvm::Optional<MetatypeRepresentation> repr)
+    std::optional<MetatypeRepresentation> repr)
     : AnyMetatypeType(TypeKind::ExistentialMetatype, C, properties, T, repr) {
   if (repr) {
     assert(*repr != MetatypeRepresentation::Thin &&
@@ -4017,7 +4017,7 @@ static void profileParams(llvm::FoldingSetNodeID &ID,
 
 void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
                            ArrayRef<AnyFunctionType::Param> params, Type result,
-                           llvm::Optional<ExtInfo> info) {
+                           std::optional<ExtInfo> info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
   if (info.has_value()) {
@@ -4030,7 +4030,7 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, llvm::Optional<ExtInfo> info) {
+                                Type result, std::optional<ExtInfo> info) {
   Type thrownError;
   Type globalActor;
   if (info.has_value()) {
@@ -4103,7 +4103,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
-                           llvm::Optional<ExtInfo> info, const ASTContext *ctx,
+                           std::optional<ExtInfo> info, const ASTContext *ctx,
                            RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::Function, ctx, output, properties,
                       params.size(), info) {
@@ -4126,7 +4126,7 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature sig,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  Type result, llvm::Optional<ExtInfo> info) {
+                                  Type result, std::optional<ExtInfo> info) {
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
@@ -4142,7 +4142,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              llvm::Optional<ExtInfo> info) {
+                                              std::optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
 
   // We do not allow type variables in GenericFunctionTypes. Note that if this
@@ -4216,7 +4216,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
 
 GenericFunctionType::GenericFunctionType(
     GenericSignature sig, ArrayRef<AnyFunctionType::Param> params, Type result,
-    llvm::Optional<ExtInfo> info, const ASTContext *ctx,
+    std::optional<ExtInfo> info, const ASTContext *ctx,
     RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::GenericFunction, ctx, result, properties,
                       params.size(), info),
@@ -4266,7 +4266,7 @@ void SILFunctionType::Profile(
     llvm::FoldingSetNodeID &id, GenericSignature genericParams, ExtInfo info,
     SILCoroutineKind coroutineKind, ParameterConvention calleeConvention,
     ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
-    ArrayRef<SILResultInfo> results, llvm::Optional<SILResultInfo> errorResult,
+    ArrayRef<SILResultInfo> results, std::optional<SILResultInfo> errorResult,
     ProtocolConformanceRef conformance, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs) {
   id.AddPointer(genericParams.getPointer());
@@ -4299,7 +4299,7 @@ SILFunctionType::SILFunctionType(
     GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
     ParameterConvention calleeConvention, ArrayRef<SILParameterInfo> params,
     ArrayRef<SILYieldInfo> yields, ArrayRef<SILResultInfo> normalResults,
-    llvm::Optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
+    std::optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs, const ASTContext &ctx,
     RecursiveTypeProperties properties,
     ProtocolConformanceRef witnessMethodConformance)
@@ -4509,7 +4509,7 @@ CanSILFunctionType SILFunctionType::get(
     GenericSignature genericSig, ExtInfo ext, SILCoroutineKind coroutineKind,
     ParameterConvention callee, ArrayRef<SILParameterInfo> params,
     ArrayRef<SILYieldInfo> yields, ArrayRef<SILResultInfo> normalResults,
-    llvm::Optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
+    std::optional<SILResultInfo> errorResult, SubstitutionMap patternSubs,
     SubstitutionMap invocationSubs, const ASTContext &ctx,
     ProtocolConformanceRef witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
@@ -4830,7 +4830,7 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
 
 CanTypeWrapper<OpenedArchetypeType>
 OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
-                         llvm::Optional<UUID> knownID) {
+                         std::optional<UUID> knownID) {
   assert(existential->isExistentialType());
   auto interfaceType = OpenedArchetypeType::getSelfInterfaceTypeFromContext(
       parentSig, existential->getASTContext());
@@ -4840,7 +4840,7 @@ OpenedArchetypeType::get(CanType existential, GenericSignature parentSig,
 CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
                                                 Type interfaceType,
                                                 GenericSignature parentSig,
-                                                llvm::Optional<UUID> knownID) {
+                                                std::optional<UUID> knownID) {
   assert(!interfaceType->hasArchetype() && "must be interface type");
 
   if (!knownID)
@@ -5353,7 +5353,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   if (wasNotFoundInCache ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
-    llvm::Optional<ForeignRepresentationInfo> result;
+    std::optional<ForeignRepresentationInfo> result;
 
     // Look for a conformance to _ObjectiveCBridgeable (other than Optional's--
     // we don't want to allow exposing APIs with double-optional types like
@@ -5565,7 +5565,7 @@ ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
-    ArrayRef<SILParameterInfo> params, llvm::Optional<SILResultInfo> result,
+    ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
   auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
@@ -5743,7 +5743,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   }
 
   auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformTypeParameterPacks([&](SubstitutableType *t) -> llvm::Optional<Type> {
+    return type.transformTypeParameterPacks([&](SubstitutableType *t) -> std::optional<Type> {
       if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
         if (packElementParams.find(paramType) != packElementParams.end()) {
           return Type(packElementParams[paramType]);
@@ -5751,7 +5751,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
 
         return Type(t);
       }
-      return llvm::None;
+      return std::nullopt;
     });
   };
 
@@ -6048,7 +6048,7 @@ void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
 }
 
 VarDecl *VarDecl::getOriginalWrappedProperty(
-    llvm::Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
+    std::optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
   if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 

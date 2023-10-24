@@ -76,10 +76,10 @@ struct DocStructureArrayBuilder::Implementation {
                       unsigned,            // BodyLength
                       unsigned,            // DocOffset
                       unsigned,            // DocLength
-                      Optional<StringRef>, // DisplayName
-                      Optional<StringRef>, // TypeName
-                      Optional<StringRef>, // RuntimeName
-                      Optional<StringRef>, // SelectorName
+                      std::optional<StringRef>, // DisplayName
+                      std::optional<StringRef>, // TypeName
+                      std::optional<StringRef>, // RuntimeName
+                      std::optional<StringRef>, // SelectorName
                       unsigned,            // InheritedTypesOffset
                       unsigned,            // AttrsOffset
                       unsigned,            // ElementsOffset
@@ -221,8 +221,8 @@ void DocStructureArrayBuilder::endSubStructure() {
   }
 
   // Canonicalize empty strings to None for the CompactArray.
-  auto str = [](StringRef str) -> Optional<StringRef> {
-    return str.empty() ? None : Optional<StringRef>(str);
+  auto str = [](StringRef str) -> std::optional<StringRef> {
+    return str.empty() ? std::nullopt : std::optional<StringRef>(str);
   };
 
   impl.structureBuilder.addEntry(

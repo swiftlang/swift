@@ -51,14 +51,14 @@ struct RequirementError {
 
   /// A requirement that conflicts with \c requirement. Both
   /// requirements will have the same subject type.
-  llvm::Optional<Requirement> conflictingRequirement;
+  std::optional<Requirement> conflictingRequirement;
 
   SourceLoc loc;
 
 private:
   RequirementError(Kind kind, Requirement requirement, SourceLoc loc)
       : kind(kind), requirement(requirement),
-        conflictingRequirement(llvm::None), loc(loc) {}
+        conflictingRequirement(std::nullopt), loc(loc) {}
 
   RequirementError(Kind kind, Requirement requirement,
                    Requirement conflict,

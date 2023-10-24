@@ -85,59 +85,59 @@ public:
 
   size_t anonymousSymbolCounter = 0;
 
-  llvm::Optional<SILDeclRef> StringToNSStringFn;
-  llvm::Optional<SILDeclRef> NSStringToStringFn;
-  llvm::Optional<SILDeclRef> ArrayToNSArrayFn;
-  llvm::Optional<SILDeclRef> NSArrayToArrayFn;
-  llvm::Optional<SILDeclRef> DictionaryToNSDictionaryFn;
-  llvm::Optional<SILDeclRef> NSDictionaryToDictionaryFn;
-  llvm::Optional<SILDeclRef> SetToNSSetFn;
-  llvm::Optional<SILDeclRef> NSSetToSetFn;
-  llvm::Optional<SILDeclRef> BoolToObjCBoolFn;
-  llvm::Optional<SILDeclRef> ObjCBoolToBoolFn;
-  llvm::Optional<SILDeclRef> BoolToDarwinBooleanFn;
-  llvm::Optional<SILDeclRef> DarwinBooleanToBoolFn;
-  llvm::Optional<SILDeclRef> NSErrorToErrorFn;
-  llvm::Optional<SILDeclRef> ErrorToNSErrorFn;
-  llvm::Optional<SILDeclRef> BoolToWindowsBoolFn;
-  llvm::Optional<SILDeclRef> WindowsBoolToBoolFn;
+  std::optional<SILDeclRef> StringToNSStringFn;
+  std::optional<SILDeclRef> NSStringToStringFn;
+  std::optional<SILDeclRef> ArrayToNSArrayFn;
+  std::optional<SILDeclRef> NSArrayToArrayFn;
+  std::optional<SILDeclRef> DictionaryToNSDictionaryFn;
+  std::optional<SILDeclRef> NSDictionaryToDictionaryFn;
+  std::optional<SILDeclRef> SetToNSSetFn;
+  std::optional<SILDeclRef> NSSetToSetFn;
+  std::optional<SILDeclRef> BoolToObjCBoolFn;
+  std::optional<SILDeclRef> ObjCBoolToBoolFn;
+  std::optional<SILDeclRef> BoolToDarwinBooleanFn;
+  std::optional<SILDeclRef> DarwinBooleanToBoolFn;
+  std::optional<SILDeclRef> NSErrorToErrorFn;
+  std::optional<SILDeclRef> ErrorToNSErrorFn;
+  std::optional<SILDeclRef> BoolToWindowsBoolFn;
+  std::optional<SILDeclRef> WindowsBoolToBoolFn;
 
-  llvm::Optional<ProtocolDecl *> PointerProtocol;
+  std::optional<ProtocolDecl *> PointerProtocol;
 
-  llvm::Optional<ProtocolDecl *> ObjectiveCBridgeable;
-  llvm::Optional<FuncDecl *> BridgeToObjectiveCRequirement;
-  llvm::Optional<FuncDecl *> UnconditionallyBridgeFromObjectiveCRequirement;
-  llvm::Optional<AssociatedTypeDecl *> BridgedObjectiveCType;
+  std::optional<ProtocolDecl *> ObjectiveCBridgeable;
+  std::optional<FuncDecl *> BridgeToObjectiveCRequirement;
+  std::optional<FuncDecl *> UnconditionallyBridgeFromObjectiveCRequirement;
+  std::optional<AssociatedTypeDecl *> BridgedObjectiveCType;
 
-  llvm::Optional<ProtocolDecl *> BridgedStoredNSError;
-  llvm::Optional<VarDecl *> NSErrorRequirement;
+  std::optional<ProtocolDecl *> BridgedStoredNSError;
+  std::optional<VarDecl *> NSErrorRequirement;
 
-  llvm::Optional<ProtocolConformance *> NSErrorConformanceToError;
+  std::optional<ProtocolConformance *> NSErrorConformanceToError;
 
-  llvm::Optional<FuncDecl *> AsyncLetStart;
-  llvm::Optional<FuncDecl *> AsyncLetGet;
-  llvm::Optional<FuncDecl *> AsyncLetGetThrowing;
-  llvm::Optional<FuncDecl *> EndAsyncLet;
+  std::optional<FuncDecl *> AsyncLetStart;
+  std::optional<FuncDecl *> AsyncLetGet;
+  std::optional<FuncDecl *> AsyncLetGetThrowing;
+  std::optional<FuncDecl *> EndAsyncLet;
 
-  llvm::Optional<FuncDecl *> TaskFutureGet;
-  llvm::Optional<FuncDecl *> TaskFutureGetThrowing;
+  std::optional<FuncDecl *> TaskFutureGet;
+  std::optional<FuncDecl *> TaskFutureGetThrowing;
 
-  llvm::Optional<FuncDecl *> RunTaskForBridgedAsyncMethod;
-  llvm::Optional<FuncDecl *> ResumeUnsafeContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
-  llvm::Optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
-  llvm::Optional<FuncDecl *> CheckExpectedExecutor;
+  std::optional<FuncDecl *> RunTaskForBridgedAsyncMethod;
+  std::optional<FuncDecl *> ResumeUnsafeContinuation;
+  std::optional<FuncDecl *> ResumeUnsafeThrowingContinuation;
+  std::optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
+  std::optional<FuncDecl *> CheckExpectedExecutor;
 
-  llvm::Optional<FuncDecl*> CreateCheckedContinuation;
-  llvm::Optional<FuncDecl*> CreateCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuation;
-  llvm::Optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
+  std::optional<FuncDecl*> CreateCheckedContinuation;
+  std::optional<FuncDecl*> CreateCheckedThrowingContinuation;
+  std::optional<FuncDecl*> ResumeCheckedContinuation;
+  std::optional<FuncDecl*> ResumeCheckedThrowingContinuation;
+  std::optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
 
-  llvm::Optional<FuncDecl *> AsyncMainDrainQueue;
-  llvm::Optional<FuncDecl *> GetMainExecutor;
-  llvm::Optional<FuncDecl *> SwiftJobRun;
-  llvm::Optional<FuncDecl *> ExitFunc;
+  std::optional<FuncDecl *> AsyncMainDrainQueue;
+  std::optional<FuncDecl *> GetMainExecutor;
+  std::optional<FuncDecl *> SwiftJobRun;
+  std::optional<FuncDecl *> ExitFunc;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -170,7 +170,7 @@ public:
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
-  llvm::Optional<SILVTable::Entry>
+  std::optional<SILVTable::Entry>
   emitVTableMethod(ClassDecl *theClass, SILDeclRef derived, SILDeclRef base);
 
   /// True if a function has been emitted for a given SILDeclRef.

@@ -268,18 +268,18 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
 
 /// Demangle the given type name to a generic parameter reference, which
 /// will be returned as (depth, index).
-static llvm::Optional<std::pair<unsigned, unsigned>>
+static std::optional<std::pair<unsigned, unsigned>>
 demangleToGenericParamRef(StringRef typeName) {
   StackAllocatedDemangler<1024> demangler;
   NodePointer node = demangler.demangleType(typeName);
   if (!node)
-    return llvm::None;
+    return std::nullopt;
 
   // Find the flat index that the right-hand side refers to.
   if (node->getKind() == Demangle::Node::Kind::Type)
     node = node->getChild(0);
   if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return llvm::None;
+    return std::nullopt;
 
   return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
                                        node->getChild(1)->getIndex());

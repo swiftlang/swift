@@ -405,8 +405,8 @@ void PropertyMap::unifyConcreteTypes(Term key,
                  << " with " << rhsProperty << "\n";
   }
 
-  llvm::Optional<unsigned> lhsDifferenceID;
-  llvm::Optional<unsigned> rhsDifferenceID;
+  std::optional<unsigned> lhsDifferenceID;
+  std::optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
                                                lhsProperty,
@@ -543,7 +543,7 @@ void PropertyMap::unifyConcreteTypes(Term key,
 ///
 /// Used by addSuperclassProperty() and addConcreteTypeProperty().
 void PropertyMap::unifyConcreteTypes(
-    Term key, llvm::Optional<Symbol> &bestProperty,
+    Term key, std::optional<Symbol> &bestProperty,
     llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
     Symbol property, unsigned ruleID) {
   // Unify this rule with all other concrete type rules we've seen so far,
@@ -563,8 +563,8 @@ void PropertyMap::unifyConcreteTypes(
   }
 
   // Otherwise, compute the meet with the existing best property.
-  llvm::Optional<unsigned> lhsDifferenceID;
-  llvm::Optional<unsigned> rhsDifferenceID;
+  std::optional<unsigned> lhsDifferenceID;
+  std::optional<unsigned> rhsDifferenceID;
 
   bool conflict = System.computeTypeDifference(key,
                                                *bestProperty, property,

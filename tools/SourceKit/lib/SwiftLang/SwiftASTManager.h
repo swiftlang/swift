@@ -145,7 +145,7 @@ class SwiftASTConsumer : public std::enable_shared_from_this<SwiftASTConsumer> {
   /// If the consumer isn't associated with any \c ASTBuildOperation at the
   /// moment (e.g. if it hasn't been scheduled on one yet or if the build
   /// operation has already informed the ASTConsumer), the callback is \c None.
-  llvm::Optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
+  std::optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
       CancellationRequestCallback;
 
   bool IsCancelled = false;
@@ -161,13 +161,13 @@ public:
   /// cause the \c ASTBuildOperation to be cancelled if no other consumer is
   /// depending on it.
   void requestCancellation() {
-    llvm::Optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
+    std::optional<std::function<void(std::shared_ptr<SwiftASTConsumer>)>>
         CallbackToCall;
     {
       llvm::sys::ScopedLock L(CancellationRequestCallbackAndIsCancelledMtx);
       IsCancelled = true;
       CallbackToCall = CancellationRequestCallback;
-      CancellationRequestCallback = llvm::None;
+      CancellationRequestCallback = std::nullopt;
     }
     if (CallbackToCall.has_value()) {
       (*CallbackToCall)(shared_from_this());
@@ -203,7 +203,7 @@ public:
   /// setCancellationRequestCallback.
   void removeCancellationRequestCallback() {
     llvm::sys::ScopedLock L(CancellationRequestCallbackAndIsCancelledMtx);
-    CancellationRequestCallback = llvm::None;
+    CancellationRequestCallback = std::nullopt;
   }
 
   // MARK: Result methods

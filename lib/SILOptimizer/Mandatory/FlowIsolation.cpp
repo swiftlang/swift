@@ -156,8 +156,8 @@ public:
   /// a normal return is reached, along with the block that returns normally.
   /// Only computed after calling solve(), where it remains None if the function
   /// doesn't return normally.
-  llvm::Optional<std::pair<SILBasicBlock *, State::Kind>> normalReturn =
-      llvm::None;
+  std::optional<std::pair<SILBasicBlock *, State::Kind>> normalReturn =
+      std::nullopt;
 
   /// indicates whether the SILFunction is (or contained in) a deinit.
   bool forDeinit;

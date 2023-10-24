@@ -95,7 +95,7 @@ SILGenModule::~SILGenModule() {
   M.verifyIncompleteOSSA();
 }
 
-static SILDeclRef getBridgingFn(llvm::Optional<SILDeclRef> &cacheSlot,
+static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
                                 SILGenModule &SGM, Identifier moduleName,
                                 StringRef functionName,
                                 std::initializer_list<Type> inputTypes,
@@ -365,7 +365,7 @@ SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
 }
 
 static FuncDecl *lookupIntrinsic(ModuleDecl &module,
-                                 llvm::Optional<FuncDecl *> &cache,
+                                 std::optional<FuncDecl *> &cache,
                                  Identifier name) {
   if (cache)
     return *cache;
@@ -384,7 +384,7 @@ static FuncDecl *lookupIntrinsic(ModuleDecl &module,
 }
 
 static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
-                                            llvm::Optional<FuncDecl *> &cache,
+                                            std::optional<FuncDecl *> &cache,
                                             StringRef name) {
   auto *module = C.getLoadedModule(C.Id_Concurrency);
   if (!module) {
@@ -635,7 +635,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(
       SILLinkage::PublicExternal, functionName, functionTy, env,
-      /*location*/ llvm::None, IsNotBare, IsNotTransparent, IsNotSerialized,
+      /*location*/ std::nullopt, IsNotBare, IsNotTransparent, IsNotSerialized,
       IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
 
   return fn;
@@ -1931,7 +1931,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   bool needsGenericContext = true;
   
   if (canStorageUseTrivialDescriptor(*this, decl)) {
-    (void)SILProperty::create(M, /*serialized*/ false, decl, llvm::None);
+    (void)SILProperty::create(M, /*serialized*/ false, decl, std::nullopt);
     return;
   }
   
@@ -2146,7 +2146,7 @@ swift::performASTLowering(ModuleDecl *mod, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc = ASTLoweringDescriptor::forWholeModule(mod, tc, options,
-                                                    llvm::None, irgenOptions);
+                                                    std::nullopt, irgenOptions);
   return llvm::cantFail(
       mod->getASTContext().evaluator(ASTLoweringRequest{desc}));
 }
@@ -2168,6 +2168,6 @@ swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
   auto desc =
-      ASTLoweringDescriptor::forFile(sf, tc, options, llvm::None, irgenOptions);
+      ASTLoweringDescriptor::forFile(sf, tc, options, std::nullopt, irgenOptions);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

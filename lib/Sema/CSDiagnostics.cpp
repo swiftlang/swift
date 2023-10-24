@@ -762,7 +762,7 @@ bool SameShapeExpansionFailure::diagnoseAsError() {
   return true;
 }
 
-llvm::Optional<Diag<Type, Type>>
+std::optional<Diag<Type, Type>>
 GenericArgumentsMismatchFailure::getDiagnosticFor(
     ContextualTypePurpose context) {
   switch (context) {
@@ -812,7 +812,7 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   case CTP_SingleValueStmtBranch:
     break;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
@@ -868,7 +868,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   path = path.drop_back(toDrop);
 
-  llvm::Optional<Diag<Type, Type>> diagnostic;
+  std::optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     if (isExpr<AssignExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_AssignSource);
@@ -2053,7 +2053,7 @@ bool AssignmentFailure::diagnoseAsError() {
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
   Expr *immutableExpr;
-  llvm::Optional<OverloadChoice> choice;
+  std::optional<OverloadChoice> choice;
   std::tie(immutableExpr, choice) = resolveImmutableBase(DestExpr);
 
   // Attempt diagnostics based on the overload choice.
@@ -2273,7 +2273,7 @@ bool AssignmentFailure::diagnoseAsError() {
   return true;
 }
 
-std::pair<Expr *, llvm::Optional<OverloadChoice>>
+std::pair<Expr *, std::optional<OverloadChoice>>
 AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   auto *DC = getDC();
   expr = expr->getValueProvidingExpr();
@@ -2303,7 +2303,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
       }
     }
 
-    llvm::Optional<OverloadChoice> member = getMemberRef(
+    std::optional<OverloadChoice> member = getMemberRef(
         getConstraintLocator(SE, ConstraintLocator::SubscriptMember));
 
     // If it isn't settable, return it.
@@ -2371,7 +2371,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
     if (member && member->isDecl() && isImmutable(member->getDecl()))
       return {expr, member};
     else
-      return {expr, llvm::None};
+      return {expr, std::nullopt};
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
@@ -2394,14 +2394,14 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
   if (auto *SAE = dyn_cast<SelfApplyExpr>(expr))
     return resolveImmutableBase(SAE->getFn());
 
-  return {expr, llvm::None};
+  return {expr, std::nullopt};
 }
 
-llvm::Optional<OverloadChoice>
+std::optional<OverloadChoice>
 AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   auto member = getOverloadChoiceIfAvailable(locator);
   if (!member)
-    return llvm::None;
+    return std::nullopt;
 
   if (!member->choice.isDecl())
     return member->choice;
@@ -2425,12 +2425,12 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
           locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
-      return memberRef ? llvm::Optional<OverloadChoice>(memberRef->choice)
-                       : llvm::None;
+      return memberRef ? std::optional<OverloadChoice>(memberRef->choice)
+                       : std::nullopt;
     }
 
     // If this is a string based dynamic lookup, there is no member declaration.
-    return llvm::None;
+    return std::nullopt;
   }
 
   return member->choice;
@@ -2791,7 +2791,7 @@ bool ContextualFailure::diagnoseAsNote() {
   return true;
 }
 
-static llvm::Optional<Diag<Type>>
+static std::optional<Diag<Type>>
 getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   switch (CTP) {
   case CTP_Unused:
@@ -2818,7 +2818,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_ComposedPropertyWrapper:
   case CTP_ExprPattern:
   case CTP_SingleValueStmtBranch:
-    return llvm::None;
+    return std::nullopt;
 
   case CTP_EnumCaseRawValue:
     return diag::cannot_convert_raw_initializer_value_nil;
@@ -2857,7 +2857,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 
   auto *locator = getLocator();
 
-  llvm::Optional<ContextualTypePurpose> CTP;
+  std::optional<ContextualTypePurpose> CTP;
   // Easy case were failure has been identified as contextual already.
   if (auto contextualTy =
           locator->getLastElementAs<LocatorPathElt::ContextualType>()) {
@@ -3526,7 +3526,7 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
           toType.getString() == "String.CharacterView.Index");
 }
 
-llvm::Optional<Diag<Type, Type>>
+std::optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                                     Type contextualType) {
   auto forProtocol = contextualType->isConstraintType();
@@ -3613,7 +3613,7 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_ExprPattern:
     break;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
@@ -3631,7 +3631,7 @@ bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
     return failure.diagnoseAsError();
   }
 
-  llvm::Optional<Diag<Type, Type>> diagnostic;
+  std::optional<Diag<Type, Type>> diagnostic;
 
   bool forProtocol = toType->isConstraintType();
   auto rawAnchor = getRawAnchor();
@@ -4858,7 +4858,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // If the base of the lookup is a protocol metatype, suggest
     // to replace the metatype with 'Self'
     // error saying the lookup cannot be on a protocol metatype
-    llvm::Optional<InFlightDiagnostic> Diag;
+    std::optional<InFlightDiagnostic> Diag;
     auto baseTy = BaseType;
 
     if (auto metatypeTy = baseTy->getAs<AnyMetatypeType>()) {
@@ -5573,7 +5573,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   return TypeChecker::isConvertibleTo(argType, paramType, solution.getDC());
 }
 
-llvm::Optional<std::pair<Expr *, ArgumentList *>>
+std::optional<std::pair<Expr *, ArgumentList *>>
 MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
   if (auto *call = getAsExpr<CallExpr>(anchor)) {
     return std::make_pair(call->getFn(), call->getArgs());
@@ -5584,7 +5584,7 @@ MissingArgumentsFailure::getCallInfo(ASTNode anchor) const {
   } else if (auto *ME = getAsExpr<MacroExpansionExpr>(anchor)) {
     return std::make_pair((Expr *)ME, ME->getArgs());
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
 void MissingArgumentsFailure::forFixIt(
@@ -6500,7 +6500,7 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto path = getLocator()->getPath();
 
-  llvm::Optional<Diag<Type, Type>> diagnostic;
+  std::optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     assert(isExpr<AssignExpr>(anchor));
     if (isa<SubscriptExpr>(castToExpr<AssignExpr>(anchor)->getDest())) {
@@ -7744,7 +7744,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     AK_MutableTyped,
   };
 
-  auto getAlternativeKind = [&]() -> llvm::Optional<AlternativeKind> {
+  auto getAlternativeKind = [&]() -> std::optional<AlternativeKind> {
     switch (getPointerKind(getParamType())) {
     case PTK_UnsafeRawPointer:
       return AK_Raw;
@@ -7755,7 +7755,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     case PTK_UnsafeMutablePointer:
       return AK_MutableTyped;
     case PTK_AutoreleasingUnsafeMutablePointer:
-      return llvm::None;
+      return std::nullopt;
     }
     llvm_unreachable("invalid pointer kind");
   };
@@ -8259,7 +8259,7 @@ bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
   return true;
 }
 
-llvm::Optional<Diag<Type, Type>>
+std::optional<Diag<Type, Type>>
 AbstractRawRepresentableFailure::getDiagnostic() const {
   auto *locator = getLocator();
 
@@ -8271,7 +8271,7 @@ AbstractRawRepresentableFailure::getDiagnostic() const {
     return diag::cannot_convert_argument_value;
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool AbstractRawRepresentableFailure::diagnoseAsError() {
@@ -8287,7 +8287,7 @@ bool AbstractRawRepresentableFailure::diagnoseAsError() {
 bool AbstractRawRepresentableFailure::diagnoseAsNote() {
   auto *locator = getLocator();
 
-  llvm::Optional<InFlightDiagnostic> diagnostic;
+  std::optional<InFlightDiagnostic> diagnostic;
   if (locator->isForContextualType()) {
     auto overload = getCalleeOverloadChoiceIfAvailable(locator);
     if (!overload)

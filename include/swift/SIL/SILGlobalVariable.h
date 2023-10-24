@@ -98,7 +98,7 @@ private:
 
   SILGlobalVariable(SILModule &M, SILLinkage linkage,
                     IsSerialized_t IsSerialized, StringRef mangledName,
-                    SILType loweredType, llvm::Optional<SILLocation> loc,
+                    SILType loweredType, std::optional<SILLocation> loc,
                     VarDecl *decl);
 
 public:
@@ -109,7 +109,7 @@ public:
   static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
                                    IsSerialized_t IsSerialized,
                                    StringRef MangledName, SILType LoweredType,
-                                   llvm::Optional<SILLocation> Loc = llvm::None,
+                                   std::optional<SILLocation> Loc = std::nullopt,
                                    VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();

@@ -358,7 +358,7 @@ bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::valueHasARCUsesInInstructionRange(SILValue Op,
                                          SILBasicBlock::iterator Start,
                                          SILBasicBlock::iterator End,
@@ -368,7 +368,7 @@ swift::valueHasARCUsesInInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return llvm::None;
+    return std::nullopt;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -381,13 +381,13 @@ swift::valueHasARCUsesInInstructionRange(SILValue Op,
   }
 
   // If all such instructions cannot use Op, return false.
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// If \p Op has arc uses in the instruction range (Start, End], return the
 /// first such instruction. Otherwise return None. We assume that Start and End
 /// are both in the same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
                                                 SILBasicBlock::iterator Start,
                                                 SILBasicBlock::iterator End,
@@ -399,7 +399,7 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return llvm::None;
+    return std::nullopt;
 
   // Otherwise, until End == Start.
   while (Start != End) {
@@ -412,14 +412,14 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
   }
 
   // If all such instructions cannot use Op, return false.
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// If \p Op has instructions in the instruction range (Start, End] which may
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
-llvm::Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::valueHasARCDecrementOrCheckInInstructionRange(
     SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
     AliasAnalysis *AA) {
@@ -428,7 +428,7 @@ swift::valueHasARCDecrementOrCheckInInstructionRange(
 
   // If Start == End, then we have an empty range, return nothing.
   if (Start == End)
-    return llvm::None;
+    return std::nullopt;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -442,7 +442,7 @@ swift::valueHasARCDecrementOrCheckInInstructionRange(
   }
 
   // If all such instructions cannot decrement Op, return nothing.
-  return llvm::None;
+  return std::nullopt;
 }
 
 bool

@@ -399,7 +399,7 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
 }
 
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
-                                  llvm::Optional<SILLocation> L) {
+                                  std::optional<SILLocation> L) {
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
@@ -586,11 +586,11 @@ namespace {
 namespace {
   struct BridgingConversion {
     Expr *SubExpr;
-    llvm::Optional<Conversion::KindTy> Kind;
+    std::optional<Conversion::KindTy> Kind;
     unsigned MaxOptionalDepth;
 
     BridgingConversion() : SubExpr(nullptr) {}
-    BridgingConversion(Expr *sub, llvm::Optional<Conversion::KindTy> kind,
+    BridgingConversion(Expr *sub, std::optional<Conversion::KindTy> kind,
                        unsigned depth)
         : SubExpr(sub), Kind(kind), MaxOptionalDepth(depth) {
       assert(!kind || Conversion::isBridgingKind(*kind));
@@ -670,14 +670,14 @@ static BridgingConversion getBridgingConversion(Expr *E) {
   // pattern above involving the opaque value, make sure we use the opening
   // as the final expression instead of accidentally look through it.
   if (open)
-    return {open, llvm::None, 0};
+    return {open, std::nullopt, 0};
 
-  return {E, llvm::None, 0};
+  return {E, std::nullopt, 0};
 }
 
 /// If the given expression represents a bridging conversion, emit it with
 /// the special reabstracting context.
-static llvm::Optional<ManagedValue>
+static std::optional<ManagedValue>
 tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
                             SGFContext C) {
   // Try to pattern-match a conversion.  This can find bridging
@@ -689,7 +689,7 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
   if (!result ||
       result.SubExpr == E ||
       result.SubExpr->getType()->isEqual(E->getType()))
-    return llvm::None;
+    return std::nullopt;
 
   // Even if the conversion doesn't involve bridging, we might still
   // expose more peephole opportunities by combining it with a contextual
@@ -697,12 +697,12 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
   if (!result.Kind) {
     // Only do this if the conversion is implicit.
     if (isExplicit)
-      return llvm::None;
+      return std::nullopt;
 
     // Look for a contextual conversion.
     auto conversion = C.getAsConversion();
     if (!conversion)
-      return llvm::None;
+      return std::nullopt;
 
     // Adjust the contextual conversion.
     auto sub = result.SubExpr;
@@ -717,7 +717,7 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
     }
 
     // If that didn't work, there's nothing special to do.
-    return llvm::None;
+    return std::nullopt;
   }
 
   auto kind = *result.Kind;
@@ -736,7 +736,7 @@ tryEmitAsBridgingConversion(SILGenFunction &SGF, Expr *E, bool isExplicit,
     if (!outerConversion ||
         !canPeepholeConversions(SGF, outerConversion->getConversion(),
                                 conversion)) {
-      return llvm::None;
+      return std::nullopt;
     }
   }
 
@@ -1086,7 +1086,7 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
                                                  bool isLexical,
                                                  bool generateDebugInfo) {
   ty = ty.getObjectType();
-  llvm::Optional<SILDebugVariable> DbgVar;
+  std::optional<SILDebugVariable> DbgVar;
   if (generateDebugInfo)
     if (auto *VD = loc.getAsASTNode<VarDecl>())
       DbgVar = SILDebugVariable(VD->isLet(), 0);
@@ -2579,7 +2579,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                captures);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   captures, calleeTypeInfo, ApplyOptions(), C, llvm::None);
+                   captures, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2603,7 +2603,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions(), C, llvm::None);
+                   {}, calleeTypeInfo, ApplyOptions(), C, std::nullopt);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -2644,7 +2644,7 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
   ManagedValue selfValue;
 
   Scope S(SGF, loc);
-  llvm::Optional<FormalEvaluationScope> FES;
+  std::optional<FormalEvaluationScope> FES;
 
   // If we have not exclusively borrowed self, we need to do so now.
   if (SGF.SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
@@ -3088,7 +3088,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
         genericSig, SILFunctionType::ExtInfo().withRepresentation(
           SILFunctionType::Representation::KeyPathAccessorGetter),
         SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, {}, result, llvm::None,
+        ParameterConvention::Direct_Unowned, params, {}, result, std::nullopt,
         SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
   
@@ -3282,7 +3282,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
         genericSig, SILFunctionType::ExtInfo().withRepresentation(
           SILFunctionType::Representation::KeyPathAccessorSetter),
         SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, {}, {}, llvm::None,
+        ParameterConvention::Direct_Unowned, params, {}, {}, std::nullopt,
         SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
   }();
   
@@ -3366,7 +3366,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           baseSubst, baseType);
   } else {
     auto baseOrig = ManagedValue::forLValue(baseArg);
-    lv = LValue::forAddress(SGFAccessKind::ReadWrite, baseOrig, llvm::None,
+    lv = LValue::forAddress(SGFAccessKind::ReadWrite, baseOrig, std::nullopt,
                             AbstractionPattern::getOpaque(), baseType);
 
     // Open an existential lvalue, if necessary.
@@ -3483,7 +3483,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           SILFunctionType::Representation::KeyPathAccessorEquals),
         SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
-        llvm::None, SubstitutionMap(), SubstitutionMap(), C);
+        std::nullopt, SubstitutionMap(), SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
     auto name = Mangle::ASTMangler()
@@ -3562,7 +3562,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           SGM.M, equatableSub, TypeExpansionContext(subSGF.F));
       auto equalsInfo =
           CalleeTypeInfo(equalsSubstTy, AbstractionPattern(boolTy), boolTy,
-                         llvm::None, llvm::None, ImportAsMemberStatus());
+                         std::nullopt, std::nullopt, ImportAsMemberStatus());
 
       Scope branchScope(subSGF, loc);
 
@@ -3605,7 +3605,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                           ManagedValue::forObjectRValueWithoutOwnership(
                               equalsWitness),
                           equatableSub, {lhsArg, rhsArg, metatyValue},
-                          equalsInfo, ApplyOptions(), SGFContext(), llvm::None)
+                          equalsInfo, ApplyOptions(), SGFContext(), std::nullopt)
                       .getUnmanagedSingleValue(subSGF, loc);
       }
       
@@ -3658,7 +3658,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           SILFunctionType::Representation::KeyPathAccessorHash),
         SILCoroutineKind::None,
         ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
-        llvm::None, SubstitutionMap(), SubstitutionMap(), C);
+        std::nullopt, SubstitutionMap(), SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
@@ -4873,11 +4873,11 @@ namespace {
     SGFAccessKind TheAccessKind;
 
     /// A flattened list of l-values.
-    SmallVectorImpl<llvm::Optional<LValue>> &Results;
+    SmallVectorImpl<std::optional<LValue>> &Results;
 
   public:
     TupleLValueEmitter(SILGenFunction &SGF, SGFAccessKind accessKind,
-                       SmallVectorImpl<llvm::Optional<LValue>> &results)
+                       SmallVectorImpl<std::optional<LValue>> &results)
         : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
 
     // If the destination is a tuple, recursively destructure.
@@ -4889,7 +4889,7 @@ namespace {
 
     // If the destination is '_', queue up a discard.
     void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
-      Results.push_back(llvm::None);
+      Results.push_back(std::nullopt);
     }
 
     // Otherwise, queue up a scalar assignment to an lvalue.
@@ -4904,18 +4904,18 @@ namespace {
       : public CanTypeVisitor<TupleLValueAssigner, void, RValue &&> {
     SILGenFunction &SGF;
     SILLocation AssignLoc;
-    MutableArrayRef<llvm::Optional<LValue>> DestLVQueue;
+    MutableArrayRef<std::optional<LValue>> DestLVQueue;
 
-    llvm::Optional<LValue> &&getNextDest() {
+    std::optional<LValue> &&getNextDest() {
       assert(!DestLVQueue.empty());
-      llvm::Optional<LValue> &next = DestLVQueue.front();
+      std::optional<LValue> &next = DestLVQueue.front();
       DestLVQueue = DestLVQueue.slice(1);
       return std::move(next);
     }
 
   public:
     TupleLValueAssigner(SILGenFunction &SGF, SILLocation assignLoc,
-                        SmallVectorImpl<llvm::Optional<LValue>> &destLVs)
+                        SmallVectorImpl<std::optional<LValue>> &destLVs)
         : SGF(SGF), AssignLoc(assignLoc), DestLVQueue(destLVs) {}
 
     /// Top-level entrypoint.
@@ -4941,7 +4941,7 @@ namespace {
     void visitType(CanType destType, RValue &&src) {
       assert(isa<LValueType>(destType));
 
-      llvm::Optional<LValue> &&next = getNextDest();
+      std::optional<LValue> &&next = getNextDest();
 
       // If the destination is a discard, do nothing.
       if (!next.has_value())
@@ -5025,7 +5025,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
   FormalEvaluationScope writeback(SGF);
 
   // Produce a flattened queue of LValues.
-  SmallVector<llvm::Optional<LValue>, 4> destLVs;
+  SmallVector<std::optional<LValue>, 4> destLVs;
   TupleLValueEmitter(SGF, SGFAccessKind::Write, destLVs).visit(dest);
 
   // Emit the r-value.
@@ -5053,11 +5053,11 @@ namespace {
     SGFAccessKind TheAccessKind;
 
     /// A flattened list of l-values.
-    SmallVectorImpl<llvm::Optional<LValue>> &Results;
+    SmallVectorImpl<std::optional<LValue>> &Results;
 
   public:
     PatternLValueEmitter(SILGenFunction &SGF, SGFAccessKind accessKind,
-                         SmallVectorImpl<llvm::Optional<LValue>> &results)
+                         SmallVectorImpl<std::optional<LValue>> &results)
         : SGF(SGF), TheAccessKind(accessKind), Results(results) {}
 
 #define USE_SUBPATTERN(Kind) \
@@ -5101,7 +5101,7 @@ namespace {
 
     Type visitAnyPattern(AnyPattern *pattern) {
       // Discard the value at this position.
-      Results.push_back(llvm::None);
+      Results.push_back(std::nullopt);
 
       return LValueType::get(pattern->getType());
     }
@@ -5113,7 +5113,7 @@ void SILGenFunction::emitAssignToPatternVars(
   FormalEvaluationScope writeback(*this);
 
   // Produce a flattened queue of LValues.
-  SmallVector<llvm::Optional<LValue>, 4> destLVs;
+  SmallVector<std::optional<LValue>, 4> destLVs;
   CanType destType = PatternLValueEmitter(
       *this, SGFAccessKind::Write, destLVs).visit(destPattern)
     ->getCanonicalType();
@@ -5198,7 +5198,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
-  // Create a temporary of type llvm::Optional<T> if it is address-only.
+  // Create a temporary of type std::optional<T> if it is address-only.
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   
   ManagedValue optValue;
@@ -5816,8 +5816,8 @@ public:
     return RValue(SGF, ManagedValue::forUnownedObjectValue(unowned), refType);
   }
 
-  llvm::Optional<AccessStorage> getAccessStorage() const override {
-    return llvm::None;
+  std::optional<AccessStorage> getAccessStorage() const override {
+    return std::nullopt;
   }
 
   void dump(raw_ostream &OS, unsigned indent) const override {

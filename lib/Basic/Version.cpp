@@ -125,10 +125,10 @@ Version::operator llvm::VersionTuple() const
   }
 }
 
-llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
+std::optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (size()) {
   case 0:
-    return llvm::None;
+    return std::nullopt;
   case 1:
     break;
   case 2:
@@ -136,12 +136,12 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     // component is 4.2.
     if (Components[0] == 4 && Components[1] == 2)
       break;
-    return llvm::None;
+    return std::nullopt;
   default:
     // We do not want to permit users requesting more precise effective language
     // versions since accepting such an argument promises more than we're able
     // to deliver.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // FIXME: When we switch to Swift 5 by default, the "4" case should return
@@ -174,7 +174,7 @@ llvm::Optional<Version> Version::getEffectiveLanguageVersion() const {
     return Version{6};
 #endif
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 

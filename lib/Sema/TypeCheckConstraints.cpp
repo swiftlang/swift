@@ -95,10 +95,10 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
-llvm::Optional<ExprKind>
+std::optional<ExprKind>
 TypeVariableType::Implementation::getAtomicLiteralKind() const {
   if (!locator || !locator->directlyAt<LiteralExpr>())
-    return llvm::None;
+    return std::nullopt;
 
   auto kind = getAsExpr(locator->getAnchor())->getKind();
   switch (kind) {
@@ -109,7 +109,7 @@ TypeVariableType::Implementation::getAtomicLiteralKind() const {
   case ExprKind::NilLiteral:
     return kind;
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
@@ -308,7 +308,7 @@ public:
 
   PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
     // We skip out-of-place expr checking here since we've already performed it.
-    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ llvm::None,
+    performSyntacticExprDiagnostics(expr, dcStack.back(), /*ctp*/ std::nullopt,
                                     /*isExprStmt=*/false,
                                     /*disableAvailabilityChecking*/ false,
                                     /*disableOutOfPlaceExprChecking*/ true);
@@ -384,7 +384,7 @@ void constraints::performSyntacticDiagnosticsForTarget(
     // context of the parent nodes.
     auto *body = target.getFunctionBody();
     diagnoseOutOfPlaceExprs(dc->getASTContext(), body,
-                            /*contextualPurpose*/ llvm::None);
+                            /*contextualPurpose*/ std::nullopt);
 
     FunctionSyntacticDiagnosticWalker walker(dc);
     body->walk(walker);
@@ -421,7 +421,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 /// FIXME: In order to remote this function both \c FrontendStatsTracer
 /// and \c PrettyStackTrace* have to be updated to accept `ASTNode`
 // instead of each individual syntactic element types.
-llvm::Optional<SyntacticElementTarget>
+std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
                                  TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -433,7 +433,7 @@ TypeChecker::typeCheckExpression(SyntacticElementTarget &target,
   return typeCheckTarget(target, options);
 }
 
-llvm::Optional<SyntacticElementTarget>
+std::optional<SyntacticElementTarget>
 TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                              TypeCheckExprOptions options) {
   DeclContext *dc = target.getDeclContext();
@@ -446,7 +446,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (ConstraintSystem::preCheckTarget(
           target, /*replaceInvalidRefsWithErrors=*/true,
           options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Check whether given target has a code completion token which requires
@@ -456,7 +456,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
                                  [&](const constraints::Solution &S) {
                                    Context.CompletionCallback->sawSolution(S);
                                  }))
-    return llvm::None;
+    return std::nullopt;
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
@@ -491,7 +491,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable)
-    return llvm::None;
+    return std::nullopt;
 
   // Apply this solution to the constraint system.
   // FIXME: This shouldn't be necessary.
@@ -502,7 +502,7 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   auto resultTarget = cs.applySolution(solution, target);
   if (!resultTarget) {
     // Failure already diagnosed, above, as part of applying the solution.
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Unless the client has disabled them, perform syntactic checks on the

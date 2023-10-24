@@ -169,9 +169,9 @@ public:
     return hasTag(declTag) ? (const Decl *)value : nullptr;
   }
   /// Get the context as a PrintStructureKind, or None.
-  llvm::Optional<PrintStructureKind> getPrintStructureKind() const {
+  std::optional<PrintStructureKind> getPrintStructureKind() const {
     if (!hasTag(PrintStructureKindTag))
-      return llvm::None;
+      return std::nullopt;
     return PrintStructureKind(value >> tagShift);
   }
   /// Whether this is a PrintStructureKind context of the given \p kind.
@@ -210,12 +210,12 @@ private:
   // MARK: The ASTPrinter callback interface.
 
   void printDeclPre(const Decl *D,
-                    llvm::Optional<BracketOptions> Bracket) override {
+                    std::optional<BracketOptions> Bracket) override {
     contextStack.emplace_back(PrintContext(D));
     openTag(getTagForDecl(D, /*isRef=*/false));
   }
   void printDeclPost(const Decl *D,
-                     llvm::Optional<BracketOptions> Bracket) override {
+                     std::optional<BracketOptions> Bracket) override {
     assert(contextStack.back().getDecl() == D && "unmatched printDeclPre");
     contextStack.pop_back();
     closeTag(getTagForDecl(D, /*isRef=*/false));
@@ -587,7 +587,7 @@ static StringRef getSourceToken(unsigned Offset,
   return Lexer::getTokenAtLocation(SM, Loc).getText();
 }
 
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 mapOffsetToOlderSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
@@ -603,7 +603,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
     auto Upd = *I;
     if (Upd->getByteOffset() <= Offset &&
         Offset < Upd->getByteOffset() + Upd->getText().size())
-      return llvm::None; // Offset is part of newly inserted text.
+      return std::nullopt; // Offset is part of newly inserted text.
 
     if (Upd->getByteOffset() <= Offset) {
       Offset += Upd->getLength(); // "bring back" what was removed.
@@ -613,7 +613,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
   return Offset;
 }
 
-static llvm::Optional<unsigned>
+static std::optional<unsigned>
 mapOffsetToNewerSnapshot(unsigned Offset,
                          ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
@@ -632,7 +632,7 @@ mapOffsetToNewerSnapshot(unsigned Offset,
 
   if (Completed)
     return Offset;
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Tries to remap the location from a previous snapshot to the latest one and
@@ -724,16 +724,16 @@ static void addRefactorings(
   }
 }
 
-static llvm::Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
+static std::optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
                                                          SourceLoc Cursor) {
   if (Cursor.isInvalid())
-    return llvm::None;
+    return std::nullopt;
   SourceLoc Loc;
   if (auto PD = dyn_cast<ParamDecl>(VD)) {
 
     // Avoid returning parent loc for internal-only names.
     if (PD->getArgumentNameLoc().isValid() && PD->getArgumentNameLoc() != Cursor)
-      return llvm::None;
+      return std::nullopt;
     auto *DC = PD->getDeclContext();
     switch (DC->getContextKind()) {
       case DeclContextKind::SubscriptDecl:
@@ -747,7 +747,7 @@ static llvm::Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
     }
   }
   if (Loc.isInvalid())
-    return llvm::None;
+    return std::nullopt;
   auto &SM = VD->getASTContext().SourceMgr;
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
@@ -887,13 +887,13 @@ static void setLocationInfo(const ValueDecl *VD,
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isValid()) {
     auto getSignatureRange =
-        [&](const ValueDecl *VD) -> llvm::Optional<unsigned> {
+        [&](const ValueDecl *VD) -> std::optional<unsigned> {
       if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
         SourceRange R = FD->getSignatureSourceRange();
         if (R.isValid())
           return getCharLength(SM, R);
       }
-      return llvm::None;
+      return std::nullopt;
     };
     unsigned NameLen;
     if (auto SigLen = getSignatureRange(VD)) {
@@ -1501,7 +1501,7 @@ public:
     if (!InputSnap)
       return false;
 
-    auto mappedBackOffset = [&]()->llvm::Optional<unsigned> {
+    auto mappedBackOffset = [&]()->std::optional<unsigned> {
       for (auto &Snap : Snapshots) {
         if (Snap->isFromSameBuffer(InputSnap)) {
           if (Snap->getStamp() == InputSnap->getStamp())
@@ -1509,19 +1509,19 @@ public:
 
           auto OptOffset = mapOffsetToOlderSnapshot(Offset, InputSnap, Snap);
           if (!OptOffset.has_value())
-            return llvm::None;
+            return std::nullopt;
 
           // Check that the new and old offset still point to the same token.
           StringRef NewTok = getSourceToken(Offset, InputSnap);
           if (NewTok.empty())
-            return llvm::None;
+            return std::nullopt;
           if (NewTok == getSourceToken(OptOffset.value(), Snap))
             return OptOffset;
 
-          return llvm::None;
+          return std::nullopt;
         }
       }
-      return llvm::None;
+      return std::nullopt;
     };
 
     auto OldOffsetOpt = mappedBackOffset();
@@ -1548,7 +1548,7 @@ SourceFile *SourceKit::retrieveInputFile(StringRef inputBufferName,
 
   // Otherwise, try to find the given buffer identifier
   const SourceManager &SM = CI.getSourceMgr();
-  llvm::Optional<unsigned> inputBufferID =
+  std::optional<unsigned> inputBufferID =
       SM.getIDForBufferIdentifier(inputBufferName);
   if (!inputBufferID) {
     // If that failed, try again with symlinks resolved (unless we've already
@@ -2055,7 +2055,7 @@ void SwiftLangSupport::getCursorInfo(
     StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
     unsigned Length, bool Actionables, bool SymbolGraph,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    llvm::Optional<VFSOptions> vfsOptions,
+    std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string error;
@@ -2083,7 +2083,7 @@ void SwiftLangSupport::getCursorInfo(
               /*ExtTyRef=*/nullptr, Entity.IsRef,
               /*Ty=*/Type(),
               /*ContainerType=*/Type(),
-              /*CustomAttrRef=*/llvm::None,
+              /*CustomAttrRef=*/std::nullopt,
               /*IsKeywordArgument=*/false,
               /*IsDynamic=*/false,
               /*ReceiverTypes=*/{},
@@ -2199,7 +2199,7 @@ void SwiftLangSupport::getCursorInfo(
 
 void SwiftLangSupport::getDiagnostics(
     StringRef PrimaryFilePath, ArrayRef<const char *> Args,
-    llvm::Optional<VFSOptions> VfsOptions,
+    std::optional<VFSOptions> VfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<DiagnosticsResult> &)> Receiver) {
   std::string FileSystemError;
@@ -2385,7 +2385,7 @@ static void resolveCursorFromUSR(
             /*ExtTyRef=*/nullptr,
             /*IsRef=*/false,
             /*Ty=*/Type(), ContainerType,
-            /*CustomAttrRef=*/llvm::None,
+            /*CustomAttrRef=*/std::nullopt,
             /*IsKeywordArgument=*/false,
             /*IsDynamic=*/false,
             /*ReceiverTypes=*/{},
@@ -2440,7 +2440,7 @@ static void resolveCursorFromUSR(
 void SwiftLangSupport::getCursorInfoFromUSR(
     StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    llvm::Optional<VFSOptions> vfsOptions,
+    std::optional<VFSOptions> vfsOptions,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
   std::string error;
@@ -2475,14 +2475,14 @@ void SwiftLangSupport::getCursorInfoFromUSR(
 // SwiftLangSupport::findUSRRange
 //===----------------------------------------------------------------------===//
 
-llvm::Optional<std::pair<unsigned, unsigned>>
+std::optional<std::pair<unsigned, unsigned>>
 SwiftLangSupport::findUSRRange(StringRef DocumentName, StringRef USR) {
   if (auto IFaceGenRef = IFaceGenContexts.get(DocumentName))
     return IFaceGenRef->findUSRRange(USR);
 
   // Only works for a module interface document currently.
   // FIXME: Report it as failed request.
-  return llvm::None;
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3024,8 +3024,8 @@ void SwiftLangSupport::collectExpressionTypes(
 
 void SwiftLangSupport::collectVariableTypes(
     StringRef PrimaryFilePath, StringRef InputBufferName,
-    ArrayRef<const char *> Args, llvm::Optional<unsigned> Offset,
-    llvm::Optional<unsigned> Length, bool FullyQualified,
+    ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+    std::optional<unsigned> Length, bool FullyQualified,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
@@ -3042,16 +3042,16 @@ void SwiftLangSupport::collectVariableTypes(
   private:
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver;
     std::string InputFile;
-    llvm::Optional<unsigned> Offset;
-    llvm::Optional<unsigned> Length;
+    std::optional<unsigned> Offset;
+    std::optional<unsigned> Length;
     bool FullyQualified;
 
   public:
     VariableTypeCollectorASTConsumer(
         std::function<void(const RequestResult<VariableTypesInFile> &)>
             Receiver,
-        StringRef InputFile, llvm::Optional<unsigned> Offset,
-        llvm::Optional<unsigned> Length, bool FullyQualified)
+        StringRef InputFile, std::optional<unsigned> Offset,
+        std::optional<unsigned> Length, bool FullyQualified)
         : Receiver(std::move(Receiver)), InputFile(InputFile), Offset(Offset),
           Length(Length), FullyQualified(FullyQualified) {}
 

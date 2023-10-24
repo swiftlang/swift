@@ -26,7 +26,7 @@ bool Renamer::renameBase(CharSourceRange Range,
 }
 
 bool Renamer::renameLabels(ArrayRef<CharSourceRange> LabelRanges,
-                           llvm::Optional<unsigned> FirstTrailingLabel,
+                           std::optional<unsigned> FirstTrailingLabel,
                            LabelRangeType RangeType, bool isCallSite) {
   if (isCallSite)
     return renameLabelsLenient(LabelRanges, FirstTrailingLabel, RangeType);
@@ -181,7 +181,7 @@ bool Renamer::labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType,
 }
 
 bool Renamer::renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
-                                  llvm::Optional<unsigned> FirstTrailingLabel,
+                                  std::optional<unsigned> FirstTrailingLabel,
                                   LabelRangeType RangeType) {
 
   ArrayRef<StringRef> OldNames = Old.args();

@@ -539,7 +539,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   if (!IRGen.Opts.UseJIT && !Context.LangOpts.hasFeature(Feature::Embedded)) {
     auto addBackDeployLib = [&](llvm::VersionTuple version,
                                 StringRef libraryName, bool forceLoad) {
-      llvm::Optional<llvm::VersionTuple> compatibilityVersion;
+      std::optional<llvm::VersionTuple> compatibilityVersion;
       if (libraryName == "swiftCompatibilityDynamicReplacements") {
         compatibilityVersion = IRGen.Opts.
             AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
@@ -2479,7 +2479,7 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM, LinkInfo &linkInfo,
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
     Alignment alignment, DebugTypeInfo DbgTy,
-    llvm::Optional<SILLocation> DebugLoc, StringRef DebugName) {
+    std::optional<SILLocation> DebugLoc, StringRef DebugName) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -2767,7 +2767,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     } else {
       // Create a global variable with debug info.
       StringRef name;
-      llvm::Optional<SILLocation> loc;
+      std::optional<SILLocation> loc;
       if (var->getDecl()) {
         // Use the VarDecl for more accurate debugging information.
         loc = var->getDecl();
@@ -3071,7 +3071,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     auto calleeContext =
         layout.emitCastTo(IGF, calleeContextBuffer.getAddress());
     auto saveValue = [&](ElementLayout layout, Explosion &explosion) -> void {
-      Address addr = layout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+      Address addr = layout.project(IGF, calleeContext, /*offsets*/ std::nullopt);
       auto &ti = cast<LoadableTypeInfo>(layout.getType());
       ti.initialize(IGF, explosion, addr, /*isOutlined*/ false);
     };
@@ -3083,7 +3083,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       auto *context = IGF.getAsyncContext();
       if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
         Address fieldAddr =
-            fieldLayout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+            fieldLayout.project(IGF, calleeContext, /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         context = emitPointerAuthSign(IGF, context, authInfo);
@@ -3100,7 +3100,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       // Sign the pointer.
       if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
         Address fieldAddr =
-            fieldLayout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+            fieldLayout.project(IGF, calleeContext, /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
@@ -3824,7 +3824,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     return getElementBitCast(existing, defaultType);
 
   const LazyConstantInitializer *lazyInitializer = nullptr;
-  llvm::Optional<ConstantInitBuilder> lazyBuilder;
+  std::optional<ConstantInitBuilder> lazyBuilder;
   if (definition.isLazy()) {
     lazyInitializer = definition.getLazy();
     lazyBuilder.emplace(*this);
@@ -5187,7 +5187,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     }
   }
 
-  llvm::Optional<LinkEntity> entity;
+  std::optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
   switch (canonicality) {
@@ -5506,7 +5506,7 @@ llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.
-llvm::Optional<llvm::Function *>
+std::optional<llvm::Function *>
 IRGenModule::getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer,
                                       bool isForeign,
                                       ForDefinition_t forDefinition) {
@@ -5521,7 +5521,7 @@ IRGenModule::getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer,
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
-  return llvm::None;
+  return std::nullopt;
 }
 
 /// Returns the address of a value-witness function.

@@ -228,7 +228,7 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
 
 static ManagedValue convertOwnershipConventionGivenParamInfo(
     SILGenFunction &SGF, SILParameterInfo param,
-    llvm::Optional<AnyFunctionType::Param> origParam, ManagedValue value,
+    std::optional<AnyFunctionType::Param> origParam, ManagedValue value,
     SILLocation loc, bool isForCoroutine) {
   bool isOwned = false;
   if (origParam) {
@@ -275,7 +275,7 @@ static void convertOwnershipConventionsGivenParamInfos(
   llvm::transform(indices(params), std::back_inserter(outVar),
                   [&](unsigned i) -> ManagedValue {
                     return convertOwnershipConventionGivenParamInfo(
-                        SGF, params[i], llvm::None /*orig param*/, values[i],
+                        SGF, params[i], std::nullopt /*orig param*/, values[i],
                         loc, isForCoroutine);
                   });
 }
@@ -352,7 +352,7 @@ private:
   SubstitutionMap Substitutions;
 
   /// The list of values captured by our callee.
-  llvm::Optional<SmallVector<ManagedValue, 2>> Captures;
+  std::optional<SmallVector<ManagedValue, 2>> Captures;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
@@ -562,7 +562,7 @@ public:
   }
 
   CalleeTypeInfo createCalleeTypeInfo(SILGenFunction &SGF,
-                                      llvm::Optional<SILDeclRef> constant,
+                                      std::optional<SILDeclRef> constant,
                                       SILType formalFnType) const & {
     CalleeTypeInfo result;
 
@@ -589,8 +589,8 @@ public:
   }
 
   ManagedValue getFnValue(SILGenFunction &SGF,
-                          llvm::Optional<ManagedValue> borrowedSelf) const & {
-    llvm::Optional<SILDeclRef> constant = llvm::None;
+                          std::optional<ManagedValue> borrowedSelf) const & {
+    std::optional<SILDeclRef> constant = std::nullopt;
 
     if (Constant)
       constant = Constant;
@@ -702,7 +702,7 @@ public:
   }
 
   CalleeTypeInfo getTypeInfo(SILGenFunction &SGF) const & {
-    llvm::Optional<SILDeclRef> constant = llvm::None;
+    std::optional<SILDeclRef> constant = std::nullopt;
 
     if (Constant)
       constant = Constant;
@@ -770,7 +770,7 @@ public:
   /// Return a specialized emission function if this is a function with a known
   /// lowering, such as a builtin, or return null if there is no specialized
   /// emitter.
-  llvm::Optional<SpecializedEmitter>
+  std::optional<SpecializedEmitter>
   getSpecializedEmitter(SILGenModule &SGM) const {
     switch (kind) {
     case Kind::StandaloneFunction: {
@@ -783,7 +783,7 @@ public:
     case Kind::WitnessMethod:
     case Kind::DynamicMethod:
     case Kind::StandaloneFunctionDynamicallyReplaceableImpl:
-      return llvm::None;
+      return std::nullopt;
     }
     llvm_unreachable("bad callee kind");
   }
@@ -849,7 +849,7 @@ public:
 
   /// The apply callee that abstractly represents the entry point that is being
   /// called.
-  llvm::Optional<Callee> applyCallee;
+  std::optional<Callee> applyCallee;
 
   /// The lvalue or rvalue representing the argument source of self.
   ArgumentSource selfParam;
@@ -3247,7 +3247,7 @@ public:
   // origParamType is a parameter type.
   void
   emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
-                llvm::Optional<AnyFunctionType::Param> param = llvm::None) {
+                std::optional<AnyFunctionType::Param> param = std::nullopt) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
     if (arg.isDelayedDefaultArg()) {
@@ -3312,7 +3312,7 @@ public:
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
-            llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {
+            std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
@@ -3721,7 +3721,7 @@ private:
   void
   emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
              AbstractionPattern origParamType, SILParameterInfo param,
-             llvm::Optional<AnyFunctionType::Param> origParam = llvm::None) {
+             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
     ManagedValue value;
     auto loc = arg.getLocation();
 
@@ -3954,7 +3954,7 @@ private:
       Initialization *innermostInit = bufferInit.get();
 
       // Wrap it in a ConversionInitialization if required.
-      llvm::Optional<ConvertingInitialization> convertingInit;
+      std::optional<ConvertingInitialization> convertingInit;
       auto substPatternType = patternExpr->getType()->getCanonicalType();
       auto loweredPatternTy = SGF.getLoweredRValueType(substPatternType);
       if (loweredPatternTy != expectedElementType.getASTType()) {
@@ -4689,12 +4689,12 @@ namespace {
 class CallEmission {
   SILGenFunction &SGF;
 
-  llvm::Optional<CallSite> selfArg;
-  llvm::Optional<CallSite> callSite;
+  std::optional<CallSite> selfArg;
+  std::optional<CallSite> callSite;
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  llvm::Optional<ActorIsolation> implicitActorHopTarget;
+  std::optional<ActorIsolation> implicitActorHopTarget;
   bool implicitlyThrows;
 
 public:
@@ -4703,7 +4703,7 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitActorHopTarget(llvm::None), implicitlyThrows(false) {}
+        implicitActorHopTarget(std::nullopt), implicitlyThrows(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -4744,7 +4744,7 @@ public:
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
   void
-  setImplicitlyAsync(llvm::Optional<ActorIsolation> implicitActorHopTarget) {
+  setImplicitlyAsync(std::optional<ActorIsolation> implicitActorHopTarget) {
     this->implicitActorHopTarget = implicitActorHopTarget;
   }
 
@@ -4792,7 +4792,7 @@ private:
   ApplyOptions emitArgumentsForNormalApply(
       AbstractionPattern origFormalType, CanSILFunctionType substFnType,
       const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
-      llvm::Optional<SILLocation> &uncurriedLoc);
+      std::optional<SILLocation> &uncurriedLoc);
 
   RValue
   applySpecializedEmitter(SpecializedEmitter &specializedEmitter, SGFContext C);
@@ -4839,7 +4839,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
   auto calleeTypeInfo = callee.getTypeInfo(SGF);
 
   SmallVector<ManagedValue, 4> uncurriedArgs;
-  llvm::Optional<SILLocation> uncurriedLoc;
+  std::optional<SILLocation> uncurriedLoc;
 
   // Evaluate the arguments.
   ApplyOptions options = emitArgumentsForNormalApply(
@@ -4848,7 +4848,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
       uncurriedLoc);
 
   // Now evaluate the callee.
-  llvm::Optional<ManagedValue> borrowedSelf;
+  std::optional<ManagedValue> borrowedSelf;
   if (callee.requiresSelfValueForDispatch()) {
     borrowedSelf = uncurriedArgs.back();
   }
@@ -4963,7 +4963,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
-  llvm::Optional<SILLocation> uncurriedLoc;
+  std::optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
 
   // *NOTE* We pass in initial options as a reference so that we can pass to
@@ -4974,7 +4974,7 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
       uncurriedLoc);
 
   // Now evaluate the callee.
-  llvm::Optional<ManagedValue> borrowedSelf;
+  std::optional<ManagedValue> borrowedSelf;
   if (callee.requiresSelfValueForDispatch()) {
     borrowedSelf = uncurriedArgs.back();
   }
@@ -5097,9 +5097,9 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     return RValue(SGF, uncurriedLoc, formalResultType, resultMV);
   }
 
-  llvm::Optional<ResultPlanPtr> resultPlan;
-  llvm::Optional<ArgumentScope> argScope;
-  llvm::Optional<CalleeTypeInfo> calleeTypeInfo;
+  std::optional<ResultPlanPtr> resultPlan;
+  std::optional<ArgumentScope> argScope;
+  std::optional<CalleeTypeInfo> calleeTypeInfo;
   SILLocation loc = callSite->Loc;
   SILFunctionConventions substConv(substFnType, SGF.SGM.M);
 
@@ -5119,7 +5119,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
-  llvm::Optional<SILLocation> uncurriedLoc;
+  std::optional<SILLocation> uncurriedLoc;
   CanFunctionType formalApplyType;
   emitArgumentsForNormalApply(origFormalType, substFnType, ForeignInfo{},
                               uncurriedArgs, uncurriedLoc);
@@ -5192,7 +5192,7 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
 ApplyOptions CallEmission::emitArgumentsForNormalApply(
     AbstractionPattern origFormalType, CanSILFunctionType substFnType,
     const ForeignInfo &foreign, SmallVectorImpl<ManagedValue> &uncurriedArgs,
-    llvm::Optional<SILLocation> &uncurriedLoc) {
+    std::optional<SILLocation> &uncurriedLoc) {
   ApplyOptions options;
 
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
@@ -5398,7 +5398,7 @@ RValue SILGenFunction::emitApply(
     ManagedValue fn, SubstitutionMap subs, ArrayRef<ManagedValue> args,
     const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
     SGFContext evalContext,
-    llvm::Optional<ActorIsolation> implicitActorHopTarget) {
+    std::optional<ActorIsolation> implicitActorHopTarget) {
   auto substFnType = calleeTypeInfo.substFnType;
 
   // Create the result plan.
@@ -5661,8 +5661,8 @@ RValue SILGenFunction::emitApply(
 RValue SILGenFunction::emitMonomorphicApply(
     SILLocation loc, ManagedValue fn, ArrayRef<ManagedValue> args,
     CanType foreignResultType, CanType nativeResultType, ApplyOptions options,
-    llvm::Optional<SILFunctionTypeRepresentation> overrideRep,
-    const llvm::Optional<ForeignErrorConvention> &foreignError,
+    std::optional<SILFunctionTypeRepresentation> overrideRep,
+    const std::optional<ForeignErrorConvention> &foreignError,
     SGFContext evalContext) {
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
@@ -5678,7 +5678,7 @@ RValue SILGenFunction::emitMonomorphicApply(
       *this, calleeTypeInfo, loc, evalContext);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fn, {},
-                   args, calleeTypeInfo, options, evalContext, llvm::None);
+                   args, calleeTypeInfo, options, evalContext, std::nullopt);
 }
 
 /// Emit either an 'apply' or a 'try_apply', with the error branch of
@@ -5946,7 +5946,7 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   auto calleeTypeInfo = callee.getTypeInfo(*this);
 
-  llvm::Optional<ManagedValue> borrowedSelf;
+  std::optional<ManagedValue> borrowedSelf;
   if (callee.requiresSelfValueForDispatch())
     borrowedSelf = args.back();
   auto mv = callee.getFnValue(*this, borrowedSelf);
@@ -5970,7 +5970,7 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
-                   finalArgs, calleeTypeInfo, ApplyOptions(), ctx, llvm::None);
+                   finalArgs, calleeTypeInfo, ApplyOptions(), ctx, std::nullopt);
 }
 
 void SILGenFunction::emitApplyOfUnavailableCodeReached() {
@@ -6082,7 +6082,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   }
 
   // Form the callee.
-  llvm::Optional<Callee> callee;
+  std::optional<Callee> callee;
   if (isa<ProtocolDecl>(ctor->getDeclContext())) {
     callee.emplace(Callee::forWitnessMethod(
         *this, selfMetaVal.getType().getASTType(),
@@ -6506,7 +6506,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     // arguments.
     return ArgumentSource(
         loc,
-        LValue::forAddress(SGFAccessKind::ReadWrite, base, llvm::None,
+        LValue::forAddress(SGFAccessKind::ReadWrite, base, std::nullopt,
                            AbstractionPattern(baseFormalType), baseFormalType));
   }
 
@@ -6714,7 +6714,7 @@ RValue SILGenFunction::emitGetAccessor(
     SILLocation loc, SILDeclRef get, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
     PreparedArguments &&subscriptIndices, SGFContext c, bool isOnSelfParameter,
-    llvm::Optional<ActorIsolation> implicitActorHopTarget) {
+    std::optional<ActorIsolation> implicitActorHopTarget) {
   // Scope any further writeback just within this operation.
   FormalEvaluationScope writebackScope(*this);
 
@@ -7171,7 +7171,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
     if (isa<VarDecl>(memberRef.getDecl())) {
       resultRV =
           emitMonomorphicApply(loc, result, {}, foreignMethodTy.getResult(),
-                               valueTy, ApplyOptions(), llvm::None, llvm::None);
+                               valueTy, ApplyOptions(), std::nullopt, std::nullopt);
     } else {
       resultRV = RValue(*this, loc, valueTy, result);
     }
@@ -7276,7 +7276,7 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
 
     auto resultRV = emitMonomorphicApply(
         loc, result, indexValues, foreignMethodTy.getResult(), valueTy,
-        ApplyOptions(), llvm::None, llvm::None);
+        ApplyOptions(), std::nullopt, std::nullopt);
 
     // Package up the result in an optional.
     emitInjectOptionalValueInto(loc, {loc, std::move(resultRV)}, optTemp,

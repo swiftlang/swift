@@ -71,7 +71,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 #endif
 }
 
-llvm::Optional<swift::threading_impl::stack_bounds>
+std::optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
   pthread_attr_t attr;
   size_t size = 0;

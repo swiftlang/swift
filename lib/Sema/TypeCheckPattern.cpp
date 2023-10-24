@@ -475,7 +475,7 @@ public:
       return nullptr;
 
     const auto options =
-        TypeResolutionOptions(llvm::None) | TypeResolutionFlags::SilenceErrors;
+        TypeResolutionOptions(std::nullopt) | TypeResolutionFlags::SilenceErrors;
 
     DeclRefTypeRepr *repr = MemberTypeRepr::create(Context, components);
 
@@ -595,7 +595,7 @@ public:
       baseTE = TypeExpr::createImplicit(enumDecl->getDeclaredTypeInContext(),
                                         Context);
     } else {
-      const auto options = TypeResolutionOptions(llvm::None) |
+      const auto options = TypeResolutionOptions(std::nullopt) |
                            TypeResolutionFlags::SilenceErrors;
 
       // Otherwise, see whether we had an enum type as the penultimate
@@ -1101,7 +1101,7 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
 /// Perform top-down type coercion on the given pattern.
 Pattern *TypeChecker::coercePatternToType(
     ContextualPattern pattern, Type type, TypeResolutionOptions options,
-    llvm::function_ref<llvm::Optional<Pattern *>(Pattern *, Type)>
+    llvm::function_ref<std::optional<Pattern *>(Pattern *, Type)>
         tryRewritePattern) {
   auto P = pattern.getPattern();
   auto dc = pattern.getDeclContext();
@@ -1114,7 +1114,7 @@ Pattern *TypeChecker::coercePatternToType(
 
   options = applyContextualPatternOptions(options, pattern);
   auto subOptions = options;
-  subOptions.setContext(llvm::None);
+  subOptions.setContext(std::nullopt);
   switch (P->getKind()) {
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
@@ -1480,7 +1480,7 @@ Pattern *TypeChecker::coercePatternToType(
     
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
-    llvm::Optional<CheckedCastKind> castKind;
+    std::optional<CheckedCastKind> castKind;
 
     EnumElementDecl *elt = EEP->getElementDecl();
     

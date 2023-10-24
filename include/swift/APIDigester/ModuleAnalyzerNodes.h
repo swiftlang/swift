@@ -179,7 +179,7 @@ class SDKContext {
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
   // The common version of two ABI/API descriptors under comparison.
-  llvm::Optional<uint8_t> CommonVersion;
+  std::optional<uint8_t> CommonVersion;
 
 public:
   // Define the set of known identifiers.
@@ -232,7 +232,7 @@ public:
   const CheckerOptions &getOpts() const { return Opts; }
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
-  llvm::Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+  std::optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
 
   CompilerInstance &newCompilerInstance() {
     CIs.emplace_back(new CompilerInstance());
@@ -364,7 +364,7 @@ class SDKNodeDecl: public SDKNode {
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
   // Diagnostic preferes the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
-  llvm::Optional<uint8_t> FixedBinaryOrder;
+  std::optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
   StringRef ObjCName;
 
@@ -446,7 +446,7 @@ public:
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
-  llvm::Optional<StringRef> getSingleModuleName() const;
+  std::optional<StringRef> getSingleModuleName() const;
 };
 
 class SDKNodeType: public SDKNode {
@@ -588,11 +588,11 @@ public:
     return InheritsConvenienceInitializers;
   };
 
-  llvm::Optional<SDKNodeDeclType *> getSuperclass() const;
+  std::optional<SDKNodeDeclType *> getSuperclass() const;
 
   /// Finding the node through all children, including the inherited ones,
   /// whose printed name matches with the given name.
-  llvm::Optional<SDKNodeDecl *> lookupChildByPrintedName(StringRef Name) const;
+  std::optional<SDKNodeDecl *> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;
@@ -686,7 +686,7 @@ public:
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
   bool ReqNewWitnessTableEntry;
-  llvm::Optional<uint8_t> SelfIndex;
+  std::optional<uint8_t> SelfIndex;
 
 protected:
   SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -695,7 +695,7 @@ public:
   bool isThrowing() const { return IsThrowing; }
   bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
   uint8_t getSelfIndex() const { return SelfIndex.value(); }
-  llvm::Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
+  std::optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.has_value(); }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &out) override;

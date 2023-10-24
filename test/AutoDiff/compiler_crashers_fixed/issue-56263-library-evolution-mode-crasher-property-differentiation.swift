@@ -50,8 +50,8 @@ public struct Struct: Differentiable {
 // 4  libsystem_platform.dylib 000000000000000000 _sigtramp + 18446603339975770784
 // 5  libsystem_c.dylib        0x00007fff2026c741 abort + 120
 // 6  libsystem_c.dylib        0x00007fff2026bb18 err + 0
-// 7  swift-frontend           0x000000010e1cb063 swift::SILBuilder::createAllocStack(swift::SILLocation, swift::SILType, llvm::Optional<swift::SILDebugVariable>, bool) (.cold.2) + 35
-// 8  swift-frontend           0x000000010a06716b swift::SILBuilder::createAllocStack(swift::SILLocation, swift::SILType, llvm::Optional<swift::SILDebugVariable>, bool) + 315
+// 7  swift-frontend           0x000000010e1cb063 swift::SILBuilder::createAllocStack(swift::SILLocation, swift::SILType, std::optional<swift::SILDebugVariable>, bool) (.cold.2) + 35
+// 8  swift-frontend           0x000000010a06716b swift::SILBuilder::createAllocStack(swift::SILLocation, swift::SILType, std::optional<swift::SILDebugVariable>, bool) + 315
 // 9  swift-frontend           0x0000000109af96d3 swift::autodiff::PullbackCloner::Implementation::visitLoadOperation(swift::SingleValueInstruction*) + 275
 // 10 swift-frontend           0x0000000109aec37b swift::autodiff::PullbackCloner::Implementation::visit(swift::SILInstruction*) + 203
 // 11 swift-frontend           0x0000000109ae8196 swift::autodiff::PullbackCloner::Implementation::visitSILBasicBlock(swift::SILBasicBlock*) + 838
