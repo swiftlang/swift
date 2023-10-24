@@ -1,6 +1,7 @@
 #ifndef SWIFT_PARTITIONUTILS_H
 #define SWIFT_PARTITIONUTILS_H
 
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallVector.h"
@@ -12,6 +13,18 @@
 namespace swift {
 
 namespace PartitionPrimitives {
+
+#ifndef NDEBUG
+extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
+#define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
+  do {                                                                         \
+    if (REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {                         \
+      LLVM_DEBUG(__VA_ARGS__);                                                 \
+    }                                                                          \
+  } while (0);
+#else
+#define REGIONBASEDISOLATION_VERBOSE_LOG(...)
+#endif
 
 struct Element {
   unsigned num;
@@ -36,9 +49,9 @@ struct Region {
 
   operator signed() const { return num; }
 
-  bool isConsumed() const { return num < 0; }
+  bool isTransferred() const { return num < 0; }
 
-  static Region consumed() { return Region(-1); }
+  static Region transferred() { return Region(-1); }
 };
 }
 
@@ -48,20 +61,20 @@ using namespace PartitionPrimitives;
 /// SILInstructions can be translated to
 enum class PartitionOpKind : uint8_t {
   /// Assign one value to the region of another, takes two args, second arg
-  /// must already be tracked with a non-consumed region
+  /// must already be tracked with a non-transferred region
   Assign,
 
   /// Assign one value to a fresh region, takes one arg.
   AssignFresh,
 
   /// Merge the regions of two values, takes two args, both must be from
-  /// non-consumed regions.
+  /// non-transferred regions.
   Merge,
 
-  /// Consume the region of a value if not already consumed, takes one arg.
+  /// Consume the region of a value if not already transferred, takes one arg.
   Transfer,
 
-  /// Require the region of a value to be non-consumed, takes one arg.
+  /// Require the region of a value to be non-transferred, takes one arg.
   Require,
 };
 
@@ -79,7 +92,8 @@ private:
   SILInstruction *sourceInst;
 
   // Record an AST expression corresponding to this PartitionOp, currently
-  // populated only for Consume expressions to indicate the value being consumed
+  // populated only for Consume expressions to indicate the value being
+  // transferred
   Expr *sourceExpr;
 
   // TODO: can the following declarations be merged?
@@ -163,7 +177,7 @@ public:
       os << "assign_fresh %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Transfer:
-      os << "consume %%" << OpArgs[0] << "\n";
+      os << "transfer %%" << OpArgs[0] << "\n";
       break;
     case PartitionOpKind::Merge:
       os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
@@ -200,8 +214,8 @@ static void horizontalUpdate(std::map<Element, Region> &map, Element key,
 class Partition {
 private:
   // Label each index with a non-negative (unsigned) label if it is associated
-  // with a valid region, and with -1 if it is associated with a consumed region
-  // in-order traversal relied upon.
+  // with a valid region, and with -1 if it is associated with a transferred
+  // region in-order traversal relied upon.
   std::map<Element, Region> labels;
 
   // Track a label that is guaranteed to be strictly larger than all in use,
@@ -227,8 +241,8 @@ private:
     };
 
     for (auto &[i, label] : labels) {
-      // correctness vacuous at consumed indices
-      if (label.isConsumed())
+      // correctness vacuous at transferred indices
+      if (label.isTransferred())
         continue;
 
       // this label should not exceed fresh_label
@@ -253,7 +267,7 @@ private:
 
   // linear time - For each region label that occurs, find the first index
   // at which it occurs and relabel all instances of it to that index.
-  // This excludes the -1 label for consumed regions.
+  // This excludes the -1 label for transferred regions.
   void canonicalize() {
     if (canonical)
       return;
@@ -263,8 +277,8 @@ private:
 
     // relies on in-order traversal of labels
     for (auto &[i, label] : labels) {
-      // leave -1 (consumed region) as is
-      if (label.isConsumed())
+      // leave -1 (transferred region) as is
+      if (label.isTransferred())
         continue;
 
       if (!relabel.count(label)) {
@@ -309,7 +323,7 @@ public:
   // so set to false to begin with
   Partition(bool canonical) : labels({}), canonical(canonical) {}
 
-  static Partition singleRegion(std::vector<Element> indices) {
+  static Partition singleRegion(ArrayRef<Element> indices) {
     Partition p;
     if (!indices.empty()) {
       Region min_index =
@@ -335,8 +349,8 @@ public:
 
   bool isTracked(Element val) const { return labels.count(val); }
 
-  bool isConsumed(Element val) const {
-    return isTracked(val) && labels.at(val).isConsumed();
+  bool isTransferred(Element val) const {
+    return isTracked(val) && labels.at(val).isTransferred();
   }
 
   // quadratic time - Construct the partition corresponding to the join of the
@@ -361,9 +375,10 @@ public:
     // of indices that are in the same region in snd are also in the same region
     // in fst - the desired property
     for (const auto [i, snd_label] : snd_reduced.labels) {
-      if (snd_label.isConsumed())
-        // if snd says that the region has been consumed, mark it consumed in fst
-        horizontalUpdate(fst_reduced.labels, i, Region::consumed());
+      if (snd_label.isTransferred())
+        // if snd says that the region has been transferred, mark it transferred
+        // in fst
+        horizontalUpdate(fst_reduced.labels, i, Region::transferred());
       else
         fst_reduced.merge(i, Element(snd_label));
     }
@@ -381,21 +396,27 @@ public:
 
   // Apply the passed PartitionOp to this partition, performing its action.
   // A `handleFailure` closure can optionally be passed in that will be called
-  // if a consumed region is required. The closure is given the PartitionOp that
-  // failed, and the index of the SIL value that was required but consumed.
-  // Additionally, a list of "nonconsumable" indices can be passed in along with
-  // a handleConsumeNonConsumable closure. In the event that a region containing
-  // one of the nonconsumable indices is consumed, the closure will be called
-  // with the offending Consume.
+  // if a transferred region is required. The closure is given the PartitionOp
+  // that failed, and the index of the SIL value that was required but
+  // transferred. Additionally, a list of "nonconsumable" indices can be passed
+  // in along with a handleConsumeNonConsumable closure. In the event that a
+  // region containing one of the nonconsumable indices is transferred, the
+  // closure will be called with the offending Consume.
   void apply(
       PartitionOp op,
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
           [](const PartitionOp &, Element) {},
-
       ArrayRef<Element> nonconsumables = {},
-
       llvm::function_ref<void(const PartitionOp &, Element)>
           handleConsumeNonConsumable = [](const PartitionOp &, Element) {}) {
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
+                                     op.print(llvm::dbgs()));
+    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
+                                     print(llvm::dbgs()));
+    SWIFT_DEFER {
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
+                                       print(llvm::dbgs()));
+    };
     switch (op.OpKind) {
     case PartitionOpKind::Assign:
       assert(op.OpArgs.size() == 2 &&
@@ -403,7 +424,7 @@ public:
       assert(labels.count(op.OpArgs[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
       // if assigning to a missing region, handle the failure
-      if (isConsumed(op.OpArgs[1]))
+      if (isTransferred(op.OpArgs[1]))
         handleFailure(op, op.OpArgs[1]);
 
       labels.insert_or_assign(op.OpArgs[0], labels.at(op.OpArgs[1]));
@@ -429,25 +450,24 @@ public:
       assert(labels.count(op.OpArgs[0]) &&
              "Consume PartitionOp's argument should already be tracked");
 
-      // check if any nonconsumables are consumed here, and handle the failure if so
+      // check if any nonconsumables are transferred here, and handle the
+      // failure if so
       for (Element nonconsumable : nonconsumables) {
         assert(labels.count(nonconsumable) &&
                "nonconsumables should be function args and self, and therefore"
                "always present in the label map because of initialization at "
                "entry");
-        if (!isConsumed(nonconsumable) &&
+        if (!isTransferred(nonconsumable) &&
             labels.at(nonconsumable) == labels.at(op.OpArgs[0])) {
           handleConsumeNonConsumable(op, nonconsumable);
           break;
         }
       }
 
-      // ensure region is consumed
-      if (!isConsumed(op.OpArgs[0]))
-        // mark region as consumed
-        horizontalUpdate(labels, op.OpArgs[0], Region::consumed());
-
-
+      // ensure region is transferred
+      if (!isTransferred(op.OpArgs[0]))
+        // mark region as transferred
+        horizontalUpdate(labels, op.OpArgs[0], Region::transferred());
 
       break;
     case PartitionOpKind::Merge:
@@ -456,10 +476,10 @@ public:
       assert(labels.count(op.OpArgs[0]) && labels.count(op.OpArgs[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
-      // if attempting to merge a consumed region, handle the failure
-      if (isConsumed(op.OpArgs[0]))
+      // if attempting to merge a transferred region, handle the failure
+      if (isTransferred(op.OpArgs[0]))
         handleFailure(op, op.OpArgs[0]);
-      if (isConsumed(op.OpArgs[1]))
+      if (isTransferred(op.OpArgs[1]))
         handleFailure(op, op.OpArgs[1]);
 
       merge(op.OpArgs[0], op.OpArgs[1]);
@@ -469,26 +489,26 @@ public:
              "Require PartitionOp should be passed 1 argument");
       assert(labels.count(op.OpArgs[0]) &&
              "Require PartitionOp's argument should already be tracked");
-      if (isConsumed(op.OpArgs[0]))
+      if (isTransferred(op.OpArgs[0]))
         handleFailure(op, op.OpArgs[0]);
     }
 
     assert(is_canonical_correct());
   }
 
-  // return a vector of the consumed values in this partition
-  std::vector<Element> getConsumedVals() const {
+  // return a vector of the transferred values in this partition
+  std::vector<Element> getTransferredVals() const {
     // for effeciency, this could return an iterator not a vector
-    std::vector<Element> consumedVals;
+    std::vector<Element> transferredVals;
     for (auto [i, _] : labels)
-      if (isConsumed(i))
-        consumedVals.push_back(i);
-    return consumedVals;
+      if (isTransferred(i))
+        transferredVals.push_back(i);
+    return transferredVals;
   }
 
-  // return a vector of the non-consumed regions in this partition, each
+  // return a vector of the non-transferred regions in this partition, each
   // represented as a vector of values
-  std::vector<std::vector<Element>> getNonConsumedRegions() const {
+  std::vector<std::vector<Element>> getNonTransferredRegions() const {
     // for effeciency, this could return an iterator not a vector
     std::map<Region, std::vector<Element>> buckets;
 
@@ -523,12 +543,12 @@ public:
 
     os << "[";
     for (auto [label, indices] : buckets) {
-      os << (label.isConsumed() ? "{" : "(");
+      os << (label.isTransferred() ? "{" : "(");
       int j = 0;
       for (Element i : indices) {
         os << (j++ ? " " : "") << i;
       }
-      os << (label.isConsumed() ? "}" : ")");
+      os << (label.isTransferred() ? "}" : ")");
     }
     os << "]\n";
   }

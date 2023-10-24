@@ -49,16 +49,12 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   return false;
 }
 
-static bool isAddress(SILValue val) {
-  return val->getType() && val->getType().isAddress();
-}
-
 static bool isApplyInst(SILInstruction &inst) {
   return ApplySite::isa(&inst) || isa<BuiltinInst>(inst);
 }
 
 static AccessStorage getAccessStorageFromAddr(SILValue value) {
-  assert(isAddress(value));
+  assert(value->getType().isAddress());
   auto accessStorage = AccessStorage::compute(value);
   if (accessStorage && accessStorage.getRoot()) {
     if (auto definingInst = accessStorage.getRoot().getDefiningInstruction()) {
@@ -72,7 +68,7 @@ static AccessStorage getAccessStorageFromAddr(SILValue value) {
 }
 
 static SILValue getUnderlyingTrackedValue(SILValue value) {
-  if (!isAddress(value)) {
+  if (!value->getType().isAddress()) {
     return getUnderlyingObject(value);
   }
 
@@ -100,6 +96,15 @@ struct TermArgSources {
 };
 
 } // namespace
+
+/// Used for generating informative diagnostics.
+static Expr *getExprForPartitionOp(const PartitionOp &op) {
+  SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
+  Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
+  assert(expr && "PartitionOp's source location should correspond to"
+                 "an AST node");
+  return expr;
+}
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Main Computation
@@ -241,7 +246,7 @@ struct PartitionOpBuilder {
 
   void addTransfer(SILValue value, Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
-           "consumed value should already have been encountered");
+           "transfered value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
         PartitionOp::Transfer(lookupValueID(value), currentInst, sourceExpr));
@@ -318,11 +323,11 @@ class PartitionOpTranslator {
   //       utilities would make it easier than handrolling
   llvm::DenseSet<SILValue> capturedUIValues;
 
-  /// A list of values that can never be consumed.
+  /// A list of values that can never be transferred.
   ///
   /// This includes all function arguments as well as ref_element_addr from
   /// actors.
-  std::vector<TrackableValueID> neverConsumedValueIDs;
+  std::vector<TrackableValueID> neverTransferredValueIDs;
 
   /// A cache of argument IDs.
   SmallVector<TrackableValueID> argIDs;
@@ -355,9 +360,9 @@ class PartitionOpTranslator {
     self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 #endif
 
-    // Otherwise, we need to compute our true aliased and sendable values. Begi
-    // by seeing if we have a value that we can prove is not aliased.
-    if (isAddress(value)) {
+    // Otherwise, we need to compute our flags. Begin by seeing if we have a
+    // value that we can prove is not aliased.
+    if (value->getType().isAddress()) {
       if (auto accessStorage = AccessStorage::compute(value))
         if (accessStorage.isUniquelyIdentified() &&
             !capturedUIValues.count(value))
@@ -380,19 +385,19 @@ class PartitionOpTranslator {
       iter.first->getSecond().addFlag(TrackableValueFlag::isSendable);
 
     // Check if our base is a ref_element_addr from an actor value. In such a
-    // case, add this id to the neverConsumedValueIDs.
+    // case, add this id to the neverTransferredValueIDs.
     if (isa<LoadInst, LoadBorrowInst>(iter.first->first)) {
       auto *svi = cast<SingleValueInstruction>(iter.first->first);
       auto storage = AccessStorageWithBase::compute(svi->getOperand(0));
       if (storage.storage && isa<RefElementAddrInst>(storage.base)) {
-        if (storage.storage.getRoot()->getType().getASTType()->isActorType()) {
-          self->neverConsumedValueIDs.push_back(iter.first->second.getID());
+        if (storage.storage.getRoot()->getType().isActor()) {
+          self->neverTransferredValueIDs.push_back(iter.first->second.getID());
         }
       }
     }
 
     // If our access storage is from a class, then see if we have an actor. In
-    // such a case, we need to add this id to the neverConsumed set.
+    // such a case, we need to add this id to the neverTransferred set.
 
     return {iter.first->first, iter.first->second};
   }
@@ -486,7 +491,7 @@ private:
       auto *self = const_cast<PartitionOpTranslator *>(this);
       for (SILArgument *arg : functionArguments) {
         if (auto state = trackIfNonSendable(arg)) {
-          self->neverConsumedValueIDs.push_back(state->getID());
+          self->neverTransferredValueIDs.push_back(state->getID());
           self->argIDs.push_back(state->getID());
         }
       }
@@ -504,16 +509,16 @@ public:
     return Partition::singleRegion(getArgIDs());
   }
 
-  // Get the vector of IDs that cannot be legally consumed at any point in
+  // Get the vector of IDs that cannot be legally transferred at any point in
   // this function. Since we place all args and self in a single region right
   // now, it is only necessary to choose a single representative of the set.
-  ArrayRef<TrackableValueID> getNeverConsumedValues() const {
-    return llvm::makeArrayRef(neverConsumedValueIDs);
+  ArrayRef<TrackableValueID> getNeverTransferredValues() const {
+    return llvm::makeArrayRef(neverTransferredValueIDs);
   }
 
-  void sortUniqueNeverConsumedValues() {
+  void sortUniqueNeverTransferredValues() {
     // TODO: Make a FrozenSetVector.
-    sortUnique(neverConsumedValueIDs);
+    sortUnique(neverTransferredValueIDs);
   }
 
   // get the results of an apply instruction. This is the single result value
@@ -579,10 +584,8 @@ public:
                         nonSendableOperands.front());
     }
 
-    // If our results are actor isolated (and thus cannot be consumed)... add
-    // them to the neverConsumedValueID array.
     if (resultsActorIsolated) {
-      neverConsumedValueIDs.push_back(
+      neverTransferredValueIDs.push_back(
           lookupValueID(nonSendableResults.front()));
     }
 
@@ -590,23 +593,22 @@ public:
     for (unsigned i = 1; i < nonSendableResults.size(); i++) {
       builder.addAssign(nonSendableResults[i], nonSendableResults.front());
 
-      // If our results are actor isolated (and thus cannot be consumed)... add
-      // them to the neverConsumedValueID array.
       if (resultsActorIsolated)
-        neverConsumedValueIDs.push_back(lookupValueID(nonSendableResults[i]));
+        neverTransferredValueIDs.push_back(
+            lookupValueID(nonSendableResults[i]));
     }
   }
 
   void translateSILApply(SILInstruction *applyInst) {
     // if this apply does not cross isolation domains, it has normal,
-    // non-consuming multi-assignment semantics
+    // non-transferring multi-assignment semantics
     if (!SILApplyCrossesIsolation(applyInst)) {
       // TODO: How do we handle partial_apply here.
       bool hasActorSelf = false;
       if (auto fas = FullApplySite::isa(applyInst)) {
         if (fas.hasSelfArgument()) {
           if (auto self = fas.getSelfArgument()) {
-            hasActorSelf = self->getType().getASTType()->isActorType();
+            hasActorSelf = self->getType().isActor();
           }
         }
       }
@@ -628,7 +630,7 @@ public:
   }
 
   // handles the semantics for SIL applies that cross isolation
-  // in particular, all arguments are consumed
+  // in particular, all arguments are transferred.
   void translateIsolationCrossingSILApply(ApplySite applySite) {
     ApplyExpr *sourceApply = applySite.getLoc().getAsASTNode<ApplyExpr>();
     assert(sourceApply && "only ApplyExpr's should cross isolation domains");
@@ -891,7 +893,7 @@ public:
           TinyPtrVector<SILValue>(inst->getResult(0)),
           inst->getOperandValues());
 
-    // Handle returns and throws - require the operand to be non-consumed
+    // Handle returns and throws - require the operand to be non-transferred
     case SILInstructionKind::ReturnInst:
     case SILInstructionKind::ThrowInst:
       return translateSILRequire(inst->getOperand(0));
@@ -1128,15 +1130,15 @@ class BlockPartitionState {
   // but this time pass in a handleFailure closure that can be used
   // to diagnose any failures
   void diagnoseFailures(
-      llvm::function_ref<void(const PartitionOp&, TrackableValueID)>
+      llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
           handleFailure,
-      llvm::function_ref<void(const PartitionOp&, TrackableValueID)>
-          handleConsumeNonConsumable) {
+      llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
+          handleTransferNonTransferable) {
     Partition workingPartition = entryPartition;
     for (auto &partitionOp : blockPartitionOps) {
       workingPartition.apply(partitionOp, handleFailure,
-                             translator.getNeverConsumedValues(),
-                             handleConsumeNonConsumable);
+                             translator.getNeverTransferredValues(),
+                             handleTransferNonTransferable);
     }
   }
 
@@ -1185,60 +1187,62 @@ public:
   }
 };
 
-enum class LocalConsumedReasonKind {
-  LocalConsumeInst,
-  LocalNonConsumeInst,
+enum class LocalTransferredReasonKind {
+  LocalTransferInst,
+  LocalNonTransferInst,
   NonLocal
 };
 
-// Why was a value consumed, without looking across blocks?
-// kind == LocalConsumeInst: a consume instruction in this block
-// kind == LocalNonConsumeInst: an instruction besides a consume instruction
+// Why was a value transferred, without looking across blocks?
+// kind == LocalTransferInst: a transfer instruction in this block
+// kind == LocalNonTransferInst: an instruction besides a transfer instruction
 //                              in this block
 // kind == NonLocal: an instruction outside this block
-struct LocalConsumedReason {
-  LocalConsumedReasonKind kind;
+struct LocalTransferredReason {
+  LocalTransferredReasonKind kind;
   std::optional<PartitionOp> localInst;
 
-  static LocalConsumedReason ConsumeInst(PartitionOp localInst) {
+  static LocalTransferredReason TransferInst(PartitionOp localInst) {
     assert(localInst.getKind() == PartitionOpKind::Transfer);
-    return LocalConsumedReason(LocalConsumedReasonKind::LocalConsumeInst, localInst);
+    return LocalTransferredReason(LocalTransferredReasonKind::LocalTransferInst,
+                                  localInst);
   }
 
-  static LocalConsumedReason NonConsumeInst() {
-    return LocalConsumedReason(LocalConsumedReasonKind::LocalNonConsumeInst);
+  static LocalTransferredReason NonTransferInst() {
+    return LocalTransferredReason(
+        LocalTransferredReasonKind::LocalNonTransferInst);
   }
 
-  static LocalConsumedReason NonLocal() {
-    return LocalConsumedReason(LocalConsumedReasonKind::NonLocal);
+  static LocalTransferredReason NonLocal() {
+    return LocalTransferredReason(LocalTransferredReasonKind::NonLocal);
   }
 
   // 0-ary constructor only used in maps, where it's immediately overridden
-  LocalConsumedReason() : kind(LocalConsumedReasonKind::NonLocal) {}
+  LocalTransferredReason() : kind(LocalTransferredReasonKind::NonLocal) {}
 
 private:
-  LocalConsumedReason(LocalConsumedReasonKind kind,
-                 std::optional<PartitionOp> localInst = {})
+  LocalTransferredReason(LocalTransferredReasonKind kind,
+                         std::optional<PartitionOp> localInst = {})
       : kind(kind), localInst(localInst) {}
 };
 
 // This class captures all available information about why a value's region was
-// consumed. In particular, it contains a map `consumeOps` whose keys are
-// "distances" and whose values are Consume PartitionOps that cause the target
-// region to be consumed. Distances are (roughly) the number of times
+// transferred. In particular, it contains a map `transferOps` whose keys are
+// "distances" and whose values are Transfer PartitionOps that cause the target
+// region to be transferred. Distances are (roughly) the number of times
 // two different predecessor blocks had to have their exit partitions joined
-// together to actually cause the target region to be consumed. If a Consume
+// together to actually cause the target region to be transferred. If a Transfer
 // op only causes a target access to be invalid because of merging/joining
 // that spans many different blocks worth of control flow, it is less likely
 // to be informative, so distance is used as a heuristic to choose which
 // access sites to display in diagnostics given a racy consumption.
-class ConsumedReason {
-  std::map<unsigned, std::vector<PartitionOp>> consumeOps;
+class TransferredReason {
+  std::map<unsigned, std::vector<PartitionOp>> transferOps;
 
-  friend class ConsumeRequireAccumulator;
+  friend class TransferRequireAccumulator;
 
   bool containsOp(const PartitionOp& op) {
-    for (auto [_, vec] : consumeOps)
+    for (auto [_, vec] : transferOps)
       for (auto vecOp : vec)
         if (op == vecOp)
           return true;
@@ -1246,45 +1250,49 @@ class ConsumedReason {
   }
 
 public:
-  // a ConsumedReason is valid if it contains at least one consume instruction
+  // a TransferredReason is valid if it contains at least one transfer
+  // instruction
   bool isValid() {
-    for (auto [_, vec] : consumeOps)
+    for (auto [_, vec] : transferOps)
       if (!vec.empty())
         return true;
     return false;
   }
 
-  ConsumedReason() {}
+  TransferredReason() {}
 
-  ConsumedReason(LocalConsumedReason localReason) {
-    assert(localReason.kind == LocalConsumedReasonKind::LocalConsumeInst);
-    consumeOps[0] = {localReason.localInst.value()};
+  TransferredReason(LocalTransferredReason localReason) {
+    assert(localReason.kind == LocalTransferredReasonKind::LocalTransferInst);
+    transferOps[0] = {localReason.localInst.value()};
   }
 
-  void addConsumeOp(PartitionOp consumeOp, unsigned distance) {
-    assert(consumeOp.getKind() == PartitionOpKind::Transfer);
+  void addTransferOp(PartitionOp transferOp, unsigned distance) {
+    assert(transferOp.getKind() == PartitionOpKind::Transfer);
     // duplicates should not arise
-    if (!containsOp(consumeOp))
-      consumeOps[distance].push_back(consumeOp);
+    if (!containsOp(transferOp))
+      transferOps[distance].push_back(transferOp);
   }
 
-  // merge in another consumedReason, adding the specified distane to all its ops
-  void addOtherReasonAtDistance(const ConsumedReason &otherReason, unsigned distance) {
-    for (auto &[otherDistance, otherConsumeOpsAtDistance] : otherReason.consumeOps)
-      for (auto otherConsumeOp : otherConsumeOpsAtDistance)
-        addConsumeOp(otherConsumeOp, distance + otherDistance);
+  // merge in another transferredReason, adding the specified distane to all its
+  // ops
+  void addOtherReasonAtDistance(const TransferredReason &otherReason,
+                                unsigned distance) {
+    for (auto &[otherDistance, otherTransferOpsAtDistance] :
+         otherReason.transferOps)
+      for (auto otherTransferOp : otherTransferOpsAtDistance)
+        addTransferOp(otherTransferOp, distance + otherDistance);
   }
 };
 
-// This class is the "inverse" of a ConsumedReason: instead of associating
+// This class is the "inverse" of a TransferredReason: instead of associating
 // accessing PartitionOps with their consumption sites, it associates
-// consumption site Consume PartitionOps with the corresponding accesses.
-// It is built up by repeatedly calling accumulateConsumedReason on
-// ConsumedReasons, which "inverts" the contents of that reason and adds it to
-// this class's tracking. Instead of a two-level map, we store a set that
+// consumption site Transfer PartitionOps with the corresponding accesses.
+// It is built up by repeatedly calling accumulateTransferredReason on
+// TransferredReasons, which "inverts" the contents of that reason and adds it
+// to this class's tracking. Instead of a two-level map, we store a set that
 // join together distances and access partitionOps so that we can use the
 // ordering by lowest diagnostics for prioritized output
-class ConsumeRequireAccumulator {
+class TransferRequireAccumulator {
   struct PartitionOpAtDistance {
     PartitionOp partitionOp;
     unsigned distance;
@@ -1302,37 +1310,52 @@ class ConsumeRequireAccumulator {
   // map consumptions to sets of requirements for that consumption, ordered so
   // that requirements at a smaller distance from the consumption come first
   std::map<PartitionOp, std::set<PartitionOpAtDistance>>
-      requirementsForConsumptions;
+      requirementsForTransfers;
+
+  SILFunction *fn;
 
 public:
-  ConsumeRequireAccumulator() {}
+  TransferRequireAccumulator(SILFunction *fn) : fn(fn) {}
 
-  void accumulateConsumedReason(PartitionOp requireOp, const ConsumedReason &consumedReason) {
-    for (auto [distance, consumeOps] : consumedReason.consumeOps)
-      for (auto consumeOp : consumeOps)
-        requirementsForConsumptions[consumeOp].insert({requireOp, distance});
+  void accumulateTransferredReason(PartitionOp requireOp,
+                                   const TransferredReason &transferredReason) {
+    for (auto [distance, transferOps] : transferredReason.transferOps)
+      for (auto transferOp : transferOps)
+        requirementsForTransfers[transferOp].insert({requireOp, distance});
   }
 
-  // for each consumption in this ConsumeRequireAccumulator, call the passed
-  // processConsumeOp closure on it, followed immediately by calling the passed
-  // processRequireOp closure on the top `numRequiresPerConsume` operations
-  // that access ("require") the region consumed. Sorting is by lowest distance
-  // first, then arbitrarily. This is used for final diagnostic output.
-  void forEachConsumeRequire(
-      llvm::function_ref<void(const PartitionOp& consumeOp, unsigned numProcessed, unsigned numSkipped)>
-          processConsumeOp,
-      llvm::function_ref<void(const PartitionOp& requireOp)>
-          processRequireOp,
-      unsigned numRequiresPerConsume = UINT_MAX) const {
-    for (auto [consumeOp, requireOps] : requirementsForConsumptions) {
-      unsigned numProcessed = std::min({(unsigned) requireOps.size(),
-                                        (unsigned) numRequiresPerConsume});
-      processConsumeOp(consumeOp, numProcessed, requireOps.size() - numProcessed);
-      unsigned numRequiresToProcess = numRequiresPerConsume;
+  void emitErrorsForTransferRequire(
+      unsigned numRequiresPerTransfer = UINT_MAX) const {
+    for (auto [transferOp, requireOps] : requirementsForTransfers) {
+      unsigned numProcessed = std::min(
+          {(unsigned)requireOps.size(), (unsigned)numRequiresPerTransfer});
+
+      // First process our transfer ops.
+      unsigned numDisplayed = numProcessed;
+      unsigned numHidden = requireOps.size() - numProcessed;
+      if (!tryDiagnoseAsCallSite(transferOp, numDisplayed, numHidden)) {
+        assert(false && "no consumptions besides callsites implemented yet");
+
+        // default to more generic diagnostic
+        auto expr = getExprForPartitionOp(transferOp);
+        auto diag = fn->getASTContext().Diags.diagnose(
+            expr->getLoc(), diag::transfer_yields_race, numDisplayed,
+            numDisplayed != 1, numHidden > 0, numHidden);
+        if (auto sourceExpr = transferOp.getSourceExpr())
+          diag.highlight(sourceExpr->getSourceRange());
+        return;
+      }
+
+      unsigned numRequiresToProcess = numRequiresPerTransfer;
       for (auto [requireOp, _] : requireOps) {
-        // ensures at most numRequiresPerConsume requires are processed per consume
-        if (numRequiresToProcess-- == 0) break;
-        processRequireOp(requireOp);
+        // ensures at most numRequiresPerTransfer requires are processed per
+        // transfer
+        if (numRequiresToProcess-- == 0)
+          break;
+        auto expr = getExprForPartitionOp(requireOp);
+        fn->getASTContext()
+            .Diags.diagnose(expr->getLoc(), diag::possible_racy_access_site)
+            .highlight(expr->getSourceRange());
       }
     }
   }
@@ -1340,92 +1363,130 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    forEachConsumeRequire(
-        [&](const PartitionOp &consumeOp, unsigned numProcessed,
-            unsigned numSkipped) {
-          os << " ┌──╼ CONSUME: ";
-          consumeOp.print(os);
-        },
-        [&](const PartitionOp &requireOp) {
-          os << " ├╼ REQUIRE: ";
-          requireOp.print(os);
-        });
+    for (auto [transferOp, requireOps] : requirementsForTransfers) {
+      os << " ┌──╼ TRANSFER: ";
+      transferOp.print(os);
+
+      for (auto &[requireOp, _] : requireOps) {
+        os << " ├╼ REQUIRE: ";
+        requireOp.print(os);
+      }
+    }
+  }
+
+private:
+  /// Try to interpret this transferOp as a source-level callsite (ApplyExpr),
+  /// and report a diagnostic including actor isolation crossing information
+  /// returns true iff one was succesfully formed and emitted.
+  bool tryDiagnoseAsCallSite(const PartitionOp &transferOp,
+                             unsigned numDisplayed, unsigned numHidden) const {
+    SILInstruction *sourceInst =
+        transferOp.getSourceInst(/*assertNonNull=*/true);
+    ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+    if (!apply)
+      // consumption does not correspond to an apply expression
+      return false;
+    auto isolationCrossing = apply->getIsolationCrossing();
+    if (!isolationCrossing) {
+      assert(false && "ApplyExprs should be transferring only if"
+                      " they are isolation crossing");
+      return false;
+    }
+    auto argExpr = transferOp.getSourceExpr();
+    if (!argExpr)
+      assert(false &&
+             "sourceExpr should be populated for ApplyExpr consumptions");
+
+    sourceInst->getFunction()
+        ->getASTContext()
+        .Diags
+        .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
+                  argExpr->findOriginalType(),
+                  isolationCrossing.value().getCallerIsolation(),
+                  isolationCrossing.value().getCalleeIsolation(), numDisplayed,
+                  numDisplayed != 1, numHidden > 0, numHidden)
+        .highlight(argExpr->getSourceRange());
+    return true;
   }
 };
 
 // A RaceTracer is used to accumulate the facts that the main phase of
 // PartitionAnalysis generates - that certain values were required at certain
-// points but were in consumed regions and thus should yield diagnostics -
-// and traces those facts to the Consume operations that could have been
+// points but were in transferred regions and thus should yield diagnostics -
+// and traces those facts to the Transfer operations that could have been
 // responsible.
 class RaceTracer {
   const BasicBlockData<BlockPartitionState>& blockStates;
 
-  std::map<std::pair<SILBasicBlock *, TrackableValueID>, ConsumedReason>
-      consumedAtEntryReasons;
+  std::map<std::pair<SILBasicBlock *, TrackableValueID>, TransferredReason>
+      transferredAtEntryReasons;
 
-  // caches the reasons why consumedVals were consumed at the exit to basic blocks
-  std::map<std::pair<SILBasicBlock *, TrackableValueID>, LocalConsumedReason>
-      consumedAtExitReasons;
+  // caches the reasons why transferredVals were transferred at the exit to
+  // basic blocks
+  std::map<std::pair<SILBasicBlock *, TrackableValueID>, LocalTransferredReason>
+      transferredAtExitReasons;
 
-  ConsumeRequireAccumulator accumulator;
+  TransferRequireAccumulator accumulator;
 
-  ConsumedReason findConsumedAtOpReason(TrackableValueID consumedVal, PartitionOp op) {
-    ConsumedReason consumedReason;
-    findAndAddConsumedReasons(op.getSourceInst(true)->getParent(), consumedVal,
-                              consumedReason, 0, op);
-    return consumedReason;
+  TransferredReason findTransferredAtOpReason(TrackableValueID transferredVal,
+                                              PartitionOp op) {
+    TransferredReason transferredReason;
+    findAndAddTransferredReasons(op.getSourceInst(true)->getParent(),
+                                 transferredVal, transferredReason, 0, op);
+    return transferredReason;
   }
 
-  void findAndAddConsumedReasons(
-      SILBasicBlock * SILBlock, TrackableValueID consumedVal,
-      ConsumedReason &consumedReason, unsigned distance,
-      std::optional<PartitionOp> targetOp = {}) {
-    assert(blockStates[SILBlock].getExitPartition().isConsumed(consumedVal));
-    LocalConsumedReason localReason
-        = findLocalConsumedReason(SILBlock, consumedVal, targetOp);
+  void findAndAddTransferredReasons(SILBasicBlock *SILBlock,
+                                    TrackableValueID transferredVal,
+                                    TransferredReason &transferredReason,
+                                    unsigned distance,
+                                    std::optional<PartitionOp> targetOp = {}) {
+    LocalTransferredReason localReason =
+        findLocalTransferredReason(SILBlock, transferredVal, targetOp);
     switch (localReason.kind) {
-    case LocalConsumedReasonKind::LocalConsumeInst:
-      // there is a local consume in the pred block
-      consumedReason.addConsumeOp(localReason.localInst.value(), distance);
+    case LocalTransferredReasonKind::LocalTransferInst:
+      // there is a local transfer in the pred block
+      transferredReason.addTransferOp(localReason.localInst.value(), distance);
       break;
-    case LocalConsumedReasonKind::LocalNonConsumeInst:
+    case LocalTransferredReasonKind::LocalNonTransferInst:
       // ignore this case, that instruction will initiate its own search
-      // for a consume op
+      // for a transfer op
       break;
-    case LocalConsumedReasonKind::NonLocal:
-      consumedReason.addOtherReasonAtDistance(
+    case LocalTransferredReasonKind::NonLocal:
+      transferredReason.addOtherReasonAtDistance(
           // recursive call
-          findConsumedAtEntryReason(SILBlock, consumedVal), distance);
+          findTransferredAtEntryReason(SILBlock, transferredVal), distance);
     }
   }
 
-  // find the reason why a value was consumed at entry to a block
-  const ConsumedReason &findConsumedAtEntryReason(
-      SILBasicBlock *SILBlock, TrackableValueID consumedVal) {
+  // find the reason why a value was transferred at entry to a block
+  const TransferredReason &
+  findTransferredAtEntryReason(SILBasicBlock *SILBlock,
+                               TrackableValueID transferredVal) {
     const BlockPartitionState &block = blockStates[SILBlock];
-    assert(block.getEntryPartition().isConsumed(consumedVal));
+    assert(block.getEntryPartition().isTransferred(transferredVal));
 
     // check the cache
-    if (consumedAtEntryReasons.count({SILBlock, consumedVal}))
-      return consumedAtEntryReasons.at({SILBlock, consumedVal});
+    if (transferredAtEntryReasons.count({SILBlock, transferredVal}))
+      return transferredAtEntryReasons.at({SILBlock, transferredVal});
 
     // enter a dummy value in the cache to prevent circular call dependencies
-    consumedAtEntryReasons[{SILBlock, consumedVal}] = ConsumedReason();
+    transferredAtEntryReasons[{SILBlock, transferredVal}] = TransferredReason();
 
     auto entryTracks = [&](TrackableValueID val) {
       return block.getEntryPartition().isTracked(val);
     };
 
     // this gets populated with all the tracked values at entry to this block
-    // that are consumed at the exit to some predecessor block, associated
-    // with the blocks that consume them
-    std::map<TrackableValueID, std::vector<SILBasicBlock *>> consumedInSomePred;
+    // that are transferred at the exit to some predecessor block, associated
+    // with the blocks that transfer them
+    std::map<TrackableValueID, std::vector<SILBasicBlock *>>
+        transferredInSomePred;
     for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
-      for (TrackableValueID consumedVal
-          : blockStates[pred].getExitPartition().getConsumedVals())
-        if (entryTracks(consumedVal))
-          consumedInSomePred[consumedVal].push_back(pred);
+      for (TrackableValueID transferredVal :
+           blockStates[pred].getExitPartition().getTransferredVals())
+        if (entryTracks(transferredVal))
+          transferredInSomePred[transferredVal].push_back(pred);
 
     // this gets populated with all the multi-edges between values tracked
     // at entry to this block that will be merged because of common regionality
@@ -1433,24 +1494,24 @@ class RaceTracer {
     // because we want to count how many steps transitive merges require
     std::map<TrackableValueID, std::set<TrackableValueID>> singleStepJoins;
     for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
-      for (std::vector<TrackableValueID> region
-          : blockStates[pred].getExitPartition().getNonConsumedRegions()) {
+      for (std::vector<TrackableValueID> region :
+           blockStates[pred].getExitPartition().getNonTransferredRegions()) {
         for (TrackableValueID fst : region) for (TrackableValueID snd : region)
             if (fst != snd && entryTracks(fst) && entryTracks(snd))
               singleStepJoins[fst].insert(snd);
       }
 
     // this gets populated with the distance, in terms of single step joins,
-    // from the target consumedVal to other values that will get merged with it
-    // because of the join at entry to this basic block
+    // from the target transferredVal to other values that will get merged with
+    // it because of the join at entry to this basic block
     std::map<TrackableValueID, unsigned> distancesFromTarget;
 
     // perform BFS
     // an entry of `{val, dist}` in the `processValues` deque indicates that
-    // `val` is known to be merged with `consumedVal` (the target of this find)
-    // at a distance of `dist` single-step joins
+    // `val` is known to be merged with `transferredVal` (the target of this
+    // find) at a distance of `dist` single-step joins
     std::deque<std::pair<TrackableValueID, unsigned>> processValues;
-    processValues.push_back({consumedVal, 0});
+    processValues.push_back({transferredVal, 0});
     while (!processValues.empty()) {
       auto [currentTarget, currentDistance] = processValues.front();
       processValues.pop_front();
@@ -1460,91 +1521,97 @@ class RaceTracer {
           processValues.push_back({nextTarget, currentDistance + 1});
     }
 
-    ConsumedReason consumedReason;
+    TransferredReason transferredReason;
 
     for (auto [predVal, distanceFromTarget] : distancesFromTarget) {
-      for (SILBasicBlock *predBlock : consumedInSomePred[predVal]) {
-        // one reason that our target consumedVal is consumed is that
-        // predConsumedVal was consumed at exit of predBlock, and
+      for (SILBasicBlock *predBlock : transferredInSomePred[predVal]) {
+        // one reason that our target transferredVal is transferred is that
+        // predTransferredVal was transferred at exit of predBlock, and
         // distanceFromTarget merges had to be performed to make that
-        // be a reason. Use this to build a ConsumedReason for consumedVal.
-        findAndAddConsumedReasons(predBlock, predVal, consumedReason, distanceFromTarget);
+        // be a reason. Use this to build a TransferredReason for
+        // transferredVal.
+        findAndAddTransferredReasons(predBlock, predVal, transferredReason,
+                                     distanceFromTarget);
       }
     }
 
-    consumedAtEntryReasons[{SILBlock, consumedVal}] = std::move(consumedReason);
+    transferredAtEntryReasons[{SILBlock, transferredVal}] =
+        std::move(transferredReason);
 
-    return consumedAtEntryReasons[{SILBlock, consumedVal}];
+    return transferredAtEntryReasons[{SILBlock, transferredVal}];
   }
 
-  // assuming that consumedVal is consumed at the point of targetOp within
+  // assuming that transferredVal is transferred at the point of targetOp within
   // SILBlock (or block exit if targetOp = {}), find the reason why it was
-  // consumed, possibly local or nonlocal. Return the reason.
-  LocalConsumedReason findLocalConsumedReason(
-      SILBasicBlock * SILBlock, TrackableValueID consumedVal,
-      std::optional<PartitionOp> targetOp = {}) {
+  // transferred, possibly local or nonlocal. Return the reason.
+  LocalTransferredReason
+  findLocalTransferredReason(SILBasicBlock *SILBlock,
+                             TrackableValueID transferredVal,
+                             std::optional<PartitionOp> targetOp = {}) {
     // if this is a query for consumption reason at block exit, check the cache
-    if (!targetOp && consumedAtExitReasons.count({SILBlock, consumedVal}))
-      return consumedAtExitReasons.at({SILBlock, consumedVal});
+    if (!targetOp && transferredAtExitReasons.count({SILBlock, transferredVal}))
+      return transferredAtExitReasons.at({SILBlock, transferredVal});
 
     const BlockPartitionState &block = blockStates[SILBlock];
 
-    // if targetOp is null, we're checking why the value is consumed at exit,
-    // so assert that it's actually consumed at exit
-    assert(targetOp || block.getExitPartition().isConsumed(consumedVal));
+    // if targetOp is null, we're checking why the value is transferred at exit,
+    // so assert that it's actually transferred at exit
+    assert(targetOp || block.getExitPartition().isTransferred(transferredVal));
 
-    std::optional<LocalConsumedReason> consumedReason;
+    std::optional<LocalTransferredReason> transferredReason;
 
     Partition workingPartition = block.getEntryPartition();
 
-    // we're looking for a local reason, so if the value is consumed at entry,
-    // revive it for the sake of this search
-    if (workingPartition.isConsumed(consumedVal))
-      workingPartition.apply(PartitionOp::AssignFresh(consumedVal));
+    // we're looking for a local reason, so if the value is transferred at
+    // entry, revive it for the sake of this search
+    if (workingPartition.isTransferred(transferredVal))
+      workingPartition.apply(PartitionOp::AssignFresh(transferredVal));
 
     int i = 0;
     block.forEachPartitionOp([&](const PartitionOp& partitionOp) {
       if (targetOp == partitionOp)
         return false; //break
       workingPartition.apply(partitionOp);
-      if (workingPartition.isConsumed(consumedVal) && !consumedReason) {
-        // this partitionOp consumes the target value
+      if (workingPartition.isTransferred(transferredVal) &&
+          !transferredReason) {
+        // this partitionOp transfers the target value
         if (partitionOp.getKind() == PartitionOpKind::Transfer)
-          consumedReason = LocalConsumedReason::ConsumeInst(partitionOp);
+          transferredReason = LocalTransferredReason::TransferInst(partitionOp);
         else
           // a merge or assignment invalidated this, but that will be a separate
           // failure to diagnose, so we don't worry about it here
-          consumedReason = LocalConsumedReason::NonConsumeInst();
+          transferredReason = LocalTransferredReason::NonTransferInst();
       }
-      if (!workingPartition.isConsumed(consumedVal) && consumedReason)
-        // value is no longer consumed - e.g. reassigned or assigned fresh
-        consumedReason = llvm::None;
+      if (!workingPartition.isTransferred(transferredVal) && transferredReason)
+        // value is no longer transferred - e.g. reassigned or assigned fresh
+        transferredReason = llvm::None;
 
       // continue walking block
       i++;
       return true;
     });
 
-    // if we failed to find a local consume reason, but the value was consumed
-    // at entry to the block, then the reason is "NonLocal"
-    if (!consumedReason && block.getEntryPartition().isConsumed(consumedVal))
-      consumedReason = LocalConsumedReason::NonLocal();
+    // if we failed to find a local transfer reason, but the value was
+    // transferred at entry to the block, then the reason is "NonLocal"
+    if (!transferredReason &&
+        block.getEntryPartition().isTransferred(transferredVal))
+      transferredReason = LocalTransferredReason::NonLocal();
 
-    // if consumedReason is none, then consumedVal was not actually consumed
-    assert(consumedReason
-           || dumpBlockSearch(SILBlock, consumedVal)
-           && " no consumption was found"
-    );
+    // if transferredReason is none, then transferredVal was not actually
+    // transferred
+    assert(transferredReason || dumpBlockSearch(SILBlock, transferredVal) &&
+                                    " no consumption was found");
 
     // if this is a query for consumption reason at block exit, update the cache
     if (!targetOp)
-      return consumedAtExitReasons[std::pair{SILBlock, consumedVal}]
-                 = consumedReason.value();
+      return transferredAtExitReasons[std::pair{SILBlock, transferredVal}] =
+                 transferredReason.value();
 
-    return consumedReason.value();
+    return transferredReason.value();
   }
 
-  bool dumpBlockSearch(SILBasicBlock * SILBlock, TrackableValueID consumedVal) {
+  bool dumpBlockSearch(SILBasicBlock *SILBlock,
+                       TrackableValueID transferredVal) {
     LLVM_DEBUG(unsigned i = 0;
                const BlockPartitionState &block = blockStates[SILBlock];
                Partition working = block.getEntryPartition();
@@ -1554,8 +1621,8 @@ class RaceTracer {
                  op.print(llvm::dbgs());
                  working.apply(op);
                  llvm::dbgs() << "│ ";
-                 if (working.isConsumed(consumedVal)) {
-                   llvm::dbgs() << "(" << consumedVal << " CONSUMED) ";
+                 if (working.isTransferred(transferredVal)) {
+                   llvm::dbgs() << "(" << transferredVal << " TRANSFERRED) ";
                  }
                  working.print(llvm::dbgs());
                  return true;
@@ -1565,17 +1632,17 @@ class RaceTracer {
   }
 
 public:
-  RaceTracer(const BasicBlockData<BlockPartitionState>& blockStates)
-      : blockStates(blockStates) {}
+  RaceTracer(SILFunction *fn,
+             const BasicBlockData<BlockPartitionState> &blockStates)
+      : blockStates(blockStates), accumulator(fn) {}
 
-  void traceUseOfConsumedValue(PartitionOp use, TrackableValueID consumedVal) {
-    accumulator.accumulateConsumedReason(
-        use, findConsumedAtOpReason(consumedVal, use));
+  void traceUseOfTransferredValue(PartitionOp use,
+                                  TrackableValueID transferredVal) {
+    accumulator.accumulateTransferredReason(
+        use, findTransferredAtOpReason(transferredVal, use));
   }
 
-  const ConsumeRequireAccumulator &getAccumulator() {
-    return accumulator;
-  }
+  const TransferRequireAccumulator &getAccumulator() { return accumulator; }
 };
 
 // Instances of PartitionAnalysis perform the region-based Sendable checking.
@@ -1606,9 +1673,7 @@ class PartitionAnalysis {
                     [this](SILBasicBlock *block) {
                       return BlockPartitionState(block, translator);
                     }),
-        raceTracer(blockStates),
-        function(fn),
-        solved(false) {
+        raceTracer(fn, blockStates), function(fn), solved(false) {
     // initialize the entry block as needing an update, and having a partition
     // that places all its non-sendable args in a single region
     blockStates[fn->getEntryBlock()].needsUpdate = true;
@@ -1679,8 +1744,9 @@ class PartitionAnalysis {
       }
     }
 
-    // Now that we have finished processing, sort/unique our non consumed array.
-    translator.sortUniqueNeverConsumedValues();
+    // Now that we have finished processing, sort/unique our non transferred
+    // array.
+    translator.sortUniqueNeverTransferredValues();
   }
 
   // track the AST exprs that have already had diagnostics emitted about
@@ -1697,17 +1763,8 @@ class PartitionAnalysis {
     return false;
   }
 
-  // used for generating informative diagnostics
-  Expr *getExprForPartitionOp(const PartitionOp& op) {
-    SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
-    Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
-    assert(expr && "PartitionOp's source location should correspond to"
-                   "an AST node");
-    return expr;
-  }
-
   // once the fixpoint has been solved for, run one more pass over each basic
-  // block, reporting any failures due to requiring consumed regions in the
+  // block, reporting any failures due to requiring transferred regions in the
   // fixpoint state
   void diagnose() {
     assert(solved && "diagnose should not be called before solve");
@@ -1715,88 +1772,62 @@ class PartitionAnalysis {
     LLVM_DEBUG(
         llvm::dbgs() << "Emitting diagnostics for function "
                      << function->getName() << "\n");
-    RaceTracer tracer = blockStates;
+    RaceTracer tracer(function, blockStates);
 
     for (auto [_, blockState] : blockStates) {
-      // populate the raceTracer with all requires of consumed valued found
+      // populate the raceTracer with all requires of transferred valued found
       // throughout the CFG
       blockState.diagnoseFailures(
           /*handleFailure=*/
-          [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
+          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             auto expr = getExprForPartitionOp(partitionOp);
 
             // ensure that multiple consumptions at the same AST node are only
             // entered once into the race tracer
-            if (hasBeenEmitted(expr)) return;
+            if (hasBeenEmitted(expr))
+              return;
 
-            raceTracer.traceUseOfConsumedValue(partitionOp, consumedVal);
+            raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
           },
 
-          /*handleConsumeNonConsumable=*/
-          [&](const PartitionOp& partitionOp, TrackableValueID consumedVal) {
+          /*handleTransferNonConsumable=*/
+          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             auto expr = getExprForPartitionOp(partitionOp);
             function->getASTContext().Diags.diagnose(
-                expr->getLoc(), diag::arg_region_consumed);
+                expr->getLoc(), diag::arg_region_transferred);
           });
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
                raceTracer.getAccumulator().print(llvm::dbgs()););
 
-    // ask the raceTracer to report diagnostics at the consumption sites
-    // for all the racy requirement sites entered into it above
-    raceTracer.getAccumulator().forEachConsumeRequire(
-        /*diagnoseConsume=*/
-        [&](const PartitionOp& consumeOp,
-            unsigned numDisplayed, unsigned numHidden) {
-
-          if (tryDiagnoseAsCallSite(consumeOp, numDisplayed, numHidden))
-            return;
-
-          assert(false && "no consumptions besides callsites implemented yet");
-
-          // default to more generic diagnostic
-          auto expr = getExprForPartitionOp(consumeOp);
-          auto diag = function->getASTContext().Diags.diagnose(
-              expr->getLoc(), diag::consumption_yields_race,
-              numDisplayed, numDisplayed != 1, numHidden > 0, numHidden);
-          if (auto sourceExpr = consumeOp.getSourceExpr())
-            diag.highlight(sourceExpr->getSourceRange());
-        },
-
-        /*diagnoseRequire=*/
-        [&](const PartitionOp& requireOp) {
-          auto expr = getExprForPartitionOp(requireOp);
-          function->getASTContext().Diags.diagnose(
-              expr->getLoc(), diag::possible_racy_access_site)
-              .highlight(expr->getSourceRange());
-        },
+    // Ask the raceTracer to report diagnostics at the consumption sites for all
+    // the racy requirement sites entered into it above.
+    raceTracer.getAccumulator().emitErrorsForTransferRequire(
         NUM_REQUIREMENTS_TO_DIAGNOSE);
   }
 
-  // try to interpret this consumeOp as a source-level callsite (ApplyExpr),
-  // and report a diagnostic including actor isolation crossing information
-  // returns true iff one was succesfully formed and emitted
-  bool tryDiagnoseAsCallSite(
-      const PartitionOp& consumeOp, unsigned numDisplayed, unsigned numHidden) {
-    SILInstruction *sourceInst = consumeOp.getSourceInst(/*assertNonNull=*/true);
+  bool tryDiagnoseAsCallSite(const PartitionOp &transferOp,
+                             unsigned numDisplayed, unsigned numHidden) {
+    SILInstruction *sourceInst =
+        transferOp.getSourceInst(/*assertNonNull=*/true);
     ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
     if (!apply)
       // consumption does not correspond to an apply expression
       return false;
     auto isolationCrossing = apply->getIsolationCrossing();
     if (!isolationCrossing) {
-      assert(false && "ApplyExprs should be consuming only if"
+      assert(false && "ApplyExprs should be transferring only if"
                       " they are isolation crossing");
       return false;
     }
-    auto argExpr = consumeOp.getSourceExpr();
+    auto argExpr = transferOp.getSourceExpr();
     if (!argExpr)
       assert(false && "sourceExpr should be populated for ApplyExpr consumptions");
 
     function->getASTContext()
         .Diags
-        .diagnose(argExpr->getLoc(), diag::call_site_consumption_yields_race,
+        .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
                   argExpr->findOriginalType(),
                   isolationCrossing.value().getCallerIsolation(),
                   isolationCrossing.value().getCalleeIsolation(), numDisplayed,
