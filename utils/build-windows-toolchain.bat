@@ -214,6 +214,8 @@ cmake ^
 
   -D CMAKE_INSTALL_PREFIX="%InstallRoot%" ^
 
+  -D SWIFT_MODULE_ABI_NAME_PREFIX="Compiler" ^
+
   -G Ninja ^
   -S %SourceRoot%\swift-syntax || (exit /b)
 cmake --build %BuildRoot%\99 || (exit /b)
