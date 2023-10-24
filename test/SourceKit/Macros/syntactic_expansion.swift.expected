@@ -20,7 +20,7 @@ source.edit.kind.active:
       }
 }"
 source.edit.kind.active:
-  7:12-7:12 "var _value: MyWrapperThingy<Int>"
+  7:17-7:17 "var _value: MyWrapperThingy<Int>"
 source.edit.kind.active:
   2:1-2:19 ""
 source.edit.kind.active:
@@ -96,7 +96,7 @@ source.edit.kind.active:
       }
 }"
 source.edit.kind.active:
-  7:12-7:12 "var _value: MyWrapperThingy<Int>"
+  7:17-7:17 "var _value: MyWrapperThingy<Int>"
 source.edit.kind.active:
   1:1-1:22 ""
 source.edit.kind.active:

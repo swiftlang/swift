@@ -293,3 +293,7 @@ struct S5 {
 // RUN: %sourcekitd-test -req=cursor -pos=67:7 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ON_DECL_WITH_PEER %s
 // CURSOR_ON_DECL_WITH_PEER: <decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>test</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type></decl.var.instance>
 // CURSOR_ON_DECL_WITH_PEER-NOT: _foo
+
+//##-- Expansion on the peer macro attached to pattern binding decl
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=66:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND_PEER_ON_VAR %s
+// EXPAND_PEER_ON_VAR: 67:21-67:21 (@__swiftmacro_9MacroUser2S5V4test21AddPeerStoredPropertyfMp_.swift) "public var _foo: Int = 100"
