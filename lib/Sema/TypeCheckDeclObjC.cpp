@@ -2958,6 +2958,36 @@ private:
     return nullptr;
   }
 
+  void diagnoseVTableUse(ValueDecl *member) {
+    if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+      for (auto accessor : storage->getAllAccessors()) {
+        diagnoseVTableUse(accessor);
+      }
+      return;
+    }
+
+    auto afd = dyn_cast_or_null<AbstractFunctionDecl>(member);
+    if (!afd || !afd->needsNewVTableEntry())
+      return;
+
+    // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
+    // like an un-representable type. If there's an `@objc` attribute on the
+    // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
+    // use the enclosing extension's `@_objcImplementation` attribute.
+    DeclAttribute *attr = afd->getAttrs()
+                              .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
+    if (!attr)
+      attr = member->getDeclContext()->getAsDecl()->getAttrs()
+                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+    assert(attr && "expected @_objcImplementation on context of member checked "
+                   "by ObjCImplementationChecker");
+    if (attr->isInvalid())
+      return;
+
+    // Emit a vague fallback diagnostic.
+    diagnose(afd, diag::objc_implementation_member_requires_vtable, afd);
+  }
+
   void addRequirements(IterableDeclContext *idc) {
     assert(idc->getDecl()->hasClangNode());
     for (Decl *_member : idc->getMembers()) {
@@ -2998,8 +3028,12 @@ private:
 
       // Skip non-member implementations.
       // FIXME: Should we consider them if they were only rejected for privacy?
-      if (!member->isObjCMemberImplementation())
+      if (!member->isObjCMemberImplementation()) {
+        // No member of an `@_objcImplementation` extension should need a vtable
+        // entry.
+        diagnoseVTableUse(member);
         continue;
+      }
 
       // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
       // in `matchRequirementsAtThreshold()`, so just precompute it.
@@ -3383,6 +3417,8 @@ private:
     case MatchOutcome::Match:
     case MatchOutcome::MatchWithExplicitObjCName:
       // Successful outcomes!
+      // If this member will require a vtable entry, diagnose that now.
+      diagnoseVTableUse(cand);
       return;
 
     case MatchOutcome::WrongImplicitObjCName:

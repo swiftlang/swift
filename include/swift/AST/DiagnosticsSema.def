@@ -1841,6 +1841,11 @@ NOTE(objc_implementation_requirement_here,none,
      "%kind0 declared in header here",
      (ValueDecl *))
 
+ERROR(objc_implementation_member_requires_vtable, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because it "
+      "is an overridable Swift-only %kindonly0",
+      (const ValueDecl *))
+
 ERROR(objc_implementation_multiple_matching_requirements,none,
       "%kind0 could match several different members declared in the header",
       (ValueDecl *))

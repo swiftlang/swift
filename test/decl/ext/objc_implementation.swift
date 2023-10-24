@@ -203,11 +203,11 @@ protocol EmptySwiftProto {}
   }
 
   @nonobjc public init(notFromHeader4: CInt) {
-    // FIXME: Should be an error; requires a vtable entry
+    // expected-warning@-1 {{initializer 'init(notFromHeader4:)' is not valid in an '@_objcImplementation' extension because it is an overridable Swift-only initializer}}
   }
 
   @nonobjc public required init(notFromHeader5: CInt) {
-    // FIXME: Should be an error; requires a vtable entry
+    // expected-warning@-1 {{initializer 'init(notFromHeader5:)' is not valid in an '@_objcImplementation' extension because it is an overridable Swift-only initializer}}
   }
 
   @nonobjc public convenience init(notFromHeader6: CInt) {
