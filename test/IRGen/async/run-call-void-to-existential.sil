@@ -92,8 +92,7 @@ bb0(%0 :$@async @callee_guaranteed () -> ()):
 }
 
 // main
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil @main : $@convention(c) () -> Int32 {
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
   %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
   %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
