@@ -9,7 +9,6 @@
 // UNSUPPORTED: use_os_stdlib
 
 import SwiftReflectionTest
-import Darwin
 
 struct StructWithEnumDepth0<T> {
   enum E {
