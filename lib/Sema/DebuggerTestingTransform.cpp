@@ -253,7 +253,7 @@ private:
 
     auto *POArgList = ArgumentList::forImplicitUnlabeled(Ctx, {DstRef});
     auto *POCall = CallExpr::createImplicit(Ctx, PODeclRef, POArgList);
-    POCall->setThrows(false);
+    POCall->setThrows(nullptr);
 
     // Create the call to checkExpect.
     UnresolvedDeclRefExpr *CheckExpectDRE = new (Ctx)
@@ -263,7 +263,7 @@ private:
         ArgumentList::forImplicitUnlabeled(Ctx, {Varname, POCall});
     auto *CheckExpectExpr =
         CallExpr::createImplicit(Ctx, CheckExpectDRE, CheckArgList);
-    CheckExpectExpr->setThrows(false);
+    CheckExpectExpr->setThrows(nullptr);
 
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
@@ -283,7 +283,7 @@ private:
 
     // Call the closure.
     auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);
-    ClosureCall->setThrows(false);
+    ClosureCall->setThrows(nullptr);
 
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.

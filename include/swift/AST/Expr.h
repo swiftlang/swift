@@ -28,6 +28,7 @@
 #include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/ThrownErrorDestination.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
@@ -324,9 +325,8 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
     ThrowsIsSet : 1,
-    Throws : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
@@ -1180,6 +1180,11 @@ class DeclRefExpr : public Expr {
   DeclNameLoc Loc;
   ActorIsolation implicitActorHopTarget;
 
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
+
 public:
   DeclRefExpr(ConcreteDeclRef D, DeclNameLoc Loc, bool Implicit,
               AccessSemantics semantics = AccessSemantics::Ordinary,
@@ -1228,6 +1233,14 @@ public:
   /// implementation itself..
   bool isImplicitlyThrows() const {
     return Bits.DeclRefExpr.IsImplicitlyThrows;
+  }
+
+  /// The error thrown from this access.
+  ThrownErrorDestination throws() const { return ThrowDest; }
+
+  void setThrows(ThrownErrorDestination throws) {
+    assert(!ThrowDest);
+    ThrowDest = throws;
   }
 
   /// Set whether this reference must account for a `throw` occurring for reasons
@@ -1562,6 +1575,11 @@ protected:
     assert(Base);
   }
 
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
+
 public:
   /// Retrieve the base of the expression.
   Expr *getBase() const { return Base; }
@@ -1601,6 +1619,14 @@ public:
   void setImplicitlyAsync(ActorIsolation target) {
     Bits.LookupExpr.IsImplicitlyAsync = true;
     implicitActorHopTarget = target;
+  }
+
+  /// The error thrown from this access.
+  ThrownErrorDestination throws() const { return ThrowDest; }
+
+  void setThrows(ThrownErrorDestination throws) {
+    assert(!ThrowDest);
+    ThrowDest = throws;
   }
 
   /// Determine whether this reference needs may implicitly throw.
@@ -4627,6 +4653,11 @@ class ApplyExpr : public Expr {
   // isolations in this struct.
   llvm::Optional<ApplyIsolationCrossing> IsolationCrossing;
 
+  /// Destination information for a thrown error, which includes any
+  /// necessary conversions from the actual type thrown to the type that
+  /// is expected by the enclosing context.
+  ThrownErrorDestination ThrowDest;
+
 protected:
   ApplyExpr(ExprKind kind, Expr *fn, ArgumentList *argList, bool implicit,
             Type ty = Type())
@@ -4656,16 +4687,18 @@ public:
   /// Does this application throw?  This is only meaningful after
   /// complete type-checking.
   ///
-  /// If true, the function expression must have a throwing function
-  /// type.  The converse is not true because of 'rethrows' functions.
-  bool throws() const {
+  /// Returns the thrown error destination, which includes both the type
+  /// thrown from this application as well as the the context's error type,
+  /// which may be different.
+  ThrownErrorDestination throws() const {
     assert(Bits.ApplyExpr.ThrowsIsSet);
-    return Bits.ApplyExpr.Throws;
+    return ThrowDest;
   }
-  void setThrows(bool throws) {
+
+  void setThrows(ThrownErrorDestination throws) {
     assert(!Bits.ApplyExpr.ThrowsIsSet);
     Bits.ApplyExpr.ThrowsIsSet = true;
-    Bits.ApplyExpr.Throws = throws;
+    ThrowDest = throws;
   }
 
   /// Is this a 'rethrows' function that is known not to throw?

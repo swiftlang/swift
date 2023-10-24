@@ -488,7 +488,7 @@ DerivedConformance::createBuiltinCall(ASTContext &ctx,
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, args);
   auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(resultType);
-  call->setThrows(false);
+  call->setThrows(nullptr);
 
   return call;
 }
@@ -502,7 +502,7 @@ CallExpr *DerivedConformance::createDiagnoseUnavailableCodeReachedCallExpr(
   auto argList = ArgumentList::createImplicit(ctx, {});
   auto callExpr = CallExpr::createImplicit(ctx, diagnoseDeclRefExpr, argList);
   callExpr->setType(ctx.getNeverType());
-  callExpr->setThrows(false);
+  callExpr->setThrows(nullptr);
   return callExpr;
 }
 

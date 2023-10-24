@@ -333,7 +333,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto *makeInvocationArgs = ArgumentList::createImplicit(C, {});
     auto makeInvocationCallExpr =
         CallExpr::createImplicit(C, makeInvocationExpr, makeInvocationArgs);
-    makeInvocationCallExpr->setThrows(false);
+    makeInvocationCallExpr->setThrows(nullptr);
 
     auto invocationEncoderPB = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, invocationPattern, makeInvocationCallExpr,

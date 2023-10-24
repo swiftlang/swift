@@ -619,14 +619,14 @@ static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
     auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
                                                     ctorAppliedType);
     selfApply->setImplicit(true);
-    selfApply->setThrows(false);
+    selfApply->setThrows(nullptr);
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
     auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
-    call->setThrows(false);
+    call->setThrows(nullptr);
     return call;
   }
 
@@ -685,7 +685,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
                                       ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
   CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
   isLocalActorCall->setType(ctx.getBoolType());
-  isLocalActorCall->setThrows(false);
+  isLocalActorCall->setThrows(nullptr);
 
   GuardStmt* guardElseRemoteReturnExec;
   {
@@ -724,7 +724,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     CallExpr *buildRemoteExecutorCall = CallExpr::createImplicit(ctx, buildRemoteExecutorExpr,
                                                                  argListForBuildRemoteExecutor);
     buildRemoteExecutorCall->setType(ctx.getUnownedSerialExecutorType());
-    buildRemoteExecutorCall->setThrows(false);
+    buildRemoteExecutorCall->setThrows(nullptr);
 
     SmallVector<ASTNode, 1> statements = {
         new(ctx) ReturnStmt(SourceLoc(), buildRemoteExecutorCall)

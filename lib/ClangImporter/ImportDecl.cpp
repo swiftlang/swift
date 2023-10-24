@@ -5948,7 +5948,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
         DotSyntaxCallExpr::create(Impl.SwiftContext, constantRef, SourceLoc(),
                                   Argument::unlabeled(typeRef));
     instantiate->setType(importedEnumTy);
-    instantiate->setThrows(false);
+    instantiate->setThrows(nullptr);
 
     result = instantiate;
   } else {

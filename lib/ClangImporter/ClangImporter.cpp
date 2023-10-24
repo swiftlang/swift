@@ -4720,7 +4720,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
     builtinFnRefExpr->setType(fnType);
     auto *argList = ArgumentList::createImplicit(ctx, {arg});
     auto callExpr = CallExpr::create(ctx, builtinFnRefExpr, argList, /*implicit*/ true);
-    callExpr->setThrows(false);
+    callExpr->setThrows(nullptr);
     return callExpr;
   };
 
@@ -4748,7 +4748,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   // This will be "Optional<UnsafeMutablePointer<Base>>"
   casted->setType(cast<FunctionType>(staticCastRefExpr->getType().getPointer())
                       ->getResult());
-  casted->setThrows(false);
+  casted->setThrows(nullptr);
 
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
@@ -5033,13 +5033,13 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMemberDotCallExpr =
       DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), selfArg);
   baseMemberDotCallExpr->setType(baseMember->getMethodInterfaceType());
-  baseMemberDotCallExpr->setThrows(false);
+  baseMemberDotCallExpr->setThrows(nullptr);
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
   auto *baseMemberCallExpr = CallExpr::createImplicit(
       ctx, baseMemberDotCallExpr, argList);
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(false);
+  baseMemberCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
                                          /*implicit=*/true);
@@ -5264,7 +5264,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMemberDotCallExpr =
       DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), selfArg);
   baseMemberDotCallExpr->setType(baseGetterMethod->getMethodInterfaceType());
-  baseMemberDotCallExpr->setThrows(false);
+  baseMemberDotCallExpr->setThrows(nullptr);
 
   ArgumentList *argumentList;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -5280,7 +5280,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *baseMemberCallExpr =
       CallExpr::createImplicit(ctx, baseMemberDotCallExpr, argumentList);
   baseMemberCallExpr->setType(baseGetterMethod->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(false);
+  baseMemberCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
                                          /*implicit=*/true);
@@ -6444,7 +6444,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     auto selfArg = createSelfArg(thunkDecl);
     auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
                                                  SourceLoc(), selfArg);
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
@@ -6455,7 +6455,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     auto *memberCall =
         DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
                                   Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
   }
@@ -6463,7 +6463,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
   specializedFuncCallExpr->setType(specializedFuncDecl->getResultInterfaceType());
-  specializedFuncCallExpr->setThrows(false);
+  specializedFuncCallExpr->setThrows(nullptr);
 
   Expr *resultExpr = nullptr;
   if (specializedFuncCallExpr->getType()->isEqual(
@@ -6576,7 +6576,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     auto selfArg = createSelfArg(thunkDecl);
     auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
                                                  SourceLoc(), selfArg);
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
@@ -6587,7 +6587,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     auto *memberCall =
         DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
                                   Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
   }
@@ -6595,7 +6595,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
   specializedFuncCallExpr->setType(thunkDecl->getResultInterfaceType());
-  specializedFuncCallExpr->setThrows(false);
+  specializedFuncCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), specializedFuncCallExpr,
                                          /*implicit=*/true);
