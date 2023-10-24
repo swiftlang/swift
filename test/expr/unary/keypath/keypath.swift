@@ -127,14 +127,14 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
-  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
+  //expected-error@-1 {{cannot convert key path type 'WritableKeyPath<A, Prop>' to contextual type 'ReferenceWritableKeyPath<A, Prop>'}}
 
   let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
-  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>'}}
+  //expected-error@-1 {{cannot convert key path type 'WritableKeyPath<A, A>' to contextual type 'ReferenceWritableKeyPath<A, A>'}}
 
   let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
@@ -162,7 +162,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
-  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
+  // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<C<A>, A>' to contextual type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
   let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value

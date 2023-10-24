@@ -6693,7 +6693,8 @@ bool ConstraintSystem::repairFailures(
     }
 
     conversionsOrFixes.push_back(IgnoreContextualType::create(
-        *this, lhs, rhs, keyPathLoc));
+        *this, lhs, rhs,
+        getConstraintLocator(keyPathLoc, ConstraintLocator::KeyPathValue)));
     break;
   }
   default:

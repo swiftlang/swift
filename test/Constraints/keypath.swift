@@ -230,11 +230,11 @@ func issue_65965() {
 	
   let refKP: ReferenceWritableKeyPath<S, String>
   refKP = \.s
-  // expected-error@-1 {{key path value type 'WritableKeyPath<S, String>' cannot be converted to contextual type 'ReferenceWritableKeyPath<S, String>'}}
+  // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<S, String>' to contextual type 'ReferenceWritableKeyPath<S, String>'}}
 	
   let writeKP: WritableKeyPath<S, String>
   writeKP = \.v
-  // expected-error@-1 {{key path value type 'KeyPath<S, String>' cannot be converted to contextual type 'WritableKeyPath<S, String>'}}
+  // expected-error@-1 {{cannot convert key path type 'KeyPath<S, String>' to contextual type 'WritableKeyPath<S, String>'}}
 }
 
 func test_any_key_path() {
