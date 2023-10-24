@@ -1928,7 +1928,7 @@ public struct AddPeerStoredPropertyMacro: PeerMacro, Sendable {
     return [
       """
 
-      private var _foo: Int = 100
+      public var _foo: Int = 100
       """
     ]
   }
