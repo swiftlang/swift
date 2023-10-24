@@ -373,6 +373,15 @@ GlobalActorAttributeRequest::evaluate(
   if (decl->getDeclContext()->getParentSourceFile() == nullptr)
     return result;
 
+  auto isStoredInstancePropertyOfStruct = [](VarDecl *var) {
+    if (var->isStatic() || !var->isOrdinaryStoredProperty())
+      return false;
+
+    auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl();
+    return isa_and_nonnull<StructDecl>(nominal) &&
+           !isWrappedValueOfPropWrapper(var);
+  };
+
   auto globalActorAttr = result->first;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Nominal types are okay...
@@ -406,25 +415,53 @@ GlobalActorAttributeRequest::evaluate(
       }
 
       // ... and not if it's the instance storage of a struct
-      if (!var->isStatic() && var->isOrdinaryStoredProperty()) {
-        if (auto *nominal = var->getDeclContext()->getSelfNominalTypeDecl()) {
-          if (isa<StructDecl>(nominal) && !isWrappedValueOfPropWrapper(var)) {
+      if (isStoredInstancePropertyOfStruct(var)) {
+        var->diagnose(diag::global_actor_on_storage_of_value_type,
+                      var->getName())
+            .highlight(globalActorAttr->getRangeWithAt())
+            .warnUntilSwiftVersion(6);
 
-            var->diagnose(diag::global_actor_on_storage_of_value_type,
-                          var->getName())
-              .highlight(globalActorAttr->getRangeWithAt())
-              .warnUntilSwiftVersion(6);
-
-            // In Swift 6, once the diag above is an error, it is disallowed.
-            if (var->getASTContext().isSwiftVersionAtLeast(6))
-              return llvm::None;
-          }
-        }
+        // In Swift 6, once the diag above is an error, it is disallowed.
+        if (var->getASTContext().isSwiftVersionAtLeast(6))
+          return llvm::None;
       }
     }
   } else if (isa<ExtensionDecl>(decl)) {
     // Extensions are okay.
   } else if (isa<ConstructorDecl>(decl) || isa<FuncDecl>(decl)) {
+    // None of the accessors/addressors besides a getter are allowed
+    // to have a global actor attribute.
+    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+      if (!accessor->isGetter()) {
+        decl->diagnose(diag::global_actor_disallowed,
+                       decl->getDescriptiveKind())
+            .fixItRemove(globalActorAttr->getRangeWithAt());
+
+        auto *storage = accessor->getStorage();
+        // Let's suggest to move the attribute to the storage if
+        // this is an accessor/addressor of a property of subscript.
+        if (storage->getDeclContext()->isTypeContext()) {
+          // If enclosing declaration has a global actor,
+          // skip the suggestion.
+          if (storage->getGlobalActorAttr())
+            return llvm::None;
+
+          // Global actor attribute cannot be applied to
+          // an instance stored property of a struct.
+          if (auto *var = dyn_cast<VarDecl>(storage)) {
+            if (isStoredInstancePropertyOfStruct(var))
+              return llvm::None;
+          }
+
+          decl->diagnose(diag::move_global_actor_attr_to_storage_decl, storage)
+              .fixItInsert(
+                  storage->getAttributeInsertionLoc(/*forModifier=*/false),
+                  llvm::Twine("@", result->second->getNameStr()).str());
+        }
+
+        return llvm::None;
+      }
+    }
     // Functions are okay.
   } else {
     // Everything else is disallowed.

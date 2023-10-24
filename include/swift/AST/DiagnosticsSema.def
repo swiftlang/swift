@@ -5670,6 +5670,8 @@ ERROR(global_actor_access,none,
 ERROR(global_actor_not_usable_from_inline,none,
       "global actor for %kind0 must be '@usableFromInline' or public",
       (const ValueDecl *))
+NOTE(move_global_actor_attr_to_storage_decl,none,
+     "move global actor attribute to %kind0", (const ValueDecl *))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%kind0 has multiple actor-isolation attributes ('%1' and '%2')",
