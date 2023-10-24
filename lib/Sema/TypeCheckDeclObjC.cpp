@@ -179,6 +179,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for structs.
   if (auto *SD = T->getStructOrBoundGenericStruct()) {
+    if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
+      // This can be a non-trivial C++ record.
+      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class)
+          .highlight(TypeRange)
+          .limitBehavior(behavior);
+      return;
+    }
     diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
         .highlight(TypeRange)
         .limitBehavior(behavior);
