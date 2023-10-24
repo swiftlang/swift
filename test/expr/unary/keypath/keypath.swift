@@ -959,12 +959,18 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   // expected-note@-2 {{chain the optional using '?' to access member 'm' only for non-'nil' base values}} {{17-17=?}}
   // expected-note@-3 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{17-17=!}}
 
+  // FIXME(diagnostics): Ideally there should be two errors here - one for `b_opt` and one for `c` but since there is
+  // no contextual type it means that both `!` and `?` could work to reference `.d` and that creates ambiguity which
+  // is not possible to diagnose at the moment.
   _ = \S1a.b_opt.c.d
   // expected-error@-1 {{value of optional type 'S1b?' must be unwrapped to refer to member 'c' of wrapped base type 'S1b'}}
   // expected-note@-2 {{chain the optional using '?' to access member 'c' only for non-'nil' base values}} {{17-17=?}}
+  let _: KeyPath<S1a, Int> = \S1a.b_opt.c.d
+  // expected-error@-1 {{value of optional type 'S1b?' must be unwrapped to refer to member 'c' of wrapped base type 'S1b'}}
+  // expected-note@-2 {{chain the optional using '?' to access member 'c' only for non-'nil' base values}} {{40-40=?}}
   // expected-error@-3 {{value of optional type 'S1c?' must be unwrapped to refer to member 'd' of wrapped base type 'S1c'}}
-  // expected-note@-4 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{19-19=?}}
-  // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{19-19=!}}
+  // expected-note@-4 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{42-42=?}}
+  // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{42-42=!}}
   _ = \S1a.b_opt?.c.d
   // expected-error@-1 {{value of optional type 'S1c?' must be unwrapped to refer to member 'd' of wrapped base type 'S1c'}}
   // expected-note@-2 {{chain the optional using '?' to access member 'd' only for non-'nil' base values}} {{20-20=?}}
@@ -1064,7 +1070,8 @@ func f_56996() {
 func f_55805() {
   let _: KeyPath<String?, Int?> = \.utf8.count
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
-  // expected-error@-2 {{key path value type 'Int' cannot be converted to contextual type 'Int?'}}
+  // expected-error@-2 {{cannot assign value of type 'KeyPath<String?, Int>' to type 'KeyPath<String?, Int?>'}}
+  // expected-note@-3 {{arguments to generic parameter 'Value' ('Int' and 'Int?') are expected to be equal}}
 }
 
 // rdar://74711236 - crash due to incorrect member access in key path
