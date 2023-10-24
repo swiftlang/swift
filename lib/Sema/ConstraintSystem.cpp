@@ -7379,7 +7379,7 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
   return conformance;
 }
 
-llvm::Optional<KeyPathCapability>
+std::pair<bool, llvm::Optional<KeyPathCapability>>
 ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
   auto *typeLocator = keyPathType->getImpl().getLocator();
   assert(typeLocator->isLastElement<LocatorPathElt::KeyPathType>());
@@ -7389,6 +7389,19 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
   auto capability = KeyPathCapability::Writable;
 
   bool didOptionalChain = false;
+
+  auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(false, llvm::None);
+  };
+
+  auto delay = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(true, llvm::None);
+  };
+
+  auto success = [](KeyPathCapability capability)
+      -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(true, capability);
+  };
 
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -7411,7 +7424,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
       auto *calleeLoc = getCalleeLocator(componentLoc);
       auto overload = findSelectedOverloadFor(calleeLoc);
       if (!overload)
-        return llvm::None;
+        return delay();
 
       // tuple elements do not change the capability of the key path
       auto choice = overload->choice;
@@ -7421,23 +7434,16 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
 
       // Discarded unsupported non-decl member lookups.
       if (!choice.isDecl())
-        return llvm::None;
+        return fail();
 
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
-      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath)) {
-        if (!shouldAttemptFixes())
-          return llvm::None;
-
-        // If this was a method reference let's mark it as read-only.
-        if (!storage) {
-          capability = KeyPathCapability::ReadOnly;
-          continue;
-        }
-      }
+      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath) ||
+          hasFixFor(calleeLoc, FixKind::UnwrapOptionalBase))
+        return fail();
 
       if (!storage)
-        return llvm::None;
+        return fail();
 
       if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
         capability = KeyPathCapability::ReadOnly;
@@ -7481,7 +7487,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
   if (didOptionalChain)
     capability = KeyPathCapability::ReadOnly;
 
-  return capability;
+  return success(capability);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

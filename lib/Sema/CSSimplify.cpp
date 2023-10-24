@@ -11736,13 +11736,6 @@ bool ConstraintSystem::resolveKeyPath(TypeVariableType *typeVar,
         contextualType = BoundGenericType::get(
             keyPathTy->getDecl(), keyPathTy->getParent(), {root, value});
       }
-    } else if (contextualType->isPlaceholder()) {
-      auto root = simplifyType(getKeyPathRootType(keyPath));
-      if (!(root->isTypeVariableOrMember() || root->isPlaceholder())) {
-        auto value = getKeyPathValueType(keyPath);
-        contextualType =
-            BoundGenericType::get(ctx.getKeyPathDecl(), Type(), {root, value});
-      }
     }
   }
 

@@ -5524,9 +5524,9 @@ public:
   ///
   /// \param keyPathType The type variable that represents the key path literal.
   ///
-  /// \returns Capability if key path is sufficiently resolved and None
-  /// otherwise.
-  llvm::Optional<KeyPathCapability>
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
   inferKeyPathLiteralCapability(TypeVariableType *keyPathType);
 
   SWIFT_DEBUG_DUMP;

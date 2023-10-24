@@ -889,13 +889,31 @@ void BindingSet::addDefault(Constraint *constraint) {
 
   if (TypeVar->getImpl().isKeyPathType() && Bindings.empty()) {
     if (constraint->getKind() == ConstraintKind::FallbackType) {
-      if (auto capability = CS.inferKeyPathLiteralCapability(TypeVar)) {
+      auto &ctx = CS.getASTContext();
+
+      bool isValid;
+      llvm::Optional<KeyPathCapability> capability;
+
+      std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
+
+      if (!isValid) {
+        // If one of the references in a key path is invalid let's add
+        // a placeholder binding in diagnostic mode to indicate that
+        // the key path cannot be properly resolved.
+        if (CS.shouldAttemptFixes()) {
+          addBinding({PlaceholderType::get(ctx, TypeVar),
+                      AllowedBindingKind::Exact, constraint});
+        }
+
+        // During normal solving the set has to stay empty.
+        return;
+      }
+
+      if (capability) {
         auto *keyPathType = defaultTy->castTo<BoundGenericType>();
 
         auto root = keyPathType->getGenericArgs()[0];
         auto value = keyPathType->getGenericArgs()[1];
-
-        auto &ctx = CS.getASTContext();
 
         switch (*capability) {
         case KeyPathCapability::ReadOnly:
@@ -914,8 +932,11 @@ void BindingSet::addDefault(Constraint *constraint) {
         }
 
         addBinding({keyPathType, AllowedBindingKind::Exact, constraint});
-        return;
       }
+
+      // If key path is not yet sufficiently resolved, don't add any
+      // bindings.
+      return;
     }
   }
 
