@@ -3742,9 +3742,10 @@ namespace {
         // Allow \Derived.property to be inferred as \Base.property to
         // simulate a sort of covariant conversion from
         // KeyPath<Derived, T> to KeyPath<Base, T>.
-        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root, locator);
+        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root,
+                         rootLocator);
       }
-      
+
       bool didOptionalChain = false;
       // We start optimistically from an lvalue base.
       Type base = LValueType::get(root);
