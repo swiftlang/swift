@@ -967,6 +967,10 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
+  /// Finds all top-level decls of this module including auxiliary decls.
+  void
+  getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results) const;
+
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 
   /// Finds top-level decls of this module filtered by their attributes.
