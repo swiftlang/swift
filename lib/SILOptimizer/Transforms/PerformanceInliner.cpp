@@ -120,6 +120,9 @@ class SILPerformanceInliner {
     /// call overhead itself.
     RemovedCallBenefit = 20,
 
+    /// The benefit of inlining a `begin_apply`.
+    RemovedCoroutineCallBenefit = 300,
+
     /// The benefit if the operand of an apply gets constant, e.g. if a closure
     /// is passed to an apply instruction in the callee.
     RemovedClosureBenefit = RemovedCallBenefit + 50,
@@ -373,7 +376,8 @@ bool SILPerformanceInliner::isProfitableToInline(
   bool IsGeneric = AI.hasSubstitutions();
 
   // Start with a base benefit.
-  int BaseBenefit = RemovedCallBenefit;
+  int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
+                                            : RemovedCallBenefit;
 
   // Osize heuristic.
   //
