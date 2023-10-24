@@ -1841,6 +1841,25 @@ NOTE(objc_implementation_requirement_here,none,
      "%kind0 declared in header here",
      (ValueDecl *))
 
+ERROR(objc_implementation_init_must_be_convenience, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because "
+      "Objective-C subclasses must be able to override "
+      "%select{designated|required}1 initializers",
+      (const ValueDecl *, /*isRequired=*/bool))
+NOTE(objc_implementation_init_turn_designated_to_convenience, none,
+     "add 'convenience' keyword to make this a convenience initializer",
+     ())
+NOTE(objc_implementation_init_turn_required_to_convenience, none,
+     "replace 'required' keyword with 'convenience' to make this a convenience "
+     "initializer",
+     ())
+
+// Fallback diagnostic; super-general by nature.
+ERROR(objc_implementation_member_requires_vtable, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because it "
+      "is an overridable Swift-only %kindonly0",
+      (const ValueDecl *))
+
 ERROR(objc_implementation_multiple_matching_requirements,none,
       "%kind0 could match several different members declared in the header",
       (ValueDecl *))
@@ -6100,7 +6119,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @_objcImplementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "

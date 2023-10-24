@@ -1173,7 +1173,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
                                      AbstractFunctionDecl *decl) const {
   auto *dc = decl->getDeclContext();
 
-  if (!isa<ClassDecl>(dc))
+  if (!isa<ClassDecl>(dc->getImplementedObjCContext()))
     return false;
 
   // Destructors always use a fixed vtable entry.

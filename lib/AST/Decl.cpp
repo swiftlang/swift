@@ -1818,7 +1818,7 @@ Type ExtensionDecl::getExtendedType() const {
 }
 
 bool ExtensionDecl::isObjCImplementation() const {
-  return getAttrs().hasAttribute<ObjCImplementationAttr>();
+  return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
 llvm::Optional<Identifier>
@@ -4300,6 +4300,7 @@ isObjCMemberImplementation(const ValueDecl *VD,
                     ? cast<AccessorDecl>(VD)->getStorage()
                     : VD;
       return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<NonObjCAttr>()
                   && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
                   && getAccessLevel() >= AccessLevel::Internal;
     }
