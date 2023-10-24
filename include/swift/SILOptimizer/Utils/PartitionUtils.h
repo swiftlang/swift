@@ -171,21 +171,22 @@ public:
   void print(llvm::raw_ostream &os) const {
     switch (OpKind) {
     case PartitionOpKind::Assign:
-      os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1] << "\n";
+      os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1];
       break;
     case PartitionOpKind::AssignFresh:
-      os << "assign_fresh %%" << OpArgs[0] << "\n";
+      os << "assign_fresh %%" << OpArgs[0];
       break;
     case PartitionOpKind::Transfer:
-      os << "transfer %%" << OpArgs[0] << "\n";
+      os << "transfer %%" << OpArgs[0];
       break;
     case PartitionOpKind::Merge:
-      os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1] << "\n";
+      os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1];
       break;
     case PartitionOpKind::Require:
-      os << "require %%" << OpArgs[0] << "\n";
+      os << "require %%" << OpArgs[0];
       break;
     }
+    os << ": " << *getSourceInst(true);
   }
 };
 
