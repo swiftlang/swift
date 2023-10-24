@@ -155,6 +155,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
         .Case("diags", SourceKitRequest::Diagnostics)
+        .Case("semantic-tokens", SourceKitRequest::SemanticTokens)
         .Case("compile", SourceKitRequest::Compile)
         .Case("compile.close", SourceKitRequest::CompileClose)
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)

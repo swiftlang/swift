@@ -195,6 +195,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
                               ResponseReceiver Rec);
 
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec);
+
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
 
@@ -1869,6 +1873,32 @@ handleRequestDiagnostics(const RequestDict &Req,
   });
 }
 
+static void
+handleRequestSemanticTokens(const RequestDict &Req,
+                            SourceKitCancellationToken CancellationToken,
+                            ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getSemanticTokens(
+        *PrimaryFilePath, InputBufferName, Args, std::move(vfsOptions),
+        CancellationToken,
+        [Rec](const RequestResult<SemanticTokensResult> &Result) {
+          reportSemanticTokens(Result, Rec);
+        });
+    return;
+  });
+}
+
 /// Expand macros in the specified source file syntactically.
 ///
 /// Request would look like:
@@ -2103,6 +2133,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestRelatedIdents, handleRequestRelatedIdents)
   HANDLE_REQUEST(RequestActiveRegions, handleRequestActiveRegions)
   HANDLE_REQUEST(RequestDiagnostics, handleRequestDiagnostics)
+  HANDLE_REQUEST(RequestSemanticTokens, handleRequestSemanticTokens)
   HANDLE_REQUEST(RequestSyntacticMacroExpansion,
                  handleRequestSyntacticMacroExpansion)
 
@@ -2724,6 +2755,32 @@ static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
   fillDiagnosticInfo(Dict, DiagResults, /*DiagStage*/ None);
+  Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportSemanticTokens
+//===----------------------------------------------------------------------===//
+
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  TokenAnnotationsArrayBuilder SemanticAnnotations;
+  for (auto SemaTok : Result.value()) {
+    UIdent Kind = SemaTok.getUIdentForKind();
+    if (Kind.isValid()) {
+      SemanticAnnotations.add(Kind, SemaTok.ByteOffset, SemaTok.Length,
+                              SemaTok.getIsSystem());
+    }
+  }
+  Dict.setCustomBuffer(KeySemanticTokens, SemanticAnnotations.createBuffer());
   Rec(RespBuilder.createResponse());
 }
 
