@@ -24,6 +24,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/ThrownErrorDestination.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/None.h"
@@ -1383,6 +1384,7 @@ class DoCatchStmt final
 
   SourceLoc DoLoc;
   Stmt *Body;
+  ThrownErrorDestination RethrowDest;
 
   DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
               ArrayRef<CaseStmt *> catches, llvm::Optional<bool> implicit)
@@ -1432,6 +1434,15 @@ public:
   // aren't exhausive, this is also the type of the error that is implicitly
   // rethrown.
   Type getCaughtErrorType() const;
+
+  /// Retrieves the rethrown error and its conversion to the error type
+  /// expected by the enclosing context.
+  ThrownErrorDestination rethrows() const { return RethrowDest; }
+
+  void setRethrows(ThrownErrorDestination rethrows) {
+    assert(!RethrowDest);
+    RethrowDest = rethrows;
+  }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::DoCatch;

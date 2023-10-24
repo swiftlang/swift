@@ -2755,7 +2755,8 @@ private:
       // We're implicitly rethrowing the error out of this do..catch, so make
       // sure that we can throw an error of this type out of this context.
       auto catches = S->getCatches();
-      checkThrownErrorType(catches.back()->getEndLoc(), rethrownErrorType);
+      S->setRethrows(
+          checkThrownErrorType(catches.back()->getEndLoc(), rethrownErrorType));
     }
 
     S->getBody()->walk(*this);
@@ -2810,15 +2811,15 @@ private:
     // But if the expression didn't type-check, suppress diagnostics.
     auto classification = getApplyClassifier().classifyApply(E);
 
-    checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
+    auto throwDest = checkThrowAsyncSite(
+        E, /*requiresTry*/ true, classification);
 
     if (!classification.isInvalid()) {
       // HACK: functions can get queued multiple times in
       // definedFunctions, so be sure to be idempotent.
       if (!E->isThrowsSet()) {
         auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
-        E->setThrows(throwsKind == ConditionalEffectKind::Conditional ||
-                     throwsKind == ConditionalEffectKind::Always);
+        E->setThrows(throwDest);
       }
 
       auto asyncKind = classification.getConditionalKind(EffectKind::Async);
@@ -2844,15 +2845,20 @@ private:
 
   ShouldRecurse_t checkLookup(LookupExpr *E) {
     if (auto classification = getApplyClassifier().classifyLookup(E)) {
-      checkThrowAsyncSite(E, classification.hasThrows(), classification);
+      auto throwDest = checkThrowAsyncSite(
+          E, classification.hasThrows(), classification);
+      E->setThrows(throwDest);
     }
 
     return ShouldRecurse;
   }
 
   ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
-    if (auto classification = getApplyClassifier().classifyDeclRef(E))
-      checkThrowAsyncSite(E, classification.hasThrows(), classification);
+    if (auto classification = getApplyClassifier().classifyDeclRef(E)) {
+      auto throwDest = checkThrowAsyncSite(
+          E, classification.hasThrows(), classification);
+      E->setThrows(throwDest);
+    }
 
     return ShouldNotRecurse;
   }
@@ -2926,7 +2932,7 @@ private:
         if (!caughtErrorType->isEqual(thrownErrorType)) {
           thrownValue = removeErasureToExistentialError(thrownValue);
           Type thrownErrorType = thrownValue->getType();
-          if (!checkThrownErrorType(loc, thrownErrorType))
+          if (checkThrownErrorType(loc, thrownErrorType))
             S->setSubExpr(thrownValue);
         }
       }
@@ -2935,14 +2941,15 @@ private:
     return ShouldRecurse;
   }
 
-  void checkThrowAsyncSite(ASTNode E, bool requiresTry,
-                           const Classification &classification) {
+  ThrownErrorDestination
+  checkThrowAsyncSite(ASTNode E, bool requiresTry,
+                      const Classification &classification) {
     // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
       Flags.set(ContextFlags::HasAnyAsyncSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
-      return;
+      return ThrownErrorDestination();
     }
 
     auto asyncKind = classification.getConditionalKind(EffectKind::Async);
@@ -3007,27 +3014,35 @@ private:
         CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
                                               classification.getThrowReason());
       } else {
-        checkThrownErrorType(E.getStartLoc(), classification.getThrownError());
+        return checkThrownErrorType(
+            E.getStartLoc(), classification.getThrownError());
       }
       break;
     }
+
+    return ThrownErrorDestination();
   }
 
   /// Check the thrown error type against the type that can be caught or
   /// rethrown by the context.
   ///
-  /// Returns \c true if an error occurred, false otherwise.
-  bool checkThrownErrorType(SourceLoc loc, Type thrownErrorType) {
+  /// Returns a thrown error destination, which will be non-throwing if there
+  /// was an error.
+  ThrownErrorDestination
+  checkThrownErrorType(SourceLoc loc, Type thrownErrorType) {
     Type caughtErrorType = getCaughtErrorTypeAt(loc);
     if (caughtErrorType->isEqual(thrownErrorType))
-      return false ;
+      return ThrownErrorDestination::forMatchingContextType(thrownErrorType);
 
     OpaqueValueExpr *opaque = new (Ctx) OpaqueValueExpr(loc, thrownErrorType);
     Expr *rethrowExpr = opaque;
     Type resultType = TypeChecker::typeCheckExpression(
         rethrowExpr, CurContext.getDeclContext(),
         {caughtErrorType, /*FIXME:*/CTP_ThrowStmt});
-    return resultType.isNull();
+    if (resultType.isNull())
+      return ThrownErrorDestination();
+
+    return ThrownErrorDestination::forConversion(opaque, rethrowExpr);
   }
 
   ShouldRecurse_t checkAwait(AwaitExpr *E) {

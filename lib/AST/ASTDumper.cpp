@@ -893,6 +893,33 @@ namespace {
       printFieldQuotedRaw([&](raw_ostream &OS) { declRef.dump(OS); }, label,
                           Color);
     }
+
+    void printThrowDest(ThrownErrorDestination throws, bool wantNothrow) {
+      if (!throws) {
+        if (wantNothrow)
+          printFlag("nothrow", ExprModifierColor);
+
+        return;
+      }
+
+      auto thrownError = throws.getThrownErrorType();
+      auto contextError = throws.getContextErrorType();
+      if (thrownError->isEqual(contextError)) {
+        // No translation of the thrown error type is required, so ony print
+        // the thrown error type.
+        Type errorExistentialType =
+            contextError->getASTContext().getErrorExistentialType();
+        if (errorExistentialType && thrownError->isEqual(errorExistentialType))
+          printFlag("throws", ExprModifierColor);
+        else {
+          printFlag("throws(" + thrownError.getString() + ")", ExprModifierColor);
+        }
+        return;
+      }
+
+      printFlag("throws(" + thrownError.getString() + " to " +
+                contextError.getString() + ")", ExprModifierColor);
+    }
   };
 
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef>,
@@ -2021,6 +2048,7 @@ public:
 
   void visitDoCatchStmt(DoCatchStmt *S, StringRef label) {
     printCommon(S, "do_catch_stmt", label);
+    printThrowDest(S->rethrows(), /*wantNothrow=*/true);
     printRec(S->getBody(), "body");
     printRecRange(S->getCatches(), Ctx, "catch_stmts");
     printFoot();
@@ -2208,6 +2236,7 @@ public:
 
   void visitDeclRefExpr(DeclRefExpr *E, StringRef label) {
     printCommon(E, "declref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getDeclRef(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
@@ -2279,6 +2308,7 @@ public:
 
   void visitMemberRefExpr(MemberRefExpr *E, StringRef label) {
     printCommon(E, "member_ref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
@@ -2290,6 +2320,7 @@ public:
   }
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, StringRef label) {
     printCommon(E, "dynamic_member_ref_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
 
@@ -2389,6 +2420,7 @@ public:
   }
   void visitSubscriptExpr(SubscriptExpr *E, StringRef label) {
     printCommon(E, "subscript_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       printFlag(getDumpString(E->getAccessSemantics()), AccessLevelColor);
@@ -2410,6 +2442,7 @@ public:
   }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E, StringRef label) {
     printCommon(E, "dynamic_subscript_expr", label);
+    printThrowDest(E->throws(), /*wantNothrow=*/false);
 
     printDeclRefField(E->getMember(), "decl");
 
@@ -2798,7 +2831,7 @@ public:
   void printApplyExpr(ApplyExpr *E, const char *NodeName, StringRef label) {
     printCommon(E, NodeName, label);
     if (E->isThrowsSet()) {
-      printFlag(E->throws() ? "throws" : "nothrow", ExprModifierColor);
+      printThrowDest(E->throws(), /*wantNothrow=*/true);
     }
     printFieldQuotedRaw([&](raw_ostream &OS) {
       auto isolationCrossing = E->getIsolationCrossing();

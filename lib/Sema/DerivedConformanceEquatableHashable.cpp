@@ -132,7 +132,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto *callExpr = DotSyntaxCallExpr::create(
         C, ref, SourceLoc(), Argument::unlabeled(base), fnType);
     callExpr->setImplicit();
-    callExpr->setThrows(false);
+    callExpr->setThrows(nullptr);
     cmpFuncExpr = callExpr;
   } else {
     cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
@@ -144,7 +144,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
                          fnType->castTo<FunctionType>()->getResult());
-  cmpExpr->setThrows(false);
+  cmpExpr->setThrows(nullptr);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -859,7 +859,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
-  callExpr->setThrows(false);
+  callExpr->setThrows(nullptr);
 
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
