@@ -202,37 +202,43 @@ static void appendRange(
     HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
     offset, endOffset);
 
-  SmallVector<SourceRange, 8> nonCommentRanges;
   SourceLoc nonCommentStart = start;
   Token token;
 
   // Re-lex the range, and skip the full text of `tok::comment` tokens.
-  while (true) {
+  while (!token.is(tok::eof)) {
     lexer.lex(token);
-
-    if (token.is(tok::eof))
-      break;
 
     if (token.is(tok::comment)) {
       // Grab the range from the last non-comment token to the beginning of this comment
       // token.
       SourceLoc commentLoc = token.getLoc();
 
-      SourceRange range { nonCommentStart, commentLoc };
-      nonCommentRanges.append(1, range);
+      auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
+
+      // Append a single whitespace character, to avoid fusing tokens.
+      scratch.push_back(' ');
 
       // Set the start of the next non-comment range to the end of this token.
-      nonCommentStart = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+
+      // The comment token's end location includes trailing whitespace, so trim trailing
+      // whitespace and only strip the portions of the comment that are not whitespace.
+      CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef commentText = sourceMgr.extractText(range);
+      unsigned whitespaceOffset = commentText.size() - commentText.rtrim().size();
+      if (whitespaceOffset > 0) {
+        endLoc = endLoc.getAdvancedLoc(-whitespaceOffset);
+      }
+
+      nonCommentStart = endLoc;
     }
   }
 
   if (nonCommentStart.isValid() && nonCommentStart != end) {
-    SourceRange range { nonCommentStart, end };
-    nonCommentRanges.append(1, range);
-  }
-
-  for (SourceRange &range : nonCommentRanges) {
-    auto charRange = CharSourceRange(sourceMgr, range.Start, range.End);
+    auto charRange = CharSourceRange(sourceMgr, nonCommentStart, end);
     StringRef text = sourceMgr.extractText(charRange);
     scratch.append(text.begin(), text.end());
   }
