@@ -307,3 +307,18 @@ actor ProtectArray {
     }
   }
 }
+
+extension Optional {
+  mutating func mutate() async {}
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ProtectDictionary {
+  var dict: [Int: Int] = [:]
+
+  func invalid() async {
+    await dict[0].mutate()
+    // expected-warning@-1 {{cannot call mutating async function 'mutate()' on actor-isolated property 'dict'; this is an error in Swift 6}}
+    // expected-targeted-complete-warning@-2 {{passing argument of non-sendable type 'inout Optional<Int>' outside of actor-isolated context may introduce data races}}
+  }
+}
