@@ -9,7 +9,7 @@ func testGetX() -> CInt {
 
 let _ = testGetX()
 
-// CHECK: define {{.*}} swiftcc i32 @"$sSo018CopyTrackedDerivedC5ClassV4getXs5Int32VyF"(ptr noalias swiftself dereferenceable(8) %[[SELF_PTR:.*]])
+// CHECK: define {{.*}} swiftcc i32 @"$sSo018CopyTrackedDerivedC5ClassV4getXs5Int32VyF"(ptr noalias nocapture swiftself dereferenceable(8) %[[SELF_PTR:.*]])
 // CHECK: = call i32 @[[SYNTH_METHOD:.*]](ptr %[[SELF_PTR]])
 
 // CHECK: define {{.*}}linkonce_odr{{.*}} i32 @[[SYNTH_METHOD]](ptr {{.*}} %[[THIS_PTR:.*]])
