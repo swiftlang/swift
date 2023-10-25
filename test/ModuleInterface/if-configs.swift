@@ -7,7 +7,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface)
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Swift.Void = {
 // CHECK-NOT: #if NOT_PROVIDED
 // CHECK-NOT: print("should not exist")
 // CHECK-NOT: #elseif !NOT_PROVIDED
@@ -35,7 +35,7 @@ public func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Void = {
 }) {
 }
 
-// CHECK: func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Swift.Void = {
 // CHECK-NOT: #if NOT_PROVIDED
 // CHECK-NOT: print("should not exist")
 // CHECK-NOT: #else
@@ -64,7 +64,7 @@ public func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {
 }) {
 }
 
-// CHECK: func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Swift.Void = {
 // CHECK-NOT: #if (
 // CHECK-NOT:   !false && true
 // CHECK-NOT: )
@@ -95,7 +95,7 @@ public func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Void = 
 }) {
 }
 
-// CHECK: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Swift.Void = {
 // CHECK-NOT: #if true
 // CHECK: print("true")
 // CHECK-NOT: #else
@@ -111,24 +111,7 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
 }) {
 }
 
-// CHECK: func hasIfCompilerCheck
-// CHECK:      #if compiler(>=5.3)
-// CHECK-NEXT:   return true
-// CHECK-NEXT: #else
-// CHECK-NEXT:   return false
-// CHECK-NEXT: #endif
-@_alwaysEmitIntoClient
-public func hasIfCompilerCheck(_ x: () -> Bool = {
-#if compiler(>=5.3)
-  return true
-#else
-  return false
-#endif
-  }) {
-}
-
-// CHECK: func hasComments
-// CHECK-NOT: #if NOT_PROVIDED
+// CHECK-LABEL: func hasComments
 // CHECK: print(
 // CHECK: "this should show up"
 // CHECK-NOT: comment! don't mess up indentation!
@@ -146,7 +129,7 @@ public func hasIfCompilerCheck(_ x: () -> Bool = {
 // CHECK-NOT: comment!
 // CHECK: return true
 @inlinable
-public func hasComments() -> Bool {
+public func hasComments(_ x: () -> Bool = {
   /* comment! */ // comment!
   #if NOT_PROVIDED
     // comment!
@@ -178,4 +161,21 @@ public func hasComments() -> Bool {
     // comment!
     return/* comment! */true/* comment! */
   #endif
+}) {
+}
+
+// CHECK-LABEL: func hasIfCompilerCheck
+// CHECK:      #if compiler(>=5.3)
+// CHECK-NEXT:   return true
+// CHECK-NEXT: #else
+// CHECK-NEXT:   return false
+// CHECK-NEXT: #endif
+@_alwaysEmitIntoClient
+public func hasIfCompilerCheck(_ x: () -> Bool = {
+#if compiler(>=5.3)
+  return true
+#else
+  return false
+#endif
+  }) {
 }

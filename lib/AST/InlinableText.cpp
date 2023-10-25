@@ -218,10 +218,15 @@ static void appendRange(
 
     // Skip over #sourceLocation's in the file.
     if (token.is(tok::pound_sourceLocation)) {
-      lexer.lex(token);
 
-      // Skip from the left paren to the right paren.
-      assert(token.is(tok::l_paren));
+      // Append the text leading up to the #sourceLocation
+      auto charRange = CharSourceRange(
+        sourceMgr, nonCommentStart, token.getLoc());
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
+
+      // Skip to the right paren. We know the AST is already valid, so there's
+      // definitely a right paren.
       while (!token.is(tok::r_paren)) {
         lexer.lex(token);
       }
