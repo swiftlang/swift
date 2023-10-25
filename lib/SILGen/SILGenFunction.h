@@ -1907,6 +1907,7 @@ public:
                                         ConcreteDeclRef defaultArgsOwner,
                                         unsigned destIndex,
                                         CanType resultType,
+                                        bool implicitlyAsync,
                                         SGFContext C = SGFContext());
 
   RValue emitApplyOfStoredPropertyInitializer(

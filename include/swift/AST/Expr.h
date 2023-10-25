@@ -4540,6 +4540,10 @@ class DefaultArgumentExpr final : public Expr {
   /// default expression.
   PointerUnion<DeclContext *, Expr *> ContextOrCallerSideExpr;
 
+  /// Whether this default argument is evaluated asynchronously because
+  /// it's isolated to the callee's isolation domain.
+  bool implicitlyAsync = false;
+
 public:
   explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner,
                                unsigned paramIndex, SourceLoc loc, Type Ty,
@@ -4573,6 +4577,16 @@ public:
   /// synchronously. If the caller does not meet the required isolation, the
   /// argument must be written explicitly at the call-site.
   ActorIsolation getRequiredIsolation() const;
+
+  /// Whether this default argument is evaluated asynchronously because
+  /// it's isolated to the callee's isolation domain.
+  bool isImplicitlyAsync() const {
+    return implicitlyAsync;
+  }
+
+  void setImplicitlyAsync() {
+    implicitlyAsync = true;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;
