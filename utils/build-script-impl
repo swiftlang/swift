@@ -236,6 +236,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-short-mangling-lookups           "1"               "whether to build stdlib with fast-path context descriptor lookups based on well-known short manglings"
     swift-stdlib-enable-vector-types              "1"               "whether to build stdlib with support for SIMD and vector types"
     swift-stdlib-experimental-hermetic-seal-at-link     "0"         "whether stdlib should be built with -experimental-hermetic-seal-at-link"
+    swift-stdlib-experimental-noncopyable-generics      "0"         "whether stdlib should be built with -enable-experimental-feature NoncopyableGenerics"
     swift-stdlib-disable-instantiation-caches     "0"               "whether to build stdlib with -disable-preallocated-instantiation-caches"
     swift-stdlib-has-type-printing                "1"               "whether stdlib should support printing user-friendly type name as strings at runtime"
     swift-stdlib-trap-function                    ""                "Name of function to call instead of emitting a trap instruction"
@@ -1851,6 +1852,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_HAS_TYPE_PRINTING:BOOL=$(true_false "${SWIFT_STDLIB_HAS_TYPE_PRINTING}")
                     -DSWIFT_STDLIB_TRAP_FUNCTION:STRING="${SWIFT_STDLIB_TRAP_FUNCTION}"
                     -DSWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK}")
+                    -DSWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS:BOOL=$(true_false "${SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS}")
                     -DSWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES:BOOL=$(true_false "${SWIFT_STDLIB_DISABLE_INSTANTIATION_CACHES}")
                     -DSWIFT_STDLIB_REFLECTION_METADATA:STRING="${SWIFT_STDLIB_REFLECTION_METADATA}"
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
