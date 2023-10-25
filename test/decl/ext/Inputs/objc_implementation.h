@@ -168,6 +168,10 @@
 
 @end
 
+@interface ObjCImplRootClass
+
+@end
+
 
 
 struct ObjCStruct {
