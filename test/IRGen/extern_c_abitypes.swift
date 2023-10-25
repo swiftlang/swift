@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Extern %t/extern_c.swift -I%t | %FileCheck %s --check-prefixes CHECK,CHECK-%target-cpu
 
 //--- c_abi_types.h
 #include <stdbool.h>
@@ -99,8 +99,14 @@ func test() {
 
   // assume %struct.c_struct and %TSo8c_structV have compatible layout
   //
-  // CHECK: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
-  // CHECK: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-x86_64: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-x86_64: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-arm64:  call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-arm64:  call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-wasm32: call void     @c_roundtrip_c_struct(ptr noalias nocapture sret(%struct.c_struct) {{.*}}, ptr{{( byval\(%struct.c_struct\))?}}[[ALIGN:(align [0-9]+)?]] {{.*}})
+  // CHECK-wasm32: call void @swift_roundtrip_c_struct(ptr noalias nocapture sret(%TSo8c_structV)   {{.*}}, ptr{{( byval\(%TSo8c_structV\))?}}[[ALIGN]] {{.*}})
+  // CHECK-armv7k: call [3 x i32]     @c_roundtrip_c_struct([3 x i32] {{.*}})
+  // CHECK-armv7k: call [3 x i32] @swift_roundtrip_c_struct([3 x i32] {{.*}})
   var c_struct_val = c_struct(foo: 496, bar: 28, baz: 8)
   _ = c_roundtrip_c_struct(c_struct_val)
   _ = swift_roundtrip_c_struct(c_struct_val)
