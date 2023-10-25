@@ -790,11 +790,20 @@ public struct RemoteCallArgument<Value> {
   /// the user-visible name of this argument.
   public let label: String?
 
-  /// The effective label of this argument, i.e. if no explicit `label` was set
-  /// this defaults to the `name`. This reflects the semantics of call sites of
-  /// function declarations without explicit label definitions in Swift.
+  /// The effective label of this argument. This reflects the semantics
+  /// of call sites of function declarations without explicit label
+  /// definitions in Swift.
+  ///
+  /// For example, for a method declared like `func hi(a: String)` the effective
+  /// label is `a` while for a method like `func hi(a b: String)` or
+  /// `func hi(_ b: String)` the label is the explicitly declared one,
+  /// so `a` and `_` respectively.
   public var effectiveLabel: String {
-    return label ?? name
+    if let label {
+      return label
+    } else {
+      return "_"
+    }
   }
 
   /// The internal name of parameter this argument is accessible as in the
