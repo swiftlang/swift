@@ -12201,7 +12201,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // The constraint ought to have been anchored on a KeyPathExpr.
   auto keyPath = castToExpr<KeyPathExpr>(locator.getAnchor());
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
-  bool resolveAsMultiArgFuncFix = false;
 
   auto formUnsolved = [&]() -> SolutionKind {
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -12232,17 +12231,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
 
     if (auto fnTy = type->getAs<FunctionType>()) {
-      if (fnTy->getParams().size() != 1) {
-        if (!shouldAttemptFixes())
-          return false;
-
-        resolveAsMultiArgFuncFix = true;
-        auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
-            *this, fnTy, getConstraintLocator(locator));
-        // Pretend the keypath type got resolved and move on.
-        return !recordFix(fix);
-      }
-
+      assert(fnTy->getParams().size() == 1);
       // Match up the root and value types to the function's param and return
       // types. Note that we're using the type of the parameter as referenced
       // from inside the function body as we'll be transforming the code into:
@@ -12276,6 +12265,23 @@ ConstraintSystem::simplifyKeyPathConstraint(
     return true;
   };
 
+  // If key path has to be converted to a function, let's check that
+  // the contextual type has precisely one parameter.
+  if (auto *fnTy = keyPathTy->getAs<FunctionType>()) {
+    if (fnTy->getParams().size() != 1) {
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      recordAnyTypeVarAsPotentialHole(rootTy);
+      recordAnyTypeVarAsPotentialHole(valueTy);
+
+      auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
+          *this, fnTy, getConstraintLocator(locator));
+      // Pretend the keypath type got resolved and move on.
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+  }
+
   // If we have a hole somewhere in the key path, the solver won't be able to
   // infer the key path type. So let's just assume this is solved.
   if (shouldAttemptFixes()) {
@@ -12296,10 +12302,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
   if (!tryMatchRootAndValueFromType(keyPathTy))
     return SolutionKind::Error;
-
-  // If we fix this keypath as `AllowMultiArgFuncKeyPathMismatch`, just proceed
-  if (resolveAsMultiArgFuncFix)
-    return SolutionKind::Solved;
 
   bool isValid;
   llvm::Optional<KeyPathCapability> capability;
