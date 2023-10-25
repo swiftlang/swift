@@ -1451,6 +1451,22 @@ bad(%41 : @owned $any Error):
   throw %41 : $any Error
 }
 
+// CHECK-LABEL: sil [ossa] @f270_reusePreexistingAllocStack : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack
+// CHECK:         apply undef<T>([[ADDR]])
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'f270_reusePreexistingAllocStack'
+sil [ossa] @f270_reusePreexistingAllocStack : $@convention(thin) <T> () -> () {
+  %var = alloc_stack $T
+  %t = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  store %t to [init] %var : $*T
+  destroy_addr %var : $*T
+  dealloc_stack %var : $*T
+  %retval = tuple ()
+  return %retval : $()
+}
+
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
 // CHECK:         fix_lifetime [[ADDR]]

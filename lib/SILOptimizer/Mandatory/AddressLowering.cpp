@@ -408,6 +408,64 @@ static bool isStoreCopy(SILValue value) {
   return true;
 }
 
+llvm::Optional<std::pair<SILValue, StoreInst *>>
+isOnlyStoredToUninitializedAddr(SILValue value) {
+  auto users = value->getUsers();
+
+  if (users.begin() == users.end())
+    return {};
+
+  if (std::next(users.begin()) != users.end())
+    return {};
+
+  auto *store = dyn_cast<StoreInst>(*users.begin());
+  if (!store)
+    return {};
+
+  auto addr = store->getDest();
+
+  // There is a single user and it's a store.  If the address is uninitialized
+  // throughout the range [def(value), store), then that address can be used.
+
+  // Rather than looking for that in a fully general way, just look for this
+  // pattern:
+  //   %addr = alloc_stack
+  //   ...
+  //   no uses of %addr
+  //   ...
+  //   %value = ...
+  //   store %value to [init] %addr
+
+  if (addr->getParentBlock() != value->getParentBlock())
+    return {};
+
+  auto *asi = dyn_cast<AllocStackInst>(addr);
+  if (!asi)
+    return {};
+
+  InstructionSet addrUsers(value->getFunction());
+  for (auto user : asi->getUsers()) {
+    if (user->getParent() != value->getParentBlock())
+      continue;
+    addrUsers.insert(user);
+  }
+
+  bool sawDef = false;
+  auto *def = value->getDefiningInstruction();
+  for (SILInstruction *instruction = asi; instruction != store;
+       instruction = instruction->getNextInstruction()) {
+    if (addrUsers.contains(instruction))
+      return {};
+    if (instruction == def)
+      sawDef = true;
+  }
+
+  if (!sawDef)
+    return {};
+
+  return {{addr, store}};
+}
+
 void ValueStorageMap::insertValue(SILValue value, SILValue storageAddress) {
   assert(!stableStorage && "cannot grow stable storage map");
 
@@ -1276,6 +1334,14 @@ void OpaqueStorageAllocation::allocateValue(SILValue value) {
   // Attempt to reuse a user's storage.
   if (findValueProjectionIntoUse(value))
     return;
+
+  if (auto pair = isOnlyStoredToUninitializedAddr(value)) {
+    auto addr = pair.value().first;
+    assert(!isStoreCopy(value));
+    auto &storage = pass.valueStorageMap.getStorage(value);
+    storage.storageAddress = addr;
+    return;
+  }
 
   // Eagerly create stack allocation. This way any operands can check
   // alloc_stack dominance before their storage is coalesced with this
@@ -2555,6 +2621,19 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
     storage.markRewritten();
     return storage.storageAddress;
   }
+  if (auto pair = isOnlyStoredToUninitializedAddr(oldResult)) {
+    auto *store = pair.value().second;
+    pass.deleter.forceDelete(store);
+    if (!oldResult->use_empty()) {
+      // Deleting the store may have resulted in the creation of a debug_value
+      // instruction for the stored value.
+      auto *use = oldResult->getSingleUse();
+      assert(use && isa<DebugValueInst>(use->getUser()));
+      pass.deleter.forceDelete(use->getUser());
+    }
+    return pair.value().first;
+  }
+
   // Allocate temporary call-site storage for an unused or loadable result.
   auto *allocInst = argBuilder.createAllocStack(callLoc, argTy);
 
@@ -3697,11 +3776,17 @@ void UseRewriter::visitOpenExistentialValueInst(
 void UseRewriter::rewriteStore(SILValue srcVal, SILValue destAddr,
                                IsInitialization_t isInit) {
   assert(use->get() == srcVal);
+
   auto *storeInst = use->getUser();
   auto loc = storeInst->getLoc();
 
   ValueStorage &storage = pass.valueStorageMap.getStorage(srcVal);
   SILValue srcAddr = storage.storageAddress;
+
+  if (srcAddr == destAddr) {
+    pass.deleter.forceDelete(storeInst);
+    return;
+  }
 
   IsTake_t isTake = IsTake;
   if (auto *copy = dyn_cast<CopyValueInst>(srcVal)) {

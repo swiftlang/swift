@@ -152,7 +152,7 @@ struct ValueStorage {
   /// struct, tuple, enum, or branch.
   unsigned isUseProjection : 1;
 
-  // The definition of this value is fully translated to lowered SIL.
+  /// The definition of this value is fully translated to lowered SIL.
   unsigned isRewritten : 1;
 
   // This is a use-projection which performs an initialization side-effect,
