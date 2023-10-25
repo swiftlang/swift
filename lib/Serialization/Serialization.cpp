@@ -40,6 +40,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
