@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-SKIP
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test -experimental-skip-non-exportable-decls | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP
 
+import Swift
+
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF
 private func privateFunc() {}
