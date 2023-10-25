@@ -5522,6 +5522,15 @@ public:
   /// Attempts to infer a capability of a key path (i.e. whether it
   /// is read-only, writable, etc.) based on the referenced members.
   ///
+  /// \param keyPath The key path literal expression.
+  ///
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
+  inferKeyPathLiteralCapability(KeyPathExpr *keyPath);
+
+  /// A convenience overload of \c inferKeyPathLiteralCapability.
+  ///
   /// \param keyPathType The type variable that represents the key path literal.
   ///
   /// \returns `bool` to indicate whether key path is valid or not,

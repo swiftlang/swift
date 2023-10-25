@@ -12199,17 +12199,15 @@ ConstraintSystem::simplifyKeyPathConstraint(
     ConstraintLocatorBuilder locator) {
   auto subflags = getDefaultDecompositionOptions(flags);
   // The constraint ought to have been anchored on a KeyPathExpr.
-  auto keyPath = castToExpr<KeyPathExpr>(locator.getBaseLocator()->getAnchor());
+  auto keyPath = castToExpr<KeyPathExpr>(locator.getAnchor());
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
-  bool definitelyFunctionType = false;
-  bool definitelyKeyPathType = false;
   bool resolveAsMultiArgFuncFix = false;
 
   auto formUnsolved = [&]() -> SolutionKind {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(Constraint::create(
           *this, ConstraintKind::KeyPath, keyPathTy, rootTy, valueTy,
-          locator.getBaseLocator(), componentTypeVars));
+          getConstraintLocator(locator), componentTypeVars));
       return SolutionKind::Solved;
     }
     return SolutionKind::Unsolved;
@@ -12218,25 +12216,18 @@ ConstraintSystem::simplifyKeyPathConstraint(
   if (keyPathTy->isTypeVariableOrMember())
     return formUnsolved();
 
-  auto tryMatchRootAndValueFromType = [&](Type type,
-                                          bool allowPartial = true) -> bool {
+  auto tryMatchRootAndValueFromType = [&](Type type) -> bool {
     Type boundRoot = Type(), boundValue = Type();
 
     if (auto bgt = type->getAs<BoundGenericType>()) {
-      definitelyKeyPathType = true;
-
       // We can get root and value from a concrete key path type.
       if (bgt->isKeyPath() ||
           bgt->isWritableKeyPath() ||
           bgt->isReferenceWritableKeyPath()) {
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
-      } else if (bgt->isPartialKeyPath()) {
-        if (!allowPartial)
-          return false;
-
-        // We can still get the root from a PartialKeyPath.
-        boundRoot = bgt->getGenericArgs()[0];
+      } else {
+        return false;
       }
     }
 
@@ -12247,12 +12238,10 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
         resolveAsMultiArgFuncFix = true;
         auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
-            *this, fnTy, locator.getBaseLocator());
+            *this, fnTy, getConstraintLocator(locator));
         // Pretend the keypath type got resolved and move on.
         return !recordFix(fix);
       }
-
-      definitelyFunctionType = true;
 
       // Match up the root and value types to the function's param and return
       // types. Note that we're using the type of the parameter as referenced
@@ -12300,192 +12289,66 @@ ConstraintSystem::simplifyKeyPathConstraint(
     // If the root type has been bound to a hole, we cannot infer it.
     if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isPlaceholder())
       return SolutionKind::Solved;
-
-    // If we have e.g a missing member somewhere, a component type variable
-    // would either be marked as a potential hole or would have a fix.
-    if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
-          auto *locator = tv->getImpl().getLocator();
-
-          // Result type of a component could be bound to a contextual
-          // (concrete) type if it's the last component in the chain,
-          // so the only way to detect errors is to check for fixes.
-          if (locator->isForKeyPathComponentResult()) {
-            auto path = locator->getPath();
-            auto *componentLoc =
-                getConstraintLocator(locator->getAnchor(), path.drop_back());
-
-            if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse) ||
-                hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
-                hasFixFor(componentLoc,
-                          FixKind::UnwrapOptionalBaseWithOptionalResult))
-              return true;
-          }
-
-          // If something inside of a component is marked as a hole,
-          // let's consider while component to be invalid.
-          return locator->isInKeyPathComponent() &&
-                 tv->getImpl().canBindToHole();
-        })) {
-      (void)tryMatchRootAndValueFromType(keyPathTy);
-      return SolutionKind::Solved;
-    }
   }
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
-  if (!tryMatchRootAndValueFromType(keyPathTy, /*allowPartial=*/false))
+  if (!tryMatchRootAndValueFromType(keyPathTy))
     return SolutionKind::Error;
 
   // If we fix this keypath as `AllowMultiArgFuncKeyPathMismatch`, just proceed
   if (resolveAsMultiArgFuncFix)
     return SolutionKind::Solved;
 
-  // See if we resolved overloads for all the components involved.
-  enum {
-    ReadOnly,
-    Writable,
-    ReferenceWritable
-  } capability = Writable;
+  bool isValid;
+  llvm::Optional<KeyPathCapability> capability;
 
-  bool anyComponentsUnresolved = false;
-  bool didOptionalChain = false;
+  std::tie(isValid, capability) = inferKeyPathLiteralCapability(keyPath);
 
-  for (unsigned i : indices(keyPath->getComponents())) {
-    auto &component = keyPath->getComponents()[i];
-    
-    switch (component.getKind()) {
-    case KeyPathExpr::Component::Kind::Invalid:
-    case KeyPathExpr::Component::Kind::Identity:
-      break;
+  // If key path is invalid, let's not don't attempt match capabilities.
+  if (!isValid)
+    return shouldAttemptFixes() ? SolutionKind::Solved : SolutionKind::Error;
 
-    case KeyPathExpr::Component::Kind::CodeCompletion: {
-      anyComponentsUnresolved = true;
-      capability = ReadOnly;
-      break;
-    }
-    case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
-      auto *componentLoc = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
-      auto *calleeLoc = getCalleeLocator(componentLoc);
-      auto overload = findSelectedOverloadFor(calleeLoc);
-
-      // If no choice was made, leave the constraint unsolved. But when
-      // generating constraints, we may already have enough information
-      // to determine whether the result will be a function type vs BGT KeyPath
-      // type, so continue through components to create new constraint at the
-      // end.
-      if (!overload) {
-        if (flags.contains(TMF_GenerateConstraints)) {
-          anyComponentsUnresolved = true;
-          continue;
-        }
-        return SolutionKind::Unsolved;
-      }
-
-      // tuple elements do not change the capability of the key path
-      auto choice = overload->choice;
-      if (choice.getKind() == OverloadChoiceKind::TupleIndex) {
-        continue;
-      }
-        
-      // Discarded unsupported non-decl member lookups.
-      if (!choice.isDecl()) {
-        return SolutionKind::Error;
-      }
-
-      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
-
-      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath)) {
-        return shouldAttemptFixes() ? SolutionKind::Solved
-                                    : SolutionKind::Error;
-      }
-
-      if (!storage)
-        return SolutionKind::Error;
-
-      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
-        capability = ReadOnly;
-        continue;
-      }
-
-      // A nonmutating setter indicates a reference-writable base.
-      if (!storage->isSetterMutating()) {
-        capability = ReferenceWritable;
-        continue;
-      }
-
-      // Otherwise, the key path maintains its current capability.
-      break;
-    }
-    
-    case KeyPathExpr::Component::Kind::OptionalChain:
-      didOptionalChain = true;
-      break;
-    
-    case KeyPathExpr::Component::Kind::OptionalForce:
-      // Forcing an optional preserves its lvalue-ness.
-      break;
-    
-    case KeyPathExpr::Component::Kind::OptionalWrap:
-      // An optional chain should already have been recorded.
-      assert(didOptionalChain);
-      break;
-
-    case KeyPathExpr::Component::Kind::TupleElement:
-      llvm_unreachable("not implemented");
-      break;
-    case KeyPathExpr::Component::Kind::DictionaryKey:
-      llvm_unreachable("DictionaryKey only valid in #keyPath");
-      break;
-    }
-  }
-
-  // Optional chains force the entire key path to be read-only.
-  if (didOptionalChain)
-    capability = ReadOnly;
+  // If key path is valid but not yet sufficiently resolved, let's delay
+  // capability checking.
+  if (!capability)
+    return formUnsolved();
 
   // Resolve the type.
   NominalTypeDecl *kpDecl;
-  switch (capability) {
-  case ReadOnly:
+  switch (*capability) {
+  case KeyPathCapability::ReadOnly:
     kpDecl = getASTContext().getKeyPathDecl();
     break;
 
-  case Writable:
+  case KeyPathCapability::Writable:
     kpDecl = getASTContext().getWritableKeyPathDecl();
     break;
 
-  case ReferenceWritable:
+  case KeyPathCapability::ReferenceWritable:
     kpDecl = getASTContext().getReferenceWritableKeyPathDecl();
     break;
   }
-  
+
   // FIXME: Allow the type to be upcast if the type system has a concrete
   // KeyPath type assigned to the expression already.
   if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
     if (keyPathBGT->isKeyPath())
       kpDecl = getASTContext().getKeyPathDecl();
-    else if (keyPathBGT->isWritableKeyPath() && capability >= Writable)
+    else if (keyPathBGT->isWritableKeyPath() &&
+             *capability >= KeyPathCapability::Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
 
-  auto loc = locator.getBaseLocator();
-  if (definitelyFunctionType) {
+  if (keyPathTy->is<FunctionType>()) {
     increaseScore(SK_FunctionConversion, locator);
     return SolutionKind::Solved;
-  } else if (!anyComponentsUnresolved ||
-             (definitelyKeyPathType && capability == ReadOnly)) {
-    auto resolvedKPTy =
-        BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-    return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                      loc);
   }
 
-  return formUnsolved();
+  auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
+                    locator);
 }
 
 ConstraintSystem::SolutionKind

@@ -7385,9 +7385,11 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
   assert(typeLocator->isLastElement<LocatorPathElt::KeyPathType>());
 
   auto *keyPath = castToExpr<KeyPathExpr>(typeLocator->getAnchor());
+  return inferKeyPathLiteralCapability(keyPath);
+}
 
-  auto capability = KeyPathCapability::Writable;
-
+std::pair<bool, llvm::Optional<KeyPathCapability>>
+ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
   bool didOptionalChain = false;
 
   auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
@@ -7403,6 +7405,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
     return std::make_pair(true, capability);
   };
 
+  auto capability = KeyPathCapability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
 
@@ -7423,8 +7426,14 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
           getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
       auto *calleeLoc = getCalleeLocator(componentLoc);
       auto overload = findSelectedOverloadFor(calleeLoc);
-      if (!overload)
+      if (!overload) {
+        // If overload cannot be found because member is missing,
+        // that's a failure.
+        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+          return fail();
+
         return delay();
+      }
 
       // tuple elements do not change the capability of the key path
       auto choice = overload->choice;
@@ -7438,8 +7447,10 @@ ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
 
       auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
-      if (hasFixFor(calleeLoc, FixKind::AllowInvalidRefInKeyPath) ||
-          hasFixFor(calleeLoc, FixKind::UnwrapOptionalBase))
+      if (hasFixFor(componentLoc, FixKind::AllowInvalidRefInKeyPath) ||
+          hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
+          hasFixFor(componentLoc,
+                    FixKind::UnwrapOptionalBaseWithOptionalResult))
         return fail();
 
       if (!storage)
