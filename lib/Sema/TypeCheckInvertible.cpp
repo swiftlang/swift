@@ -134,6 +134,12 @@ bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
   assert(!type->hasTypeParameter() && "forgot to mapTypeIntoContext first");
   auto &ctx = type->getASTContext();
 
+  // Pack expansions such as `repeat T` themselves do not have conformances,
+  // so check its pattern type for conformance.
+  if (auto *pet = type->getAs<PackExpansionType>()) {
+    type = pet->getPatternType()->getCanonicalType();
+  }
+
   auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
   if (!copyable)
     llvm_unreachable("missing Copyable protocol!");

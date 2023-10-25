@@ -34,6 +34,9 @@ struct RequirementError {
     /// A type requirement on a trivially invalid subject type,
     /// e.g. Bool: Collection.
     InvalidRequirementSubject,
+    /// An inverse constraint applied to an invalid subject type,
+    /// e.g., each T : ~Copyable
+    InvalidInverseSubject,
     /// An invalid shape requirement, e.g. T.shape == Int.shape
     InvalidShapeRequirement,
     /// A pair of conflicting requirements, T == Int, T == String
@@ -76,6 +79,11 @@ public:
   static RequirementError forInvalidRequirementSubject(Requirement req,
                                                        SourceLoc loc) {
     return {Kind::InvalidRequirementSubject, req, loc};
+  }
+
+  static RequirementError forInvalidInverseSubject(Requirement req,
+                                                   SourceLoc loc) {
+    return {Kind::InvalidInverseSubject, req, loc};
   }
 
   static RequirementError forInvalidShapeRequirement(Requirement req,

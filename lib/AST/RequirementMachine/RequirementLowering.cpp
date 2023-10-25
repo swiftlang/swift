@@ -393,13 +393,20 @@ static void desugarConformanceRequirement(Requirement req,
     }
 
   } else if (constraintType->is<InverseType>()) {
+    auto subject = req.getFirstType();
+
     // Fast-path
-    if (req.getFirstType()->isTypeParameter()) {
-      result.push_back(req);
-      return;
+    if (subject->isTypeParameter()) {
+      if (!subject->isParameterPack()) {
+        result.push_back(req);
+        return;
+      }
+      // Disallow parameter packs for now.
+      errors.push_back(RequirementError::forInvalidInverseSubject(req, loc));
+    } else {
+      // Only permit type-parameter subjects.
+      errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
     }
-    // Only permit type-parameter subjects for inverse-conformance requirements.
-    errors.push_back(RequirementError::forInvalidRequirementSubject(req, loc));
   }
 
   for (auto subReq : subReqs)

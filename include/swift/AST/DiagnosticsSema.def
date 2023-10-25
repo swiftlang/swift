@@ -3084,6 +3084,10 @@ ERROR(requires_not_suitable_archetype,none,
       "generic parameter or associated type",
       (Type))
 
+ERROR(requires_not_suitable_inverse_subject,none,
+      "cannot apply inverse %1 to type %0 in conformance requirement",
+      (Type, Type))
+
 ERROR(invalid_shape_requirement,none,
       "invalid same-shape requirement between %0 and %1",
       (Type, Type))
