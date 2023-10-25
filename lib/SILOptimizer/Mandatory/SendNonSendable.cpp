@@ -246,7 +246,7 @@ struct PartitionOpBuilder {
 
   void addTransfer(SILValue value, Expr *sourceExpr = nullptr) {
     assert(valueHasID(value) &&
-           "transfered value should already have been encountered");
+           "transferred value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
         PartitionOp::Transfer(lookupValueID(value), currentInst, sourceExpr));
@@ -1237,50 +1237,43 @@ private:
 // to be informative, so distance is used as a heuristic to choose which
 // access sites to display in diagnostics given a racy consumption.
 class TransferredReason {
-  std::map<unsigned, std::vector<PartitionOp>> transferOps;
+  std::multimap<unsigned, PartitionOp> transferOps;
 
   friend class TransferRequireAccumulator;
 
   bool containsOp(const PartitionOp& op) {
-    for (auto [_, vec] : transferOps)
-      for (auto vecOp : vec)
-        if (op == vecOp)
-          return true;
-    return false;
+    return llvm::any_of(transferOps,
+                        [&](const std::pair<unsigned, PartitionOp> &pair) {
+                          return pair.second == op;
+                        });
   }
 
 public:
-  // a TransferredReason is valid if it contains at least one transfer
-  // instruction
-  bool isValid() {
-    for (auto [_, vec] : transferOps)
-      if (!vec.empty())
-        return true;
-    return false;
-  }
+  // A TransferredReason is valid if it contains at least one transfer
+  // instruction.
+  bool isValid() { return transferOps.size(); }
 
   TransferredReason() {}
 
   TransferredReason(LocalTransferredReason localReason) {
     assert(localReason.kind == LocalTransferredReasonKind::LocalTransferInst);
-    transferOps[0] = {localReason.localInst.value()};
+    transferOps.emplace(0, localReason.localInst.value());
   }
 
   void addTransferOp(PartitionOp transferOp, unsigned distance) {
     assert(transferOp.getKind() == PartitionOpKind::Transfer);
     // duplicates should not arise
     if (!containsOp(transferOp))
-      transferOps[distance].push_back(transferOp);
+      transferOps.emplace(distance, transferOp);
   }
 
   // merge in another transferredReason, adding the specified distane to all its
   // ops
   void addOtherReasonAtDistance(const TransferredReason &otherReason,
                                 unsigned distance) {
-    for (auto &[otherDistance, otherTransferOpsAtDistance] :
+    for (auto &[otherDistance, otherTransferOpAtDistance] :
          otherReason.transferOps)
-      for (auto otherTransferOp : otherTransferOpsAtDistance)
-        addTransferOp(otherTransferOp, distance + otherDistance);
+      addTransferOp(otherTransferOpAtDistance, distance + otherDistance);
   }
 };
 
@@ -1319,9 +1312,8 @@ public:
 
   void accumulateTransferredReason(PartitionOp requireOp,
                                    const TransferredReason &transferredReason) {
-    for (auto [distance, transferOps] : transferredReason.transferOps)
-      for (auto transferOp : transferOps)
-        requirementsForTransfers[transferOp].insert({requireOp, distance});
+    for (auto [distance, transferOp] : transferredReason.transferOps)
+      requirementsForTransfers[transferOp].insert({requireOp, distance});
   }
 
   void emitErrorsForTransferRequire(
@@ -1387,15 +1379,12 @@ private:
       // consumption does not correspond to an apply expression
       return false;
     auto isolationCrossing = apply->getIsolationCrossing();
-    if (!isolationCrossing) {
-      assert(false && "ApplyExprs should be transferring only if"
-                      " they are isolation crossing");
-      return false;
-    }
+    assert(isolationCrossing && "ApplyExprs should be transferring only if "
+                                "they are isolation crossing");
+
     auto argExpr = transferOp.getSourceExpr();
-    if (!argExpr)
-      assert(false &&
-             "sourceExpr should be populated for ApplyExpr consumptions");
+    assert(argExpr &&
+           "sourceExpr should be populated for ApplyExpr consumptions");
 
     sourceInst->getFunction()
         ->getASTContext()
