@@ -122,6 +122,9 @@ bool ArrayAllocation::replacementsAreValid() {
 /// Recursively look at all uses of this definition. Abort if the array value
 /// could escape or be changed. Collect all uses that are calls to array.count.
 bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
+  LLVM_DEBUG(llvm::dbgs() << "Collecting uses of:");
+  LLVM_DEBUG(Def->dump());
+
   for (auto *Opd : Def->getUses()) {
     auto *User = Opd->getUser();
     // Ignore reference counting and debug instructions.
@@ -181,17 +184,28 @@ bool ArrayAllocation::analyze(ApplyInst *Alloc) {
   if (!Uninitialized)
     return false;
 
-  ArrayValue = Uninitialized.getArrayValue();
-  if (!ArrayValue)
-    return false;
+  LLVM_DEBUG(llvm::dbgs() << "Found array allocation: ");
+  LLVM_DEBUG(Alloc->dump());
 
-  // Figure out all stores to the array.
-  if (!mapInitializationStores(Uninitialized))
+  ArrayValue = Uninitialized.getArrayValue();
+  if (!ArrayValue) {
+    LLVM_DEBUG(llvm::dbgs() << "Did not find array value\n");
     return false;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "ArrayValue: ");
+  LLVM_DEBUG(ArrayValue->dump());
+  // Figure out all stores to the array.
+  if (!mapInitializationStores(Uninitialized)) {
+    LLVM_DEBUG(llvm::dbgs() << "Could not map initializing stores\n");
+    return false;
+  }
 
   // Check if the array value was stored or has escaped.
-  if (!recursivelyCollectUses(ArrayValue))
+  if (!recursivelyCollectUses(ArrayValue)) {
+    LLVM_DEBUG(llvm::dbgs() << "Array value stored or escaped\n");
     return false;
+  }
 
   return true;
 }
@@ -328,7 +342,9 @@ public:
     auto &Fn = *getFunction();
     bool Changed = false;
 
-    for (auto &BB :Fn) {
+    LLVM_DEBUG(llvm::dbgs() << "ArrayElementPropagation looking at function: "
+                            << Fn.getName() << "\n");
+    for (auto &BB : Fn) {
       for (auto &Inst : BB) {
         if (auto *Apply = dyn_cast<ApplyInst>(&Inst)) {
           ArrayAllocation ALit;

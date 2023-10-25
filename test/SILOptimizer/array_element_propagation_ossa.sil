@@ -68,7 +68,8 @@ sil [ossa] @propagate_with_get_element_returning_direct_result : $@convention(th
   %4 = metatype $@thin MyArray<MyInt>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   debug_value %7 : $MyArray<MyInt>
   debug_value %8 : $UnsafeMutablePointer<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
@@ -138,7 +139,8 @@ sil [ossa] @repeated_initialization : $@convention(thin) () -> () {
   %4 = metatype $@thin MyArray<MyInt>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
@@ -185,7 +187,8 @@ sil [ossa] @unknown_use : $@convention(thin) () -> () {
   %4 = metatype $@thin MyArray<MyInt>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
@@ -233,7 +236,8 @@ sil [ossa] @append_contentsOf_int : $@convention(thin) () -> () {
   %4 = metatype $@thin Array<MyInt>.Type
   %5 = function_ref @arrayAdoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin Array<MyInt>.Type) -> @owned (Array<MyInt>, UnsafeMutablePointer<MyInt>)
-  (%7, %8) = destructure_tuple %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8a) = destructure_tuple %6 : $(Array<MyInt>, UnsafeMutablePointer<MyInt>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $Array<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 27
@@ -257,7 +261,7 @@ sil [ossa] @append_contentsOf_int : $@convention(thin) () -> () {
 // CHECK-LABEL: sil [ossa] @negative_index
 // CHECK: store %{{[0-9]+}} to [trivial]
 // CHECK: [[GETF:%.*]] = function_ref @getElement : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
-// CHECK: apply [[GETF]](%15, %17, %19, %7) : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
+// CHECK: apply [[GETF]](%16, %18, %20, %7) : $@convention(method) (MyInt, MyBool, _MyDependenceToken, @guaranteed MyArray<MyInt>) -> MyInt
 // CHECK-LABEL: // end sil function 'negative_index'
 sil [ossa] @negative_index : $@convention(thin) () -> () {
 bb0:
@@ -268,7 +272,8 @@ bb0:
   %4 = metatype $@thin MyArray<MyInt>.Type
   %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
   %6 = apply %5(%3, %2, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
-  (%7, %8) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  (%7, %8a) = destructure_tuple %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
+  %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
   %9 = struct_extract %8 : $UnsafeMutablePointer<MyInt>, #UnsafeMutablePointer._rawValue
   %10 = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*MyInt
   %11 = integer_literal $Builtin.Int64, 0
