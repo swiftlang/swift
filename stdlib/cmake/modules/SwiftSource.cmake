@@ -578,6 +578,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
+  if(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+    list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+  endif()
+
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
@@ -1181,4 +1185,3 @@ function(_compile_swift_files
       LANGUAGE C
       OBJECT_DEPENDS "${source_files}")
 endfunction()
-
