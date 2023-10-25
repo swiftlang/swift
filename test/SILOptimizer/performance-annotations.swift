@@ -412,3 +412,8 @@ func testInfiniteLoop(_ c: Cl) {
   while true {}
 }
 
+@_noAllocation
+func testPrecondition(_ count: Int) {
+  precondition(count == 2, "abc")
+}
+
