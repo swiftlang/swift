@@ -172,6 +172,10 @@
 
 @end
 
+@interface ObjCImplGenericClass<T> : NSObject
+
+@end
+
 
 
 struct ObjCStruct {

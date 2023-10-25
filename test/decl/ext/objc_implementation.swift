@@ -460,6 +460,10 @@ protocol EmptySwiftProto {}
   // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
 }
 
+@_objcImplementation extension ObjCImplGenericClass {
+  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+}
+
 func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.method(fromHeader1: 1)
   obj.method(fromHeader2: 2)

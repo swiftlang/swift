@@ -1722,6 +1722,9 @@ ERROR(attr_objc_implementation_must_have_super,none,
       "'@_objcImplementation' cannot be used to implement root %kind0; declare "
       "its superclass in the header",
       (ValueDecl *))
+ERROR(objc_implementation_cannot_have_generics,none,
+      "'@_objcImplementation' cannot be used to implement %kind0",
+      (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
       "umbrella or bridging header imports the header that declares it",
