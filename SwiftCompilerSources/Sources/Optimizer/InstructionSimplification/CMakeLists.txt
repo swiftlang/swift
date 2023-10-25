@@ -14,7 +14,9 @@ swift_compiler_sources(Optimizer
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
   SimplifyConvertEscapeToNoEscape.swift
+  SimplifyCopyValue.swift
   SimplifyDebugStep.swift
+  SimplifyDestroyValue.swift
   SimplifyDestructure.swift
   SimplifyGlobalValue.swift
   SimplifyInitEnumDataAddr.swift
