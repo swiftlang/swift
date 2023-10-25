@@ -4992,7 +4992,6 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMember = static_cast<FuncDecl *>(context);
   auto baseStruct =
       cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
-  auto baseType = baseStruct->getDeclaredType();
 
   auto forwardedFunc = synthesizeBaseFunctionDeclCall(
       *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), ctx,

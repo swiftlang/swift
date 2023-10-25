@@ -2818,7 +2818,6 @@ private:
       // HACK: functions can get queued multiple times in
       // definedFunctions, so be sure to be idempotent.
       if (!E->isThrowsSet()) {
-        auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
         E->setThrows(throwDest);
       }
 

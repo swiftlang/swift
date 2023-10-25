@@ -2991,10 +2991,10 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // Ok, we now have our insert pt. Call the appropriate operations.
     assert(InsertPt);
     if (auto *InsertBefore = InsertPt.dyn_cast<llvm::Instruction *>()) {
-      auto *Inst = inserter.insert(Storage, Var, Expr, DL, InsertBefore);
+      inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
-      auto *Inst = inserter.insert(Storage, Var, Expr, DL,
-                                   InsertPt.get<llvm::BasicBlock *>());
+      inserter.insert(Storage, Var, Expr, DL,
+                      InsertPt.get<llvm::BasicBlock *>());
     }
     return;
   }
