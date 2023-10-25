@@ -125,9 +125,6 @@ public:
   /// What kind of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
-  /// DWARF output format version number.
-  std::optional<uint8_t> DWARFVersion;
-
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 

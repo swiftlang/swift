@@ -13,8 +13,7 @@
 
 namespace swift {
 
-/// Represents the nine reflection sections used by Swift + the Swift AST
-/// section used by the debugger.
+/// Represents the nine reflection sections used by Swift
 enum ReflectionSectionKind : uint8_t {
 #define HANDLE_SWIFT_SECTION(KIND, MACHO, ELF, COFF) KIND,
 #include "llvm/BinaryFormat/Swift.def"
