@@ -313,7 +313,7 @@ struct TypeInStructInheritance2 : , #^TYPE_IN_STRUCT_INHERITANCE_2?check=WITH_GL
 
 struct TypeInStructInheritance3 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_3?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+// FIXME: 'check' should be 'WITH_GLOBAL_TYPES'
 struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES_EXPR^#
 
 struct TypeInStructInheritance5 : #^TYPE_IN_STRUCT_INHERITANCE_5?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
@@ -325,7 +325,7 @@ struct TypeInStructInheritance6 : , #^TYPE_IN_STRUCT_INHERITANCE_6?check=WITH_GL
 struct TypeInStructInheritance7 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_7?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
 
-// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+// FIXME: 'check' should be 'WITH_GLOBAL_TYPES'
 struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES_EXPR^# {
 }
 
