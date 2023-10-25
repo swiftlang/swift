@@ -586,7 +586,7 @@ static Type substType(Type derivedType, unsigned level,
           isa<OpaqueTypeArchetypeType>(substOrig) &&
           known->getCanonicalType() == substOrig->getCanonicalType())
         return std::nullopt; // Recursively process the substitutions of the
-                           // opaque type archetype.
+                             // opaque type archetype.
       return known;
     }
 

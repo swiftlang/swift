@@ -6663,7 +6663,7 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
   // Record '{' '}' to the current hash, nothing else.
   recordTokenHash("}");
   llvm::SaveAndRestore<std::optional<StableHasher>> T(CurrentTokenHash,
-                                                       std::nullopt);
+                                                      std::nullopt);
 
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
@@ -8844,7 +8844,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   recordTokenHash("}");
 
   llvm::SaveAndRestore<std::optional<StableHasher>> T(CurrentTokenHash,
-                                                       std::nullopt);
+                                                      std::nullopt);
 
   // If we can delay parsing this body, or this is the first pass of code
   // completion, skip until the end. If we encounter a code completion token

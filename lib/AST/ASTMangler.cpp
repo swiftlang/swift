@@ -2300,8 +2300,7 @@ namespace {
 /// assumes that field and global-variable bindings always bind at
 /// least one name, which is probably a reasonable assumption but may
 /// not be adequately enforced.
-static std::optional<VarDecl *>
-findFirstVariable(PatternBindingDecl *binding) {
+static std::optional<VarDecl *> findFirstVariable(PatternBindingDecl *binding) {
   for (auto idx : range(binding->getNumPatternEntries())) {
     auto var = FindFirstVariable().visit(binding->getPattern(idx));
     if (var) return var;

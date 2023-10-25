@@ -19,7 +19,6 @@
 
 #include "clang/AST/Type.h"
 
-
 namespace swift {
 
 // MARK: - ClangTypeInfo

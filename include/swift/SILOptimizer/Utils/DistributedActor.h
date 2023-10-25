@@ -13,8 +13,8 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DISTRIBUTED_ACTOR_H
 #define SWIFT_SILOPTIMIZER_UTILS_DISTRIBUTED_ACTOR_H
 
-#include "llvm/ADT/ArrayRef.h"
 #include "swift/AST/Decl.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <utility>
 
 namespace swift {
@@ -48,8 +48,8 @@ SILValue refDistributedActorSystem(SILBuilder &B,
 /// \param tryTargets For a call that can throw, the normal and error basic
 /// blocks that the call will branch to.
 void emitDistributedActorSystemWitnessCall(
-    SILBuilder &B, SILLocation loc, DeclName methodName,
-    SILValue base, SILType actorType, llvm::ArrayRef<SILValue> args,
+    SILBuilder &B, SILLocation loc, DeclName methodName, SILValue base,
+    SILType actorType, llvm::ArrayRef<SILValue> args,
     std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets =
         std::nullopt);
 

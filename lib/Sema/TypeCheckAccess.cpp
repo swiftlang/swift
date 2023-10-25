@@ -1286,8 +1286,9 @@ public:
       auto *macroDecl = D->getResolvedMacro(customAttr);
       if (macroDecl) {
         diagnoseDeclAvailability(
-          macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-          ExportContext::forDeclSignature(const_cast<Decl *>(D)), std::nullopt);
+            macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
+            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
+            std::nullopt);
       }
     }
   }

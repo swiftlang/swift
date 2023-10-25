@@ -1450,7 +1450,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       bool isPostfixIfConfigExpr = false;
       {
         llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
-                                                             std::nullopt);
+                                                            std::nullopt);
         Parser::BacktrackingScope Backtrack(*this);
         // Skip to the first body. We may need to skip multiple '#if' directives
         // since we support nested '#if's. e.g.

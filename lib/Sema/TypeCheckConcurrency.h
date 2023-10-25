@@ -288,14 +288,12 @@ using FunctionCheckOptions = OptionSet<FunctionCheckKind>;
 ///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonSendableTypesInReference(
-    Expr *base, ConcreteDeclRef declRef,
-    const DeclContext *fromDC, SourceLoc refLoc,
-    SendableCheckReason refKind,
+    Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
+    SourceLoc refLoc, SendableCheckReason refKind,
     std::optional<ActorIsolation> knownIsolation = std::nullopt,
-    FunctionCheckOptions funcCheckOptions =
-        (FunctionCheckOptions() |
-         FunctionCheckKind::Params |
-         FunctionCheckKind::Results),
+    FunctionCheckOptions funcCheckOptions = (FunctionCheckOptions() |
+                                             FunctionCheckKind::Params |
+                                             FunctionCheckKind::Results),
     SourceLoc diagnoseLoc = SourceLoc());
 
 /// Produce a diagnostic for a missing conformance to Sendable.

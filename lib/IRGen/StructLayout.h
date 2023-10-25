@@ -426,9 +426,8 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, std::optional<CanType> type,
-               LayoutKind kind, LayoutStrategy strategy,
-               ArrayRef<const TypeInfo *> fields,
+  StructLayout(IRGenModule &IGM, std::optional<CanType> type, LayoutKind kind,
+               LayoutStrategy strategy, ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.

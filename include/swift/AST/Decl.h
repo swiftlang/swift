@@ -6200,8 +6200,7 @@ public:
 
   /// Retrieve information about the mutability of the composed
   /// property wrappers.
-  std::optional<PropertyWrapperMutability>
-  getPropertyWrapperMutability() const;
+  std::optional<PropertyWrapperMutability> getPropertyWrapperMutability() const;
 
   /// Returns whether this property is the backing storage property or a storage
   /// wrapper for wrapper instance's projectedValue. If this property is

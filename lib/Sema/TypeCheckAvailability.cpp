@@ -180,9 +180,10 @@ static void forEachOuterDecl(DeclContext *DC, Fn fn) {
   }
 }
 
-static void computeExportContextBits(
-    ASTContext &Ctx, Decl *D, bool *spi, bool *implicit, bool *deprecated,
-    std::optional<PlatformKind> *unavailablePlatformKind) {
+static void
+computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi, bool *implicit,
+                         bool *deprecated,
+                         std::optional<PlatformKind> *unavailablePlatformKind) {
   if (D->isSPI() ||
       D->isAvailableAsSPI())
     *spi = true;
@@ -1069,15 +1070,15 @@ private:
       FalseRefinement = FalseFlow;
     }
 
-    auto makeResult = [isUnavailability](
-                          std::optional<AvailabilityContext> TrueRefinement,
-                          std::optional<AvailabilityContext> FalseRefinement) {
-      if (isUnavailability.has_value() && isUnavailability.value()) {
-        // If this is an unavailability check, invert the result.
-        return std::make_pair(FalseRefinement, TrueRefinement);
-      }
-      return std::make_pair(TrueRefinement, FalseRefinement);
-    };
+    auto makeResult =
+        [isUnavailability](std::optional<AvailabilityContext> TrueRefinement,
+                           std::optional<AvailabilityContext> FalseRefinement) {
+          if (isUnavailability.has_value() && isUnavailability.value()) {
+            // If this is an unavailability check, invert the result.
+            return std::make_pair(FalseRefinement, TrueRefinement);
+          }
+          return std::make_pair(TrueRefinement, FalseRefinement);
+        };
 
     if (NestedCount == 0)
       return makeResult(std::nullopt, FalseRefinement);

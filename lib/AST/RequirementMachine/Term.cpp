@@ -129,10 +129,10 @@ bool Term::containsUnresolvedSymbols() const {
 /// This is used to implement Term::compare() and MutableTerm::compare()
 /// below.
 static std::optional<int> shortlexCompare(const Symbol *lhsBegin,
-                                           const Symbol *lhsEnd,
-                                           const Symbol *rhsBegin,
-                                           const Symbol *rhsEnd,
-                                           RewriteContext &ctx) {
+                                          const Symbol *lhsEnd,
+                                          const Symbol *rhsBegin,
+                                          const Symbol *rhsEnd,
+                                          RewriteContext &ctx) {
   // First, compare the number of name symbols.
   unsigned lhsNameCount = 0;
   for (auto *iter = lhsBegin; iter != lhsEnd; ++iter) {
@@ -187,7 +187,7 @@ std::optional<int> Term::compare(Term other, RewriteContext &ctx) const {
 /// Shortlex order on mutable terms. Returns None if the terms are identical
 /// except for an incomparable superclass or concrete type symbol at the end.
 std::optional<int> MutableTerm::compare(const MutableTerm &other,
-                                         RewriteContext &ctx) const {
+                                        RewriteContext &ctx) const {
   return shortlexCompare(begin(), end(), other.begin(), other.end(), ctx);
 }
 

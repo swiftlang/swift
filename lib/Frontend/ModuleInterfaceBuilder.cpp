@@ -45,7 +45,7 @@ namespace path = llvm::sys::path;
 /// If the file dependency in \p FullDepPath is inside the \p Base directory,
 /// this returns its path relative to \p Base. Otherwise it returns None.
 static std::optional<StringRef> getRelativeDepPath(StringRef DepPath,
-                                                    StringRef Base) {
+                                                   StringRef Base) {
   // If Base is the root directory, or DepPath does not start with Base, bail.
   if (Base.size() <= 1 || !DepPath.startswith(Base)) {
     return std::nullopt;

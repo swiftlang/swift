@@ -127,8 +127,7 @@ struct ArgumentDescriptor {
     return false;
   }
 
-  std::optional<ValueOwnershipKind>
-  getTransformedOwnershipKind(SILType SubTy) {
+  std::optional<ValueOwnershipKind> getTransformedOwnershipKind(SILType SubTy) {
     if (IsEntirelyDead)
       return std::nullopt;
     if (SubTy.isTrivial(*Arg->getFunction()))

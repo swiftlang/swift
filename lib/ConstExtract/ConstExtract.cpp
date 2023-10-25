@@ -677,8 +677,7 @@ void writeAttributeInfo(llvm::json::OStream &JSON,
 }
 
 void writePropertyWrapperAttributes(
-    llvm::json::OStream &JSON,
-    std::optional<AttrValueVector> PropertyWrappers,
+    llvm::json::OStream &JSON, std::optional<AttrValueVector> PropertyWrappers,
     const ASTContext &ctx) {
   if (!PropertyWrappers.has_value()) {
     return;

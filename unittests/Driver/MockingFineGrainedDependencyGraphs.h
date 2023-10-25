@@ -85,11 +85,11 @@ ModuleDepGraph::Changes getChangesForSimulatedLoad(
 ///
 /// See \ref simulateLoad for a parameter description.
 
-std::vector<const driver::Job *>
-simulateReload(ModuleDepGraph &g, const driver::Job *cmd,
-               const DependencyDescriptions &dependencyDescriptions,
-               std::optional<Fingerprint> interfaceHashIfNonEmpty = std::nullopt,
-               const bool hadCompilationError = false);
+std::vector<const driver::Job *> simulateReload(
+    ModuleDepGraph &g, const driver::Job *cmd,
+    const DependencyDescriptions &dependencyDescriptions,
+    std::optional<Fingerprint> interfaceHashIfNonEmpty = std::nullopt,
+    const bool hadCompilationError = false);
 
 std::vector<const driver::Job *>
 printJobsForDebugging(const std::vector<const driver::Job *> &jobs);

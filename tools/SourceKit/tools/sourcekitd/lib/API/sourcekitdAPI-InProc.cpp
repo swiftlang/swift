@@ -188,9 +188,7 @@ public:
     return SOURCEKITD_VARIANT_TYPE_INT64;
   }
 
-  std::optional<int64_t> getInt64() const override {
-    return Storage;
-  }
+  std::optional<int64_t> getInt64() const override { return Storage; }
 
   static bool classof(const SKDObject *O) {
     return O->getKind() == ObjectKind::Int64;
@@ -718,12 +716,14 @@ std::optional<StringRef> RequestDict::getString(UIdent Key) const {
   return std::nullopt;
 }
 
-std::optional<RequestDict> RequestDict::getDictionary(SourceKit::UIdent Key) const {
+std::optional<RequestDict>
+RequestDict::getDictionary(SourceKit::UIdent Key) const {
   SKDDictionary *DictObject = nullptr;
   if (auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key))) {
     DictObject = dyn_cast<SKDDictionary>(Object);
   }
-  return DictObject ? std::optional<RequestDict>(RequestDict(DictObject)) : std::nullopt;
+  return DictObject ? std::optional<RequestDict>(RequestDict(DictObject))
+                    : std::nullopt;
 }
 
 bool RequestDict::getStringArray(SourceKit::UIdent Key,
@@ -793,7 +793,8 @@ bool RequestDict::getInt64(SourceKit::UIdent Key, int64_t &Val,
   return false;
 }
 
-std::optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) const {
+std::optional<int64_t>
+RequestDict::getOptionalInt64(SourceKit::UIdent Key) const {
   auto Object = static_cast<SKDObject *>(Dict)->get(SKDUIDFromUIdent(Key));
   if (!Object)
     return std::nullopt;

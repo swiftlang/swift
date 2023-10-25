@@ -21,8 +21,8 @@
 using namespace swift;
 
 std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                       KeyPathExpr *expr,
-                                                       bool requireResultType) {
+                                                      KeyPathExpr *expr,
+                                                      bool requireResultType) {
   // TODO: Native keypaths
   assert(expr->isObjC() && "native keypaths not type-checked this way");
   

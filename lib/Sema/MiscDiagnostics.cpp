@@ -6217,8 +6217,8 @@ std::optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (::omitNeedlessWords(name, {}, "", typeName, contextTypeName, {},
                           /*returnsSelf=*/false, true,
-                          /*allPropertyNames=*/nullptr, std::nullopt, std::nullopt,
-                          scratch)) {
+                          /*allPropertyNames=*/nullptr, std::nullopt,
+                          std::nullopt, scratch)) {
     return Context.getIdentifier(name);
   }
 

@@ -395,8 +395,7 @@ public:
   /// Substitute anonymous function arguments with "_$ArgNo".
   std::optional<SILDebugVariable>
   substituteAnonymousArgs(llvm::SmallString<4> Name,
-                          std::optional<SILDebugVariable> Var,
-                          SILLocation Loc);
+                          std::optional<SILDebugVariable> Var, SILLocation Loc);
 
   AllocStackInst *
   createAllocStack(SILLocation Loc, SILType elementType,

@@ -29,7 +29,6 @@
 
 #include "chrono_utils.h"
 
-
 #include "swift/Threading/Errors.h"
 
 namespace swift {

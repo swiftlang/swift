@@ -268,7 +268,7 @@ public:
   std::optional<SymbolicValue> computeCallResult(ApplyInst *apply);
 
   std::optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
-                                                        SILFunction *callee);
+                                                       SILFunction *callee);
 
   std::optional<SymbolicValue>
   computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
@@ -284,10 +284,10 @@ public:
   SymbolicValue getConstAddrAndLoadResult(SILValue addr);
   SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
   std::optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
-                                               SILValue dest);
+                                              SILValue dest);
+
 private:
-  std::optional<SymbolicValue>
-  initializeAddressFromSingleWriter(SILValue addr);
+  std::optional<SymbolicValue> initializeAddressFromSingleWriter(SILValue addr);
 };
 } // namespace swift
 
@@ -1874,8 +1874,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                     UnknownReason::UnsupportedInstruction);
 }
 
-std::pair<std::optional<SILBasicBlock::iterator>,
-          std::optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprFunctionState::evaluateInstructionAndGetNext(
     SILBasicBlock::iterator instI,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks) {
@@ -1992,7 +1991,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
         inst->getModule().getSwiftModule(), sourceType, targetType);
     if (castResult == DynamicCastFeasibility::MaySucceed) {
       return {std::nullopt, getUnknown(evaluator, inst->asSILNode(),
-                                     UnknownReason::UnknownCastResult)};
+                                       UnknownReason::UnknownCastResult)};
     }
     // Determine the basic block to jump to.
     SILBasicBlock *resultBB =
@@ -2014,7 +2013,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
                           << "\n");
 
   return {std::nullopt, getUnknown(evaluator, inst->asSILNode(),
-                                 UnknownReason::UnsupportedInstruction)};
+                                   UnknownReason::UnsupportedInstruction)};
 }
 
 /// Evaluate a call to the specified function as if it were a constant
@@ -2153,8 +2152,7 @@ ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
 
 ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
 
-std::pair<std::optional<SILBasicBlock::iterator>,
-          std::optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
   // Reset `stepsEvaluated` to zero.
   stepsEvaluated = 0;
@@ -2221,8 +2219,7 @@ void ConstExprStepEvaluator::setMutableAddressesToUnknown(
   }
 }
 
-std::pair<std::optional<SILBasicBlock::iterator>,
-          std::optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
     SILBasicBlock::iterator instI) {
   SILInstruction *inst = &(*instI);
@@ -2263,8 +2260,7 @@ bool swift::isFailStopError(SymbolicValue errorVal) {
   }
 }
 
-std::pair<std::optional<SILBasicBlock::iterator>,
-          std::optional<SymbolicValue>>
+std::pair<std::optional<SILBasicBlock::iterator>, std::optional<SymbolicValue>>
 ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
     SILBasicBlock::iterator instI) {
   auto evaluateResult = evaluate(instI);

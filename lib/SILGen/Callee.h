@@ -44,9 +44,8 @@ public:
       ImportAsMemberStatus foreignSelf,
       std::optional<SILFunctionTypeRepresentation> overrideRep = std::nullopt)
       : origFormalType(std::nullopt), substFnType(substFnType),
-        origResultType(origResultType),
-        substResultType(substResultType), foreign{foreignSelf, foreignError,
-                                                  foreignAsync},
+        origResultType(origResultType), substResultType(substResultType),
+        foreign{foreignSelf, foreignError, foreignAsync},
         overrideRep(overrideRep) {}
 
   CalleeTypeInfo(

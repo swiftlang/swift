@@ -193,8 +193,7 @@ public:
       std::optional<PairToSecondEltRange> resultRange;
       if (baseIter->second.has_value()) {
         unsigned count = std::distance(baseIter, rangeEnd);
-        ArrayRef<std::pair<Key, std::optional<Value>>> slice(&*baseIter,
-                                                              count);
+        ArrayRef<std::pair<Key, std::optional<Value>>> slice(&*baseIter, count);
         resultRange.emplace(slice, PairToSecondElt());
       }
       currentValue = {baseIter->first, resultRange};
@@ -235,8 +234,7 @@ public:
 
   struct ToNonErasedValues {
     std::optional<std::pair<Key, std::optional<PairToSecondEltRange>>>
-    operator()(
-        std::pair<Key, std::optional<PairToSecondEltRange>> pair) const {
+    operator()(std::pair<Key, std::optional<PairToSecondEltRange>> pair) const {
       if (!pair.second.has_value())
         return std::nullopt;
       return pair;

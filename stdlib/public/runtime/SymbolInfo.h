@@ -38,7 +38,6 @@
 #include <dlfcn.h>
 #endif
 
-
 namespace swift {
 struct SymbolInfo {
 private:

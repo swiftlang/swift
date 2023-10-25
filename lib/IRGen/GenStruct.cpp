@@ -235,7 +235,7 @@ namespace {
     }
 
     std::optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
-                                                     VarDecl *field) const {
+                                                    VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
         return std::nullopt;
@@ -487,9 +487,7 @@ namespace {
                              SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
                              align, IsNotTriviallyDestroyable,
-                             IsNotBitwiseTakable,
-                             IsCopyable,
-                             IsFixedSize),
+                             IsNotBitwiseTakable, IsCopyable, IsFixedSize),
           clangDecl(clangDecl) {
       (void)clangDecl;
     }
@@ -666,11 +664,11 @@ namespace {
                              // with user-defined special member functions.
                              SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotTriviallyDestroyable, IsNotBitwiseTakable,
+                             align, IsNotTriviallyDestroyable,
+                             IsNotBitwiseTakable,
                              // TODO: Set this appropriately for the type's
                              // C++ import behavior.
-                             IsCopyable,
-                             IsFixedSize),
+                             IsCopyable, IsFixedSize),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -1614,8 +1612,8 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
 }
 
 std::optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                            SILType baseType,
-                                                            VarDecl *field) {
+                                                           SILType baseType,
+                                                           VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 

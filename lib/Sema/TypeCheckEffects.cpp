@@ -705,9 +705,8 @@ public:
   
   /// Return a classification that only retains the throwing parts of the
   /// given classification.
-  Classification onlyThrowing(
-      std::optional<PotentialEffectReason> newThrowReason = std::nullopt
-  ) const {
+  Classification onlyThrowing(std::optional<PotentialEffectReason>
+                                  newThrowReason = std::nullopt) const {
     Classification result(*this);
     result.AsyncKind = ConditionalEffectKind::None;
     result.AsyncReason = std::nullopt;
@@ -765,12 +764,10 @@ public:
   }
 
   /// Return a classification for a given declaration reference.
-  static Classification forDeclRef(
-      ConcreteDeclRef declRef,
-      ConditionalEffectKind conditionalKind,
-      PotentialEffectReason reason,
-      std::optional<EffectKind> onlyEffect = std::nullopt
-  ) {
+  static Classification
+  forDeclRef(ConcreteDeclRef declRef, ConditionalEffectKind conditionalKind,
+             PotentialEffectReason reason,
+             std::optional<EffectKind> onlyEffect = std::nullopt) {
     Classification result;
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
@@ -1771,8 +1768,7 @@ private:
   }
 
   explicit Context(bool handlesErrors, bool handlesAsync,
-                   std::optional<AnyFunctionRef> function,
-                   DeclContext *dc)
+                   std::optional<AnyFunctionRef> function, DeclContext *dc)
       : TheKind(Kind::PotentiallyHandled), Function(function), DC(dc),
         HandlesErrors(handlesErrors), HandlesAsync(handlesAsync) {}
 
@@ -2234,9 +2230,8 @@ public:
   }
   /// I did not want to add 'await' as a PotentialEffectReason, since it's
   /// not actually an effect. So, we have this odd boolean hanging around.
-  unsigned
-  effectReasonToIndex(std::optional<PotentialEffectReason> maybeReason,
-                      bool forAwait = false) {
+  unsigned effectReasonToIndex(std::optional<PotentialEffectReason> maybeReason,
+                               bool forAwait = false) {
     // while not actually an effect, in some instances we diagnose the
     // appearance of an await within a non-async context.
     if (forAwait)

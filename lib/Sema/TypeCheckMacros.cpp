@@ -1478,8 +1478,8 @@ bool swift::accessorMacroIntroducesInitAccessor(
 }
 
 std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
-                                                CustomAttr *attr,
-                                                MacroDecl *macro) {
+                                               CustomAttr *attr,
+                                               MacroDecl *macro) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
@@ -1644,8 +1644,8 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
   return introducedConformances;
 }
 
-std::optional<unsigned> swift::expandMembers(CustomAttr *attr,
-                                              MacroDecl *macro, Decl *decl) {
+std::optional<unsigned> swift::expandMembers(CustomAttr *attr, MacroDecl *macro,
+                                             Decl *decl) {
   auto nominal = dyn_cast<NominalTypeDecl>(decl);
   if (!nominal) {
     auto ext = dyn_cast<ExtensionDecl>(decl);
@@ -1687,7 +1687,7 @@ std::optional<unsigned> swift::expandMembers(CustomAttr *attr,
 }
 
 std::optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
-                                            Decl *decl) {
+                                           Decl *decl) {
   auto macroSourceFile =
       ::evaluateAttachedMacro(macro, decl, attr,
                               /*passParentContext=*/false, MacroRole::Peer);
@@ -1727,9 +1727,10 @@ ExpandExtensionMacros::evaluate(Evaluator &evaluator,
   return nominal->getASTContext().AllocateCopy(bufferIDs);
 }
 
-std::optional<unsigned>
-swift::expandExtensions(CustomAttr *attr, MacroDecl *macro,
-                        MacroRole role, NominalTypeDecl *nominal) {
+std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
+                                                MacroDecl *macro,
+                                                MacroRole role,
+                                                NominalTypeDecl *nominal) {
   if (nominal->getDeclContext()->isLocalContext()) {
     nominal->diagnose(diag::local_extension_macro);
     return std::nullopt;

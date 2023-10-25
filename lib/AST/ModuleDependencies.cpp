@@ -657,7 +657,8 @@ ModuleDependenciesCache::ModuleDependenciesCache(
 }
 
 std::optional<const ModuleDependencyInfo *>
-ModuleDependenciesCache::findDependency(const ModuleDependencyID moduleID) const {
+ModuleDependenciesCache::findDependency(
+    const ModuleDependencyID moduleID) const {
   return findDependency(moduleID.ModuleName, moduleID.Kind);
 }
 

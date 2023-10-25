@@ -2092,12 +2092,14 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
         // and either the initializer is required, the base type's instance type
         // is not a class, or this is a 'self' or 'super' reference.
         if (IsStaticMetatype || IsUnresolvedMember || Ty->is<ArchetypeType>())
-          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt, Result,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt,
+                             Result,
                              /*isOnType*/ true);
         else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
                   CD->isRequired()) &&
                  !HaveLParen)
-          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt, Result,
+          addConstructorCall(CD, Reason, dynamicLookupInfo, std::nullopt,
+                             Result,
                              /*isOnType*/ false);
         return;
       }
@@ -2987,8 +2989,8 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
   return DeclAttribute::canAttributeAppearOnDeclKind(DAK, DK.value());
 }
 
-void CompletionLookup::getAttributeDeclCompletions(
-    bool IsInSil, std::optional<DeclKind> DK) {
+void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
+                                                   std::optional<DeclKind> DK) {
   // FIXME: also include user-defined attribute keywords
   StringRef TargetName = "Declaration";
   if (DK.has_value()) {

@@ -28,8 +28,8 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
-#include "llvm/Support/thread.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/thread.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <sys/param.h>
@@ -338,7 +338,8 @@ static std::optional<sourcekitd_uid_t> getReqOptValueAsUID(StringRef Value) {
   return sourcekitd_uid_get_from_buf(Value.data(), Value.size());
 }
 
-static std::optional<sourcekitd_object_t> getReqOptValueAsArray(StringRef Value) {
+static std::optional<sourcekitd_object_t>
+getReqOptValueAsArray(StringRef Value) {
   if (!Value.startswith("[") || !Value.endswith("]"))
     return std::nullopt;
   SmallVector<StringRef, 4> Elements;

@@ -1264,15 +1264,15 @@ private:
   void verifyLowering(const TypeLowering &, AbstractionPattern origType,
                       CanType origSubstType,
                       TypeExpansionContext forExpansion);
-  bool visitAggregateLeaves(
-      Lowering::AbstractionPattern origType, CanType substType,
-      TypeExpansionContext context,
-      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
-                         std::optional<unsigned>)>
-          isLeafAggregate,
-      std::function<bool(CanType, Lowering::AbstractionPattern, ValueDecl *,
-                         std::optional<unsigned>)>
-          visit);
+  bool
+  visitAggregateLeaves(Lowering::AbstractionPattern origType, CanType substType,
+                       TypeExpansionContext context,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
+                                          ValueDecl *, std::optional<unsigned>)>
+                           isLeafAggregate,
+                       std::function<bool(CanType, Lowering::AbstractionPattern,
+                                          ValueDecl *, std::optional<unsigned>)>
+                           visit);
 #endif
 };
 
@@ -1281,7 +1281,8 @@ private:
 CanSILFunctionType getNativeSILFunctionType(
     Lowering::TypeConverter &TC, TypeExpansionContext context,
     Lowering::AbstractionPattern origType, CanAnyFunctionType substType,
-    SILExtInfo silExtInfo, std::optional<SILDeclRef> origConstant = std::nullopt,
+    SILExtInfo silExtInfo,
+    std::optional<SILDeclRef> origConstant = std::nullopt,
     std::optional<SILDeclRef> constant = std::nullopt,
     std::optional<SubstitutionMap> reqtSubs = std::nullopt,
     ProtocolConformanceRef witnessMethodConformance = ProtocolConformanceRef());

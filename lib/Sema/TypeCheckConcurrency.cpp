@@ -1047,9 +1047,9 @@ bool swift::diagnoseNonSendableTypes(
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
-    Expr *base, ConcreteDeclRef declRef,
-    const DeclContext *fromDC, SourceLoc refLoc,
-    SendableCheckReason refKind, std::optional<ActorIsolation> knownIsolation,
+    Expr *base, ConcreteDeclRef declRef, const DeclContext *fromDC,
+    SourceLoc refLoc, SendableCheckReason refKind,
+    std::optional<ActorIsolation> knownIsolation,
     FunctionCheckOptions funcCheckOptions, SourceLoc diagnoseLoc) {
   // Retrieve the actor isolation to use in diagnostics.
   auto getActorIsolation = [&] {
@@ -1151,88 +1151,86 @@ void swift::diagnoseMissingSendableConformance(
 }
 
 namespace {
-  /// Infer Sendable from the instance storage of the given nominal type.
-  /// \returns \c std::nullopt if there is no way to make the type \c Sendable,
-  /// \c true if \c Sendable needs to be @unchecked, \c false if it can be
-  /// \c Sendable without the @unchecked.
-  std::optional<bool>
-  inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
-                                   SmallVectorImpl<Requirement> &requirements) {
-    // Raw storage is assumed not to be sendable.
-    if (auto sd = dyn_cast<StructDecl>(nominal)) {
-      if (sd->getAttrs().hasAttribute<RawLayoutAttr>()) {
-        return true;
-      }
+/// Infer Sendable from the instance storage of the given nominal type.
+/// \returns \c std::nullopt if there is no way to make the type \c Sendable,
+/// \c true if \c Sendable needs to be @unchecked, \c false if it can be
+/// \c Sendable without the @unchecked.
+std::optional<bool>
+inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
+                                 SmallVectorImpl<Requirement> &requirements) {
+  // Raw storage is assumed not to be sendable.
+  if (auto sd = dyn_cast<StructDecl>(nominal)) {
+    if (sd->getAttrs().hasAttribute<RawLayoutAttr>()) {
+      return true;
     }
-      
-    class Visitor: public StorageVisitor {
-    public:
-      NominalTypeDecl *nominal;
-      SmallVectorImpl<Requirement> &requirements;
-      bool isUnchecked = false;
-      ProtocolDecl *sendableProto = nullptr;
-
-      Visitor(
-          NominalTypeDecl *nominal, SmallVectorImpl<Requirement> &requirements
-      ) : StorageVisitor(),
-        nominal(nominal), requirements(requirements) {
-        ASTContext &ctx = nominal->getASTContext();
-        sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
-      }
-
-      bool operator()(VarDecl *var, Type propertyType) override {
-        // If we have a class with mutable state, only an @unchecked
-        // conformance will work.
-        if (isa<ClassDecl>(nominal) && var->supportsMutation())
-          isUnchecked = true;
-
-        return checkType(propertyType);
-      }
-
-      bool operator()(EnumElementDecl *element, Type elementType) override {
-        return checkType(elementType);
-      }
-
-      /// Check sendability of the given type, recording any requirements.
-      bool checkType(Type type) {
-        if (!sendableProto)
-          return true;
-
-        auto module = nominal->getParentModule();
-        auto conformance = TypeChecker::conformsToProtocol(
-            type, sendableProto, module);
-        if (conformance.isInvalid())
-          return true;
-
-        // If there is an unavailable conformance here, fail.
-        if (conformance.hasUnavailableConformance())
-          return true;
-
-        // Look for missing Sendable conformances.
-        return conformance.forEachMissingConformance(module,
-            [&](BuiltinProtocolConformance *missing) {
-              // For anything other than Sendable, fail.
-              if (missing->getProtocol() != sendableProto)
-                return true;
-
-              // If we have an archetype, capture the requirement
-              // to make this type Sendable.
-              if (missing->getType()->is<ArchetypeType>()) {
-                requirements.push_back(
-                    Requirement(
-                      RequirementKind::Conformance,
-                      missing->getType()->mapTypeOutOfContext(),
-                      sendableProto->getDeclaredType()));
-                return false;
-              }
-
-              return true;
-            });
-      }
-    } visitor(nominal, requirements);
-
-    return visitor.visit(nominal, nominal);
   }
+
+  class Visitor : public StorageVisitor {
+  public:
+    NominalTypeDecl *nominal;
+    SmallVectorImpl<Requirement> &requirements;
+    bool isUnchecked = false;
+    ProtocolDecl *sendableProto = nullptr;
+
+    Visitor(NominalTypeDecl *nominal,
+            SmallVectorImpl<Requirement> &requirements)
+        : StorageVisitor(), nominal(nominal), requirements(requirements) {
+      ASTContext &ctx = nominal->getASTContext();
+      sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
+    }
+
+    bool operator()(VarDecl *var, Type propertyType) override {
+      // If we have a class with mutable state, only an @unchecked
+      // conformance will work.
+      if (isa<ClassDecl>(nominal) && var->supportsMutation())
+        isUnchecked = true;
+
+      return checkType(propertyType);
+    }
+
+    bool operator()(EnumElementDecl *element, Type elementType) override {
+      return checkType(elementType);
+    }
+
+    /// Check sendability of the given type, recording any requirements.
+    bool checkType(Type type) {
+      if (!sendableProto)
+        return true;
+
+      auto module = nominal->getParentModule();
+      auto conformance =
+          TypeChecker::conformsToProtocol(type, sendableProto, module);
+      if (conformance.isInvalid())
+        return true;
+
+      // If there is an unavailable conformance here, fail.
+      if (conformance.hasUnavailableConformance())
+        return true;
+
+      // Look for missing Sendable conformances.
+      return conformance.forEachMissingConformance(
+          module, [&](BuiltinProtocolConformance *missing) {
+            // For anything other than Sendable, fail.
+            if (missing->getProtocol() != sendableProto)
+              return true;
+
+            // If we have an archetype, capture the requirement
+            // to make this type Sendable.
+            if (missing->getType()->is<ArchetypeType>()) {
+              requirements.push_back(
+                  Requirement(RequirementKind::Conformance,
+                              missing->getType()->mapTypeOutOfContext(),
+                              sendableProto->getDeclaredType()));
+              return false;
+            }
+
+            return true;
+          });
+    }
+  } visitor(nominal, requirements);
+
+  return visitor.visit(nominal, nominal);
+}
 }
 
 static bool checkSendableInstanceStorage(
@@ -2032,7 +2030,7 @@ namespace {
     /// @returns None if the context expression is either an InOutExpr,
     ///               not tracked, or if the decl is not a property or subscript
     std::optional<VarRefUseEnv> kindOfUsage(ValueDecl const *decl,
-                                             Expr *use) const {
+                                            Expr *use) const {
       // we need a use for lookup.
       if (!use)
         return std::nullopt;
@@ -3039,7 +3037,8 @@ namespace {
           auto result = ActorReferenceResult::forReference(
               memberRef->first, selfApplyFn->getLoc(), getDeclContext(),
               kindOfUsage(memberRef->first.getDecl(), selfApplyFn),
-              isolatedActor, std::nullopt, std::nullopt, getClosureActorIsolation);
+              isolatedActor, std::nullopt, std::nullopt,
+              getClosureActorIsolation);
           switch (result) {
           case ActorReferenceResult::SameConcurrencyDomain:
             break;

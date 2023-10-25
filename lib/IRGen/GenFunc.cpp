@@ -1249,8 +1249,8 @@ public:
       auto *context = subIGF.getAsyncContext();
       if (auto schema =
               subIGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
-        Address fieldAddr =
-            fieldLayout.project(subIGF, calleeContext, /*offsets*/ std::nullopt);
+        Address fieldAddr = fieldLayout.project(subIGF, calleeContext,
+                                                /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             subIGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         context = emitPointerAuthSign(subIGF, context, authInfo);
@@ -1265,8 +1265,8 @@ public:
       auto fnVal = currentResumeFn;
       // Sign the pointer.
       if (auto schema = subIGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
-        Address fieldAddr =
-            fieldLayout.project(subIGF, calleeContext, /*offsets*/ std::nullopt);
+        Address fieldAddr = fieldLayout.project(subIGF, calleeContext,
+                                                /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             subIGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         fnVal = emitPointerAuthSign(subIGF, fnVal, authInfo);

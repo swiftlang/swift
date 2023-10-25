@@ -749,8 +749,8 @@ Iter next_or_end(const Iter &I, const Iter &End) {
 }
 
 template <typename Iter>
-auto deref_or_none(const Iter &I, const Iter &End)
-    -> std::optional<std::remove_const_t<std::remove_reference_t<decltype(*I)>>> {
+auto deref_or_none(const Iter &I, const Iter &End) -> std::optional<
+    std::remove_const_t<std::remove_reference_t<decltype(*I)>>> {
   if (I == End)
     return std::nullopt;
   return *I;

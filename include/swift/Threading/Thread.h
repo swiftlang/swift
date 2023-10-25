@@ -19,7 +19,6 @@
 #ifndef SWIFT_THREADING_THREAD_H
 #define SWIFT_THREADING_THREAD_H
 
-
 #include "Impl.h"
 
 namespace swift {

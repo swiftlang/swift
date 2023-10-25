@@ -3071,7 +3071,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     auto calleeContext =
         layout.emitCastTo(IGF, calleeContextBuffer.getAddress());
     auto saveValue = [&](ElementLayout layout, Explosion &explosion) -> void {
-      Address addr = layout.project(IGF, calleeContext, /*offsets*/ std::nullopt);
+      Address addr =
+          layout.project(IGF, calleeContext, /*offsets*/ std::nullopt);
       auto &ti = cast<LoadableTypeInfo>(layout.getType());
       ti.initialize(IGF, explosion, addr, /*isOutlined*/ false);
     };

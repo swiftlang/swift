@@ -3085,11 +3085,12 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
 
     return SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionType::Representation::KeyPathAccessorGetter),
-        SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, {}, result, std::nullopt,
-        SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
+        genericSig,
+        SILFunctionType::ExtInfo().withRepresentation(
+            SILFunctionType::Representation::KeyPathAccessorGetter),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, params, {},
+        result, std::nullopt, SubstitutionMap(), SubstitutionMap(),
+        SGM.getASTContext());
   }();
   
   // Find the function and see if we already created it.
@@ -3279,11 +3280,12 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     }
 
     return SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionType::Representation::KeyPathAccessorSetter),
-        SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, {}, {}, std::nullopt,
-        SubstitutionMap(), SubstitutionMap(), SGM.getASTContext());
+        genericSig,
+        SILFunctionType::ExtInfo().withRepresentation(
+            SILFunctionType::Representation::KeyPathAccessorSetter),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, params, {},
+        {}, std::nullopt, SubstitutionMap(), SubstitutionMap(),
+        SGM.getASTContext());
   }();
   
   // Mangle the name of the thunk to see if we already created it.
@@ -3479,11 +3481,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     results.push_back({boolTy, ResultConvention::Unowned});
 
     auto signature = SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionType::Representation::KeyPathAccessorEquals),
-        SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
-        std::nullopt, SubstitutionMap(), SubstitutionMap(), C);
+        genericSig,
+        SILFunctionType::ExtInfo().withRepresentation(
+            SILFunctionType::Representation::KeyPathAccessorEquals),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, params,
+        /*yields*/ {}, results, std::nullopt, SubstitutionMap(),
+        SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
     auto name = Mangle::ASTMangler()
@@ -3600,12 +3603,13 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
         isEqual = subSGF
-                      .emitApply(
-                          std::move(equalsResultPlan), std::move(argScope), loc,
-                          ManagedValue::forObjectRValueWithoutOwnership(
-                              equalsWitness),
-                          equatableSub, {lhsArg, rhsArg, metatyValue},
-                          equalsInfo, ApplyOptions(), SGFContext(), std::nullopt)
+                      .emitApply(std::move(equalsResultPlan),
+                                 std::move(argScope), loc,
+                                 ManagedValue::forObjectRValueWithoutOwnership(
+                                     equalsWitness),
+                                 equatableSub, {lhsArg, rhsArg, metatyValue},
+                                 equalsInfo, ApplyOptions(), SGFContext(),
+                                 std::nullopt)
                       .getUnmanagedSingleValue(subSGF, loc);
       }
       
@@ -3654,11 +3658,12 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     results.push_back({intTy, ResultConvention::Unowned});
 
     auto signature = SILFunctionType::get(
-        genericSig, SILFunctionType::ExtInfo().withRepresentation(
-          SILFunctionType::Representation::KeyPathAccessorHash),
-        SILCoroutineKind::None,
-        ParameterConvention::Direct_Unowned, params, /*yields*/ {}, results,
-        std::nullopt, SubstitutionMap(), SubstitutionMap(), C);
+        genericSig,
+        SILFunctionType::ExtInfo().withRepresentation(
+            SILFunctionType::Representation::KeyPathAccessorHash),
+        SILCoroutineKind::None, ParameterConvention::Direct_Unowned, params,
+        /*yields*/ {}, results, std::nullopt, SubstitutionMap(),
+        SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;

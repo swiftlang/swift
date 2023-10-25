@@ -65,8 +65,7 @@ void AbstractSourceFileDepGraphFactory::addSourceFileNodesToGraph() {
 }
 
 void AbstractSourceFileDepGraphFactory::addADefinedDecl(
-    const DependencyKey &interfaceKey,
-    std::optional<Fingerprint> fingerprint) {
+    const DependencyKey &interfaceKey, std::optional<Fingerprint> fingerprint) {
 
   auto nodePair =
       g.findExistingNodePairOrCreateAndAddIfNew(interfaceKey, fingerprint);

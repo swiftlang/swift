@@ -63,7 +63,8 @@ protected:
   /// None -> Not yet computed
   /// Optional(nullptr) -> No layout string
   /// Optional(Constant*) -> Layout string
-  mutable std::optional<llvm::Constant*> _layoutString;
+  mutable std::optional<llvm::Constant *> _layoutString;
+
 public:
   TypeLayoutEntryKind kind;
   uint8_t hasArchetypeField : 1;

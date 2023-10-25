@@ -82,8 +82,7 @@ enum class EnforceExclusivityMode {
 namespace llvm {
 
 inline raw_ostream &
-operator<<(raw_ostream &os,
-           const std::optional<CopyPropagationOption> option) {
+operator<<(raw_ostream &os, const std::optional<CopyPropagationOption> option) {
   if (option) {
     switch (*option) {
     case CopyPropagationOption::Off:

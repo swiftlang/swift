@@ -83,7 +83,7 @@ bool Task::execute() {
   }
 
   std::optional<llvm::StringRef> Redirects[] = {
-    std::nullopt,
+      std::nullopt,
       llvm::StringRef{StdoutPath},
       llvm::StringRef{SeparateErrors ? StderrPath : StdoutPath},
   };

@@ -2834,8 +2834,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
   // Branch to pullback successor blocks.
   assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
   builder.createSwitchEnum(pbLoc, predEnumVal, /*DefaultBB*/ nullptr,
-                           pullbackSuccessorCases, std::nullopt, ProfileCounter(),
-                           OwnershipKind::Owned);
+                           pullbackSuccessorCases, std::nullopt,
+                           ProfileCounter(), OwnershipKind::Owned);
 }
 
 //--------------------------------------------------------------------------//

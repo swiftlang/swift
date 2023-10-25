@@ -430,8 +430,7 @@ class InheritedProtocolCollector {
 
   /// Helper to extract the `@available` attributes on a decl.
   static AvailableAttrList
-  getAvailabilityAttrs(const Decl *D,
-                       std::optional<AvailableAttrList> &cache) {
+  getAvailabilityAttrs(const Decl *D, std::optional<AvailableAttrList> &cache) {
     if (cache.has_value())
       return cache.value();
 

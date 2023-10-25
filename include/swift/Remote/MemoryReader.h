@@ -171,7 +171,7 @@ public:
 
   /// Attempt to read and resolve a pointer value at the given remote address.
   std::optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
-                                                    unsigned pointerSize) {
+                                                   unsigned pointerSize) {
     // First, try to lookup the pointer as a dynamic symbol (binding), as
     // reading memory may potentially be expensive.
     if (auto dynamicSymbol = getDynamicSymbol(address))

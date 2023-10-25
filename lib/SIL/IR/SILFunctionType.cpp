@@ -770,8 +770,8 @@ static CanSILFunctionType getAutoDiffPullbackType(
                              llvm::makeArrayRef(substConformances));
   }
   return SILFunctionType::get(
-      GenericSignature(), SILFunctionType::ExtInfo(), originalFnTy->getCoroutineKind(),
-      ParameterConvention::Direct_Guaranteed,
+      GenericSignature(), SILFunctionType::ExtInfo(),
+      originalFnTy->getCoroutineKind(), ParameterConvention::Direct_Guaranteed,
       pullbackParams, {}, pullbackResults, std::nullopt, substitutions,
       /*invocationSubstitutions*/ SubstitutionMap(), ctx);
 }
@@ -2147,8 +2147,7 @@ static CanSILFunctionType getSILFunctionType(
     AbstractionPattern origType, CanAnyFunctionType substFnInterfaceType,
     SILExtInfoBuilder extInfoBuilder, const Conventions &conventions,
     const ForeignInfo &foreignInfo, std::optional<SILDeclRef> origConstant,
-    std::optional<SILDeclRef> constant,
-    std::optional<SubstitutionMap> reqtSubs,
+    std::optional<SILDeclRef> constant, std::optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
   // Find the generic parameters.
   CanGenericSignature genericSig =
@@ -2695,8 +2694,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     TypeConverter &TC, TypeExpansionContext context,
     AbstractionPattern origType, CanAnyFunctionType substInterfaceType,
     SILExtInfoBuilder extInfoBuilder, std::optional<SILDeclRef> origConstant,
-    std::optional<SILDeclRef> constant,
-    std::optional<SubstitutionMap> reqtSubs,
+    std::optional<SILDeclRef> constant, std::optional<SubstitutionMap> reqtSubs,
     ProtocolConformanceRef witnessMethodConformance) {
   assert(bool(origConstant) == bool(constant));
   auto getSILFunctionTypeForConventions =

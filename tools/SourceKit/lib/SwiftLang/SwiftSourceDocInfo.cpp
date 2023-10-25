@@ -588,8 +588,7 @@ static StringRef getSourceToken(unsigned Offset,
 }
 
 static std::optional<unsigned>
-mapOffsetToOlderSnapshot(unsigned Offset,
-                         ImmutableTextSnapshotRef NewSnap,
+mapOffsetToOlderSnapshot(unsigned Offset, ImmutableTextSnapshotRef NewSnap,
                          ImmutableTextSnapshotRef OldSnap) {
   SmallVector<ReplaceImmutableTextUpdateRef, 16> Updates;
   OldSnap->foreachReplaceUntil(NewSnap,
@@ -614,8 +613,7 @@ mapOffsetToOlderSnapshot(unsigned Offset,
 }
 
 static std::optional<unsigned>
-mapOffsetToNewerSnapshot(unsigned Offset,
-                         ImmutableTextSnapshotRef OldSnap,
+mapOffsetToNewerSnapshot(unsigned Offset, ImmutableTextSnapshotRef OldSnap,
                          ImmutableTextSnapshotRef NewSnap) {
   bool Completed = OldSnap->foreachReplaceUntil(NewSnap,
     [&](ReplaceImmutableTextUpdateRef Upd)->bool {
@@ -725,7 +723,7 @@ static void addRefactorings(
 }
 
 static std::optional<unsigned> getParamParentNameOffset(const ValueDecl *VD,
-                                                         SourceLoc Cursor) {
+                                                        SourceLoc Cursor) {
   if (Cursor.isInvalid())
     return std::nullopt;
   SourceLoc Loc;
@@ -1501,7 +1499,7 @@ public:
     if (!InputSnap)
       return false;
 
-    auto mappedBackOffset = [&]()->std::optional<unsigned> {
+    auto mappedBackOffset = [&]() -> std::optional<unsigned> {
       for (auto &Snap : Snapshots) {
         if (Snap->isFromSameBuffer(InputSnap)) {
           if (Snap->getStamp() == InputSnap->getStamp())

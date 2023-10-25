@@ -213,8 +213,7 @@ public:
     };
 
     struct ToLiveLocalSucc {
-      std::optional<unsigned>
-      operator()(std::optional<SuccessorID> ID) const {
+      std::optional<unsigned> operator()(std::optional<SuccessorID> ID) const {
         if (!ID)
           return std::nullopt;
         if ((*ID).IsNonLocal)
@@ -224,8 +223,7 @@ public:
     };
 
     struct ToLiveNonLocalSucc {
-      std::optional<unsigned>
-      operator()(std::optional<SuccessorID> ID) const {
+      std::optional<unsigned> operator()(std::optional<SuccessorID> ID) const {
         if (!ID)
           return std::nullopt;
         if (!(*ID).IsNonLocal)

@@ -663,9 +663,7 @@ public:
     return Name;
   }
 
-  std::optional<CommentParts> getParts() const {
-    return Parts;
-  }
+  std::optional<CommentParts> getParts() const { return Parts; }
 
   void setParts(CommentParts P) {
     Parts = P;

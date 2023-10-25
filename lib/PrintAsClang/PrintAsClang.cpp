@@ -309,10 +309,12 @@ static void collectClangModuleHeaderIncludes(
     requiredTextualIncludes.insert(textualInclude);
   };
 
-  if (std::optional<clang::Module::Header> umbrellaHeader = clangModule->getUmbrellaHeaderAsWritten()) {
+  if (std::optional<clang::Module::Header> umbrellaHeader =
+          clangModule->getUmbrellaHeaderAsWritten()) {
     addHeader(umbrellaHeader->Entry.getFileEntry().tryGetRealPathName(),
         umbrellaHeader->PathRelativeToRootModuleDirectory);
-  } else if (std::optional<clang::Module::DirectoryName> umbrellaDir = clangModule->getUmbrellaDirAsWritten()) {
+  } else if (std::optional<clang::Module::DirectoryName> umbrellaDir =
+                 clangModule->getUmbrellaDirAsWritten()) {
     SmallString<128> nativeUmbrellaDirPath;
     std::error_code errorCode;
     llvm::sys::path::native(umbrellaDir->Entry.getDirEntry().getName(),

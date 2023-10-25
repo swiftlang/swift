@@ -1339,7 +1339,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     bool pointerEscape = (Attr >> 3) & 0x1;
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
-        std::nullopt, hasDynamicLifetime, reflection, usesMoveableValueDebugInfo,
+        std::nullopt, hasDynamicLifetime, reflection,
+        usesMoveableValueDebugInfo,
         /*skipVarDeclAssert*/ false, pointerEscape);
     break;
   }
@@ -3394,8 +3395,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
       SILMod, linkage.value(), isSerialized ? IsSerialized : IsNotSerialized,
-      Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr), std::nullopt,
-      dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
+      Name.str(), getSILType(Ty, SILValueCategory::Object, nullptr),
+      std::nullopt, dID ? cast<VarDecl>(MF->getDecl(dID)) : nullptr);
   v->setLet(IsLet);
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);

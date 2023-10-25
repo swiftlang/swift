@@ -593,8 +593,7 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
-                                    std::optional<DeclKind> DK,
-                                    StringRef Name);
+                                    std::optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 

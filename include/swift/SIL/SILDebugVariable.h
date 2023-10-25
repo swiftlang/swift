@@ -64,8 +64,7 @@ struct SILDebugVariable {
       : ArgNo(ArgNo), Constant(Constant), Implicit(false),
         isDenseMapSingleton(0), Scope(nullptr) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo,
-                   bool IsImplicit = false,
-                   std::optional<SILType> AuxType = {},
+                   bool IsImplicit = false, std::optional<SILType> AuxType = {},
                    std::optional<SILLocation> DeclLoc = {},
                    const SILDebugScope *DeclScope = nullptr,
                    llvm::ArrayRef<SILDIExprElement> ExprElements = {})

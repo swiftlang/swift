@@ -445,7 +445,7 @@ namespace {
       // remaining calls to minus before the computation times out.
       // Returns None if the computation "timed out".
       std::optional<Space> minus(const Space &other, const DeclContext *DC,
-                                  unsigned *minusCount) const {
+                                 unsigned *minusCount) const {
         if (minusCount && (*minusCount)-- == 0)
           return std::nullopt;
 

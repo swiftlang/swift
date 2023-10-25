@@ -67,8 +67,9 @@ std::string Mangle::translateOperator(StringRef Op) {
   return Encoded;
 }
 
-std::optional<StringRef> Mangle::getStandardTypeSubst(
-    StringRef TypeName, bool allowConcurrencyManglings) {
+std::optional<StringRef>
+Mangle::getStandardTypeSubst(StringRef TypeName,
+                             bool allowConcurrencyManglings) {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
   if (TypeName == #TYPENAME) {                       \
     return StringRef(#MANGLING);                     \
@@ -83,4 +84,3 @@ std::optional<StringRef> Mangle::getStandardTypeSubst(
 
   return std::nullopt;
 }
-

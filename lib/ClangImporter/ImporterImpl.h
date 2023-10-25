@@ -1047,8 +1047,8 @@ public:
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   std::optional<Decl *> importDeclCached(const clang::NamedDecl *ClangDecl,
-                                          Version version,
-                                          bool UseCanonicalDecl = true);
+                                         Version version,
+                                         bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
@@ -1495,8 +1495,7 @@ public:
       bool isFromSystemModule, ParameterList **bodyParams,
       importer::ImportedName importedName,
       std::optional<ForeignAsyncConvention> &asyncConv,
-      std::optional<ForeignErrorConvention> &errorConv,
-      SpecialMethodKind kind);
+      std::optional<ForeignErrorConvention> &errorConv, SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.

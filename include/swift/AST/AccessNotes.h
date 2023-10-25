@@ -96,8 +96,8 @@ public:
 
   /// Load the access notes from \p buffer, or \c None if they cannot be loaded.
   /// Diagnoses any parsing issues with the access notes file.
-  static std::optional<AccessNotesFile>
-      load(ASTContext &ctx, const llvm::MemoryBuffer *buffer);
+  static std::optional<AccessNotesFile> load(ASTContext &ctx,
+                                             const llvm::MemoryBuffer *buffer);
 
   /// Look up the access note in this file, if any, which applies to \p VD.
   NullablePtr<const AccessNote> lookup(ValueDecl *VD) const;

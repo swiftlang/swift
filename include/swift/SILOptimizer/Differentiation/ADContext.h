@@ -224,10 +224,10 @@ public:
   /// and arguments. Erase the newly created instruction from the processed set,
   /// if it exists - it may exist in the processed set if it has the same
   /// pointer value as a previously processed and deleted instruction.
-  LinearFunctionInst *
-  createLinearFunction(SILBuilder &builder, SILLocation loc,
-                       IndexSubset *parameterIndices, SILValue original,
-                       std::optional<SILValue> transposeFunction = std::nullopt);
+  LinearFunctionInst *createLinearFunction(
+      SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
+      SILValue original,
+      std::optional<SILValue> transposeFunction = std::nullopt);
 
   // Given a `differentiable_function` instruction, finds the corresponding
   // differential operator used in the AST. If no differential operator is

@@ -220,9 +220,8 @@ public:
   /// \param arena The arena to allocate the ArgumentList in.
   static ArgumentList *
   create(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-         SourceLoc rParenLoc,
-         std::optional<unsigned> firstTrailingClosureIndex, bool isImplicit,
-         ArgumentList *originalArgs = nullptr,
+         SourceLoc rParenLoc, std::optional<unsigned> firstTrailingClosureIndex,
+         bool isImplicit, ArgumentList *originalArgs = nullptr,
          AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new explicit parsed ArgumentList.
@@ -527,7 +526,7 @@ public:
   /// will match against semantic sub-expressions, but that may be disabled by
   /// passing \c false for \c allowSemantic.
   std::optional<unsigned> findArgumentExpr(Expr *expr,
-                                            bool allowSemantic = true) const;
+                                           bool allowSemantic = true) const;
 
   /// Creates a TupleExpr or ParenExpr that holds the argument exprs. A
   /// ParenExpr will be returned for a single argument, otherwise a TupleExpr.

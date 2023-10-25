@@ -90,7 +90,7 @@ public:
 
   /// Try to find an appropriate emitter for the given declaration.
   static std::optional<SpecializedEmitter> forDecl(SILGenModule &SGM,
-                                                    SILDeclRef decl);
+                                                   SILDeclRef decl);
 
   bool isEarlyEmitter() const { return TheKind == Kind::EarlyEmitter; }
   EarlyEmitter *getEarlyEmitter() const {

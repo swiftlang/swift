@@ -955,8 +955,7 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
       Type());
 }
 
-std::optional<Type> 
-AbstractFunctionDecl::getEffectiveThrownErrorType() const {
+std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   // FIXME: Only getters can have thrown error types right now, and DidSet
   // has a cyclic reference if we try to get its interface type here. Find a
   // better way to express this.
@@ -5422,8 +5421,7 @@ Type AssociatedTypeDecl::getDefaultDefinitionType() const {
            Type());
 }
 
-std::optional<Type>
-AssociatedTypeDecl::getCachedDefaultDefinitionType() const {
+std::optional<Type> AssociatedTypeDecl::getCachedDefaultDefinitionType() const {
   if (Bits.AssociatedTypeDecl.IsDefaultDefinitionTypeComputed)
     return DefaultDefinition.getType();
 
@@ -7820,8 +7818,9 @@ std::optional<PropertyWrapperMutability>
 VarDecl::getPropertyWrapperMutability() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator, PropertyWrapperMutabilityRequest{mutableThis}, std::nullopt);
+  return evaluateOrDefault(ctx.evaluator,
+                           PropertyWrapperMutabilityRequest{mutableThis},
+                           std::nullopt);
 }
 
 std::optional<PropertyWrapperSynthesizedPropertyKind>

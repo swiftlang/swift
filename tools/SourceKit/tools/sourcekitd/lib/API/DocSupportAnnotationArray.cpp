@@ -21,11 +21,9 @@ using namespace SourceKit;
 using namespace sourcekitd;
 
 struct DocSupportAnnotationArrayBuilder::Implementation {
-  CompactArrayBuilder<UIdent,
-                      std::optional<StringRef>,
-                      std::optional<StringRef>,
-                      unsigned,
-                      unsigned> Builder;
+  CompactArrayBuilder<UIdent, std::optional<StringRef>,
+                      std::optional<StringRef>, unsigned, unsigned>
+      Builder;
 };
 
 DocSupportAnnotationArrayBuilder::DocSupportAnnotationArrayBuilder()

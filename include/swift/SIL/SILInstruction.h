@@ -6697,9 +6697,9 @@ public:
                  ArrayRef<EnumElementDecl *> CaseDecls,
                  std::optional<ArrayRef<ProfileCounter>> CaseCounts,
                  ProfileCounter DefaultCount)
-      : InstructionBaseWithTrailingOperands(
-            Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
-            DefaultCount) {
+      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
+                                            bool(DefaultValue), CaseCounts,
+                                            DefaultCount) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -9735,8 +9735,7 @@ public:
     return getSuccessorBuf()[getNumCases()];
   }
 
-  std::optional<unsigned>
-  getUniqueCaseForDestination(SILBasicBlock *bb) const {
+  std::optional<unsigned> getUniqueCaseForDestination(SILBasicBlock *bb) const {
     for (unsigned i = 0; i < getNumCases(); ++i) {
       if (getCase(i).second == bb) {
         return i + 1;

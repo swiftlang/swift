@@ -103,9 +103,10 @@ struct swift::RequirementCheck {
 };
 
 swift::Witness RequirementMatch::getWitness(ASTContext &ctx) const {
-  return swift::Witness(
-      this->Witness, WitnessSubstitutions, ReqEnv->getWitnessThunkSignature(),
-      ReqEnv->getRequirementToWitnessThunkSubs(), DerivativeGenSig, std::nullopt);
+  return swift::Witness(this->Witness, WitnessSubstitutions,
+                        ReqEnv->getWitnessThunkSignature(),
+                        ReqEnv->getRequirementToWitnessThunkSubs(),
+                        DerivativeGenSig, std::nullopt);
 }
 
 AssociatedTypeDecl *
@@ -4166,9 +4167,9 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
           bool inExtension = isa<ExtensionDecl>(ctor->getDeclContext());
           auto &diags = ctor->getASTContext().Diags;
           SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, ctor);
-          std::optional<InFlightDiagnostic> fixItDiag = diags.diagnose(
-              diagLoc, diag::witness_initializer_not_required,
-              requirement, inExtension, conformance->getType());
+          std::optional<InFlightDiagnostic> fixItDiag =
+              diags.diagnose(diagLoc, diag::witness_initializer_not_required,
+                             requirement, inExtension, conformance->getType());
           if (diagLoc != ctor->getLoc() && !ctor->isImplicit()) {
             // If the main diagnostic is emitted on the conformance, we want to
             // attach the fix-it to the note that shows where the initializer is
@@ -5963,9 +5964,9 @@ combineBaseNameAndFirstArgument(Identifier baseName,
 /// effectively the sum of the edit distances between the corresponding
 /// argument labels.
 static std::optional<unsigned> scorePotentiallyMatchingNames(DeclName lhs,
-                                                              DeclName rhs,
-                                                              bool isFunc,
-                                                              unsigned limit) {
+                                                             DeclName rhs,
+                                                             bool isFunc,
+                                                             unsigned limit) {
   // If there are a different number of argument labels, we're done.
   if (lhs.getArgumentNames().size() != rhs.getArgumentNames().size())
     return std::nullopt;

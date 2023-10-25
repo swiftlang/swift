@@ -87,7 +87,8 @@ public:
 
   /// Searches for a declaration with the given USR and returns the
   /// (offset,length) pair into the interface source if it finds one.
-  std::optional<std::pair<unsigned, unsigned>> findUSRRange(StringRef USR) const;
+  std::optional<std::pair<unsigned, unsigned>>
+  findUSRRange(StringRef USR) const;
 
   void applyTo(swift::CompilerInvocation &CompInvok) const;
 

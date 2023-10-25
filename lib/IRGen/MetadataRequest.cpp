@@ -1226,8 +1226,8 @@ static MetadataResponse emitDynamicTupleTypeMetadataRef(IRGenFunction &IGF,
   {
     ConditionalDominanceScope scope(IGF);
 
-    std::optional<StackAddress> labelString = emitDynamicTupleTypeLabels(
-        IGF, type, packType, shapeExpression);
+    std::optional<StackAddress> labelString =
+        emitDynamicTupleTypeLabels(IGF, type, packType, shapeExpression);
 
     // Otherwise, we know that either statically or dynamically, we have more than
     // one element. Emit the pack.

@@ -364,7 +364,7 @@ void Projection::getFirstLevelProjections(
 //===----------------------------------------------------------------------===//
 
 std::optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
-                                                                 SILValue End) {
+                                                                SILValue End) {
   ProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the

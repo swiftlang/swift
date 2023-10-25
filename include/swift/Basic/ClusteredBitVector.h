@@ -29,8 +29,8 @@
 #ifndef SWIFT_BASIC_CLUSTEREDBITVECTOR_H
 #define SWIFT_BASIC_CLUSTEREDBITVECTOR_H
 
-#include "llvm/ADT/APInt.h"
 #include "swift/Basic/Debug.h"
+#include "llvm/ADT/APInt.h"
 #include <cassert>
 
 namespace swift {
@@ -63,13 +63,11 @@ public:
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(const std::optional<APInt> &bits)
-    : Bits(bits) {}
+  ClusteredBitVector(const std::optional<APInt> &bits) : Bits(bits) {}
 
   /// Create a new ClusteredBitVector from the provided APInt,
   /// with a size of 0 if the optional does not have a value.
-  ClusteredBitVector(std::optional<APInt> &&bits)
-    : Bits(std::move(bits)) {}
+  ClusteredBitVector(std::optional<APInt> &&bits) : Bits(std::move(bits)) {}
 
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {
     this->Bits = other.Bits;

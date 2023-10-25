@@ -364,8 +364,7 @@ private:
       return true;
     StringRef moduleName;
     std::optional<std::string> swiftModulePath, swiftModuleDocPath,
-                                swiftModuleSourceInfoPath, swiftModuleCacheKey,
-                                clangModuleCacheKey;
+        swiftModuleSourceInfoPath, swiftModuleCacheKey, clangModuleCacheKey;
     std::optional<std::vector<std::string>> headerDependencyPaths;
     std::string clangModuleMapPath = "", clangModulePath = "";
     bool isFramework = false, isSystem = false;

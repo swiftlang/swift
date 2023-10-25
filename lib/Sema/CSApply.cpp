@@ -471,7 +471,7 @@ namespace {
     // substitutions; this is different from an Optional(SubstitutionMap()),
     // indicating a valid call to a non-generic operator.
     std::optional<SubstitutionMap> getOperatorSubstitutions(ValueDecl *witness,
-                                                             Type refType) {
+                                                            Type refType) {
       // We have to recover substitutions in this hacky way because
       // the AST does not retain enough information to devirtualize
       // calls like this.
@@ -5439,7 +5439,8 @@ namespace {
           llvm::none_of(makeArrayRef(ExprStack).drop_back(1),
                        [](Expr *E) { return isa<MacroExpansionExpr>(E); })) {
         (void)evaluateOrDefault(cs.getASTContext().evaluator,
-                                ExpandMacroExpansionExprRequest{E}, std::nullopt);
+                                ExpandMacroExpansionExprRequest{E},
+                                std::nullopt);
       }
 
       cs.cacheExprTypes(E);
@@ -6601,8 +6602,7 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
       return true;
     }
 
-    if (std::optional<Type> elementType =
-            ConstraintSystem::isSetType(toType)) {
+    if (std::optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
       peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
       return true;
     }

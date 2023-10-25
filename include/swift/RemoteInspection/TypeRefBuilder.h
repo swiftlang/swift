@@ -376,9 +376,8 @@ struct TypeRefDecl {
       : mangledName(mangledName), 
         genericParamsPerLevel(genericParamsPerLevel) {}
 
-  TypeRefDecl(std::string mangledName) 
-      : mangledName(mangledName), 
-        genericParamsPerLevel(std::nullopt) {}
+  TypeRefDecl(std::string mangledName)
+      : mangledName(mangledName), genericParamsPerLevel(std::nullopt) {}
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -497,7 +496,8 @@ public:
 
   BuiltTypeDecl createTypeDecl(Node *node, std::vector<size_t> paramsPerLevel) {
     auto mangling = Demangle::mangleNode(node);
-    if (!mangling.isSuccess()) return std::nullopt;
+    if (!mangling.isSuccess())
+      return std::nullopt;
     return {{mangling.result(), paramsPerLevel}};
   }
 
@@ -508,7 +508,8 @@ public:
 
   BuiltTypeDecl createTypeDecl(Node *node, bool &typeAlias) {
     auto mangling = Demangle::mangleNode(node);
-    if (!mangling.isSuccess()) return std::nullopt;
+    if (!mangling.isSuccess())
+      return std::nullopt;
     return {{mangling.result()}};
   }
 
@@ -520,7 +521,8 @@ public:
   BuiltProtocolDecl
   createProtocolDecl(Node *node) {
     auto mangling = Demangle::mangleNode(node);
-    if (!mangling.isSuccess()) return std::nullopt;
+    if (!mangling.isSuccess())
+      return std::nullopt;
     return std::make_pair(mangling.result(), false);
   }
 
@@ -1101,9 +1103,14 @@ private:
   using UnderlyingTypeReader = std::function<const TypeRef* (uint64_t, unsigned)>;
   using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
   using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
-  using PointerReader = std::function<std::optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
-  using DynamicSymbolResolver = std::function<std::optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress)>;
-  using IntVariableReader = std::function<std::optional<uint64_t> (std::string, unsigned)>;
+  using PointerReader =
+      std::function<std::optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress, unsigned)>;
+  using DynamicSymbolResolver =
+      std::function<std::optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress)>;
+  using IntVariableReader =
+      std::function<std::optional<uint64_t>(std::string, unsigned)>;
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -1120,36 +1127,46 @@ private:
   IntVariableReader OpaqueIntVariableReader;
 
 public:
-  template<typename Runtime>
+  template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr)
       : TC(*this), ExternalTypeRefCache(externalCache),
-      PointerSize(sizeof(typename Runtime::StoredPointer)),
-      TypeRefDemangler(
-      [this, &reader](RemoteRef<char> string, bool useOpaqueTypeSymbolicReferences) -> Demangle::Node * {
-        return reader.demangle(string,
-                               remote::MangledNameKind::Type,
-                               Dem, useOpaqueTypeSymbolicReferences);
-      }),
-      OpaqueUnderlyingTypeReader(
-      [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
-          descriptorAddr, ordinal).getType();
-      }),
-      OpaqueByteReader([&reader](remote::RemoteAddress address, unsigned size) -> remote::MemoryReader::ReadBytesResult {
-        return reader.Reader->readBytes(address, size);
-      }),
-      OpaqueStringReader([&reader](remote::RemoteAddress address, std::string &dest) -> bool {
-        return reader.Reader->readString(address, dest);
-      }),
-      OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> std::optional<remote::RemoteAbsolutePointer> {
-        return reader.Reader->readPointer(address, size);
-      }),
-      OpaqueDynamicSymbolResolver([&reader](remote::RemoteAddress address) -> std::optional<remote::RemoteAbsolutePointer> {
-        return reader.Reader->getDynamicSymbol(address);
-      }),
-      OpaqueIntVariableReader(
-        [&reader](std::string symbol, unsigned size) -> std::optional<uint64_t> {
+        PointerSize(sizeof(typename Runtime::StoredPointer)),
+        TypeRefDemangler([this, &reader](RemoteRef<char> string,
+                                         bool useOpaqueTypeSymbolicReferences)
+                             -> Demangle::Node * {
+          return reader.demangle(string, remote::MangledNameKind::Type, Dem,
+                                 useOpaqueTypeSymbolicReferences);
+        }),
+        OpaqueUnderlyingTypeReader(
+            [&reader](uint64_t descriptorAddr,
+                      unsigned ordinal) -> const TypeRef * {
+              return reader
+                  .readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
+                                                             ordinal)
+                  .getType();
+            }),
+        OpaqueByteReader(
+            [&reader](remote::RemoteAddress address,
+                      unsigned size) -> remote::MemoryReader::ReadBytesResult {
+              return reader.Reader->readBytes(address, size);
+            }),
+        OpaqueStringReader([&reader](remote::RemoteAddress address,
+                                     std::string &dest) -> bool {
+          return reader.Reader->readString(address, dest);
+        }),
+        OpaquePointerReader(
+            [&reader](remote::RemoteAddress address, unsigned size)
+                -> std::optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->readPointer(address, size);
+            }),
+        OpaqueDynamicSymbolResolver(
+            [&reader](remote::RemoteAddress address)
+                -> std::optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->getDynamicSymbol(address);
+            }),
+        OpaqueIntVariableReader([&reader](std::string symbol, unsigned size)
+                                    -> std::optional<uint64_t> {
           std::optional<uint64_t> result;
           if (auto Reader = reader.Reader) {
             auto Addr = Reader->getSymbolAddress(symbol);
@@ -1176,8 +1193,7 @@ public:
             }
           }
           return result;
-      })
-  { }
+        }) {}
 
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
@@ -1250,7 +1266,8 @@ public:
   ///
   void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
                    bool printTypeName = false);
-  FieldTypeCollectionResult collectFieldTypes(std::optional<std::string> forMangledTypeName);
+  FieldTypeCollectionResult
+  collectFieldTypes(std::optional<std::string> forMangledTypeName);
   void dumpFieldSection(std::ostream &stream);
   void dumpBuiltinTypeSection(std::ostream &stream);
   void dumpCaptureSection(std::ostream &stream);
@@ -1531,8 +1548,7 @@ private:
     }
 
     std::optional<std::string>
-    readFullyQualifiedProtocolName(
-        uintptr_t protocolDescriptorTarget) {
+    readFullyQualifiedProtocolName(uintptr_t protocolDescriptorTarget) {
       std::optional<std::string> protocolName;
       // Set low bit indicates that this is an indirect
       // reference
@@ -1576,7 +1592,7 @@ private:
     readFullyQualifiedProtocolNameFromProtocolDescriptor(
         uintptr_t protocolDescriptorAddress) {
       std::optional<std::string> protocolName =
-        readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+          readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(

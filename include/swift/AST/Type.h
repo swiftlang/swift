@@ -321,8 +321,7 @@ public:
   ///
   /// This is the 'map' counterpart to TypeBase::getTypeParameterPacks().
   Type transformTypeParameterPacks(
-      llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn)
-      const;
+      llvm::function_ref<std::optional<Type>(SubstitutableType *)> fn) const;
 
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {

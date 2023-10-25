@@ -504,9 +504,9 @@ public:
                                      Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
-  std::optional<unsigned> _depthIndexToFlatIndex(
-                                          unsigned depth, unsigned index,
-                                          llvm::ArrayRef<unsigned> paramCounts);
+  std::optional<unsigned>
+  _depthIndexToFlatIndex(unsigned depth, unsigned index,
+                         llvm::ArrayRef<unsigned> paramCounts);
 
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for

@@ -654,13 +654,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    "-warn-on-potentially-unavailable-enum-case");
 
   if (const Arg *A = Args.getLastArg(OPT_unavailable_decl_optimization_EQ)) {
-    auto value =
-        llvm::StringSwitch<std::optional<UnavailableDeclOptimization>>(
-            A->getValue())
-            .Case("none", UnavailableDeclOptimization::None)
-            .Case("stub", UnavailableDeclOptimization::Stub)
-            .Case("complete", UnavailableDeclOptimization::Complete)
-            .Default(std::nullopt);
+    auto value = llvm::StringSwitch<std::optional<UnavailableDeclOptimization>>(
+                     A->getValue())
+                     .Case("none", UnavailableDeclOptimization::None)
+                     .Case("stub", UnavailableDeclOptimization::Stub)
+                     .Case("complete", UnavailableDeclOptimization::Complete)
+                     .Default(std::nullopt);
 
     if (value)
       Opts.UnavailableDeclOptimizationMode = *value;

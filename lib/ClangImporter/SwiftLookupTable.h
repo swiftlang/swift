@@ -17,9 +17,9 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 #define SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
@@ -451,8 +451,8 @@ public:
   SingleEntry mapStored(uint64_t &entry, bool assumeModule = false);
 
   /// Translate a Clang DeclContext into a context kind and name.
-  static std::optional<StoredContext> translateDeclContext(
-                                         const clang::DeclContext *dc);
+  static std::optional<StoredContext>
+  translateDeclContext(const clang::DeclContext *dc);
 
   /// Translate a Clang effective context into a context kind and name.
   std::optional<StoredContext> translateContext(EffectiveClangContext context);

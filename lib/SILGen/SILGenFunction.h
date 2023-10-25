@@ -1105,8 +1105,8 @@ public:
 
   /// Emit the executor for the given actor isolation.
   std::optional<SILValue> emitExecutor(SILLocation loc,
-                                        ActorIsolation isolation,
-                                        std::optional<ManagedValue> maybeSelf);
+                                       ActorIsolation isolation,
+                                       std::optional<ManagedValue> maybeSelf);
 
   /// Emit the executor value that corresponds to the generic (concurrent)
   /// executor.
@@ -1176,9 +1176,8 @@ public:
   ///                 exception type.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(std::optional<Type> directResultType, 
-                     std::optional<Type> exnType,
-                     CleanupLocation L);
+  void prepareEpilog(std::optional<Type> directResultType,
+                     std::optional<Type> exnType, CleanupLocation L);
   void prepareRethrowEpilog(Type exnType, CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   

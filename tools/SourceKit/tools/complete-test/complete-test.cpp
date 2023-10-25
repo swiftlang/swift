@@ -14,10 +14,10 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Signals.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #include <regex>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
@@ -640,7 +640,8 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addBoolOption(KeyHideLowPriority, options.hideLowPriority);
     addBoolOption(KeyHideByName, options.hideByName);
 
-    auto addIntOption = [&](sourcekitd_uid_t key, std::optional<unsigned> option) {
+    auto addIntOption = [&](sourcekitd_uid_t key,
+                            std::optional<unsigned> option) {
       if (option)
         sourcekitd_request_dictionary_set_int64(opts, key, *option);
     };

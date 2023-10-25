@@ -41,7 +41,8 @@ class ModuleDependenciesCacheDeserializer {
 
   std::optional<std::string> getIdentifier(unsigned n);
   std::optional<std::vector<std::string>> getStringArray(unsigned n);
-  std::optional<std::vector<ModuleDependencyID>> getModuleDependencyIDArray(unsigned n);
+  std::optional<std::vector<ModuleDependencyID>>
+  getModuleDependencyIDArray(unsigned n);
 
 public:
   ModuleDependenciesCacheDeserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
@@ -641,7 +642,8 @@ bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
   return false;
 }
 
-std::optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(unsigned n) {
+std::optional<std::string>
+ModuleDependenciesCacheDeserializer::getIdentifier(unsigned n) {
   if (n == 0)
     return std::string();
 
@@ -652,7 +654,8 @@ std::optional<std::string> ModuleDependenciesCacheDeserializer::getIdentifier(un
   return Identifiers[n];
 }
 
-std::optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::getStringArray(unsigned n) {
+std::optional<std::vector<std::string>>
+ModuleDependenciesCacheDeserializer::getStringArray(unsigned n) {
   if (n == 0)
     return std::vector<std::string>();
 
@@ -675,7 +678,8 @@ std::optional<std::vector<std::string>> ModuleDependenciesCacheDeserializer::get
   return result;
 }
 
-std::optional<std::vector<ModuleDependencyID>> ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
+std::optional<std::vector<ModuleDependencyID>>
+ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
   auto encodedIdentifierStringArray = getStringArray(n);
   if (encodedIdentifierStringArray.has_value()) {
     static const std::string textualPrefix("swiftTextual");

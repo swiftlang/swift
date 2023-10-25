@@ -116,8 +116,9 @@ ArgumentList *ArgumentList::createTypeChecked(ASTContext &ctx,
                                               ArgumentList *originalArgs,
                                               ArrayRef<Argument> newArgs) {
   return create(ctx, originalArgs->getLParenLoc(), newArgs,
-                originalArgs->getRParenLoc(), /*trailingClosureIdx*/ std::nullopt,
-                originalArgs->isImplicit(), originalArgs);
+                originalArgs->getRParenLoc(),
+                /*trailingClosureIdx*/ std::nullopt, originalArgs->isImplicit(),
+                originalArgs);
 }
 
 ArgumentList *

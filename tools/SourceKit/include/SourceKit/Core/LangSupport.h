@@ -1178,7 +1178,7 @@ public:
           Receiver) = 0;
 
   virtual std::optional<std::pair<unsigned, unsigned>>
-      findUSRRange(StringRef DocumentName, StringRef USR) = 0;
+  findUSRRange(StringRef DocumentName, StringRef USR) = 0;
 
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,

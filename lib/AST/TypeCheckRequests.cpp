@@ -715,8 +715,7 @@ void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
 // StorageImplInfoRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<StorageImplInfo>
-StorageImplInfoRequest::getCachedResult() const {
+std::optional<StorageImplInfo> StorageImplInfoRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.ImplInfoComputed)
     return storage->ImplInfo;
@@ -1368,8 +1367,7 @@ void swift::simple_display(llvm::raw_ostream &out, Initializer *init) {
 // CallerSideDefaultArgExprRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<Expr *>
-CallerSideDefaultArgExprRequest::getCachedResult() const {
+std::optional<Expr *> CallerSideDefaultArgExprRequest::getCachedResult() const {
   auto *defaultExpr = std::get<0>(getStorage());
   auto storage = defaultExpr->ContextOrCallerSideExpr;
   assert(!storage.isNull());

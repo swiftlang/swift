@@ -19,7 +19,6 @@
 
 #include <optional>
 
-
 namespace llvm {
   class Constant;
 }
@@ -70,8 +69,8 @@ namespace irgen {
   /// Returns None if \p field has an empty type and therefore has no
   /// corresponding element in the llvm type.
   std::optional<unsigned> getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                       SILType baseType,
-                                                       VarDecl *field);
+                                                      SILType baseType,
+                                                      VarDecl *field);
 } // end namespace irgen
 } // end namespace swift
 

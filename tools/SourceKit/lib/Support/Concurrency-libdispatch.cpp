@@ -104,8 +104,8 @@ static void executeBlock(void *Data) {
 
 static void executeOnLargeStackThread(void *Data) {
   static const size_t ThreadStackSize = 8 << 20; // 8 MB.
-  llvm::thread Thread(std::optional<unsigned>(ThreadStackSize),
-                      executeBlock, Data);
+  llvm::thread Thread(std::optional<unsigned>(ThreadStackSize), executeBlock,
+                      Data);
   Thread.join();
 }
 

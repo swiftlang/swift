@@ -116,7 +116,7 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
 }
 
 static std::optional<YAMLModuleNode> createYAMLModuleNode(ModuleDecl *Mod,
-                                                           IRGenModule &IGM) {
+                                                          IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 

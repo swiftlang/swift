@@ -1350,8 +1350,7 @@ public:
   ///
   /// If the surviving element came from an expansion element, the
   /// returned element is the pattern type of the expansion.
-  std::optional<AbstractionPattern>
-  getVanishingTupleElementPatternType() const;
+  std::optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
 
   /// Does this tuple type vanish, i.e. is it flattened to a singleton
   /// non-expansion element under substitution?

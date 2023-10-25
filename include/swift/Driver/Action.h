@@ -272,8 +272,7 @@ private:
   Mode RequestedMode;
 public:
   REPLJobAction(Mode mode)
-      : JobAction(Action::Kind::REPLJob, std::nullopt,
-                  file_types::TY_Nothing),
+      : JobAction(Action::Kind::REPLJob, std::nullopt, file_types::TY_Nothing),
         RequestedMode(mode) {}
 
   Mode getRequestedMode() const { return RequestedMode; }

@@ -2555,8 +2555,8 @@ swift::getTypePackByMangledName(StringRef typeName,
 
 // ==== Function metadata functions ----------------------------------------------
 
-static std::optional<llvm::StringRef>
-cstrToStringRef(const char *typeNameStart, size_t typeNameLength) {
+static std::optional<llvm::StringRef> cstrToStringRef(const char *typeNameStart,
+                                                      size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   for (char c : typeName) {
     if (c >= '\x01' && c <= '\x1F')

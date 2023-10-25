@@ -519,7 +519,8 @@ cleanUpAHungUpTask(Task &T,
  @param pidToWaitFor the pid of the process to wait for
  @return Status information of the wait call and information about process
  */
-static std::pair<std::optional<int>, TaskProcessInformation> waitForPid(const pid_t pidToWaitFor);
+static std::pair<std::optional<int>, TaskProcessInformation>
+waitForPid(const pid_t pidToWaitFor);
 static bool
 cleanUpAfterSignal(int Status, const Task &T, TaskProcessInformation ProcInfo,
                    const TaskQueue::TaskSignalledCallback SignalledCallback);
@@ -596,7 +597,8 @@ cleanUpAHungUpTask(Task &T,
                    : false /* Can this case ever happen? */;
 }
 
-static std::pair<std::optional<int>, TaskProcessInformation> waitForPid(const pid_t pidToWaitFor) {
+static std::pair<std::optional<int>, TaskProcessInformation>
+waitForPid(const pid_t pidToWaitFor) {
   for (;;) {
     int Status = 0;
 

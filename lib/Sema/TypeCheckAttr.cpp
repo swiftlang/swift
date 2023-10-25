@@ -3518,7 +3518,8 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *PD,
                                        TypeEraserAttr *attr) const {
   if (auto *typeEraserRepr = attr->getParsedTypeEraserTypeRepr()) {
-    return TypeResolution::resolveContextualType(typeEraserRepr, PD, std::nullopt,
+    return TypeResolution::resolveContextualType(typeEraserRepr, PD,
+                                                 std::nullopt,
                                                  // Unbound generics and
                                                  // placeholders are not allowed
                                                  // within this attribute.
@@ -3550,14 +3551,13 @@ ResolveRawLayoutLikeTypeRequest::evaluate(Evaluator &evaluator,
   }
 
   // Resolve the like type in the struct's context.
-  return TypeResolution::resolveContextualType(
-        attr->LikeType, sd, std::nullopt,
-        // Unbound generics and placeholders
-        // are not allowed within this
-        // attribute.
-        /*unboundTyOpener*/ nullptr,
-        /*placeholderHandler*/ nullptr,
-        /*packElementOpener*/ nullptr);
+  return TypeResolution::resolveContextualType(attr->LikeType, sd, std::nullopt,
+                                               // Unbound generics and
+                                               // placeholders are not allowed
+                                               // within this attribute.
+                                               /*unboundTyOpener*/ nullptr,
+                                               /*placeholderHandler*/ nullptr,
+                                               /*packElementOpener*/ nullptr);
 }
 
 bool
@@ -5057,9 +5057,8 @@ enum class AbstractFunctionDeclLookupErrorKind {
 static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType, DeclNameRefWithLoc funcNameWithLoc,
     DeclContext *lookupContext, NameLookupOptions lookupOptions,
-    const llvm::function_ref<
-        std::optional<AbstractFunctionDeclLookupErrorKind>(
-            AbstractFunctionDecl *)> &isValidCandidate,
+    const llvm::function_ref<std::optional<AbstractFunctionDeclLookupErrorKind>(
+        AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
   assert(lookupContext);
   auto &ctx = lookupContext->getASTContext();

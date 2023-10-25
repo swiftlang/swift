@@ -17,11 +17,11 @@
 #ifndef SWIFT_SEMA_TYPOCORRECTION_H
 #define SWIFT_SEMA_TYPOCORRECTION_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/DeclNameLoc.h"
-#include "llvm/ADT/SmallVector.h"
+#include "swift/AST/Identifier.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 

@@ -993,7 +993,7 @@ private:
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB.
   std::optional<LiveValues> getLiveOutValues(BasicBlockSetVector &phiBlocks,
-                                              SILBasicBlock *startBlock);
+                                             SILBasicBlock *startBlock);
 
   /// Get the values for this AllocStack variable that are flowing out of
   /// StartBB or undef if there are none.
@@ -1002,7 +1002,7 @@ private:
 
   /// Get the values for this AllocStack variable that are flowing into block.
   std::optional<LiveValues> getLiveInValues(BasicBlockSetVector &phiBlocks,
-                                             SILBasicBlock *block);
+                                            SILBasicBlock *block);
 
   /// Get the values for this AllocStack variable that are flowing into block or
   /// undef if there are none.

@@ -1832,10 +1832,10 @@ public:
   template <class Result, class DescriptorFn, class MetadataFn,
             class ClassNameFn>
   std::optional<Result> forTypeReference(TypeReferenceKind refKind,
-                                          StoredPointer ref,
-                                          const DescriptorFn &descriptorFn,
-                                          const MetadataFn &metadataFn,
-                                          const ClassNameFn &classNameFn) {
+                                         StoredPointer ref,
+                                         const DescriptorFn &descriptorFn,
+                                         const MetadataFn &metadataFn,
+                                         const ClassNameFn &classNameFn) {
     switch (refKind) {
     case TypeReferenceKind::IndirectTypeDescriptor: {
       StoredPointer descriptorAddress = 0;
@@ -1962,8 +1962,7 @@ public:
     return Reader->readPointer(RemoteAddress(address), sizeof(StoredPointer));
   }
 
-  std::optional<StoredPointer>
-  readResolvedPointerValue(StoredPointer address) {
+  std::optional<StoredPointer> readResolvedPointerValue(StoredPointer address) {
     if (auto pointer = readPointer(address)) {
       if (!pointer->isResolved())
         return std::nullopt;

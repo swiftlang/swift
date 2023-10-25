@@ -135,10 +135,10 @@ AsyncContextLayout::AsyncContextLayout(
     IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
     ArrayRef<const TypeInfo *> fieldTypeInfos, CanSILFunctionType originalType,
     CanSILFunctionType substitutedType, SubstitutionMap substitutionMap)
-    : StructLayout(IGM, /*type=*/ std::nullopt, LayoutKind::NonHeapObject,
+    : StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                    strategy, fieldTypeInfos, /*typeToFill*/ nullptr),
       originalType(originalType), substitutedType(substitutedType),
-      substitutionMap(substitutionMap)  {
+      substitutionMap(substitutionMap) {
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
   assert(this->isFixedLayout());
@@ -2879,8 +2879,8 @@ public:
       auto fnVal = currentResumeFn;
       // Sign the pointer.
       if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
-        Address fieldAddr =
-            resumeParentField.project(IGF, this->context, /*offsets*/ std::nullopt);
+        Address fieldAddr = resumeParentField.project(IGF, this->context,
+                                                      /*offsets*/ std::nullopt);
         auto authInfo = PointerAuthInfo::emit(
             IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
         fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
@@ -5699,8 +5699,8 @@ void irgen::emitAsyncReturn(
   llvm::Value *fnVal = fn.claimNext();
 
   if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextResume) {
-    Address fieldAddr =
-        returnToCallerLayout.project(IGF, contextAddr, /*offsets*/ std::nullopt);
+    Address fieldAddr = returnToCallerLayout.project(IGF, contextAddr,
+                                                     /*offsets*/ std::nullopt);
     auto authInfo = PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
                                           PointerAuthEntity());
     fnVal = emitPointerAuthAuth(IGF, fnVal, authInfo);

@@ -75,7 +75,7 @@ class SyntacticElementTarget;
 namespace TypeChecker {
 
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                            Type builderType);
+                                                           Type builderType);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
@@ -5322,8 +5322,8 @@ public:
   ///
   /// \returns The index of the best solution, or nothing if there was no
   /// best solution.
-  std::optional<unsigned>
-  findBestSolution(SmallVectorImpl<Solution> &solutions, bool minimize);
+  std::optional<unsigned> findBestSolution(SmallVectorImpl<Solution> &solutions,
+                                           bool minimize);
 
 public:
   /// Apply a given solution to the target, producing a fully
@@ -5639,7 +5639,7 @@ public:
   /// \param argInsertIdx The index in the argument list where this argument was
   /// expected.
   virtual std::optional<unsigned> missingArgument(unsigned paramIdx,
-                                                   unsigned argInsertIdx);
+                                                  unsigned argInsertIdx);
 
   /// Indicate that there was no label given when one was expected by parameter.
   ///
@@ -5717,7 +5717,7 @@ struct CompletionArgInfo {
 /// from the provided anchor if it's a \c CallExpr, \c SubscriptExpr, or
 /// \c ObjectLiteralExpr.
 std::optional<CompletionArgInfo> getCompletionArgInfo(ASTNode anchor,
-                                                       ConstraintSystem &cs);
+                                                      ConstraintSystem &cs);
 
 /// Match the call arguments (as described by the given argument type) to
 /// the parameters (as described by the given parameter type).

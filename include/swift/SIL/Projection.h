@@ -570,7 +570,7 @@ public:
   /// types via ref_element_addr. If Start is an address type though, End will
   /// always also be an address type.
   static std::optional<ProjectionPath> getProjectionPath(SILValue Start,
-                                                          SILValue End);
+                                                         SILValue End);
 
   /// Treating a projection path as an ordered set, if RHS is a prefix of LHS,
   /// return the projection path with that prefix removed.

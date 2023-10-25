@@ -71,7 +71,7 @@ static bool isLineAtLocEmpty(SourceManager &SM, SourceLoc Loc) {
 
 /// \returns the first token after the token at \c Loc.
 static std::optional<Token> getTokenAfter(SourceManager &SM, SourceLoc Loc,
-                                           bool SkipComments = true) {
+                                          bool SkipComments = true) {
   assert(Loc.isValid());
   CommentRetentionMode Mode = SkipComments
     ? CommentRetentionMode::None
@@ -87,9 +87,9 @@ static std::optional<Token> getTokenAfter(SourceManager &SM, SourceLoc Loc,
 /// \returns the last token of the given kind in the open range between \c From
 ///   and \c To.
 static std::optional<Token> getLastTokenOfKindInOpenRange(SourceManager &SM,
-                                                           tok Kind,
-                                                           SourceLoc From,
-                                                           SourceLoc To) {
+                                                          tok Kind,
+                                                          SourceLoc From,
+                                                          SourceLoc To) {
   std::optional<Token> Match;
   while (auto Next = getTokenAfter(SM, From)) {
     if (!Next || !SM.isBeforeInBuffer(Next->getLoc(), To))
@@ -945,8 +945,8 @@ public:
   /// Checks if the target location immediately follows the provided \p EndLoc,
   /// optionally allowing for a single comma in between.
   static std::optional<TrailingInfo> find(SourceManager &SM, SourceLoc EndLoc,
-                                           SourceLoc TargetLoc,
-                                           bool LookPastTrailingComma = true) {
+                                          SourceLoc TargetLoc,
+                                          bool LookPastTrailingComma = true) {
     // If the target is before the end of the end token, it's not trailing.
     SourceLoc TokenEndLoc = Lexer::getLocForEndOfToken(SM, EndLoc);
     if (SM.isBeforeInBuffer(TargetLoc, TokenEndLoc))
@@ -1964,8 +1964,8 @@ private:
   }
 
   std::optional<IndentContext> getIndentContextFrom(TrailingWhereClause *TWC,
-                                                     SourceLoc ContextLoc,
-                                                     Decl *WalkableParent) {
+                                                    SourceLoc ContextLoc,
+                                                    Decl *WalkableParent) {
     if (!TWC)
       return std::nullopt;
     return getIndentContextFromWhereClause(TWC->getRequirements(),
@@ -1974,8 +1974,8 @@ private:
   }
 
   std::optional<IndentContext> getIndentContextFrom(GenericParamList *GP,
-                                                     SourceLoc ContextLoc,
-                                                     Decl *WalkableParent) {
+                                                    SourceLoc ContextLoc,
+                                                    Decl *WalkableParent) {
     if (!GP)
       return std::nullopt;
 
@@ -2052,8 +2052,8 @@ private:
 
   template <typename T>
   std::optional<IndentContext> getIndentContextFromBraces(SourceRange Braces,
-                                                           SourceLoc ContextLoc,
-                                                           T *WalkableParent) {
+                                                          SourceLoc ContextLoc,
+                                                          T *WalkableParent) {
     return getIndentContextFromBraces(Braces.Start, Braces.End, ContextLoc,
                                       WalkableParent);
   }
@@ -2323,7 +2323,7 @@ private:
 
   template <typename T>
   std::optional<IndentContext> getIndentContextFrom(PoundAvailableInfo *A,
-                                                     T *WalkableParent) {
+                                                    T *WalkableParent) {
     SourceLoc ContextLoc = A->getStartLoc();
     SourceLoc L = A->getLParenLoc();
     SourceLoc R = getLocIfKind(SM, A->getRParenLoc(), tok::r_paren);
@@ -2851,8 +2851,7 @@ private:
 #pragma mark Pattern indent contexts
 
   std::optional<IndentContext>
-  getIndentContextFrom(Pattern *P,
-                       std::optional<TrailingInfo> TrailingTarget) {
+  getIndentContextFrom(Pattern *P, std::optional<TrailingInfo> TrailingTarget) {
     if (TrailingTarget)
       return std::nullopt;
 

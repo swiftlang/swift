@@ -626,8 +626,8 @@ SwiftLookupTable::lookup(SerializedSwiftName baseName,
 }
 
 SmallVector<SwiftLookupTable::SingleEntry, 4>
-SwiftLookupTable::lookupGlobalsAsMembersImpl(SerializedSwiftName baseName,
-                                             std::optional<StoredContext> searchContext) {
+SwiftLookupTable::lookupGlobalsAsMembersImpl(
+    SerializedSwiftName baseName, std::optional<StoredContext> searchContext) {
   SmallVector<SwiftLookupTable::SingleEntry, 4> result;
 
   // Find entries for this base name.
@@ -691,8 +691,7 @@ SwiftLookupTable::lookupGlobalsAsMembers(
   if (!searchContext)
     return lookupGlobalsAsMembersImpl(baseName, std::nullopt);
 
-  std::optional<StoredContext> storedContext =
-      translateContext(*searchContext);
+  std::optional<StoredContext> storedContext = translateContext(*searchContext);
   if (!storedContext) return { };
 
   return lookupGlobalsAsMembersImpl(baseName, *storedContext);

@@ -234,17 +234,15 @@ struct ConstValueTypePropertyInfo {
   std::shared_ptr<CompileTimeValue> Value;
   std::optional<AttrValueVector> PropertyWrappers;
 
-  ConstValueTypePropertyInfo(
-      swift::VarDecl *VarDecl, std::shared_ptr<CompileTimeValue> Value,
-      std::optional<AttrValueVector> PropertyWrappers)
-      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers)
-    {}
+  ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
+                             std::shared_ptr<CompileTimeValue> Value,
+                             std::optional<AttrValueVector> PropertyWrappers)
+      : VarDecl(VarDecl), Value(Value), PropertyWrappers(PropertyWrappers) {}
 
   ConstValueTypePropertyInfo(swift::VarDecl *VarDecl,
                              std::shared_ptr<CompileTimeValue> Value)
       : VarDecl(VarDecl), Value(Value),
-        PropertyWrappers(std::optional<AttrValueVector>())
-    {}
+        PropertyWrappers(std::optional<AttrValueVector>()) {}
 };
 
 struct ConstValueTypeInfo {

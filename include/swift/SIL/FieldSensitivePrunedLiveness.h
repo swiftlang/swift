@@ -204,7 +204,7 @@ struct SubElementOffset {
   /// \returns None if we didn't know how to compute sub-element for this
   /// projection.
   static std::optional<SubElementOffset> compute(SILValue projectionFromRoot,
-                                                  SILValue root) {
+                                                 SILValue root) {
     assert(projectionFromRoot->getType().getCategory() ==
                root->getType().getCategory() &&
            "projectionFromRoot and root must both be objects or address.");
@@ -296,7 +296,7 @@ struct TypeTreeLeafTypeRange {
   /// \returns None if we are unable to understand the path in between \p
   /// projectedAddress and \p rootAddress.
   static std::optional<TypeTreeLeafTypeRange> get(SILValue projectedValue,
-                                                   SILValue rootValue) {
+                                                  SILValue rootValue) {
     auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
     if (!startEltOffset)
       return std::nullopt;

@@ -231,8 +231,7 @@ public:
 
   /// On success returns the ID of the newly registered Reflection Info.
   template <typename T>
-  std::optional<uint32_t>
-  readMachOSections(
+  std::optional<uint32_t> readMachOSections(
       RemoteAddress ImageStart,
       llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
@@ -492,8 +491,9 @@ public:
   }
 
   /// On success returns the ID of the newly registered Reflection Info.
-  std::optional<uint32_t> readPECOFF(RemoteAddress ImageStart,
-                  llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
+  std::optional<uint32_t>
+  readPECOFF(RemoteAddress ImageStart,
+             llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf = this->getReader().readBytes(ImageStart,
                                            sizeof(llvm::object::dos_header));
     if (!Buf)
@@ -1280,7 +1280,7 @@ public:
   /// with the type and protocol of each conformance. Returns None on success,
   /// and a string describing the error on failure.
   std::optional<std::string> iterateConformances(
-    std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
+      std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     std::string ConformancesPointerName =
         "_swift_debug_protocolConformanceStatePointer";
     auto ConformancesAddrAddr =
@@ -1363,7 +1363,7 @@ public:
   /// each allocation found. Returns None on success, and a string describing
   /// the error on failure.
   std::optional<std::string> iterateMetadataAllocations(
-    std::function<void (MetadataAllocation<Runtime>)> Call) {
+      std::function<void(MetadataAllocation<Runtime>)> Call) {
     std::string IterationEnabledName =
         "_swift_debug_metadataAllocationIterationEnabled";
     std::string AllocationPoolPointerName =
@@ -1982,8 +1982,7 @@ private:
   ///
   /// \param Builder Used to obtain offsets of elements known so far.
   std::optional<StoredPointer>
-  readMetadataSource(StoredPointer Context,
-                     const MetadataSource *MS,
+  readMetadataSource(StoredPointer Context, const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
     switch (MS->getKind()) {
     case MetadataSourceKind::ClosureBinding: {

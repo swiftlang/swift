@@ -417,11 +417,11 @@ public:
   /// Translate line and column pair to the offset.
   /// If the column number is the maximum unsinged int, return the offset of the end of the line.
   std::optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
-                                              unsigned Col) const;
+                                             unsigned Col) const;
 
   /// Translate the end position of the given line to the offset.
   std::optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
-                                                     unsigned Line) const;
+                                                    unsigned Line) const;
 
   /// Get the length of the line
   std::optional<unsigned> getLineLength(unsigned BufferId, unsigned Line) const;

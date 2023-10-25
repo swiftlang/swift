@@ -262,8 +262,8 @@ void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
 }
 
 std::optional<RemoteRef<FieldDescriptor>>
-TypeRefBuilder::findFieldDescriptorAtIndex(
-    size_t Index, const std::string &MangledName) {
+TypeRefBuilder::findFieldDescriptorAtIndex(size_t Index,
+                                           const std::string &MangledName) {
   populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
   auto Found = FieldTypeInfoCache.find(MangledName);
   if (Found != FieldTypeInfoCache.end()) {

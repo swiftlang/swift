@@ -137,8 +137,8 @@ public:
       std::vector<StructuralRequirement> &&writtenRequirements,
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             std::optional<unsigned>>> &&requirementRules);
+      std::vector<std::tuple<MutableTerm, MutableTerm, std::optional<unsigned>>>
+          &&requirementRules);
 
   unsigned getLongestInitialRule() const {
     return LongestInitialRule;
@@ -189,14 +189,14 @@ public:
   void addRules(
       std::vector<Rule> &&importedRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
-      std::vector<std::tuple<MutableTerm, MutableTerm,
-                             std::optional<unsigned>>> &&requirementRules);
+      std::vector<std::tuple<MutableTerm, MutableTerm, std::optional<unsigned>>>
+          &&requirementRules);
 
   bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
 
   std::optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
-                                                 const PropertyMap *map,
-                                                 RewritePath *path = nullptr);
+                                                const PropertyMap *map,
+                                                RewritePath *path = nullptr);
 
   //////////////////////////////////////////////////////////////////////////////
   ///

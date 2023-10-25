@@ -1839,8 +1839,7 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
 }
 
 /// Look up whether the given string corresponds to a SIL opcode.
-static std::optional<SILInstructionKind>
-getOpcodeByName(StringRef OpcodeName) {
+static std::optional<SILInstructionKind> getOpcodeByName(StringRef OpcodeName) {
   return llvm::StringSwitch<std::optional<SILInstructionKind>>(OpcodeName)
 #define FULL_INST(Id, TextualName, Parent, MemBehavior, MayRelease)            \
   .Case(#TextualName, SILInstructionKind::Id)
@@ -6043,9 +6042,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
             getLocalValue(caseName.second, ResultType, InstLoc, B)));
 
       if (Opcode == SILInstructionKind::SelectEnumInst) {
-        ResultVal = B.createSelectEnum(InstLoc, Val, ResultType, DefaultValue,
-                                       CaseValues, std::nullopt,
-                                       ProfileCounter());
+        ResultVal =
+            B.createSelectEnum(InstLoc, Val, ResultType, DefaultValue,
+                               CaseValues, std::nullopt, ProfileCounter());
       } else
         ResultVal = B.createSelectEnumAddr(InstLoc, Val, ResultType,
                                            DefaultValue, CaseValues);
@@ -7431,9 +7430,9 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
 /// will still incorrectly diagnose this as an "invalid redeclaration" and give
 /// all but the first declaration an error type.
 static std::optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
-                                                  SILLinkage GlobalLinkage,
-                                                  SILType GlobalType,
-                                                  Parser &P) {
+                                                 SILLinkage GlobalLinkage,
+                                                 SILType GlobalType,
+                                                 Parser &P) {
   // Create a set of DemangleOptions to produce the global variable's
   // identifier, which is used as a search key in the declaration context.
   Demangle::DemangleOptions demangleOpts;

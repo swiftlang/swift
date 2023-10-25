@@ -230,8 +230,8 @@ ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
   Storage = DeclName(ctx, Identifier(), pieces);
 }
 
-std::optional<ObjCSelector>
-ObjCSelector::parse(ASTContext &ctx, StringRef string) {
+std::optional<ObjCSelector> ObjCSelector::parse(ASTContext &ctx,
+                                                StringRef string) {
   // Find the first colon.
   auto colonPos = string.find(':');
 

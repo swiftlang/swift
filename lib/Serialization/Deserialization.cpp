@@ -2023,8 +2023,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       }
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(
-            scratch, std::nullopt, IID, std::nullopt, std::nullopt, std::nullopt);
+        XRefValuePathPieceLayout::readRecord(scratch, std::nullopt, IID,
+                                             std::nullopt, std::nullopt,
+                                             std::nullopt);
         result = getIdentifier(IID);
         break;
       }

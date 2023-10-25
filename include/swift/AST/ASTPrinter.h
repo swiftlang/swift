@@ -306,8 +306,7 @@ public:
   void callPrintDeclPre(const Decl *D, std::optional<BracketOptions> Bracket);
 
   /// Make a callback to printDeclPost(), performing any necessary bookkeeping.
-  void callPrintDeclPost(const Decl *D,
-                         std::optional<BracketOptions> Bracket) {
+  void callPrintDeclPost(const Decl *D, std::optional<BracketOptions> Bracket) {
     printDeclPost(D, Bracket);
   }
 

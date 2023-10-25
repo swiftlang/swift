@@ -891,8 +891,7 @@ public:
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
-  std::optional<SourceFileDepGraph> static loadFromBuffer(
-      llvm::MemoryBuffer &);
+  std::optional<SourceFileDepGraph> static loadFromBuffer(llvm::MemoryBuffer &);
   std::optional<SourceFileDepGraph> static loadFromSwiftModuleBuffer(
       llvm::MemoryBuffer &);
 

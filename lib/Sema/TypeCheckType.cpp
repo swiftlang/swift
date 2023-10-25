@@ -3994,8 +3994,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(
   if (shouldStoreClangType(representation) && !clangFnType) {
     assert(results.size() <= 1 && yields.size() == 0 &&
            "C functions and blocks have at most 1 result and 0 yields.");
-    auto result =
-        results.empty() ? std::optional<SILResultInfo>() : results[0];
+    auto result = results.empty() ? std::optional<SILResultInfo>() : results[0];
     clangFnType = getASTContext().getCanonicalClangFunctionType(params, result,
                                                                 representation);
     extInfoBuilder = extInfoBuilder.withClangFunctionType(clangFnType);

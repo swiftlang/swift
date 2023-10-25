@@ -1371,7 +1371,7 @@ protected:
   }
 
 private:
-  template<typename Fn>
+  template <typename Fn>
   std::optional<TypeLookupError>
   decodeTypeSequenceElement(Demangle::NodePointer node, unsigned depth,
                             Fn resultCallback) {

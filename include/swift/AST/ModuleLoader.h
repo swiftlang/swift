@@ -25,10 +25,10 @@
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/VersionTuple.h"
 #include <system_error>
 

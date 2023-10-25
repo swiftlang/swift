@@ -944,7 +944,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
 }
 
 static std::optional<unsigned> getParamIndex(const ParameterList *paramList,
-                                              const ParamDecl *decl) {
+                                             const ParamDecl *decl) {
   ArrayRef<ParamDecl *> params = paramList->getArray();
   for (unsigned i = 0; i < params.size(); ++i) {
     if (params[i] == decl) return i;

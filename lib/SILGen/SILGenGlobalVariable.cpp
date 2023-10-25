@@ -89,8 +89,9 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
     // The accessor to obtain a global's address may need to initialize the
     // variable first. So, we must call this accessor with the same
     // isolation that the variable itself requires during access.
-    ExecutorBreadcrumb prevExecutor = emitHopToTargetActor(loc, actorIso,
-                                                           /*base=*/std::nullopt);
+    ExecutorBreadcrumb prevExecutor =
+        emitHopToTargetActor(loc, actorIso,
+                             /*base=*/std::nullopt);
 
     SILValue addr = B.createApply(loc, accessor, SubstitutionMap(), {});
 

@@ -132,10 +132,10 @@ namespace {
     Size HeaderSize;
 
   public:
-    ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
-                       ReferenceCounting refcounting,
-                       bool completelyFragileLayout,
-                       std::optional<ArrayRef<SILType>> tailTypes = std::nullopt)
+    ClassLayoutBuilder(
+        IRGenModule &IGM, SILType classType, ReferenceCounting refcounting,
+        bool completelyFragileLayout,
+        std::optional<ArrayRef<SILType>> tailTypes = std::nullopt)
         : StructLayoutBuilder(IGM), TailTypes(tailTypes),
           CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.

@@ -189,7 +189,7 @@ namespace {
 
     /// Return the statically-known offset of the given element.
     std::optional<Size> getFixedElementOffset(IRGenModule &IGM,
-                                               unsigned fieldNo) const {
+                                              unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       switch (field.getKind()) {
       case ElementLayout::Kind::Empty:
@@ -205,7 +205,7 @@ namespace {
     }
 
     std::optional<unsigned> getElementStructIndex(IRGenModule &IGM,
-                                                   unsigned fieldNo) const {
+                                                  unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
         return std::nullopt;
@@ -512,7 +512,7 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, /*type=*/ std::nullopt, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                           LayoutStrategy::Universal, fieldTypes);
     }
   };
@@ -632,8 +632,8 @@ Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
 }
 
 std::optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
-                                                       SILType tupleType,
-                                                       unsigned fieldNo) {
+                                                      SILType tupleType,
+                                                      unsigned fieldNo) {
   // Macro happens to work with IGM, too.
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }

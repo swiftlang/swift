@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/Actor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Basic/STLExtras.h"
 #include "gtest/gtest.h"
-#include <vector>
 #include <tuple>
+#include <vector>
 
 using namespace swift;
 

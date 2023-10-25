@@ -49,9 +49,8 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings
-  update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-         std::optional<unsigned> IDEInspectionCheckDependencyInterval);
+  Settings update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+                  std::optional<unsigned> IDEInspectionCheckDependencyInterval);
   Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 

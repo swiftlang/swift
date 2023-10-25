@@ -100,7 +100,7 @@ public:
 
 private:
   std::optional<std::string> computeOutputFile(StringRef outputArg,
-                                                const InputFile &input) const;
+                                               const InputFile &input) const;
 
   /// \return the correct output filename when none was specified.
   ///

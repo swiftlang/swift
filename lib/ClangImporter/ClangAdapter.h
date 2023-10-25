@@ -19,8 +19,8 @@
 #define CLANG_ADAPTER_H
 
 #include "swift/Basic/StringExtras.h"
-#include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 #include "ImportName.h"
 

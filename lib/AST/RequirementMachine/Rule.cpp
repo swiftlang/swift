@@ -263,8 +263,7 @@ unsigned Rule::getNesting() const {
 }
 
 /// Linear order on rules; compares LHS followed by RHS.
-std::optional<int> Rule::compare(const Rule &other,
-                                  RewriteContext &ctx) const {
+std::optional<int> Rule::compare(const Rule &other, RewriteContext &ctx) const {
   std::optional<int> compare = LHS.compare(other.LHS, ctx);
   if (!compare.has_value() || *compare != 0)
     return compare;

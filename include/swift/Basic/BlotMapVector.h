@@ -13,9 +13,9 @@
 #ifndef SWIFT_BASIC_BLOTMAPVECTOR_H
 #define SWIFT_BASIC_BLOTMAPVECTOR_H
 
-#include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/DenseMap.h"
 #include <vector>
 
 namespace swift {

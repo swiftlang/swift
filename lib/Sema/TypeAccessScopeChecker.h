@@ -47,7 +47,6 @@ class TypeAccessScopeChecker {
   }
 
 public:
-
   static std::optional<AccessScope>
   getAccessScope(TypeRepr *TR, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false) {

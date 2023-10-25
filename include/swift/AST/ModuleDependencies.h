@@ -26,9 +26,9 @@
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
@@ -947,8 +947,7 @@ private:
   ///
   /// \returns the cached result, or \c None if there is no cached entry.
   std::optional<const ModuleDependencyInfo *>
-  findDependency(StringRef moduleName,
-                 std::optional<ModuleDependencyKind> kind,
+  findDependency(StringRef moduleName, std::optional<ModuleDependencyKind> kind,
                  StringRef scanContextHash) const;
 
   /// Record dependencies for the given module.

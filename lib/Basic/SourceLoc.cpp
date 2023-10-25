@@ -633,8 +633,8 @@ SourceManager::resolveOffsetForEndOfLine(unsigned BufferId,
   return resolveFromLineCol(BufferId, Line, ~0u);
 }
 
-std::optional<unsigned>
-SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
+std::optional<unsigned> SourceManager::getLineLength(unsigned BufferId,
+                                                     unsigned Line) const {
   auto BegOffset = resolveFromLineCol(BufferId, Line, 0);
   auto EndOffset = resolveFromLineCol(BufferId, Line, ~0u);
   if (BegOffset && EndOffset) {
@@ -644,8 +644,8 @@ SourceManager::getLineLength(unsigned BufferId, unsigned Line) const {
 }
 
 std::optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
-                                                           unsigned Line,
-                                                           unsigned Col) const {
+                                                          unsigned Line,
+                                                          unsigned Col) const {
   if (Line == 0) {
     return std::nullopt;
   }

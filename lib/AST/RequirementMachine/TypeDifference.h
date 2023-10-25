@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Symbol.h"
+#include "Term.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "Symbol.h"
-#include "Term.h"
 
 #ifndef TYPE_DIFFERENCE_H_
 #define TYPE_DIFFERENCE_H_

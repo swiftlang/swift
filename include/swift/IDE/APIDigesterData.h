@@ -278,10 +278,9 @@ public:
 
 public:
   TypeMemberDiffItem(StringRef usr, StringRef newTypeName,
-                     StringRef newPrintedName,
-                     std::optional<uint8_t> selfIndex,
-                     std::optional<uint8_t> removedIndex,
-                     StringRef oldTypeName, StringRef oldPrintedName)
+                     StringRef newPrintedName, std::optional<uint8_t> selfIndex,
+                     std::optional<uint8_t> removedIndex, StringRef oldTypeName,
+                     StringRef oldPrintedName)
       : usr(usr), newTypeName(newTypeName), newPrintedName(newPrintedName),
         selfIndex(selfIndex), removedIndex(removedIndex),
         oldTypeName(oldTypeName), oldPrintedName(oldPrintedName),

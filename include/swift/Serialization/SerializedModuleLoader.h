@@ -65,8 +65,7 @@ struct SerializedModuleBaseName {
   /// If the interface with \p baseName exists, returns its path (which may be
   /// the private interface if there is one). Return an empty optional
   /// otherwise.
-  std::optional<std::string>
-  findInterfacePath(llvm::vfs::FileSystem &fs) const;
+  std::optional<std::string> findInterfacePath(llvm::vfs::FileSystem &fs) const;
 };
 
 /// Common functionality shared between \c ImplicitSerializedModuleLoader,

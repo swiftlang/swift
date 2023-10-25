@@ -863,7 +863,7 @@ private:
 
   // Evaluation.
   std::optional<PropertyWrapperMutability> evaluate(Evaluator &evaluator,
-                                                     VarDecl *var) const;
+                                                    VarDecl *var) const;
 
 public:
   // Caching
@@ -883,7 +883,7 @@ private:
 
   // Evaluation.
   std::optional<PropertyWrapperLValueness> evaluate(Evaluator &evaluator,
-                                                     VarDecl *var) const;
+                                                    VarDecl *var) const;
 
 public:
   // Caching
@@ -3887,7 +3887,7 @@ private:
   friend SimpleRequest;
 
   std::optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                                 const Decl *decl) const;
+                                                const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -3904,7 +3904,7 @@ private:
   friend SimpleRequest;
 
   std::optional<AvailableAttrDeclPair> evaluate(Evaluator &evaluator,
-                                                 const Decl *decl) const;
+                                                const Decl *decl) const;
 
 public:
   bool isCached() const { return true; }
@@ -4182,7 +4182,7 @@ private:
   friend SimpleRequest;
 
   std::optional<unsigned> evaluate(Evaluator &evaluator,
-                                    MacroExpansionDecl *med) const;
+                                   MacroExpansionDecl *med) const;
 
 public:
   bool isCached() const { return true; }
@@ -4202,7 +4202,7 @@ private:
   friend SimpleRequest;
 
   std::optional<unsigned> evaluate(Evaluator &evaluator,
-                                    MacroExpansionExpr *mee) const;
+                                   MacroExpansionExpr *mee) const;
 
 public:
   bool isCached() const { return true; }

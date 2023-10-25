@@ -101,7 +101,7 @@ enum class DIKind : uint8_t { No, Yes, Partial };
 
 /// This implements the lattice merge operation for 2 optional DIKinds.
 static std::optional<DIKind> mergeKinds(std::optional<DIKind> OK1,
-                                         std::optional<DIKind> OK2) {
+                                        std::optional<DIKind> OK2) {
   // If OK1 is unset, ignore it.
   if (!OK1.has_value())
     return OK2;

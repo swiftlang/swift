@@ -341,8 +341,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   IsRuntimeAccessible_t isRuntimeAccessible = IsNotRuntimeAccessible;
 
   auto *F = SILFunction::create(
-      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare, IsTrans,
-      IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
+      mod, linkage, name, constantType, nullptr, std::nullopt, IsNotBare,
+      IsTrans, IsSer, entryCount, IsDyn, IsDistributed, isRuntimeAccessible,
       IsNotExactSelfClass, IsNotThunk, constant.getSubclassScope(),
       inlineStrategy);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));

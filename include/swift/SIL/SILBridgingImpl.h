@@ -1216,7 +1216,7 @@ BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftI
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
                                     bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
   return {get().createAllocStack(regularLoc(), type.get(), std::nullopt,
-                                         hasDynamicLifetime, isLexical, wasMoved)};
+                                 hasDynamicLifetime, isLexical, wasMoved)};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {

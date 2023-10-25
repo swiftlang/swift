@@ -1013,9 +1013,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   if (targetFormalType.isExistentialType()) {
     Explosion outRes;
-    emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
-                                  targetLoweredType, mode,
-                                  /*not a metatype*/ std::nullopt, fnSig, outRes);
+    emitScalarExistentialDowncast(
+        IGF, instance, sourceLoweredType, targetLoweredType, mode,
+        /*not a metatype*/ std::nullopt, fnSig, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }

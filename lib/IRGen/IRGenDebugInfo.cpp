@@ -1413,17 +1413,17 @@ private:
 
     case TypeKind::BuiltinNativeObject: {
       unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                            /* DWARFAddressSpace */ std::nullopt,
-                                            MangledName);
+      auto PTy = DBuilder.createPointerType(
+          nullptr, PtrSize, 0,
+          /* DWARFAddressSpace */ std::nullopt, MangledName);
       return DBuilder.createObjectPointerType(PTy);
     }
 
     case TypeKind::BuiltinBridgeObject: {
       unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-      auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                            /* DWARFAddressSpace */ std::nullopt,
-                                            MangledName);
+      auto PTy = DBuilder.createPointerType(
+          nullptr, PtrSize, 0,
+          /* DWARFAddressSpace */ std::nullopt, MangledName);
       return DBuilder.createObjectPointerType(PTy);
     }
 

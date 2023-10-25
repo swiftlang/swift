@@ -280,8 +280,9 @@ public:
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
-      auto substType = IFS.withNewOptions(
-          std::nullopt, [&] { return selfType.subst(IFS)->getCanonicalType(); });
+      auto substType = IFS.withNewOptions(std::nullopt, [&] {
+        return selfType.subst(IFS)->getCanonicalType();
+      });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
             substConformance, substType, typeExpansionContext);

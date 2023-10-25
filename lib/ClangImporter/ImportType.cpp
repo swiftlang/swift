@@ -210,12 +210,11 @@ namespace {
     std::optional<unsigned> CompletionHandlerErrorParamIndex;
 
   public:
-    SwiftTypeConverter(
-        ClangImporter::Implementation &impl,
-        llvm::function_ref<void(Diagnostic &&)> addDiag,
-        bool allowNSUIntegerAsInt, Bridgeability bridging,
-        const clang::FunctionType *completionHandlerType,
-        std::optional<unsigned> completionHandlerErrorParamIndex)
+    SwiftTypeConverter(ClangImporter::Implementation &impl,
+                       llvm::function_ref<void(Diagnostic &&)> addDiag,
+                       bool allowNSUIntegerAsInt, Bridgeability bridging,
+                       const clang::FunctionType *completionHandlerType,
+                       std::optional<unsigned> completionHandlerErrorParamIndex)
         : Impl(impl), addImportDiagnostic(addDiag),
           AllowNSUIntegerAsInt(allowNSUIntegerAsInt), Bridging(bridging),
           CompletionHandlerType(completionHandlerType),
@@ -1860,16 +1859,15 @@ private:
   Result recurse(Type ty) {
     bool anyFound = false;
 
-    Type newTy =
-        ty.transformRec([&](TypeBase *childTy) -> std::optional<Type> {
-          // We want to visit the first level of children.
-          if (childTy == ty.getPointer())
-            return std::nullopt;
+    Type newTy = ty.transformRec([&](TypeBase *childTy) -> std::optional<Type> {
+      // We want to visit the first level of children.
+      if (childTy == ty.getPointer())
+        return std::nullopt;
 
-          auto result = this->visit(childTy);
-          anyFound |= result.second;
-          return result.first;
-        });
+      auto result = this->visit(childTy);
+      anyFound |= result.second;
+      return result.first;
+    });
 
     return { newTy, anyFound };
   }

@@ -1364,7 +1364,7 @@ static std::optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 
 /// Figure out if a declaration should be exported to Objective-C.
 static std::optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
-                                                   bool allowImplicit) {
+                                                  bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
     return std::nullopt;

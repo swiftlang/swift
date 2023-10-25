@@ -50,7 +50,7 @@ namespace llvm {
     return !(lhs == rhs);
   }
 
-  template<typename T>
+  template <typename T>
   void simple_display(raw_ostream &out, const std::optional<T> &opt) {
     if (opt) {
       simple_display(out, *opt);

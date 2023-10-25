@@ -3778,8 +3778,7 @@ MetatypeType::MetatypeType(Type T, const ASTContext *C,
     : AnyMetatypeType(TypeKind::Metatype, C, properties, T, repr) {}
 
 ExistentialMetatypeType *
-ExistentialMetatypeType::get(Type T,
-                             std::optional<MetatypeRepresentation> repr,
+ExistentialMetatypeType::get(Type T, std::optional<MetatypeRepresentation> repr,
                              const ASTContext &ctx) {
   // If we're creating an existential metatype from an
   // existential type, wrap the constraint type direcly.
@@ -5743,16 +5742,17 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   }
 
   auto eraseParameterPackRec = [&](Type type) -> Type {
-    return type.transformTypeParameterPacks([&](SubstitutableType *t) -> std::optional<Type> {
-      if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
-        if (packElementParams.find(paramType) != packElementParams.end()) {
-          return Type(packElementParams[paramType]);
-        }
+    return type.transformTypeParameterPacks(
+        [&](SubstitutableType *t) -> std::optional<Type> {
+          if (auto *paramType = dyn_cast<GenericTypeParamType>(t)) {
+            if (packElementParams.find(paramType) != packElementParams.end()) {
+              return Type(packElementParams[paramType]);
+            }
 
-        return Type(t);
-      }
-      return std::nullopt;
-    });
+            return Type(t);
+          }
+          return std::nullopt;
+        });
   };
 
   for (auto requirement : baseGenericSig.getRequirements()) {

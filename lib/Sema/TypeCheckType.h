@@ -234,7 +234,8 @@ public:
   TypeResolutionOptions(Context context) : base(context), context(context),
       flags(unsigned(TypeResolutionFlags::Direct)) {}
   // Helper forwarding constructors:
-  TypeResolutionOptions(std::nullopt_t) : TypeResolutionOptions(Context::None){}
+  TypeResolutionOptions(std::nullopt_t)
+      : TypeResolutionOptions(Context::None) {}
 
   /// Test the current type resolution base context.
   bool hasBase(Context context) const { return base == context; }

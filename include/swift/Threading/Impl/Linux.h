@@ -25,7 +25,6 @@
 
 #include "chrono_utils.h"
 
-
 #include "swift/Threading/Errors.h"
 
 #include "Linux/ulock.h"

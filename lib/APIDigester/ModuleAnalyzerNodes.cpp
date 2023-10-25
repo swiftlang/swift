@@ -856,7 +856,7 @@ static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Ri
 
 // Return whether a decl has been moved in/out to an extension
 static std::optional<bool> isFromExtensionChanged(const SDKNode &L,
-                                                   const SDKNode &R) {
+                                                  const SDKNode &R) {
   assert(L.getKind() == R.getKind());
   // Version 8 starts to include whether a decl is from an extension.
   if (L.getJsonFormatVersion() + R.getJsonFormatVersion() < 2 * 8) {

@@ -721,15 +721,14 @@ private:
   /// Set failed on failure.
 
   std::optional<unsigned> getRecordedBufferID(const InputFile &input,
-                                               const bool shouldRecover,
-                                               bool &failed);
+                                              const bool shouldRecover,
+                                              bool &failed);
 
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.
   /// On failure, return a null pointer for the first element of the returned
   /// pair.
-  std::optional<ModuleBuffers>
-  getInputBuffersIfPresent(const InputFile &input);
+  std::optional<ModuleBuffers> getInputBuffersIfPresent(const InputFile &input);
 
   /// Try to open the module doc file corresponding to the input parameter.
   /// Return None for error, nullptr if no such file exists, or the buffer if

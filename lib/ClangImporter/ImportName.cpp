@@ -2390,15 +2390,16 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           baseName, argumentNames, params, method->getReturnType(),
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
-              ? std::optional<unsigned>(
-                    static_cast<unsigned int>(result.getErrorInfo()->ErrorParameterIndex))
+              ? std::optional<unsigned>(static_cast<unsigned int>(
+                    result.getErrorInfo()->ErrorParameterIndex))
               : std::nullopt,
           method->hasRelatedResultType(), method->isInstanceMethod(),
           swift::transform(result.getAsyncInfo(),
-              [](const ForeignAsyncConvention::Info &info) {
-                return info.completionHandlerParamIndex();
-              }),
-          swift::transform(result.getAsyncInfo(),
+                           [](const ForeignAsyncConvention::Info &info) {
+                             return info.completionHandlerParamIndex();
+                           }),
+          swift::transform(
+              result.getAsyncInfo(),
               [&](const ForeignAsyncConvention::Info &info) {
                 return method->getDeclName().getObjCSelector().getNameForSlot(
                     info.completionHandlerParamIndex());

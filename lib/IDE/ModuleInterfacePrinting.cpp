@@ -85,9 +85,10 @@ private:
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
   }
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      std::optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     return OtherPrinter.printSynthesizedExtensionPre(ED, Target, Bracket);
   }
 
@@ -221,7 +222,7 @@ static bool extensionHasClangNode(ExtensionDecl *ext) {
 }
 
 std::optional<StringRef> swift::ide::findGroupNameForUSR(ModuleDecl *M,
-                                                          StringRef USR) {
+                                                         StringRef USR) {
   for (auto File : M->getTopLevelModule()->getFiles()) {
     if (auto Name = File->getGroupNameByUSR(USR)) {
       return Name;
@@ -967,8 +968,8 @@ void ClangCommentPrinter::printDeclPre(const Decl *D,
   return OtherPrinter.printDeclPre(D, Bracket);
 }
 
-void ClangCommentPrinter::printDeclPost(
-    const Decl *D, std::optional<BracketOptions> Bracket) {
+void ClangCommentPrinter::printDeclPost(const Decl *D,
+                                        std::optional<BracketOptions> Bracket) {
   OtherPrinter.printDeclPost(D, Bracket);
 
   // Skip parameters; see printDeclPre().

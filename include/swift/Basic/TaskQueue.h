@@ -240,8 +240,8 @@ class DummyTaskQueue : public TaskQueue {
     bool SeparateErrors;
 
     DummyTask(const char *ExecPath, ArrayRef<const char *> Args,
-              ArrayRef<const char *> Env = std::nullopt, void *Context = nullptr,
-              bool SeparateErrors = false)
+              ArrayRef<const char *> Env = std::nullopt,
+              void *Context = nullptr, bool SeparateErrors = false)
         : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
           SeparateErrors(SeparateErrors) {}
   };

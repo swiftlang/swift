@@ -106,11 +106,11 @@ public:
     registeredMetatype = metatype;
   }
 
-  static SILGlobalVariable *create(SILModule &Module, SILLinkage Linkage,
-                                   IsSerialized_t IsSerialized,
-                                   StringRef MangledName, SILType LoweredType,
-                                   std::optional<SILLocation> Loc = std::nullopt,
-                                   VarDecl *Decl = nullptr);
+  static SILGlobalVariable *
+  create(SILModule &Module, SILLinkage Linkage, IsSerialized_t IsSerialized,
+         StringRef MangledName, SILType LoweredType,
+         std::optional<SILLocation> Loc = std::nullopt,
+         VarDecl *Decl = nullptr);
 
   ~SILGlobalVariable();
 

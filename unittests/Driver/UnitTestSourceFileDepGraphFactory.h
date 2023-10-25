@@ -58,7 +58,7 @@ private:
 
   /// Parse and return an interface \c DependencyKey
   std::optional<DependencyKey> parseADefinedDecl(StringRef s, NodeKind,
-                                                  DeclAspect);
+                                                 DeclAspect);
 
   DependencyKey computeUseKey(StringRef s, bool isCascadingUse);
 

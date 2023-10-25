@@ -795,8 +795,7 @@ namespace driver {
 
     TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
                                        StringRef Output, StringRef Errors,
-                                       void *Context,
-                                       std::optional<int> Signal,
+                                       void *Context, std::optional<int> Signal,
                                        TaskProcessInformation ProcInfo) {
       const Job *SignalledCmd = (const Job *)Context;
 

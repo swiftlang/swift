@@ -25,9 +25,7 @@ class SwiftObjectFileFormat {
 public:
   virtual ~SwiftObjectFileFormat() {}
   virtual llvm::StringRef getSectionName(ReflectionSectionKind section) = 0;
-  virtual std::optional<llvm::StringRef> getSegmentName() {
-    return {};
-  }
+  virtual std::optional<llvm::StringRef> getSegmentName() { return {}; }
   /// Get the name of the segment in the symbol rich binary that may contain
   /// Swift metadata.
   virtual std::optional<llvm::StringRef> getSymbolRichSegmentName() {

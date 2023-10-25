@@ -5970,7 +5970,8 @@ RValue SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
-                   finalArgs, calleeTypeInfo, ApplyOptions(), ctx, std::nullopt);
+                   finalArgs, calleeTypeInfo, ApplyOptions(), ctx,
+                   std::nullopt);
 }
 
 void SILGenFunction::emitApplyOfUnavailableCodeReached() {
@@ -7169,9 +7170,9 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
 
     RValue resultRV;
     if (isa<VarDecl>(memberRef.getDecl())) {
-      resultRV =
-          emitMonomorphicApply(loc, result, {}, foreignMethodTy.getResult(),
-                               valueTy, ApplyOptions(), std::nullopt, std::nullopt);
+      resultRV = emitMonomorphicApply(
+          loc, result, {}, foreignMethodTy.getResult(), valueTy, ApplyOptions(),
+          std::nullopt, std::nullopt);
     } else {
       resultRV = RValue(*this, loc, valueTy, result);
     }

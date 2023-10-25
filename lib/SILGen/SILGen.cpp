@@ -2167,7 +2167,7 @@ std::unique_ptr<SILModule>
 swift::performASTLowering(FileUnit &sf, Lowering::TypeConverter &tc,
                           const SILOptions &options,
                           const IRGenOptions *irgenOptions) {
-  auto desc =
-      ASTLoweringDescriptor::forFile(sf, tc, options, std::nullopt, irgenOptions);
+  auto desc = ASTLoweringDescriptor::forFile(sf, tc, options, std::nullopt,
+                                             irgenOptions);
   return llvm::cantFail(sf.getASTContext().evaluator(ASTLoweringRequest{desc}));
 }

@@ -125,9 +125,8 @@ public:
   /// Create a witness for the given requirement.
   ///
   /// Deserialized witnesses do not have a witness thunk signature.
-  static Witness
-  forDeserialized(ValueDecl *decl, SubstitutionMap substitutions,
-                  std::optional<ActorIsolation> enterIsolation) {
+  static Witness forDeserialized(ValueDecl *decl, SubstitutionMap substitutions,
+                                 std::optional<ActorIsolation> enterIsolation) {
     // TODO: It's probably a good idea to have a separate 'deserialized' bit.
     return Witness(
         decl, substitutions, nullptr, SubstitutionMap(), CanGenericSignature(),

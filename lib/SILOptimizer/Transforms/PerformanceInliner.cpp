@@ -738,7 +738,7 @@ static bool isInlineAlwaysCallSite(SILFunction *Callee, int numCallerBlocks) {
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
 static std::optional<bool> shouldInlineGeneric(FullApplySite AI,
-                                                int numCallerBlocks) {
+                                               int numCallerBlocks) {
   assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 

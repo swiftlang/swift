@@ -429,7 +429,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       }
 
       llvm::SaveAndRestore<std::optional<AccessKind>> C(this->OpAccess,
-                                                         NewOpAccess);
+                                                        NewOpAccess);
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
@@ -525,7 +525,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return doSkipChildren();
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
     llvm::SaveAndRestore<std::optional<AccessKind>> C(this->OpAccess,
-                                                       AccessKind::ReadWrite);
+                                                      AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -534,7 +534,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return doSkipChildren();
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
     llvm::SaveAndRestore<std::optional<AccessKind>> C(this->OpAccess,
-                                                       AccessKind::Read);
+                                                      AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
       return Action::Stop();
@@ -544,7 +544,7 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   } else if (auto AE = dyn_cast<AssignExpr>(E)) {
     {
       llvm::SaveAndRestore<std::optional<AccessKind>> C(this->OpAccess,
-                                                         AccessKind::Write);
+                                                        AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
         return Action::Stop();
@@ -617,9 +617,9 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       auto macroRef = ME->getMacroRef();
       if (auto *macroDecl = dyn_cast_or_null<MacroDecl>(macroRef.getDecl())) {
         auto macroRefType = macroDecl->getDeclaredInterfaceType();
-        if (!passReference(macroDecl, macroRefType, ME->getMacroNameLoc(),
-                           ReferenceMetaData(SemaReferenceKind::DeclRef,
-                                             std::nullopt)))
+        if (!passReference(
+                macroDecl, macroRefType, ME->getMacroNameLoc(),
+                ReferenceMetaData(SemaReferenceKind::DeclRef, std::nullopt)))
           return Action::Stop();
       }
     }

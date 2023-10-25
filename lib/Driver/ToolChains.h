@@ -101,9 +101,7 @@ public:
   std::string sanitizerRuntimeLibName(StringRef Sanitizer,
                                       bool shared = true) const override;
 
-  std::optional<llvm::Triple> getTargetVariant() const {
-    return TargetVariant;
-  }
+  std::optional<llvm::Triple> getTargetVariant() const { return TargetVariant; }
 };
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {

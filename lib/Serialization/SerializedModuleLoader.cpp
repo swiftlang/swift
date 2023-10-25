@@ -89,7 +89,7 @@ void forEachTargetModuleBasename(const ASTContext &Ctx,
 std::optional<bool> forEachModuleSearchPath(
     const ASTContext &Ctx,
     llvm::function_ref<std::optional<bool>(StringRef, ModuleSearchPathKind,
-                                            bool isSystem)>
+                                           bool isSystem)>
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =

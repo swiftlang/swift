@@ -303,10 +303,11 @@ SILValue SILGenFunction::emitForeignErrorBlock(
 
 /// Perform a foreign error check by testing whether the call result is zero.
 /// The call result is otherwise ignored.
-static SILValue emitResultIsZeroErrorCheck(
-    SILGenFunction &SGF, SILLocation loc, ManagedValue result,
-    ManagedValue errorSlot, bool suppressErrorCheck, bool zeroIsError,
-    std::optional<ForeignAsyncConvention> foreignAsync) {
+static SILValue
+emitResultIsZeroErrorCheck(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue result, ManagedValue errorSlot,
+                           bool suppressErrorCheck, bool zeroIsError,
+                           std::optional<ForeignAsyncConvention> foreignAsync) {
   // Just ignore the call result if we're suppressing the error check.
   if (suppressErrorCheck) {
     return SILValue();

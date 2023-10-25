@@ -22,15 +22,15 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   assert(mappedTypeNames.empty() && "expected empty type map");
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                         \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      CLANG_REPR, std::optional<StringRef>(CLANG_REPR),                       \
+      CLANG_REPR, std::optional<StringRef>(CLANG_REPR),                        \
       std::optional<StringRef>(CLANG_REPR), NEEDS_NULLABILITY}
 #define MAP_C(SWIFT_NAME, OBJC_REPR, C_REPR, NEEDS_NULLABILITY)                \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, std::optional<StringRef>(C_REPR),                            \
+      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
       std::optional<StringRef>(C_REPR), NEEDS_NULLABILITY}
 #define MAP_CXX(SWIFT_NAME, OBJC_REPR, C_REPR, CXX_REPR, NEEDS_NULLABILITY)    \
   mappedTypeNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = {  \
-      OBJC_REPR, std::optional<StringRef>(C_REPR),                            \
+      OBJC_REPR, std::optional<StringRef>(C_REPR),                             \
       std::optional<StringRef>(CXX_REPR), NEEDS_NULLABILITY}
 
   MAP(CBool, "bool", false);

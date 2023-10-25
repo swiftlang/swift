@@ -2391,9 +2391,8 @@ private:
 
   /// If \p BGT represents a generic struct used to import Clang types, print
   /// it out.
-  bool
-  printIfKnownGenericStruct(const BoundGenericStructType *BGT,
-                            std::optional<OptionalTypeKind> optionalKind) {
+  bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
+                                 std::optional<OptionalTypeKind> optionalKind) {
     auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
 
     if (bgsTy->isUnmanaged()) {
@@ -2594,9 +2593,8 @@ private:
     }
   }
 
-  void
-  visitGenericTypeParamType(GenericTypeParamType *type,
-                            std::optional<OptionalTypeKind> optionalKind) {
+  void visitGenericTypeParamType(GenericTypeParamType *type,
+                                 std::optional<OptionalTypeKind> optionalKind) {
     const GenericTypeParamDecl *decl = type->getDecl();
     assert(decl && "can't print canonicalized GenericTypeParamType");
 
@@ -2719,9 +2717,8 @@ private:
     os << "instancetype";
   }
 
-  void
-  visitReferenceStorageType(ReferenceStorageType *RST,
-                            std::optional<OptionalTypeKind> optionalKind) {
+  void visitReferenceStorageType(ReferenceStorageType *RST,
+                                 std::optional<OptionalTypeKind> optionalKind) {
     visitPart(RST->getReferentType(), optionalKind);
   }
 

@@ -828,7 +828,7 @@ private:
   /// from the requirement, used when entering an actor-isolated synchronous
   /// witness from an asynchronous requirement.
   std::optional<ActorIsolation> checkActorIsolation(ValueDecl *requirement,
-                                                     ValueDecl *witness);
+                                                    ValueDecl *witness);
 
   /// Record a type witness.
   ///

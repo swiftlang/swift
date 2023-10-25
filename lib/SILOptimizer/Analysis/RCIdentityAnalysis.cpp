@@ -174,7 +174,7 @@ SILValue RCIdentityFunctionInfo::stripOneRCIdentityIncomingValue(SILArgument *A,
 /// false if RCIdentity has a payloaded enum case, and None if we failed to find
 /// anything.
 static std::optional<bool> proveNonPayloadedEnumCase(SILBasicBlock *BB,
-                                                      SILValue RCIdentity) {
+                                                     SILValue RCIdentity) {
   // Then see if BB has one predecessor... if it does not, return None so we
   // keep searching up the domtree.
   SILBasicBlock *SinglePred = BB->getSinglePredecessorBlock();

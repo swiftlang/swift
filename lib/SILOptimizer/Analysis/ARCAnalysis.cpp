@@ -358,11 +358,9 @@ bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
-std::optional<SILBasicBlock::iterator>
-swift::valueHasARCUsesInInstructionRange(SILValue Op,
-                                         SILBasicBlock::iterator Start,
-                                         SILBasicBlock::iterator End,
-                                         AliasAnalysis *AA) {
+std::optional<SILBasicBlock::iterator> swift::valueHasARCUsesInInstructionRange(
+    SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
+    AliasAnalysis *AA) {
   assert(Start->getParent() == End->getParent() &&
          "Start and End should be in the same basic block");
 

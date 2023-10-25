@@ -605,8 +605,7 @@ public:
                   std::optional<VFSOptions> vfsOptions) override;
 
   void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
-                           StringRef ModuleName,
-                           std::optional<StringRef> Group,
+                           StringRef ModuleName, std::optional<StringRef> Group,
                            ArrayRef<const char *> Args,
                            bool SynthesizedExtensions,
                            std::optional<StringRef> InterestedUSR) override;
@@ -749,7 +748,7 @@ public:
                   DocInfoConsumer &Consumer) override;
 
   std::optional<std::pair<unsigned, unsigned>>
-      findUSRRange(StringRef DocumentName, StringRef USR) override;
+  findUSRRange(StringRef DocumentName, StringRef USR) override;
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) override;

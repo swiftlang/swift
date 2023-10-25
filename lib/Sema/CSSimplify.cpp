@@ -89,8 +89,8 @@ bool MatchCallArgumentListener::canClaimArgIgnoringNameMismatch(
 /// Otherwise, an empty optional.
 ///
 static std::optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
-                                                         StringRef argName,
-                                                         unsigned maxScore) {
+                                                        StringRef argName,
+                                                        unsigned maxScore) {
   using namespace camel_case;
 
   // Compute the edit distance.
@@ -1214,7 +1214,7 @@ public:
   }
 
   std::optional<unsigned> missingArgument(unsigned paramIdx,
-                                           unsigned argInsertIdx) override {
+                                          unsigned argInsertIdx) override {
     if (!CS.shouldAttemptFixes())
       return std::nullopt;
 
@@ -1363,7 +1363,7 @@ public:
         ArgInfo(ArgInfo) {}
 
   std::optional<unsigned> missingArgument(unsigned paramIdx,
-                                           unsigned argInsertIdx) override {
+                                          unsigned argInsertIdx) override {
     // When solving for code completion, if any argument contains the
     // completion location, later arguments shouldn't be considered missing
     // (causing the solution to have a worse score) as the user just hasn't
@@ -1466,7 +1466,7 @@ namespace {
 /// to be opened (from the argument type), and the adjustments that need to be
 /// applied to the existential type after it is opened.
 static std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                 Type, OpenedExistentialAdjustments>>
+                                Type, OpenedExistentialAdjustments>>
 shouldOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
                                   Type paramTy, Type argTy, Expr *argExpr,
                                   ConstraintSystem &cs) {
@@ -2442,8 +2442,7 @@ static PackType *replaceTypeVariablesWithFreshPacks(ConstraintSystem &cs,
     auto *packExpansionElt = pack->getElementType(i)->getAs<PackExpansionType>();
 
     auto instantiatedPattern = pattern.transformRec([&](Type t)
-                                                        -> std::optional<
-                                                            Type> {
+                                                        -> std::optional<Type> {
       if (isPackExpansionType(t))
         return t;
 
@@ -15927,9 +15926,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getLocator());
 
   case ConstraintKind::DynamicTypeOf:
-    return simplifyDynamicTypeOfConstraint(constraint.getFirstType(),
-                                           constraint.getSecondType(),
-                                           std::nullopt, constraint.getLocator());
+    return simplifyDynamicTypeOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
+        constraint.getLocator());
 
   case ConstraintKind::EscapableFunctionOf:
     return simplifyEscapableFunctionOfConstraint(
@@ -15982,9 +15981,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getKind(), constraint.getLocator(), std::nullopt);
 
   case ConstraintKind::TransitivelyConformsTo:
-    return simplifyTransitivelyConformsTo(constraint.getFirstType(),
-                                          constraint.getSecondType(),
-                                          constraint.getLocator(), std::nullopt);
+    return simplifyTransitivelyConformsTo(
+        constraint.getFirstType(), constraint.getSecondType(),
+        constraint.getLocator(), std::nullopt);
 
   case ConstraintKind::CheckedCast: {
     auto result = simplifyCheckedCastConstraint(

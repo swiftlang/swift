@@ -54,7 +54,7 @@ SILVTable *SILVTable::create(SILModule &M, ClassDecl *Class, SILType classType,
 }
 
 std::optional<SILVTable::Entry> SILVTable::getEntry(SILModule &M,
-                                                     SILDeclRef method) const {
+                                                    SILDeclRef method) const {
   SILDeclRef m = method;
   do {
     auto entryIter = M.VTableEntryCache.find({this, m});

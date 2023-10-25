@@ -1171,7 +1171,7 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
 ///
 /// \returns the type to bind to, if the binding is okay.
 static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
-                                               Type type) {
+                                              Type type) {
   // If the type references the type variable, don't permit the binding.
   if (type->hasTypeVariable()) {
     SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;

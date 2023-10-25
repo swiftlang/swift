@@ -109,9 +109,9 @@ void LoopCloner::cloneLoop() {
 /// might contain early exits so this is the maximum if no early exits are
 /// taken.
 static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
-                                                    SILBasicBlock *Preheader,
-                                                    SILBasicBlock *Header,
-                                                    SILBasicBlock *Latch) {
+                                                   SILBasicBlock *Preheader,
+                                                   SILBasicBlock *Header,
+                                                   SILBasicBlock *Latch) {
 
   // Skip a split backedge.
   SILBasicBlock *OrigLatch = Latch;

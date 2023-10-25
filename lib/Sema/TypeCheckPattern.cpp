@@ -474,8 +474,8 @@ public:
     if (!ExprToDeclRefTypeRepr(components, Context).visit(ude->getBase()))
       return nullptr;
 
-    const auto options =
-        TypeResolutionOptions(std::nullopt) | TypeResolutionFlags::SilenceErrors;
+    const auto options = TypeResolutionOptions(std::nullopt) |
+                         TypeResolutionFlags::SilenceErrors;
 
     DeclRefTypeRepr *repr = MemberTypeRepr::create(Context, components);
 

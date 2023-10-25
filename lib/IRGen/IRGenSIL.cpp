@@ -4200,9 +4200,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       if (fnType->hasErrorResult()) {
         SmallVector<llvm::Value *, 16> nativeResultsStorage;
         nativeResultsStorage.push_back(getNullErrorValue());
-        return emitAsyncReturn(IGF, asyncLayout, fnType,
-                               std::optional<llvm::ArrayRef<llvm::Value *>>(
-                                   nativeResultsStorage));
+        return emitAsyncReturn(
+            IGF, asyncLayout, fnType,
+            std::optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
       }
 
       return emitAsyncReturn(IGF, asyncLayout, fnType, std::nullopt);

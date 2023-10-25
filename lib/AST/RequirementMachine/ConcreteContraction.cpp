@@ -200,8 +200,7 @@ class ConcreteContraction {
     Other
   };
 
-  std::optional<Type> substTypeParameterRec(Type type,
-                                             Position position) const;
+  std::optional<Type> substTypeParameterRec(Type type, Position position) const;
   Type substTypeParameter(Type type, Position position) const;
   Type substType(Type type) const;
   Requirement substRequirement(const Requirement &req) const;

@@ -460,7 +460,7 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 /// fully type-checked body of the function (on success) or a \c nullptr
 /// value if an error occurred while type checking the transformed body.
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
-                                                            Type builderType);
+                                                           Type builderType);
 
 /// Find the return statements within the body of the given function.
 std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
@@ -645,7 +645,7 @@ bool typeCheckForCodeCompletion(
 ///
 /// Returns the type of the last component of the key-path.
 std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                          bool requireResultType = false);
+                                         bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.

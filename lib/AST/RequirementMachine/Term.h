@@ -145,7 +145,7 @@ public:
   }
 
   std::optional<int> compare(const MutableTerm &other,
-                              RewriteContext &ctx) const;
+                             RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 

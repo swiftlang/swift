@@ -128,11 +128,11 @@ public:
   std::optional<FuncDecl *> ResumeUnsafeThrowingContinuationWithError;
   std::optional<FuncDecl *> CheckExpectedExecutor;
 
-  std::optional<FuncDecl*> CreateCheckedContinuation;
-  std::optional<FuncDecl*> CreateCheckedThrowingContinuation;
-  std::optional<FuncDecl*> ResumeCheckedContinuation;
-  std::optional<FuncDecl*> ResumeCheckedThrowingContinuation;
-  std::optional<FuncDecl*> ResumeCheckedThrowingContinuationWithError;
+  std::optional<FuncDecl *> CreateCheckedContinuation;
+  std::optional<FuncDecl *> CreateCheckedThrowingContinuation;
+  std::optional<FuncDecl *> ResumeCheckedContinuation;
+  std::optional<FuncDecl *> ResumeCheckedThrowingContinuation;
+  std::optional<FuncDecl *> ResumeCheckedThrowingContinuationWithError;
 
   std::optional<FuncDecl *> AsyncMainDrainQueue;
   std::optional<FuncDecl *> GetMainExecutor;

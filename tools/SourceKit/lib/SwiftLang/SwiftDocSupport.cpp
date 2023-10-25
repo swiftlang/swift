@@ -141,8 +141,7 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  bool shouldContinuePre(const Decl *D,
-                         std::optional<BracketOptions> Bracket) {
+  bool shouldContinuePre(const Decl *D, std::optional<BracketOptions> Bracket) {
     assert(Bracket.has_value());
     if (!Bracket.value().shouldOpenExtension(D) &&
         isa<ExtensionDecl>(D))
@@ -161,9 +160,10 @@ public:
     return true;
   }
 
-  void printSynthesizedExtensionPre(
-      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
-      std::optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     assert(!SynthesizedExtensionInfo.first);
     SynthesizedExtensionInfo = {ED, Target};
     if (!shouldContinuePre(ED, Bracket))
@@ -1079,7 +1079,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
 
-  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options, true);
+  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options,
+                       true);
 
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);

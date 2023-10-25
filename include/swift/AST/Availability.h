@@ -229,11 +229,12 @@ public:
 class AvailabilityContext {
   VersionRange OSVersion;
   std::optional<bool> SPI;
+
 public:
   /// Creates a context that requires certain versions of the target OS.
   explicit AvailabilityContext(VersionRange OSVersion,
                                std::optional<bool> SPI = std::nullopt)
-    : OSVersion(OSVersion), SPI(SPI) {}
+      : OSVersion(OSVersion), SPI(SPI) {}
 
   /// Creates a context that imposes the constraints of the ASTContext's
   /// deployment target.

@@ -771,20 +771,16 @@ struct DenseMapInfo<swift::AttributedImport<ModuleInfo>> {
   // DenseMapInfo-able, but we do check that the spiGroups match in isEqual().
 
   static inline AttributedImport getEmptyKey() {
-    return AttributedImport(ModuleInfoDMI::getEmptyKey(),
-                            SourceLocDMI::getEmptyKey(),
-                            ImportOptionsDMI::getEmptyKey(),
-                            StringRefDMI::getEmptyKey(),
-                            {}, {}, std::nullopt,
-                            swift::AccessLevel::Public, {});
+    return AttributedImport(
+        ModuleInfoDMI::getEmptyKey(), SourceLocDMI::getEmptyKey(),
+        ImportOptionsDMI::getEmptyKey(), StringRefDMI::getEmptyKey(), {}, {},
+        std::nullopt, swift::AccessLevel::Public, {});
   }
   static inline AttributedImport getTombstoneKey() {
-    return AttributedImport(ModuleInfoDMI::getTombstoneKey(),
-                            SourceLocDMI::getEmptyKey(),
-                            ImportOptionsDMI::getTombstoneKey(),
-                            StringRefDMI::getTombstoneKey(),
-                            {}, {}, std::nullopt,
-                            swift::AccessLevel::Public, {});
+    return AttributedImport(
+        ModuleInfoDMI::getTombstoneKey(), SourceLocDMI::getEmptyKey(),
+        ImportOptionsDMI::getTombstoneKey(), StringRefDMI::getTombstoneKey(),
+        {}, {}, std::nullopt, swift::AccessLevel::Public, {});
   }
   static inline unsigned getHashValue(const AttributedImport &import) {
     return detail::combineHashValue(

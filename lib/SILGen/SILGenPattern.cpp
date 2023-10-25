@@ -422,8 +422,7 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
-  std::optional<SILLocation>
-  getSubjectLocationOverride(SILLocation loc) const {
+  std::optional<SILLocation> getSubjectLocationOverride(SILLocation loc) const {
     if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
       if (!Switch->isImplicit())
         return SILLocation(Switch->getSubjectExpr());
@@ -960,8 +959,8 @@ static unsigned getConstructorPrefix(const ClauseMatrix &matrix,
 /// most likely to give an optimal decision tree.
 ///
 /// \return std::nullopt if we didn't find a meaningful necessary column
-static std::optional<unsigned>
-chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
+static std::optional<unsigned> chooseNecessaryColumn(const ClauseMatrix &matrix,
+                                                     unsigned firstRow) {
   assert(firstRow < matrix.rows() &&
          "choosing necessary column of matrix with no rows remaining?");
 

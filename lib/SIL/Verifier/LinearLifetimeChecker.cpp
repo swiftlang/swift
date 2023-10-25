@@ -105,12 +105,11 @@ struct State {
   /// terminates.
   llvm::SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
-  State(
-      SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-      std::optional<function_ref<void(Operand *)>>
-          nonConsumingUseOutsideLifetimeCallback,
-      ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
+  State(SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+        std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        std::optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
+        ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
         errorBuilder(errorBuilder), visitedBlocks(value->getFunction()),
         leakingBlockCallback(leakingBlockCallback),
@@ -119,13 +118,12 @@ struct State {
         consumingUses(consumingUses), nonConsumingUses(nonConsumingUses),
         blocksWithConsumingUses(value->getFunction()) {}
 
-  State(
-      SILBasicBlock *beginBlock,
-      LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-      std::optional<function_ref<void(Operand *)>>
-          nonConsumingUseOutsideLifetimeCallback,
-      ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
+  State(SILBasicBlock *beginBlock,
+        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+        std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+        std::optional<function_ref<void(Operand *)>>
+            nonConsumingUseOutsideLifetimeCallback,
+        ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
         visitedBlocks(beginBlock->getParent()),
         leakingBlockCallback(leakingBlockCallback),

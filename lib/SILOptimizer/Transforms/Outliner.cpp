@@ -1289,8 +1289,8 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
   }
   auto FunctionType = SILFunctionType::get(
       nullptr, ExtInfo, SILCoroutineKind::None,
-      ParameterConvention::Direct_Unowned, Parameters, {}, Results, std::nullopt,
-      SubstitutionMap(), SubstitutionMap(), M.getASTContext());
+      ParameterConvention::Direct_Unowned, Parameters, {}, Results,
+      std::nullopt, SubstitutionMap(), SubstitutionMap(), M.getASTContext());
   return FunctionType;
 }
 

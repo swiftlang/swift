@@ -65,25 +65,25 @@ struct DocStructureArrayBuilder::Implementation {
   typedef CompactArrayBuilder<unsigned> StructureArrayBuilder;
   SmallVector<char, 256> structureArrayBuffer;
 
-  CompactArrayBuilder<unsigned,            // Offset
-                      unsigned,            // Length
-                      UIdent,              // Kind
-                      UIdent,              // AccessLevel
-                      UIdent,              // SetterAccessLevel
-                      unsigned,            // NameOffset
-                      unsigned,            // NameLength
-                      unsigned,            // BodyOffset
-                      unsigned,            // BodyLength
-                      unsigned,            // DocOffset
-                      unsigned,            // DocLength
+  CompactArrayBuilder<unsigned,                 // Offset
+                      unsigned,                 // Length
+                      UIdent,                   // Kind
+                      UIdent,                   // AccessLevel
+                      UIdent,                   // SetterAccessLevel
+                      unsigned,                 // NameOffset
+                      unsigned,                 // NameLength
+                      unsigned,                 // BodyOffset
+                      unsigned,                 // BodyLength
+                      unsigned,                 // DocOffset
+                      unsigned,                 // DocLength
                       std::optional<StringRef>, // DisplayName
                       std::optional<StringRef>, // TypeName
                       std::optional<StringRef>, // RuntimeName
                       std::optional<StringRef>, // SelectorName
-                      unsigned,            // InheritedTypesOffset
-                      unsigned,            // AttrsOffset
-                      unsigned,            // ElementsOffset
-                      unsigned             // ChildrenOffset
+                      unsigned,                 // InheritedTypesOffset
+                      unsigned,                 // AttrsOffset
+                      unsigned,                 // ElementsOffset
+                      unsigned                  // ChildrenOffset
                       >
       structureBuilder;
 

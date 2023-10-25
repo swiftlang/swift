@@ -1435,15 +1435,13 @@ namespace {
     std::optional<ActorIsolation> ActorIso;
 
   public:
-    AccessorBasedComponent(PathComponent::KindTy kind,
-                           AbstractStorageDecl *decl, SILDeclRef accessor,
-                           bool isSuper, bool isDirectAccessorUse,
-                           SubstitutionMap substitutions,
-                           CanType baseFormalType, LValueTypeData typeData,
-                           ArgumentList *argListForDiagnostics,
-                           PreparedArguments &&indices,
-                           bool isOnSelfParameter = false,
-                           std::optional<ActorIsolation> actorIso = std::nullopt)
+    AccessorBasedComponent(
+        PathComponent::KindTy kind, AbstractStorageDecl *decl,
+        SILDeclRef accessor, bool isSuper, bool isDirectAccessorUse,
+        SubstitutionMap substitutions, CanType baseFormalType,
+        LValueTypeData typeData, ArgumentList *argListForDiagnostics,
+        PreparedArguments &&indices, bool isOnSelfParameter = false,
+        std::optional<ActorIsolation> actorIso = std::nullopt)
         : super(kind, decl, baseFormalType, typeData, argListForDiagnostics,
                 std::move(indices)),
           Accessor(accessor), IsSuper(isSuper),
@@ -1525,16 +1523,12 @@ namespace {
   class InitAccessorComponent
       : public AccessorBasedComponent<LogicalPathComponent> {
   public:
-    InitAccessorComponent(AbstractStorageDecl *decl,
-                          SILDeclRef accessor,
-                          bool isSuper,
-                          bool isDirectAccessorUse,
-                          SubstitutionMap substitutions,
-                          CanType baseFormalType,
+    InitAccessorComponent(AbstractStorageDecl *decl, SILDeclRef accessor,
+                          bool isSuper, bool isDirectAccessorUse,
+                          SubstitutionMap substitutions, CanType baseFormalType,
                           LValueTypeData typeData,
                           ArgumentList *subscriptArgList,
-                          PreparedArguments &&indices,
-                          bool isOnSelfParameter,
+                          PreparedArguments &&indices, bool isOnSelfParameter,
                           std::optional<ActorIsolation> actorIso)
         : AccessorBasedComponent(
               InitAccessorKind, decl, accessor, isSuper, isDirectAccessorUse,
@@ -3555,8 +3549,8 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
   address = SGF.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
   LValue lv;
-  lv.add<ValueComponent>(SGF.emitManagedBufferWithCleanup(address), std::nullopt,
-                         typeData);
+  lv.add<ValueComponent>(SGF.emitManagedBufferWithCleanup(address),
+                         std::nullopt, typeData);
   return lv;
 }
 
@@ -3850,7 +3844,8 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
       SubstitutionMap subs, bool isSuper, SGFAccessKind accessKind,
       CanType formalRValueType, LValueOptions options, LValue &lv,
       ArgumentList *argListForDiagnostics, PreparedArguments &&indices,
-      bool isSelf = false, std::optional<ActorIsolation> actorIso = std::nullopt)
+      bool isSelf = false,
+      std::optional<ActorIsolation> actorIso = std::nullopt)
       : super(SGF, storage, subs, accessKind, formalRValueType), LV(lv),
         Options(options), Loc(loc), IsSuper(isSuper), IsOnSelfParameter(isSelf),
         BaseFormalType(lv.getSubstFormalType()),

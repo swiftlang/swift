@@ -1230,8 +1230,7 @@ inferDefaultAccessSyntactically(const ExtensionDecl *ED) {
 /// Document structure is a purely syntactic request that shouldn't require name lookup
 /// or type-checking, so this is a best-effort computation, particularly where extensions
 /// are concerned.
-static std::optional<AccessLevel>
-inferAccessSyntactically(const ValueDecl *D) {
+static std::optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
   assert(D);
 
   // Check if the decl has an explicit access control attribute.

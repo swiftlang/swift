@@ -1215,8 +1215,7 @@ static unsigned getConstantLabelsLength(CanTupleType type) {
 /// appropriate number of blank spaces, given the dynamic length of
 /// the pack.
 std::optional<StackAddress>
-irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF,
-                                  CanTupleType type,
+irgen::emitDynamicTupleTypeLabels(IRGenFunction &IGF, CanTupleType type,
                                   CanPackType packType,
                                   llvm::Value *shapeExpression) {
   bool hasLabels = false;

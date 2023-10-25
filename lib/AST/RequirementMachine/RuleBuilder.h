@@ -114,9 +114,10 @@ private:
   void addPermanentProtocolRules(const ProtocolDecl *proto);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
-  void addRequirement(const Requirement &req, const ProtocolDecl *proto,
-                      std::optional<ArrayRef<Term>> substitutions = std::nullopt,
-                      std::optional<unsigned> requirementID = std::nullopt);
+  void
+  addRequirement(const Requirement &req, const ProtocolDecl *proto,
+                 std::optional<ArrayRef<Term>> substitutions = std::nullopt,
+                 std::optional<unsigned> requirementID = std::nullopt);
   void addRequirement(const StructuralRequirement &req,
                       const ProtocolDecl *proto);
   void addTypeAlias(const ProtocolTypeAlias &alias,

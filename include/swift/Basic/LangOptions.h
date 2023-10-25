@@ -31,10 +31,10 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
 #include <atomic>
 #include <string>
 #include <vector>
@@ -220,7 +220,8 @@ namespace swift {
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
-    std::optional<DiagnosticBehavior> RequireExplicitAvailability = std::nullopt;
+    std::optional<DiagnosticBehavior> RequireExplicitAvailability =
+        std::nullopt;
 
     /// Introduction platform and version to suggest as fix-it
     /// when using RequireExplicitAvailability.

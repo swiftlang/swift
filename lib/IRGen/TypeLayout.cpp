@@ -549,8 +549,7 @@ bool TypeLayoutEntry::isAlignedGroup() const {
   return getKind() == TypeLayoutEntryKind::AlignedGroup;
 }
 
-std::optional<const FixedTypeInfo *>
-TypeLayoutEntry::getFixedTypeInfo() const {
+std::optional<const FixedTypeInfo *> TypeLayoutEntry::getFixedTypeInfo() const {
   return std::nullopt;
 }
 

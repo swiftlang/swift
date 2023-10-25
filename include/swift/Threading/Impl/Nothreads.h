@@ -17,7 +17,6 @@
 #ifndef SWIFT_THREADING_IMPL_NOTHREADS_H
 #define SWIFT_THREADING_IMPL_NOTHREADS_H
 
-
 #include "chrono_utils.h"
 
 namespace swift {

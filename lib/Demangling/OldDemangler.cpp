@@ -768,8 +768,9 @@ private:
     return demangleIdentifier(depth + 1);
   }
 
-  NodePointer demangleIdentifier(unsigned depth,
-                                 std::optional<Node::Kind> kind = std::nullopt) {
+  NodePointer
+  demangleIdentifier(unsigned depth,
+                     std::optional<Node::Kind> kind = std::nullopt) {
     if (!Mangled)
       return nullptr;
     

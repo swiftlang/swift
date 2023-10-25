@@ -1276,8 +1276,7 @@ ModuleFile::getSourceFileNameForDecl(const Decl *D) const {
   return getSourceFileNameById(Triple.value().Group);
 }
 
-std::optional<unsigned>
-ModuleFile::getSourceOrderForDecl(const Decl *D) const {
+std::optional<unsigned> ModuleFile::getSourceOrderForDecl(const Decl *D) const {
   auto Triple = getCommentForDecl(D);
   if (!Triple.has_value()) {
     return std::nullopt;

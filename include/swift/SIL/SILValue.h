@@ -17,9 +17,9 @@
 #ifndef SWIFT_SIL_SILVALUE_H
 #define SWIFT_SIL_SILVALUE_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Range.h"
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentConvention.h"

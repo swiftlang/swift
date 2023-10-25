@@ -58,8 +58,7 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-static bool
-isValidPrefixUnaryOperator(std::optional<StringRef> UnaryOperator) {
+static bool isValidPrefixUnaryOperator(std::optional<StringRef> UnaryOperator) {
   return UnaryOperator != std::nullopt &&
          (UnaryOperator.value() == ">=" || UnaryOperator.value() == "<");
 }
@@ -797,7 +796,7 @@ Result Parser::parseIfConfigRaw(
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
                                  SourceMgr.getIDEInspectionTargetLoc())) {
     llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
-                                                         std::nullopt);
+                                                        std::nullopt);
     BacktrackingScope backtrack(*this);
     do {
       auto startLoc = Tok.getLoc();

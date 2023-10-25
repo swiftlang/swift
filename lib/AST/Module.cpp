@@ -2503,8 +2503,7 @@ NominalTypeDecl *ModuleDecl::getMainTypeDecl() const {
 }
 
 bool ModuleDecl::registerEntryPointFile(
-    FileUnit *file, SourceLoc diagLoc,
-    std::optional<ArtificialMainKind> kind) {
+    FileUnit *file, SourceLoc diagLoc, std::optional<ArtificialMainKind> kind) {
   if (!EntryPointInfo.hasEntryPoint()) {
     EntryPointInfo.setEntryPointFile(file);
     return false;

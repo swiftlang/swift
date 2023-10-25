@@ -654,8 +654,7 @@ enum class PlatformAgnosticAvailabilityKind {
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
-#define INIT_VER_TUPLE(X)                                                      \
-  X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
+#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
 
   AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
@@ -2537,14 +2536,15 @@ public:
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
-  std::optional<std::pair<TypeRepr *, unsigned>> getArrayLikeTypeAndCount() const {
+  std::optional<std::pair<TypeRepr *, unsigned>>
+  getArrayLikeTypeAndCount() const {
     if (!LikeType)
       return std::nullopt;
     if (Alignment == ~0u)
       return std::nullopt;
     return std::make_pair(LikeType, SizeOrCount);
   }
-  
+
   /// Return the size and alignment of the attributed type. Returns
   /// None if the attribute specifies layout like some other type.
   std::optional<std::pair<unsigned, unsigned>> getSizeAndAlignment() const {

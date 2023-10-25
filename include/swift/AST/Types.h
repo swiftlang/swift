@@ -3283,7 +3283,8 @@ public:
       return Param(getType(), Identifier(), getFlags().asParamFlags());
     }
 
-    Yield subst(SubstitutionMap subs, SubstOptions options = std::nullopt) const {
+    Yield subst(SubstitutionMap subs,
+                SubstOptions options = std::nullopt) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
 
@@ -3714,9 +3715,8 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<Param> params, Type result,
-               std::optional<ExtInfo> info, const ASTContext *ctx,
-               RecursiveTypeProperties properties);
+  FunctionType(ArrayRef<Param> params, Type result, std::optional<ExtInfo> info,
+               const ASTContext *ctx, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 static CanFunctionType get(CanParamArrayRef params, CanType result,
