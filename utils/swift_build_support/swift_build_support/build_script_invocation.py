@@ -646,8 +646,6 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_swiftformat)
         builder.add_product(products.SKStressTester,
                             is_enabled=self.args.build_skstresstester)
-        builder.add_product(products.SwiftEvolve,
-                            is_enabled=self.args.build_swiftevolve)
         builder.add_product(products.IndexStoreDB,
                             is_enabled=self.args.build_indexstoredb)
         builder.add_product(products.PlaygroundSupport,
