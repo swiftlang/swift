@@ -1685,6 +1685,16 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                      : "-gdwarf_types");
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_dwarf_version)) {
+    unsigned vers;
+    if (!StringRef(A->getValue()).getAsInteger(10, vers) && vers >= 2 &&
+        vers <= 5)
+      OI.DWARFVersion = vers;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.

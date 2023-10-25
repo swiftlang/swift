@@ -36,7 +36,6 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -2241,9 +2240,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
              trace.emplace(*buffer);
            });
 
-  // Setting DWARF Version depend on platform
+  // Setting DWARF Version based on frontend options.
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.DWARFVersion = swift::DWARFVersion;
+  IRGenOpts.DWARFVersion = IRGenOpts.DWARFVersion;
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
