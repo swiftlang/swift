@@ -420,9 +420,14 @@ public:
 
   void visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
     auto moduleDecl = VD->getModuleContext();
-    auto publicDefaultArgGenerators = moduleDecl->isTestingEnabled() ||
-                                      moduleDecl->arePrivateImportsEnabled();
-    if (Ctx.getOpts().PublicSymbolsOnly && !publicDefaultArgGenerators)
+    // Check if symbols should be more visible than their declared access level.
+    // In case of `package` access level, the symbol should be visible by an
+    // external module in the same package, thus the default argument should be
+    // generated and its linkage emitted.
+    auto shouldGenerateDefaultArgs = moduleDecl->isTestingEnabled() ||
+                                     moduleDecl->arePrivateImportsEnabled() ||
+                                     VD->getFormalAccess() == AccessLevel::Package;
+    if (Ctx.getOpts().PublicSymbolsOnly && !shouldGenerateDefaultArgs)
       return;
 
     // In Swift 3 (or under -enable-testing), default arguments (of public
