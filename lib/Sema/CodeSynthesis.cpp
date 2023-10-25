@@ -338,7 +338,14 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
-    addNonIsolatedToSynthesized(decl, ctor);
+
+    // FIXME: If 'IsolatedDefaultValues' is enabled, the memberwise init
+    // should be 'nonisolated' if none of the memberwise-initialized properties
+    // are global actor isolated and have non-Sendable type, and none of the
+    // initial values require global actor isolation.
+    if (!ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
+      addNonIsolatedToSynthesized(decl, ctor);
+    }
   }
 
   // If we are defining a default initializer for a class that has a superclass,

@@ -2001,6 +2001,16 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
       if (Expr *argExpr = arg.getExpr()) {
         checkSendable = shouldCheckSendable(argExpr);
         argType = argExpr->findOriginalType();
+
+        // If this is a default argument expression, don't check Sendability
+        // if the argument is evaluated in the callee's isolation domain.
+        if (auto *defaultExpr = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+          auto argIsolation = defaultExpr->getRequiredIsolation();
+          auto calleeIsolation = isolationCrossing->getCalleeIsolation();
+          if (argIsolation == calleeIsolation) {
+            continue;
+          }
+        }
       }
     }
 
@@ -2260,8 +2270,10 @@ namespace {
       // recieve isolation from its decl context), then the expression cannot
       // require a different isolation.
       for (auto *dc : contextStack) {
-        if (!infersIsolationFromContext(dc))
+        if (!infersIsolationFromContext(dc)) {
+          requiredIsolation.clear();
           return false;
+        }
 
         // To refine the required isolation, the existing requirement
         // must either be 'nonisolated' or exactly the same as the
@@ -2275,6 +2287,7 @@ namespace {
               requiredIsolationLoc,
               diag::conflicting_default_argument_isolation,
               isolation->second, refinedIsolation);
+          requiredIsolation.clear();
           return true;
         }
       }
@@ -2285,8 +2298,8 @@ namespace {
     void checkDefaultArgument(DefaultArgumentExpr *expr) {
       // Check the context isolation against the required isolation for
       // evaluating the default argument synchronously. If the default
-      // argument must be evaluated asynchronously, it must be written
-      // explicitly in the argument list with 'await'.
+      // argument must be evaluated asynchronously, record that in the
+      // expression node.
       auto requiredIsolation = expr->getRequiredIsolation();
       auto contextIsolation = getInnermostIsolatedContext(
           getDeclContext(), getClosureActorIsolation);
@@ -2308,10 +2321,7 @@ namespace {
         break;
       }
 
-      auto &ctx = getDeclContext()->getASTContext();
-      ctx.Diags.diagnose(
-          expr->getLoc(), diag::isolated_default_argument,
-          requiredIsolation, contextIsolation);
+      expr->setImplicitlyAsync();
     }
 
     /// Check closure captures for Sendable violations.

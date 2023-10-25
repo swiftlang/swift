@@ -16,7 +16,6 @@ func mainActorCaller() {
 }
 
 func nonisolatedCaller() async {
-  // expected-error@+1 {{main actor-isolated default argument cannot be synchronously evaluated from a nonisolated context}}
   await useMainActorDefault()
 
   await useMainActorDefault(mainActorDefaultArg())
