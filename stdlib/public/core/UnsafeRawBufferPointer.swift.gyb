@@ -845,7 +845,7 @@ extension Unsafe${Mutable}RawBufferPointer {
         "buffer base address must be properly aligned to access C.Element"
       )
       _precondition(
-        $0.count * MemoryLayout<C.Element>.stride < self.count,
+        $0.count * MemoryLayout<C.Element>.stride <= self.count,
         "buffer cannot contain every element from source collection."
       )
       let start = baseAddress?.initializeMemory(
