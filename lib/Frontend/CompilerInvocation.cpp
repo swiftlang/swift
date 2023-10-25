@@ -20,6 +20,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/ParseVersion.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1334,6 +1335,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
+    assert(nodeMetatypesInitialized && "no SwiftCompilerSources");
+
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
     Opts.DisableImplicitConcurrencyModuleImport = true;

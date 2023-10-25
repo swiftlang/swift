@@ -31,9 +31,9 @@
 
 using namespace swift;
 
-namespace {
-
 bool nodeMetatypesInitialized = false;
+
+namespace {
 
 // Filled in by class registration in initializeSwiftModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
