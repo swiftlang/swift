@@ -881,6 +881,9 @@ bool SILFunction::shouldBePreservedForDebugger() const {
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
     return false;
 
+  if (hasSemanticsAttr("no.preserve.debugger"))
+    return false;
+
   // Only keep functions defined in this module.
   if (!isDefinition())
     return false;
