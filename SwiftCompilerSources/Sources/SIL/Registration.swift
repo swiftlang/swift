@@ -131,6 +131,7 @@ public func registerSILClasses() {
   register(UnconditionalCheckedCastInst.self)
   register(ConvertFunctionInst.self)
   register(ThinToThickFunctionInst.self)
+  register(ConvertEscapeToNoEscapeInst.self)
   register(ObjCExistentialMetatypeToObjectInst.self)
   register(ObjCMetatypeToObjectInst.self)
   register(ValueToBridgeObjectInst.self)

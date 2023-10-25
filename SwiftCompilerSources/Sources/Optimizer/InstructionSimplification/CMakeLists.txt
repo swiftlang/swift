@@ -13,6 +13,7 @@ swift_compiler_sources(Optimizer
   SimplifyBuiltin.swift
   SimplifyCondBranch.swift
   SimplifyCondFail.swift
+  SimplifyConvertEscapeToNoEscape.swift
   SimplifyDebugStep.swift
   SimplifyDestructure.swift
   SimplifyGlobalValue.swift

@@ -795,6 +795,11 @@ final public
 class ThinToThickFunctionInst : SingleValueInstruction, ConversionInstruction {}
 
 final public
+class ConvertEscapeToNoEscapeInst : SingleValueInstruction, UnaryInstruction {
+  public var fromFunction: Value { operand.value }
+}
+
+final public
 class ObjCExistentialMetatypeToObjectInst : SingleValueInstruction,
                                             ConversionInstruction {}
 
