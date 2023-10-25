@@ -5705,6 +5705,13 @@ void constraints::simplifyLocator(ASTNode &anchor,
       // Extract tuple element.
       auto elt = path[0].castTo<LocatorPathElt::AnyTupleElement>();
       unsigned index = elt.getIndex();
+
+      if (auto *AE = getAsExpr<AssignExpr>(anchor)) {
+        if (isa<TupleExpr>(AE->getSrc())) {
+          anchor = AE->getSrc();
+        }
+      }
+
       if (auto tupleExpr = getAsExpr<TupleExpr>(anchor)) {
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
@@ -5720,6 +5727,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
           continue;
         }
       }
+
       break;
     }
 
