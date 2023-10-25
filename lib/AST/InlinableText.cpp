@@ -189,6 +189,13 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
+/// Appends the textual contents of the provided source range, stripping
+/// the contents of comments that appear in the source.
+///
+/// Given that comments are treated as whitespace, this also appends a
+/// space or newline (depending if the comment was multi-line and itself
+/// had newlines in the body) in place of the comment, to avoid fusing tokens
+/// together.
 static void appendRange(
   SourceManager &sourceMgr, SourceLoc start, SourceLoc end,
   SmallVectorImpl<char> &scratch) {
@@ -210,28 +217,44 @@ static void appendRange(
     lexer.lex(token);
 
     if (token.is(tok::comment)) {
-      // Append the range from the last non-comment token to the beginning of this comment
-      // token.
+      // Grab the start of the full comment token (with leading trivia as well)
       SourceLoc commentLoc = token.getLoc();
+
+      // Find the end of the token (with trailing trivia)
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+
+      // The comment token's range includes leading/trailing whitespace, so trim
+      // whitespace and only strip the portions of the comment that are not whitespace.
+      CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef fullTokenText = sourceMgr.extractText(range);
+      unsigned leadingWhitespace = fullTokenText.size() - fullTokenText.ltrim().size();
+      if (leadingWhitespace > 0) {
+        commentLoc = commentLoc.getAdvancedLoc(leadingWhitespace);
+      }
+
+      unsigned trailingWhitespace = fullTokenText.size() - fullTokenText.rtrim().size();
+      if (trailingWhitespace > 0) {
+        endLoc = endLoc.getAdvancedLoc(-trailingWhitespace);
+      }
+
+      // First, extract the text up to the start of the comment, including the whitespace.
       auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
       StringRef text = sourceMgr.extractText(charRange);
       scratch.append(text.begin(), text.end());
 
-      // Append a single whitespace character, to avoid fusing tokens.
-      scratch.push_back(' ');
+      // Next, search through the comment text to see if it's a block comment with a newline. If so
+      // we need to re-insert a newline to avoid fusing multi-line tokens together.
+      auto commentTextRange = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef commentText = sourceMgr.extractText(commentTextRange);
+      bool hasNewline = commentText.find_first_of("\n\r") != StringRef::npos;
 
-      // Set the start of the next non-comment range to the end of this token.
-      SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+      // Use a newline as a filler character if the comment itself had a newline in it.
+      char filler = hasNewline ? '\n' : ' ';
 
-      // The comment token's end location includes trailing whitespace, so trim trailing
-      // whitespace and only strip the portions of the comment that are not whitespace.
-      CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
-      StringRef commentText = sourceMgr.extractText(range);
-      unsigned whitespaceOffset = commentText.size() - commentText.rtrim().size();
-      if (whitespaceOffset > 0) {
-        endLoc = endLoc.getAdvancedLoc(-whitespaceOffset);
-      }
+      // Append a single whitespace filler character, to avoid fusing tokens.
+      scratch.push_back(filler);
 
+      // Start the next region after the contents of the comment.
       nonCommentStart = endLoc;
     }
   }
