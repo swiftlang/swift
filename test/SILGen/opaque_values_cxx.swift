@@ -15,12 +15,12 @@ import Cxx
 // CHECK:         end_borrow [[VECTOR]]
 // CHECK:         return [[BEGIN]]
 // CHECK-LABEL: } // end sil function '$sSo3stdO3__1O0055vectorCUnsignedIntallocatorCUnsignedInt_iqGBpboaivxaEhaV3Cxx0B8SequenceSCAgHP13__beginUnsafe11RawIteratorQzyFTW'
-// CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO{{(3__1O)?}}0020___wrap_iter__udAAdDaVSQSCSQ2eeoiySbx_xtFZTW : {{.*}} {
-// CHECK:       bb0([[LHS:%[^,]+]] : $std.__1.__wrap_iter<_>, [[RHS:%[^,]+]] :
-// CHECK:         [[CALLEE:%[^,]+]] = function_ref @$sSo2eeoiySbSo3stdO{{(3__1O)?}}0020___wrap_iter__udAAdDaV_AGtFTO
+// CHECK-LABEL: sil {{.*}}[ossa] @$sSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaVSQSCSQ2eeoiySbx_xtFZTW : {{.*}} {
+// CHECK:       bb0([[LHS:%[^,]+]] : $std.__1.__wrap_iter<UnsafePointer<CUnsignedInt>>, [[RHS:%[^,]+]] :
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @$sSo2eeoiySbSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaV_AGtFTO
 // CHECK:         [[EQUAL:%[^,]+]] = apply [[CALLEE]]([[LHS]], [[RHS]])
 // CHECK:         return [[EQUAL]]
-// CHECK-LABEL: } // end sil function '$sSo3stdO{{(3__1O)?}}0020___wrap_iter__udAAdDaVSQSCSQ2eeoiySbx_xtFZTW'
+// CHECK-LABEL: } // end sil function '$sSo3stdO{{(3__1O)?}}0047___wrap_iterUnsafePointerCUnsignedInt_heCInnaEgaVSQSCSQ2eeoiySbx_xtFZTW'
 func test_cxx_vector_uint32t_iterate(_ n: Int, _ vectorOfU32: VectorOfU32) {
   for x in vectorOfU32 {}
 }
