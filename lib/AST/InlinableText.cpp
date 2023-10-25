@@ -216,6 +216,19 @@ static void appendRange(
   while (!token.is(tok::eof)) {
     lexer.lex(token);
 
+    // Skip over #sourceLocation's in the file.
+    if (token.is(tok::pound_sourceLocation)) {
+      lexer.lex(token);
+
+      // Skip from the left paren to the right paren.
+      assert(token.is(tok::l_paren));
+      while (!token.is(tok::r_paren)) {
+        lexer.lex(token);
+      }
+
+      nonCommentStart = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+    }
+
     if (token.is(tok::comment)) {
       // Grab the start of the full comment token (with leading trivia as well)
       SourceLoc commentLoc = token.getLoc();
@@ -224,31 +237,37 @@ static void appendRange(
       SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
 
       // The comment token's range includes leading/trailing whitespace, so trim
-      // whitespace and only strip the portions of the comment that are not whitespace.
+      // whitespace and only strip the portions of the comment that are not
+      // whitespace.
       CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
       StringRef fullTokenText = sourceMgr.extractText(range);
-      unsigned leadingWhitespace = fullTokenText.size() - fullTokenText.ltrim().size();
+      unsigned leadingWhitespace = fullTokenText.size() - 
+        fullTokenText.ltrim().size();
       if (leadingWhitespace > 0) {
         commentLoc = commentLoc.getAdvancedLoc(leadingWhitespace);
       }
 
-      unsigned trailingWhitespace = fullTokenText.size() - fullTokenText.rtrim().size();
+      unsigned trailingWhitespace = fullTokenText.size() -
+        fullTokenText.rtrim().size();
       if (trailingWhitespace > 0) {
         endLoc = endLoc.getAdvancedLoc(-trailingWhitespace);
       }
 
-      // First, extract the text up to the start of the comment, including the whitespace.
+      // First, extract the text up to the start of the comment, including the
+      // whitespace.
       auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
       StringRef text = sourceMgr.extractText(charRange);
       scratch.append(text.begin(), text.end());
 
-      // Next, search through the comment text to see if it's a block comment with a newline. If so
-      // we need to re-insert a newline to avoid fusing multi-line tokens together.
+      // Next, search through the comment text to see if it's a block comment
+      // with a newline. If so we need to re-insert a newline to avoid fusing
+      // multi-line tokens together.
       auto commentTextRange = CharSourceRange(sourceMgr, commentLoc, endLoc);
       StringRef commentText = sourceMgr.extractText(commentTextRange);
       bool hasNewline = commentText.find_first_of("\n\r") != StringRef::npos;
 
-      // Use a newline as a filler character if the comment itself had a newline in it.
+      // Use a newline as a filler character if the comment itself had a newline
+      // in it.
       char filler = hasNewline ? '\n' : ' ';
 
       // Append a single whitespace filler character, to avoid fusing tokens.

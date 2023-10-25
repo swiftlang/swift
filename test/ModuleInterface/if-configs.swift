@@ -141,6 +141,7 @@ public func hasIfCompilerCheck(_ x: () -> Bool = {
 // CHECK-NEXT: let y = 2
 // CHECK: let a = 3
 // CHECK: let b = 2
+// CHECK-NOT: #sourceLocation
 // CHECK-NOT: #if
 // CHECK-NOT: comment!
 // CHECK: return true
@@ -170,6 +171,8 @@ public func hasComments() -> Bool {
 
   let a = 3
   /* test */let b = 2
+
+  #sourceLocation(file: "if-configs.swift", line: 200)
 
   #if !NOT_PROVIDED
     // comment!
