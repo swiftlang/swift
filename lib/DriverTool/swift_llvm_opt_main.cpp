@@ -232,7 +232,6 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
     PrintPassOpts.Verbose = false;
     PrintPassOpts.SkipAnalyses = false;
-    auto &Mod = *M;
     llvm::StandardInstrumentations SI(M->getContext(), false, false, PrintPassOpts);
     SI.registerCallbacks(PIC, &MAM);
 

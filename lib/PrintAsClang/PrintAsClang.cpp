@@ -315,7 +315,7 @@ static void collectClangModuleHeaderIncludes(
   } else if (llvm::Optional<clang::Module::DirectoryName> umbrellaDir = clangModule->getUmbrellaDirAsWritten()) {
     SmallString<128> nativeUmbrellaDirPath;
     std::error_code errorCode;
-    llvm::sys::path::native(umbrellaDir->Entry.getDirEntry().getName(),
+    llvm::sys::path::native(umbrellaDir->Entry.getName(),
                             nativeUmbrellaDirPath);
     llvm::vfs::FileSystem &fileSystem = fileManager.getVirtualFileSystem();
     for (llvm::vfs::recursive_directory_iterator
