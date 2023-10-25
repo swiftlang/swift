@@ -263,8 +263,8 @@ extension Actor {
       }
     }
 
-    // We emit the first error that we see. So we do not emit the self error.
     await transferToMain(closure) // expected-sns-note {{access here could race}}
+    // expected-sns-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
@@ -286,9 +286,7 @@ extension Actor {
       closure = {}
     }
 
-    // TODO: We do not error here yet since we are performing the control flow
-    // union incorrectly.
-    await transferToMain(closure)
+    await transferToMain(closure) // expected-sns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }

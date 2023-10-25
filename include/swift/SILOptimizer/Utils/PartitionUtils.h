@@ -225,6 +225,11 @@ static void horizontalUpdate(std::map<Element, Region> &map, Element key,
 }
 
 class Partition {
+public:
+  /// A class defined in PartitionUtils unittest used to grab state from
+  /// Partition without exposing it to other users.
+  struct PartitionTester;
+
 private:
   // Label each index with a non-negative (unsigned) label if it is associated
   // with a valid region, and with -1 if it is associated with a transferred
@@ -351,6 +356,21 @@ public:
     return p;
   }
 
+  static Partition separateRegions(ArrayRef<Element> indices) {
+    Partition p;
+    if (indices.empty())
+      return p;
+
+    Region max_index =
+        Region(*std::max_element(indices.begin(), indices.end()));
+    p.fresh_label = Region(max_index + 1);
+    for (Element index : indices) {
+      p.labels.insert_or_assign(index, Region(index));
+    }
+    assert(p.is_canonical_correct());
+    return p;
+  }
+
   // linear time - Test two partititons for equality by first putting them
   // in canonical form then comparing for exact equality.
   static bool equals(Partition &fst, Partition &snd) {
@@ -370,30 +390,63 @@ public:
   // two passed partitions; the join labels each index labelled by both operands
   // and two indices are in the same region of the join iff they are in the same
   // region in either operand.
-  static Partition join(Partition &fst, Partition &snd) {
-    // ensure copies are made
-    Partition fst_reduced = false;
-    Partition snd_reduced = false;
+  static Partition join(const Partition &fst, const Partition &snd) {
+    // First copy and canonicalize our inputs.
+    Partition fst_reduced = fst;
+    Partition snd_reduced = snd;
 
-    // make canonical copies of fst and snd, reduced to their intersected domain
-    for (auto [i, _] : fst.labels)
-      if (snd.labels.count(i)) {
-        fst_reduced.labels.insert_or_assign(i, fst.labels.at(i));
-        snd_reduced.labels.insert_or_assign(i, snd.labels.at(i));
-      }
     fst_reduced.canonicalize();
     snd_reduced.canonicalize();
 
-    // merging each index in fst with its label in snd ensures that all pairs
-    // of indices that are in the same region in snd are also in the same region
-    // in fst - the desired property
-    for (const auto [i, snd_label] : snd_reduced.labels) {
-      if (snd_label.isTransferred())
-        // if snd says that the region has been transferred, mark it transferred
-        // in fst
-        horizontalUpdate(fst_reduced.labels, i, Region::transferred());
-      else
-        fst_reduced.merge(i, Element(snd_label));
+    // For each element in snd_reduced...
+    for (const auto &[sndEltNumber, sndRegionNumber] : snd_reduced.labels) {
+      // For values that are both in fst_reduced and snd_reduced, we need to
+      // merge their regions.
+      if (fst_reduced.labels.count(sndEltNumber)) {
+        if (sndRegionNumber.isTransferred()) {
+          // If snd says that the region has been transferred, mark it
+          // transferred in fst.
+          horizontalUpdate(fst_reduced.labels, sndEltNumber,
+                           Region::transferred());
+          continue;
+        }
+
+        // Otherwise merge. This maintains canonicality.
+        fst_reduced.merge(sndEltNumber, Element(sndRegionNumber));
+        continue;
+      }
+
+      // Otherwise, we have an element in snd that is not in fst. First see if
+      // our region is transferred. In such a case, just add this element as
+      // transferred.
+      if (sndRegionNumber.isTransferred()) {
+        fst_reduced.labels.insert({sndEltNumber, Region::transferred()});
+        continue;
+      }
+
+      // Then check if the representative element number for this element in snd
+      // is in fst. In that case, we know that we visited it before we visited
+      // this elt number (since we are processing in order) so what ever is
+      // mapped to that number in snd must be the correct number for this
+      // element as well since this number is guaranteed to be greater than our
+      // representative and the number mapped to our representative in fst must
+      // be <= our representative.
+      auto iter = fst_reduced.labels.find(Element(sndRegionNumber));
+      if (iter != fst_reduced.labels.end()) {
+        fst_reduced.labels.insert({sndEltNumber, iter->second});
+        if (fst_reduced.fresh_label < Region(sndEltNumber))
+          fst_reduced.fresh_label = Region(sndEltNumber + 1);
+        continue;
+      }
+
+      // Otherwise, we have an element that is not in fst and its representative
+      // is not in fst. This means that we must be our representative in snd
+      // since we should have visited our representative earlier if we were not
+      // due to our traversal being in order. Thus just add this to fst_reduced.
+      assert(sndEltNumber == Element(sndRegionNumber));
+      fst_reduced.labels.insert({sndEltNumber, sndRegionNumber});
+      if (fst_reduced.fresh_label < sndRegionNumber)
+        fst_reduced.fresh_label = Region(sndEltNumber + 1);
     }
 
     LLVM_DEBUG(llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
@@ -581,6 +634,9 @@ public:
     }
     os << "]\n";
   }
+
+  /// Routine used in unittests
+  Region getRegion(Element elt) const { return labels.at(elt); }
 };
 
 } // namespace swift
