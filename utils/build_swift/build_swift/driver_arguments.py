@@ -208,7 +208,6 @@ def _apply_default_arguments(args):
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
         args.test_swiftformat = False
-        args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
         args.test_swiftdocc = False
 
@@ -688,9 +687,6 @@ def create_argument_parser():
     option(['--swiftformat'], toggle_true('build_swiftformat'),
            help='build swift-format')
 
-    option(['--swiftevolve'], toggle_true('build_swiftevolve'),
-           help='build the swift-evolve tool')
-
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
     option(['--swiftdocc'], toggle_true('build_swiftdocc'),
@@ -735,8 +731,6 @@ def create_argument_parser():
            help='install the SourceKit stress tester')
     option(['--install-swift-driver'], toggle_true('install_swift_driver'),
            help='install new Swift driver')
-    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
-           help='install SwiftEvolve')
     option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
            help='install Swift DocC')
     option(['--toolchain-benchmarks'],
@@ -1244,8 +1238,6 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
            help='skip testing swift-format')
-    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
-           help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')

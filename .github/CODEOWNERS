@@ -209,7 +209,6 @@
 /utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham
 /utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham
 /utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham
-/utils/swift_build_support/products/swiftevolve.py            @ahoppen @bnbarham
 /utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham
 /utils/update-checkout*                                       @shahmishal

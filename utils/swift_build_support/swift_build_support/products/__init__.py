@@ -32,7 +32,6 @@ from .swift import Swift
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
-from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
@@ -67,7 +66,6 @@ __all__ = [
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',
-    'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
