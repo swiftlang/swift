@@ -1,6 +1,6 @@
 
 // RUN: %target-swift-emit-silgen -module-name reabstract -Xllvm -sil-full-demangle %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name reabstract -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=MANDATORY
+// RUN: %target-swift-emit-sil -module-name reabstract -Xllvm -sil-disable-pass=simplification -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=MANDATORY
 
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
