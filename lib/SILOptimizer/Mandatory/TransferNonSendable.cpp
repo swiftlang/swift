@@ -1,4 +1,4 @@
-//===--- SendNonSendable.cpp ----------------------------------------------===//
+//===--- TransferNonSendable.cpp ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -27,7 +27,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "send-non-sendable"
+#define DEBUG_TYPE "transfer-non-sendable"
 
 using namespace swift;
 
@@ -709,7 +709,8 @@ public:
     if (auto cast = dyn_cast<TryApplyInst>(applyInst))
       return translateIsolationCrossingSILApply(cast);
 
-    llvm_unreachable("Only ApplyInst, BeginApplyInst, and TryApplyInst should cross isolation domains");
+    llvm_unreachable("Only ApplyInst, BeginApplyInst, and TryApplyInst should "
+                     "cross isolation domains");
   }
 
   // handles the semantics for SIL applies that cross isolation
@@ -731,7 +732,8 @@ public:
 
     auto getSourceSelf = [&]() {
       if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
-        if (auto calledExpr = dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
+        if (auto calledExpr =
+                dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
           return calledExpr->getBase();
       return (Expr *)nullptr;
     };
@@ -814,7 +816,7 @@ public:
   // an enum select is just a multi assign
   void translateSILSelectEnum(SelectEnumOperation selectEnumInst) {
     SmallVector<SILValue, 8> enumOperands;
-    for (unsigned i = 0; i < selectEnumInst.getNumCases(); i ++)
+    for (unsigned i = 0; i < selectEnumInst.getNumCases(); i++)
       enumOperands.push_back(selectEnumInst.getCase(i).second);
     if (selectEnumInst.hasDefault())
       enumOperands.push_back(selectEnumInst.getDefaultResult());
@@ -829,8 +831,8 @@ public:
     for (unsigned i = 0; i < switchEnumInst->getNumCases(); i++) {
       SILBasicBlock *dest = switchEnumInst->getCase(i).second;
       if (dest->getNumArguments() > 0) {
-        assert(dest->getNumArguments() == 1
-               && "expected at most one bb arg in dest of enum switch");
+        assert(dest->getNumArguments() == 1 &&
+               "expected at most one bb arg in dest of enum switch");
         argSources.addValues({switchEnumInst->getOperand()}, dest);
       }
     }
@@ -992,7 +994,8 @@ public:
     // argument passing
     case SILInstructionKind::BranchInst: {
       auto *branchInst = cast<BranchInst>(inst);
-      assert(branchInst->getNumArgs() == branchInst->getDestBB()->getNumArguments());
+      assert(branchInst->getNumArgs() ==
+             branchInst->getDestBB()->getNumArguments());
       TermArgSources argSources;
       argSources.addValues(branchInst->getArgs(), branchInst->getDestBB());
       return translateSILPhi(argSources);
@@ -1256,18 +1259,16 @@ class BlockPartitionState {
 public:
   // run the passed action on each partitionOp in this block. Action should
   // return true iff iteration should continue
-  void forEachPartitionOp(llvm::function_ref<bool (const PartitionOp&)> action) const {
+  void forEachPartitionOp(
+      llvm::function_ref<bool(const PartitionOp &)> action) const {
     for (const PartitionOp &partitionOp : blockPartitionOps)
-      if (!action(partitionOp)) break;
+      if (!action(partitionOp))
+        break;
   }
 
-  const Partition& getEntryPartition() const {
-    return entryPartition;
-  }
+  const Partition &getEntryPartition() const { return entryPartition; }
 
-  const Partition& getExitPartition() const {
-    return exitPartition;
-  }
+  const Partition &getExitPartition() const { return exitPartition; }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
@@ -1352,7 +1353,7 @@ class TransferredReason {
 
   friend class TransferRequireAccumulator;
 
-  bool containsOp(const PartitionOp& op) {
+  bool containsOp(const PartitionOp &op) {
     return llvm::any_of(transferOps,
                         [&](const std::pair<unsigned, PartitionOp> &pair) {
                           return pair.second == op;
@@ -1404,7 +1405,7 @@ class TransferRequireAccumulator {
     PartitionOpAtDistance(PartitionOp partitionOp, unsigned distance)
         : partitionOp(partitionOp), distance(distance) {}
 
-    bool operator<(const PartitionOpAtDistance& other) const {
+    bool operator<(const PartitionOpAtDistance &other) const {
       if (distance != other.distance)
         return distance < other.distance;
       return partitionOp < other.partitionOp;
@@ -1516,7 +1517,7 @@ private:
 // and traces those facts to the Transfer operations that could have been
 // responsible.
 class RaceTracer {
-  const BasicBlockData<BlockPartitionState>& blockStates;
+  const BasicBlockData<BlockPartitionState> &blockStates;
 
   std::map<std::pair<SILBasicBlock *, TrackableValueID>, TransferredReason>
       transferredAtEntryReasons;
@@ -1596,7 +1597,8 @@ class RaceTracer {
     for (SILBasicBlock *pred : SILBlock->getPredecessorBlocks())
       for (std::vector<TrackableValueID> region :
            blockStates[pred].getExitPartition().getNonTransferredRegions()) {
-        for (TrackableValueID fst : region) for (TrackableValueID snd : region)
+        for (TrackableValueID fst : region)
+          for (TrackableValueID snd : region)
             if (fst != snd && entryTracks(fst) && entryTracks(snd))
               singleStepJoins[fst].insert(snd);
       }
@@ -1668,9 +1670,9 @@ class RaceTracer {
       workingPartition.apply(PartitionOp::AssignFresh(transferredVal));
 
     int i = 0;
-    block.forEachPartitionOp([&](const PartitionOp& partitionOp) {
+    block.forEachPartitionOp([&](const PartitionOp &partitionOp) {
       if (targetOp == partitionOp)
-        return false; //break
+        return false; // break
       workingPartition.apply(partitionOp);
       if (workingPartition.isTransferred(transferredVal) &&
           !transferredReason) {
@@ -1880,7 +1882,8 @@ class PartitionAnalysis {
     if (auto castExpr = dyn_cast<ImplicitConversionExpr>(expr))
       return hasBeenEmitted(castExpr->getSubExpr());
 
-    if (emittedExprs.contains(expr)) return true;
+    if (emittedExprs.contains(expr))
+      return true;
     emittedExprs.insert(expr);
     return false;
   }
@@ -1891,9 +1894,8 @@ class PartitionAnalysis {
   void diagnose() {
     assert(solved && "diagnose should not be called before solve");
 
-    LLVM_DEBUG(
-        llvm::dbgs() << "Emitting diagnostics for function "
-                     << function->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
+                            << function->getName() << "\n");
     RaceTracer tracer(function, blockStates);
 
     for (auto [block, blockState] : blockStates) {
@@ -1960,7 +1962,8 @@ class PartitionAnalysis {
     }
     auto argExpr = transferOp.getSourceExpr();
     if (!argExpr)
-      assert(false && "sourceExpr should be populated for ApplyExpr consumptions");
+      assert(false &&
+             "sourceExpr should be populated for ApplyExpr consumptions");
 
     function->getASTContext()
         .Diags
@@ -2003,14 +2006,14 @@ namespace {
 // this class is the entry point to the region-based Sendable analysis,
 // after certain checks are performed to ensure the analysis can be completed
 // a PartitionAnalysis object is created and used to run the analysis.
-class SendNonSendable : public SILFunctionTransform {
+class TransferNonSendable : public SILFunctionTransform {
   // find any ApplyExprs in this function, and check if any of them make an
   // unsatisfied isolation jump, emitting appropriate diagnostics if so
   void run() override {
     SILFunction *function = getFunction();
 
     if (!function->getASTContext().LangOpts.hasFeature(
-            Feature::SendNonSendable))
+            Feature::TransferNonSendable))
       return;
 
     LLVM_DEBUG(llvm::dbgs()
@@ -2024,9 +2027,9 @@ class SendNonSendable : public SILFunctionTransform {
       return;
     }
 
-    // The sendable protocol should /always/ be available if SendNonSendable is
-    // enabled. If not, there is a major bug in the compiler and we should fail
-    // loudly.
+    // The sendable protocol should /always/ be available if TransferNonSendable
+    // is enabled. If not, there is a major bug in the compiler and we should
+    // fail loudly.
     if (!function->getASTContext().getProtocol(KnownProtocolKind::Sendable))
       llvm::report_fatal_error("Sendable protocol not available!");
 
@@ -2038,6 +2041,6 @@ class SendNonSendable : public SILFunctionTransform {
 
 /// This pass is known to depend on the following passes having run before it:
 /// none so far.
-SILTransform *swift::createSendNonSendable() {
-  return new SendNonSendable();
+SILTransform *swift::createTransferNonSendable() {
+  return new TransferNonSendable();
 }

@@ -20,7 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include <algorithm>
 
-#define DEBUG_TYPE "send-non-sendable"
+#define DEBUG_TYPE "transfer-non-sendable"
 
 namespace swift {
 
@@ -91,7 +91,7 @@ enum class PartitionOpKind : uint8_t {
 };
 
 // PartitionOp represents a primitive operation that can be performed on
-// Partitions. This is part of the SendNonSendable SIL pass workflow:
+// Partitions. This is part of the TransferNonSendable SIL pass workflow:
 // first SILBasicBlocks are compiled to vectors of PartitionOps, then a fixed
 // point partition is found over the CFG.
 class PartitionOp {

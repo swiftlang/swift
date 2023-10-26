@@ -219,7 +219,7 @@ EXPERIMENTAL_FEATURE(BuiltinModule, true)
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
 /// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(SendNonSendable, false)
+EXPERIMENTAL_FEATURE(TransferNonSendable, false)
 
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
