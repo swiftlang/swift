@@ -3,4 +3,4 @@
 // REQUIRES: OS=macosx
 
 // CHECK: import CxxStdlib.vector
-// CHECK: extension std.basic_string<Int8, char_traits<Int8>, allocator<Int8>> {
+// CHECK: extension std.basic_string<CChar, char_traits<CChar>, allocator<CChar>> {

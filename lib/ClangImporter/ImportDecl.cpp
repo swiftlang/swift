@@ -2815,14 +2815,15 @@ namespace {
       // conformances to Swift protocols from the Cxx module.
       auto clangModule = Impl.getClangOwningModule(result->getClangNode());
       if (clangModule && requiresCPlusPlus(clangModule)) {
-        auto nominalDecl = cast<NominalTypeDecl>(result);
-        conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
-        conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
+        if (auto nominalDecl = dyn_cast<NominalTypeDecl>(result)) {
+          conformToCxxIteratorIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxSequenceIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxSetIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxDictionaryIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxPairIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxOptionalIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
+        }
       }
 
       if (auto *ntd = dyn_cast<NominalTypeDecl>(result))
