@@ -634,9 +634,6 @@ public:
     }
     os << "]\n";
   }
-
-  /// Routine used in unittests
-  Region getRegion(Element elt) const { return labels.at(elt); }
 };
 
 } // namespace swift
