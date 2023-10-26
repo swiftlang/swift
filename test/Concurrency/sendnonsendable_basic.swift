@@ -265,8 +265,8 @@ extension Actor {
 
     await transferToMain(closure) // expected-sns-note {{access here could race}}
     // expected-sns-warning @-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
-    // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
-    // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+    // expected-complete-warning @-2 {{passing argument of non-sendable type '() -> ()' into main actor-isolated context may introduce data races}}
+    // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
   // In this case, we reinit along both paths, but only one has an actor derived
