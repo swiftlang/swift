@@ -1765,7 +1765,7 @@ uint16_t SILGenFunction::emitBasicProlog(
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()
     : AbstractionPattern(genericSig.getCanonicalSignature(),
-                         CanType(resultType));
+                         resultType->getCanonicalType());
   
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
