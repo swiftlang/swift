@@ -2041,13 +2041,19 @@ extension RequiredDefaultInitMacro: MemberMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let decl: DeclSyntax
-    if declaration.is(ClassDeclSyntax.self) && protocols.isEmpty {
-      decl = "required init() { }"
+    let initDecl: DeclSyntax
+    let funcDecl: DeclSyntax
+    if !declaration.is(ClassDeclSyntax.self) {
+      initDecl = "init() { }"
+      funcDecl = "func f() { }"
+    } else if !protocols.isEmpty {
+      initDecl = "required init() { }"
+      funcDecl = "func f() { }"
     } else {
-      decl = "init() { }"
+      initDecl = "required init() { }"
+      funcDecl = "override func f() { }"
     }
-    return [ decl ]
+    return [ initDecl, funcDecl ]
   }
 }
 
