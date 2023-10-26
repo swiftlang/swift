@@ -3297,7 +3297,7 @@ createExtensionGenericParams(ASTContext &ctx,
 }
 
 /// If the extended type is a generic typealias whose underlying type is
-/// a tuple, the extension inherits the generic paramter list from the
+/// a tuple, the extension inherits the generic parameter list from the
 /// typealias.
 static GenericParamList *
 createTupleExtensionGenericParams(ASTContext &ctx,
