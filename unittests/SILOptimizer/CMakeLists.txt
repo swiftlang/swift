@@ -7,4 +7,5 @@ target_link_libraries(SwiftSILOptimizerTests
    swiftSILOptimizer
    swiftIRGen
    swiftAST
+   swiftFrontend
 )
