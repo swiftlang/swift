@@ -8,12 +8,25 @@ import Distributed
 
 public distributed actor DA {
   public typealias ActorSystem = LocalTestingDistributedActorSystem
+
+  // CHECK-NOT: s38distributed_thunk_skip_function_bodies2DAC9publicVarSiyYaKFTE
+  distributed var publicVar: Int {
+    let NEVER_TYPECHECK = 1
+    blackHole(NEVER_TYPECHECK)
+    return 1
+  }
 }
 
 @inline(never)
 public func blackHole<T>(_ t: T) { }
 
 extension DA {
+  // CHECK-NOT: s38distributed_thunk_skip_function_bodies2DAC20publicVarInExtensionSiyYaKFTE
+  distributed var publicVarInExtension: Int {
+    let NEVER_TYPECHECK = 1
+    blackHole(NEVER_TYPECHECK)
+    return 1
+  }
 
   // CHECK-NOT: s38distributed_thunk_skip_function_bodies2DAC10publicFuncyyYaKFTE
   public distributed func publicFunc() {

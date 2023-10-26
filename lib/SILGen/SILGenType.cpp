@@ -1223,12 +1223,7 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1404,12 +1399,7 @@ public:
       }
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
