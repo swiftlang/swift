@@ -15,7 +15,7 @@
 // REQUIRES: OS=macosx
 
 import Darwin
-import Dispatch // expected-remark {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
+import Dispatch // expected-warning {{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'Dispatch'}}
 import StdlibUnittest
 
 // These are an attempt to simulate some kind of async work, and the

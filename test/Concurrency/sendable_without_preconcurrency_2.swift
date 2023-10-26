@@ -9,7 +9,7 @@
 // REQUIRES: asserts
 
 import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -warn-concurrency) type
-import NonStrictModule // expected-remark{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'NonStrictModule'}}
+import NonStrictModule // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'NonStrictModule'}}
 
 actor A {
   func f() -> [StrictStruct: NonStrictClass] { [:] }

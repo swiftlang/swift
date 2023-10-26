@@ -2564,11 +2564,11 @@ NOTE(add_nominal_sendable_conformance,none,
 NOTE(add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
-REMARK(add_predates_concurrency_import,none,
+WARNING(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
-REMARK(remove_predates_concurrency_import,none,
+WARNING(remove_predates_concurrency_import,none,
      "'@preconcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",

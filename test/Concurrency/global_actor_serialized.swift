@@ -11,7 +11,7 @@
 // a global-actor annotation that is an error in Swift 6, but only a warning
 // in Swift 5, then we do not reject the import as an error.
 
-import SerializedStruct // expected-remark {{add '@preconcurrency' to treat 'Sendable'-related errors from module 'SerializedStruct' as warnings}}
+import SerializedStruct // expected-warning {{add '@preconcurrency' to treat 'Sendable'-related errors from module 'SerializedStruct' as warnings}}
 
 // use it to force the right checks happen.
 func test() async -> Int {
