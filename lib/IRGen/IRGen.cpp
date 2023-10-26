@@ -17,6 +17,7 @@
 #include "../Serialization/ModuleFormat.h"
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/ABI/ObjectFile.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -26,7 +27,6 @@
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
@@ -1630,6 +1630,7 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
                                           llvm::GlobalVariable::InternalLinkage,
                                           Data, "__Swift_AST");
+
   std::string Section;
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::DXContainer:
@@ -1638,18 +1639,23 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    Section = COFFASTSectionName;
+  case llvm::Triple::COFF: {
+    SwiftObjectFileFormatCOFF COFF;
+    Section = COFF.getSectionName(ReflectionSectionKind::swiftast);
     break;
+  }
   case llvm::Triple::ELF:
-    Section = ELFASTSectionName;
+  case llvm::Triple::Wasm: {
+    SwiftObjectFileFormatELF ELF;
+    Section = ELF.getSectionName(ReflectionSectionKind::swiftast);
     break;
-  case llvm::Triple::MachO:
-    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
+  }
+  case llvm::Triple::MachO: {
+    SwiftObjectFileFormatMachO MachO;
+    Section = std::string(*MachO.getSegmentName()) + "," +
+              MachO.getSectionName(ReflectionSectionKind::swiftast).str();
     break;
-  case llvm::Triple::Wasm:
-    Section = WasmASTSectionName;
-    break;
+  }
   }
   ASTSym->setSection(Section);
   ASTSym->setAlignment(llvm::MaybeAlign(serialization::SWIFTMODULE_ALIGNMENT));

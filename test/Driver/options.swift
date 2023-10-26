@@ -116,6 +116,14 @@
 // RUN: not %swiftc_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
 // MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
 
+// RUN: %swift_driver -### -g -dwarf-version=3 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_3 %s
+// DWARF_VERSION_3: -dwarf-version=3
+// RUN: not %swift_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swift_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swiftc_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swiftc_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
+
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
