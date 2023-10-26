@@ -4224,9 +4224,6 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
       }
-      if (Type thrownError = T->getThrownError()) {
-        printFieldQuoted(thrownError.getString(), "thrown_error");
-      }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), "global_actor");
       }
@@ -4234,6 +4231,9 @@ namespace {
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext());
       printAnyFunctionParamsRec(T->getParams(), "input");
       printRec(T->getResult(), "output");
+      if (Type thrownError = T->getThrownError()) {
+        printRec(thrownError, "thrown_error");
+      }
     }
 
     void visitFunctionType(FunctionType *T, StringRef label) {
