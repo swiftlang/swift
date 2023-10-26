@@ -168,6 +168,14 @@
 
 @end
 
+@interface ObjCImplRootClass
+
+@end
+
+@interface ObjCImplGenericClass<T> : NSObject
+
+@end
+
 
 
 struct ObjCStruct {

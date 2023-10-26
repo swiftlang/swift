@@ -1503,6 +1503,19 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     return;
   }
 
+  if (!CD->hasSuperclass()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_objc_implementation_must_have_super,
+                          CD);
+    CD->diagnose(diag::decl_declared_here, CD);
+    return;
+  }
+
+  if (CD->isTypeErasedGenericClass()) {
+    diagnoseAndRemoveAttr(attr, diag::objc_implementation_cannot_have_generics,
+                          CD);
+    CD->diagnose(diag::decl_declared_here, CD);
+  }
+
   if (!attr->isCategoryNameInvalid() && !ED->getImplementedObjCDecl()) {
     diagnose(attr->getLocation(),
              diag::attr_objc_implementation_category_not_found,

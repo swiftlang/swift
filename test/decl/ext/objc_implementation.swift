@@ -456,6 +456,14 @@ protocol EmptySwiftProto {}
 @_objcImplementation(WTF) extension SwiftClass {} // expected
 // expected-error@-1 {{'@_objcImplementation' cannot be used to extend class 'SwiftClass' because it was defined by a Swift 'class' declaration, not an imported Objective-C '@interface' declaration}} {{1-27=}}
 
+@_objcImplementation extension ObjCImplRootClass {
+  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement root class 'ObjCImplRootClass'; declare its superclass in the header}}
+}
+
+@_objcImplementation extension ObjCImplGenericClass {
+  // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
+}
+
 func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.method(fromHeader1: 1)
   obj.method(fromHeader2: 2)
