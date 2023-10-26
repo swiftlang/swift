@@ -3712,9 +3712,9 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !TypeChecker::isConvertibleTo(
-                   thrownTy, ctx.getErrorExistentialType(),
-                  resolution.getDeclContext())) {
+               !TypeChecker::conformsToProtocol(
+                  thrownTy, ctx.getErrorDecl(),
+                  resolution.getDeclContext()->getParentModule())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
           thrownTy);

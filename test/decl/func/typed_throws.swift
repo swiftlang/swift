@@ -123,5 +123,3 @@ struct HasASubscript {
     }
   }
 }
-
-func throwCodableErrors() throws(any Codable & Error) { }

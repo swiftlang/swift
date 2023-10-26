@@ -2639,11 +2639,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     Type thrownTy = AFD->getThrownInterfaceType();
     if (thrownTy) {
       thrownTy = AFD->getThrownInterfaceType();
-      auto anyErrorType = Context.getErrorExistentialType();
-      if (thrownTy && anyErrorType) {
+      ProtocolDecl *errorProto = Context.getErrorDecl();
+      if (thrownTy && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
-        if (!TypeChecker::isConvertibleTo(
-                thrownTyInContext, anyErrorType, AFD)) {
+        if (!TypeChecker::conformsToProtocol(
+                thrownTyInContext, errorProto, AFD->getParentModule())) {
           SourceLoc loc;
           if (auto thrownTypeRepr = AFD->getThrownTypeRepr())
             loc = thrownTypeRepr->getLoc();
