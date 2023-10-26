@@ -601,7 +601,10 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
     auto var = cast<VarDecl>(deserialized.get());
     auto result = NamedPattern::createImplicit(getContext(), var);
-    recordPatternType(result, getType(typeID));
+    auto typeOrErr = getTypeChecked(typeID);
+    if (!typeOrErr)
+      return typeOrErr.takeError();
+    recordPatternType(result, typeOrErr.get());
     restoreOffset.reset();
     return result;
   }
@@ -3037,7 +3040,14 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
 
   SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {
-    auto accessor = dyn_cast_or_null<AccessorDecl>(getDecl(id));
+    auto accessorOrErr = getDeclChecked(id);
+    if (!accessorOrErr) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(accessorOrErr.takeError());
+      diagnoseAndConsumeError(accessorOrErr.takeError());
+      continue;
+    }
+    auto accessor = dyn_cast_or_null<AccessorDecl>(accessorOrErr.get());
     if (!accessor) return;
     accessors.push_back(accessor);
   }
@@ -3258,9 +3268,11 @@ public:
     auto genericSig = MF.getGenericSignature(genericSigID);
     alias->setGenericSignature(genericSig);
 
-    auto underlying = MF.getType(underlyingTypeID);
-    alias->setUnderlyingType(underlying);
-    
+    auto underlyingOrErr = MF.getTypeChecked(underlyingTypeID);
+    if (!underlyingOrErr)
+      return underlyingOrErr.takeError();
+    alias->setUnderlyingType(underlyingOrErr.get());
+
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
     else
@@ -4214,7 +4226,9 @@ public:
                                               rawAccessLevel);
     
     auto declContext = MF.getDeclContext(contextID);
-    auto interfaceSig = MF.getGenericSignature(interfaceSigID);
+    auto interfaceSigOrErr = MF.getGenericSignatureChecked(interfaceSigID);
+    if (!interfaceSigOrErr)
+      return interfaceSigOrErr.takeError();
 
     // Check for reentrancy.
     if (declOrOffset.isComplete())
@@ -4225,7 +4239,7 @@ public:
     // Create the decl.
     auto opaqueDecl = OpaqueTypeDecl::get(
         /*NamingDecl=*/ nullptr, genericParams, declContext,
-        interfaceSig, /*OpaqueReturnTypeReprs*/ { });
+        interfaceSigOrErr.get(), /*OpaqueReturnTypeReprs*/ { });
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
