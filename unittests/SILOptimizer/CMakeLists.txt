@@ -6,4 +6,5 @@ target_link_libraries(SwiftSILOptimizerTests
    PRIVATE
    swiftSILOptimizer
    swiftIRGen
+   swiftAST
 )
