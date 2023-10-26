@@ -232,7 +232,7 @@ class PartitionOpTranslator;
 
 struct PartitionOpBuilder {
   /// Parent translator that contains state.
-  PartitionOpTranslator *translater;
+  PartitionOpTranslator *translator;
 
   /// Used to statefully track the instruction currently being translated, for
   /// insertion into generated PartitionOps.
@@ -470,7 +470,7 @@ public:
     assert(sendableProtocol && "PartitionOpTranslators should only be created "
                                "in contexts in which the availability of the "
                                "Sendable protocol has already been checked.");
-    builder.translater = this;
+    builder.translator = this;
     initCapturedUniquelyIdentifiedValues();
 
     LLVM_DEBUG(llvm::dbgs() << "Initializing Function Args:\n");
@@ -1134,11 +1134,11 @@ public:
 };
 
 TrackableValueID PartitionOpBuilder::lookupValueID(SILValue value) {
-  return translater->lookupValueID(value);
+  return translator->lookupValueID(value);
 }
 
 bool PartitionOpBuilder::valueHasID(SILValue value, bool dumpIfHasNoID) {
-  return translater->valueHasID(value, dumpIfHasNoID);
+  return translator->valueHasID(value, dumpIfHasNoID);
 }
 
 void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
@@ -1182,9 +1182,9 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
   sortUnique(opsToPrint);
   for (unsigned opArg : opsToPrint) {
     llvm::dbgs() << "          └╼ ";
-    SILValue value = translater->stateIndexToEquivalenceClass[opArg];
-    auto iter = translater->equivalenceClassValuesToState.find(value);
-    assert(iter != translater->equivalenceClassValuesToState.end());
+    SILValue value = translator->stateIndexToEquivalenceClass[opArg];
+    auto iter = translator->equivalenceClassValuesToState.find(value);
+    assert(iter != translator->equivalenceClassValuesToState.end());
     llvm::dbgs() << "State: %%" << opArg << ". ";
     iter->getSecond().print(llvm::dbgs());
     llvm::dbgs() << "\n             Value: " << value;
