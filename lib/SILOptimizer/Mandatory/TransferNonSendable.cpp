@@ -2013,7 +2013,7 @@ class TransferNonSendable : public SILFunctionTransform {
     SILFunction *function = getFunction();
 
     if (!function->getASTContext().LangOpts.hasFeature(
-            Feature::TransferNonSendable))
+            Feature::RegionBasedIsolation))
       return;
 
     LLVM_DEBUG(llvm::dbgs()

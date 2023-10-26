@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify %s
-// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify -enable-experimental-feature TransferNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -parse-as-library -enable-experimental-feature StrictConcurrency=complete -enable-experimental-feature GlobalConcurrency -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

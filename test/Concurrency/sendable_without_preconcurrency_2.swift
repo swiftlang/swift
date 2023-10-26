@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature TransferNonSendable
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

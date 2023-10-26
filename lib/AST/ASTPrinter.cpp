@@ -3569,7 +3569,7 @@ static bool usesFeatureParameterPacks(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureTransferNonSendable(Decl *decl) { return false; }
+static bool usesFeatureRegionBasedIsolation(Decl *decl) { return false; }
 
 static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
 
