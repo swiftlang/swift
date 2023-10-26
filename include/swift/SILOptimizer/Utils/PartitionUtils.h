@@ -361,12 +361,12 @@ public:
     if (indices.empty())
       return p;
 
-    Region max_index =
-        Region(*std::max_element(indices.begin(), indices.end()));
-    p.fresh_label = Region(max_index + 1);
+    auto maxIndex = Element(0);
     for (Element index : indices) {
       p.labels.insert_or_assign(index, Region(index));
+      maxIndex = Element(std::max(maxIndex, index));
     }
+    p.fresh_label = Region(maxIndex + 1);
     assert(p.is_canonical_correct());
     return p;
   }
