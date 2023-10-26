@@ -482,7 +482,7 @@ public:
     for (SILArgument *arg : functionArguments) {
       if (auto state = tryToTrackValue(arg)) {
         // If we have an arg that is an actor, we allow for it to be
-        // consumed... value ids derived from it though cannot be consumed.
+        // transfer... value ids derived from it though cannot be transferred.
         LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID());
         neverTransferredValueIDs.push_back(state->getID());
         nonSendableIndices.push_back(state->getID());
@@ -1071,7 +1071,7 @@ public:
 
     // We ignore begin_access since we look through them. We look through them
     // since we want to treat the use of the begin_access as the semantic giving
-    // instruction. Otherwise, if we have a store after a consume we will emit
+    // instruction. Otherwise, if we have a store after a transfer we will emit
     // an error on the begin_access rather than allowing for the store to
     // overwrite the original value. This would then cause an error.
     //
@@ -1343,7 +1343,7 @@ private:
 /// causes a target access to be invalid because of merging/joining that spans
 /// many different blocks worth of control flow, it is less likely to be
 /// informative, so distance is used as a heuristic to choose which access sites
-/// to display in diagnostics given a racy consumption.
+/// to display in diagnostics given a racy transfer.
 class TransferredReason {
   std::multimap<unsigned, PartitionOp> transferOps;
 
@@ -1437,7 +1437,7 @@ public:
       unsigned numDisplayed = numProcessed;
       unsigned numHidden = requireOps.size() - numProcessed;
       if (!tryDiagnoseAsCallSite(transferOp, numDisplayed, numHidden)) {
-        assert(false && "no consumptions besides callsites implemented yet");
+        assert(false && "no transfers besides callsites implemented yet");
 
         // Default to a more generic diagnostic if we can't find the callsite.
         auto expr = getExprForPartitionOp(transferOp);
@@ -1486,16 +1486,17 @@ private:
     SILInstruction *sourceInst =
         transferOp.getSourceInst(/*assertNonNull=*/true);
     ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+
+    // If the transfer does not correspond to an apply expression... bail.
     if (!apply)
-      // consumption does not correspond to an apply expression
       return false;
+
     auto isolationCrossing = apply->getIsolationCrossing();
     assert(isolationCrossing && "ApplyExprs should be transferring only if "
                                 "they are isolation crossing");
 
     auto argExpr = transferOp.getSourceExpr();
-    assert(argExpr &&
-           "sourceExpr should be populated for ApplyExpr consumptions");
+    assert(argExpr && "sourceExpr should be populated for ApplyExpr transfers");
 
     sourceInst->getFunction()
         ->getASTContext()
@@ -1648,13 +1649,13 @@ class RaceTracer {
   findLocalTransferredReason(SILBasicBlock *SILBlock,
                              TrackableValueID transferredVal,
                              std::optional<PartitionOp> targetOp = {}) {
-    // if this is a query for consumption reason at block exit, check the cache
+    // If this is a query for transfer reason at block exit, check the cache.
     if (!targetOp && transferredAtExitReasons.count({SILBlock, transferredVal}))
       return transferredAtExitReasons.at({SILBlock, transferredVal});
 
     const BlockPartitionState &block = blockStates[SILBlock];
 
-    // if targetOp is null, we're checking why the value is transferred at exit,
+    // If targetOp is null, we're checking why the value is transferred at exit,
     // so assert that it's actually transferred at exit
     assert(targetOp || block.getExitPartition().isTransferred(transferredVal));
 
@@ -1662,8 +1663,8 @@ class RaceTracer {
 
     Partition workingPartition = block.getEntryPartition();
 
-    // we're looking for a local reason, so if the value is transferred at
-    // entry, revive it for the sake of this search
+    // We are looking for a local reason, so if the value is transferred at
+    // entry, revive it for the sake of this search.
     if (workingPartition.isTransferred(transferredVal))
       workingPartition.apply(PartitionOp::AssignFresh(transferredVal));
 
@@ -1674,16 +1675,16 @@ class RaceTracer {
       workingPartition.apply(partitionOp);
       if (workingPartition.isTransferred(transferredVal) &&
           !transferredReason) {
-        // this partitionOp transfers the target value
+        // This partitionOp transfers the target value.
         if (partitionOp.getKind() == PartitionOpKind::Transfer)
           transferredReason = LocalTransferredReason::TransferInst(partitionOp);
         else
-          // a merge or assignment invalidated this, but that will be a separate
-          // failure to diagnose, so we don't worry about it here
+          // A merge or assignment invalidated this, but that will be a separate
+          // failure to diagnose, so we don't worry about it here.
           transferredReason = LocalTransferredReason::NonTransferInst();
       }
       if (!workingPartition.isTransferred(transferredVal) && transferredReason)
-        // value is no longer transferred - e.g. reassigned or assigned fresh
+        // Value is no longer transferred - e.g. reassigned or assigned fresh.
         transferredReason = llvm::None;
 
       // continue walking block
@@ -1691,18 +1692,18 @@ class RaceTracer {
       return true;
     });
 
-    // if we failed to find a local transfer reason, but the value was
-    // transferred at entry to the block, then the reason is "NonLocal"
+    // If we failed to find a local transfer reason, but the value was
+    // transferred at entry to the block, then the reason is "NonLocal".
     if (!transferredReason &&
         block.getEntryPartition().isTransferred(transferredVal))
       transferredReason = LocalTransferredReason::NonLocal();
 
-    // if transferredReason is none, then transferredVal was not actually
-    // transferred
+    // If transferredReason is none, then transferredVal was not actually
+    // transferred.
     assert(transferredReason || dumpBlockSearch(SILBlock, transferredVal) &&
-                                    " no consumption was found");
+                                    " no transfer was found");
 
-    // if this is a query for consumption reason at block exit, update the cache
+    // If this is a query for a transfer reason at block exit, update the cache.
     if (!targetOp)
       return transferredAtExitReasons[std::pair{SILBlock, transferredVal}] =
                  transferredReason.value();
@@ -1908,7 +1909,7 @@ class PartitionAnalysis {
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             auto expr = getExprForPartitionOp(partitionOp);
 
-            // ensure that multiple consumptions at the same AST node are only
+            // ensure that multiple transfers at the same AST node are only
             // entered once into the race tracer
             if (hasBeenEmitted(expr))
               return;
@@ -1923,10 +1924,10 @@ class PartitionAnalysis {
             raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
           },
 
-          /*handleTransferNonConsumable=*/
+          /*handleTransferNonTransferrable=*/
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             LLVM_DEBUG(llvm::dbgs()
-                       << "Emitting ConsumeNonConsume Error!\n"
+                       << "Emitting TransferNonTransferrable Error!\n"
                        << "ID:  %%" << transferredVal << "\n"
                        << "Rep: "
                        << *translator.getValueForId(transferredVal)
@@ -1940,7 +1941,7 @@ class PartitionAnalysis {
     LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
                raceTracer.getAccumulator().print(llvm::dbgs()););
 
-    // Ask the raceTracer to report diagnostics at the consumption sites for all
+    // Ask the raceTracer to report diagnostics at the transfer sites for all
     // the racy requirement sites entered into it above.
     raceTracer.getAccumulator().emitErrorsForTransferRequire(
         NUM_REQUIREMENTS_TO_DIAGNOSE);
@@ -1951,9 +1952,12 @@ class PartitionAnalysis {
     SILInstruction *sourceInst =
         transferOp.getSourceInst(/*assertNonNull=*/true);
     ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+
+    // If the transfer does not correspond to an apply expression... return
+    // early.
     if (!apply)
-      // consumption does not correspond to an apply expression
       return false;
+
     auto isolationCrossing = apply->getIsolationCrossing();
     if (!isolationCrossing) {
       assert(false && "ApplyExprs should be transferring only if"
@@ -1962,8 +1966,7 @@ class PartitionAnalysis {
     }
     auto argExpr = transferOp.getSourceExpr();
     if (!argExpr)
-      assert(false &&
-             "sourceExpr should be populated for ApplyExpr consumptions");
+      assert(false && "sourceExpr should be populated for ApplyExpr transfers");
 
     function->getASTContext()
         .Diags

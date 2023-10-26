@@ -83,7 +83,7 @@ enum class PartitionOpKind : uint8_t {
   /// non-transferred regions.
   Merge,
 
-  /// Consume the region of a value if not already transferred, takes one arg.
+  /// Transfer the region of a value if not already transferred, takes one arg.
   Transfer,
 
   /// Require the region of a value to be non-transferred, takes one arg.
@@ -104,7 +104,7 @@ private:
   SILInstruction *sourceInst;
 
   /// Record an AST expression corresponding to this PartitionOp, currently
-  /// populated only for Consume expressions to indicate the value being
+  /// populated only for Transfer expressions to indicate the value being
   /// transferred
   Expr *sourceExpr;
 
@@ -381,17 +381,17 @@ public:
   /// `handleFailure` closure can optionally be passed in that will be called if
   /// a transferred region is required. The closure is given the PartitionOp
   /// that failed, and the index of the SIL value that was required but
-  /// transferred. Additionally, a list of "nonconsumable" indices can be passed
-  /// in along with a handleConsumeNonConsumable closure. In the event that a
-  /// region containing one of the nonconsumable indices is transferred, the
-  /// closure will be called with the offending transfer.
+  /// transferred. Additionally, a list of "nontransferrable" indices can be
+  /// passed in along with a handleTransferNonTransferrable closure. In the
+  /// event that a region containing one of the nontransferrable indices is
+  /// transferred, the closure will be called with the offending transfer.
   void apply(
       PartitionOp op,
       llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
           [](const PartitionOp &, Element) {},
-      ArrayRef<Element> nonconsumables = {},
+      ArrayRef<Element> nontransferrables = {},
       llvm::function_ref<void(const PartitionOp &, Element)>
-          handleConsumeNonConsumable = [](const PartitionOp &, Element) {},
+          handleTransferNonTransferrable = [](const PartitionOp &, Element) {},
       llvm::function_ref<bool(Element)> isActorDerived = nullptr) {
 
     REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
@@ -431,28 +431,29 @@ public:
       break;
     case PartitionOpKind::Transfer: {
       assert(op.OpArgs.size() == 1 &&
-             "Consume PartitionOp should be passed 1 argument");
+             "Transfer PartitionOp should be passed 1 argument");
       assert(labels.count(op.OpArgs[0]) &&
-             "Consume PartitionOp's argument should already be tracked");
+             "Transfer PartitionOp's argument should already be tracked");
 
-      // check if any nonconsumables are transferred here, and handle the
+      // check if any nontransferrables are transferred here, and handle the
       // failure if so
-      for (Element nonconsumable : nonconsumables) {
-        assert(labels.count(nonconsumable) &&
-               "nonconsumables should be function args and self, and therefore"
-               "always present in the label map because of initialization at "
-               "entry");
-        if (!isTransferred(nonconsumable) &&
-            labels.at(nonconsumable) == labels.at(op.OpArgs[0])) {
-          handleConsumeNonConsumable(op, nonconsumable);
+      for (Element nonTransferrable : nontransferrables) {
+        assert(
+            labels.count(nonTransferrable) &&
+            "nontransferrables should be function args and self, and therefore"
+            "always present in the label map because of initialization at "
+            "entry");
+        if (!isTransferred(nonTransferrable) &&
+            labels.at(nonTransferrable) == labels.at(op.OpArgs[0])) {
+          handleTransferNonTransferrable(op, nonTransferrable);
           break;
         }
       }
 
       // If this value is actor derived or if any elements in its region are
-      // actor derived, we need to treat as non-consumable.
+      // actor derived, we need to treat as nontransferrable.
       if (isActorDerived && isActorDerived(op.OpArgs[0]))
-        return handleConsumeNonConsumable(op, op.OpArgs[0]);
+        return handleTransferNonTransferrable(op, op.OpArgs[0]);
       Region elementRegion = labels.at(op.OpArgs[0]);
       if (llvm::any_of(labels,
                        [&](const std::pair<Element, Region> &pair) -> bool {
@@ -460,7 +461,7 @@ public:
                            return false;
                          return isActorDerived && isActorDerived(pair.first);
                        }))
-        return handleConsumeNonConsumable(op, op.OpArgs[0]);
+        return handleTransferNonTransferrable(op, op.OpArgs[0]);
 
       // Ensure if the region is transferred...
       if (!isTransferred(op.OpArgs[0]))
