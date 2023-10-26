@@ -92,7 +92,7 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xcc" "-DNDEBUG")
   endif()
 
-  if("${BRIDGING_MODE}" STREQUAL "PURE")
+  if("${SWIFT_BRIDGING_MODE}" STREQUAL "PURE")
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
 
