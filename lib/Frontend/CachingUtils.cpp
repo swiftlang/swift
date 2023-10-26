@@ -209,18 +209,14 @@ bool replayCachedCompilerOutputs(
               Outputs.try_emplace(ID, File);
             });
 
-    // Nothing to replay.
-    if (Outputs.empty())
-      return;
+    // Add cached diagnostic entry for lookup. Output path doesn't matter here.
+    Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
+                        "<cached-diagnostics>");
 
     return replayOutputsForInputFile(InputPath, Outputs);
   };
 
   llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
-
-  replayOutputsForInputFile(
-      "<cached-diagnostics>",
-      {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
   if (!CanReplayAllOutput)
     return false;

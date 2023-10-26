@@ -50,9 +50,8 @@ enum class SwiftCacheToolAction {
 
 struct OutputEntry {
   std::string InputPath;
-  std::string OutputPath;
-  std::string OutputKind;
   std::string CacheKey;
+  std::vector<std::pair<std::string, std::string>> Outputs;
 };
 
 enum ID {
@@ -285,35 +284,30 @@ int SwiftCacheToolInvocation::printOutputKeys() {
 
   std::vector<OutputEntry> OutputKeys;
   bool hasError = false;
-  auto addOutputKey = [&](StringRef InputPath, file_types::ID OutputKind,
-                          StringRef OutputPath) {
+  auto addFromInputFile = [&](const InputFile &Input) {
+    auto InputPath = Input.getFileName();
     auto OutputKey =
         createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
     if (!OutputKey) {
-      llvm::errs() << "cannot create cache key for " << OutputPath << ": "
+      llvm::errs() << "cannot create cache key for " << InputPath << ": "
                    << toString(OutputKey.takeError()) << "\n";
       hasError = true;
     }
     OutputKeys.emplace_back(
-        OutputEntry{InputPath.str(), OutputPath.str(),
-                    file_types::getTypeName(OutputKind).str(),
-                    CAS.getID(*OutputKey).toString()});
-  };
-  auto addFromInputFile = [&](const InputFile &Input) {
-    auto InputPath = Input.getFileName();
+        OutputEntry{InputPath, CAS.getID(*OutputKey).toString(), {}});
+    auto &Outputs = OutputKeys.back().Outputs;
     if (!Input.outputFilename().empty())
-      addOutputKey(InputPath,
-                   Invocation.getFrontendOptions()
-                       .InputsAndOutputs.getPrincipalOutputType(),
-                   Input.outputFilename());
+      Outputs.emplace_back(file_types::getTypeName(
+                               Invocation.getFrontendOptions()
+                                   .InputsAndOutputs.getPrincipalOutputType()),
+                           Input.outputFilename());
     Input.getPrimarySpecificPaths()
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &File, file_types::ID ID) {
               // Dont print serialized diagnostics.
               if (file_types::isProducedFromDiagnostics(ID))
                 return;
-
-              addOutputKey(InputPath, ID, File);
+              Outputs.emplace_back(file_types::getTypeName(ID), File);
             });
   };
   llvm::for_each(
@@ -321,8 +315,10 @@ int SwiftCacheToolInvocation::printOutputKeys() {
       addFromInputFile);
 
   // Add diagnostics file.
-  addOutputKey("<cached-diagnostics>", file_types::ID::TY_CachedDiagnostics,
-               "<cached-diagnostics>");
+  if (!OutputKeys.empty())
+    OutputKeys.front().Outputs.emplace_back(
+        file_types::getTypeName(file_types::ID::TY_CachedDiagnostics),
+        "<cached-diagnostics>");
 
   if (hasError)
     return 1;
@@ -331,10 +327,16 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   Out.array([&] {
     for (const auto &E : OutputKeys) {
       Out.object([&] {
-        Out.attribute("OutputPath", E.OutputPath);
-        Out.attribute("OutputKind", E.OutputKind);
         Out.attribute("Input", E.InputPath);
         Out.attribute("CacheKey", E.CacheKey);
+        Out.attributeArray("Outputs", [&] {
+          for (const auto &OutEntry : E.Outputs) {
+            Out.object([&] {
+              Out.attribute("Kind", OutEntry.first);
+              Out.attribute("Path", OutEntry.second);
+            });
+          }
+        });
       });
     }
   });

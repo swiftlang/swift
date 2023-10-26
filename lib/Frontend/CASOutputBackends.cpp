@@ -157,6 +157,12 @@ void SwiftCASOutputBackend::Implementation::initBackend(
             });
   };
   llvm::for_each(InputsAndOutputs.getAllInputs(), addInput);
+
+  // FIXME: Cached diagnostics is associated with the first output producing
+  // input file.
+  OutputToInputMap.insert({"<cached-diagnostics>",
+                           {InputsAndOutputs.getFirstOutputProducingInput(),
+                            file_types::TY_CachedDiagnostics}});
 }
 
 Error SwiftCASOutputBackend::Implementation::storeImpl(

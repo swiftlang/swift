@@ -157,6 +157,8 @@ public:
   /// instead of just answering "batch" if there is more than one primary.
   std::string getStatsFileMangledInputName() const;
 
+  const InputFile &getFirstOutputProducingInput() const;
+
   bool isInputPrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;
