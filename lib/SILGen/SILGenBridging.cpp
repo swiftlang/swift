@@ -2134,7 +2134,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   // Set up the throw destination if necessary.
   CleanupLocation cleanupLoc(fd);
   if (thrownErrorType) {
-    prepareRethrowEpilog(*thrownErrorType, cleanupLoc);
+    prepareRethrowEpilog(fd,
+                         AbstractionPattern(*thrownErrorType),
+                         *thrownErrorType,
+                         cleanupLoc);
   }
 
   SILValue result;
