@@ -218,8 +218,8 @@ EXPERIMENTAL_FEATURE(BuiltinModule, true)
 // Enable strict concurrency.
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
-/// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(SendNonSendable, false)
+/// Region Based Isolation testing using the TransferNonSendable pass
+EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
 
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)

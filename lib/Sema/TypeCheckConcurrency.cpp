@@ -3182,7 +3182,7 @@ namespace {
 
       // check if language features ask us to defer sendable diagnostics
       // if so, don't check for sendability of arguments here
-      if (!ctx.LangOpts.hasFeature(Feature::SendNonSendable)) {
+      if (!ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation)) {
         diagnoseApplyArgSendability(apply, getDeclContext());
       }
 

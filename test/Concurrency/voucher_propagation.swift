@@ -159,7 +159,7 @@ func withVouchers(call: @Sendable @escaping (voucher_t?, voucher_t?, voucher_t?)
 
       // Clear any voucher that the call adopted.
       adopt(voucher: nil)
-      group.leave() // expected-complete-sns-warning {{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
+      group.leave() // expected-complete-tns-warning {{capture of 'group' with non-sendable type 'DispatchGroup' in a `@Sendable` closure}}
     }
     group.wait()
 

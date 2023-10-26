@@ -41,9 +41,9 @@ using PartitionTester = Partition::PartitionTester;
 //                                   Tests
 //===----------------------------------------------------------------------===//
 
-// this test tests that if a series of merges is split between two partitions
+// This test tests that if a series of merges is split between two partitions
 // p1 and p2, but also applied in its entirety to p3, then joining p1 and p2
-// yields p3
+// yields p3.
 TEST(PartitionUtilsTest, TestMergeAndJoin) {
   Partition p1;
   Partition p2;
@@ -354,7 +354,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
   ASSERT_EQ(tester.getRegion(44), 3);
 }
 
-// This test tests the semantics of assignment
+// This test tests the semantics of assignment.
 TEST(PartitionUtilsTest, TestAssign) {
   Partition p1;
   Partition p2;

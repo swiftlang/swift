@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-sns- -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-sns- -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-tns- -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix complete-tns- -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -14,14 +14,14 @@ actor SomeGlobalActor {
 @MainActor(unsafe) func globalMain() { } // expected-note {{calls to global function 'globalMain()' from outside of its actor context are implicitly asynchronous}}
 
 @SomeGlobalActor(unsafe) func globalSome() { } // expected-note 2{{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
-// expected-complete-sns-note @-1 {{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
+// expected-complete-tns-note @-1 {{calls to global function 'globalSome()' from outside of its actor context are implicitly asynchronous}}
 
 // ----------------------------------------------------------------------
 // Witnessing and unsafe global actor
 // ----------------------------------------------------------------------
 protocol P1 {
   @MainActor(unsafe) func onMainActor() // expected-note{{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
-  // expected-complete-sns-note @-1 {{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
+  // expected-complete-tns-note @-1 {{mark the protocol requirement 'onMainActor()' 'async' to allow actor-isolated conformances}}
 }
 
 struct S1_P1: P1 {
@@ -38,7 +38,7 @@ struct S3_P1: P1 {
 
 struct S4_P1_quietly: P1 {
   @SomeGlobalActor func onMainActor() { }
-  // expected-complete-sns-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
+  // expected-complete-tns-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
 }
 
 @SomeGlobalActor
@@ -50,13 +50,13 @@ struct S4_P1: P1 {
 @MainActor(unsafe)
 protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-sns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   nonisolated func g()
 }
 
 struct S5_P2: P2 {
   func f() { } // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-sns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-complete-tns-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   func g() { }
 }
 
@@ -68,12 +68,12 @@ nonisolated func testP2(x: S5_P2, p2: P2) {
 }
 
 func testP2_noconcurrency(x: S5_P2, p2: P2) {
-  // expected-complete-sns-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
+  // expected-complete-tns-note @-1 2{{add '@MainActor' to make global function 'testP2_noconcurrency(x:p2:)' part of global actor 'MainActor'}}
   p2.f() // okay without complete. with targeted/minimal not concurrency-related code.
-  // expected-complete-sns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-tns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // okay
   x.f() // okay without complete. with targeted/minimal not concurrency-related code
-  // expected-complete-sns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-complete-tns-error @-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
@@ -87,7 +87,7 @@ class C1 {
 class C2: C1 {
   override func method() { // expected-note 2{{overridden declaration is here}}
     globalSome() // okay when not in complete
-    // expected-complete-sns-error @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
+    // expected-complete-tns-error @-1 {{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
