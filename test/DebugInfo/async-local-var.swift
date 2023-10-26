@@ -2,6 +2,7 @@
 // RUN:    -module-name a  -disable-availability-checking \
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 func getString() async -> String {
   return ""
