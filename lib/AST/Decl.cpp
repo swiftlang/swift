@@ -10540,22 +10540,15 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getActorIsolation(vd);
 
   // In the context of the initializing or default-value expression of a
-  // stored property, the isolation varies between instance and type members:
+  // stored property:
   //   - For a static stored property, the isolation matches the VarDecl.
   //     Static properties are initialized upon first use, so the isolation
   //     of the initializer must match the isolation required to access the
   //     property.
-  //   - For a field of a nominal type, the expression can require a specific
-  //     actor isolation. That default expression may only be used from inits
-  //     that meet the required isolation.
+  //   - For a field of a nominal type, the expression can require the same
+  //     actor isolation as the field itself. That default expression may only
+  //     be used from inits that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
-    auto &ctx = dc->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues) &&
-        var->isInstanceMember() &&
-        !var->getAttrs().hasAttribute<LazyAttr>()) {
-      return ActorIsolation::forNonisolated();
-    }
-
     return getActorIsolation(var);
   }
 
