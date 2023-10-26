@@ -1003,18 +1003,28 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
       decl, ctx.getIdentifier("value_type"));
   auto iterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
       decl, ctx.getIdentifier("const_iterator"));
-  if (!valueType || !iterType)
+  auto mutableIterType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("iterator"));
+  if (!valueType || !iterType || !mutableIterType)
     return;
 
   ProtocolDecl *cxxRandomAccessIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
-  if (!cxxRandomAccessIteratorProto)
+  ProtocolDecl *cxxMutableRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto || !cxxMutableRandomAccessIteratorProto)
     return;
 
   auto rawIteratorTy = iterType->getUnderlyingType();
+  auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
   if (!checkConformance(rawIteratorTy, cxxRandomAccessIteratorProto))
+    return;
+
+  // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
+  if (!checkConformance(rawMutableIteratorTy,
+                        cxxMutableRandomAccessIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
@@ -1023,6 +1033,8 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
                                valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
+                               rawMutableIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxVector});
 }
 
