@@ -33,6 +33,7 @@
 #include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/RuntimeInternals.h"
+#include "swift/RemoteInspection/TypeInfoBuilders.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"

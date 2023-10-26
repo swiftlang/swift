@@ -1,6 +1,7 @@
 
 add_swift_host_library(swiftRemoteInspection STATIC
   ${SWIFT_SOURCE_DIR}/stdlib/public/RemoteInspection/MetadataSource.cpp
+  ${SWIFT_SOURCE_DIR}/stdlib/public/RemoteInspection/TypeInfoBuilders.cpp
   ${SWIFT_SOURCE_DIR}/stdlib/public/RemoteInspection/TypeLowering.cpp
   ${SWIFT_SOURCE_DIR}/stdlib/public/RemoteInspection/TypeRef.cpp
   ${SWIFT_SOURCE_DIR}/stdlib/public/RemoteInspection/TypeRefBuilder.cpp)
