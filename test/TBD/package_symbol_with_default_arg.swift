@@ -7,15 +7,15 @@
 // RUN:  -emit-tbd -emit-tbd-path %t/libUtils.tbd -Xfrontend -tbd-install_name=%t/libUtils.dylib -Xfrontend -validate-tbd-against-ir=all
 
 // RUN: %FileCheck %s --check-prefix CHECK-TBD < %t/libUtils.tbd
-// CHECK-TBD-NOT: _$s5Utils6pubBar3argS2i_tFfA_
-// CHECK-TBD-NOT: _$s5Utils11internalBar3argS2i_tF
-// CHECK-TBD-NOT: _$s5Utils11internalBar3argS2i_tFfA_
-// CHECK-TBD-NOT: _$s5Utils11internalFoo3argS2i_tF
-// CHECK-TBD: _$s5Utils6pkgBar3argS2i_tF
-// CHECK-TBD: _$s5Utils6pkgBar3argS2i_tFfA_
-// CHECK-TBD: _$s5Utils6pkgFoo3argS2i_tF
-// CHECK-TBD: _$s5Utils6pubBar3argS2i_tF
-// CHECK-TBD: _$s5Utils6pubFoo3argS2i_tF
+// CHECK-TBD-NOT: $s5Utils6pubBar3argS2i_tFfA_
+// CHECK-TBD-NOT: $s5Utils11internalBar3argS2i_tF
+// CHECK-TBD-NOT: $s5Utils11internalBar3argS2i_tFfA_
+// CHECK-TBD-NOT: $s5Utils11internalFoo3argS2i_tF
+// CHECK-TBD: $s5Utils6pkgBar3argS2i_tF
+// CHECK-TBD: $s5Utils6pkgBar3argS2i_tFfA_
+// CHECK-TBD: $s5Utils6pkgFoo3argS2i_tF
+// CHECK-TBD: $s5Utils6pubBar3argS2i_tF
+// CHECK-TBD: $s5Utils6pubFoo3argS2i_tF
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(UtilsForTesting)) %t/Utils.swift \
 // RUN:  -module-name UtilsForTesting -package-name testpkg \
@@ -25,15 +25,15 @@
 
 
 // RUN: %FileCheck %s --check-prefix CHECK-TEST < %t/libUtilsForTesting.tbd
-// CHECK-TEST-NOT: _$s15UtilsForTesting6pubBar3argS2i_tFfA_
-// CHECK-TEST: _$s15UtilsForTesting11internalBar3argS2i_tF
-// CHECK-TEST: _$s15UtilsForTesting11internalBar3argS2i_tFfA_
-// CHECK-TEST: _$s15UtilsForTesting11internalFoo3argS2i_tF
-// CHECK-TEST: _$s15UtilsForTesting6pkgBar3argS2i_tF
-// CHECK-TEST: _$s15UtilsForTesting6pkgBar3argS2i_tFfA_
-// CHECK-TEST: _$s15UtilsForTesting6pkgFoo3argS2i_tF
-// CHECK-TEST: _$s15UtilsForTesting6pubBar3argS2i_tF
-// CHECK-TEST: _$s15UtilsForTesting6pubFoo3argS2i_tF
+// CHECK-TEST-NOT: $s15UtilsForTesting6pubBar3argS2i_tFfA_
+// CHECK-TEST: $s15UtilsForTesting11internalBar3argS2i_tF
+// CHECK-TEST: $s15UtilsForTesting11internalBar3argS2i_tFfA_
+// CHECK-TEST: $s15UtilsForTesting11internalFoo3argS2i_tF
+// CHECK-TEST: $s15UtilsForTesting6pkgBar3argS2i_tF
+// CHECK-TEST: $s15UtilsForTesting6pkgBar3argS2i_tFfA_
+// CHECK-TEST: $s15UtilsForTesting6pkgFoo3argS2i_tF
+// CHECK-TEST: $s15UtilsForTesting6pubBar3argS2i_tF
+// CHECK-TEST: $s15UtilsForTesting6pubFoo3argS2i_tF
 
 // RUN: %target-swift-frontend -typecheck %t/main.swift -I %t -L %t -lUtils -package-name mypkg -verify
 
