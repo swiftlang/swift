@@ -369,9 +369,20 @@ int SwiftCacheToolInvocation::validateOutputs() {
     report_fatal_error(DB.takeError());
 
   auto &CAS = *DB->first;
+  auto &Cache = *DB->second;
 
   PrintingDiagnosticConsumer PDC;
   Instance.getDiags().addConsumer(PDC);
+
+  auto lookupFailed = [&](StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << "\n";
+    return true;
+  };
+  auto lookupError = [&](llvm::Error Err, StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << ": "
+                 << toString(std::move(Err)) << "\n";
+    return true;
+  };
 
   auto validateCacheKeysFromFile = [&](const std::string &Path) {
     auto Keys = readOutputEntriesFromFile(Path);
@@ -391,28 +402,30 @@ int SwiftCacheToolInvocation::validateOutputs() {
             return true;
           }
           auto Ref = CAS.getReference(*ID);
-          if (!Ref) {
-            llvm::errs() << "failed to find output for cache key " << Key
-                         << "\n";
-            return true;
-          }
-          cas::CachedResultLoader Loader(*DB->first, *DB->second, *Ref);
-          auto Result = Loader.replay(
+          if (!Ref)
+            return lookupFailed(*Key);
+          auto KeyID = CAS.getID(*Ref);
+          auto Lookup = Cache.get(KeyID);
+          if (!Lookup)
+            return lookupError(Lookup.takeError(), *Key);
+
+          if (!*Lookup)
+            return lookupFailed(*Key);
+
+          auto OutputRef = CAS.getReference(**Lookup);
+          if (!OutputRef)
+            return lookupFailed(*Key);
+
+          cas::CachedResultLoader Loader(CAS, *OutputRef);
+          if (auto Err = Loader.replay(
                   [&](file_types::ID Kind, ObjectRef Ref) -> llvm::Error {
                     auto Proxy = CAS.getProxy(Ref);
                     if (!Proxy)
                       return Proxy.takeError();
                     return llvm::Error::success();
-                  });
-
-          if (!Result) {
+                  })) {
             llvm::errs() << "failed to find output for cache key " << *Key
-                         << ": " << toString(Result.takeError()) << "\n";
-            return true;
-          }
-          if (!*Result) {
-            llvm::errs() << "failed to load output for cache key " << *Key
-                         << "\n";
+                         << ": " << toString(std::move(Err)) << "\n";
             return true;
           }
           continue;

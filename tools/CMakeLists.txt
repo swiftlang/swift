@@ -28,6 +28,7 @@ add_swift_tool_subdirectory(libSwiftScan)
 add_swift_tool_subdirectory(libStaticMirror)
 add_swift_tool_subdirectory(libMockPlugin)
 add_swift_tool_subdirectory(swift-plugin-server)
+add_swift_tool_subdirectory(swift-scan-test)
 
 if(SWIFT_INCLUDE_TESTS OR SWIFT_INCLUDE_TEST_BINARIES)
   add_swift_tool_subdirectory(swift-ide-test)

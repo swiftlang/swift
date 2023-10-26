@@ -63,19 +63,19 @@ std::vector<std::string> remapPathsFromCommandLine(
 namespace cas {
 class CachedResultLoader {
 public:
-  CachedResultLoader(llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
-                     llvm::cas::ObjectRef CacheKey)
-      : CAS(CAS), Cache(Cache), CacheKey(CacheKey) {}
+  CachedResultLoader(llvm::cas::ObjectStore &CAS,
+                     llvm::cas::ObjectRef OutputRef)
+      : CAS(CAS), OutputRef(OutputRef) {}
 
   using CallbackTy =
       llvm::function_ref<llvm::Error(file_types::ID, llvm::cas::ObjectRef)>;
-  // Replay the cached result, return false if a cache miss happened.
-  llvm::Expected<bool> replay(CallbackTy Callback);
+
+  /// Replay the cached result.
+  llvm::Error replay(CallbackTy Callback);
 
 private:
   llvm::cas::ObjectStore &CAS;
-  llvm::cas::ActionCache &Cache;
-  llvm::cas::ObjectRef CacheKey;
+  llvm::cas::ObjectRef OutputRef;
 };
 } // end namespace cas
 } // end namespace swift
