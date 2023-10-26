@@ -1224,3 +1224,7 @@ ProtocolConformanceRef
 SILType::conformsToProtocol(SILFunction *fn, ProtocolDecl *protocol) const {
   return fn->getParentModule()->conformsToProtocol(getASTType(), protocol);
 }
+
+bool SILType::isSendable(SILFunction *fn) const {
+  return getASTType()->isSendableType(fn->getParentModule());
+}

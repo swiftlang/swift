@@ -232,10 +232,7 @@ extension MyActor {
 @available(SwiftStdlib 5.1, *)
 func testConversionsAndSendable(a: MyActor, s: any Sendable, f: @Sendable () -> Void) async {
   await a.f(s)
-
-  // FIXME: 'f' is Sendable
   await a.g(f)
-  // expected-tns-warning@-1 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
 }
 
 @available(SwiftStdlib 5.1, *)
