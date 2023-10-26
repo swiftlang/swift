@@ -3024,7 +3024,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
-      auto typeID = S.addTypeRef(theAttr->getType());
+      auto typeID = S.addTypeRef(
+          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr)));
       if (!typeID && !S.allowCompilerErrors()) {
         llvm::PrettyStackTraceString message("CustomAttr has no type");
         abort();

@@ -7,6 +7,10 @@ struct ConformsToPublicProto: PublicProto {
   func req() -> Int { return 1 }
 }
 
+struct ConformsToMainActorProto: MainActorProtocol {
+  func req() -> Int { return 1 }
+}
+
 func testGlobalFunctions() {
   _ = publicFunc()
   _ = publicFuncWithDefaultArg()
@@ -76,6 +80,12 @@ func testConformances() {
     _ = x.req()
     constrainedGenericPublicFunction(x)
   }
+}
+
+@MainActor
+func testMainActorConstraint() {
+  let _: ConformsToMainActorProto = ConformsToMainActorProto()
+  let _: Int = PublicStruct(x: 5).publicMainActorMethod()
 }
 
 // FIXME: This conformance ought to be included to verify that a redundant
