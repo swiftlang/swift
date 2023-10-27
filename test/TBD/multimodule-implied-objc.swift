@@ -19,10 +19,12 @@
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/cache \
 // RUN:   %t/Client.swift -emit-ir -o/dev/null -parse-as-library \
 // RUN:   -module-name client -validate-tbd-against-ir=missing \
-// RUN:   -emit-tbd -emit-tbd-path %t/client.tbd 
+// RUN:   -tbd-install_name client -emit-tbd -emit-tbd-path %t/client.tbd 
 
-// RUN: %FileCheck %s < %t/client.tbd
-// CHECK: objc-classes: [ _TtCO6client11extendedAPI6Square ]
+// RUN: %validate-json %t/client.tbd | %FileCheck %s
+
+// CHECK: "objc_class": 
+// CHECK: "_TtCO6client11extendedAPI6Square"
 // CHECK-NOT: _OBJC_CLASS_$
 // CHECK-NOT: _OBJC_METACLASS_$
 

@@ -593,7 +593,7 @@ TBDFile GenerateTBDRequest::evaluate(Evaluator &evaluator,
   auto &ctx = M->getASTContext();
 
   llvm::MachO::InterfaceFile file;
-  file.setFileType(llvm::MachO::FileType::TBD_V4);
+  file.setFileType(llvm::MachO::FileType::TBD_V5);
   file.setApplicationExtensionSafe(isApplicationExtensionSafe(ctx.LangOpts));
   file.setInstallName(opts.InstallName);
   file.setTwoLevelNamespace();
@@ -659,7 +659,7 @@ void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
   auto desc = TBDGenDescriptor::forModule(M, opts);
   auto file = llvm::cantFail(evaluator(GenerateTBDRequest{desc}));
   llvm::cantFail(llvm::MachO::TextAPIWriter::writeToStream(os, file),
-                 "YAML writing should be error-free");
+                 "TBD writing should be error-free");
 }
 
 class APIGenRecorder final : public APIRecorder {
