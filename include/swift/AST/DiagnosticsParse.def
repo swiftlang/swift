@@ -1485,6 +1485,10 @@ ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
+ERROR(multiple_access_level_modifiers,none,
+      "multiple incompatible access-level modifiers specified", ())
+NOTE(previous_access_level_modifier,none,
+     "previous modifier specified here", ())
 ERROR(mutually_exclusive_attrs,none,
       "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
 

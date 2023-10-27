@@ -3093,9 +3093,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!Tok.is(tok::l_paren)) {
       // Normal access control attribute.
       AttrRange = Loc;
-      DuplicateAttribute = Attributes.getAttribute<AccessControlAttr>();
-      if (!DuplicateAttribute)
+
+      if (!DiscardAttribute) {
         Attributes.add(new (Context) AccessControlAttr(AtLoc, Loc, access));
+        break;
+      }
+
+      // Diagnose if there's already an access control attribute on
+      // this declaration with a different access level.
+      if (access != cast<AccessControlAttr>(DuplicateAttribute)->getAccess()) {
+        diagnose(Loc, diag::multiple_access_level_modifiers)
+            .highlight(AttrRange);
+        diagnose(DuplicateAttribute->getLocation(),
+                 diag::previous_access_level_modifier)
+            .highlight(DuplicateAttribute->getRange());
+
+        // Remove the reference to the duplicate attribute
+        // to avoid the extra diagnostic.
+        DuplicateAttribute = nullptr;
+      }
       break;
     }
 
@@ -3125,11 +3141,28 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
+    // Check for duplicate setter access control attributes.
     DuplicateAttribute = Attributes.getAttribute<SetterAccessAttr>();
-    if (!DuplicateAttribute) {
+    DiscardAttribute = DuplicateAttribute != nullptr;
+
+    if (!DiscardAttribute) {
       Attributes.add(new (Context) SetterAccessAttr(AtLoc, AttrRange, access));
+      break;
     }
 
+    // Diagnose if there's already a setter access control attribute on
+    // this declaration with a different access level.
+    if (access != cast<SetterAccessAttr>(DuplicateAttribute)->getAccess()) {
+      diagnose(Loc, diag::multiple_access_level_modifiers)
+        .highlight(AttrRange);
+      diagnose(DuplicateAttribute->getLocation(),
+               diag::previous_access_level_modifier)
+          .highlight(DuplicateAttribute->getRange());
+
+      // Remove the reference to the duplicate attribute
+      // to avoid the extra diagnostic.
+      DuplicateAttribute = nullptr;
+    }
     break;
   }
 
