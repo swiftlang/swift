@@ -781,6 +781,7 @@ public:
 
     if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    // FIXME: TypedThrowsAnnotation
     if (F->getFlags().isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
@@ -1166,12 +1167,16 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError())
+      thrownErrorType = visit(F->getThrownError());
+
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *
@@ -1303,10 +1308,14 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError())
+      thrownErrorType = visit(F->getThrownError());
+
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *

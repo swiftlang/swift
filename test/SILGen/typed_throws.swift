@@ -11,10 +11,10 @@ enum MyBigError: Error {
 
 func throwsMyBigError() throws(MyBigError) { }
 
-// CHECK: sil hidden [ossa] @$s12typed_throws20doesNotThrowConcreteyyKF : $@convention(thin) () -> @error MyError
+// CHECK: sil hidden [ossa] @$s12typed_throws20doesNotThrowConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
 func doesNotThrowConcrete() throws(MyError) { }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B8ConcreteyyKF : $@convention(thin) () -> @error MyError
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B8ConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
 func throwsConcrete() throws(MyError) {
   // CHECK: [[ERROR:%[0-9]+]] = enum $MyError, #MyError.fail!enumelt
   // CHECK-NOT: builtin "willThrow"
@@ -22,7 +22,7 @@ func throwsConcrete() throws(MyError) {
   throw .fail
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws15rethrowConcreteyyKF
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws15rethrowConcreteyyAA7MyErrorOYKF
 func rethrowConcrete() throws(MyError) {
   // CHECK: try_apply [[FN:%[0-9]+]]() : $@convention(thin) () -> @error MyError, normal [[NORMALBB:bb[0-9]+]], error [[ERRORBB:bb[0-9]+]]
   // CHECK: [[ERRORBB]]([[ERROR:%[0-9]+]] : $MyError)
@@ -85,7 +85,7 @@ func throwsOneOrTheOtherWithRethrow() throws {
 // CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B26ConcreteWithDoCatchRethrowyyKF : $@convention(thin) () -> @error any Error
 func throwsConcreteWithDoCatchRethrow() throws {
   do {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyKF : $@convention(thin) () -> @error MyError
+    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
     // CHECK: try_apply [[FN]]() : $@convention(thin) () -> @error MyError, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     try throwsConcrete()
 
@@ -100,10 +100,10 @@ func throwsConcreteWithDoCatchRethrow() throws {
   // CHECK: throw [[ERR:%[0-9]+]] : $any Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B31ConcreteWithDoCatchTypedRethrowyyKF : $@convention(thin) () -> @error MyError
+// CHECK-LABEL: sil hidden [ossa] @$s12typed_throws0B31ConcreteWithDoCatchTypedRethrowyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
 func throwsConcreteWithDoCatchTypedRethrow() throws(MyError) {
   do {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyKF : $@convention(thin) () -> @error MyError
+    // CHECK: [[FN:%[0-9]+]] = function_ref @$s12typed_throws0B8ConcreteyyAA7MyErrorOYKF : $@convention(thin) () -> @error MyError
     // CHECK: try_apply [[FN]]() : $@convention(thin) () -> @error MyError, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     try throwsConcrete()
 

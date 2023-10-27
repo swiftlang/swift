@@ -2825,8 +2825,14 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Ya");
   if (fn->isSendable())
     appendOperator("Yb");
-  if (fn->isThrowing())
-    appendOperator("K");
+  if (auto thrownError = fn->getEffectiveThrownErrorType()) {
+    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())){
+      appendOperator("K");
+    } else {
+      appendType(*thrownError, sig);
+      appendOperator("YK");
+    }
+  }
   switch (auto diffKind = fn->getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;

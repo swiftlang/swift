@@ -1001,8 +1001,11 @@ public:
       #undef CASE
       }
 
+      BuiltType thrownError = BuiltType();
+      // FIXME: Read from metadata.
+
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind, globalActor);
+          Parameters, Result, flags, diffKind, globalActor, thrownError);
       TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }

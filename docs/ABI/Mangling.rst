@@ -646,6 +646,9 @@ Types
     global-actor :: = type 'Yc'                // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.11
+    throws ::= type 'YK'                     // 'throws(type)' annotation on function types
+  #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
   differentiable ::= 'Yjd'                   // @differentiable on function type
