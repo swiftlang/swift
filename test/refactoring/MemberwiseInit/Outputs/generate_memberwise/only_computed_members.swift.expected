@@ -6,8 +6,8 @@ class Person {
   var avgHeight = 175
   let line = #line, file = #file, handle = #dsohandle
   lazy var idea: Idea = { fatalError() }()
-  var location: () throws -> Place = { fatalError() }
-  var secondLocation: (() -> Place)!
+  var location: () throws -> Place<Int> = { fatalError() }
+  var secondLocation: (() -> Place<Int>)!
   @MyWrapper var wrapped: String = ""
   var computed: String { "hi" }
   var getSet: String {
