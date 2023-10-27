@@ -1310,9 +1310,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
 
   // Only certain decls can be ObjC.
   llvm::Optional<Diag<>> error;
-  if (isa<ClassDecl>(D) ||
-      isa<ProtocolDecl>(D)) {
+  if (isa<ClassDecl>(D)) {
     /* ok */
+  } else if (auto *P = dyn_cast<ProtocolDecl>(D)) {
+    if (P->isMarkerProtocol())
+      error = diag::invalid_objc_decl;
+    /* ok on non-marker protocols */
   } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
     if (!Ext->getSelfClassDecl())
       error = diag::objc_extension_not_class;
