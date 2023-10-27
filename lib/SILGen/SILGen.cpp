@@ -1416,13 +1416,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       emitNativeToForeignThunk(thunk);
   }
 
-  if (auto thunkDecl = AFD->getDistributedThunk()) {
-    if (!thunkDecl->isBodySkipped()) {
-      auto thunk = SILDeclRef(thunkDecl).asDistributed();
-      emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
-                             getFunction(thunk, ForDefinition));
-    }
-  }
+  emitDistributedThunkForDecl(AFD);
 
   if (AFD->isBackDeployed(M.getASTContext())) {
     // Emit the fallback function that will be used when the original function
