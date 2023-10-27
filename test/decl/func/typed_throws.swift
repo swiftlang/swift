@@ -135,3 +135,14 @@ struct HasASubscript {
 
 // expected-error@+1{{thrown type 'any Codable & Error' (aka 'any Decodable & Encodable & Error') does not conform to the 'Error' protocol}}
 func throwCodableErrors() throws(any Codable & Error) { }
+
+enum Either<First, Second> {
+case first(First)
+case second(Second)
+}
+
+extension Either: Error where First: Error, Second: Error { }
+
+func f<E1, E2>(_ error: Either<E1, E2>) throws(Either<E1, E2>) {
+  throw error
+}
