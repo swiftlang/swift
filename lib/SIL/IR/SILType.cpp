@@ -713,6 +713,15 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
   return false;
 }
 
+bool SILModuleConventions::isThrownIndirectlyInSIL(SILType type, SILModule &M) {
+  if (SILModuleConventions(M).loweredAddresses) {
+    return M.Types.getTypeLowering(type, TypeExpansionContext::minimal())
+        .isAddressOnly();
+  }
+
+  return false;
+}
+
 bool SILFunctionType::isNoReturnFunction(SILModule &M,
                                          TypeExpansionContext context) const {
   for (unsigned i = 0, e = getNumResults(); i < e; ++i) {
