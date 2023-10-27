@@ -1319,7 +1319,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   std::string conformanceList;
   {
     llvm::raw_string_ostream OS(conformanceList);
-    if (role == MacroRole::Extension) {
+    if (role == MacroRole::Extension || role == MacroRole::Member) {
       llvm::interleave(
           conformances,
           [&](const ProtocolDecl *protocol) {
