@@ -279,6 +279,22 @@ SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
   return reinterpret_cast<void *>(&value);
 }
 
+/// Helper struct that destroys any additional storage allocated (e.g. for
+/// resilient value types) for a Swift value owned by C++ code after the Swift
+/// value was consumed and thus the original C++ destructor is not ran.
+template <class T> class ConsumedValueStorageDestroyer {
+public:
+  SWIFT_INLINE_THUNK ConsumedValueStorageDestroyer(T &val) noexcept
+      : value(val) {}
+  SWIFT_INLINE_THUNK ~ConsumedValueStorageDestroyer() noexcept {
+    if constexpr (isOpaqueLayout<T>)
+      reinterpret_cast<OpaqueStorage &>(value).~OpaqueStorage();
+  }
+
+private:
+  T &value;
+};
+
 } // namespace _impl
 
 #pragma clang diagnostic pop
