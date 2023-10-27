@@ -2627,14 +2627,28 @@ public:
     if (yieldType) {
       substYieldType = visit(yieldType, yieldPattern);
     }
-    
+
+    CanType newErrorType;
+
+    if (auto optPair = pattern.getFunctionThrownErrorType(func)) {
+      auto errorPattern = optPair->first;
+      auto errorType = optPair->second;
+      newErrorType = visit(errorType, errorPattern);
+    }
+
     auto newResultTy = visit(func.getResult(),
                              pattern.getFunctionResultType());
 
     llvm::Optional<FunctionType::ExtInfo> extInfo;
     if (func->hasExtInfo())
       extInfo = func->getExtInfo();
-    
+
+    if (newErrorType) {
+      if (!extInfo)
+        extInfo = FunctionType::ExtInfo();
+      extInfo = extInfo->withThrows(true, newErrorType);
+    }
+
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
                                 newResultTy, extInfo);
   }
