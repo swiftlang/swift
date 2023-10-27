@@ -151,6 +151,12 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
       continue;
     }
 
+    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
+      if (Def != MDI->getBase())
+        return false;
+      continue;
+    }
+
     // Check array semantic calls.
     ArraySemanticsCall ArrayOp(User);
     switch (ArrayOp.getKind()) {
