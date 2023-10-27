@@ -27,6 +27,9 @@ actor Actor {
   final var finalKlass = NonSendableKlass()
 
   func useKlass(_ x: NonSendableKlass) {}
+
+  func useSendableFunction(_: @Sendable () -> Void) {}
+  func useNonSendableFunction(_: () -> Void) {}
 }
 
 final actor FinalActor {
@@ -468,4 +471,23 @@ extension Actor {
     // But this will error since we race.
     closure() // expected-tns-note {{access here could race}}
   }
+}
+
+/////////////////////////////
+// Sendable Function Tests //
+/////////////////////////////
+
+// Make sure that we do not error on function values that are Sendable... even
+// if the function is converted to a non-Sendable form by a function conversion.
+func testConversionsAndSendable(a: Actor, f: @Sendable () -> Void, f2: () -> Void) async {
+  // No function conversion.
+  await a.useSendableFunction(f)
+
+  // Function conversion.
+  await a.useNonSendableFunction(f)
+
+  // Show that we error if we are not sendable.
+  await a.useNonSendableFunction(f2) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
+  // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }

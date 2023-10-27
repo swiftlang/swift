@@ -659,6 +659,13 @@ bool swift::isSendableType(ModuleDecl *module, Type type) {
   if (!proto)
     return true;
 
+  // First check if we have a function type. If we do, check if it is
+  // Sendable. We do this since functions cannot conform to protocols.
+  if (auto *fas = type->getCanonicalType()->getAs<SILFunctionType>())
+    return fas->isSendable();
+  if (auto *fas = type->getCanonicalType()->getAs<AnyFunctionType>())
+    return fas->isSendable();
+
   auto conformance = TypeChecker::conformsToProtocol(type, proto, module);
   if (conformance.isInvalid())
     return false;

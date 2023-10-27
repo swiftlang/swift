@@ -318,7 +318,6 @@ class PartitionOpTranslator {
   friend PartitionOpBuilder;
 
   SILFunction *function;
-  ProtocolDecl *sendableProtocol;
 
   /// A map from the representative of an equivalence class of values to their
   /// TrackableValueState. The state contains both the unique value id for the
@@ -460,13 +459,7 @@ class PartitionOpTranslator {
 
 public:
   PartitionOpTranslator(SILFunction *function)
-      : function(function),
-        sendableProtocol(
-            function->getASTContext().getProtocol(KnownProtocolKind::Sendable)),
-        functionArgPartition(), builder() {
-    assert(sendableProtocol && "PartitionOpTranslators should only be created "
-                               "in contexts in which the availability of the "
-                               "Sendable protocol has already been checked.");
+      : function(function), functionArgPartition(), builder() {
     builder.translator = this;
     initCapturedUniquelyIdentifiedValues();
 
@@ -483,7 +476,7 @@ public:
       if (auto state = tryToTrackValue(arg)) {
         // If we have an arg that is an actor, we allow for it to be
         // transfer... value ids derived from it though cannot be transferred.
-        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID());
+        LLVM_DEBUG(llvm::dbgs() << "    %%" << state->getID() << ": ");
         neverTransferredValueIDs.push_back(state->getID());
         nonSendableIndices.push_back(state->getID());
         LLVM_DEBUG(llvm::dbgs() << *arg);
@@ -530,16 +523,14 @@ private:
   /// NOTE: We special case RawPointer and NativeObject to ensure they are
   /// treated as non-Sendable and strict checking is applied to it.
   bool isNonSendableType(SILType type) const {
-    switch (type.getASTType()->getKind()) {
-    case TypeKind::BuiltinNativeObject:
-    case TypeKind::BuiltinRawPointer:
-      // These are very unsafe... definitely not Sendable.
+    // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
+    if (type.getASTType()->is<BuiltinNativeObjectType>() ||
+        type.getASTType()->is<BuiltinRawPointerType>()) {
       return true;
-    default:
-      // Consider caching this if it's a performance bottleneck.
-      return type.conformsToProtocol(function, sendableProtocol)
-          .hasMissingConformance(function->getParentModule());
     }
+
+    // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
+    return !type.isSendable(function);
   }
 
   // ===========================================================================

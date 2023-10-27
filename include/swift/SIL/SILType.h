@@ -880,6 +880,9 @@ public:
 
   bool isActor() const { return getASTType()->isActorType(); }
 
+  /// Returns true if this function conforms to the Sendable protocol.
+  bool isSendable(SILFunction *fn) const;
+
   ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
                                             ProtocolDecl *protocol) const;
 
