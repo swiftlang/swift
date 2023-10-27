@@ -3872,6 +3872,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     break;
   }
+  case DAK_Nonisolated: {
+    auto isUnsafe =
+        parseSingleAttrOption<bool>(*this, Loc, AttrRange, AttrName, DK,
+                                    {{Context.Id_unsafe, true}}, false);
+    if (!isUnsafe) {
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute) {
+      Attributes.add(new (Context) NonisolatedAttr(AtLoc, AttrRange, *isUnsafe,
+                                                   /*implicit*/ false));
+    }
+    break;
+  }
   case DAK_MacroRole: {
     auto syntax = (AttrName == "freestanding" ? MacroSyntax::Freestanding
                                               : MacroSyntax::Attached);

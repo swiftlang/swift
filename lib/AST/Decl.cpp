@@ -2460,6 +2460,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
         switch (getActorIsolation(type)) {
           case ActorIsolation::Unspecified:
+          case ActorIsolation::NonisolatedUnsafe:
           case ActorIsolation::GlobalActorUnsafe:
             break;
 
@@ -7893,6 +7894,15 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
+bool VarDecl::isGlobalStorage() const {
+  if (!hasStorage()) {
+    return false;
+  }
+  const auto *dc = getDeclContext();
+  return isStatic() || dc->isModuleScopeContext() ||
+         (dc->isTypeContext() && !isInstanceMember());
+}
+
 bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
@@ -10500,6 +10510,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       switch (auto isolation = closure->getActorIsolation()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
         return false;

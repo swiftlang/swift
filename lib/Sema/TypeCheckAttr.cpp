@@ -6777,9 +6777,10 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   if (auto var = dyn_cast<VarDecl>(D)) {
     // stored properties have limitations as to when they can be nonisolated.
     if (var->hasStorage()) {
+      const bool isUnsafeGlobal = attr->isUnsafe() && var->isGlobalStorage();
 
       // 'nonisolated' can not be applied to mutable stored properties.
-      if (var->supportsMutation()) {
+      if (var->supportsMutation() && !isUnsafeGlobal) {
         diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
         return;
       }
@@ -6833,8 +6834,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       return;
     }
   }
-  
-  // `nonisolated` on non-async actor initializers is invalid
+
+  // `nonisolated` on non-async actor initializers is invalid.
   // the reasoning is that there is a "little bit" of isolation,
   // as afforded by flow-isolation.
   if (auto ctor = dyn_cast<ConstructorDecl>(D)) {

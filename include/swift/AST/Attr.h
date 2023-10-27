@@ -187,6 +187,10 @@ protected:
     SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
       isCategoryNameInvalid : 1
     );
+
+    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
+      isUnsafe : 1
+    );
   } Bits;
   // clang-format on
 
@@ -2431,6 +2435,26 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjCImplementation;
+  }
+};
+
+/// Represents nonisolated modifier.
+class NonisolatedAttr final : public DeclAttribute {
+public:
+  NonisolatedAttr(SourceLoc atLoc, SourceRange range, bool unsafe,
+                  bool implicit)
+      : DeclAttribute(DAK_Nonisolated, atLoc, range, implicit) {
+    Bits.NonisolatedAttr.isUnsafe = unsafe;
+    assert((isUnsafe() == unsafe) && "not enough bits for unsafe state");
+  }
+
+  NonisolatedAttr(bool unsafe, bool implicit)
+      : NonisolatedAttr({}, {}, unsafe, implicit) {}
+
+  bool isUnsafe() const { return Bits.NonisolatedAttr.isUnsafe; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Nonisolated;
   }
 };
 

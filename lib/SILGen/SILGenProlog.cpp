@@ -1281,6 +1281,7 @@ void SILGenFunction::emitProlog(
           return false;
 
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
           return false;
         }
@@ -1332,6 +1333,7 @@ void SILGenFunction::emitProlog(
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -1384,6 +1386,7 @@ void SILGenFunction::emitProlog(
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -1572,6 +1575,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     return llvm::None;
 
   case ActorIsolation::ActorInstance: {
@@ -1597,8 +1601,9 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
       getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
         return CE->getActorIsolation();
       });
-  if (isolation != ActorIsolation::Nonisolated
-      && isolation != ActorIsolation::Unspecified) {
+  if (isolation != ActorIsolation::Nonisolated &&
+      isolation != ActorIsolation::NonisolatedUnsafe &&
+      isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in nonisolated
     // async functions. But it needs work for any closure passed to
     // Task.detached, which currently has unspecified isolation.

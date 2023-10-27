@@ -499,7 +499,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
 SIMPLE_DECL_ATTR(reasync, Reasync,
   OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   109)
-CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
+CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   112)
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,

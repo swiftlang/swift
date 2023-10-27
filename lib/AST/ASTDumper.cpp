@@ -1456,8 +1456,10 @@ namespace {
         });
       }
 
-      printFlag(D->getAttrs().hasAttribute<NonisolatedAttr>(), "nonisolated",
-                ExprModifierColor);
+      if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
+        printFlag(attr->isUnsafe() ? "nonisolated(unsafe)" : "nonisolated",
+                  ExprModifierColor);
+      }
       printFlag(D->isDistributed(), "distributed", ExprModifierColor);
       printFlag(D->isDistributedThunk(), "distributed_thunk",ExprModifierColor);
     }
@@ -2735,6 +2737,7 @@ public:
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance:
