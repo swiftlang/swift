@@ -110,6 +110,10 @@ private:
   /// Zero or more primary associated type requirements from a
   /// ParameterizedProtocolType
   ArrayRef<Type> sameTypeRequirements;
+
+  /// Existentials allow a relaxed notion of \c ValueDecl::isObjC
+  /// that includes `Sendable` protocol.
+  static bool isObjCProtocol(ProtocolDecl *P);
 };
 
 }
