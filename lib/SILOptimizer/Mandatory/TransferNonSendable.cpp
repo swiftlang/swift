@@ -587,13 +587,26 @@ public:
   }
 #endif
 
+  enum SILMultiAssignFlags : uint8_t {
+    None = 0x0,
+
+    /// Set to true if this SILMultiAssign call should assume that we are
+    /// creating a new value that is guaranteed to be propagating actor self.
+    ///
+    /// As an example, this is used when a partial_apply captures an actor. Even
+    /// though we are doing an assign fresh, we want to make sure that the
+    /// closure is viewed as coming from an actor.
+    PropagatesActorSelf = 0x1,
+  };
+  using SILMultiAssignOptions = OptionSet<SILMultiAssignFlags>;
+
   /// Require all non-sendable sources, merge their regions, and assign the
   /// resulting region to all non-sendable targets, or assign non-sendable
   /// targets to a fresh region if there are no non-sendable sources.
   template <typename TargetRange, typename SourceRange>
   void translateSILMultiAssign(const TargetRange &resultValues,
                                const SourceRange &sourceValues,
-                               bool propagagesActorSelf = false) {
+                               SILMultiAssignOptions options = {}) {
     REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
                                      << "Performing Multi Assign!\n");
     SmallVector<SILValue, 8> assignOperands;
@@ -611,7 +624,7 @@ public:
         REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Result: " << *result);
         assignResults.push_back(value->getRepresentative());
         // TODO: Can we pass back a reference to value perhaps?
-        if (propagagesActorSelf) {
+        if (options.contains(SILMultiAssignFlags::PropagatesActorSelf)) {
           markValueAsActorDerived(result);
         }
       }
@@ -654,26 +667,26 @@ public:
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
     if (!SILApplyCrossesIsolation(applyInst)) {
-      // TODO: How do we handle partial_apply here.
-      bool hasActorSelf = false;
+      SILMultiAssignOptions options;
       if (auto fas = FullApplySite::isa(applyInst)) {
         if (fas.hasSelfArgument()) {
           if (auto self = fas.getSelfArgument()) {
-            hasActorSelf = self->getType().isActor();
+            if (self->getType().isActor())
+              options |= SILMultiAssignFlags::PropagatesActorSelf;
           }
         }
       } else if (auto *pai = dyn_cast<PartialApplyInst>(applyInst)) {
         for (auto arg : pai->getOperandValues()) {
           if (auto value = tryToTrackValue(arg)) {
             if (value->isActorDerived()) {
-              hasActorSelf = true;
+              options |= SILMultiAssignFlags::PropagatesActorSelf;
             }
           } else {
             // NOTE: One may think that only sendable things can enter
             // here... but we treat things like function_ref/class_method which
             // are non-Sendable as sendable for our purposes.
             if (arg->getType().isActor()) {
-              hasActorSelf = true;
+              options |= SILMultiAssignFlags::PropagatesActorSelf;
             }
           }
         }
@@ -682,7 +695,7 @@ public:
       SmallVector<SILValue, 8> applyResults;
       getApplyResults(applyInst, applyResults);
       return translateSILMultiAssign(
-          applyResults, applyInst->getOperandValues(), hasActorSelf);
+          applyResults, applyInst->getOperandValues(), options);
     }
 
     if (auto cast = dyn_cast<ApplyInst>(applyInst))
