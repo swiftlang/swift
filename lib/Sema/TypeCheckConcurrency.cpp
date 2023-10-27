@@ -2229,7 +2229,7 @@ namespace {
       // in the current context stack must require the same isolation. If
       // along the way to the innermost context, we find a DeclContext that
       // has a different isolation (e.g. it's a local function that does not
-      // recieve isolation from its decl context), then the expression cannot
+      // receive isolation from its decl context), then the expression cannot
       // require a different isolation.
       for (auto *dc : contextStack) {
         if (!infersIsolationFromContext(dc)) {
