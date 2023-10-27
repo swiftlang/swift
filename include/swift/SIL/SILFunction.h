@@ -424,9 +424,6 @@ private:
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
 
-  /// The function is in a statically linked module.
-  unsigned IsStaticallyLinked : 1;
-
   /// If true, the function has lexical lifetimes even if the module does not.
   unsigned ForceEnableLexicalLifetimes : 1;
 
@@ -696,12 +693,6 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
-  }
-
-  bool isStaticallyLinked() const { return IsStaticallyLinked; }
-
-  void setIsStaticallyLinked(bool value) {
-    IsStaticallyLinked = value;
   }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {

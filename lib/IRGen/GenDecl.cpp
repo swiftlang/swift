@@ -2404,7 +2404,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     // an associated DeclContext and are serialized into the current module.  As
     // a result, we explicitly handle SIL Functions here. We do not expect other
     // types to be referenced directly.
-    isKnownLocal = entity.getSILFunction()->isStaticallyLinked();
+    if (const auto *MD = entity.getSILFunction()->getParentModule())
+      isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
