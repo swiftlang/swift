@@ -1743,6 +1743,10 @@ ERROR(attr_objc_implementation_category_not_found,none,
 NOTE(attr_objc_implementation_fixit_remove_category_name,none,
      "remove arguments to implement the main '@interface' for this class",
      ())
+ERROR(attr_objc_implementation_no_category_for_func,none,
+      "%kind0 does not belong to an Objective-C category; remove the category "
+      "name from this attribute",
+      (ValueDecl*))
 ERROR(attr_objc_implementation_no_conformance,none,
       "'@_objcImplementation' extension cannot add conformance to %0; "
       "add this conformance %select{with an ordinary extension|"

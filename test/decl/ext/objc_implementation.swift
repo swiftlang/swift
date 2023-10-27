@@ -464,6 +464,21 @@ protocol EmptySwiftProto {}
   // expected-error@-1 {{'@_objcImplementation' cannot be used to implement generic class 'ObjCImplGenericClass'}}
 }
 
+@_objcImplementation @_cdecl("CImplFunc1")
+func CImplFunc1(_: Int32) {
+  // OK
+}
+
+@_objcImplementation(BadCategory) @_cdecl("CImplFunc2")
+func CImplFunc2(_: Int32) {
+  // expected-error@-2 {{global function 'CImplFunc2' does not belong to an Objective-C category; remove the category name from this attribute}} {{21-34=}}
+}
+
+@_objcImplementation @_cdecl("CImplFuncMissing")
+func CImplFuncMissing(_: Int32) {
+  // FIXME: expected-DISABLED-error@-1 {{fnord}}
+}
+
 func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.method(fromHeader1: 1)
   obj.method(fromHeader2: 2)

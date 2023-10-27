@@ -2858,12 +2858,16 @@ static bool hasExposeAttr(const ValueDecl *VD, bool isExtension = false) {
   return false;
 }
 
-/// Skip \c \@objcImplementation \c extension member implementations and
-/// overrides. They are already declared in handwritten headers, and they may
-/// have attributes that aren't allowed in a category.
+/// Skip \c \@objcImplementation functions, \c extension member
+/// implementations, and overrides. They are already declared in handwritten
+/// headers, and they may have attributes that aren't allowed in a category.
 ///
 /// \return true if \p VD should \em not be included in the header.
 static bool excludeForObjCImplementation(const ValueDecl *VD) {
+  // If it's an ObjC implementation (and not an extension, which might have
+  // members that need printing), skip it; it's declared elsewhere.
+  if (VD->isObjCImplementation() && ! isa<ExtensionDecl>(VD))
+    return true;
   // Exclude member implementations; they are declared elsewhere.
   if (VD->isObjCMemberImplementation())
     return true;

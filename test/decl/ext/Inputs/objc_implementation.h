@@ -176,7 +176,8 @@
 
 @end
 
-
+void CImplFunc1(int param);
+void CImplFunc2(int param);
 
 struct ObjCStruct {
   int foo;
