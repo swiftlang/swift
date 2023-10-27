@@ -849,8 +849,11 @@ InferredGenericSignatureRequest::evaluate(
   // Finish by adding any remaining requirements. This is used to introduce
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
+  SmallVector<Requirement, 4> rawAddedRequirements;
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
+    desugarRequirement(req, SourceLoc(), rawAddedRequirements, errors);
+  for (const auto &req : rawAddedRequirements)
+    requirements.push_back({req, SourceLoc(), /*inferred=*/true});
 
   // Re-order requirements so that inferred requirements appear last. This
   // ensures that if an inferred requirement is redundant with some other
