@@ -2044,15 +2044,21 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
 
 AbstractionPattern::CallingConventionKind
 AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
-  // Tuples should be destructured.
-  if (isTuple()) {
-    return Destructured;
-  }
   switch (getKind()) {
   case Kind::Opaque:
     // Maximally abstracted values are always thrown indirectly.
     return Indirect;
 
+  case Kind::ClangType:
+  case Kind::Type:
+  case Kind::Discard:
+    // Pass according to the formal type.
+    return SILType::isFormallyThrownIndirectly(getType(),
+                                               TC,
+                                               getGenericSignatureOrNull())
+      ? Indirect : Direct;
+
+  case Kind::Tuple:
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::PartialCurriedObjCMethodType:
@@ -2064,20 +2070,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
   case Kind::CXXMethodType:
   case Kind::CurriedCXXMethodType:
   case Kind::PartialCurriedCXXMethodType:
-    // Function types are always thrown directly
-    return Direct;
-
-  case Kind::ClangType:
-  case Kind::Type:
-  case Kind::Discard:
-    // Pass according to the formal type.
-    return SILType::isFormallyThrownIndirectly(getType(),
-                                               TC,
-                                               getGenericSignatureOrNull())
-      ? Indirect : Direct;
-
   case Kind::Invalid:
-  case Kind::Tuple:
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
