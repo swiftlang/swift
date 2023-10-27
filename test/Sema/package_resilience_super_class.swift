@@ -20,6 +20,7 @@
 // RUN: %target-build-swift -I %t -L %t -lUtils %s -o %t/main %target-rpath(%t) -package-name mypkg -DTESTABLE
 // RUN: %target-run %t/main %t/%target-library-name(Utils) | %FileCheck %s
 
+// REQUIRES: rdar117594759
 //--- Utils.swift
 
 open class OpenKlass {
