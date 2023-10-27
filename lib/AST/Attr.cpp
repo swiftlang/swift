@@ -970,9 +970,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
   case DAK_Custom: {
-
     auto attr = cast<CustomAttr>(this);
-    if (auto type = attr->getType()) {
+    if (auto type =
+            D->getResolvedCustomAttrType(const_cast<CustomAttr *>(attr))) {
       // Print custom attributes only if the attribute decl is accessible.
       // FIXME: rdar://85477478 They should be rejected.
       if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
