@@ -41,6 +41,7 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "Private.h"
+#include "SwiftEquatableSupport.h"
 #include "SwiftObject.h"
 #include "SwiftValue.h"
 #include "WeakReference.h"
@@ -373,11 +374,62 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 }
 
 - (NSUInteger)hash {
-  return (NSUInteger)self;
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+  auto hashableConformance =
+    reinterpret_cast<const hashable_support::HashableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &hashable_support::HashableProtocolDescriptor));
+  if (hashableConformance == NULL) {
+    return (NSUInteger)self;
+  }
+  return _swift_stdlib_Hashable_hashValue_indirect(
+    &self, selfMetadata, hashableConformance);
 }
 
-- (BOOL)isEqual:(id)object {
-  return self == object;
+- (BOOL)isEqual:(id)other {
+  if (self == other) {
+    return YES;
+  }
+  // Both objects must be `SwiftObject` in ObjC
+  if (object_getClass(other) != object_getClass((id)self)) {
+    return NO;
+  }
+
+  // TODO: Bincompat check -- return NO if this is an old executable
+
+  // Get Swift type for self and other
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+  auto otherMetadata = _swift_getClassOfAllocated(other);
+
+  // Find common parent Swift class
+  const ClassMetadata * parentMetadata = NULL;
+  // Collect parents of self
+  std::unordered_set<const ClassMetadata *> selfParents;
+  for (auto m = selfMetadata; m != NULL; m = m->Superclass) {
+    selfParents.emplace(m);
+  }
+  // Find first parent of other that is also a parent of self
+  for (auto m = otherMetadata; m != NULL; m = m->Superclass) {
+    if (selfParents.find(m) != selfParents.end()) {
+      parentMetadata = m;
+      break;
+    }
+  }
+  // If there's no common Swift parent class, we can't compare them
+  if (parentMetadata == NULL) {
+    return NO;
+  }
+
+  auto equatableConformance =
+    reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+        parentMetadata, &equatable_support::EquatableProtocolDescriptor));
+  if (equatableConformance == NULL) {
+    return NO;
+  }
+
+  return _swift_stdlib_Equatable_isEqual_indirect(
+          &self, &other, parentMetadata, equatableConformance);
 }
 
 - (id)performSelector:(SEL)aSelector {

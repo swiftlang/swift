@@ -80,7 +80,10 @@ void HackSwiftObject()
     class_addMethod(cls, @selector(perform2::), (IMP)Perform2, "@@:@@");
 }
 
-void TestSwiftObjectNSObject(id c, id d)
+void TestSwiftObjectNSObject(id c, id d,
+			     id e1a, id e1b, id e2,
+			     id h1a, id h1b, id h2,
+			     NSUInteger hash1, NSUInteger hash2)
 {
   printf("TestSwiftObjectNSObject\n");
 
@@ -159,12 +162,24 @@ void TestSwiftObjectNSObject(id c, id d)
   expectFalse([C_meta isEqual:D_meta]);
   expectFalse([S_meta isEqual:C_meta]);
 
+  // Check that ObjC isEqual delegates to Equatable
+  expectTrue([e1a isEqual: e1b]);
+  expectFalse([e1a isEqual: e2]);
+  expectFalse([e1b isEqual: e2]);
+
+  // Check that ObjC isEqual delegates to Hashable
+  expectTrue([h1a isEqual: h1b]);
+  expectFalse([h1a isEqual: h2]);
+  expectFalse([h1b isEqual: h2]);
 
   printf("NSObjectProtocol.hash\n");
 
   expectTrue ([d hash] + [c hash] + [D hash] + [C hash] + [S hash] +
               [D_meta hash] + [C_meta hash] + [S_meta hash] != 0);
 
+  expectTrue([h1a hash] == hash1);
+  expectTrue([h1b hash] == hash1);
+  expectTrue([h2 hash] == hash2);
 
   printf("NSObjectProtocol.self\n");
 

@@ -39,8 +39,24 @@ class D : C {
   @objc override class func cClassOverride() -> Int { return 8 }
 }
 
+class E : Equatable {
+  var i : Int
+  static func ==(lhs: E, rhs: E) -> Bool { lhs.i == rhs.i }
+  init(i: Int) { self.i = i }
+}
+
+class H : Hashable {
+  var i : Int
+  static func ==(lhs: H, rhs: H) -> Bool { lhs.i == rhs.i }
+  func hash(into hasher: inout Hasher) { hasher.combine(i + 17) }
+  init(i: Int) { self.i = i }
+}
+
 @_silgen_name("TestSwiftObjectNSObject") 
-func TestSwiftObjectNSObject(_ c: C, _ d: D)
+func TestSwiftObjectNSObject(
+  _ c: C, _ d: D,
+  _ e1a: E, _ e1b: E, _ e2: E,
+  _ h1a: H, _ h1b: H, _ h2: H, _ hash1: UInt, _ hash2: UInt)
 
 // This check is for NSLog() output from TestSwiftObjectNSObject().
 // CHECK: c ##SwiftObjectNSObject.C##
@@ -50,7 +66,9 @@ func TestSwiftObjectNSObject(_ c: C, _ d: D)
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
 if #available(OSX 10.12, iOS 10.0, *) {
-  TestSwiftObjectNSObject(C(), D())
+  TestSwiftObjectNSObject(C(), D(),
+    E(i:1), E(i:1), E(i:2),
+    H(i:1), H(i:1), H(i:2), UInt(H(i:1).hashValue), UInt(H(i:2).hashValue))
   // does not return
 } else {
   // Horrible hack to satisfy FileCheck
