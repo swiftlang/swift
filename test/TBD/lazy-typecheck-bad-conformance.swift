@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -experimental-lazy-typecheck -emit-tbd -emit-tbd-path %t/lazy.tbd %s -enable-library-evolution -parse-as-library
+// RUN: %target-swift-frontend -typecheck -experimental-lazy-typecheck -emit-tbd -emit-tbd-path %t/lazy.tbd %s -enable-library-evolution -parse-as-library -tbd-install_name lazy
 
 public protocol P {
   func req()
