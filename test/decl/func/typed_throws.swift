@@ -124,4 +124,5 @@ struct HasASubscript {
   }
 }
 
+// expected-error@+1{{thrown type 'any Codable & Error' (aka 'any Decodable & Encodable & Error') does not conform to the 'Error' protocol}}
 func throwCodableErrors() throws(any Codable & Error) { }
