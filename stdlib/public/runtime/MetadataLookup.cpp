@@ -1934,7 +1934,7 @@ public:
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
       FunctionMetadataDifferentiabilityKind diffKind,
-      BuiltType globalActorType) const {
+      BuiltType globalActorType, BuiltType thrownError) const {
     assert(
         (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
         (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
@@ -1968,6 +1968,8 @@ public:
       }
       flags = flags.withGlobalActor(true);
     }
+
+    // FIXME: thrownError
 
     return BuiltType(
       flags.hasGlobalActor()

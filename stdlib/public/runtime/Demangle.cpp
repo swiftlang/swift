@@ -807,6 +807,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     if (func->isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    // FIXME: TypedThrowsAnnotation
     if (func->isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);

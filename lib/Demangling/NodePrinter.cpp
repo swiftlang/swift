@@ -557,6 +557,7 @@ private:
     case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
+    case Node::Kind::TypedThrowsAnnotation:
     case Node::Kind::EmptyList:
     case Node::Kind::FirstElementMarker:
     case Node::Kind::VariadicMarker:
@@ -863,7 +864,7 @@ private:
 
     unsigned argIndex = node->getNumChildren() - 2;
     unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
@@ -880,10 +881,15 @@ private:
           (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
       ++startIndex;
     }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation) {
+
+    Node *thrownErrorNode = nullptr;
+    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
+        node->getChild(startIndex)->getKind()
+          == Node::Kind::TypedThrowsAnnotation) {
+      thrownErrorNode = node->getChild(startIndex);
       ++startIndex;
-      isThrows = true;
     }
+
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
@@ -923,8 +929,9 @@ private:
     if (isAsync)
       Printer << " async";
 
-    if (isThrows)
-      Printer << " throws";
+    if (thrownErrorNode) {
+      print(thrownErrorNode, depth + 1);
+    }
 
     print(node->getChild(argIndex + 1), depth + 1);
   }
@@ -2909,10 +2916,16 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   }
   case Node::Kind::AsyncAnnotation:
-    Printer << " async ";
+    Printer << " async";
     return nullptr;
   case Node::Kind::ThrowsAnnotation:
-    Printer << " throws ";
+    Printer << " throws";
+    return nullptr;
+  case Node::Kind::TypedThrowsAnnotation:
+    Printer << " throws(";
+    if (Node->getNumChildren() == 1)
+      print(Node->getChild(0), depth + 1);
+    Printer << ")";
     return nullptr;
   case Node::Kind::EmptyList:
     Printer << " empty-list ";
