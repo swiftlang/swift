@@ -109,7 +109,7 @@ static Expr *getExprForPartitionOp(const PartitionOp &op) {
 
 namespace {
 
-static const char *SEP_STR = "╾──────────────────────────────╼\n";
+constexpr const char *SEP_STR = "╾──────────────────────────────╼\n";
 
 using TrackableValueID = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
