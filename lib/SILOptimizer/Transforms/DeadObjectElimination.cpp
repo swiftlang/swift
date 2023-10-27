@@ -1170,9 +1170,15 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
+  auto *ARI = dyn_cast<AllocRefInst>(AI->getArgument(0));
+
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
+  }
+
+  if (ARI) {
+    deleter.forceDeleteWithUsers(ARI);
   }
 
   ++DeadAllocApplyEliminated;
