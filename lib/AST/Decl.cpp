@@ -4905,7 +4905,7 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 }
 
 bool NominalTypeDecl::isFormallyResilient() const {
-  // Private and (unversioned) internal types always have a
+  // Private, (unversioned) internal, and package types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true).isPublic())
