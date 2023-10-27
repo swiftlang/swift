@@ -136,6 +136,15 @@ void ModuleDependencyInfo::addModuleImport(
 
     ImportPath::Builder scratch;
     auto realPath = importDecl->getRealModulePath(scratch);
+
+    // Explicit 'Builtin' import is not a part of the module's
+    // dependency set, does not exist on the filesystem,
+    // and is resolved within the compiler during compilation.
+    SmallString<64> importedModuleName;
+    realPath.getString(importedModuleName);
+    if (importedModuleName == BUILTIN_NAME)
+      continue;
+
     addModuleImport(realPath, &alreadyAddedModules);
 
     // Additionally, keep track of which dependencies of a Source
