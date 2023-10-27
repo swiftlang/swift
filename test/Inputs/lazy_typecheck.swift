@@ -96,6 +96,10 @@ public protocol PublicProto {
   func req() throws -> Int
 }
 
+@MainActor public protocol MainActorProtocol {
+  func req() throws -> Int
+}
+
 protocol InternalProto {
   func goodReq() -> Int // expected-note 2 {{protocol requires function 'goodReq()' with type '() -> Int'; add a stub for conformance}}
   func badReq() -> DoesNotExist // expected-error {{cannot find type 'DoesNotExist' in scope}}
@@ -115,6 +119,10 @@ public struct PublicStruct {
   }
 
   public func publicMethod() -> Int {
+    return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
+  }
+
+  @MainActor public func publicMainActorMethod() -> Int {
     return true // expected-error {{cannot convert return expression of type 'Bool' to return type 'Int'}}
   }
 

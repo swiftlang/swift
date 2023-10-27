@@ -41,6 +41,9 @@
 // CHECK:         func req() throws -> Swift.Int
 // CHECK:       }
 // CHECK:       #endif
+// CHECK:       @MainActor public protocol MainActorProtocol {
+// CHECK:         func req() throws -> Swift.Int
+// CHECK:       }
 // CHECK:       public struct PublicStruct {
 // CHECK:         public var publicProperty: Swift.Int
 // CHECK:         public var publicPropertyInferredType: Swift.String
@@ -54,6 +57,7 @@
 // CHECK-NEXT:    }
 // CHECK:         public init(x: Swift.Int)
 // CHECK:         public func publicMethod() -> Swift.Int
+// CHECK:         @MainActor public func publicMainActorMethod() -> Swift.Int
 // CHECK:         public static func publicStaticMethod()
 // CHECK:       }
 // CHECK:       public struct PublicGenericStruct<T> {

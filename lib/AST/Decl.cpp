@@ -493,6 +493,29 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
       macroName);
 }
 
+Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
+  if (auto ty = attr->getType())
+    return ty;
+
+  auto dc = getDeclContext();
+  auto *nominal = evaluateOrDefault(
+      getASTContext().evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  if (!nominal)
+    return Type();
+
+  CustomAttrTypeKind kind;
+  if (nominal->isGlobalActor()) {
+    kind = CustomAttrTypeKind::GlobalActor;
+  } else if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    kind = CustomAttrTypeKind::PropertyWrapper;
+  } else {
+    kind = CustomAttrTypeKind::NonGeneric;
+  }
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           CustomAttrTypeRequest{attr, dc, kind}, Type());
+}
+
 bool Decl::isExposedToClients() const {
   return DeclExportabilityVisitor().visit(this);
 }
