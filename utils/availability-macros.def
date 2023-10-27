@@ -35,7 +35,9 @@ SwiftStdlib 5.7:macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0
 SwiftStdlib 5.8:macOS 13.3, iOS 16.4, watchOS 9.4, tvOS 16.4
 SwiftStdlib 5.9:macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0
 SwiftStdlib 5.10:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+SwiftStdlib 5.11:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
 # TODO: Also update ASTContext::getSwift510Availability when needed
+# TODO: Also update ASTContext::getSwift511Availability when needed
 
 # Local Variables:
 # mode: conf-unix
