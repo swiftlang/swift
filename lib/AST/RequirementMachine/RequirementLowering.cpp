@@ -768,6 +768,9 @@ void swift::rewriting::realizeRequirement(
 /// Desugars and expands all default conformance requirements on \c subject,
 /// accounting for and eliminating inverse constraints.
 ///
+/// For inverse constraints on subjects other than the ones specified, they are
+/// removed and diagnosed as errors.
+///
 /// \param subjects the subject types for which we should expand defaults.
 void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
                                  SmallVectorImpl<Type> const& subjects,
@@ -791,10 +794,22 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
     if (!inverse)
       return false;
 
+    // At this point, we have a conformance constraint with an inverse.
     auto subject = req.getFirstType()->getCanonicalType();
 
-    if (defaults.count(subject) == 0)
-      return false;
+    // If the inverse is on a subject that wasn't permitted by our caller, then
+    // remove and diagnose as an error. This can happen when an inner context
+    // has a constraint on some outer generic parameter, e.g.,
+    //
+    //     protocol P {
+    //       func f() where Self: ~Copyable
+    //     }
+    //
+    if (defaults.count(subject) == 0) {
+      errors.push_back(
+          RequirementError::forInvalidInverseOuterSubject(req, structReq.loc));
+      return true;
+    }
 
     // TODO: check for redundant inverses.
 

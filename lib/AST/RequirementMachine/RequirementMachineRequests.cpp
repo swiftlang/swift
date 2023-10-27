@@ -837,12 +837,15 @@ InferredGenericSignatureRequest::evaluate(
   auto *moduleForInference = lookupDC->getParentModule();
   auto &ctx = moduleForInference->getASTContext();
 
-  // Expand default requirements for all generic parameters.
-  SmallVector<Type, 8> gpTypes;
-  for (auto gtpt : genericParams)
-    gpTypes.push_back(Type(gtpt)); // NOTE: wish we had std::views::transform
+  // After realizing requirements, expand default requirements only for local
+  // generic parameters, as the outer parameters have already been expanded.
+  SmallVector<Type, 4> localGPs;
+  if (genericParamList)
+    for (auto *gtpd : genericParamList->getParams())
+      localGPs.push_back(gtpd->getDeclaredInterfaceType());
 
-  expandDefaultRequirements(ctx, gpTypes, requirements, errors);
+  // Expand defaults and eliminate all inverse-conformance requirements.
+  expandDefaultRequirements(ctx, localGPs, requirements, errors);
 
   // Perform requirement inference from function parameter and result
   // types and such.

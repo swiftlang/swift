@@ -3088,6 +3088,11 @@ ERROR(requires_not_suitable_inverse_subject,none,
       "cannot apply inverse %1 to type %0 in conformance requirement",
       (Type, Type))
 
+ERROR(requires_not_suitable_inverse_outer_subject,none,
+      "cannot add inverse constraint '%0: %1' "
+      "on generic parameter '%0' defined in outer scope",
+      (StringRef, StringRef))
+
 ERROR(invalid_shape_requirement,none,
       "invalid same-shape requirement between %0 and %1",
       (Type, Type))

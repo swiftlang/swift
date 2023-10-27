@@ -122,6 +122,23 @@ bool swift::rewriting::diagnoseRequirementErrors(
       break;
     }
 
+    case RequirementError::Kind::InvalidInverseOuterSubject: {
+      if (error.requirement.hasError())
+        break;
+
+      assert(error.requirement.getKind() == RequirementKind::Conformance);
+
+      auto subjectType = error.requirement.getFirstType();
+      auto constraintType = error.requirement.getSecondType();
+
+      assert(constraintType->is<InverseType>());
+
+      ctx.Diags.diagnose(loc, diag::requires_not_suitable_inverse_outer_subject,
+                         subjectType.getString(), constraintType.getString());
+      diagnosedError = true;
+      break;
+    }
+
     case RequirementError::Kind::InvalidShapeRequirement: {
       if (error.requirement.hasError())
         break;
