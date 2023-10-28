@@ -62,11 +62,11 @@ struct SerializedModuleBaseName {
   /// Gets the filename with a particular extension appended to it.
   std::string getName(file_types::ID fileTy) const;
 
-  /// If the interface with \p baseName exists, returns its path (which may be
-  /// the private interface if there is one). Return an empty optional
-  /// otherwise.
+  /// If the interface with \p baseName exists, returns its path (which may be the
+  /// package interface if applicable (in the same package as the main module) or
+  /// private interface if there is one). Return an empty optional otherwise.
   llvm::Optional<std::string>
-  findInterfacePath(llvm::vfs::FileSystem &fs) const;
+  findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const;
 };
 
 /// Common functionality shared between \c ImplicitSerializedModuleLoader,

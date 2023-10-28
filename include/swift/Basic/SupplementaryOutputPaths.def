@@ -137,6 +137,14 @@ OUTPUT(ModuleInterfaceOutputPath, TY_SwiftModuleInterfaceFile)
 OUTPUT(PrivateModuleInterfaceOutputPath,
             TY_PrivateSwiftModuleInterfaceFile)
 
+/// The path to which we should emit a package module interface.
+///
+/// The package module interface contains all package and public decls.
+///
+/// \sa ModuleInterfaceOutputPath
+OUTPUT(PackageModuleInterfaceOutputPath,
+            TY_PackageSwiftModuleInterfaceFile)
+
 /// The path to which we should emit module summary file.
 OUTPUT(ModuleSummaryOutputPath, TY_SwiftModuleSummaryFile)
 

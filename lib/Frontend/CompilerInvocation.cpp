@@ -414,10 +414,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   Opts.PrintMissingImports =
     !Args.hasArg(OPT_disable_print_missing_imports_in_module_interface);
 
-  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) { 
     StringRef contents = A->getValue();
     if (contents == "spi") {
-      Opts.PrintPrivateInterfaceContent = true;
+      Opts.InterfaceContentMode = 1;
+    }
+    if (contents == "ipi") {
+      Opts.InterfaceContentMode = 2; // ES TODO: check this logic
     }
   }
   for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {

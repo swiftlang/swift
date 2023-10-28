@@ -156,7 +156,7 @@ static bool shouldTypeCheck(const PrintOptions &options) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs,
+                                                   int interfaceContentMode,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
@@ -188,7 +188,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
   result.AlwaysTryPrintParameterLabels = true;
-  result.PrintSPIs = printSPIs;
+  result.InterfaceContentMode = interfaceContentMode;
   result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -220,7 +220,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         return false;
 
       // Skip SPI decls if `PrintSPIs`.
-      if (!options.PrintSPIs && D->isSPI())
+      if (!options.InterfaceContentMode == 1 && D->isSPI())
         return false;
 
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -1179,8 +1179,8 @@ void PrintAST::printAttributes(const Decl *D) {
       }
     }
 
-    // SPI groups
-    if (Options.PrintSPIs &&
+    // Add SPI groups to both private and package interfaces
+    if (Options.InterfaceContentMode != 0 &&
         DeclAttribute::canAttributeAppearOnDeclKind(
           DAK_SPIAccessControl, D->getKind())) {
       interleave(D->getSPIGroups(),
@@ -1191,7 +1191,7 @@ void PrintAST::printAttributes(const Decl *D) {
              [&] { Printer << ""; });
       Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
     }
-
+    
     // Don't print any contextual decl modifiers.
     // We will handle 'mutating' and 'nonmutating' separately.
     if (isa<AccessorDecl>(D)) {
@@ -5991,9 +5991,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
     Filter |= ModuleDecl::ImportFilterKind::Default;
 
-    // For private swiftinterfaces, also look through @_spiOnly imports.
-    if (Options.PrintSPIs)
+    // For private or package swiftinterfaces, also look through @_spiOnly imports.
+    if (Options.InterfaceContentMode != 0)
       Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+    if (Options.InterfaceContentMode == 2) // ES TODO: package mode
+      Filter |= ModuleDecl::ImportFilterKind::PackageOnly;
 
     SmallVector<ImportedModule, 4> Imports;
     Options.CurrentModule->getImportedModules(Imports, Filter);

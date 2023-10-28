@@ -67,7 +67,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   }
   assert(fs.exists(InPath));
 
-  // Use the private interface file if exits.
+  // If not, use the private interface file if exits.
   auto PrivateInPath =
       BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
   if (fs.exists(PrivateInPath)) {
@@ -79,7 +79,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
   }
-
+  // ES TODO: add a package path if needed
   return dependencies.getError();
 }
 

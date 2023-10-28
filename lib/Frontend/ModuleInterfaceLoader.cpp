@@ -1208,7 +1208,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
-  std::string InPath = BaseName.findInterfacePath(fs).value_or("");
+  std::string InPath = BaseName.findInterfacePath(fs, Ctx).value_or("");
   if (InPath.empty()) {
     if (fs.exists(ModPath)) {
       LLVM_DEBUG(llvm::dbgs()
