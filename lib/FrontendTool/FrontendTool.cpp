@@ -988,12 +988,25 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.PrintPrivateInterfaceContent = true;
+    privOpts.InterfaceContentMode = 1;
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
         Instance.getOutputBackend(),
         Invocation.getPrivateModuleInterfaceOutputPathForWholeModule(),
+        privOpts,
+        Invocation.getLangOptions(),
+        Instance.getMainModule());
+  }
+  if (opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath()) {
+    // Copy the settings from the module interface to add package decl printing.
+    ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
+    privOpts.InterfaceContentMode = 2;
+    privOpts.ModulesToSkipInPublicInterface.clear();
+
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Instance.getOutputBackend(),
+        Invocation.getPackageModuleInterfaceOutputPathForWholeModule(),
         privOpts,
         Invocation.getLangOptions(),
         Instance.getMainModule());
@@ -1486,7 +1499,7 @@ static bool performCompile(CompilerInstance &Instance,
           opts.InputsAndOutputs.getAllInputs(), [](const InputFile &IF) {
             const auto kind = IF.getType();
             return kind == file_types::TY_Swift ||
-                   kind == file_types::TY_SwiftModuleInterfaceFile;
+                   kind == file_types::TY_SwiftModuleInterfaceFile; // ES TODO: package?
           });
     }
     return true;

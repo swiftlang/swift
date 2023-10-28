@@ -602,6 +602,23 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs) const {
   if (!fs.exists(interfacePath))
     return {};
 
+  // First, look up package interface that contains all of SPI, public,
+  // and package decls
+  std::string packagePath {
+      getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
+  if (fs.exists(packagePath)) {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> bufferForFile =
+      fs.getBufferForFile(packagePath);
+    if (bufferForFile) {
+      // ES TODO: look up the package-name in the file and see if it's in the same package
+//      *buffer = std::move(*bufferForFile);
+
+      // If in the same package, then return the package path
+      return packagePath;
+    }
+    // otherwise do below
+  }
+
   // If present, use the private interface instead of the public one.
   std::string privatePath{
       getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
@@ -688,6 +705,7 @@ bool SerializedModuleLoaderBase::findModule(
       (moduleName + ".framework").str(),
       genericBaseName.getName(file_types::TY_SwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile),
+      genericBaseName.getName(file_types::TY_PackageSwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_SwiftModuleFile)};
 
   auto searchPaths = Ctx.SearchPathOpts.moduleSearchPathsContainingFile(

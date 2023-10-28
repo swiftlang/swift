@@ -325,6 +325,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_interface_path);
   auto privateModuleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_private_module_interface_path);
+  auto packageModuleInterfaceOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_package_module_interface_path);
   auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_source_info_path);
   auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
@@ -342,7 +344,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
+      !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput || 
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
       !moduleSemanticInfoOutput || !optRecordOutput) {
     return llvm::None;
@@ -617,6 +619,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_emit_loaded_module_trace_path,
                                options::OPT_emit_module_interface_path,
                                options::OPT_emit_private_module_interface_path,
+                               options::OPT_emit_package_module_interface_path,
                                options::OPT_emit_module_source_info_path,
                                options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),

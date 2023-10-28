@@ -1515,6 +1515,7 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
   collectVisibleTopLevelModuleNamesImpl(
       names,
       file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile));
+      // ES TODO: add package interface logic here
 }
 
 void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
