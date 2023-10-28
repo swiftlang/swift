@@ -24,10 +24,17 @@ func blah<T>(_ t: borrowing T) where T: ~Copyable,
 
 func foo<T: ~Copyable>(x: borrowing T) {}
 
-struct Buurap<T: ~Copyable> {}
+struct Buurap<T: ~Copyable> where T: ~Copyable {}
 
-protocol Foo: ~Copyable  // expected-note {{previous inverse constraint here}}
-         where Self: ~Copyable { // expected-error {{duplicate inverse constraint}}
+struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
+struct ExtraNoncopyEnum: ~Copyable, ~Copyable {}
+protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
+
+protocol Foo: ~Copyable
+         where Self: ~Copyable {
+
+    associatedtype Touch : ~Copyable,
+                           ~Copyable
 
     func test<T>(_ t: T) where T: ~Self  // expected-error {{type 'Self' is not invertible}}
 }

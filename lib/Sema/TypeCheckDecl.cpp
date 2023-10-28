@@ -952,21 +952,9 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
 
   // The set of defaults all types start with.
   auto defaults = InvertibleProtocolSet::full();
-  std::map<InvertibleProtocolKind, SourceLoc> lastInverse;
 
-  // Does correctness checking after inspecting the inheritance clause.
-  // TODO: we can probably move this to `checkInheritanceClause` instead.
   auto foundInverse = [&](SourceLoc loc, InvertibleProtocolKind kind) {
-    // do we still have this default?
-    if (defaults.contains(kind)) {
-      defaults.remove(kind);
-      lastInverse.insert({kind, loc});
-      return;
-    }
-
-    // diagnose duplicate inverses
-    ctx.Diags.diagnose(loc, diag::inverse_duplicate);
-    ctx.Diags.diagnose(lastInverse[kind], diag::inverse_duplicate_previous);
+    defaults.remove(kind);
   };
 
   // Check the inheritance clause for inverses.

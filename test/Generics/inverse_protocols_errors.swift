@@ -41,9 +41,3 @@ struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 }
-
-struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
-// expected-error@-1 {{duplicate inverse constraint}}
-// expected-note@-2 {{previous inverse constraint here}}
-
-protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
