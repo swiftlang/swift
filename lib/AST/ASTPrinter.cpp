@@ -117,6 +117,27 @@ static bool isPublicOrUsableFromInline(Type ty) {
   });
 }
 
+static bool isPackage(const ValueDecl *VD) {
+  AccessScope scope =
+      VD->getFormalAccessScope(/*useDC*/nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  return scope.isPackage();
+}
+
+static bool isPackage(Type ty) {
+  // Note the double negative here: we're looking for any referenced decls that
+  // are *not* public-or-usableFromInline.
+  return !ty.findIf([](Type typePart) -> bool {
+    // FIXME: If we have an internal typealias for a non-internal type, we ought
+    // to be able to print it by desugaring.
+    if (auto *aliasTy = dyn_cast<TypeAliasType>(typePart.getPointer()))
+      return !isPackage(aliasTy->getDecl());
+    if (auto *nominal = typePart->getAnyNominal())
+      return !isPackage(nominal);
+    return false;
+  });
+}
+
 static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
   // Add exported prespecialized symbols.
   for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
@@ -156,7 +177,7 @@ static bool shouldTypeCheck(const PrintOptions &options) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   bool printSPIs,
+                                                   PrintInterfaceContentMode interfaceContentMode,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
@@ -188,7 +209,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
   result.AlwaysTryPrintParameterLabels = true;
-  result.PrintSPIs = printSPIs;
+  result.InterfaceContentMode = interfaceContentMode;
   result.DesugarExistentialConstraint = true;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -220,7 +241,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         return false;
 
       // Skip SPI decls if `PrintSPIs`.
-      if (!options.PrintSPIs && D->isSPI())
+      if (options.InterfaceContentMode == PrintInterfaceContentMode::Public && D->isSPI())
         return false;
 
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -234,7 +255,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (contributesToParentTypeStorage(ASD))
               return true;
 
-          return false;
+          if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(VD))
+            return false;
         }
 
         // Skip member implementations and @objc overrides in @objcImpl
@@ -268,15 +290,19 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
 
         for (const Requirement &req : ED->getGenericRequirements()) {
-          if (!isPublicOrUsableFromInline(req.getFirstType()))
-            return false;
+          if (!isPublicOrUsableFromInline(req.getFirstType())) {
+            if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(req.getSecondType()))
+              return false;
+          }
 
           switch (req.getKind()) {
           case RequirementKind::Conformance:
           case RequirementKind::Superclass:
           case RequirementKind::SameType:
-            if (!isPublicOrUsableFromInline(req.getSecondType()))
-              return false;
+            if (!isPublicOrUsableFromInline(req.getSecondType())) {
+              if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(req.getSecondType()))
+                return false;
+            }
             break;
           case RequirementKind::SameShape:
           case RequirementKind::Layout:
@@ -1181,8 +1207,8 @@ void PrintAST::printAttributes(const Decl *D) {
       }
     }
 
-    // SPI groups
-    if (Options.PrintSPIs &&
+    // Add SPI groups to both private and package interfaces
+    if (Options.InterfaceContentMode != PrintInterfaceContentMode::Public &&
         DeclAttribute::canAttributeAppearOnDeclKind(
           DAK_SPIAccessControl, D->getKind())) {
       interleave(D->getSPIGroups(),
@@ -1193,7 +1219,7 @@ void PrintAST::printAttributes(const Decl *D) {
              [&] { Printer << ""; });
       Options.ExcludeAttrList.push_back(DAK_SPIAccessControl);
     }
-
+    
     // Don't print any contextual decl modifiers.
     // We will handle 'mutating' and 'nonmutating' separately.
     if (isa<AccessorDecl>(D)) {
@@ -1269,6 +1295,9 @@ static bool mustPrintPropertyName(VarDecl *decl, const PrintOptions &opts) {
   // FIXME: We might be able to avoid printing names for some of these
   //        if we serialized references to them using field indices.
   if (contributesToParentTypeStorage(decl)) return true;
+
+  if (opts.InterfaceContentMode == PrintInterfaceContentMode::Package && isPackage(decl))
+    return true;
 
   // If it's public or @usableFromInline, we must print the name because it's a
   // visible entry-point.
@@ -5979,8 +6008,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     ModuleDecl::ImportFilter Filter = ModuleDecl::ImportFilterKind::Exported;
     Filter |= ModuleDecl::ImportFilterKind::Default;
 
-    // For private swiftinterfaces, also look through @_spiOnly imports.
-    if (Options.PrintSPIs)
+    // For private or package swiftinterfaces, also look through @_spiOnly imports.
+    if (Options.InterfaceContentMode != PrintInterfaceContentMode::Public)
       Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
 
     SmallVector<ImportedModule, 4> Imports;

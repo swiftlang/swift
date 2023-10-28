@@ -524,7 +524,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
 
   if (ModuleInterfaceSourcePath) {
     if (auto InterfacePath =
-        BaseName.findInterfacePath(*Ctx.SourceMgr.getFileSystem()))
+        BaseName.findInterfacePath(*Ctx.SourceMgr.getFileSystem(), Ctx))
       ModuleInterfaceSourcePath->assign(InterfacePath->begin(),
                                         InterfacePath->end());
   }
@@ -597,11 +597,37 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
 }
 
 llvm::Optional<std::string>
-SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs) const {
+SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
   std::string interfacePath{getName(file_types::TY_SwiftModuleInterfaceFile)};
   if (!fs.exists(interfacePath))
     return {};
 
+  // First, search if a package interface exists and use that if importer
+  // is also in the same package
+  std::string packagePath{
+      getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
+  if (fs.exists(packagePath)) {
+    // Read the interface file and extract its package-name argument value
+    StringRef result;
+    if (auto packageFile = llvm::MemoryBuffer::getFile(packagePath)) {
+      llvm::BumpPtrAllocator alloc;
+      llvm::StringSaver argSaver(alloc);
+      SmallVector<const char*, 8> args;
+      (void)extractCompilerFlagsFromInterface(packagePath,
+                                              (*packageFile)->getBuffer(), argSaver, args);
+      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+        StringRef current(args[I]), next(args[I + 1]);
+        if (current == "-package-name") {
+          result = next;
+          break;
+        }
+      }
+    }
+    if (!result.empty() && result == ctx.LangOpts.PackageName)
+      return packagePath;
+  }
+
+  // If above fails, use the existing logic.
   // If present, use the private interface instead of the public one.
   std::string privatePath{
       getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
@@ -688,6 +714,7 @@ bool SerializedModuleLoaderBase::findModule(
       (moduleName + ".framework").str(),
       genericBaseName.getName(file_types::TY_SwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile),
+      genericBaseName.getName(file_types::TY_PackageSwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_SwiftModuleFile)};
 
   auto searchPaths = Ctx.SearchPathOpts.moduleSearchPathsContainingFile(

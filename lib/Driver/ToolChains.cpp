@@ -728,6 +728,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_SwiftModuleInterfaceFile:
   case file_types::TY_PrivateSwiftModuleInterfaceFile:
+  case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_SwiftModuleSummaryFile:
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
@@ -857,6 +858,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
 
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SerializedDiagnostics,
@@ -993,6 +998,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
     case file_types::TY_PrivateSwiftModuleInterfaceFile:
+    case file_types::TY_PackageSwiftModuleInterfaceFile:
     case file_types::TY_SwiftModuleSummaryFile:
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
@@ -1147,6 +1153,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_PrivateSwiftModuleInterfaceFile,
                    "-emit-private-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_PackageSwiftModuleInterfaceFile,
+                   "-emit-package-module-interface-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
