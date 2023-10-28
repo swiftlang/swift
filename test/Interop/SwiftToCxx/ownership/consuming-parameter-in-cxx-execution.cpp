@@ -11,6 +11,25 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+size_t allocCount = 0;
+size_t totalAllocs = 0;
+
+void * _Nonnull trackedAlloc(size_t size, size_t align) {
+    ++allocCount;
+    ++totalAllocs;
+    return malloc(size);
+}
+void trackedFree(void *_Nonnull p) {
+    --allocCount;
+    free(p);
+}
+
+#define SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_alloc trackedAlloc
+#define SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_free  trackedFree
+
 #include "consuming.h"
 
 extern "C" size_t swift_retainCount(void * _Nonnull obj);
@@ -45,5 +64,8 @@ int main() {
     assert(getRetainCount(k) == 3);
   }
 // CHECK-NEXT: destroy AKlass
+  // verify that all of the opaque buffers are freed.
+  assert(allocCount == 0);
+  assert(totalAllocs != 0);
   return 0;
 }
