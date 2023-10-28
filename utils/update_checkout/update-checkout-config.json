@@ -46,10 +46,6 @@
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
-        "icu": {
-            "remote": { "id": "unicode-org/icu" },
-            "platforms": [ "Linux" ]
-        },
         "yams": {
             "remote": { "id": "jpsim/Yams" }
         },
@@ -88,7 +84,22 @@
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } },
         "wasi-libc": {
-            "remote": { "id": "WebAssembly/wasi-libc" } }
+            "remote": { "id": "WebAssembly/wasi-libc" } },
+        "curl": {
+            "remote": { "id": "curl/curl" }
+        },
+        "icu": {
+            "remote": { "id": "unicode-org/icu" }
+        },
+        "libxml2": {
+            "remote": { "id": "gnome/libxml2" }
+        },
+        "sqlite": {
+            "remote": { "id": "sqlite/sqlite" }
+        },
+        "zlib": {
+            "remote": { "id": "madler/zlib" }
+        },
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
@@ -119,7 +130,6 @@
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "main",
@@ -134,7 +144,12 @@
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
-                "wasi-libc": "wasi-sdk-20"
+                "wasi-libc": "wasi-sdk-20",
+                "curl": "8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.9.12",
+                "sqlite": "version-3.36.0",
+                "zlib": "v1.2.11"
             }
         },
         "release/5.10": {
@@ -164,7 +179,6 @@
                 "swift-integration-tests": "release/5.10",
                 "swift-xcode-playground-support": "release/5.10",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "release/5.10",
@@ -178,7 +192,12 @@
                 "swift-markdown": "release/5.10",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/release/5.10"
+                "swift-experimental-string-processing": "swift/release/5.10",
+                "curl": "8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.9.12",
+                "sqlite": "version-3.36.0",
+                "zlib": "v1.2.11"
             }
         },
         "rebranch": {
