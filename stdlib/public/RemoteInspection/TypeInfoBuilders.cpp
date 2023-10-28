@@ -143,6 +143,67 @@ void EnumTypeInfoBuilder::addCase(const std::string &Name, const TypeRef *TR,
   }
 }
 
+// Recursively populate the spare bit mask for this single type
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask,
+                                  uint64_t mpePointerSpareBits);
+
+// Recursively populate the spare bit mask for this collection of
+// record fields or enum cases.
+static bool populateSpareBitsMask(const std::vector<FieldInfo> &Fields,
+                                  BitMask &mask, uint64_t mpePointerSpareBits) {
+  for (auto Field : Fields) {
+    if (Field.TR != 0) {
+      BitMask submask(Field.TI.getSize());
+      if (!populateSpareBitsMask(&Field.TI, submask, mpePointerSpareBits)) {
+        return false;
+      }
+      mask.andMask(submask, Field.Offset);
+    }
+  }
+  return true;
+}
+
+// General recursive type walk to combine spare bit info from nested structures.
+static bool populateSpareBitsMask(const TypeInfo *TI, BitMask &mask,
+                                  uint64_t mpePointerSpareBits) {
+  switch (TI->getKind()) {
+  case TypeInfoKind::Reference: {
+    if (TI->getSize() == 8) {
+      mask.andMask(mpePointerSpareBits, 0);
+    } else /* TI->getSize() == 4 */ {
+      uint32_t pointerMask = (uint32_t)mpePointerSpareBits;
+      mask.andMask(pointerMask, 0);
+    }
+    break;
+  }
+  case TypeInfoKind::Enum: {
+    auto EnumTI = reinterpret_cast<const EnumTypeInfo *>(TI);
+    // Remove bits used by the payloads
+    if (!populateSpareBitsMask(EnumTI->getCases(), mask, mpePointerSpareBits)) {
+      return false;
+    }
+    // TODO: Remove bits needed to discriminate payloads.
+    // Until then, return false for any type with an enum in it so we
+    // won't claim to support something we don't.
+    return false;
+    break;
+  }
+  case TypeInfoKind::Record: {
+    auto RecordTI = dyn_cast<RecordTypeInfo>(TI);
+    if (!populateSpareBitsMask(RecordTI->getFields(), mask,
+                               mpePointerSpareBits)) {
+      return false;
+    }
+    break;
+  }
+  default: {
+    mask.makeZero();
+    break;
+  }
+  }
+  return true;
+}
+
 const TypeInfo *
 EnumTypeInfoBuilder::build(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
