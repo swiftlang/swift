@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 813; // VTable bit redefinition
+const uint16_t SWIFTMODULE_VERSION_MINOR = 815; // nonisolated(unsafe)
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -532,6 +532,7 @@ enum class ActorIsolation : uint8_t {
   Unspecified = 0,
   ActorInstance,
   Nonisolated,
+  NonisolatedUnsafe,
   GlobalActor,
   GlobalActorUnsafe
 };
@@ -2342,6 +2343,7 @@ namespace decls_block {
 
   using ExternDeclAttrLayout = BCRecordLayout<Extern_DECL_ATTR,
                                               BCFixed<1>, // implicit flag
+                                              BCFixed<1>, // extern kind
                                               BCVBR<4>,   // number of bytes in module name
                                               BCVBR<4>,   // number of bytes in name
                                               BCBlob      // module name and declaration name
@@ -2354,6 +2356,12 @@ namespace decls_block {
     BCFixed<1>,         // has visibility
     AccessLevelField    // visibility
   >;
+
+  using NonisolatedDeclAttrLayout =
+      BCRecordLayout<Nonisolated_DECL_ATTR,
+                     BCFixed<1>, // is the argument (unsafe)
+                     BCFixed<1>  // implicit flag
+                     >;
 
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,

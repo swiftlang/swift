@@ -40,7 +40,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
@@ -1417,6 +1416,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(GlobalActorUnsafe)
 #undef CASE
@@ -3023,7 +3023,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
-      auto typeID = S.addTypeRef(theAttr->getType());
+      auto typeID = S.addTypeRef(
+          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr)));
       if (!typeID && !S.allowCompilerErrors()) {
         llvm::PrettyStackTraceString message("CustomAttr has no type");
         abort();
@@ -3135,11 +3136,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<ExternAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExternDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->ModuleName);
-      blob.append(theAttr->Name);
+      auto moduleName = theAttr->ModuleName.value_or(StringRef());
+      auto name = theAttr->Name.value_or(StringRef());
+      blob.append(moduleName);
+      blob.append(name);
       ExternDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-          theAttr->ModuleName.size(), theAttr->Name.size(), blob);
+          (unsigned)theAttr->getExternKind(),
+          moduleName.size(), name.size(), blob);
       return;
     }
 
@@ -3166,6 +3170,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
+
+    case DAK_Nonisolated: {
+      auto *theAttr = cast<NonisolatedAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
+      NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            theAttr->isUnsafe(),
+                                            theAttr->isImplicit());
       return;
     }
 

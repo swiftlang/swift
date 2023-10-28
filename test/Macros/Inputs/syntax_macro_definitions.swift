@@ -22,7 +22,7 @@ public struct ColorLiteralMacro: ExpressionMacro {
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
     let argList = replaceFirstLabel(
-      of: macro.argumentList, with: "_colorLiteralRed"
+      of: macro.arguments, with: "_colorLiteralRed"
     )
     let initSyntax: ExprSyntax = ".init(\(argList))"
     return initSyntax
@@ -51,7 +51,7 @@ public struct AssertMacro: ExpressionMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    guard let argument = macro.argumentList.first?.expression else {
+    guard let argument = macro.arguments.first?.expression else {
       fatalError("boom")
     }
 
@@ -64,7 +64,7 @@ public struct StringifyMacro: ExpressionMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    guard let argument = macro.argumentList.first?.expression else {
+    guard let argument = macro.arguments.first?.expression else {
       fatalError("boom")
     }
 
@@ -77,7 +77,7 @@ public struct ExprAndDeclMacro: ExpressionMacro, DeclarationMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    guard let argument = macro.argumentList.first?.expression else {
+    guard let argument = macro.arguments.first?.expression else {
       fatalError("boom")
     }
 
@@ -97,7 +97,7 @@ public struct StringifyAndTryMacro: ExpressionMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    guard let argument = macro.argumentList.first?.expression else {
+    guard let argument = macro.arguments.first?.expression else {
       fatalError("boom")
     }
 
@@ -180,7 +180,7 @@ public enum AddBlocker: ExpressionMacro {
       context.diagnose(diag)
     }
 
-    return result.asProtocol(FreestandingMacroExpansionSyntax.self)!.argumentList.first!.expression
+    return result.asProtocol(FreestandingMacroExpansionSyntax.self)!.arguments.first!.expression
   }
 }
 
@@ -189,7 +189,7 @@ public class RecursiveMacro: ExpressionMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    guard let argument = macro.argumentList.first?.expression,
+    guard let argument = macro.arguments.first?.expression,
           argument.description == "false" else {
       return "\(macro)"
     }
@@ -237,7 +237,7 @@ public struct DefineBitwidthNumberedStructsMacro: DeclarationMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    guard let firstElement = node.argumentList.first,
+    guard let firstElement = node.arguments.first,
           let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
           stringLiteral.segments.count == 1,
           case let .stringSegment(prefix) = stringLiteral.segments.first else {
@@ -333,7 +333,7 @@ public struct WarningMacro: ExpressionMacro {
      of macro: some FreestandingMacroExpansionSyntax,
      in context: some MacroExpansionContext
    ) throws -> ExprSyntax {
-     guard let firstElement = macro.argumentList.first,
+     guard let firstElement = macro.arguments.first,
        let stringLiteral = firstElement.expression
          .as(StringLiteralExprSyntax.self),
        stringLiteral.segments.count == 1,
@@ -362,13 +362,13 @@ public struct ErrorMacro: ExpressionMacro {
     of macro: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> ExprSyntax {
-    guard let firstElement = macro.argumentList.first,
+    guard let firstElement = macro.arguments.first,
           let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self),
           stringLiteral.segments.count == 1,
           case let .stringSegment(messageString)? = stringLiteral.segments.first
       else {
         let errorNode: Syntax
-          if let firstElement = macro.argumentList.first {
+          if let firstElement = macro.arguments.first {
           errorNode = Syntax(firstElement)
         } else {
           errorNode = Syntax(macro)
@@ -470,6 +470,8 @@ extension AccessorBlockSyntax {
       return false
     case .getter:
       return true
+    @unknown default:
+      return false
     }
   }
 }
@@ -512,12 +514,6 @@ public struct WillSetMacro: AccessorMacro {
     providingAccessorsOf declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
-    guard let varDecl = declaration.as(VariableDeclSyntax.self),
-      let binding = varDecl.bindings.first,
-      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier else {
-      return []
-    }
-
     return [
       """
         willSet { }
@@ -854,7 +850,7 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
     let visitor = Visitor(context: context)
     visitor.walk(node)
 
-    return node.argumentList.first!.expression
+    return node.arguments.first!.expression
   }
 }
 
@@ -995,7 +991,7 @@ public struct CoerceToIntMacro: ExpressionMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) -> ExprSyntax {
-    "\(node.argumentList.first!.expression) as Int"
+    "\(node.arguments.first!.expression) as Int"
   }
 }
 
@@ -1660,7 +1656,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
     }
 
     let accessSpecifier: String
-    if let _ = node.argumentList.first(labeled: "public") {
+    if let _ = node.arguments.first(labeled: "public") {
       accessSpecifier = "public "
     } else {
       accessSpecifier = ""
@@ -1695,7 +1691,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
       """
     ]
 
-    if let _ = node.argumentList.first(labeled: "causeErrors") {
+    if let _ = node.arguments.first(labeled: "causeErrors") {
 
       results += ["""
 
@@ -1836,7 +1832,7 @@ public struct UseIdentifierMacro: DeclarationMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    guard let argument = node.argumentList.first?.expression.as(StringLiteralExprSyntax.self) else {
+    guard let argument = node.arguments.first?.expression.as(StringLiteralExprSyntax.self) else {
       fatalError("boom")
     }
     return [
@@ -1900,7 +1896,7 @@ public struct AddPeerStoredPropertyMacro: PeerMacro, Sendable {
     return [
       """
 
-      private var _foo: Int = 100
+      public var _foo: Int = 100
       """
     ]
   }
@@ -2045,13 +2041,19 @@ extension RequiredDefaultInitMacro: MemberMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let decl: DeclSyntax
-    if declaration.is(ClassDeclSyntax.self) && protocols.isEmpty {
-      decl = "required init() { }"
+    let initDecl: DeclSyntax
+    let funcDecl: DeclSyntax
+    if !declaration.is(ClassDeclSyntax.self) {
+      initDecl = "init() { }"
+      funcDecl = "func f() { }"
+    } else if !protocols.isEmpty {
+      initDecl = "required init() { }"
+      funcDecl = "func f() { }"
     } else {
-      decl = "init() { }"
+      initDecl = "required init() { }"
+      funcDecl = "override func f() { }"
     }
-    return [ decl ]
+    return [ initDecl, funcDecl ]
   }
 }
 

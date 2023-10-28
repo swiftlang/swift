@@ -19,7 +19,7 @@
 
 // and look for nonisolated
 
-// BC-CHECK: <Nonisolated_DECL_ATTR abbrevid={{[0-9]+}} op0=0/>
+// BC-CHECK: <Nonisolated_DECL_ATTR abbrevid={{[0-9]+}} op0=0 op1=0/>
 
 
 actor UnsafeCounter {

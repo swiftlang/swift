@@ -865,37 +865,6 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitCopyValueInst(CopyValueInst *cvi) {
-  assert(cvi->getFunction()->hasOwnership());
-
-  // Sometimes when RAUWing code we get copy_value on .none values (consider
-  // transformations around function types that result in given a copy_value a
-  // thin_to_thick_function argument). In such a case, just RAUW with the
-  // copy_value's operand since it is a no-op.
-  if (cvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
-    replaceInstUsesWith(*cvi, cvi->getOperand());
-    return eraseInstFromFunction(*cvi);
-  }
-
-  return nullptr;
-}
-
-SILInstruction *SILCombiner::visitDestroyValueInst(DestroyValueInst *dvi) {
-  assert(dvi->getFunction()->hasOwnership());
-
-  // Sometimes when RAUWing code we get destroy_value on .none values. In such a
-  // case, just delete the destroy_value.
-  //
-  // As an example, consider transformations around function types that result
-  // in a thin_to_thick_function being passed to a destroy_value.
-  if (dvi->getOperand()->getOwnershipKind() == OwnershipKind::None) {
-    eraseInstFromFunction(*dvi);
-    return nullptr;
-  }
-
-  return nullptr;
-}
-
 /// Create a value from stores to an address.
 ///
 /// If there are only stores to \p addr, return the stored value. Also, if there

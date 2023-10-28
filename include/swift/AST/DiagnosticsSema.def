@@ -1718,6 +1718,13 @@ ERROR(attr_objc_implementation_must_be_imported,none,
       "defined by a Swift 'class' declaration, not an imported Objective-C "
       "'@interface' declaration",
       (ValueDecl *))
+ERROR(attr_objc_implementation_must_have_super,none,
+      "'@_objcImplementation' cannot be used to implement root %kind0; declare "
+      "its superclass in the header",
+      (ValueDecl *))
+ERROR(objc_implementation_cannot_have_generics,none,
+      "'@_objcImplementation' cannot be used to implement %kind0",
+      (ValueDecl *))
 ERROR(attr_objc_implementation_category_not_found,none,
       "could not find category %0 on Objective-C class %1; make sure your "
       "umbrella or bridging header imports the header that declares it",
@@ -1841,6 +1848,25 @@ NOTE(objc_implementation_requirement_here,none,
      "%kind0 declared in header here",
      (ValueDecl *))
 
+ERROR(objc_implementation_init_must_be_convenience, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because "
+      "Objective-C subclasses must be able to override "
+      "%select{designated|required}1 initializers",
+      (const ValueDecl *, /*isRequired=*/bool))
+NOTE(objc_implementation_init_turn_designated_to_convenience, none,
+     "add 'convenience' keyword to make this a convenience initializer",
+     ())
+NOTE(objc_implementation_init_turn_required_to_convenience, none,
+     "replace 'required' keyword with 'convenience' to make this a convenience "
+     "initializer",
+     ())
+
+// Fallback diagnostic; super-general by nature.
+ERROR(objc_implementation_member_requires_vtable, none,
+      "%kind0 is not valid in an '@_objcImplementation' extension because it "
+      "is an overridable Swift-only %kindonly0",
+      (const ValueDecl *))
+
 ERROR(objc_implementation_multiple_matching_requirements,none,
       "%kind0 could match several different members declared in the header",
       (ValueDecl *))
@@ -1871,9 +1897,31 @@ ERROR(section_not_at_top_level,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
-// @_extern
+// @extern
+ERROR(attr_extern_experimental,none,
+      "@extern requires '-enable-experimental-feature Extern'", ())
 ERROR(extern_not_at_top_level_func,none,
-      "@_extern attribute can only be applied to global functions", ())
+      "@extern attribute can only be applied to global functions", ())
+ERROR(extern_empty_c_name,none,
+      "expected non-empty C name in @extern attribute", ())
+ERROR(extern_only_non_other_attr,none,
+      "@extern attribute cannot be applied to an '@%0' declaration", (StringRef))
+WARNING(extern_c_maybe_invalid_name, none,
+        "C name '%0' may be invalid; explicitly specify the name in @extern(c) to suppress this warning",
+        (StringRef))
+
+ERROR(c_func_variadic, none,
+      "cannot declare variadic argument %0 in %kind1",
+      (DeclName, const ValueDecl *))
+ERROR(c_func_unsupported_specifier, none,
+      "cannot declare '%0' argument %1 in %kind2",
+      (StringRef, DeclName, const ValueDecl *))
+ERROR(c_func_unsupported_type, none, "%0 cannot be represented in C",
+      (Type))
+ERROR(c_func_async,none,
+      "async functions cannot be represented in C", ())
+ERROR(c_func_throws,none,
+      "raising errors from C functions is not supported", ())
 
 ERROR(expose_wasm_not_at_top_level_func,none,
       "@_expose attribute with 'wasm' can only be applied to global functions", ())
@@ -2516,11 +2564,11 @@ NOTE(add_nominal_sendable_conformance,none,
 NOTE(add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
-REMARK(add_predates_concurrency_import,none,
+WARNING(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
      "%select{| as warnings}0", (bool, Identifier))
-REMARK(remove_predates_concurrency_import,none,
+WARNING(remove_predates_concurrency_import,none,
      "'@preconcurrency' attribute on module %0 is unused", (Identifier))
 WARNING(remove_public_import,none,
         "public import of %0 was not used in public declarations or inlinable code",
@@ -5289,9 +5337,8 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "non-isolated context",
       (const ValueDecl *))
-ERROR(isolated_default_argument,none,
-      "%0 default argument cannot be synchronously evaluated from a "
-      "%1 context",
+ERROR(isolated_default_argument_context,none,
+      "%0 default argument in a %1 context", 
       (ActorIsolation, ActorIsolation))
 ERROR(conflicting_default_argument_isolation,none,
       "default argument cannot be both %0 and %1",
@@ -5648,6 +5695,8 @@ ERROR(global_actor_access,none,
 ERROR(global_actor_not_usable_from_inline,none,
       "global actor for %kind0 must be '@usableFromInline' or public",
       (const ValueDecl *))
+NOTE(move_global_actor_attr_to_storage_decl,none,
+     "move global actor attribute to %kind0", (const ValueDecl *))
 
 ERROR(actor_isolation_multiple_attr,none,
       "%kind0 has multiple actor-isolation attributes ('%1' and '%2')",
@@ -6076,7 +6125,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @objcMembers|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|in an @_objcImplementation extension of a class (without final or @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "

@@ -295,3 +295,24 @@ do {
     }
   }
 }
+
+// rdar://117220710 - The compiler incorrectly infers `v` pattern to be optional.
+do {
+  struct S {
+    var test: Int
+  }
+
+  func check(_: S?, _: S?) -> Bool { false }
+
+  func test(data: [S]?, exclusion: S?) {
+    for v in data ?? [] where check(v, exclusion) {
+      _ = v.test // Ok
+    }
+  }
+
+  let _ = { (data: [S]?, exclusion: S?) in
+    for v in data ?? [] where check(v, exclusion) {
+      _ = v.test // Ok
+    }
+  }
+}

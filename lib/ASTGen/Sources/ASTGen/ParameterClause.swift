@@ -76,7 +76,7 @@ extension ASTGenVisitor {
 
     let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
-    return BridgedParamDecl.createParsed(
+    return .createParsed(
       self.ctx,
       declContext: self.declContext,
       specifierLoc: specifierLoc,
@@ -84,8 +84,8 @@ extension ASTGenVisitor {
       firstNameLoc: node.optionalFirstName.bridgedSourceLoc(in: self),
       secondName: secondName,
       secondNameLoc: secondNameLoc,
-      type: self.generate(node.optionalType),
-      defaultValue: self.generate(node.defaultValue?.value)
+      type: self.generate(node.optionalType).asNullable,
+      defaultValue: self.generate(node.defaultValue?.value).asNullable
     )
   }
 }

@@ -440,7 +440,14 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
         Decl *decl = declOrOffset;
         if (decl != parent)
           continue;
-        return cast<TypeDecl>(getDecl(entry.second));
+        Expected<Decl *> typeOrErr = getDeclChecked(entry.second);
+        if (!typeOrErr) {
+          if (!getContext().LangOpts.EnableDeserializationRecovery)
+            fatal(typeOrErr.takeError());
+          diagnoseAndConsumeError(typeOrErr.takeError());
+          continue;
+        }
+        return cast<TypeDecl>(typeOrErr.get());
       }
     }
   }

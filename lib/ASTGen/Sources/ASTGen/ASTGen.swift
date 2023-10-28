@@ -48,9 +48,9 @@ enum ASTNode {
   var bridged: BridgedASTNode {
     switch self {
     case .expr(let e):
-      return BridgedASTNode(ptr: e.raw!, kind: .expr)
+      return BridgedASTNode(ptr: e.raw, kind: .expr)
     case .stmt(let s):
-      return BridgedASTNode(ptr: s.raw!, kind: .stmt)
+      return BridgedASTNode(ptr: s.raw, kind: .stmt)
     case .decl(let d):
       return BridgedASTNode(ptr: d.raw, kind: .decl)
     default:
@@ -323,18 +323,18 @@ extension ASTGenVisitor {
 // 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(_ node: TypeSyntax?) -> BridgedTypeRepr {
+  func generate(_ node: TypeSyntax?) -> BridgedTypeRepr? {
     guard let node else {
-      return BridgedTypeRepr(raw: nil)
+      return nil
     }
 
     return self.generate(node)
   }
 
   @inline(__always)
-  func generate(_ node: ExprSyntax?) -> BridgedExpr {
+  func generate(_ node: ExprSyntax?) -> BridgedExpr? {
     guard let node else {
-      return BridgedExpr(raw: nil)
+      return nil
     }
 
     return self.generate(node)
@@ -351,27 +351,27 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: GenericParameterClauseSyntax?) -> BridgedGenericParamList {
+  func generate(_ node: GenericParameterClauseSyntax?) -> BridgedGenericParamList? {
     guard let node else {
-      return BridgedGenericParamList(raw: nil)
+      return nil
     }
 
     return self.generate(node)
   }
 
   @inline(__always)
-  func generate(_ node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause {
+  func generate(_ node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause? {
     guard let node else {
-      return BridgedTrailingWhereClause(raw: nil)
+      return nil
     }
 
     return self.generate(node)
   }
 
   @inline(__always)
-  func generate(_ node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList {
+  func generate(_ node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList? {
     guard let node else {
-      return BridgedParameterList(raw: nil)
+      return nil
     }
 
     return self.generate(node)

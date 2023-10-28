@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
-// XFAIL: OS=windows-msvc
 
 import StdlibUnittest
 import POD

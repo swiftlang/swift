@@ -64,8 +64,35 @@ macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", 
 
 let world = 17
 
-// CHECK-NOT: structWithUnqualifiedLookup
 public
 #structWithUnqualifiedLookup
-
+// CHECK-NOT: structWithUnqualifiedLookup
+// CHECK-NOT: struct StructWithUnqualifiedLookup
 // CHECK: struct StructWithUnqualifiedLookup
+// CHECK-NOT: struct StructWithUnqualifiedLookup
+
+@attached(peer, names: named(_foo))
+macro AddPeerStoredProperty() = #externalMacro(module: "MacroDefinition", type: "AddPeerStoredPropertyMacro")
+
+@AddPeerStoredProperty
+public var test: Int = 10
+// CHECK: var test
+// CHECK-NOT: var _foo
+// CHECK: var _foo
+// CHECK-NOT: var _foo
+
+// CHECK: struct TestStruct {
+public struct TestStruct {
+  public #structWithUnqualifiedLookup
+  // CHECK-NOT: structWithUnqualifiedLookup
+  // CHECK-NOT: struct StructWithUnqualifiedLookup
+  // CHECK: struct StructWithUnqualifiedLookup
+  // CHECK-NOT: struct StructWithUnqualifiedLookup
+
+  @AddPeerStoredProperty
+  public var test: Int = 10
+  // CHECK: var test
+  // CHECK-NOT: var _foo
+  // CHECK: var _foo
+  // CHECK-NOT: var _foo
+}

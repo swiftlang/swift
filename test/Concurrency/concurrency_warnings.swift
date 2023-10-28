@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -warn-concurrency -parse-as-library %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

@@ -180,8 +180,9 @@ void SILFunctionBuilder::addFunctionAttributes(
     }
   }
 
-  if (auto *EA = Attrs.getAttribute<ExternAttr>()) {
-    F->setWasmImportModuleAndField(EA->ModuleName, EA->Name);
+  if (auto *EA = ExternAttr::find(Attrs, ExternKind::Wasm)) {
+    // @extern(wasm) always has explicit names
+    F->setWasmImportModuleAndField(*EA->ModuleName, *EA->Name);
   }
 
   if (Attrs.hasAttribute<UsedAttr>())

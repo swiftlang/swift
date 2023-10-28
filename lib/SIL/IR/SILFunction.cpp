@@ -214,7 +214,6 @@ void SILFunction::init(
   this->Zombie = false;
   this->HasOwnership = true,
   this->WasDeserializedCanonical = false;
-  this->IsStaticallyLinked = false;
   this->IsWithoutActuallyEscapingThunk = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
   this->perfConstraints = PerformanceConstraints::None;
@@ -290,7 +289,6 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
   newSnapshot->OptMode = OptMode;
-  newSnapshot->IsStaticallyLinked = IsStaticallyLinked;
   newSnapshot->copyEffects(this);
 
   SILFunctionCloner cloner(newSnapshot);
@@ -879,6 +877,9 @@ SILFunction::isPossiblyUsedExternally() const {
 bool SILFunction::shouldBePreservedForDebugger() const {
   // Only preserve for the debugger at Onone.
   if (getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
+    return false;
+
+  if (hasSemanticsAttr("no.preserve.debugger"))
     return false;
 
   // Only keep functions defined in this module.

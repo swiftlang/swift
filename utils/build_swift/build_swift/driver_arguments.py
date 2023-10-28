@@ -208,7 +208,6 @@ def _apply_default_arguments(args):
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
         args.test_swiftformat = False
-        args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
         args.test_swiftdocc = False
 
@@ -688,9 +687,6 @@ def create_argument_parser():
     option(['--swiftformat'], toggle_true('build_swiftformat'),
            help='build swift-format')
 
-    option(['--swiftevolve'], toggle_true('build_swiftevolve'),
-           help='build the swift-evolve tool')
-
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
     option(['--swiftdocc'], toggle_true('build_swiftdocc'),
@@ -735,8 +731,6 @@ def create_argument_parser():
            help='install the SourceKit stress tester')
     option(['--install-swift-driver'], toggle_true('install_swift_driver'),
            help='install new Swift driver')
-    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
-           help='install SwiftEvolve')
     option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
            help='install Swift DocC')
     option(['--toolchain-benchmarks'],
@@ -749,6 +743,9 @@ def create_argument_parser():
                 'toolchain')
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
+    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
+           help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
 
     option('--xctest', toggle_true('build_xctest'),
@@ -1241,8 +1238,6 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
            help='skip testing swift-format')
-    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
-           help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
@@ -1251,6 +1246,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
+    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
+           help='skip testing stdlib for WebAssembly')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1259,7 +1256,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,

@@ -64,6 +64,15 @@ bool SILFunctionArgument::isIndirectResult() const {
   return getIndex() < numIndirectResults;
 }
 
+bool SILFunctionArgument::isIndirectErrorResult() const {
+  auto numIndirectResults =
+      getFunction()->getConventions().getNumIndirectSILResults();
+  auto numIndirectErrorResults =
+      getFunction()->getConventions().getNumIndirectSILErrorResults();
+  return ((getIndex() >= numIndirectResults) &&
+          (getIndex() < numIndirectResults + numIndirectErrorResults));
+}
+
 SILArgumentConvention SILFunctionArgument::getArgumentConvention() const {
   return getFunction()->getConventions().getSILArgumentConvention(getIndex());
 }

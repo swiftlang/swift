@@ -149,3 +149,60 @@ public struct PublicGA {
 @InternalGA open class OpenClassInternalGA {} // expected-error {{open class 'OpenClassInternalGA' cannot have internal global actor 'InternalGA'}}
 @PackageGA open class OpenClassPackageGA {} // expected-error {{open class 'OpenClassPackageGA' cannot have package global actor 'PackageGA'}}
 @PublicGA open class OpenClassPublicGA {}
+
+// rdar://99281333 - no accessors/addressors/observers expect to 'get' are allowed to have a global actor attribute
+do {
+  class TestInvalidAccessors {
+    var test1: Int {
+      get { 42 }
+      @GA1
+      set { } // expected-error {{setter cannot have a global actor}} {{158:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
+
+      @GA1 _modify { fatalError() } // expected-error {{_modify accessor cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
+    }
+
+    func local() {
+      var test: Bool {
+        get { false }
+
+        @GA1
+        set { } // expected-error {{setter cannot have a global actor}}
+      }
+    }
+
+    @GA1 var testAlreadyWithGlobal: String {
+      get { "" }
+      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+    }
+  }
+
+  struct TestStruct {
+    var test1: Int {
+      get { 42 }
+      @GA1
+      set { } // expected-error {{setter cannot have a global actor}} {{184:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
+      @GA1 _modify { fatalError() } // expected-error {{_modify accessor cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
+    }
+
+    var test2: Int {
+      @GA1 willSet { // expected-error {{willSet observer cannot have a global actor}} {{7-12=}}
+        // expected-note@-1 {{move global actor attribute to property 'test2'}} {{191:5-5=@GA1}}
+      }
+    }
+
+    subscript(x: Int) -> Bool {
+      get { true }
+      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to subscript 'subscript(_:)'}} {{197:5-5=@GA1}}
+    }
+
+    @GA1 subscript(y: Bool) -> String {
+      get { "" }
+      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+    }
+  }
+}

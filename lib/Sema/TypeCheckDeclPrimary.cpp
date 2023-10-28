@@ -1032,7 +1032,18 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
-    (void)param->getInitializerIsolation();
+
+    // If the default argument has isolation, it must match the
+    // isolation of the decl context.
+    auto defaultArgIsolation = param->getInitializerIsolation();
+    if (defaultArgIsolation.isActorIsolated()) {
+      auto *dc = param->getDeclContext();
+      auto enclosingIsolation = getActorIsolationOfContext(dc);
+      if (enclosingIsolation != defaultArgIsolation) {
+        param->diagnose(diag::isolated_default_argument_context,
+            defaultArgIsolation, enclosingIsolation);
+      }
+    }
 
     if (!ifacety->hasPlaceholder()) {
       continue;
@@ -3406,7 +3417,7 @@ public:
   /// Determine whether the given declaration should not have a definition.
   static bool requiresNoDefinition(Decl *decl) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Function with @_extern should not have a body.
+      // Function with @extern should not have a body.
       return func->getAttrs().hasAttribute<ExternAttr>();
     }
     // Everything else can have a definition.

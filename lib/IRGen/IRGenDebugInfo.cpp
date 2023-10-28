@@ -29,7 +29,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1363,6 +1362,7 @@ private:
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
     unsigned Encoding = 0;
+    uint32_t NumExtraInhabitants = 0;
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
     TypeBase *BaseTy = DbgTy.getType();
@@ -1386,6 +1386,8 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned;
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1393,6 +1395,8 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1401,6 +1405,8 @@ private:
       // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
       SizeInBits = FloatTy->getBitWidth();
       Encoding = llvm::dwarf::DW_ATE_float;
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1726,7 +1732,8 @@ private:
       DebugTypeInfo AliasedDbgTy(
           AliasedTy, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
           DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
-          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer());
+          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
+          DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, 0, Scope);
     }
@@ -1774,7 +1781,9 @@ private:
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
-    return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
+    return DBuilder.createBasicType(MangledName, SizeInBits, Encoding,
+                                    llvm::DINode::FlagZero,
+                                    NumExtraInhabitants);
   }
 
   /// Determine if there exists a name mangling for the given type.
@@ -2982,10 +2991,10 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // Ok, we now have our insert pt. Call the appropriate operations.
     assert(InsertPt);
     if (auto *InsertBefore = InsertPt.dyn_cast<llvm::Instruction *>()) {
-      auto *Inst = inserter.insert(Storage, Var, Expr, DL, InsertBefore);
+      inserter.insert(Storage, Var, Expr, DL, InsertBefore);
     } else {
-      auto *Inst = inserter.insert(Storage, Var, Expr, DL,
-                                   InsertPt.get<llvm::BasicBlock *>());
+      inserter.insert(Storage, Var, Expr, DL,
+                      InsertPt.get<llvm::BasicBlock *>());
     }
     return;
   }

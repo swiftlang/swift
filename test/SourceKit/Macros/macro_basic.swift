@@ -60,6 +60,13 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 @freestanding(expression) macro assert(_: String) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
 #assert("foobar")
 
+@attached(peer, names: named(_foo))
+macro AddPeerStoredProperty() = #externalMacro(module: "MacroDefinition", type: "AddPeerStoredPropertyMacro")
+struct S5 {
+  @AddPeerStoredProperty
+  var test: Int = 10
+}
+
 // REQUIRES: swift_swift_parser, executable_test, shell
 
 // RUN: %empty-directory(%t)
@@ -281,3 +288,12 @@ macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition"
 //##-- Expansion on "fails to typecheck" macro expression
 // RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=61:2 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=ERRONEOUS_EXPAND %s
 // ERRONEOUS_EXPAND: 61:1-61:18 (@__swiftmacro_{{.+}}.swift) "assert("foobar")"
+
+//##-- Cursor-info on a decl where a peer macro attached.
+// RUN: %sourcekitd-test -req=cursor -pos=67:7 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=CURSOR_ON_DECL_WITH_PEER %s
+// CURSOR_ON_DECL_WITH_PEER: <decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>test</decl.name>: <decl.var.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.type></decl.var.instance>
+// CURSOR_ON_DECL_WITH_PEER-NOT: _foo
+
+//##-- Expansion on the peer macro attached to pattern binding decl
+// RUN: %sourcekitd-test -req=refactoring.expand.macro -pos=66:4 %s -- ${COMPILER_ARGS[@]} | %FileCheck -check-prefix=EXPAND_PEER_ON_VAR %s
+// EXPAND_PEER_ON_VAR: 67:21-67:21 (@__swiftmacro_9MacroUser2S5V4test21AddPeerStoredPropertyfMp_.swift) "public var _foo: Int = 100"

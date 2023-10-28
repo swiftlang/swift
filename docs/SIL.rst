@@ -4361,6 +4361,8 @@ The following types of test arguments are supported:
          Example: @function[foo].block[2]
 - trace: @trace <-- the first ``debug_value [trace]`` in the current function
          @trace[uint] <-- the ``debug_value [trace]`` at index ``uint``
+- value: @{instruction}.result <-- the first result of the instruction
+         @{instruction}.result[uint] <-- the result at index ``uint`` produced by the instruction
          @{function}.{trace} <-- the indicated trace in the indicated function
          Example: @function[bar].trace
 - argument: @argument <-_ the first argument of the current block

@@ -15,6 +15,8 @@
 ///
 // -----------------------------------------------------------------------------
 
+#if FIXED117438849
+
 import TestsUtils
 import CxxSubscripts
 
@@ -42,3 +44,5 @@ public func run_ReadAccessor(_ N: Int) {
     }
   }
 }
+
+#endif

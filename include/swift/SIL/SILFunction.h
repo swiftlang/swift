@@ -303,7 +303,7 @@ private:
   /// empty.
   StringRef WasmExportName;
 
-  /// Name of a Wasm import module and field if @_extern(wasm) attribute
+  /// Name of a Wasm import module and field if @extern(wasm) attribute
   llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
@@ -423,9 +423,6 @@ private:
 
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
-
-  /// The function is in a statically linked module.
-  unsigned IsStaticallyLinked : 1;
 
   /// If true, the function has lexical lifetimes even if the module does not.
   unsigned ForceEnableLexicalLifetimes : 1;
@@ -696,12 +693,6 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
-  }
-
-  bool isStaticallyLinked() const { return IsStaticallyLinked; }
-
-  void setIsStaticallyLinked(bool value) {
-    IsStaticallyLinked = value;
   }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
@@ -1297,14 +1288,14 @@ public:
   StringRef wasmExportName() const { return WasmExportName; }
   void setWasmExportName(StringRef value) { WasmExportName = value; }
 
-  /// Return Wasm import module name if @_extern(wasm) was used otherwise empty
+  /// Return Wasm import module name if @extern(wasm) was used otherwise empty
   StringRef wasmImportModuleName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->first;
     return StringRef();
   }
 
-  /// Return Wasm import field name if @_extern(wasm) was used otherwise empty
+  /// Return Wasm import field name if @extern(wasm) was used otherwise empty
   StringRef wasmImportFieldName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->second;

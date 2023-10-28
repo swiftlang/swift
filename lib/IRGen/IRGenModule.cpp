@@ -21,7 +21,6 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -928,6 +927,14 @@ namespace RuntimeConstants {
     // swift_task_run_inline is only available under task-to-thread execution
     // model.
     return RuntimeAvailability::ConditionallyAvailable;
+  }
+
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
   }
 
 } // namespace RuntimeConstants

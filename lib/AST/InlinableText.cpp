@@ -189,20 +189,112 @@ struct ExtractInactiveRanges : public ASTWalker {
 };
 } // end anonymous namespace
 
+/// Appends the textual contents of the provided source range, stripping
+/// the contents of comments that appear in the source.
+///
+/// Given that comments are treated as whitespace, this also appends a
+/// space or newline (depending if the comment was multi-line and itself
+/// had newlines in the body) in place of the comment, to avoid fusing tokens
+/// together.
+static void appendRange(
+  SourceManager &sourceMgr, SourceLoc start, SourceLoc end,
+  SmallVectorImpl<char> &scratch) {
+  unsigned bufferID = sourceMgr.findBufferContainingLoc(start);
+  unsigned offset = sourceMgr.getLocOffsetInBuffer(start, bufferID);
+  unsigned endOffset = sourceMgr.getLocOffsetInBuffer(end, bufferID);
+
+  // Strip comments from the chunk before adding it by re-lexing the range.
+  LangOptions FakeLangOpts;
+  Lexer lexer(FakeLangOpts, sourceMgr, bufferID, nullptr, LexerMode::Swift,
+    HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+    offset, endOffset);
+
+  SourceLoc nonCommentStart = start;
+  Token token;
+
+  // Re-lex the range, and skip the full text of `tok::comment` tokens.
+  while (!token.is(tok::eof)) {
+    lexer.lex(token);
+
+    // Skip over #sourceLocation's in the file.
+    if (token.is(tok::pound_sourceLocation)) {
+
+      // Append the text leading up to the #sourceLocation
+      auto charRange = CharSourceRange(
+        sourceMgr, nonCommentStart, token.getLoc());
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
+
+      // Skip to the right paren. We know the AST is already valid, so there's
+      // definitely a right paren.
+      while (!token.is(tok::r_paren)) {
+        lexer.lex(token);
+      }
+
+      nonCommentStart = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+    }
+
+    if (token.is(tok::comment)) {
+      // Grab the start of the full comment token (with leading trivia as well)
+      SourceLoc commentLoc = token.getLoc();
+
+      // Find the end of the token (with trailing trivia)
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+
+      // The comment token's range includes leading/trailing whitespace, so trim
+      // whitespace and only strip the portions of the comment that are not
+      // whitespace.
+      CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef fullTokenText = sourceMgr.extractText(range);
+      unsigned leadingWhitespace = fullTokenText.size() - 
+        fullTokenText.ltrim().size();
+      if (leadingWhitespace > 0) {
+        commentLoc = commentLoc.getAdvancedLoc(leadingWhitespace);
+      }
+
+      unsigned trailingWhitespace = fullTokenText.size() -
+        fullTokenText.rtrim().size();
+      if (trailingWhitespace > 0) {
+        endLoc = endLoc.getAdvancedLoc(-trailingWhitespace);
+      }
+
+      // First, extract the text up to the start of the comment, including the
+      // whitespace.
+      auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
+
+      // Next, search through the comment text to see if it's a block comment
+      // with a newline. If so we need to re-insert a newline to avoid fusing
+      // multi-line tokens together.
+      auto commentTextRange = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef commentText = sourceMgr.extractText(commentTextRange);
+      bool hasNewline = commentText.find_first_of("\n\r") != StringRef::npos;
+
+      // Use a newline as a filler character if the comment itself had a newline
+      // in it.
+      char filler = hasNewline ? '\n' : ' ';
+
+      // Append a single whitespace filler character, to avoid fusing tokens.
+      scratch.push_back(filler);
+
+      // Start the next region after the contents of the comment.
+      nonCommentStart = endLoc;
+    }
+  }
+
+  if (nonCommentStart.isValid() && nonCommentStart != end) {
+    auto charRange = CharSourceRange(sourceMgr, nonCommentStart, end);
+    StringRef text = sourceMgr.extractText(charRange);
+    scratch.append(text.begin(), text.end());
+  }
+}
+
 StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
                                       SmallVectorImpl<char> &scratch) {
   // Extract inactive ranges from the text of the node.
   ExtractInactiveRanges extractor(sourceMgr);
   node.walk(extractor);
-
-  // If there were no inactive ranges, then there were no #if configs.
-  // Return an unowned buffer directly into the source file.
-  if (extractor.ranges.empty()) {
-    auto range =
-      Lexer::getCharSourceRangeFromSourceRange(
-        sourceMgr, node.getSourceRange());
-    return sourceMgr.extractText(range);
-  }
 
   // Begin piecing together active code ranges.
 
@@ -211,9 +303,7 @@ StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
   SourceLoc end = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
   for (auto &range : extractor.getSortedRanges()) {
     // Add the text from the current 'start' to this ignored range's start.
-    auto charRange = CharSourceRange(sourceMgr, start, range.getStart());
-    auto chunk = sourceMgr.extractText(charRange);
-    scratch.append(chunk.begin(), chunk.end());
+    appendRange(sourceMgr, start, range.getStart(), scratch);
 
     // Set 'start' to the end of this range, effectively skipping it.
     start = range.getEnd();
@@ -221,9 +311,8 @@ StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
 
   // If there's leftover unignored text, add it.
   if (start != end) {
-    auto range = CharSourceRange(sourceMgr, start, end);
-    auto chunk = sourceMgr.extractText(range);
-    scratch.append(chunk.begin(), chunk.end());
+    appendRange(sourceMgr, start, end, scratch);
   }
+
   return { scratch.data(), scratch.size() };
 }

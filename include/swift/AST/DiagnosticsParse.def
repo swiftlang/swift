@@ -1485,6 +1485,10 @@ ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
+ERROR(multiple_access_level_modifiers,none,
+      "multiple incompatible access-level modifiers specified", ())
+NOTE(previous_access_level_modifier,none,
+     "previous modifier specified here", ())
 ERROR(mutually_exclusive_attrs,none,
       "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
 
@@ -1865,7 +1869,7 @@ ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in @_rawLayout attribute", (StringRef, StringRef))
 
 ERROR(attr_extern_expected_label,none,
-      "expected %0 argument to @_extern attribute", (StringRef))
+      "expected %0 argument to @extern attribute", (StringRef))
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------

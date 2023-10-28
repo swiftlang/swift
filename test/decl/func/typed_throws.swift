@@ -76,10 +76,14 @@ func mapArray<T, U, E: Error>(_ array: [T], body: (T) throws(E) -> U) throws(E) 
   return resultArray
 }
 
+struct Person {
+  var name: String
+}
+
 func addOrThrowUntyped(_ i: Int, _ j: Int) throws -> Int { i + j }
 func addOrThrowMyError(_ i: Int, _ j: Int) throws(MyError) -> Int { i + j }
 
-func testMapArray(numbers: [Int]) {
+func testMapArray(numbers: [Int], friends: [Person]) {
   // Note: try is not required, because this throws Never
   _ = mapArray(numbers) { $0 + 1 }
 
@@ -100,6 +104,11 @@ func testMapArray(numbers: [Int]) {
     _ = try mapArray(numbers) { (x) throws(MyError) in try addOrThrowMyError(x, 1) }
   } catch {
     let _: Int = error // expected-error{{cannot convert value of type 'MyError' to specified type 'Int'}}
+  }
+
+  do {
+    // Keypath-as-function
+    _ = mapArray(friends, body: \Person.name)
   }
 }
 
@@ -122,4 +131,18 @@ struct HasASubscript {
       return 0
     }
   }
+}
+
+// expected-error@+1{{thrown type 'any Codable & Error' (aka 'any Decodable & Encodable & Error') does not conform to the 'Error' protocol}}
+func throwCodableErrors() throws(any Codable & Error) { }
+
+enum Either<First, Second> {
+case first(First)
+case second(Second)
+}
+
+extension Either: Error where First: Error, Second: Error { }
+
+func f<E1, E2>(_ error: Either<E1, E2>) throws(Either<E1, E2>) {
+  throw error
 }

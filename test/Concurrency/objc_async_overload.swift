@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=targeted
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop

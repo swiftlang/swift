@@ -218,8 +218,8 @@ EXPERIMENTAL_FEATURE(BuiltinModule, true)
 // Enable strict concurrency.
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
-/// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(SendNonSendable, false)
+/// Region Based Isolation testing using the TransferNonSendable pass
+EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
 
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
@@ -256,6 +256,9 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
+
+/// Enable the `@extern` attribute.
+EXPERIMENTAL_FEATURE(Extern, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -97,6 +97,8 @@ private func registerSwiftPasses() {
   registerForSILCombine(RetainValueInst.self,      { run(RetainValueInst.self, $0) })
   registerForSILCombine(ReleaseValueInst.self,     { run(ReleaseValueInst.self, $0) })
   registerForSILCombine(LoadInst.self,             { run(LoadInst.self, $0) })
+  registerForSILCombine(CopyValueInst.self,        { run(CopyValueInst.self, $0) })
+  registerForSILCombine(DestroyValueInst.self,     { run(DestroyValueInst.self, $0) })
 
   // Test passes
   registerPass(functionUsesDumper, { functionUsesDumper.run($0) })

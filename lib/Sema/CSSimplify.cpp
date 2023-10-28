@@ -12248,6 +12248,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // { root in root[keyPath: kp] }.
       boundRoot = fnTy->getParams()[0].getParameterType();
       boundValue = fnTy->getResult();
+
+      // Key paths never throw, so if the function has a thrown error type
+      // that is a type variable, infer it to be Never.
+      if (auto thrownError = fnTy->getThrownError()) {
+        if (thrownError->isTypeVariableOrMember()) {
+          (void)matchTypes(
+            thrownError, getASTContext().getNeverType(),
+            ConstraintKind::Equal, TMF_GenerateConstraints, locator);
+        }
+      }
     }
 
     if (boundRoot &&

@@ -397,6 +397,10 @@ UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
   }
 }
 
+UIdent SwiftSemanticToken::getUIdentForKind() {
+  return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, IsRef);
+}
+
 UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     ide::CodeCompletionDeclKind Kind, bool IsRef) {
   if (IsRef) {

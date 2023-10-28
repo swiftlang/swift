@@ -50,7 +50,7 @@ static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl,
   auto accessorImplDotCallExpr =
       DotSyntaxCallExpr::create(ctx, accessorImplExpr, SourceLoc(), selfArg);
   accessorImplDotCallExpr->setType(accessorImpl->getMethodInterfaceType());
-  accessorImplDotCallExpr->setThrows(false);
+  accessorImplDotCallExpr->setThrows(nullptr);
 
   ArgumentList *argList;
   if (keyRefExpr) {
@@ -61,7 +61,7 @@ static CallExpr *createAccessorImplCallExpr(FuncDecl *accessorImpl,
   auto *accessorImplCallExpr =
       CallExpr::createImplicit(ctx, accessorImplDotCallExpr, argList);
   accessorImplCallExpr->setType(accessorImpl->getResultInterfaceType());
-  accessorImplCallExpr->setThrows(false);
+  accessorImplCallExpr->setThrows(nullptr);
   return accessorImplCallExpr;
 }
 
@@ -348,7 +348,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
     initTy = initTy->castTo<FunctionType>()->getResult();
     auto initRef = DotSyntaxCallExpr::create(
         ctx, declRef, SourceLoc(), Argument::unlabeled(typeRef), initTy);
-    initRef->setThrows(false);
+    initRef->setThrows(nullptr);
 
     // (rawValue: T) -> ...
     initTy = initTy->castTo<FunctionType>()->getResult();
@@ -356,7 +356,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
     auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_rawValue, expr);
     auto initCall = CallExpr::createImplicit(ctx, initRef, argList);
     initCall->setType(initTy);
-    initCall->setThrows(false);
+    initCall->setThrows(nullptr);
 
     expr = initCall;
 
@@ -422,7 +422,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  auto nonisolatedAttr = new (C) NonisolatedAttr(/*IsImplicit=*/true);
+  auto nonisolatedAttr =
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true);
   var->getAttrs().add(nonisolatedAttr);
 
   // Set the function up as the getter.
@@ -467,7 +468,7 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
 
   auto call = CallExpr::createImplicitEmpty(ctx, zeroInitializerRef);
   call->setType(selfType);
-  call->setThrows(false);
+  call->setThrows(nullptr);
 
   auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
   assign->setType(emptyTuple);
@@ -852,7 +853,7 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto reinterpreted =
       CallExpr::createImplicit(ctx, reinterpretCastRefExpr, argList);
   reinterpreted->setType(importedFieldDecl->getInterfaceType());
-  reinterpreted->setThrows(false);
+  reinterpreted->setThrows(nullptr);
   auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
@@ -897,7 +898,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto selfPointer =
       CallExpr::createImplicit(ctx, addressofFnRefExpr, selfPtrArgs);
   selfPointer->setType(ctx.TheRawPointerType);
-  selfPointer->setThrows(false);
+  selfPointer->setThrows(nullptr);
 
   auto initializeFn =
       cast<FuncDecl>(getBuiltinValueDecl(ctx, ctx.getIdentifier("initialize")));
@@ -919,7 +920,7 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto initialize =
       CallExpr::createImplicit(ctx, initializeFnRefExpr, initArgs);
   initialize->setType(TupleType::getEmpty(ctx));
-  initialize->setThrows(false);
+  initialize->setThrows(nullptr);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), {initialize}, SourceLoc(),
                                 /*implicit*/ true);
@@ -1237,7 +1238,7 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
   auto reinterpreted =
       CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
   reinterpreted->setType(enumTy);
-  reinterpreted->setThrows(false);
+  reinterpreted->setThrows(nullptr);
 
   auto assign = new (ctx) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                      /*implicit*/ true);
@@ -1309,7 +1310,7 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto reinterpreted =
       CallExpr::createImplicit(ctx, reinterpretCastRef, argList);
   reinterpreted->setType(rawTy);
-  reinterpreted->setThrows(false);
+  reinterpreted->setThrows(nullptr);
 
   auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
@@ -1892,12 +1893,12 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto dotCallExpr =
       DotSyntaxCallExpr::create(ctx, methodExpr, SourceLoc(), baseArg);
   dotCallExpr->setType(methodDecl->getMethodInterfaceType());
-  dotCallExpr->setThrows(false);
+  dotCallExpr->setThrows(nullptr);
 
   auto *argList = ArgumentList::createImplicit(ctx, forwardingArgs);
   auto callExpr = CallExpr::createImplicit(ctx, dotCallExpr, argList);
   callExpr->setType(funcDecl->getResultInterfaceType());
-  callExpr->setThrows(false);
+  callExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), callExpr,
                                          /*implicit*/ true);

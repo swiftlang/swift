@@ -297,15 +297,4 @@ func testCollectionCompatibilityCoercions(_ arr: [Int], _ optArr: [Any]?, _ set:
   // CHECK: [[CAST_FN:%.+]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK: apply [[CAST_FN]]<String, Int, Int, String>([[DICT]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   _ = promote(promote(promote(dict))) as [Int: String]
-
-  typealias Magic<T> = T
-
-  // These are currently not peepholed.
-  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  // CHECK: apply [[CAST_FN]]<Int, String>
-  [i].self as Magic as [String]
-
-  // CHECK: [[CAST_FN:%.+]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-  // CHECK: apply [[CAST_FN]]<Int, String>
-  (try [i]) as Magic as [String]
 }

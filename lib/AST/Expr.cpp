@@ -2860,3 +2860,36 @@ Type Expr::findOriginalType() const {
 
   return expr->getType()->getRValueType();
 }
+
+ThrownErrorDestination
+ThrownErrorDestination::forConversion(OpaqueValueExpr *thrownError,
+                                      Expr *conversion) {
+  ASTContext &ctx = thrownError->getType()->getASTContext();
+  auto conversionStorage = ctx.Allocate<Conversion>();
+  conversionStorage->thrownError = thrownError;
+  conversionStorage->conversion = conversion;
+
+  return ThrownErrorDestination(conversionStorage);
+}
+
+Type ThrownErrorDestination::getThrownErrorType() const {
+  if (!*this)
+    return Type();
+
+  if (auto type = storage.dyn_cast<TypeBase *>())
+    return Type(type);
+
+  auto conversion = storage.get<Conversion *>();
+  return conversion->thrownError->getType();
+}
+
+Type ThrownErrorDestination::getContextErrorType() const {
+  if (!*this)
+    return Type();
+
+  if (auto type = storage.dyn_cast<TypeBase *>())
+    return Type(type);
+
+  auto conversion = storage.get<Conversion *>();
+  return conversion->conversion->getType();
+}

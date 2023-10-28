@@ -5904,7 +5904,8 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   // as an intermediate collection cast can dynamically change if the conditions
   // are met or not.
   if (type->isKnownStdlibCollectionType())
-    return !M->lookupConformance(type, Proto).isInvalid();
+    return !M->lookupConformance(type, Proto, /*allowMissing=*/true)
+                .isInvalid();
   return !conformsToProtocol(type, Proto, M).isInvalid();
 }
 

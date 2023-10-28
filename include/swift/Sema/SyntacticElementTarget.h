@@ -469,6 +469,8 @@ public:
   bool shouldBindPatternVarsOneWay() const {
     if (kind == Kind::expression)
       return expression.bindPatternVarsOneWay;
+    if (kind == Kind::forEachStmt)
+      return !ignoreForEachWhereClause() && forEachStmt.stmt->getWhere();
     return false;
   }
 

@@ -926,8 +926,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     return CharSourceRange(rightBraceLoc, 0);
   }
   case MacroRole::Peer: {
-    SourceLoc afterDeclLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    SourceLoc endLoc = target.getEndLoc();
+    if (auto var = dyn_cast<VarDecl>(target.get<Decl *>())) {
+      if (auto binding = var->getParentPatternBinding())
+        endLoc = binding->getEndLoc();
+    }
+    SourceLoc afterDeclLoc = Lexer::getLocForEndOfToken(sourceMgr, endLoc);
     return CharSourceRange(afterDeclLoc, 0);
     break;
   }
@@ -1315,7 +1319,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   std::string conformanceList;
   {
     llvm::raw_string_ostream OS(conformanceList);
-    if (role == MacroRole::Extension) {
+    if (role == MacroRole::Extension || role == MacroRole::Member) {
       llvm::interleave(
           conformances,
           [&](const ProtocolDecl *protocol) {

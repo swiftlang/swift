@@ -20,9 +20,11 @@
 using namespace swift;
 using namespace Lowering;
 
-void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
-                                   llvm::Optional<Type> exnType,
-                                   CleanupLocation CleanupL) {
+void SILGenFunction::prepareEpilog(DeclContext *DC,
+                                   llvm::Optional<Type> directResultType,
+                                   llvm::Optional<Type> errorType,
+                                   CleanupLocation CleanupL,
+                                   llvm::Optional<AbstractionPattern> origClosureType) {
   auto *epilogBB = createBasicBlock();
 
   // If we have any direct results, receive them via BB arguments.
@@ -63,8 +65,14 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
 
   ReturnDest = JumpDest(epilogBB, getCleanupsDepth(), CleanupL);
 
-  if (exnType) {
-    prepareRethrowEpilog(*exnType, CleanupL);
+  if (errorType) {
+    auto genericSig = DC->getGenericSignatureOfContext();
+    AbstractionPattern origErrorType = origClosureType
+      ? *origClosureType->getFunctionThrownErrorType()
+      : AbstractionPattern(genericSig.getCanonicalSignature(),
+                           (*errorType)->getCanonicalType());
+
+    prepareRethrowEpilog(DC, origErrorType, *errorType, CleanupL);
   }
 
   if (F.getLoweredFunctionType()->isCoroutine()) {
@@ -73,10 +81,15 @@ void SILGenFunction::prepareEpilog(llvm::Optional<Type> directResultType,
 }
 
 void SILGenFunction::prepareRethrowEpilog(
-    Type exnType, CleanupLocation cleanupLoc) {
-  SILType loweredExnType = getLoweredType(exnType);
+    DeclContext *dc, AbstractionPattern origErrorType, Type errorType,
+    CleanupLocation cleanupLoc) {
+
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPhiArgument(loweredExnType, OwnershipKind::Owned);
+  if (!IndirectErrorResult) {
+    SILType loweredErrorType = getLoweredType(origErrorType, errorType);
+    rethrowBB->createPhiArgument(loweredErrorType, OwnershipKind::Owned);
+  }
+
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 

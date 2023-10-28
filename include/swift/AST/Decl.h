@@ -957,6 +957,10 @@ public:
   unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
                                          const CustomAttr *attr) const;
 
+  /// Returns the resolved type for the give custom attribute attached to this
+  /// declaration.
+  Type getResolvedCustomAttrType(CustomAttr *attr) const;
+
   /// Determines if this declaration is exposed to clients of the module it is
   /// defined in. For example, `public` declarations are exposed to clients.
   bool isExposedToClients() const;
@@ -6128,7 +6132,10 @@ public:
   /// True if this is a top-level global variable from the main source file.
   bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
   void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
-  
+
+  /// True if this is any storage of static duration (global scope or static).
+  bool isGlobalStorage() const;
+
   /// Retrieve the custom attributes that attach property wrappers to this
   /// property. The returned list contains all of the attached property wrapper
   /// attributes in source order, which means the outermost wrapper attribute

@@ -13,8 +13,7 @@ func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasy
 
 // CHECK-LABEL: sil hidden @$s26mandatory_inlining_reasync20callsReasyncFunctionSiyF : $@convention(thin) () -> Int {
 // CHECK: [[FN:%.*]] = function_ref @$s26mandatory_inlining_reasync20callsReasyncFunctionSiyFSiyXEfU_ : $@convention(thin) () -> Int
-// CHECK-NEXT: [[THICK:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) () -> Int to $@noescape @callee_guaranteed () -> Int
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[THICK]]() : $@noescape @callee_guaranteed () -> Int
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]() : $@convention(thin) () -> Int
 // CHECK-NEXT:  return [[RESULT]] : $Int
 func callsReasyncFunction() -> Int {
   return reasyncFunction(nil, { return 321 } )

@@ -237,7 +237,7 @@ public:
   std::string DebugCompilationDir;
 
   /// The DWARF version of debug info.
-  unsigned DWARFVersion;
+  uint8_t DWARFVersion = 4;
 
   /// The command line string that is to be stored in the debug info.
   std::string DebugFlags;
@@ -512,8 +512,7 @@ public:
   bool EmitCASIDFile;
 
   IRGenOptions()
-      : DWARFVersion(2),
-        OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
+      : OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),

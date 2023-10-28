@@ -665,6 +665,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) override;
 
+  void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver)
+      override;
+
   void getNameInfo(
       StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
       NameTranslatingInfo &Input, ArrayRef<const char *> Args,
@@ -811,6 +818,10 @@ public:
 
 /// Disable expensive SIL options which do not affect indexing or diagnostics.
 void disableExpensiveSILOptions(swift::SILOptions &Opts);
+
+swift::SourceFile *retrieveInputFile(StringRef inputBufferName,
+                                     const swift::CompilerInstance &CI,
+                                     bool haveRealPath = false);
 
 } // namespace SourceKit
 

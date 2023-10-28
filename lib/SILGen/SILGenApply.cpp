@@ -2518,18 +2518,21 @@ private:
     AbstractionPattern origResultType;
     ClaimedParamsRef paramsToEmit;
     SILFunctionTypeRepresentation functionRepresentation;
-    
+    bool implicitlyAsync;
+
     DefaultArgumentStorage(SILLocation loc,
                            ConcreteDeclRef defaultArgsOwner,
                            unsigned destIndex,
                            CanType resultType,
                            AbstractionPattern origResultType,
                            ClaimedParamsRef paramsToEmit,
-                           SILFunctionTypeRepresentation functionRepresentation)
+                           SILFunctionTypeRepresentation functionRepresentation,
+                           bool implicitlyAsync)
       : loc(loc), defaultArgsOwner(defaultArgsOwner), destIndex(destIndex),
         resultType(resultType), origResultType(origResultType),
         paramsToEmit(paramsToEmit),
-        functionRepresentation(functionRepresentation)
+        functionRepresentation(functionRepresentation),
+        implicitlyAsync(implicitlyAsync)
     {}
   };
   struct BorrowedLValueStorage {
@@ -2656,13 +2659,15 @@ public:
                   CanType resultType,
                   AbstractionPattern origResultType,
                   ClaimedParamsRef params,
-                  SILFunctionTypeRepresentation functionTypeRepresentation)
+                  SILFunctionTypeRepresentation functionTypeRepresentation,
+                  bool implicitlyAsync)
     : Kind(DefaultArgument) {
     Value.emplace<DefaultArgumentStorage>(Kind, loc, defaultArgsOwner,
                                           destIndex,
                                           resultType,
                                           origResultType, params,
-                                          functionTypeRepresentation);
+                                          functionTypeRepresentation,
+                                          implicitlyAsync);
   }
 
   DelayedArgument(DelayedArgument &&other)
@@ -3261,7 +3266,7 @@ public:
                                     defArg->getParamIndex(),
                                     substParamType, origParamType,
                                     claimNextParameters(numParams),
-                                    Rep);
+                                    Rep, defArg->isImplicitlyAsync());
       Args.push_back(ManagedValue());
 
       maybeEmitForeignArgument();
@@ -4255,7 +4260,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
-                                                  info.resultType);
+                                                  info.resultType,
+                                                  info.implicitlyAsync);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
@@ -5515,6 +5521,7 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
     }

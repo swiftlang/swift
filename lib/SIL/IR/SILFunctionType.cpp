@@ -2190,32 +2190,6 @@ static CanSILFunctionType getSILFunctionType(
     isAsync = true;
   }
 
-  // Map 'throws' to the appropriate error convention.
-  // Give the type an error argument whether the substituted type semantically
-  // `throws` or if the abstraction pattern specifies a Swift function type
-  // that also throws. This prevents the need for a second possibly-thunking
-  // conversion when using a non-throwing function in more abstract throwing
-  // context.
-  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
-  if (auto origFnType = origType.getAs<AnyFunctionType>()) {
-    isThrowing |= origFnType->getExtInfo().isThrowing();
-  }
-  if (isThrowing && !foreignInfo.error &&
-      !foreignInfo.async) {
-    assert(!origType.isForeign()
-           && "using native Swift error convention for foreign type!");
-    SILType exnType;
-    if (CanType thrownError = substFnInterfaceType.getThrownError()) {
-      exnType = TC.getLoweredType(thrownError, expansionContext);
-    } else {
-      // Untyped error throws the exception type.
-      exnType = SILType::getExceptionType(TC.Context);
-    }
-    assert(exnType.isObject());
-    errorResult = SILResultInfo(exnType.getASTType(),
-                                ResultConvention::Owned);
-  }
-  
   // Get the yield type for an accessor coroutine.
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();
@@ -2306,6 +2280,36 @@ static CanSILFunctionType getSILFunctionType(
       coroutineOrigYieldType = substYieldType;
       coroutineSubstYieldType = substYieldType.getType();
     }
+  }
+
+  // Map 'throws' to the appropriate error convention.
+  // Give the type an error argument whether the substituted type semantically
+  // `throws` or if the abstraction pattern specifies a Swift function type
+  // that also throws. This prevents the need for a second possibly-thunking
+  // conversion when using a non-throwing function in more abstract throwing
+  // context.
+  bool isThrowing = substFnInterfaceType->getExtInfo().isThrowing();
+  if (auto origFnType = origType.getAs<AnyFunctionType>()) {
+    isThrowing |= origFnType->getExtInfo().isThrowing();
+  }
+
+  if (isThrowing && !foreignInfo.error &&
+      !foreignInfo.async) {
+    assert(!origType.isForeign()
+           && "using native Swift error convention for foreign type!");
+    auto optPair = origType.getFunctionThrownErrorType(substFnInterfaceType);
+    assert(optPair &&
+           "Lowering a throwing function type against non-throwing pattern");
+
+    auto origErrorType = optPair->first;
+    auto errorType = optPair->second;
+    auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
+                                           TypeExpansionContext::minimal());
+
+    errorResult = SILResultInfo(errorTLConv.getLoweredType().getASTType(),
+                                errorTLConv.isAddressOnly()
+                                ? ResultConvention::Indirect
+                                : ResultConvention::Owned);
   }
 
   // Lower the result type.
@@ -4081,6 +4085,8 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::Func:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
+      if (ExternAttr::find(c.getDecl()->getAttrs(), ExternKind::C))
+        return SILFunctionTypeRepresentation::CFunctionPointer;
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Destroyer:

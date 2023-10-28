@@ -237,7 +237,8 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
     paramsForForwarding.emplace_back(param.forward(*this));
   }
 
-  prepareEpilog(getResultInterfaceType(AFD),
+  prepareEpilog(AFD,
+                getResultInterfaceType(AFD),
                 AFD->getEffectiveThrownErrorType(),
                 CleanupLocation(AFD));
 

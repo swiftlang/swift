@@ -1537,9 +1537,9 @@ public:
   }
 };
 
-static SourceFile *retrieveInputFile(StringRef inputBufferName,
-                                     const CompilerInstance &CI,
-                                     bool haveRealPath = false) {
+SourceFile *SourceKit::retrieveInputFile(StringRef inputBufferName,
+                                         const CompilerInstance &CI,
+                                         bool haveRealPath) {
   // Don't bother looking up if we have the same file as the primary file or
   // we weren't given a separate input file
   if (inputBufferName.empty() ||
