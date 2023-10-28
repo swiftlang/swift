@@ -159,7 +159,6 @@
 #include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
-#include "swift/Basic/Defer.h"
 #include "Diagnostics.h"
 #include "RewriteContext.h"
 #include "NameLookup.h"
@@ -779,6 +778,19 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
   if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
     return;
 
+  // TODO(kavon): we can be more efficient in two ways:
+  // 1. Instead of allocating space in this map for each target to describe
+  //    defaults, which are much more common, we use the set to track inverses
+  //    only so that the more common case has no overhead beyond just adding
+  //    the defaults. This should yield a constant-time improvement.
+  //
+  // 2. Instead of searching the _entire_ results vector for inverses, we can
+  //    take advantage of the fact that the requirements appended by nesting
+  //    level. Thus, we could get an iterator position for the start of the
+  //    removal search, which would be the end of the `result` vector before
+  //    requirements for the current subjects got pushed there. This should
+  //    yield a O(|result|^2) -> O(|result|)  performance improvement.
+
   llvm::DenseMap<CanType, InvertibleProtocolSet> defaults;
   for (auto subject : subjects)
     defaults.insert({ subject->getCanonicalType(),
@@ -810,8 +822,6 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
           RequirementError::forInvalidInverseOuterSubject(req, structReq.loc));
       return true;
     }
-
-    // TODO: check for redundant inverses.
 
     // Apply the inverse to the subject's defaults.
     defaults[subject].remove(inverse->getInverseKind());
