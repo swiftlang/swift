@@ -432,6 +432,7 @@ public:
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
   std::string getPrivateModuleInterfaceOutputPathForWholeModule() const;
+  std::string getPackageModuleInterfaceOutputPathForWholeModule() const;
 
   /// APIDescriptorPath only makes sense in whole module compilation mode,
   /// so return the APIDescriptorPath when in that mode and fail an assert

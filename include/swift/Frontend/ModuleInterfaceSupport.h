@@ -55,8 +55,8 @@ struct ModuleInterfaceOptions {
   /// e.g. -package-name PACKAGE_ID
   std::string IgnorablePrivateFlags;
 
-  /// Print for a private swiftinterface file, SPI decls and attributes.
-  bool PrintPrivateInterfaceContent = false;
+  /// Prints package, SPIs, or public/inlinable decls depending on the mode.
+  PrintInterfaceContentMode InterfaceContentMode = PrintInterfaceContentMode::Public;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.

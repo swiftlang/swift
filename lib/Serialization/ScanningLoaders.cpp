@@ -67,11 +67,20 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   }
   assert(fs.exists(InPath));
 
-  // Use the private interface file if exits.
-  auto PrivateInPath =
-      BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
-  if (fs.exists(PrivateInPath)) {
-    InPath = PrivateInPath;
+  // Use package.swiftinterface if it exists and its package-name applies to
+  // the importer module.
+  auto PkgInPath = getPackageInterfacePathIfInSamePackage(fs, Ctx);
+  if (fs.exists(PkgInPath)) {
+    InPath = PkgInPath;
+  }
+
+  // If not in package, use the private interface file if exits.
+  if (fs.exists(InPath)) {
+    auto PrivateInPath =
+    BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
+    if (fs.exists(PrivateInPath)) {
+      InPath = PrivateInPath;
+    }
   }
   auto dependencies =
       scanInterfaceFile(InPath, IsFramework, isTestableDependencyLookup);
@@ -79,7 +88,6 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     this->dependencies = std::move(dependencies.get());
     return std::error_code();
   }
-
   return dependencies.getError();
 }
 

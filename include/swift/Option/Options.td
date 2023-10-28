@@ -56,8 +56,9 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface module interface file,
-// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option should be written into a .private.swiftinterface or
+// .package.swiftinterface module interface file, and read/parsed from
+// there when reconstituting a .swiftmodule from it.
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
 
@@ -592,6 +593,12 @@ def emit_private_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+
+def emit_package_module_interface_path :
+  Separate<["-"], "emit-package-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
+  MetaVarName<"<path>">, HelpText<"Output package module interface file to <path>">;
 
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,

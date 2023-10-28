@@ -118,6 +118,12 @@ struct ShouldPrintChecker {
   virtual ~ShouldPrintChecker() = default;
 };
 
+enum class PrintInterfaceContentMode : uint8_t {
+  Public, // prints public/inlinable decls
+  Private, // prints SPI and public/inlinable decls
+  Package // prints package, SPI, and public/inlinable decls
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -299,8 +305,7 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
-  // Print SPI attributes and decls that are visible only as SPI.
-  bool PrintSPIs = true;
+  PrintInterfaceContentMode InterfaceContentMode;
 
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
@@ -684,7 +689,7 @@ struct PrintOptions {
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
-                                              bool printSPIs,
+                                              PrintInterfaceContentMode interfaceContentMode,
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>

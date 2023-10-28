@@ -799,7 +799,8 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
    }
   if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
       (Opts.InputsAndOutputs.hasModuleInterfaceOutputPath() ||
-       Opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath())) {
+       Opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath() ||
+        Opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath())) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }
