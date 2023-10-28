@@ -2448,6 +2448,17 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
+  if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
+    auto leafRange = TypeTreeLeafTypeRange::get(op->get(), getRootAddress());
+    if (!leafRange) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to compute leaf range!\n");
+      return false;
+    }
+
+    useState.recordLivenessUse(user, *leafRange);
+    return true;
+  }
+
   // If we don't fit into any of those categories, just track as a liveness
   // use. We assume all such uses must only be reads to the memory. So we assert
   // to be careful.
