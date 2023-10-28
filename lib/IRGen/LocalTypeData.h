@@ -271,6 +271,22 @@ public:
   MetadataResponse tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
                           bool allowAbstract, DynamicMetadataRequest request);
 
+  /// Whether the cached state was advanced or otherwise why not.
+  enum class StateAdvancement {
+    /// No entry whose state could be advanced was found.
+    NoEntry,
+    /// An entry was found whose state was already advanced at least as far as
+    /// the indicated state.
+    AlreadyAtLeast,
+    /// The state was advanced.
+    Advanced,
+  };
+
+  /// Advances the state cached for \p key to \p state within the active
+  /// dominance scope.
+  StateAdvancement advanceStateInScope(IRGenFunction &IGF, LocalTypeDataKey key,
+                                       MetadataState state);
+
   /// Add a new concrete entry to the cache at the given definition point.
   void addConcrete(DominancePoint point, bool isConditional,
                    LocalTypeDataKey key, MetadataResponse value) {

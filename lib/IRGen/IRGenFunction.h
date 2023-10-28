@@ -673,7 +673,8 @@ public:
   MetadataResponse tryGetConcreteLocalTypeData(LocalTypeDataKey key,
                                                DynamicMetadataRequest request);
   void setUnscopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
-  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value);
+  void setScopedLocalTypeData(LocalTypeDataKey key, MetadataResponse value,
+                              bool mayEmitDebugInfo = true);
 
   /// Given a concrete type metadata node, add all the local type data
   /// that we can reach from it.
