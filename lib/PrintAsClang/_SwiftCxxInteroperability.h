@@ -110,6 +110,12 @@ extern "C" void _fatalError_Cxx_move_of_Swift_value_type_not_supported_yet();
 
 SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,
                                               size_t align) noexcept {
+#if defined(SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_alloc) &&       \
+    defined(SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_free)
+  // Allow the user to provide custom allocator for heap-allocated Swift
+  // value types.
+  return SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_alloc(size, align);
+#else
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
 #else
@@ -120,13 +126,21 @@ SWIFT_INLINE_THUNK void *_Nonnull opaqueAlloc(size_t size,
   (void)res;
 #endif
   return r;
+#endif
 }
 
 SWIFT_INLINE_THUNK void opaqueFree(void *_Nonnull p) noexcept {
+#if defined(SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_alloc) &&       \
+    defined(SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_free)
+  // Allow the user to provide custom allocator for heap-allocated Swift
+  // value types.
+  SWIFT_CXX_INTEROPERABILITY_OVERRIDE_OPAQUE_STORAGE_free(p);
+#else
 #if defined(_WIN32)
   _aligned_free(p);
 #else
   free(p);
+#endif
 #endif
 }
 
