@@ -1354,7 +1354,7 @@ public:
     const FunctionTypeFlags Flags;
     const FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
     const Metadata *const *Parameters;
-    const uint32_t *ParameterFlags;
+    const ::ParameterFlags *ParameterFlags;
     const Metadata *Result;
     const Metadata *GlobalActor;
 
@@ -1370,14 +1370,13 @@ public:
     }
     const Metadata *getResult() const { return Result; }
 
-    const uint32_t *getParameterFlags() const {
+    const ::ParameterFlags *getParameterFlags() const {
       return ParameterFlags;
     }
 
     ::ParameterFlags getParameterFlags(unsigned index) const {
       assert(index < Flags.getNumParameters());
-      auto flags = Flags.hasParameterFlags() ? ParameterFlags[index] : 0;
-      return ParameterFlags::fromIntValue(flags);
+      return Flags.hasParameterFlags() ? ParameterFlags[index] : ::ParameterFlags();
     }
 
     const Metadata *getGlobalActor() const { return GlobalActor; }
@@ -1509,7 +1508,7 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
             "'swift_getFunctionTypeMetadataGlobalActor'");
   FunctionCacheEntry::Key key = {
     flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
-    parameterFlags, result, nullptr
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1525,7 +1524,8 @@ swift::swift_getFunctionTypeMetadataDifferentiable(
   assert(flags.isDifferentiable());
   assert(diffKind.isDifferentiable());
   FunctionCacheEntry::Key key = {
-    flags, diffKind, parameters, parameterFlags, result, nullptr
+    flags, diffKind, parameters,
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result, nullptr
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1537,7 +1537,8 @@ swift::swift_getFunctionTypeMetadataGlobalActor(
     const Metadata *result, const Metadata *globalActor) {
   assert(flags.hasGlobalActor());
   FunctionCacheEntry::Key key = {
-    flags, diffKind, parameters, parameterFlags, result, globalActor
+    flags, diffKind, parameters,
+    reinterpret_cast<const ParameterFlags *>(parameterFlags), result, globalActor
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1595,7 +1596,7 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   for (unsigned i = 0; i < numParameters; ++i) {
     Data.getParameters()[i] = key.getParameter(i);
     if (flags.hasParameterFlags())
-      Data.getParameterFlags()[i] = key.getParameterFlags(i).getIntValue();
+      Data.getParameterFlags()[i] = key.getParameterFlags(i);
   }
 }
 

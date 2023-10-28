@@ -1459,21 +1459,70 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
 };
 using EnumMetadata = TargetEnumMetadata<InProcess>;
 
+template <typename Runtime>
+struct TargetFunctionGlobalActorMetadata {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> GlobalActorType;
+};
+
 /// The structure of function type metadata.
 template <typename Runtime>
-struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
+struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime>,
+  swift::ABI::TrailingObjects<
+    TargetFunctionTypeMetadata<Runtime>,
+    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>,
+    ParameterFlags,
+    TargetFunctionMetadataDifferentiabilityKind<typename Runtime::StoredSize>,
+    TargetFunctionGlobalActorMetadata<Runtime>> {
   using StoredSize = typename Runtime::StoredSize;
   using Parameter = ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
 
+private:
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<
+        TargetFunctionTypeMetadata<Runtime>,
+        Parameter,
+        ParameterFlags,
+        TargetFunctionMetadataDifferentiabilityKind<StoredSize>,
+        TargetFunctionGlobalActorMetadata<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
   TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
-  Parameter *getParameters() { return reinterpret_cast<Parameter *>(this + 1); }
+private:
+  size_t numTrailingObjects(OverloadToken<Parameter>) const {
+    return getNumParameters();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ParameterFlags>) const {
+    return hasParameterFlags() ? getNumParameters() : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>
+  ) const {
+    return isDifferentiable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionGlobalActorMetadata<Runtime>>
+  ) const {
+    return hasGlobalActor() ? 1 : 0;
+  }
+
+public:
+  Parameter *getParameters() { 
+    return this->template getTrailingObjects<Parameter>();
+  }
 
   const Parameter *getParameters() const {
-    return reinterpret_cast<const Parameter *>(this + 1);
+    return this->template getTrailingObjects<Parameter>();
   }
 
   Parameter getParameter(unsigned index) const {
@@ -1483,8 +1532,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
 
   ParameterFlags getParameterFlags(unsigned index) const {
     assert(index < getNumParameters());
-    auto flags = hasParameterFlags() ? getParameterFlags()[index] : 0;
-    return ParameterFlags::fromIntValue(flags);
+    return hasParameterFlags() ? getParameterFlags()[index] : ParameterFlags();
   }
 
   StoredSize getNumParameters() const {
@@ -1507,32 +1555,24 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     return metadata->getKind() == MetadataKind::Function;
   }
 
-  uint32_t *getParameterFlags() {
-    return reinterpret_cast<uint32_t *>(getParameters() + getNumParameters());
+  ParameterFlags *getParameterFlags() {
+    return this->template getTrailingObjects<ParameterFlags>();
   }
 
-  const uint32_t *getParameterFlags() const {
-    return reinterpret_cast<const uint32_t *>(getParameters() +
-                                              getNumParameters());
+  const ParameterFlags *getParameterFlags() const {
+    return this->template getTrailingObjects<ParameterFlags>();
   }
 
   TargetFunctionMetadataDifferentiabilityKind<StoredSize> *
   getDifferentiabilityKindAddress() {
     assert(isDifferentiable());
-    void *previousEndAddr = hasParameterFlags()
-        ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters())
-        : reinterpret_cast<void *>(getParameters() + getNumParameters());
-    return reinterpret_cast<
-        TargetFunctionMetadataDifferentiabilityKind<StoredSize> *>(
-        llvm::alignAddr(previousEndAddr,
-                        llvm::Align(alignof(typename Runtime::StoredPointer))));
+    return this->template getTrailingObjects<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>();
   }
 
   TargetFunctionMetadataDifferentiabilityKind<StoredSize>
   getDifferentiabilityKind() const {
     if (isDifferentiable()) {
-      return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
-          ->getDifferentiabilityKindAddress();
+      return *(this->template getTrailingObjects<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>());
     }
     return TargetFunctionMetadataDifferentiabilityKind<StoredSize>
         ::NonDifferentiable;
@@ -1541,26 +1581,18 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *
   getGlobalActorAddr() {
     assert(hasGlobalActor());
-    
-    void *endAddr =
-        isDifferentiable()
-          ? reinterpret_cast<void *>(getDifferentiabilityKindAddress() + 1) :
-        hasParameterFlags()
-          ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters()) :
-        reinterpret_cast<void *>(getParameters() + getNumParameters());
-    return reinterpret_cast<
-        ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *>(
-          llvm::alignAddr(
-              endAddr, llvm::Align(alignof(typename Runtime::StoredPointer))));
+    auto globalActorAddr =
+      this->template getTrailingObjects<TargetFunctionGlobalActorMetadata<Runtime>>();
+    return &globalActorAddr->GlobalActorType;
   }
 
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>
   getGlobalActor() const {
     if (!hasGlobalActor())
       return ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>();
-
-    return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
-      ->getGlobalActorAddr();
+    auto globalActorAddr =
+      this->template getTrailingObjects<TargetFunctionGlobalActorMetadata<Runtime>>();
+    return globalActorAddr->GlobalActorType;
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
