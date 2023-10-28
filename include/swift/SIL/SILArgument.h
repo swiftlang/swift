@@ -433,6 +433,8 @@ public:
 
   bool isIndirectResult() const;
 
+  bool isIndirectErrorResult() const;
+
   SILArgumentConvention getArgumentConvention() const;
 
   /// Given that this is an entry block argument, and given that it does

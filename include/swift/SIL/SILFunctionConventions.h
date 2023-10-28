@@ -78,6 +78,8 @@ class SILModuleConventions {
 public:
   static bool isPassedIndirectlyInSIL(SILType type, SILModule &M);
 
+  static bool isThrownIndirectlyInSIL(SILType type, SILModule &M);
+
   static bool isReturnedIndirectlyInSIL(SILType type, SILModule &M);
 
   static SILModuleConventions getLoweredAddressConventions(SILModule &M) {
