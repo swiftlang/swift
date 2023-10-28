@@ -1044,10 +1044,20 @@ SILType::getSingletonAggregateFieldType(SILModule &M,
 }
 
 bool SILType::isMoveOnly() const {
-  // Nominal types are move-only if declared as such.
-  if (getASTType()->isNoncopyable())
+  // Legacy check.
+  if (!getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    return getASTType()->isNoncopyable() || isMoveOnlyWrapped();
+  }
+
+  // Anything within the move-only wrapper is move-only.
+  if (isMoveOnlyWrapped())
     return true;
 
+  auto ty = getASTType();
+
+  // All kinds of references are copyable.
+  if (isa<ReferenceStorageType>(ty))
+    return false;
 
   // TODO: Nonescaping closures ought to be treated as move-only in SIL.
   // They aren't marked move-only now, because the necessary move-only passes
@@ -1060,7 +1070,19 @@ bool SILType::isMoveOnly() const {
     return fnTy->isTrivialNoEscape();
   }
    */
-  return isMoveOnlyWrapped();
+  if (isa<SILFunctionType>(ty))
+    return false;
+
+  // Treat all other SIL-specific types as Copyable.
+  if (isa<SILBlockStorageType,
+          SILBoxType,
+          SILPackType,
+          SILTokenType>(ty)) {
+    return false;
+  }
+
+  // Finally, for other ordinary types, ask the AST type.
+  return ty->isNoncopyable();
 }
 
 
