@@ -929,6 +929,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::ConditionallyAvailable;
   }
 
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
