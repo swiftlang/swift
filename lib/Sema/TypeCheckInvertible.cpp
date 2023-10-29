@@ -42,7 +42,7 @@ SourceRange findInverseRemovalRange(const TypeDecl *typeDecl,
           return inheritedTypes.getRemovalRange(i);
   }
 
-  // TODO: just ask HasNoncopyableAnnotationRequest for the annotation?
+  // TODO: just ask NoncopyableAnnotationRequest for the annotation?
   // so we can handle where clauses.
 
   return SourceRange();
@@ -274,7 +274,7 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
 
   switch (kp) {
   case KnownProtocolKind::Copyable: {
-    if (evaluateOrDefault(evaluator, HasNoncopyableAnnotationRequest{nominal}, false))
+    if (nominal->canBeNoncopyable())
       return nullptr; // it's not Copyable.
 
     // TODO: generate conditional conformances implied by ~Copyable on generic params.

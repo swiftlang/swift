@@ -4876,12 +4876,11 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
-bool TypeDecl::isNoncopyable() const {
-  // NOTE: must answer true iff it is unconditionally noncopyable.
+InverseMarkingKind TypeDecl::getNoncopyableMarking() const {
   return evaluateOrDefault(getASTContext().evaluator,
-                           HasNoncopyableAnnotationRequest{
+                           NoncopyableAnnotationRequest{
                                const_cast<TypeDecl *>(this)},
-                           true); // default to true for safety
+                           InverseMarkingKind::Explicit);
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

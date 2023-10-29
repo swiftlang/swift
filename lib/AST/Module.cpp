@@ -2019,7 +2019,7 @@ LookupConformanceInModuleRequest::evaluate(
         // We only need to do this until we are properly dealing with or
         // omitting Copyable conformances in modules/interfaces.
 
-        if (nominal->isNoncopyable())
+        if (nominal->canBeNoncopyable())
           return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
         else
           return ProtocolConformanceRef(protocol);

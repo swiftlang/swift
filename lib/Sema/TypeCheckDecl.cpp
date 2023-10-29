@@ -914,7 +914,9 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   return explicitFinalAttr;
 }
 
-bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *decl) const {
+InverseMarkingKind
+NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
+                                       TypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
   // ----------------
@@ -925,10 +927,10 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
         if (!decl->getASTContext().supportsMoveOnlyTypes())
           decl->diagnose(diag::moveOnly_requires_lexical_lifetimes);
 
-        return true;
+        return InverseMarkingKind::Explicit;
       }
     }
-    return false;
+    return InverseMarkingKind::None;
   }
   // ----------------
 
@@ -947,7 +949,7 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl)
                || (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)
                    && isa<ClassDecl>(decl)));
-    return true;
+    return InverseMarkingKind::Explicit;
   }
 
   // For all other nominals, we can simply check the inheritance clause.
@@ -1009,7 +1011,9 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
     }
   }
 
-  return !defaults.contains(InvertibleProtocolKind::Copyable);
+  return !defaults.contains(InvertibleProtocolKind::Copyable)
+         ? InverseMarkingKind::Explicit
+         : InverseMarkingKind::None;
 }
 
 bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {

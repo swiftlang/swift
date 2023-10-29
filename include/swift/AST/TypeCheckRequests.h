@@ -427,10 +427,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration has any markings that would cause it
-/// to not have an implicit, unconditional conformance to Copyable.
-class HasNoncopyableAnnotationRequest
-    : public SimpleRequest<HasNoncopyableAnnotationRequest, bool(TypeDecl *),
+/// Determine the kind of noncopyable marking present for this declaration.
+class NoncopyableAnnotationRequest
+    : public SimpleRequest<NoncopyableAnnotationRequest,
+                           InverseMarkingKind(TypeDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -439,13 +439,13 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, TypeDecl *decl) const;
+  InverseMarkingKind evaluate(Evaluator &evaluator, TypeDecl *decl) const;
 
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  llvm::Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
+  llvm::Optional<InverseMarkingKind> getCachedResult() const;
+  void cacheResult(InverseMarkingKind value) const;
 };
 
 /// Determine whether the given declaration is escapable.

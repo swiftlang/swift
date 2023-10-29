@@ -2403,7 +2403,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->isNoncopyable()) {
+      if (D->canBeNoncopyable()) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())
@@ -2487,7 +2487,7 @@ namespace {
       properties =
           applyLifetimeAnnotation(D->getLifetimeAnnotation(), properties);
 
-      if (D->isNoncopyable()) {
+      if (D->canBeNoncopyable()) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         if (properties.isAddressOnly())

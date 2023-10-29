@@ -314,25 +314,29 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// hasNoncopyableAnnotation computation.
+// NoncopyableAnnotationRequest computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> HasNoncopyableAnnotationRequest::getCachedResult() const {
+llvm::Optional<InverseMarkingKind>
+NoncopyableAnnotationRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
-    return static_cast<bool>(decl->LazySemanticInfo.hasNoncopyableAnnotation);
+    return static_cast<InverseMarkingKind>(
+              decl->LazySemanticInfo.noncopyableAnnotationKind);
 
   return llvm::None;
 }
 
-void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
+void NoncopyableAnnotationRequest::cacheResult(InverseMarkingKind value) const {
   auto decl = std::get<0>(getStorage());
   decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
-  decl->LazySemanticInfo.hasNoncopyableAnnotation = value;
+  decl->LazySemanticInfo.noncopyableAnnotationKind =
+      static_cast<unsigned>(value);
 
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
     // Add an attribute for printing
-    if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+    if (value == InverseMarkingKind::Explicit
+        && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
       decl->getAttrs().add(new(decl->getASTContext())
                                MoveOnlyAttr(/*Implicit=*/true));
   }
