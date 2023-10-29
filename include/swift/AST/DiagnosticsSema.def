@@ -2447,10 +2447,6 @@ ERROR(inferred_opaque_type,none,
 // Inverse Constraints
 ERROR(inverse_type_not_invertible,none,
       "type %0 is not invertible", (Type))
-ERROR(inverse_duplicate,none,
-      "duplicate inverse constraint", ())
-NOTE(inverse_duplicate_previous,none,
-      "previous inverse constraint here", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,
@@ -3131,6 +3127,15 @@ ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
       (Type))
+
+ERROR(requires_not_suitable_inverse_subject,none,
+      "cannot apply inverse %1 to type %0 in conformance requirement",
+      (Type, Type))
+
+ERROR(requires_not_suitable_inverse_outer_subject,none,
+      "cannot add inverse constraint '%0: %1' "
+      "on generic parameter '%0' defined in outer scope",
+      (StringRef, StringRef))
 
 ERROR(invalid_shape_requirement,none,
       "invalid same-shape requirement between %0 and %1",
@@ -7558,7 +7563,7 @@ ERROR(noncopyable_cannot_conform_to_type, none,
      "noncopyable %kind0 cannot conform to %1",
      (const ValueDecl *, Type))
 ERROR(noncopyable_parameter_requires_ownership, none,
-      "noncopyable parameter must specify its ownership", ())
+      "parameter of noncopyable type %0 must specify ownership", (Type))
 ERROR(noncopyable_parameter_subscript_unsupported, none,
       "subscripts cannot have noncopyable parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,

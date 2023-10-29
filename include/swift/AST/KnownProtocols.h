@@ -42,14 +42,36 @@ enum : uint8_t {
 enum : unsigned { NumKnownProtocolKindBits =
   countBitsUsed(static_cast<unsigned>(NumKnownProtocols - 1)) };
 
-using KnownProtocolSet = FixedBitSet<NumKnownProtocols, KnownProtocolKind>;
-
-/// Produces a set of all protocols that have an inverse, i.e., for every
-/// known protocol KP in the set, ~KP exists.
-KnownProtocolSet getInvertibleProtocols();
-
 /// Retrieve the name of the given known protocol.
 llvm::StringRef getProtocolName(KnownProtocolKind kind);
+
+/// MARK: Invertible protocols
+///
+/// The invertible protocols are a subset of the known protocols.
+
+enum : uint8_t {
+  // Use preprocessor trick to count all the invertible protocols.
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) +1
+  /// The number of invertible protocols.
+  NumInvertibleProtocols =
+#include "swift/AST/KnownProtocols.def"
+};
+
+enum class InvertibleProtocolKind : uint8_t {
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) Id,
+#include "swift/AST/KnownProtocols.def"
+};
+
+using InvertibleProtocolSet = FixedBitSet<NumInvertibleProtocols,
+                                          InvertibleProtocolKind>;
+
+/// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
+/// \returns None if the known protocol is not invertible.
+llvm::Optional<InvertibleProtocolKind>
+    getInvertibleProtocolKind(KnownProtocolKind kp);
+
+/// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
+KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);
 
 } // end namespace swift
 

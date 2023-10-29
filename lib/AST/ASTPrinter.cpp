@@ -6204,6 +6204,11 @@ public:
       Printer << "_";
   }
 
+  void visitInverseType(InverseType *T) {
+    Printer << "~";
+    visit(T->getInvertedProtocol());
+  }
+
   void visitPlaceholderType(PlaceholderType *T) {
     if (Options.PrintTypesForDebugging) {
       Printer << "<<placeholder for ";

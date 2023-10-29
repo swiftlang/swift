@@ -132,8 +132,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // AnyObject is the empty class-constrained existential.
   if (Name == "AnyObject")
     return CanType(
-      ProtocolCompositionType::get(Context, {},
-                                   /*HasExplicitAnyObject=*/true));
+      ProtocolCompositionType::theAnyObjectType(Context));
 
   return Type();
 }
