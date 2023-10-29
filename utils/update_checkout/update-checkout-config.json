@@ -145,7 +145,7 @@
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
                 "wasi-libc": "wasi-sdk-20",
-                "curl": "8_4_0",
+                "curl": "curl-8_4_0",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.9.12",
                 "sqlite": "version-3.36.0",
