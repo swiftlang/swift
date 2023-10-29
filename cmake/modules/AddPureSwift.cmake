@@ -31,6 +31,12 @@ function(_add_host_swift_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-backtracing-module-import>")
   endif()
 
+   if(SWIFT_ANALYZE_CODE_COVERAGE)
+     set(_cov_flags $<$<COMPILE_LANGUAGE:Swift>:-profile-generate -profile-coverage-mapping>)
+     target_compile_options(${name} PRIVATE ${_cov_flags})
+     target_link_options(${name} PRIVATE ${_cov_flags})
+  endif()
+
   # The compat56 library is not available in current toolchains. The stage-0
   # compiler will build fine since the builder compiler is not aware of the 56
   # compat library, but the stage-1 and subsequent stage compilers will fail as

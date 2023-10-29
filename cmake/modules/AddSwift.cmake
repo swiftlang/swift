@@ -179,6 +179,12 @@ function(_add_host_variant_c_compile_link_flags name)
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:${_lto_flag_out}>)
     target_link_options(${name} PRIVATE ${_lto_flag_out})
   endif()
+
+  if(SWIFT_ANALYZE_CODE_COVERAGE)
+     set(_cov_flags $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
+     target_compile_options(${name} PRIVATE ${_cov_flags})
+     target_link_options(${name} PRIVATE ${_cov_flags})
+  endif()
 endfunction()
 
 
@@ -321,11 +327,6 @@ function(_add_host_variant_c_compile_flags target)
   string(TOUPPER "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_THREADING_PACKAGE}" _threading_package)
   target_compile_definitions(${target} PRIVATE
     "SWIFT_THREADING_${_threading_package}")
-
-  if(SWIFT_ANALYZE_CODE_COVERAGE)
-    target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fprofile-instr-generate -fcoverage-mapping>)
-  endif()
 
   if((SWIFT_HOST_VARIANT_ARCH STREQUAL "armv7" OR
       SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64") AND
