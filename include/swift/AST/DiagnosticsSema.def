@@ -3170,7 +3170,7 @@ ERROR(recursive_superclass_constraint,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0 : %1", (Type, ProtocolDecl *))
+        "redundant conformance constraint %0 : %1", (Type, Type))
 
 WARNING(missing_protocol_refinement, none,
         "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
