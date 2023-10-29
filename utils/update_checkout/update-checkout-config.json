@@ -99,7 +99,7 @@
         },
         "zlib": {
             "remote": { "id": "madler/zlib" }
-        },
+        }
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
