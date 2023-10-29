@@ -31,8 +31,6 @@ func buildMetatype() -> Any.Type {
 // CHECK-NOMANGLE: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sySi12typed_throws10MyBigErrorOYKcMa"
 // CHECK: call ptr @swift_getExtendedFunctionTypeMetadata({{i32|i64}} 2231369729, {{i32|i64}} 0, ptr [[PARAMS:%.*]], ptr null, ptr getelementptr inbounds (%swift.full_existential_type, ptr @"$sytN", i32 0, i32 1), ptr null, i32 1, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr {{.*}}@"$s12typed_throws10MyBigErrorOMf"
 
-// CHECK-NOMANGLE: declare extern_weak ptr @swift_getExtendedFunctionTypeMetadata
-
 protocol P {
   associatedtype A
 }
