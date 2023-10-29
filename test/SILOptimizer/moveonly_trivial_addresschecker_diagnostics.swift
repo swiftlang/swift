@@ -6,8 +6,7 @@
 
 var boolValue: Bool { return true }
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var i: Int = 0
 }
 
@@ -27,8 +26,7 @@ public func consumeVal(_ x: __owned AggStruct) {}
 public func consumeVal(_ x: __owned AggGenericStruct<String>) {}
 public func consumeVal<T>(_ x: __owned AggGenericStruct<T>) {}
 
-@_moveOnly
-public enum NonTrivialEnum {
+public enum NonTrivialEnum: ~Copyable {
     case first
     case second(Int)
     case third(NonTrivialStruct)
@@ -42,19 +40,16 @@ public enum NonTrivialEnum {
 // Aggregate Struct //
 //////////////////////
 
-@_moveOnly
-public struct MoveOnlyInt {
+public struct MoveOnlyInt: ~Copyable {
     var value: Int
 }
 
-@_moveOnly
-public struct KlassPair {
+public struct KlassPair: ~Copyable {
     var lhs: MoveOnlyInt
     var rhs: Int
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct: ~Copyable {
     var lhs = MoveOnlyInt(value: 5)
     var center: Int = 6
     var rhs: Int = 7
@@ -317,8 +312,7 @@ public func aggStructConsumeGrandFieldArg(_ x2: inout AggStruct) {
 // Aggregate Generic Struct //
 //////////////////////////////
 
-@_moveOnly
-public struct AggGenericStruct<T> { // FIXME: this generic parameter should probably be used for better coverage.
+public struct AggGenericStruct<T>: ~Copyable { // FIXME: this generic parameter should probably be used for better coverage.
     var lhs = MoveOnlyInt(value: 5)
     var rhs: UnsafeRawPointer? = nil
     var pair = KlassPair(lhs: MoveOnlyInt(value: 5), rhs: 6)
@@ -792,8 +786,7 @@ public func aggGenericStructConsumeGrandFieldArg<T>(_ x2: inout AggGenericStruct
 // Enum Test Cases //
 /////////////////////
 
-@_moveOnly
-public enum EnumTy {
+public enum EnumTy: ~Copyable {
     case klass(NonTrivialStruct)
     case int(Int)
 
