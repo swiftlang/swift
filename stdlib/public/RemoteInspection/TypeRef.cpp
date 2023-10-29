@@ -779,9 +779,17 @@ public:
           Dem);
     }
 
-    if (F->getFlags().isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
-    // FIXME: TypedThrowsAnnotation
+    if (F->getFlags().isThrowing()) {
+      if (auto thrownError = F->getThrownError()) {
+        auto node = Dem.createNode(Node::Kind::TypedThrowsAnnotation);
+        auto thrownErrorNode = visit(thrownError);
+        node->addChild(thrownErrorNode, Dem);
+        funcNode->addChild(node, Dem);
+      } else {
+        funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+      }
+    }
+
     if (F->getFlags().isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);

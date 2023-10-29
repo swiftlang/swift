@@ -1002,7 +1002,10 @@ public:
       }
 
       BuiltType thrownError = BuiltType();
-      // FIXME: Read from metadata.
+      if (Function->hasThrownError()) {
+        thrownError = readTypeFromMetadata(Function->getThrownError(), false,
+                                           recursion_limit);
+      }
 
       auto BuiltFunction = Builder.createFunctionType(
           Parameters, Result, flags, diffKind, globalActor, thrownError);

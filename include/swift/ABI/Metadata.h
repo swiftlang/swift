@@ -1463,6 +1463,13 @@ template <typename Runtime>
 struct TargetFunctionGlobalActorMetadata {
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> GlobalActorType;
 };
+using FunctionGlobalActorMetadata = TargetFunctionGlobalActorMetadata<InProcess>;
+
+template <typename Runtime>
+struct TargetFunctionThrownErrorMetadata {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ThrownErrorType;
+};
+using FunctionThrownErrorMetadata = TargetFunctionThrownErrorMetadata<InProcess>;
 
 /// The structure of function type metadata.
 template <typename Runtime>
@@ -1472,7 +1479,9 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime>,
     ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>,
     ParameterFlags,
     TargetFunctionMetadataDifferentiabilityKind<typename Runtime::StoredSize>,
-    TargetFunctionGlobalActorMetadata<Runtime>> {
+    TargetFunctionGlobalActorMetadata<Runtime>,
+    ExtendedFunctionTypeFlags,
+    TargetFunctionThrownErrorMetadata<Runtime>> {
   using StoredSize = typename Runtime::StoredSize;
   using Parameter = ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
 
@@ -1483,7 +1492,9 @@ private:
         Parameter,
         ParameterFlags,
         TargetFunctionMetadataDifferentiabilityKind<StoredSize>,
-        TargetFunctionGlobalActorMetadata<Runtime>>;
+        TargetFunctionGlobalActorMetadata<Runtime>,
+        ExtendedFunctionTypeFlags,
+        TargetFunctionThrownErrorMetadata<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1516,6 +1527,16 @@ private:
     return hasGlobalActor() ? 1 : 0;
   }
 
+  size_t numTrailingObjects(OverloadToken<ExtendedFunctionTypeFlags>) const {
+    return hasExtendedFlags() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionThrownErrorMetadata<Runtime>>
+  ) const {
+    return hasThrownError() ? 1 : 0;
+  }
+      
 public:
   Parameter *getParameters() { 
     return this->template getTrailingObjects<Parameter>();
@@ -1548,6 +1569,13 @@ public:
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
   bool hasGlobalActor() const { return Flags.hasGlobalActor(); }
+  bool hasExtendedFlags() const { return Flags.hasExtendedFlags(); }
+  bool hasThrownError() const {
+    if (!Flags.hasExtendedFlags())
+      return false;
+
+    return getExtendedFlags().isTypedThrows();
+  }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
@@ -1593,6 +1621,35 @@ public:
     auto globalActorAddr =
       this->template getTrailingObjects<TargetFunctionGlobalActorMetadata<Runtime>>();
     return globalActorAddr->GlobalActorType;
+  }
+
+  ExtendedFunctionTypeFlags *getExtendedFlagsAddr() {
+    assert(hasExtendedFlags());
+    return this->template getTrailingObjects<ExtendedFunctionTypeFlags>();
+  }
+      
+  ExtendedFunctionTypeFlags getExtendedFlags() const {
+    if (!hasExtendedFlags())
+      return ExtendedFunctionTypeFlags();
+
+    return this->template getTrailingObjects<ExtendedFunctionTypeFlags>()[0];
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *
+  getThrownErrorAddr() {
+    assert(hasThrownError());
+    auto thrownErrorAddr =
+      this->template getTrailingObjects<TargetFunctionThrownErrorMetadata<Runtime>>();
+    return &thrownErrorAddr->ThrownErrorType;
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>
+  getThrownError() const {
+    if (!hasThrownError())
+      return ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>();
+    auto thrownErrorAddr =
+      this->template getTrailingObjects<TargetFunctionThrownErrorMetadata<Runtime>>();
+    return thrownErrorAddr->ThrownErrorType;
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
