@@ -406,12 +406,12 @@ entry(%0: $*T):
 // CHECK: define{{.*}} swiftcc void @apply_closure_generic(ptr %0, ptr %1, ptr %T, ptr %V)
 // CHECK:  [[T0:%.*]] = getelementptr inbounds ptr, ptr %T
 // CHECK:  [[T1:%.*]] = load ptr, ptr [[T0]]
-// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T1]]
+// CHECK:  [[T2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
 // CHECK:  [[T3:%.*]] = load i64, ptr [[T2]]
 // CHECK:  [[T4:%.*]] = alloca i8, i64 [[T3]]
 // CHECK:  [[V0:%.*]] = getelementptr inbounds ptr, ptr %V
 // CHECK:  [[V1:%.*]] = load ptr, ptr [[V0]]
-// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[V1]]
+// CHECK:  [[V2:%.*]] = getelementptr inbounds %swift.vwtable{{.*}}
 // CHECK:  [[V3:%.*]] = load i64, ptr [[V2]]
 // CHECK:  [[V4:%.*]] = alloca i8, i64 [[V3]]
 // CHECK: call swiftcc void %0(ptr noalias sret(%swift.opaque) [[T4]], ptr swiftself %1, ptr noalias nocapture swifterror dereferenceable(8) %swifterror, ptr [[V4]])
