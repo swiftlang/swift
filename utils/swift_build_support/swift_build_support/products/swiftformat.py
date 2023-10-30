@@ -87,6 +87,8 @@ class SwiftFormat(product.Product):
         self.run_build_script_helper('build', host_target)
         if self.args.swiftsyntax_lint:
             self.lint_swiftsyntax()
+        if self.args.sourcekitlsp_lint:
+            self.lint_sourcekitlsp()
 
     def lint_swiftsyntax(self):
         linting_cmd = [
@@ -94,6 +96,17 @@ class SwiftFormat(product.Product):
             '--lint',
             '--swift-format', os.path.join(self.build_dir, self.configuration(),
                                            'swift-format'),
+        ]
+        shell.call(linting_cmd)
+
+    def lint_sourcekitlsp(self):
+        linting_cmd = [
+            os.path.join(self.build_dir, self.configuration(), 'swift-format'),
+            'lint',
+            '--parallel',
+            '--strict',
+            '--recursive',
+            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
         ]
         shell.call(linting_cmd)
 
