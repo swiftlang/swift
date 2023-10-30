@@ -259,8 +259,13 @@ struct PartitionOpBuilder {
     assert(valueHasID(src, /*dumpIfHasNoID=*/true) &&
            "source value of assignment should already have been encountered");
 
-    if (lookupValueID(tgt) == lookupValueID(src))
+    TrackableValueID srcID = lookupValueID(src);
+    if (lookupValueID(tgt) == srcID) {
+      LLVM_DEBUG(llvm::dbgs() << "    Skipping assign since tgt and src have "
+                                 "the same representative.\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Rep ID: %%" << srcID.num << ".\n");
       return;
+    }
 
     currentInstPartitionOps.emplace_back(PartitionOp::Assign(
         lookupValueID(tgt), lookupValueID(src), currentInst));
@@ -367,9 +372,6 @@ class PartitionOpTranslator {
       return {iter.first->first, iter.first->second};
     }
 
-    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Initializing %%"
-                                                  << iter.first->second.getID()
-                                                  << ": " << *value);
     self->stateIndexToEquivalenceClass[iter.first->second.getID()] = value;
 
     // Otherwise, we need to compute our flags. Begin by seeing if we have a
@@ -607,21 +609,17 @@ public:
   void translateSILMultiAssign(const TargetRange &resultValues,
                                const SourceRange &sourceValues,
                                SILMultiAssignOptions options = {}) {
-    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs()
-                                     << "Performing Multi Assign!\n");
     SmallVector<SILValue, 8> assignOperands;
     SmallVector<SILValue, 8> assignResults;
 
     for (SILValue src : sourceValues) {
       if (auto value = tryToTrackValue(src)) {
-        REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Operand: " << *src);
         assignOperands.push_back(value->getRepresentative());
       }
     }
 
     for (SILValue result : resultValues) {
       if (auto value = tryToTrackValue(result)) {
-        REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Result: " << *result);
         assignResults.push_back(value->getRepresentative());
         // TODO: Can we pass back a reference to value perhaps?
         if (options.contains(SILMultiAssignFlags::PropagatesActorSelf)) {
@@ -1221,10 +1219,11 @@ class BlockPartitionState {
   /// to discover if an error occured.
   bool recomputeExitFromEntry() {
     Partition workingPartition = entryPartition;
+    PartitionOpEvaluator eval(workingPartition);
     for (auto partitionOp : blockPartitionOps) {
       // By calling apply without providing a `handleFailure` closure, errors
       // will be suppressed
-      workingPartition.apply(partitionOp);
+      eval.apply(partitionOp);
     }
     bool exitUpdated = !Partition::equals(exitPartition, workingPartition);
     exitPartition = workingPartition;
@@ -1235,19 +1234,23 @@ class BlockPartitionState {
   /// entryPartition this time diagnosing errors as we apply the dataflow.
   void diagnoseFailures(
       llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
-          handleFailure,
+          failureCallback,
       llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
-          handleTransferNonTransferable) {
+          transferredNonTransferrableCallback) {
     Partition workingPartition = entryPartition;
+    PartitionOpEvaluator eval(workingPartition);
+    eval.failureCallback = failureCallback;
+    eval.transferredNonTransferrableCallback =
+        transferredNonTransferrableCallback;
+    eval.nonTransferrableElements = translator.getNeverTransferredValues();
+    eval.isActorDerivedCallback = [&](Element element) -> bool {
+      auto iter = translator.getValueForId(element);
+      if (!iter)
+        return false;
+      return iter->isActorDerived();
+    };
     for (auto &partitionOp : blockPartitionOps) {
-      workingPartition.apply(
-          partitionOp, handleFailure, translator.getNeverTransferredValues(),
-          handleTransferNonTransferable, [&](Element element) -> bool {
-            auto iter = translator.getValueForId(element);
-            if (!iter)
-              return false;
-            return iter->isActorDerived();
-          });
+      eval.apply(partitionOp);
     }
   }
 
@@ -1268,29 +1271,29 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    LLVM_DEBUG(
-        os << SEP_STR << "BlockPartitionState[reached=" << reached
-           << ", needsUpdate=" << needsUpdate << "]\nid: ";
-        basicBlock->printID(os); os << "entry partition: ";
-        entryPartition.print(os); os << "exit partition: ";
-        exitPartition.print(os);
-        os << "instructions:\n┌──────────╼\n"; for (PartitionOp op
-                                                    : blockPartitionOps) {
-          os << "│ ";
-          op.print(os);
-        } os << "└──────────╼\nSuccs:\n";
-        for (auto succ
-             : basicBlock->getSuccessorBlocks()) {
-          os << "→";
-          succ->printID(os);
-        } os
-        << "Preds:\n";
-        for (auto pred
-             : basicBlock->getPredecessorBlocks()) {
-          os << "←";
-          pred->printID(os);
-        } os
-        << SEP_STR;);
+    os << SEP_STR << "BlockPartitionState[reached=" << reached
+       << ", needsUpdate=" << needsUpdate << "]\nid: ";
+    basicBlock->printID(os);
+    os << "entry partition: ";
+    entryPartition.print(os);
+    os << "exit partition: ";
+    exitPartition.print(os);
+    os << "instructions:\n┌──────────╼\n";
+    for (PartitionOp op : blockPartitionOps) {
+      os << "│ ";
+      op.print(os, true /*extra space*/);
+    }
+    os << "└──────────╼\nSuccs:\n";
+    for (auto succ : basicBlock->getSuccessorBlocks()) {
+      os << "→";
+      succ->printID(os);
+    }
+    os << "Preds:\n";
+    for (auto pred : basicBlock->getPredecessorBlocks()) {
+      os << "←";
+      pred->printID(os);
+    }
+    os << SEP_STR;
   }
 };
 
@@ -1385,6 +1388,20 @@ public:
     for (auto &[otherDistance, otherTransferOpAtDistance] :
          otherReason.transferOps)
       addTransferOp(otherTransferOpAtDistance, distance + otherDistance);
+  }
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+
+  void print(llvm::raw_ostream &os) const {
+    if (transferOps.empty()) {
+      os << "    Empty.\n";
+      return;
+    }
+
+    for (auto &[first, second] : transferOps) {
+      os << "    Distance: " << first << ". Op: ";
+      second.print(os);
+    }
   }
 };
 
@@ -1669,14 +1686,19 @@ class RaceTracer {
 
     // We are looking for a local reason, so if the value is transferred at
     // entry, revive it for the sake of this search.
-    if (workingPartition.isTransferred(transferredVal))
-      workingPartition.apply(PartitionOp::AssignFresh(transferredVal));
+    if (workingPartition.isTransferred(transferredVal)) {
+      PartitionOpEvaluator eval(workingPartition);
+      eval.emitLog = false;
+      eval.apply(PartitionOp::AssignFresh(transferredVal));
+    }
 
     int i = 0;
     block.forEachPartitionOp([&](const PartitionOp &partitionOp) {
       if (targetOp == partitionOp)
         return false; // break
-      workingPartition.apply(partitionOp);
+      PartitionOpEvaluator eval(workingPartition);
+      eval.emitLog = false;
+      eval.apply(partitionOp);
       if (workingPartition.isTransferred(transferredVal) &&
           !transferredReason) {
         // This partitionOp transfers the target value.
@@ -1704,8 +1726,9 @@ class RaceTracer {
 
     // If transferredReason is none, then transferredVal was not actually
     // transferred.
-    assert(transferredReason || dumpBlockSearch(SILBlock, transferredVal) &&
-                                    " no transfer was found");
+    assert(transferredReason ||
+           printBlockSearch(llvm::errs(), SILBlock, transferredVal) &&
+               " no transfer was found");
 
     // If this is a query for a transfer reason at block exit, update the cache.
     if (!targetOp)
@@ -1715,24 +1738,31 @@ class RaceTracer {
     return transferredReason.value();
   }
 
-  bool dumpBlockSearch(SILBasicBlock *SILBlock,
-                       TrackableValueID transferredVal) {
-    LLVM_DEBUG(unsigned i = 0;
-               const BlockPartitionState &block = blockStates[SILBlock];
-               Partition working = block.getEntryPartition();
-               llvm::dbgs() << "┌──────────╼\n│ "; working.print(llvm::dbgs());
-               block.forEachPartitionOp([&](const PartitionOp &op) {
-                 llvm::dbgs() << "├[" << i++ << "] ";
-                 op.print(llvm::dbgs());
-                 working.apply(op);
-                 llvm::dbgs() << "│ ";
-                 if (working.isTransferred(transferredVal)) {
-                   llvm::dbgs() << "(" << transferredVal << " TRANSFERRED) ";
-                 }
-                 working.print(llvm::dbgs());
-                 return true;
-               });
-               llvm::dbgs() << "└──────────╼\n";);
+  SWIFT_DEBUG_DUMPER(dump(SILBasicBlock *block,
+                          TrackableValueID transferredVal)) {
+    printBlockSearch(llvm::dbgs(), block, transferredVal);
+  }
+
+  bool printBlockSearch(raw_ostream &os, SILBasicBlock *SILBlock,
+                        TrackableValueID transferredVal) const {
+    unsigned i = 0;
+    const BlockPartitionState &block = blockStates[SILBlock];
+    Partition working = block.getEntryPartition();
+    PartitionOpEvaluator eval(working);
+    os << "┌──────────╼\n│ ";
+    working.print(os);
+    block.forEachPartitionOp([&](const PartitionOp &op) {
+      os << "├[" << i++ << "] ";
+      op.print(os);
+      eval.apply(op);
+      os << "│ ";
+      if (working.isTransferred(transferredVal)) {
+        os << "(" << transferredVal << " TRANSFERRED) ";
+      }
+      working.print(os);
+      return true;
+    });
+    os << "└──────────╼\n";
     return false;
   }
 
@@ -1743,8 +1773,11 @@ public:
 
   void traceUseOfTransferredValue(PartitionOp use,
                                   TrackableValueID transferredVal) {
-    accumulator.accumulateTransferredReason(
-        use, findTransferredAtOpReason(transferredVal, use));
+    auto reason = findTransferredAtOpReason(transferredVal, use);
+    LLVM_DEBUG(llvm::dbgs() << "    Traced Use Of TransferredValue. ";
+               use.print(llvm::dbgs()); llvm::dbgs() << "    Reason: ";
+               reason.print(llvm::dbgs()));
+    accumulator.accumulateTransferredReason(use, reason);
   }
 
   const TransferRequireAccumulator &getAccumulator() { return accumulator; }
@@ -1904,7 +1937,7 @@ class PartitionAnalysis {
     RaceTracer tracer(function, blockStates);
 
     for (auto [block, blockState] : blockStates) {
-      LLVM_DEBUG(llvm::dbgs() << "Block bb" << block.getDebugID() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
 
       // populate the raceTracer with all requires of transferred valued found
       // throughout the CFG
@@ -1919,9 +1952,9 @@ class PartitionAnalysis {
               return;
 
             LLVM_DEBUG(llvm::dbgs()
-                       << "Emitting Use After Transfer Error!\n"
-                       << "ID:  %%" << transferredVal << "\n"
-                       << "Rep: "
+                       << "    Emitting Use After Transfer Error!\n"
+                       << "    ID:  %%" << transferredVal << "\n"
+                       << "    Rep: "
                        << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
 
