@@ -1565,6 +1565,39 @@ swift::swift_getFunctionTypeMetadataGlobalActor(
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
+extern "C" const EnumDescriptor NOMINAL_TYPE_DESCR_SYM(s5NeverO);
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
+
+namespace {
+  /// Classification for a given thrown error type.
+  enum class ThrownErrorClassification {
+    /// An arbitrary thrown error.
+    Arbitrary,
+    /// 'Never', which means a function type is non-throwing.
+    Never,
+    /// 'any Error', which means the function type uses untyped throws.
+    AnyError,
+  };
+
+  /// Classify a thrown error type.
+  ThrownErrorClassification classifyThrownError(const Metadata *type) {
+    if (auto enumMetadata = dyn_cast<EnumMetadata>(type)) {
+      if (enumMetadata->getDescription() == &NOMINAL_TYPE_DESCR_SYM(s5NeverO))
+        return ThrownErrorClassification::Never;
+    } else if (auto existential = dyn_cast<ExistentialTypeMetadata>(type)) {
+      auto protocols = existential->getProtocols();
+      if (protocols.size() == 1 &&
+          !protocols[0].isObjC() &&
+          protocols[0].getSwiftProtocol() == &PROTOCOL_DESCR_SYM(s5Error) &&
+          !existential->isClassBounded() &&
+          !existential->isObjC())
+        return ThrownErrorClassification::AnyError;
+    }
+
+    return ThrownErrorClassification::Arbitrary;
+  }
+}
+
 const FunctionTypeMetadata *
 swift::swift_getExtendedFunctionTypeMetadata(
     FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
@@ -1573,6 +1606,31 @@ swift::swift_getExtendedFunctionTypeMetadata(
     ExtendedFunctionTypeFlags extFlags, const Metadata *thrownError) {
   assert(flags.hasExtendedFlags() || extFlags.getIntValue() == 0);
   assert(flags.hasExtendedFlags() || thrownError == nullptr);
+
+  if (thrownError) {
+    // Perform adjustments based on the given thrown error.
+    switch (classifyThrownError(thrownError)){
+    case ThrownErrorClassification::Arbitrary:
+      // Nothing to do.
+      break;
+
+    case ThrownErrorClassification::Never:
+      // The thrown error was 'Never', so make this a non-throwing function
+      flags = flags.withThrows(false);
+
+      // Fall through to clear out the error.
+      SWIFT_FALLTHROUGH;
+
+    case ThrownErrorClassification::AnyError:
+      // Clear out the thrown error and extended flags.
+      thrownError = nullptr;
+      extFlags = extFlags.withTypedThrows(false);
+      if (extFlags.getIntValue() == 0)
+        flags = flags.withExtendedFlags(false);
+      break;
+    }
+  }
+
   FunctionCacheEntry::Key key = {
     flags, diffKind, parameters,
     reinterpret_cast<const ParameterFlags *>(parameterFlags), result,
