@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
 // RUN: %target-interop-build-clangxx -std=c++20 -c %t/use-swift-cxx-types.cpp -I %t -o %t/swift-cxx-execution.o
-// RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O
+// RUN: %target-interop-build-swift %t/use-cxx-types.swift -o %t/swift-cxx-execution -Xlinker %t/swift-cxx-execution.o -module-name UseCxx -Xfrontend -entry-point-function-name -Xfrontend swiftMain -I %t -O -Xfrontend -disable-availability-checking
 
 // RUN: %target-codesign %t/swift-cxx-execution
 // RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
@@ -44,6 +44,13 @@ struct NonTrivialTemplate {
 
 using NonTrivialTemplateTrivial = NonTrivialTemplate<Trivial>;
 
+class ImmortalFRT {
+public:
+    int x;
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")));
+
 //--- module.modulemap
 module CxxTest {
     header "header.h"
@@ -64,6 +71,10 @@ public struct TakesNonTrivial {
     }
 
     public var prop: NonTrivialTemplateTrivial
+}
+
+public func consumeImmortalFRT(_ x: consuming ImmortalFRT) {
+    print("frt x \(x.x)")
 }
 
 //--- use-swift-cxx-types.cpp
@@ -91,7 +102,6 @@ int main() {
     puts("DoneCall");
     swiftVal.setProp(x);
   }
-  puts("EndOfTest");
 // CHECK-NEXT: create NonTrivialTemplate
 // CHECK-NEXT: call
 // CHECK-NEXT: copy NonTrivialTemplate
@@ -104,6 +114,13 @@ int main() {
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
+  {
+    ImmortalFRT frt;
+    frt.x = 2;
+    UseCxx::consumeImmortalFRT(&frt);
+  }
+// CHECK-NEXT: frt x 2
+  puts("EndOfTest");
 // CHECK-NEXT: EndOfTest
   return 0;
 }
