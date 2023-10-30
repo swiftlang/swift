@@ -400,7 +400,9 @@ func makeExpansionOutputResult(
   outputPointer: UnsafeMutablePointer<BridgedString>
 ) -> Int {
   guard var expandedSource = expandedSource else {
-    outputPointer.pointee = BridgedString()
+    // NOTE: You cannot use 'init()' here as that will produce garbage
+    // (rdar://116825963).
+    outputPointer.pointee = BridgedString(data: nil, length: 0)
     return -1
   }
   outputPointer.pointee = allocateBridgedString(expandedSource)

@@ -127,7 +127,9 @@ struct CompilerPlugin {
   }
 
   private func waitForNextMessage() throws -> PluginToHostMessage {
-    var result: BridgedData = BridgedData()
+    // NOTE: You cannot use 'init()' here as that will produce garbage
+    // (rdar://116825963).
+    var result = BridgedData(baseAddress: nil, size: 0)
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
     defer { BridgedData_free(result) }
     guard !hadError else {

@@ -380,7 +380,9 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     guard let node else {
-      return .init()
+      // NOTE: You cannot do '.init()' here as that will produce garbage
+      // (rdar://116825963).
+      return .init(data: nil, numElements: 0)
     }
 
     return self.generate(node)
@@ -389,7 +391,9 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
     guard let node else {
-      return .init()
+      // NOTE: You cannot do '.init()' here as that will produce garbage
+      // (rdar://116825963).
+      return .init(data: nil, numElements: 0)
     }
 
     return self.generate(node)
@@ -403,7 +407,9 @@ extension Collection {
   ///   on a ``LazyFilterSequence`` due to the `count` access.
   func compactMap<T>(in astgen: ASTGenVisitor, _ transform: (Element) -> T?) -> BridgedArrayRef {
     if self.isEmpty {
-      return .init()
+      // NOTE: You cannot do '.init()' here as that will produce garbage
+      // (rdar://116825963).
+      return .init(data: nil, numElements: 0)
     }
 
     let baseAddress = astgen.allocator.allocate(T.self, count: self.count).baseAddress!
@@ -429,7 +435,9 @@ extension LazyCollectionProtocol {
   /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
   func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
     if self.isEmpty {
-      return .init()
+      // NOTE: You cannot do '.init()' here as that will produce garbage
+      // (rdar://116825963).
+      return .init(data: nil, numElements: 0)
     }
 
     let buffer = astgen.allocator.allocate(Element.self, count: self.count)
@@ -455,7 +463,9 @@ extension Optional where Wrapped: LazyCollectionProtocol {
   @inline(__always)
   func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
     guard let self else {
-      return .init()
+      // NOTE: You cannot do '.init()' here as that will produce garbage
+      // (rdar://116825963).
+      return .init(data: nil, numElements: 0)
     }
 
     return self.bridgedArray(in: astgen)
