@@ -6047,8 +6047,9 @@ ERROR(invalid_objc_decl_context,none,
       "@objc can only be used with members of classes, @objc protocols, and "
       "concrete extensions of classes", ())
 ERROR(invalid_objc_decl,none,
-      "only classes (and their extensions), protocols, methods, initializers, "
-      "properties, and subscript declarations can be declared @objc", ())
+      "only classes (and their extensions), non-marker protocols, methods, "
+      "initializers, properties, and subscript declarations can be declared"
+      " @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
 NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
