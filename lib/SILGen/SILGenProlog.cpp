@@ -1768,14 +1768,15 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
 
   // The calling convention always uses minimal resilience expansion.
   auto errorConvType = SGF.SGM.Types.getLoweredType(
-      errorTypeInContext, TypeExpansionContext::minimal());
+      origErrorType, errorTypeInContext, TypeExpansionContext::minimal());
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
   if (!SILModuleConventions::isThrownIndirectlyInSIL(errorConvType,
                                                      SGF.SGM.M)) {
     if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
-        || origErrorType.getErrorConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
+        || origErrorType.getErrorConvention(SGF.SGM.Types)
+            != AbstractionPattern::Indirect)
       return;
   }
 
@@ -1813,10 +1814,16 @@ uint16_t SILGenFunction::emitBasicProlog(
 
   llvm::Optional<AbstractionPattern> origErrorType;
   if (errorType) {
-    origErrorType = origClosureType
-      ? origClosureType->getFunctionThrownErrorType()
-      : AbstractionPattern(genericSig.getCanonicalSignature(),
-                           (*errorType)->getCanonicalType());
+    if (origClosureType &&
+        !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+      origErrorType =
+          origClosureType->getFunctionThrownErrorType();
+    } else {
+      origErrorType =
+          AbstractionPattern(genericSig.getCanonicalSignature(),
+                             (*errorType)->getCanonicalType());
+    }
+
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
 
