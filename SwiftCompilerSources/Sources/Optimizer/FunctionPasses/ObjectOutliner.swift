@@ -41,7 +41,6 @@ import SIL
 ///
 let objectOutliner = FunctionPass(name: "object-outliner") {
   (function: Function, context: FunctionPassContext) in
-
   for inst in function.instructions {
     if let ari = inst as? AllocRefInstBase {
       if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
@@ -83,6 +82,10 @@ private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
     switch use.instruction {
     case let uci as UpcastInst:
       if let ecm = findEndCOWMutation(of: uci) {
+        return ecm
+      }
+    case let urci as UncheckedRefCastInst:
+      if let ecm = findEndCOWMutation(of: urci) {
         return ecm
       }
     case let mv as MoveValueInst:
@@ -174,6 +177,18 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
       if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores) {
         return false
       }
+    case let atp as AddressToPointerInst:
+      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
+    case let mdi as MarkDependenceInst:
+      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
+    case let pta as PointerToAddressInst:
+      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
     case let store as StoreInst:
       if store.source.type.isTuple {
         // This kind of SIL is never generated because tuples are stored with separated stores to tuple_element_addr.
@@ -228,6 +243,17 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is EndCOWMutationInst:
     return true
 
+  case let mdi as MarkDependenceInst:
+    if (use == mdi.baseOperand) {
+      return true;
+    }
+    for mdiUse in mdi.uses {
+      if !isValidUseOfObject(mdiUse) {
+        return false
+      }
+    }
+    return true
+
   case is StructElementAddrInst,
        is AddressToPointerInst,
        is StructInst,
@@ -239,9 +265,12 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is UpcastInst,
        is BeginDeallocRefInst,
        is RefTailAddrInst,
-       is RefElementAddrInst:
-    for use in (inst as! SingleValueInstruction).uses {
-      if !isValidUseOfObject(use) {
+       is RefElementAddrInst,
+       is StructInst,
+       is PointerToAddressInst,
+       is IndexAddrInst:
+    for instUse in (inst as! SingleValueInstruction).uses {
+      if !isValidUseOfObject(instUse) {
         return false
       }
     }
@@ -343,6 +372,8 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       context.erase(instruction: endMutation)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
+    case let urci as UncheckedRefCastInst:
+      worklist.pushIfNotVisited(usersOf: urci)
     case let moveValue as MoveValueInst:
       worklist.pushIfNotVisited(usersOf: moveValue)
     case is DeallocRefInst, is DeallocStackRefInst:
