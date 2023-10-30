@@ -17,7 +17,7 @@
 // Function implementations should be placed into SILBridgingImpl.h or SILBridging.cpp and
 // required header files should be added there.
 //
-#include "swift/Basic/BasicBridging.h"
+#include "swift/AST/ASTBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
 #include "llvm/ADT/ArrayRef.h"
@@ -39,7 +39,6 @@ struct BridgedFunction;
 struct BridgedBasicBlock;
 struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
-struct BridgedNominalTypeDecl;
 
 namespace swift {
 class ValueBase;
@@ -130,26 +129,6 @@ struct BridgedType {
   BRIDGED_INLINE SwiftInt getNumTupleElements() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getTupleElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
-};
-
-// AST bridging
-
-struct BridgedNominalTypeDecl {
-  swift::NominalTypeDecl * _Nonnull decl;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
-  bool isStructWithUnreferenceableStorage() const;
-  BRIDGED_INLINE bool isGlobalActor() const;
-};
-
-struct BridgedVarDecl {
-  const swift::VarDecl * _Nonnull decl;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getUserFacingName() const;
-};
-
-struct OptionalBridgedVarDecl {
-  const swift::VarDecl * _Nullable decl;
 };
 
 // SIL Bridging
@@ -654,19 +633,19 @@ struct BridgedInstruction {
   //                   VarDeclInst and DebugVariableInst
   // =========================================================================//
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   DebugValue_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   AllocStack_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   AllocBox_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   GlobalAddr_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   RefElementAddr_getDecl() const;
 
   BRIDGED_INLINE OptionalBridgedSILDebugVariable DebugValue_getVarInfo() const;

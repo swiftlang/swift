@@ -15,6 +15,12 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/BridgingUtils.h"
 
+#ifdef PURE_BRIDGING_MODE
+// In PURE_BRIDGING_MODE, bridging functions are not inlined and therefore
+// inluded in the cpp file.
+#include "swift/AST/ASTBridgingImpl.h"
+#endif
+
 using namespace swift;
 
 static_assert(sizeof(BridgedDiagnosticArgument) >= sizeof(DiagnosticArgument),
@@ -67,4 +73,16 @@ void DiagnosticEngine_diagnose(
 
 bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine bridgedEngine) {
   return bridgedEngine.get()->hadAnyError();
+}
+
+//===----------------------------------------------------------------------===//
+// BridgedNominalTypeDecl
+//===----------------------------------------------------------------------===//
+
+bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
+    BridgedNominalTypeDecl decl) {
+  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl.get())) {
+    return structDecl->hasUnreferenceableStorage();
+  }
+  return false;
 }

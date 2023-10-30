@@ -440,17 +440,6 @@ bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
   return ::mayBeDeinitBarrierNotConsideringSideEffects(get());
 }
 
-//===----------------------------------------------------------------------===//
-//                               BridgedNominalTypeDecl
-//===----------------------------------------------------------------------===//
-
-bool BridgedNominalTypeDecl::isStructWithUnreferenceableStorage() const {
-  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl)) {
-    return structDecl->hasUnreferenceableStorage();
-  }
-  return false;
-}
-
 void writeCharToStderr(int c) {
   putc(c, stderr);
 }

@@ -28,6 +28,8 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 namespace swift {
   class DiagnosticArgument;
   class DiagnosticEngine;
+  class NominalTypeDecl;
+  class VarDecl;
 }
 
 //===----------------------------------------------------------------------===//
@@ -86,6 +88,69 @@ void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
 
 bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 
+//===----------------------------------------------------------------------===//
+// NominalTypeDecl
+//===----------------------------------------------------------------------===//
+
+class BridgedNominalTypeDecl {
+  swift::NominalTypeDecl * _Nonnull Ptr;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedNominalTypeDecl(swift::NominalTypeDecl * _Nonnull ptr) : Ptr(ptr) {}
+
+  swift::NominalTypeDecl * _Nonnull get() const { return Ptr; }
+#endif
+};
+
+SWIFT_NAME("BridgedNominalTypeDecl.getName(self:)")
+BRIDGED_INLINE
+BridgedStringRef BridgedNominalTypeDecl_getName(BridgedNominalTypeDecl decl);
+
+SWIFT_NAME("BridgedNominalTypeDecl.isStructWithUnreferenceableStorage(self:)")
+bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
+    BridgedNominalTypeDecl decl);
+
+SWIFT_NAME("BridgedNominalTypeDecl.isGlobalActor(self:)")
+BRIDGED_INLINE
+bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl);
+
+//===----------------------------------------------------------------------===//
+// VarDecl
+//===----------------------------------------------------------------------===//
+
+class BridgedVarDecl {
+  swift::VarDecl * _Nonnull Ptr;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedVarDecl(swift::VarDecl * _Nonnull ptr) : Ptr(ptr) {}
+
+  swift::VarDecl * _Nonnull get() const { return Ptr; }
+#endif
+};
+
+SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
+BRIDGED_INLINE
+BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
+
+class BridgedNullableVarDecl {
+  swift::VarDecl * _Nullable Ptr;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  BridgedNullableVarDecl(swift::VarDecl * _Nullable ptr) : Ptr(ptr) {}
+
+  swift::VarDecl * _Nullable get() const { return Ptr; }
+#endif
+};
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
+
+#ifndef PURE_BRIDGING_MODE
+// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore
+// included in the header file.
+#include "ASTBridgingImpl.h"
+#endif
 
 #endif // SWIFT_AST_ASTBRIDGING_H
