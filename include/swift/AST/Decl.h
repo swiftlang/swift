@@ -3324,6 +3324,9 @@ public:
     };
   }
 
+  /// Should the underlying type be visible to clients outside of the module?
+  bool exportUnderlyingType() const;
+
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
   llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
