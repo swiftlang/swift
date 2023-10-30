@@ -921,20 +921,16 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
 
     // Let's find out how many serialization requirements does this method cover
     // e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
-    unsigned numSerializationReqsCovered = llvm::count_if(
-        FD->getGenericRequirements(), [&](const Requirement &requirement) {
-          if (!(requirement.getFirstType()->isEqual(paramTy) &&
-                requirement.getKind() == RequirementKind::Conformance))
-            return 0;
-
-          return serializationReqs.count(requirement.getProtocolDecl()) ? 1 : 0;
-        });
+    bool okay = llvm::all_of(serializationReqs,
+                            [&](ProtocolDecl *p) -> bool {
+                              return FD->getGenericSignature()->requiresProtocol(paramTy, p);
+                            });
 
     // If the current method covers all of the serialization requirements,
     // it's a match. Note that it might also have other requirements, but
     // we let that go as long as there are no two candidates that differ
     // only in generic requirements.
-    if (numSerializationReqsCovered == serializationReqs.size())
+    if (okay)
       candidates.push_back(FD);
   }
 
