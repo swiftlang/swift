@@ -14,30 +14,19 @@ import ASTBridging
 
 public struct SourceLoc {
   /// Points into a source file.
-  let locationInFile: UnsafePointer<UInt8>
-
-  public init?(locationInFile: UnsafePointer<UInt8>?) {
-    guard let locationInFile = locationInFile else {
-      return nil
-    }
-    self.locationInFile = locationInFile
-  }
+  public let bridged: BridgedSourceLoc
 
   public init?(bridged: BridgedSourceLoc) {
-    guard bridged.isValid() else {
+    guard bridged.isValid else {
       return nil
     }
-    self.locationInFile = bridged.uint8Pointer()!
-  }
-
-  public var bridged: BridgedSourceLoc {
-    .init(locationInFile)
+    self.bridged = bridged
   }
 }
 
 extension SourceLoc {
   public func advanced(by n: Int) -> SourceLoc {
-    SourceLoc(locationInFile: locationInFile.advanced(by: n))!
+    SourceLoc(bridged: bridged.advanced(by: n))!
   }
 }
 

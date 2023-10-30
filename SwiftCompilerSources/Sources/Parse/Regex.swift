@@ -63,8 +63,7 @@ private func _RegexLiteralLexingFn(
   if let error = error {
     // Emit diagnostic if diagnostics are enabled.
     if let diagEngine = DiagnosticEngine(bridged: bridgedDiagnosticEngine) {
-      let startLoc = SourceLoc(
-        locationInFile: error.location.assumingMemoryBound(to: UInt8.self))!
+      let startLoc = SourceLoc(bridged: BridgedSourceLoc(raw: error.location))!
       diagEngine.diagnose(startLoc, .foreign_diagnostic, error.message)
     }
     return error.completelyErroneous

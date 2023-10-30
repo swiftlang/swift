@@ -112,7 +112,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
-      bridged.hasSemanticsAttr(BridgedStringRef(buffer.baseAddress!, buffer.count))
+      bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
 

@@ -31,8 +31,16 @@
 #include <cassert>
 #include "llvm/CAS/CASReference.h"
 
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
+#endif
+
+// FIXME: We ought to be importing '<swift/briging>' instead.
+#if __has_attribute(swift_name)
+#define SWIFT_NAME(NAME) __attribute__((swift_name(NAME)))
+#else
+#define SWIFT_NAME(NAME)
 #endif
 
 #ifdef PURE_BRIDGING_MODE
@@ -52,56 +60,86 @@ struct BridgedOStream {
 };
 
 class BridgedStringRef {
-  const char * _Nonnull data;
-  size_t length;
+  const char *_Nullable Data;
+  size_t Length;
 
 public:
 #ifdef USED_IN_CPP_SOURCE
-  BridgedStringRef(llvm::StringRef sref) : data(sref.data()), length(sref.size()) {}
+  BridgedStringRef(llvm::StringRef sref)
+      : Data(sref.data()), Length(sref.size()) {}
 
-  llvm::StringRef get() const { return llvm::StringRef(data, length); }
+  llvm::StringRef get() const { return llvm::StringRef(Data, Length); }
 #endif
 
-  BridgedStringRef(const char * _Nullable data, size_t length)
-    : data(data), length(length) {}
+  SWIFT_NAME("init(data:count:)")
+  BridgedStringRef(const char *_Nullable data, size_t length)
+      : Data(data), Length(length) {}
 
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
-    return (const uint8_t * _Nonnull)data;
-  }
-  SwiftInt size() const { return (SwiftInt)length; }
   void write(BridgedOStream os) const;
 };
 
+SWIFT_NAME("getter:BridgedStringRef.data(self:)")
+BRIDGED_INLINE 
+const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str);
+
+SWIFT_NAME("getter:BridgedStringRef.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedStringRef_count(BridgedStringRef str);
+
+SWIFT_NAME("getter:BridgedStringRef.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedStringRef_empty(BridgedStringRef str);
+
 class BridgedOwnedString {
-  char * _Nonnull data;
-  size_t length;
+  char *_Nonnull Data;
+  size_t Length;
 
 public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedOwnedString(const std::string &stringToCopy);
+
+  llvm::StringRef getRef() const { return llvm::StringRef(Data, Length); }
 #endif
 
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
-    return (const uint8_t * _Nonnull)(data ? data : "");
-  }
-  SwiftInt size() const { return (SwiftInt)length; }
   void destroy() const;
 };
 
-class BridgedSourceLoc {
-  const void * _Nullable opaquePointer;
-public:
-  BridgedSourceLoc() : opaquePointer(nullptr) {}
-  BridgedSourceLoc(const void * _Nullable loc) : opaquePointer(loc) {}
+SWIFT_NAME("getter:BridgedOwnedString.data(self:)")
+BRIDGED_INLINE 
+const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str);
 
-  bool isValid() const { return opaquePointer != nullptr; }
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nullable uint8Pointer() const {
-    return (const uint8_t * _Nullable)opaquePointer;
+SWIFT_NAME("getter:BridgedOwnedString.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedOwnedString_count(BridgedOwnedString str);
+
+SWIFT_NAME("getter:BridgedOwnedString.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedOwnedString_empty(BridgedOwnedString str);
+
+class BridgedSourceLoc {
+  const void *_Nullable Raw;
+
+public:
+  BridgedSourceLoc() : Raw(nullptr) {}
+
+  SWIFT_NAME("init(raw:)")
+  BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
+
+  swift::SourceLoc get() const {
+    return swift::SourceLoc(
+        llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
   }
-  const char * _Nullable getLoc() const {
-    return (const char * _Nullable)opaquePointer;
-  }
+#endif
+
+  SWIFT_IMPORT_UNSAFE
+  const void *_Nullable getOpaquePointerValue() const { return Raw; }
+
+  SWIFT_NAME("advanced(by:)")
+  BRIDGED_INLINE
+  BridgedSourceLoc advancedBy(size_t n) const;
 };
+
+SWIFT_NAME("getter:BridgedSourceLoc.isValid(self:)")
+BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc str);
 
 struct BridgedArrayRef {
   const void * _Nullable data;
@@ -109,5 +147,11 @@ struct BridgedArrayRef {
 };
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
+
+#ifndef PURE_BRIDGING_MODE
+// In _not_ PURE_BRIDGING_MODE, bridging functions are inlined and therefore
+// included in the header file.
+#include "BasicBridgingImpl.h"
+#endif
 
 #endif

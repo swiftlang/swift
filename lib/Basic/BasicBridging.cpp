@@ -13,6 +13,12 @@
 #include "swift/Basic/BridgingUtils.h"
 #include "llvm/Support/raw_ostream.h"
 
+#ifdef PURE_BRIDGING_MODE
+// In PURE_BRIDGING_MODE, bridging functions are not inlined and therefore
+// inluded in the cpp file.
+#include "swift/Basic/BasicBridgingImpl.h"
+#endif
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -20,7 +26,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 void BridgedStringRef::write(BridgedOStream os) const {
-  static_cast<raw_ostream *>(os.streamAddr)->write(data, length);
+  static_cast<raw_ostream *>(os.streamAddr)->write(Data, Length);
 }
 
 //===----------------------------------------------------------------------===//
@@ -28,15 +34,15 @@ void BridgedStringRef::write(BridgedOStream os) const {
 //===----------------------------------------------------------------------===//
 
 BridgedOwnedString::BridgedOwnedString(const std::string &stringToCopy)
-  : data(nullptr), length(stringToCopy.size()) {
-  if (length != 0) {
-    data = new char[length];
-    std::memcpy(data, stringToCopy.data(), length);
+    : Data(nullptr), Length(stringToCopy.size()) {
+  if (Length != 0) {
+    Data = new char[Length];
+    std::memcpy(Data, stringToCopy.data(), Length);
   }
 }
 
 void BridgedOwnedString::destroy() const {
-  if (data)
-    delete [] data;
+  if (Data)
+    delete[] Data;
 }
 

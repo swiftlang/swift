@@ -37,15 +37,12 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
 
-static SourceLoc getSourceLoc(BridgedSourceLoc bridgedLoc) {
-  return SourceLoc(llvm::SMLoc::getFromPointer(bridgedLoc.getLoc()));
-}
-
-BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text)
-  : BridgedDiagnosticFixIt(DiagnosticInfo::FixIt(
-      CharSourceRange(getSourceLoc(start), length),
-      text.get(),
-      llvm::ArrayRef<DiagnosticArgument>())) {}
+BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
+                                               uint32_t length,
+                                               BridgedStringRef text)
+    : BridgedDiagnosticFixIt(DiagnosticInfo::FixIt(
+          CharSourceRange(start.get(), length), text.get(),
+          llvm::ArrayRef<DiagnosticArgument>())) {}
 
 void DiagnosticEngine_diagnose(
     BridgedDiagEngine bridgedEngine, BridgedSourceLoc loc,
@@ -60,11 +57,11 @@ void DiagnosticEngine_diagnose(
   for (auto arg : getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
     arguments.push_back(arg.get());
   }
-  auto inflight = D->diagnose(SourceLoc(llvm::SMLoc::getFromPointer(loc.getLoc())), diagID, arguments);
+  auto inflight = D->diagnose(loc.get(), diagID, arguments);
 
   // Add highlight.
   if (highlightStart.isValid()) {
-    CharSourceRange highlight(getSourceLoc(highlightStart), (unsigned)hightlightLength);
+    CharSourceRange highlight(highlightStart.get(), (unsigned)hightlightLength);
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }
 
