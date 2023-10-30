@@ -1214,10 +1214,11 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     return true;
 }
 
-llvm::SmallPtrSet<ProtocolDecl *, 2>
+void
 swift::extractDistributedSerializationRequirements(
-    ASTContext &C, ArrayRef<Requirement> allRequirements) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
+    ASTContext &C,
+    ArrayRef<Requirement> allRequirements,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> &into) {
   auto DA = C.getDistributedActorDecl();
   auto daSerializationReqAssocType =
       DA->getAssociatedType(C.Id_SerializationRequirement);
@@ -1238,8 +1239,6 @@ swift::extractDistributedSerializationRequirements(
       }
     }
   }
-
-  return serializationReqs;
 }
 
 /******************************************************************************/

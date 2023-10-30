@@ -1127,7 +1127,9 @@ diagnosePotentialUnavailability(SourceRange ReferenceRange,
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 
 /// Type check a single 'distributed func' declaration.
-void checkDistributedFunc(FuncDecl *func);
+///
+/// Returns `true` if there was an error.
+bool checkDistributedFunc(FuncDecl *func);
 
 bool checkAvailability(SourceRange ReferenceRange,
                        AvailabilityContext Availability,
