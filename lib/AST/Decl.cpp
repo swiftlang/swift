@@ -3952,17 +3952,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::skipAccessCheckIfInterface(const DeclContext *useDC,
-                                           AccessLevel useAcl,
-                                           AccessScope declScope) const {
-  if (!useDC || useAcl != AccessLevel::Package || !declScope.isPackage() ||
-      !isUsableFromInline() ||
-      getDeclContext()->getParentModule() == useDC->getParentModule())
-    return false;
-  auto useSF = useDC->getParentSourceFile();
-  return useSF && useSF->Kind == SourceFileKind::Interface;
-}
-
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
