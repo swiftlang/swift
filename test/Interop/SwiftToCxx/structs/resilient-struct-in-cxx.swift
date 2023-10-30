@@ -85,7 +85,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Structs::FirstSmallStruct> {
-// CHECK-NEXT: SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT: SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:   return Structs::_impl::$s7Structs16FirstSmallStructVMa(0)._0;
 // CHECK-NEXT: }
 // CHECK-NEXT: };
