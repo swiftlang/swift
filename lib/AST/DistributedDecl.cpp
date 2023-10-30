@@ -1224,14 +1224,13 @@ swift::extractDistributedSerializationRequirements(
       DA->getAssociatedType(C.Id_SerializationRequirement);
 
   for (auto req : allRequirements) {
-    if (req.getSecondType()->isAny()) {
-      continue;
-    }
-    if (!req.getFirstType()->hasDependentMember())
+    // FIXME: Seems unprincipled
+    if (req.getKind() != RequirementKind::SameType &&
+        req.getKind() != RequirementKind::Conformance)
       continue;
 
     if (auto dependentMemberType =
-            req.getFirstType()->castTo<DependentMemberType>()) {
+            req.getFirstType()->getAs<DependentMemberType>()) {
       if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
         // auto requirementProto = req.getSecondType();
         // if (auto proto = dyn_cast_or_null<ProtocolDecl>(
@@ -1248,7 +1247,7 @@ swift::extractDistributedSerializationRequirements(
         //   }
         auto layout = req.getSecondType()->getExistentialLayout();
         for (auto p : layout.getProtocols()) {
-          serializationReqs.insert(p);
+          into.insert(p);
         }
       }
     }
