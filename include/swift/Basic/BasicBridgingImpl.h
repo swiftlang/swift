@@ -16,7 +16,7 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// BridgedStringRef
+// MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//
 
 const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str) {
@@ -30,7 +30,7 @@ SwiftInt BridgedStringRef_count(BridgedStringRef str) {
 bool BridgedStringRef_empty(BridgedStringRef str) { return str.get().empty(); }
 
 //===----------------------------------------------------------------------===//
-// BridgedOwnedString
+// MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
 
 const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str) {
@@ -47,7 +47,7 @@ bool BridgedOwnedString_empty(BridgedOwnedString str) {
 }
 
 //===----------------------------------------------------------------------===//
-// BridgedSourceLoc
+// MARK: BridgedSourceLoc
 //===----------------------------------------------------------------------===//
 
 bool BridgedSourceLoc_isValid(BridgedSourceLoc str) {

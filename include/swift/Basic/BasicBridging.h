@@ -100,7 +100,7 @@ typedef uintptr_t SwiftUInt;
   BRIDGING_WRAPPER_IMPL(Name, Nullable##Name, _Nullable)
 
 //===----------------------------------------------------------------------===//
-// ArrayRef
+// MARK: ArrayRef
 //===----------------------------------------------------------------------===//
 
 struct BridgedArrayRef {
@@ -109,7 +109,7 @@ struct BridgedArrayRef {
 };
 
 //===----------------------------------------------------------------------===//
-// Data
+// MARK: Data
 //===----------------------------------------------------------------------===//
 
 struct BridgedData {
@@ -120,7 +120,7 @@ struct BridgedData {
 void BridgedData_free(BridgedData data);
 
 //===----------------------------------------------------------------------===//
-// Feature
+// MARK: Feature
 //===----------------------------------------------------------------------===//
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
@@ -130,7 +130,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
 };
 
 //===----------------------------------------------------------------------===//
-// OStream
+// MARK: OStream
 //===----------------------------------------------------------------------===//
 
 struct BridgedOStream {
@@ -138,7 +138,7 @@ struct BridgedOStream {
 };
 
 //===----------------------------------------------------------------------===//
-// StringRef
+// MARK: StringRef
 //===----------------------------------------------------------------------===//
 
 class BridgedStringRef {
@@ -195,7 +195,7 @@ SWIFT_NAME("getter:BridgedOwnedString.isEmpty(self:)")
 BRIDGED_INLINE bool BridgedOwnedString_empty(BridgedOwnedString str);
 
 //===----------------------------------------------------------------------===//
-// SourceLoc
+// MARK: SourceLoc
 //===----------------------------------------------------------------------===//
 
 class BridgedSourceLoc {
@@ -228,7 +228,7 @@ SWIFT_NAME("getter:BridgedSourceLoc.isValid(self:)")
 BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc str);
 
 //===----------------------------------------------------------------------===//
-// SourceRange
+// MARK: SourceRange
 //===----------------------------------------------------------------------===//
 
 struct BridgedSourceRange {
@@ -242,7 +242,7 @@ struct BridgedCharSourceRange {
 };
 
 //===----------------------------------------------------------------------===//
-// Plugins
+// MARK: Plugins
 //===----------------------------------------------------------------------===//
 
 SWIFT_BEGIN_ASSUME_NONNULL

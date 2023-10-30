@@ -18,7 +18,7 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// BridgedNominalTypeDecl
+// MARK: BridgedNominalTypeDecl
 //===----------------------------------------------------------------------===//
 
 BridgedStringRef BridgedNominalTypeDecl_getName(BridgedNominalTypeDecl decl) {
@@ -30,7 +30,7 @@ bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl) {
 }
 
 //===----------------------------------------------------------------------===//
-// BridgedVarDecl
+// MARK: BridgedVarDecl
 //===----------------------------------------------------------------------===//
 
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl) {

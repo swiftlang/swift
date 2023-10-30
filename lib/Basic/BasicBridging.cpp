@@ -23,7 +23,7 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                                BridgedStringRef
+// MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//
 
 void BridgedStringRef::write(BridgedOStream os) const {
@@ -31,7 +31,7 @@ void BridgedStringRef::write(BridgedOStream os) const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                BridgedOwnedString
+// MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
 
 BridgedOwnedString::BridgedOwnedString(const std::string &stringToCopy)
@@ -48,7 +48,7 @@ void BridgedOwnedString::destroy() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Data
+// MARK: Data
 //===----------------------------------------------------------------------===//
 
 void BridgedData_free(BridgedData data) {
@@ -58,7 +58,7 @@ void BridgedData_free(BridgedData data) {
 }
 
 //===----------------------------------------------------------------------===//
-// JSON
+// MARK: JSON
 //===----------------------------------------------------------------------===//
 
 void *JSON_newValue() { return new llvm::json::Value(nullptr); }
