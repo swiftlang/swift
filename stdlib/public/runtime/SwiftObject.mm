@@ -380,7 +380,12 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       swift_conformsToProtocolCommon(
 	selfMetadata, &hashable_support::HashableProtocolDescriptor));
   if (hashableConformance == NULL) {
-    return (NSUInteger)self;
+    // If a type is Equatable (but not Hashable), we
+    // have to return something here that is compatible
+    // with the `isEqual:` below.  NSObject's default
+    // of `(NSUInteger)self` won't work, so we instead
+    // return a constant fallback value:
+    return (NSUInteger)1;
   }
   return _swift_stdlib_Hashable_hashValue_indirect(
     &self, selfMetadata, hashableConformance);
@@ -390,36 +395,39 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
   if (self == other) {
     return YES;
   }
-  // Both objects must be `SwiftObject` in ObjC
-  if (object_getClass(other) != object_getClass((id)self)) {
-    return NO;
-  }
-
-  // TODO: Bincompat check -- return NO if this is an old executable
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
   auto otherMetadata = _swift_getClassOfAllocated(other);
 
-  // Find common parent Swift class
+  // Find common parent class
   const ClassMetadata * parentMetadata = NULL;
-  // Collect parents of self
-  std::unordered_set<const ClassMetadata *> selfParents;
-  for (auto m = selfMetadata; m != NULL; m = m->Superclass) {
-    selfParents.emplace(m);
-  }
-  // Find first parent of other that is also a parent of self
-  for (auto m = otherMetadata; m != NULL; m = m->Superclass) {
-    if (selfParents.find(m) != selfParents.end()) {
-      parentMetadata = m;
-      break;
+  if (selfMetadata == otherMetadata) {
+    parentMetadata = selfMetadata;
+  } else {
+    // Collect parents of self
+    std::unordered_set<const ClassMetadata *> selfAncestors;
+    for (auto m = selfMetadata; m != NULL; m = m->Superclass) {
+      selfAncestors.emplace(m);
+    }
+    // Find first parent of other that is also a parent of self
+    for (auto m = otherMetadata; m != NULL; m = m->Superclass) {
+      if (selfAncestors.find(m) != selfAncestors.end()) {
+	parentMetadata = m;
+	break;
+      }
+    }
+    // If there's no common parent class, we can't compare them
+    if (parentMetadata == NULL) {
+      return NO;
     }
   }
-  // If there's no common Swift parent class, we can't compare them
-  if (parentMetadata == NULL) {
-    return NO;
-  }
+  // Note: Because `self` subclasses SwiftObject, we know parentMetadata
+  // must be a Swift type or SwiftObject itself.
 
+  // This will work for types that implement Hashable or only Equatable.
+  // In the latter case, there is a risk that `-hash` and `-isEqual:` might
+  // be incompatible.  See notes above for `-hash`
   auto equatableConformance =
     reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
       swift_conformsToProtocolCommon(

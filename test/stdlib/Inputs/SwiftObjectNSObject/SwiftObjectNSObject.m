@@ -80,10 +80,43 @@ void HackSwiftObject()
     class_addMethod(cls, @selector(perform2::), (IMP)Perform2, "@@:@@");
 }
 
-void TestSwiftObjectNSObject(id c, id d,
-			     id e1a, id e1b, id e2,
-			     id h1a, id h1b, id h2,
-			     NSUInteger hash1, NSUInteger hash2)
+void TestSwiftObjectNSObjectAssertNoErrors(void)
+{
+  printf("\nTotal: %d error%s\n",
+         Errors, Errors == 1 ? "" : "s");
+  if (Errors > 0) {
+    exit(1);
+  }
+}
+
+
+void TestSwiftObjectNSObjectEquals(id e1, id e2)
+{
+  printf("NSObjectProtocol.isEqual: Expect %s == %s\n",
+	 [[e1 description] UTF8String],
+	 [[e2 description] UTF8String]);
+  expectTrue([e1 isEqual:e2]);
+  expectTrue([e2 isEqual:e1]);
+}
+
+void TestSwiftObjectNSObjectNotEquals(id e1, id e2)
+{
+  printf("NSObjectProtocol.isEqual: Expect %s != %s\n",
+	 [[e1 description] UTF8String],
+	 [[e2 description] UTF8String]);
+  expectFalse([e1 isEqual:e2]);
+  expectFalse([e2 isEqual:e1]);
+}
+
+void TestSwiftObjectNSObjectHashValue(id e, NSUInteger hashValue)
+{
+  printf("NSObjectProtocol.hash: Expect [%s hashValue] == %lu\n",
+	 [[e description] UTF8String],
+	 (unsigned long)hashValue);
+  expectTrue([e hash] == hashValue);
+}
+
+void TestSwiftObjectNSObject(id c, id d)
 {
   printf("TestSwiftObjectNSObject\n");
 
@@ -162,24 +195,10 @@ void TestSwiftObjectNSObject(id c, id d,
   expectFalse([C_meta isEqual:D_meta]);
   expectFalse([S_meta isEqual:C_meta]);
 
-  // Check that ObjC isEqual delegates to Equatable
-  expectTrue([e1a isEqual: e1b]);
-  expectFalse([e1a isEqual: e2]);
-  expectFalse([e1b isEqual: e2]);
-
-  // Check that ObjC isEqual delegates to Hashable
-  expectTrue([h1a isEqual: h1b]);
-  expectFalse([h1a isEqual: h2]);
-  expectFalse([h1b isEqual: h2]);
-
   printf("NSObjectProtocol.hash\n");
 
   expectTrue ([d hash] + [c hash] + [D hash] + [C hash] + [S hash] +
               [D_meta hash] + [C_meta hash] + [S_meta hash] != 0);
-
-  expectTrue([h1a hash] == hash1);
-  expectTrue([h1b hash] == hash1);
-  expectTrue([h2 hash] == hash2);
 
   printf("NSObjectProtocol.self\n");
 
@@ -813,9 +832,4 @@ void TestSwiftObjectNSObject(id c, id d,
   expectTrue ([S_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
   expectTrue ([C_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
   expectTrue ([D_meta instanceMethodForSelector:@selector(DESSLOK)] == fwd);
-
-
-  printf("TestSwiftObjectNSObject: %d error%s\n",
-         Errors, Errors == 1 ? "" : "s");
-  exit(Errors ? 1 : 0);
 }
