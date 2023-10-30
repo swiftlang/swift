@@ -98,7 +98,7 @@ class Target {
     }
   }
 
-  var reader: RemoteMemoryReader
+  var reader: CachingMemoryReader<RemoteMemoryReader>
 
   var mcontext: MContext
 
@@ -158,7 +158,7 @@ class Target {
 
     task = parentTask
 
-    reader = RemoteMemoryReader(task: task_t(task))
+    reader = CachingMemoryReader(for: RemoteMemoryReader(task: task_t(task)))
 
     name = Self.getProcessName(pid: pid)
 
