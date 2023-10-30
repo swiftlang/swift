@@ -138,7 +138,7 @@ struct ValueStorage {
 
   /// When either isDefProjection or isUseProjection is set, this refers to the
   /// storage whose "def" this value projects out of or whose operand this
-  /// storage projects into via its "use.
+  /// storage projects into via its "use".
   uint32_t projectedStorageID = InvalidID;
 
   /// For use-projections, identifies the operand index of the composing use.
