@@ -341,11 +341,12 @@ swift::getDistributedSerializationRequirements(
     return true; // we're done here, any means there are no requirements
 
   auto *serialReqType = existentialRequirementTy->getAs<ExistentialType>();
+                                       ->getAs<ExistentialType>();
   if (!serialReqType || serialReqType->hasError()) {
     return false;
   }
 
-  auto layout = serialReqType->getExistentialLayout();
+  auto desugaredTy = serialReqType->getConstraintType();
   for (auto p : layout.getProtocols()) {
     requirementProtos.insert(p);
   }
@@ -1224,15 +1225,25 @@ swift::extractDistributedSerializationRequirements(
       DA->getAssociatedType(C.Id_SerializationRequirement);
 
   for (auto req : allRequirements) {
-    // FIXME: Seems unprincipled
-    if (req.getKind() != RequirementKind::SameType &&
-        req.getKind() != RequirementKind::Conformance)
+    if (req.getSecondType()->isAny()) {
+      continue;
+    }
+    if (!req.getFirstType()->hasDependentMember())
       continue;
 
     if (auto dependentMemberType =
-            req.getFirstType()->getAs<DependentMemberType>()) {
+            req.getFirstType()->castTo<DependentMemberType>()) {
       if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
-        auto layout = req.getSecondType()->getExistentialLayout();
+        auto requirementProto = req.getSecondType();
+        if (auto proto = dyn_cast_or_null<ProtocolDecl>(
+                requirementProto->getAnyNominal())) {
+          into.insert(proto);
+        } else {
+          auto serialReqType = requirementProto->castTo<ExistentialType>()
+                                   ->getConstraintType();
+          auto flattenedRequirements =
+              flattenDistributedSerializationTypeToRequiredProtocols(
+                  serialReqType.getPointer());
         for (auto p : layout.getProtocols()) {
           serializationReqs.insert(p);
         }
