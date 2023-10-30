@@ -37,6 +37,9 @@ let swiftSetttings: [SwiftSetting] = [
 let package = Package(
   name: "swiftSwiftCompiler",
   platforms: [
+    // We need at least macOS 13 here to avoid hitting an availability error
+    // for CxxStdlib. It's only needed for the package though, the CMake build
+    // works fine with a lower deployment target.
     .macOS(.v13)
   ],
   products: [

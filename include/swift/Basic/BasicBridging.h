@@ -36,7 +36,7 @@
 #include <string>
 #endif
 
-// FIXME: We ought to be importing '<swift/briging>' instead.
+// FIXME: We ought to be importing '<swift/bridging>' instead.
 #if __has_attribute(swift_name)
 #define SWIFT_NAME(NAME) __attribute__((swift_name(NAME)))
 #else
@@ -273,7 +273,7 @@ public:
 };
 
 SWIFT_NAME("getter:BridgedSourceLoc.isValid(self:)")
-BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc str);
+BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc loc);
 
 //===----------------------------------------------------------------------===//
 // MARK: SourceRange
@@ -359,7 +359,8 @@ SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE
 // In _not_ PURE_BRIDGING_MODE, bridging functions are inlined and therefore
-// included in the header file.
+// included in the header file. This is because they rely on C++ headers that
+// we don't want to pull in when using "pure bridging mode".
 #include "BasicBridgingImpl.h"
 #endif
 

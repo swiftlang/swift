@@ -74,8 +74,8 @@ bool BridgedOwnedString_empty(BridgedOwnedString str) {
 // MARK: BridgedSourceLoc
 //===----------------------------------------------------------------------===//
 
-bool BridgedSourceLoc_isValid(BridgedSourceLoc str) {
-  return str.getOpaquePointerValue() != nullptr;
+bool BridgedSourceLoc_isValid(BridgedSourceLoc loc) {
+  return loc.getOpaquePointerValue() != nullptr;
 }
 
 BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {

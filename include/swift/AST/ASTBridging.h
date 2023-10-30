@@ -927,8 +927,9 @@ SWIFT_END_ASSUME_NONNULL
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE
-// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore
-// included in the header file.
+// In _not_ PURE_BRIDGING_MODE, bridging functions are inlined and therefore
+// included in the header file. This is because they rely on C++ headers that
+// we don't want to pull in when using "pure bridging mode".
 #include "ASTBridgingImpl.h"
 #endif
 
