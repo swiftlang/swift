@@ -119,7 +119,7 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
+      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, count: data.count))
     }
     if hadError {
       throw PluginError.failedToSendMessage
@@ -127,15 +127,13 @@ struct CompilerPlugin {
   }
 
   private func waitForNextMessage() throws -> PluginToHostMessage {
-    // NOTE: You cannot use 'init()' here as that will produce garbage
-    // (rdar://116825963).
-    var result = BridgedData(baseAddress: nil, size: 0)
+    var result = BridgedData()
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
-    defer { BridgedData_free(result) }
+    defer { result.free() }
     guard !hadError else {
       throw PluginError.failedToReceiveMessage
     }
-    let data = UnsafeBufferPointer(start: result.baseAddress, count: Int(result.size))
+    let data = UnsafeBufferPointer(start: result.baseAddress, count: result.count)
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
   }
 

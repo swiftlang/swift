@@ -23,11 +23,6 @@
 
 namespace swift {
 
-template <typename T>
-inline llvm::ArrayRef<T> getArrayRef(BridgedArrayRef bridged) {
-  return {static_cast<const T *>(bridged.data), bridged.numElements};
-}
-
 } // namespace swift
 
 #endif

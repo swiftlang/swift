@@ -16,6 +16,30 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedArrayRef
+//===----------------------------------------------------------------------===//
+
+const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr) {
+  return arr.Data;
+}
+
+SwiftInt BridgedArrayRef_count(BridgedArrayRef arr) {
+  return static_cast<SwiftInt>(arr.Length);
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedData
+//===----------------------------------------------------------------------===//
+
+const char *_Nullable BridgedData_baseAddress(BridgedData data) {
+  return data.BaseAddress;
+}
+
+SwiftInt BridgedData_count(BridgedData data) {
+  return static_cast<SwiftInt>(data.Length);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//
 

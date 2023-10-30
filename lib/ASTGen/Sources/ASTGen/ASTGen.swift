@@ -380,9 +380,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     guard let node else {
-      // NOTE: You cannot do '.init()' here as that will produce garbage
-      // (rdar://116825963).
-      return .init(data: nil, numElements: 0)
+      return .init()
     }
 
     return self.generate(node)
@@ -391,9 +389,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generate(_ node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
     guard let node else {
-      // NOTE: You cannot do '.init()' here as that will produce garbage
-      // (rdar://116825963).
-      return .init(data: nil, numElements: 0)
+      return .init()
     }
 
     return self.generate(node)
@@ -407,9 +403,7 @@ extension Collection {
   ///   on a ``LazyFilterSequence`` due to the `count` access.
   func compactMap<T>(in astgen: ASTGenVisitor, _ transform: (Element) -> T?) -> BridgedArrayRef {
     if self.isEmpty {
-      // NOTE: You cannot do '.init()' here as that will produce garbage
-      // (rdar://116825963).
-      return .init(data: nil, numElements: 0)
+      return .init()
     }
 
     let baseAddress = astgen.allocator.allocate(T.self, count: self.count).baseAddress!
@@ -427,7 +421,7 @@ extension Collection {
       }
     }
 
-    return .init(data: baseAddress, numElements: self.count)
+    return .init(data: baseAddress, count: self.count)
   }
 }
 
@@ -435,15 +429,13 @@ extension LazyCollectionProtocol {
   /// Returns a copy of the collection's elements as a `BridgedArrayRef` with a lifetime tied to that of `astgen`.
   func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
     if self.isEmpty {
-      // NOTE: You cannot do '.init()' here as that will produce garbage
-      // (rdar://116825963).
-      return .init(data: nil, numElements: 0)
+      return .init()
     }
 
     let buffer = astgen.allocator.allocate(Element.self, count: self.count)
     _ = buffer.initialize(from: self)
 
-    return .init(data: buffer.baseAddress, numElements: self.count)
+    return .init(data: buffer.baseAddress, count: self.count)
   }
 }
 
@@ -463,9 +455,7 @@ extension Optional where Wrapped: LazyCollectionProtocol {
   @inline(__always)
   func bridgedArray(in astgen: ASTGenVisitor) -> BridgedArrayRef {
     guard let self else {
-      // NOTE: You cannot do '.init()' here as that will produce garbage
-      // (rdar://116825963).
-      return .init(data: nil, numElements: 0)
+      return .init()
     }
 
     return self.bridgedArray(in: astgen)

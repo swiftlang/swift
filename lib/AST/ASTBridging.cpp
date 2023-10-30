@@ -40,7 +40,7 @@ using namespace swift;
 template <typename T>
 static inline llvm::ArrayRef<T>
 unbridgedArrayRef(const BridgedArrayRef bridged) {
-  return {static_cast<const T *>(bridged.data), size_t(bridged.numElements)};
+  return bridged.get<T>();
 }
 
 static inline StringRef unbridged(BridgedStringRef cStr) {
@@ -202,7 +202,7 @@ void BridgedDiagnosticEngine_diagnose(
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
-  for (auto arg : getArrayRef<BridgedDiagnosticArgument>(bridgedArguments)) {
+  for (auto arg : bridgedArguments.get<BridgedDiagnosticArgument>()) {
     arguments.push_back(arg.get());
   }
   auto inflight = D->diagnose(loc.get(), diagID, arguments);
@@ -215,7 +215,7 @@ void BridgedDiagnosticEngine_diagnose(
 
   // Add fix-its.
   for (const BridgedDiagnosticFixIt &fixIt :
-       getArrayRef<BridgedDiagnosticFixIt>(bridgedFixIts)) {
+       bridgedFixIts.get<BridgedDiagnosticFixIt>()) {
     auto range = fixIt.get().getRange();
     auto text = fixIt.get().getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
@@ -1460,7 +1460,7 @@ bool Plugin_spawnIfNeeded(PluginHandle handle) {
 
 bool Plugin_sendMessage(PluginHandle handle, const BridgedData data) {
   auto *plugin = static_cast<LoadedExecutablePlugin *>(handle);
-  StringRef message(data.baseAddress, data.size);
+  StringRef message(data.BaseAddress, data.Length);
   auto error = plugin->sendMessage(message);
   if (error) {
     // FIXME: Pass the error message back to the caller.

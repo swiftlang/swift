@@ -411,10 +411,18 @@ struct BridgedSubstitutionMap {
 struct BridgedTypeArray {
   BridgedArrayRef typeArray;
 
+#ifdef USED_IN_CPP_SOURCE
+  BridgedTypeArray(llvm::ArrayRef<swift::Type> types) : typeArray(types) {}
+
+  llvm::ArrayRef<swift::Type> get() const {
+    return typeArray.get<swift::Type>();
+  }
+#endif
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedTypeArray fromReplacementTypes(BridgedSubstitutionMap substMap);
 
-  SwiftInt getCount() const { return SwiftInt(typeArray.numElements); }
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedType getAt(SwiftInt index) const;
@@ -423,7 +431,16 @@ struct BridgedTypeArray {
 struct BridgedSILTypeArray {
   BridgedArrayRef typeArray;
 
-  SwiftInt getCount() const { return SwiftInt(typeArray.numElements); }
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
+      : typeArray(silTypes) {}
+
+  llvm::ArrayRef<swift::SILType> get() const {
+    return typeArray.get<swift::SILType>();
+  }
+#endif
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedType getAt(SwiftInt index) const;

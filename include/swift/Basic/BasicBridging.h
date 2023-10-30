@@ -103,20 +103,66 @@ typedef uintptr_t SwiftUInt;
 // MARK: ArrayRef
 //===----------------------------------------------------------------------===//
 
-struct BridgedArrayRef {
-  const void *_Nullable data;
-  size_t numElements;
+class BridgedArrayRef {
+public:
+  SWIFT_UNAVAILABLE("Use '.data' instead")
+  const void *_Nullable Data;
+
+  SWIFT_UNAVAILABLE("Use '.count' instead")
+  size_t Length;
+
+  BridgedArrayRef() : Data(nullptr), Length(0) {}
+
+  SWIFT_NAME("init(data:count:)")
+  BridgedArrayRef(const void *_Nullable data, size_t length)
+      : Data(data), Length(length) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  template <typename T>
+  BridgedArrayRef(llvm::ArrayRef<T> arr)
+      : Data(arr.data()), Length(arr.size()) {}
+
+  template <typename T>
+  llvm::ArrayRef<T> get() const {
+    return {static_cast<const T *>(Data), Length};
+  }
+#endif
 };
+
+SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
+BRIDGED_INLINE
+const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
+
+SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
 
 //===----------------------------------------------------------------------===//
 // MARK: Data
 //===----------------------------------------------------------------------===//
 
-struct BridgedData {
-  const char *_Nullable baseAddress;
-  size_t size;
+class BridgedData {
+public:
+  SWIFT_UNAVAILABLE("Use '.baseAddress' instead")
+  const char *_Nullable BaseAddress;
+
+  SWIFT_UNAVAILABLE("Use '.count' instead")
+  size_t Length;
+
+  BridgedData() : BaseAddress(nullptr), Length(0) {}
+
+  SWIFT_NAME("init(baseAddress:count:)")
+  BridgedData(const char *_Nullable baseAddress, size_t length)
+      : BaseAddress(baseAddress), Length(length) {}
 };
 
+SWIFT_NAME("getter:BridgedData.baseAddress(self:)")
+BRIDGED_INLINE
+const char *_Nullable BridgedData_baseAddress(BridgedData data);
+
+SWIFT_NAME("getter:BridgedData.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedData_count(BridgedData data);
+
+SWIFT_NAME("BridgedData.free(self:)")
 void BridgedData_free(BridgedData data);
 
 //===----------------------------------------------------------------------===//
@@ -152,6 +198,8 @@ public:
 
   llvm::StringRef get() const { return llvm::StringRef(Data, Length); }
 #endif
+
+  BridgedStringRef() : Data(nullptr), Length(0) {}
 
   SWIFT_NAME("init(data:count:)")
   BridgedStringRef(const char *_Nullable data, size_t length)

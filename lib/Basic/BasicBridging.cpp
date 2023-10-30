@@ -52,9 +52,9 @@ void BridgedOwnedString::destroy() const {
 //===----------------------------------------------------------------------===//
 
 void BridgedData_free(BridgedData data) {
-  if (data.baseAddress == nullptr)
+  if (data.BaseAddress == nullptr)
     return;
-  free(const_cast<char *>(data.baseAddress));
+  free(const_cast<char *>(data.BaseAddress));
 }
 
 //===----------------------------------------------------------------------===//
@@ -64,7 +64,7 @@ void BridgedData_free(BridgedData data) {
 void *JSON_newValue() { return new llvm::json::Value(nullptr); }
 
 void *JSON_deserializedValue(BridgedData data) {
-  auto result = llvm::json::parse({data.baseAddress, data.size});
+  auto result = llvm::json::parse({data.BaseAddress, data.Length});
   if (!result) {
     return nullptr;
   }
