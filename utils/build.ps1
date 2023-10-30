@@ -1582,6 +1582,8 @@ function Build-Installer() {
     Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" "$Stage\"
     Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msm" "$Stage\"
     Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" "$Stage\"
+    # Extract installer engine to ease code-signing on swift.org CI
+    Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn detach "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($HostArch.BinaryCache)\installer\$($HostArch.VSName)\"
   }
 }
 
