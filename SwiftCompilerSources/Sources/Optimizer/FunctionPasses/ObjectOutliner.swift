@@ -147,7 +147,7 @@ private func findInitStores(of object: Value,
         return false
       }
     default:
-      if !isValidUseOfObject(use.instruction) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -184,7 +184,7 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
         return false
       }
     default:
-      if !isValidUseOfObject(use.instruction) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -198,7 +198,7 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
       if !handleStore(store, index: index, stores: &stores) {
         return false
       }
-    } else if !isValidUseOfObject(use.instruction) {
+    } else if !isValidUseOfObject(use) {
       return false
     }
   }
@@ -215,7 +215,8 @@ private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreIns
   return false
 }
 
-private func isValidUseOfObject(_ inst: Instruction) -> Bool {
+private func isValidUseOfObject(_ use: Operand) -> Bool {
+  let inst = use.instruction
   switch inst {
   case is DebugValueInst,
        is LoadInst,
@@ -240,7 +241,7 @@ private func isValidUseOfObject(_ inst: Instruction) -> Bool {
        is RefTailAddrInst,
        is RefElementAddrInst:
     for use in (inst as! SingleValueInstruction).uses {
-      if !isValidUseOfObject(use.instruction) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
