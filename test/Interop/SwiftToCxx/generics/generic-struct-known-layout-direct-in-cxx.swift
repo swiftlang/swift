@@ -78,6 +78,7 @@
 
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK: template<class T_0_0, class T_0_1>
+// CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
