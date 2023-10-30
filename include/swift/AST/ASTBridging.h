@@ -34,17 +34,17 @@ namespace swift {
 // Identifier
 //===----------------------------------------------------------------------===//
 
-typedef struct BridgedIdentifier {
+struct BridgedIdentifier {
   const void *_Nullable raw;
-} BridgedIdentifier;
+};
 
 //===----------------------------------------------------------------------===//
 // ASTContext
 //===----------------------------------------------------------------------===//
 
-typedef struct BridgedASTContext {
+struct BridgedASTContext {
   void *_Nonnull raw;
-} BridgedASTContext;
+};
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
@@ -120,10 +120,10 @@ namespace swift {
 
 // NOTE: This must be the same underlying value as C++ 'swift::DiagID' defined
 // in 'DiagnosticList.cpp'.
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #define DIAG(KIND, ID, Options, Text, Signature) BridgedDiagID_##ID,
 #include "swift/AST/DiagnosticsAll.def"
-} BridgedDiagID;
+};
 
 class BridgedDiagnosticArgument {
   int64_t storage[3];
@@ -159,17 +159,17 @@ public:
 };
 
 /// Diagnostic severity when reporting diagnostics.
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
   BridgedFatalError,
   BridgedError,
   BridgedWarning,
   BridgedRemark,
   BridgedNote,
-} BridgedDiagnosticSeverity;
+};
 
-typedef struct BridgedDiagnostic {
+struct BridgedDiagnostic {
   void *_Nonnull raw;
-} BridgedDiagnostic;
+};
 
 // FIXME: Can we bridge InFlightDiagnostic?
 void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
@@ -239,7 +239,7 @@ BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
 // Misc
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+struct BridgedTupleTypeElement {
   BridgedIdentifier Name;
   BridgedSourceLoc NameLoc;
   BridgedIdentifier SecondName;
@@ -248,9 +248,9 @@ typedef struct {
   BridgedSourceLoc ColonLoc;
   BridgedTypeRepr Type;
   BridgedSourceLoc TrailingCommaLoc;
-} BridgedTupleTypeElement;
+};
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
   /// A type bound T : P, where T is a type that depends on a generic
   /// parameter and P is some type that should bound T, either as a concrete
   /// supertype or a protocol to which T must conform.
@@ -266,17 +266,17 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
 
   // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
   // when adding enumerators.
-} BridgedRequirementReprKind;
+};
 
-typedef struct {
+struct BridgedRequirementRepr {
   BridgedSourceLoc SeparatorLoc;
   BridgedRequirementReprKind Kind;
   BridgedTypeRepr FirstType;
   BridgedTypeRepr SecondType;
   // FIXME: Handle Layout Requirements
-} BridgedRequirementRepr;
+};
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// An expanded macro.
   BridgedExpandedMacro = 0,
   /// An external macro, spelled with either the old spelling (Module.Type)
@@ -284,10 +284,10 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedExternalMacro,
   /// The builtin definition for "externalMacro".
   BridgedBuiltinExternalMacro
-} BridgedMacroDefinitionKind;
+};
 
 /// Bridged parameter specifiers
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size_t {
   BridgedAttributedTypeSpecifierInOut,
   BridgedAttributedTypeSpecifierBorrowing,
   BridgedAttributedTypeSpecifierConsuming,
@@ -295,10 +295,10 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedAttributedTypeSpecifier : size
   BridgedAttributedTypeSpecifierLegacyOwned,
   BridgedAttributedTypeSpecifierConst,
   BridgedAttributedTypeSpecifierIsolated,
-} BridgedAttributedTypeSpecifier;
+};
 
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
-typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_autoclosure,
   BridgedTypeAttrKind_convention,
   BridgedTypeAttrKind_noescape,
@@ -351,18 +351,18 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind : size_t {
   BridgedTypeAttrKind_thin,
   BridgedTypeAttrKind_thick,
   BridgedTypeAttrKind_Count
-} BridgedTypeAttrKind;
+};
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
+enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
   ASTNodeKindExpr,
   ASTNodeKindStmt,
   ASTNodeKindDecl
-} ASTNodeKind;
+};
 
-typedef struct BridgedASTNode {
+struct BridgedASTNode {
   void *_Nonnull ptr;
   ASTNodeKind kind;
-} BridgedASTNode;
+};
 
 struct BridgedIdentifierAndSourceLoc {
   BridgedIdentifier name;
@@ -628,11 +628,11 @@ BridgedExtensionDecl ExtensionDecl_createParsed(
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange);
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(closed) {
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedOperatorFixity {
   BridgedOperatorFixityInfix,
   BridgedOperatorFixityPrefix,
   BridgedOperatorFixityPostfix,
-} BridgedOperatorFixity;
+};
 
 SWIFT_NAME("BridgedOperatorDecl.createParsed(_:declContext:fixity:"
            "operatorKeywordLoc:name:nameLoc:colonLoc:precedenceGroupName:"
@@ -644,11 +644,11 @@ BridgedOperatorDecl OperatorDecl_createParsed(
     BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc);
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(closed) {
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAssociativity {
   BridgedAssociativityNone,
   BridgedAssociativityLeft,
   BridgedAssociativityRight,
-} BridgedAssociativity;
+};
 
 SWIFT_NAME("BridgedPrecedenceGroupDecl.createParsed(declContext:"
            "precedencegroupKeywordLoc:name:nameLoc:leftBraceLoc:"
@@ -668,7 +668,7 @@ BridgedPrecedenceGroupDecl PrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
     BridgedSourceLoc cRightBraceLoc);
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedImportKind {
   BridgedImportKindModule,
   BridgedImportKindType,
   BridgedImportKindStruct,
@@ -677,7 +677,7 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) {
   BridgedImportKindProtocol,
   BridgedImportKindVar,
   BridgedImportKindFunc,
-} BridgedImportKind;
+};
 
 SWIFT_NAME("BridgedImportDecl.createParsed(_:declContext:importKeywordLoc:"
            "importKind:importKindLoc:path:)")

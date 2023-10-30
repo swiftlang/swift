@@ -112,10 +112,10 @@ struct BridgedArrayRef {
 // Data
 //===----------------------------------------------------------------------===//
 
-typedef struct BridgedData {
+struct BridgedData {
   const char *_Nullable baseAddress;
   size_t size;
-} BridgedData;
+};
 
 void BridgedData_free(BridgedData data);
 
@@ -123,11 +123,11 @@ void BridgedData_free(BridgedData data);
 // Feature
 //===----------------------------------------------------------------------===//
 
-typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)           \
   FeatureName,
 #include "swift/Basic/Features.def"
-} BridgedFeature;
+};
 
 //===----------------------------------------------------------------------===//
 // OStream
@@ -231,15 +231,15 @@ BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc str);
 // SourceRange
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+struct BridgedSourceRange {
   BridgedSourceLoc startLoc;
   BridgedSourceLoc endLoc;
-} BridgedSourceRange;
+};
 
-typedef struct {
+struct BridgedCharSourceRange {
   void *_Nonnull start;
   size_t byteLength;
-} BridgedCharSourceRange;
+};
 
 //===----------------------------------------------------------------------===//
 // Plugins
