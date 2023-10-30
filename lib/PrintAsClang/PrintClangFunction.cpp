@@ -30,6 +30,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -280,6 +281,25 @@ public:
         if (isa<clang::ObjCContainerDecl>(cd->getClangDecl()))
           os << " __strong";
         printInoutTypeModifier();
+      }
+      if (isa<clang::CXXRecordDecl>(cd->getClangDecl())) {
+        if (std::find_if(
+                cd->getClangDecl()->getAttrs().begin(),
+                cd->getClangDecl()->getAttrs().end(), [](clang::Attr *attr) {
+                  if (auto *sa = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+                    llvm::StringRef value = sa->getAttribute();
+                    if ((value.startswith("retain:") ||
+                         value.startswith("release:")) &&
+                        !value.endswith(":immortal"))
+                      return true;
+                  }
+                  return false;
+                }) != cd->getClangDecl()->getAttrs().end()) {
+          // This is a shared FRT. Do not bridge it back to
+          // C++ as its ownership is not managed automatically
+          // in C++ yet.
+          return ClangRepresentation::unsupported;
+        }
       }
       // FIXME: Mark that this is only ObjC representable.
       return ClangRepresentation::representable;
