@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Markup/Markup.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -33,39 +34,6 @@
 
 using namespace swift;
 using namespace swift::markup;
-
-extern "C" void *swift_ASTGen_createQueuedDiagnostics();
-extern "C" void swift_ASTGen_destroyQueuedDiagnostics(void *queued);
-extern "C" void swift_ASTGen_addQueuedSourceFile(
-      void *queuedDiagnostics,
-      ssize_t bufferID,
-      void *sourceFile,
-      const uint8_t *displayNamePtr,
-      intptr_t displayNameLength,
-      ssize_t parentID,
-      ssize_t positionInParent);
-extern "C" void swift_ASTGen_addQueuedDiagnostic(
-    void *queued,
-    const char* text, ptrdiff_t textLength,
-    BridgedDiagnosticSeverity severity,
-    const void *sourceLoc,
-    const void **highlightRanges,
-    ptrdiff_t numHighlightRanges
-);
-extern "C" void
-swift_ASTGen_renderQueuedDiagnostics(void *queued, ssize_t contextSize,
-                                     ssize_t colorize,
-                                     BridgedString *renderedString);
-extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
-
-// FIXME: Hack because we cannot easily get to the already-parsed source
-// file from here. Fix this egregious oversight!
-extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
-                                              size_t bufferLength,
-                                              const char *moduleName,
-                                              const char *filename,
-                                              void *_Nullable ctx);
-extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
 
 namespace {
   class ColoredStream : public raw_ostream {
