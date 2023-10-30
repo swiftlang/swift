@@ -91,10 +91,10 @@ public struct DiagnosticEngine {
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in
-          DiagnosticEngine_diagnose(bridged, bridgedSourceLoc,
-                                    id, bridgedArgsRef,
-                                    highlightStart, highlightLength,
-                                    bridgedFixItsRef)
+          bridged.diagnose(at: bridgedSourceLoc, id, bridgedArgsRef,
+                           highlightAt: highlightStart,
+                           highlightLength: highlightLength,
+                           fixIts: bridgedFixItsRef)
         }
       }
     }

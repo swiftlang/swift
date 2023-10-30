@@ -254,7 +254,7 @@ extension ASTGenVisitor {
 
     // Handle type attributes.
     if !node.attributes.isEmpty {
-      let typeAttributes = TypeAttributes_create()
+      let typeAttributes = BridgedTypeAttributes()
       for attributeElt in node.attributes {
         // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
         // but we don't have that ability right now.
@@ -270,7 +270,7 @@ extension ASTGenVisitor {
         let nameSyntax = identType.name
         var name = nameSyntax.text
         let typeAttrKind = name.withBridgedString { bridgedName in
-          TypeAttrKind_fromString(bridgedName)
+          BridgedTypeAttrKind(from: bridgedName)
         }
         let atLoc = attribute.atSign.bridgedSourceLoc(in: self)
         let attrLoc = nameSyntax.bridgedSourceLoc(in: self)
@@ -291,7 +291,7 @@ extension ASTGenVisitor {
           .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
           .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
           .count, .unimplementable:
-          TypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
+          typeAttributes.addSimpleAttr(kind: typeAttrKind, atLoc: atLoc, attrLoc: attrLoc)
 
         case .opened, .pack_element, .differentiable, .convention,
           ._opaqueReturnTypeOf:
@@ -303,7 +303,7 @@ extension ASTGenVisitor {
       type = BridgedAttributedTypeRepr.createParsed(
         self.ctx,
         base: type,
-        attributes: typeAttributes
+        consumingAttributes: typeAttributes
       )
     }
 
