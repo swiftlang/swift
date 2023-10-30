@@ -485,11 +485,13 @@ class FunctionTypeRef final : public TypeRef {
   FunctionTypeFlags Flags;
   FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
   const TypeRef *GlobalActor;
+  const TypeRef *ThrownError;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
                            const TypeRef *Result, FunctionTypeFlags Flags,
                            FunctionMetadataDifferentiabilityKind DiffKind,
-                           const TypeRef *GlobalActor) {
+                           const TypeRef *GlobalActor,
+                           const TypeRef *ThrownError) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -500,6 +502,7 @@ class FunctionTypeRef final : public TypeRef {
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
     ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     ID.addPointer(GlobalActor);
+    ID.addPointer(ThrownError);
 
     return ID;
   }
@@ -508,18 +511,20 @@ public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
                   FunctionTypeFlags Flags,
                   FunctionMetadataDifferentiabilityKind DiffKind,
-                  const TypeRef *GlobalActor)
+                  const TypeRef *GlobalActor,
+                  const TypeRef *ThrownError)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
         Flags(Flags), DifferentiabilityKind(DiffKind),
-        GlobalActor(GlobalActor) {}
+        GlobalActor(GlobalActor), ThrownError(ThrownError) {}
 
   template <typename Allocator>
   static const FunctionTypeRef *create(
       Allocator &A, std::vector<Param> Params, const TypeRef *Result,
       FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind,
-      const TypeRef *GlobalActor) {
+      const TypeRef *GlobalActor, const TypeRef *ThrownError) {
     FIND_OR_CREATE_TYPEREF(
-        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor);
+        A, FunctionTypeRef, Params, Result, Flags, DiffKind, GlobalActor,
+        ThrownError);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -540,6 +545,10 @@ public:
     return GlobalActor;
   }
 
+  const TypeRef *getThrownError() const {
+    return ThrownError;
+  }
+  
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Function;
   }

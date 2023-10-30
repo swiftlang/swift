@@ -793,9 +793,9 @@ public:
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags,
       FunctionMetadataDifferentiabilityKind diffKind,
-      const TypeRef *globalActor) {
+      const TypeRef *globalActor, const TypeRef *thrownError) {
     return FunctionTypeRef::create(
-        *this, params, result, flags, diffKind, globalActor);
+        *this, params, result, flags, diffKind, globalActor, thrownError);
   }
 
   const FunctionTypeRef *createImplFunctionType(
@@ -852,7 +852,7 @@ public:
 
     auto result = createTupleType({}, llvm::ArrayRef<llvm::StringRef>());
     return FunctionTypeRef::create(
-        *this, {}, result, funcFlags, diffKind, nullptr);
+        *this, {}, result, funcFlags, diffKind, nullptr, nullptr);
   }
 
   BuiltType createProtocolTypeFromDecl(BuiltProtocolDecl protocol) {

@@ -787,6 +787,31 @@ FUNCTION(GetFunctionMetadataDifferentiable,
          MEMEFFECTS(ReadOnly))
 
 // Metadata *
+// swift_getExtendedFunctionTypeMetadata(unsigned long flags,
+//                                       unsigned long diffKind,
+//                                       const Metadata **parameters,
+//                                       const uint32_t *parameterFlags,
+//                                       const Metadata *result,
+//                                       const Metadata *globalActor,
+//                                       uint32_t extendedflags,
+//                                       const Metadata *thrownError);
+FUNCTION(GetFunctionMetadataExtended,
+         swift_getExtendedFunctionTypeMetadata,
+         C_CC, TypedThrowsAvailability,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0),
+              Int32Ty->getPointerTo(0),
+              TypeMetadataPtrTy,
+              TypeMetadataPtrTy,
+              Int32Ty,
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(MetaData),
+         MEMEFFECTS(ReadOnly))
+
+// Metadata *
 // swift_getFunctionTypeMetadataGlobalActor(unsigned long flags,
 //                                          unsigned long diffKind,
 //                                          const Metadata **parameters,

@@ -805,8 +805,18 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           (Node::IndexType)MangledDifferentiabilityKind::Linear), Dem);
       break;
     }
-    if (func->isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isThrowing()) {
+      if (auto thrownError = func->getThrownError()) {
+        auto thrownErrorTypeNode =
+          _swift_buildDemanglingForMetadata(thrownError, Dem);
+        NodePointer thrownErrorNode =
+            Dem.createNode(Node::Kind::TypedThrowsAnnotation);
+        thrownErrorNode->addChild(thrownErrorTypeNode, Dem);
+        funcNode->addChild(thrownErrorNode, Dem);
+      } else {
+        funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+      }
+    }
     if (func->isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
