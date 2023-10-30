@@ -942,8 +942,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
       continue;
 
     auto paramTy = genericParamList->getParams()[0]
-                       ->getInterfaceType()
-                       ->getMetatypeInstanceType();
+                       ->getDeclaredInterfaceType();
 
     // `decodeNextArgument` should return its generic parameter value
     if (!FD->getResultInterfaceType()->isEqual(paramTy))
