@@ -27,7 +27,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
-#include "swift/Basic/BridgingUtils.h"
 
 #ifdef PURE_BRIDGING_MODE
 // In PURE_BRIDGING_MODE, bridging functions are not inlined and therefore

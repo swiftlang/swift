@@ -19,7 +19,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"

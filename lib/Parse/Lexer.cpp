@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"

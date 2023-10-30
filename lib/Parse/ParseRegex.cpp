@@ -14,9 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/Parser.h"
 
 // Regex parser delivered via Swift modules.
