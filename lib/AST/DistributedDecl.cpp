@@ -341,12 +341,11 @@ swift::getDistributedSerializationRequirements(
     return true; // we're done here, any means there are no requirements
 
   auto *serialReqType = existentialRequirementTy->getAs<ExistentialType>();
-                                       ->getAs<ExistentialType>();
   if (!serialReqType || serialReqType->hasError()) {
     return false;
   }
 
-  auto desugaredTy = serialReqType->getConstraintType();
+  auto layout = serialReqType->getExistentialLayout();
   for (auto p : layout.getProtocols()) {
     requirementProtos.insert(p);
   }
@@ -1234,16 +1233,20 @@ swift::extractDistributedSerializationRequirements(
     if (auto dependentMemberType =
             req.getFirstType()->castTo<DependentMemberType>()) {
       if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
-        auto requirementProto = req.getSecondType();
-        if (auto proto = dyn_cast_or_null<ProtocolDecl>(
-                requirementProto->getAnyNominal())) {
-          into.insert(proto);
-        } else {
-          auto serialReqType = requirementProto->castTo<ExistentialType>()
-                                   ->getConstraintType();
-          auto flattenedRequirements =
-              flattenDistributedSerializationTypeToRequiredProtocols(
-                  serialReqType.getPointer());
+        // auto requirementProto = req.getSecondType();
+        // if (auto proto = dyn_cast_or_null<ProtocolDecl>(
+        //         requirementProto->getAnyNominal())) {
+        //   into.insert(proto);
+        // } else {
+        //   auto serialReqType = requirementProto->castTo<ExistentialType>()
+        //                            ->getConstraintType();
+        //   auto flattenedRequirements =
+        //       flattenDistributedSerializationTypeToRequiredProtocols(
+        //           serialReqType.getPointer());
+        //   for (auto p : flattenedRequirements) {
+        //     into.insert(p);
+        //   }
+        auto layout = req.getSecondType()->getExistentialLayout();
         for (auto p : layout.getProtocols()) {
           serializationReqs.insert(p);
         }
