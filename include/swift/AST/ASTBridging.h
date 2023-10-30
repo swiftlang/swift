@@ -125,9 +125,6 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-BRIDGING_WRAPPER_NONNULL(DiagnosticEngine)
-BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
-
 class BridgedDiagnosticArgument {
   int64_t storage[3];
 
@@ -366,10 +363,6 @@ typedef struct BridgedASTNode {
   void *_Nonnull ptr;
   ASTNodeKind kind;
 } BridgedASTNode;
-
-typedef struct BridgedTypeAttributes {
-  void *_Nonnull raw;
-} BridgedTypeAttributes;
 
 struct BridgedIdentifierAndSourceLoc {
   BridgedIdentifier name;

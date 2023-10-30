@@ -233,14 +233,6 @@ static inline BridgedDiagnosticImpl *unbridged(BridgedDiagnostic cDiag) {
   return static_cast<BridgedDiagnosticImpl *>(cDiag.raw);
 }
 
-static inline DiagnosticEngine &unbridged(BridgedDiagnosticEngine cEngine) {
-  return *cEngine.get();
-}
-
-static inline TypeAttributes *unbridged(BridgedTypeAttributes cAttributes) {
-  return static_cast<TypeAttributes *>(cAttributes.raw);
-}
-
 static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
   switch (kind) {
 #define TYPE_ATTR(X)                                                           \
@@ -281,7 +273,7 @@ BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc,
     break;
   }
 
-  DiagnosticEngine &diags = unbridged(cDiags);
+  DiagnosticEngine &diags = *unbridged(cDiags);
   return {new BridgedDiagnosticImpl{diags.diagnose(loc, diagID, text), {text}}};
 }
 
