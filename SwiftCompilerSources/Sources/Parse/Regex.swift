@@ -46,7 +46,7 @@ private func _RegexLiteralLexingFn(
   _ curPtrPtr: UnsafeMutablePointer<UnsafePointer<CChar>>,
   _ bufferEndPtr: UnsafePointer<CChar>,
   _ mustBeRegex: CBool,
-  _ bridgedDiagnosticEngine: BridgedOptionalDiagnosticEngine
+  _ bridgedDiagnosticEngine: BridgedNullableDiagnosticEngine
 ) -> /*CompletelyErroneous*/ CBool {
   let inputPtr = curPtrPtr.pointee
 
@@ -92,7 +92,7 @@ public func _RegexLiteralParsingFn(
   _ captureStructureOut: UnsafeMutableRawPointer,
   _ captureStructureSize: CUnsignedInt,
   _ bridgedDiagnosticBaseLoc: BridgedSourceLoc,
-  _ bridgedDiagnosticEngine: BridgedDiagEngine
+  _ bridgedDiagnosticEngine: BridgedDiagnosticEngine
 ) -> Bool {
   let str = String(cString: inputPtr)
   let captureBuffer = UnsafeMutableRawBufferPointer(

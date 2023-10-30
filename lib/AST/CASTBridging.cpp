@@ -143,7 +143,7 @@ static inline BridgedDiagnosticImpl *unbridged(BridgedDiagnostic cDiag) {
 }
 
 static inline DiagnosticEngine &unbridged(BridgedDiagnosticEngine cEngine) {
-  return *static_cast<DiagnosticEngine *>(cEngine.raw);
+  return *cEngine.get();
 }
 
 static inline TypeAttributes *unbridged(BridgedTypeAttributes cAttributes) {

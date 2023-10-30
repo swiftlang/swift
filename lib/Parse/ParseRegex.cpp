@@ -40,12 +40,12 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  bool hadError =
-      regexLiteralParsingFn(regexText.str().c_str(), &version,
-                            /*captureStructureOut*/ capturesBuf.data(),
-                            /*captureStructureSize*/ capturesBuf.size(),
-                            /*diagBaseLoc*/ {(const uint8_t *)(Tok.getLoc().getOpaquePointerValue())},
-                            getBridgedDiagnosticEngine(&Diags));
+  bool hadError = regexLiteralParsingFn(
+      regexText.str().c_str(), &version,
+      /*captureStructureOut*/ capturesBuf.data(),
+      /*captureStructureSize*/ capturesBuf.size(),
+      /*diagBaseLoc*/ {(const uint8_t *)(Tok.getLoc().getOpaquePointerValue())},
+      &Diags);
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);
 

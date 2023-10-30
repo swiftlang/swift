@@ -28,7 +28,7 @@
 ///              past.
 /// - MustBeRegex: whether an error during lexing should be considered a regex
 ///                literal, or some thing else.
-/// - BridgedOptionalDiagnosticEngine: RegexLiteralLexingFn should diagnose the
+/// - BridgedNullableDiagnosticEngine: RegexLiteralLexingFn should diagnose the
 ///                                    token using this engine.
 ///
 /// Returns: A bool indicating whether lexing was completely erroneous, and
@@ -37,7 +37,7 @@
 typedef bool (*RegexLiteralLexingFn)(
     /*CurPtrPtr*/ const char *_Nonnull *_Nonnull,
     /*BufferEnd*/ const char *_Nonnull,
-    /*MustBeRegex*/ bool, BridgedOptionalDiagnosticEngine);
+    /*MustBeRegex*/ bool, BridgedNullableDiagnosticEngine);
 void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn _Nullable fn);
 
 /// Parse a regex literal string. Takes the following arguments:
@@ -58,7 +58,7 @@ typedef bool (*RegexLiteralParsingFn)(/*InputPtr*/ const char *_Nonnull,
                                       /*CaptureStructureOut*/ void *_Nonnull,
                                       /*CaptureStructureSize*/ unsigned,
                                       /*DiagnosticBaseLoc*/ BridgedSourceLoc,
-                                      BridgedDiagEngine);
+                                      BridgedDiagnosticEngine);
 void Parser_registerRegexLiteralParsingFn(RegexLiteralParsingFn _Nullable fn);
 
 #endif // REGEX_PARSER_BRIDGING

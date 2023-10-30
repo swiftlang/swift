@@ -43,6 +43,13 @@
 #define SWIFT_NAME(NAME)
 #endif
 
+#if __has_attribute(availability)
+#define SWIFT_UNAVAILABLE(msg) \
+  __attribute__((availability(swift, unavailable, message=msg)))
+#else
+#define SWIFT_UNAVAILABLE(msg)
+#endif
+
 #ifdef PURE_BRIDGING_MODE
 // In PURE_BRIDGING_MODE, briding functions are not inlined
 #define BRIDGED_INLINE
@@ -54,6 +61,43 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef intptr_t SwiftInt;
 typedef uintptr_t SwiftUInt;
+
+// Define a bridging wrapper that wraps an underlying C++ pointer type. When
+// importing into Swift, we expose an initializer and accessor that works with
+// `void *`, which is imported as UnsafeMutableRawPointer. Note we can't rely on
+// Swift importing the underlying C++ pointer as an OpaquePointer since that is
+// liable to change with PURE_BRIDGING_MODE, since that changes what we include,
+// and Swift could import the underlying pointee type instead. We need to be
+// careful that the interface we expose remains consistent regardless of
+// PURE_BRIDGING_MODE.
+#define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
+  class Bridged##Name {                                                        \
+    swift::Node * Nullability Ptr;                                             \
+                                                                               \
+  public:                                                                      \
+    SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
+    Bridged##Name(swift::Node * Nullability ptr) : Ptr(ptr) {}                 \
+                                                                               \
+    SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
+    swift::Node * Nullability get() const { return Ptr; }                      \
+  };                                                                           \
+                                                                               \
+  SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
+  inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
+    return bridged.get();                                                      \
+  }                                                                            \
+                                                                               \
+  SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
+  inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
+    return static_cast<swift::Node *>(ptr);                                    \
+  }
+
+// Bridging wrapper macros for convenience.
+#define BRIDGING_WRAPPER_NONNULL(Name) \
+  BRIDGING_WRAPPER_IMPL(Name, Name, _Nonnull)
+
+#define BRIDGING_WRAPPER_NULLABLE(Name) \
+  BRIDGING_WRAPPER_IMPL(Name, Nullable##Name, _Nullable)
 
 struct BridgedOStream {
   void * _Nonnull streamAddr;

@@ -17,14 +17,6 @@
 
 using namespace swift;
 
-namespace {
-/// BridgedDiagEngine -> DiagnosticEngine *.
-DiagnosticEngine *getDiagnosticEngine(const BridgedDiagEngine &bridged) {
-  return static_cast<DiagnosticEngine *>(bridged.object);
-}
-
-} // namespace
-
 static_assert(sizeof(BridgedDiagnosticArgument) >= sizeof(DiagnosticArgument),
               "BridgedDiagnosticArgument has wrong size");
 
@@ -45,12 +37,12 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
           llvm::ArrayRef<DiagnosticArgument>())) {}
 
 void DiagnosticEngine_diagnose(
-    BridgedDiagEngine bridgedEngine, BridgedSourceLoc loc,
+    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
     BridgedDiagID bridgedDiagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     BridgedSourceLoc highlightStart, uint32_t hightlightLength,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
-  auto *D = getDiagnosticEngine(bridgedEngine);
+  auto *D = bridgedEngine.get();
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
@@ -73,7 +65,6 @@ void DiagnosticEngine_diagnose(
   }
 }
 
-bool DiagnosticEngine_hadAnyError(BridgedDiagEngine bridgedEngine) {
-  auto *D = getDiagnosticEngine(bridgedEngine);
-  return D->hadAnyError();
+bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine bridgedEngine) {
+  return bridgedEngine.get()->hadAnyError();
 }

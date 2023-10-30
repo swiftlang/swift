@@ -181,7 +181,7 @@ struct BridgedPassContext {
   // AST
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
-  BridgedDiagEngine getDiagnosticEngine() const;
+  BridgedDiagnosticEngine getDiagnosticEngine() const;
 
   // SIL modifications
 

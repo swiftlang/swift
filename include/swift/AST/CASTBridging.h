@@ -13,7 +13,7 @@
 #ifndef SWIFT_C_AST_ASTBRIDGING_H
 #define SWIFT_C_AST_ASTBRIDGING_H
 
-#include "swift/Basic/BasicBridging.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/Basic/CBasicBridging.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Nullability.h"
@@ -169,10 +169,6 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
 typedef struct BridgedDiagnostic {
   void *raw;
 } BridgedDiagnostic;
-
-typedef struct BridgedDiagnosticEngine {
-  void *raw;
-} BridgedDiagnosticEngine;
 
 typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   /// An expanded macro.

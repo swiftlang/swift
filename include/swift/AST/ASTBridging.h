@@ -27,6 +27,7 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
   class DiagnosticArgument;
+  class DiagnosticEngine;
 }
 
 //===----------------------------------------------------------------------===//
@@ -40,14 +41,8 @@ typedef enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
 #include "swift/AST/DiagnosticsAll.def"
 } BridgedDiagID;
 
-// The name must not collide with BridgedDiagnosticEngine in CASTBridging.h.
-struct BridgedDiagEngine {
-  void * _Nonnull object;
-};
-
-struct BridgedOptionalDiagnosticEngine {
-  void *_Nullable object;
-};
+BRIDGING_WRAPPER_NONNULL(DiagnosticEngine)
+BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
 
 class BridgedDiagnosticArgument {
   int64_t storage[3];
@@ -83,12 +78,13 @@ public:
 };
 
 // FIXME: Can we bridge InFlightDiagnostic?
-void DiagnosticEngine_diagnose(BridgedDiagEngine, BridgedSourceLoc loc,
+void DiagnosticEngine_diagnose(BridgedDiagnosticEngine, BridgedSourceLoc loc,
                                BridgedDiagID diagID, BridgedArrayRef arguments,
-                               BridgedSourceLoc highlightStart, uint32_t hightlightLength,
+                               BridgedSourceLoc highlightStart,
+                               uint32_t hightlightLength,
                                BridgedArrayRef fixIts);
 
-bool DiagnosticEngine_hadAnyError(BridgedDiagEngine);
+bool DiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

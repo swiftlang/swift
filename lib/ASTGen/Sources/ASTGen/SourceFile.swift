@@ -1,3 +1,4 @@
+import ASTBridging
 import CASTBridging
 import CBasicBridging
 import SwiftDiagnostics

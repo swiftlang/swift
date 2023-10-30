@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import BasicBridging
 import CASTBridging
 import CBasicBridging
