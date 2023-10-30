@@ -342,7 +342,7 @@ extension ASTGenVisitor {
 @_cdecl("swift_ASTGen_buildTypeRepr")
 @usableFromInline
 func buildTypeRepr(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeRawPointer,
   typeLocPtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,

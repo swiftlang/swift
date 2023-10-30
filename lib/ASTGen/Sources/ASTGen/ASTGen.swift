@@ -476,7 +476,7 @@ extension Optional where Wrapped: LazyCollectionProtocol {
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
   ctx: UnsafeMutableRawPointer,

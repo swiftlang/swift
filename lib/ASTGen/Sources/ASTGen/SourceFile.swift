@@ -102,7 +102,7 @@ extension Syntax {
 /// Emit diagnostics within the given source file.
 @_cdecl("swift_ASTGen_emitParserDiagnostics")
 public func emitParserDiagnostics(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
+  diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
   downgradePlaceholderErrorsToWarnings: CInt
