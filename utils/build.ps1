@@ -1578,6 +1578,8 @@ function Build-Installer() {
   Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Properties $Properties
 
   if ($Stage -and (-not $ToBatch)) {
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.cab" "$Stage\"
+    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" "$Stage\"
     Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msm" "$Stage\"
     Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" "$Stage\"
   }
