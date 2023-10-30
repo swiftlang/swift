@@ -507,8 +507,22 @@ bool CheckDistributedFunctionRequest::evaluate(
   // SerializationRequirement
   llvm::SmallPtrSet<ProtocolDecl *, 2> serializationRequirements;
   if (auto extension = dyn_cast<ExtensionDecl>(DC)) {
-    serializationRequirements = extractDistributedSerializationRequirements(
-        C, extension->getGenericRequirements());
+    auto actorOrProtocol = extension->getExtendedNominal();
+    if (auto actor = dyn_cast<ClassDecl>(actorOrProtocol)) {
+      assert(actor->isAnyActor());
+      serializationRequirements = getDistributedSerializationRequirementProtocols(
+          getDistributedActorSystemType(actor)->getAnyNominal(),
+          C.getProtocol(KnownProtocolKind::DistributedActorSystem));
+    } else if (auto protocol = dyn_cast<ProtocolDecl>(actorOrProtocol)) {
+      extractDistributedSerializationRequirements(
+          C, protocol->getGenericRequirements(),
+          /*into=*/serializationRequirements);
+      extractDistributedSerializationRequirements(
+          C, extension->getGenericRequirements(),
+          /*into=*/serializationRequirements);
+    } else {
+      // ignore
+    }
   } else if (auto actor = dyn_cast<ClassDecl>(DC)) {
     serializationRequirements = getDistributedSerializationRequirementProtocols(
         getDistributedActorSystemType(actor)->getAnyNominal(),
@@ -555,6 +569,7 @@ bool CheckDistributedFunctionRequest::evaluate(
         if (auto paramNominalTy = paramTy->getAnyNominal()) {
           addCodableFixIt(paramNominalTy, diag);
         } // else, no nominal type to suggest the fixit for, e.g. a closure
+
         return true;
       }
     }
@@ -749,11 +764,11 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   (void)nominal->getDistributedActorIDProperty();
 }
 
-void TypeChecker::checkDistributedFunc(FuncDecl *func) {
+bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
   if (!func->isDistributed())
-    return;
+    return false;
 
-  swift::checkDistributedFunction(func);
+  return swift::checkDistributedFunction(func);
 }
 
 llvm::SmallPtrSet<ProtocolDecl *, 2>

@@ -123,9 +123,11 @@ getDistributedSerializationRequirements(
 /// Given any set of generic requirements, locate those which are about the
 /// `SerializationRequirement`. Those need to be applied in the parameter and
 /// return type checking of distributed targets.
-llvm::SmallPtrSet<ProtocolDecl *, 2>
+void
 extractDistributedSerializationRequirements(
-    ASTContext &C, ArrayRef<Requirement> allRequirements);
+    ASTContext &C,
+    ArrayRef<Requirement> allRequirements,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> &into);
 
 }
 
