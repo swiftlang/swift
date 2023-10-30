@@ -51,7 +51,7 @@ sil @takeTy : $<T> (@thick T.Type) -> ()
 //                // Verify that the metadata for T.Assoc isn't spuriously completed again.
 // CHECK-NOT:     call swiftcc %swift.metadata_response @swift_checkMetadataState(i64 0, ptr %T.Assoc)
 //                // Verify that the metadata for T.Assoc from swift_getAssociatedTypeWitness is reused directly in the getBox call.
-// CHECK:         call swiftcc void @getBox(ptr noalias sret(%swift.opaque) %6, ptr %T.Assoc, ptr %T.Assoc)
+// CHECK:         call swiftcc void @getBox(ptr noalias sret(%swift.opaque) %{{.*}}, ptr %T.Assoc, ptr %T.Assoc)
 //              }
 sil @test_struct : $@convention(thin) <T : P> () -> () {
 entry:
