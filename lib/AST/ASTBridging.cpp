@@ -150,13 +150,13 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
 // Define `unbridged` overloads for each AST node.
 #define AST_BRIDGING_WRAPPER(Name)                                             \
   [[maybe_unused]] static Name *unbridged(Bridged##Name bridged) {             \
-    return static_cast<Name *>(bridged.raw);                                   \
+    return bridged.get();                                                      \
   }
 #include "swift/AST/ASTBridgingWrappers.def"
 
 #define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
   [[maybe_unused]] static Name *unbridged(BridgedNullable##Name bridged) {     \
-    return static_cast<Name *>(bridged.raw);                                   \
+    return bridged.get();                                                      \
   }
 #define AST_BRIDGING_WRAPPER_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"

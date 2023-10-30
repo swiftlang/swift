@@ -28,8 +28,6 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 namespace swift {
   class DiagnosticArgument;
   class DiagnosticEngine;
-  class NominalTypeDecl;
-  class VarDecl;
 }
 
 //===----------------------------------------------------------------------===//
@@ -60,22 +58,19 @@ bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
 // AST nodes
 //===----------------------------------------------------------------------===//
 
+// Forward declare the underlying AST node type for each wrapper.
+namespace swift {
+#define AST_BRIDGING_WRAPPER(Name) class Name;
+#include "swift/AST/ASTBridgingWrappers.def"
+} // end namespace swift
+
 // Define the bridging wrappers for each AST node.
-#define AST_BRIDGING_WRAPPER_NONNULL(Name)                                     \
-  typedef struct {                                                             \
-    void *_Nonnull raw;                                                        \
-  } Bridged##Name;
+#define AST_BRIDGING_WRAPPER(Name) BRIDGING_WRAPPER_NONNULL(Name)
+#include "swift/AST/ASTBridgingWrappers.def"
 
-// For nullable nodes, define both a nullable and non-null variant.
-#define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
-  typedef struct {                                                             \
-    void *_Nullable raw;                                                       \
-  } BridgedNullable##Name;                                                     \
-                                                                               \
-  typedef struct {                                                             \
-    void *_Nonnull raw;                                                        \
-  } Bridged##Name;
-
+// For nullable nodes, also define a nullable variant.
+#define AST_BRIDGING_WRAPPER_NULLABLE(Name) BRIDGING_WRAPPER_NULLABLE(Name)
+#define AST_BRIDGING_WRAPPER_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
 // Declare `.asDecl` on each BridgedXXXDecl type, which upcasts a wrapper for
@@ -219,17 +214,6 @@ void Diagnostic_finish(BridgedDiagnostic cDiag);
 // NominalTypeDecl
 //===----------------------------------------------------------------------===//
 
-class BridgedNominalTypeDecl {
-  swift::NominalTypeDecl * _Nonnull Ptr;
-
-public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedNominalTypeDecl(swift::NominalTypeDecl * _Nonnull ptr) : Ptr(ptr) {}
-
-  swift::NominalTypeDecl * _Nonnull get() const { return Ptr; }
-#endif
-};
-
 SWIFT_NAME("BridgedNominalTypeDecl.getName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedNominalTypeDecl_getName(BridgedNominalTypeDecl decl);
@@ -250,31 +234,9 @@ void NominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl decl,
 // VarDecl
 //===----------------------------------------------------------------------===//
 
-class BridgedVarDecl {
-  swift::VarDecl * _Nonnull Ptr;
-
-public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedVarDecl(swift::VarDecl * _Nonnull ptr) : Ptr(ptr) {}
-
-  swift::VarDecl * _Nonnull get() const { return Ptr; }
-#endif
-};
-
 SWIFT_NAME("BridgedVarDecl.getUserFacingName(self:)")
 BRIDGED_INLINE
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl);
-
-class BridgedNullableVarDecl {
-  swift::VarDecl * _Nullable Ptr;
-
-public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedNullableVarDecl(swift::VarDecl * _Nullable ptr) : Ptr(ptr) {}
-
-  swift::VarDecl * _Nullable get() const { return Ptr; }
-#endif
-};
 
 //===----------------------------------------------------------------------===//
 // Misc

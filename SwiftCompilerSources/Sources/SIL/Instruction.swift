@@ -358,8 +358,8 @@ public struct VarDecl {
   var bridged: BridgedVarDecl
   
   public init?(bridged: BridgedNullableVarDecl) {
-    guard let decl = bridged.get() else { return nil }
-    self.bridged = BridgedVarDecl(decl: decl)
+    guard let decl = bridged.raw else { return nil }
+    self.bridged = BridgedVarDecl(raw: decl)
   }
   
   public var userFacingName: String { String(bridged.getUserFacingName()) }
