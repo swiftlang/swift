@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CBasicBridging
+// Building the BasicBridging module requires a bunch of '-Xcc' args, which
+// don't currently end up in the module interface. So import as
+// @_implementationOnly.
+@_implementationOnly import BasicBridging
 
 extension String {
   init(_ data: BridgedData) {

@@ -1,7 +1,5 @@
 import ASTBridging
 import BasicBridging
-import CASTBridging
-import CBasicBridging
 // Needed to use BumpPtrAllocator
 @_spi(BumpPtrAllocator) import SwiftSyntax
 

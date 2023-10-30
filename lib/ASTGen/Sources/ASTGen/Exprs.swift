@@ -1,4 +1,4 @@
-import CASTBridging
+import ASTBridging
 import SwiftDiagnostics
 import SwiftSyntax
 

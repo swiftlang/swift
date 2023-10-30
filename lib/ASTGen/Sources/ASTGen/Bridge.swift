@@ -1,6 +1,5 @@
+import ASTBridging
 import BasicBridging
-import CASTBridging
-import CBasicBridging
 import SwiftSyntax
 
 extension BridgedSourceLoc: ExpressibleByNilLiteral {

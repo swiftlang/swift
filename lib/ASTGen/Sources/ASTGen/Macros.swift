@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import ASTBridging
 import BasicBridging
-import CASTBridging
 import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators

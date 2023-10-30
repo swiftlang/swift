@@ -12,8 +12,6 @@
 
 import ASTBridging
 import BasicBridging
-import CASTBridging
-import CBasicBridging
 import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
 import swiftLLVMJSON

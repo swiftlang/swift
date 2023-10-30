@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/CASTBridging.h"
+#include "swift/AST/ASTBridging.h"
 
 #ifdef __cplusplus
 extern "C" {
