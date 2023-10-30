@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import BasicBridging
 import CASTBridging
 import CBasicBridging
 import SwiftCompilerPluginMessageHandling
@@ -58,7 +59,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   libraryPath: UnsafePointer<CChar>,
   moduleName: UnsafePointer<CChar>,
-  errorOut: UnsafeMutablePointer<BridgedString>?
+  errorOut: UnsafeMutablePointer<BridgedStringRef>?
 ) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
 
@@ -367,7 +368,7 @@ class PluginDiagnosticsEngine {
     let start = bridgedSourceLoc(at: range.startOffset, in: range.fileName)
     let end = bridgedSourceLoc(at: range.endOffset, in: range.fileName)
 
-    if start.raw == nil || end.raw == nil {
+    if !start.isValid || !end.isValid {
       return nil
     }
     return (start: start, end: end)

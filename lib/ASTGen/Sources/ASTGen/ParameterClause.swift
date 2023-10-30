@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import BasicBridging
 import CASTBridging
 import SwiftSyntax
 

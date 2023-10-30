@@ -1,3 +1,4 @@
+import BasicBridging
 import CASTBridging
 import CBasicBridging
 // Needed to use BumpPtrAllocator

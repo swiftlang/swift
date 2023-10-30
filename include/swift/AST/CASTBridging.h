@@ -13,6 +13,7 @@
 #ifndef SWIFT_C_AST_ASTBRIDGING_H
 #define SWIFT_C_AST_ASTBRIDGING_H
 
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/CBasicBridging.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Nullability.h"
@@ -101,23 +102,9 @@ extern "C" {
 
 SWIFT_BEGIN_ASSUME_NONNULL
 
-typedef struct {
-  const unsigned char *_Nullable data;
-  size_t length;
-} BridgedString;
-
-typedef struct {
-  const void *_Nullable data;
-  size_t numElements;
-} BridgedArrayRef;
-
 typedef struct BridgedASTContext {
   void *raw;
 } BridgedASTContext;
-
-typedef struct BridgedSourceLoc {
-  const void *_Nullable raw;
-} BridgedSourceLoc;
 
 typedef struct {
   BridgedSourceLoc startLoc;
@@ -298,7 +285,8 @@ extern "C" {
 /// \returns a diagnostic instance that can be extended with additional
 /// information and then must be finished via \c SwiftDiagnostic_finish.
 SWIFT_NAME("BridgedDiagnostic.init(at:message:severity:engine:)")
-BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc, BridgedString cText,
+BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc,
+                                    BridgedStringRef cText,
                                     BridgedDiagnosticSeverity severity,
                                     BridgedDiagnosticEngine cDiags);
 
@@ -312,7 +300,7 @@ SWIFT_NAME("BridgedDiagnostic.fixItReplace(self:start:end:replacement:)")
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
-                             BridgedString cReplaceText);
+                             BridgedStringRef cReplaceText);
 
 /// Finish the given diagnostic and emit it.
 SWIFT_NAME("BridgedDiagnostic.finish(self:)")
@@ -320,7 +308,7 @@ void Diagnostic_finish(BridgedDiagnostic cDiag);
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
-                                           BridgedString cStr);
+                                           BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
 _Bool ASTContext_langOptsHasFeature(BridgedASTContext cContext,
@@ -371,12 +359,12 @@ BridgedUnresolvedDeclRefExpr UnresolvedDeclRefExpr_createParsed(
 
 SWIFT_NAME("BridgedStringLiteralExpr.createParsed(_:value:loc:)")
 BridgedStringLiteralExpr
-StringLiteralExpr_createParsed(BridgedASTContext cContext, BridgedString cStr,
+StringLiteralExpr_createParsed(BridgedASTContext cContext, BridgedStringRef cStr,
                                BridgedSourceLoc cTokenLoc);
 
 SWIFT_NAME("BridgedIntegerLiteralExpr.createParsed(_:value:loc:)")
 BridgedIntegerLiteralExpr
-IntegerLiteralExpr_createParsed(BridgedASTContext cContext, BridgedString cStr,
+IntegerLiteralExpr_createParsed(BridgedASTContext cContext, BridgedStringRef cStr,
                                 BridgedSourceLoc cTokenLoc);
 
 SWIFT_NAME("BridgedBooleanLiteralExpr.createParsed(_:value:loc:)")
@@ -680,7 +668,7 @@ BridgedParameterList ParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc);
 
-BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr);
+BridgedTypeAttrKind TypeAttrKind_fromString(BridgedStringRef cStr);
 BridgedTypeAttributes TypeAttributes_create(void);
 void TypeAttributes_addSimpleAttr(BridgedTypeAttributes cAttributes,
                                   BridgedTypeAttrKind kind,

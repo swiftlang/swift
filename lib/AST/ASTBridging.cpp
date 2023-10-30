@@ -60,7 +60,7 @@ void DiagnosticEngine_diagnose(
   auto inflight = D->diagnose(loc.get(), diagID, arguments);
 
   // Add highlight.
-  if (highlightStart.isValid()) {
+  if (highlightStart.get().isValid()) {
     CharSourceRange highlight(highlightStart.get(), (unsigned)hightlightLength);
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }

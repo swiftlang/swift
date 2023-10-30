@@ -1,5 +1,6 @@
 #include "swift/AST/CASTBridging.h"
 
+#include "swift/Basic/BasicBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
@@ -117,9 +118,8 @@ unbridgedArrayRef(const BridgedArrayRef bridged) {
   return {static_cast<const T *>(bridged.data), size_t(bridged.numElements)};
 }
 
-static inline StringRef unbridged(BridgedString cStr) {
-  return StringRef{reinterpret_cast<const char *>(cStr.data),
-                   size_t(cStr.length)};
+static inline StringRef unbridged(BridgedStringRef cStr) {
+  return cStr.get();
 }
 
 static inline ASTContext &unbridged(BridgedASTContext cContext) {
@@ -127,8 +127,7 @@ static inline ASTContext &unbridged(BridgedASTContext cContext) {
 }
 
 static inline SourceLoc unbridged(BridgedSourceLoc cLoc) {
-  auto smLoc = llvm::SMLoc::getFromPointer(static_cast<const char *>(cLoc.raw));
-  return SourceLoc(smLoc);
+  return cLoc.get();
 }
 
 static inline SourceRange unbridged(BridgedSourceRange cRange) {
@@ -162,7 +161,7 @@ static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
   }
 }
 
-BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc, BridgedString cText,
+BridgedDiagnostic Diagnostic_create(BridgedSourceLoc cLoc, BridgedStringRef cText,
                                     BridgedDiagnosticSeverity severity,
                                     BridgedDiagnosticEngine cDiags) {
   StringRef origText = unbridged(cText);
@@ -208,7 +207,7 @@ void Diagnostic_highlight(BridgedDiagnostic cDiag, BridgedSourceLoc cStartLoc,
 void Diagnostic_fixItReplace(BridgedDiagnostic cDiag,
                              BridgedSourceLoc cStartLoc,
                              BridgedSourceLoc cEndLoc,
-                             BridgedString cReplaceText) {
+                             BridgedStringRef cReplaceText) {
 
   SourceLoc startLoc = unbridged(cStartLoc);
   SourceLoc endLoc = unbridged(cEndLoc);
@@ -229,7 +228,7 @@ void Diagnostic_finish(BridgedDiagnostic cDiag) {
 }
 
 BridgedIdentifier ASTContext_getIdentifier(BridgedASTContext cContext,
-                                           BridgedString cStr) {
+                                           BridgedStringRef cStr) {
   StringRef str = unbridged(cStr);
   if (str.size() == 1 && str.front() == '_')
     return BridgedIdentifier();
@@ -329,7 +328,7 @@ BridgedUnresolvedDeclRefExpr UnresolvedDeclRefExpr_createParsed(
 }
 
 BridgedStringLiteralExpr
-StringLiteralExpr_createParsed(BridgedASTContext cContext, BridgedString cStr,
+StringLiteralExpr_createParsed(BridgedASTContext cContext, BridgedStringRef cStr,
                                BridgedSourceLoc cTokenLoc) {
   ASTContext &context = unbridged(cContext);
   auto str = context.AllocateCopy(unbridged(cStr));
@@ -337,7 +336,7 @@ StringLiteralExpr_createParsed(BridgedASTContext cContext, BridgedString cStr,
 }
 
 BridgedIntegerLiteralExpr
-IntegerLiteralExpr_createParsed(BridgedASTContext cContext, BridgedString cStr,
+IntegerLiteralExpr_createParsed(BridgedASTContext cContext, BridgedStringRef cStr,
                                 BridgedSourceLoc cTokenLoc) {
   ASTContext &context = unbridged(cContext);
   auto str = context.AllocateCopy(unbridged(cStr));
@@ -462,7 +461,7 @@ BridgedParamDecl ParamDecl_createParsed(
     BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
     BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  assert((bool)cSecondNameLoc.raw == (bool)cSecondName.raw);
+  assert(cSecondNameLoc.get().isValid() == (bool)cSecondName.raw);
   if (!cSecondName.raw) {
     cSecondName = cFirstName;
     cSecondNameLoc = cFirstNameLoc;
@@ -540,7 +539,7 @@ BridgedConstructorDecl ConstructorDecl_createParsed(
     BridgedParameterList bridgedParameterList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
-  assert((bool)cFailabilityMarkLoc.raw || !isIUO);
+  assert(cFailabilityMarkLoc.get().isValid() || !isIUO);
 
   ASTContext &context = unbridged(cContext);
 
@@ -850,8 +849,9 @@ BridgedOperatorDecl OperatorDecl_createParsed(
     BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
     BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc) {
-  assert(bool(cColonLoc.raw) == (bool)cPrecedenceGroupName.raw);
-  assert(bool(cColonLoc.raw) == (bool)cPrecedenceGroupLoc.raw);
+  auto colonLoc = cColonLoc.get();
+  assert(colonLoc.isValid() == (bool)cPrecedenceGroupName.raw);
+  assert(colonLoc.isValid() == cPrecedenceGroupLoc.get().isValid());
 
   ASTContext &context = unbridged(cContext);
   auto operatorKeywordLoc = unbridged(cOperatorKeywordLoc);
@@ -867,12 +867,12 @@ BridgedOperatorDecl OperatorDecl_createParsed(
         unbridged(cPrecedenceGroupName), unbridged(cPrecedenceGroupLoc));
     break;
   case BridgedOperatorFixityPrefix:
-    assert(!cColonLoc.raw);
+    assert(colonLoc.isInvalid());
     decl = new (context)
         PrefixOperatorDecl(declContext, operatorKeywordLoc, name, nameLoc);
     break;
   case BridgedOperatorFixityPostfix:
-    assert(!cColonLoc.raw);
+    assert(colonLoc.isInvalid());
     decl = new (context)
         PostfixOperatorDecl(declContext, operatorKeywordLoc, name, nameLoc);
     break;
@@ -1012,7 +1012,7 @@ PackExpansionTypeRepr_createParsed(BridgedASTContext cContext,
   return bridged(PE);
 }
 
-BridgedTypeAttrKind TypeAttrKind_fromString(BridgedString cStr) {
+BridgedTypeAttrKind TypeAttrKind_fromString(BridgedStringRef cStr) {
   TypeAttrKind kind = TypeAttributes::getAttrKindFromString(unbridged(cStr));
   switch (kind) {
 #define TYPE_ATTR(X) case TAK_##X: return BridgedTypeAttrKind_##X;
