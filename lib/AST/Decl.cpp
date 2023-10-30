@@ -4294,13 +4294,8 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
   if (accessScope.getDeclContext() == useDC) return true;
-  if (!AccessScope(useDC).isChildOf(accessScope)) {
-    // Grant access if this VD is an inlinable package decl referenced by
-    // another module in an interface file.
-    if (VD->skipAccessCheckIfInterface(useDC, access, accessScope))
-      return true;
-    return false;
-  }
+  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
+
   // useDC is null only when caller wants to skip non-public type checks.
   if (!useDC) return true;
 
@@ -4426,14 +4421,6 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcFile = sourceDC->getParentSourceFile();
-
-    // srcFile could be null if VD decl is from an imported .swiftmodule
-    if (srcFile && srcFile->Kind == SourceFileKind::Interface) {
-      // If source file is interface, package decls must be usableFromInline or
-      // inlinable, and are accessed only within the defining module so return true
-      return true;
-    }
     auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);
