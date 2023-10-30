@@ -4293,14 +4293,16 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   AccessScope accessScope = getAccessScopeForFormalAccess(
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
-  if (accessScope.getDeclContext() == useDC) return true;
-  if (!AccessScope(useDC).isChildOf(accessScope)) return false;
-
+  if (accessScope.getDeclContext() == useDC)
+    return true;
+  if (!AccessScope(useDC).isChildOf(accessScope))
+    return false;
   // useDC is null only when caller wants to skip non-public type checks.
-  if (!useDC) return true;
-
+  if (!useDC)
+    return true;
   // Check SPI access
-  if (!VD->isSPI()) return true;
+  if (!VD->isSPI())
+    return true;
   auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
   return !useSF || useSF->isImportedAsSPI(VD) ||
          VD->getDeclContext()->getParentModule() == useDC->getParentModule();

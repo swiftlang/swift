@@ -92,10 +92,6 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       }
     }
   }
-  if (!M->getPackageName().empty()) {
-    StringRef pkgName = M->getPackageName().str();
-    out << " -package-name " << pkgName;
-  }
   out << "\n";
 
   if (!Opts.IgnorableFlags.empty()) {

@@ -548,7 +548,7 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"ABI name to use for the contents of this module">;
 def package_name : Separate<["-"], "package-name">,
-  Flags<[FrontendOption, ModuleInterfaceOptionIgnorablePrivate]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the package the module belongs to">;
 def export_as : Separate<["-"], "export-as">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
