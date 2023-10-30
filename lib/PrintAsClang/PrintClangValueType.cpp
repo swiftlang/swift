@@ -581,14 +581,27 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
 
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wc++17-extensions\"\n";
-  if (!typeDecl->isGeneric()) {
-    // FIXME: generic type support.
+
+  if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl))
     os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<";
-    printer.printNominalTypeReference(typeDecl,
-                                      /*moduleContext=*/nullptr);
-    os << "> = true;\n";
-  }
+  os << "static inline const constexpr bool isUsableInGenericContext<";
+  printer.printNominalTypeReference(typeDecl,
+                                    /*moduleContext=*/nullptr);
+  os << "> = ";
+  if (typeDecl->isGeneric()) {
+    auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
+    llvm::interleave(
+        signature.getInnermostGenericParams(), os,
+        [&](const GenericTypeParamType *genericParamType) {
+          os << "isUsableInGenericContext<";
+          printer.printGenericTypeParamTypeName(genericParamType);
+          os << '>';
+        },
+        " && ");
+  } else
+    os << "true";
+  os << ";\n";
+
   os << "#pragma clang diagnostic pop\n";
   os << "} // namespace swift\n";
   os << "\n";
