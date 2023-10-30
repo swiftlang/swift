@@ -58,8 +58,8 @@ class FileImageSource: ImageSource {
            _mapping.count)
   }
 
-  public func fetch<T>(from addr: Address,
-                       into buffer: UnsafeMutableBufferPointer<T>) throws {
+  public func fetch(from addr: Address,
+                    into buffer: UnsafeMutableRawBufferPointer) throws {
     let start = Int(addr)
     _ = try buffer.withMemoryRebound(to: UInt8.self) { byteBuf in
       guard _mapping.indices.contains(start) else {
@@ -69,7 +69,6 @@ class FileImageSource: ImageSource {
       guard slice.count >= byteBuf.count else {
         throw FileImageSourceError.outOfRangeRead
       }
-      byteBuf.update(from: slice)
     }
   }
 }
