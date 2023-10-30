@@ -241,7 +241,13 @@ public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
 
 @_silgen_name("swift_once")
 public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c) (UnsafeMutableRawPointer)->()), context: UnsafeMutableRawPointer) {
-  if loadAcquire(predicate) < 0 { return }
+  let checkedLoadAcquire = { predicate in
+    let value = loadAcquire(predicate)
+    assert(value == -1 || value == 0 || value == 1)
+    return value
+  }
+
+  if checkedLoadAcquire(predicate) < 0 { return }
 
   let won = compareExchangeRelaxed(predicate, expectedOldValue: 0, desiredNewValue: 1)
   if won {
@@ -251,7 +257,7 @@ public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c)
   }
 
   // TODO: This should really use an OS provided lock
-  while loadAcquire(predicate) >= 0 {
+  while checkedLoadAcquire(predicate) >= 0 {
     // spin
   }
 }
