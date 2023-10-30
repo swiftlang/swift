@@ -530,8 +530,8 @@ bool CheckDistributedFunctionRequest::evaluate(
   } else if (isa<ProtocolDecl>(DC)) {
     if (auto seqReqTy =
         getConcreteReplacementForMemberSerializationRequirement(func)) {
-      auto seqReqTyDes = seqReqTy->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-      for (auto req : flattenDistributedSerializationTypeToRequiredProtocols(seqReqTyDes)) {
+      auto layout = seqReqTy->getExistentialLayout();
+      for (auto req : layout.getProtocols()) {
         serializationRequirements.insert(req);
       }
     }
@@ -783,11 +783,13 @@ swift::getDistributedSerializationRequirementProtocols(
     return {};
   }
 
-  auto serialReqType =
-      ty->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-
   // TODO(distributed): check what happens with Any
-  return flattenDistributedSerializationTypeToRequiredProtocols(serialReqType);
+  auto layout = ty->getExistentialLayout();
+  llvm::SmallPtrSet<ProtocolDecl *, 2> result;
+  for (auto p : layout.getProtocols()) {
+    result.insert(p);
+  }
+  return result;
 }
 
 ConstructorDecl*

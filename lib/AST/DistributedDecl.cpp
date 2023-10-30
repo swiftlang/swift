@@ -340,45 +340,17 @@ swift::getDistributedSerializationRequirements(
   if (existentialRequirementTy->isAny())
     return true; // we're done here, any means there are no requirements
 
-  ExistentialType *serialReqType = existentialRequirementTy
-                                       ->getAs<ExistentialType>();
+  auto *serialReqType = existentialRequirementTy->getAs<ExistentialType>();
   if (!serialReqType || serialReqType->hasError()) {
     return false;
   }
 
-  auto desugaredTy = serialReqType->getConstraintType();
-  auto flattenedRequirements =
-      flattenDistributedSerializationTypeToRequiredProtocols(
-          desugaredTy.getPointer());
-  for (auto p : flattenedRequirements) {
+  auto layout = serialReqType->getExistentialLayout();
+  for (auto p : layout.getProtocols()) {
     requirementProtos.insert(p);
   }
 
   return true;
-}
-
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::flattenDistributedSerializationTypeToRequiredProtocols(
-    TypeBase *serializationRequirement) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  if (auto composition =
-          serializationRequirement->getAs<ProtocolCompositionType>()) {
-    for (auto member : composition->getMembers()) {
-      if (auto comp = member->getAs<ProtocolCompositionType>()) {
-        for (auto protocol :
-             flattenDistributedSerializationTypeToRequiredProtocols(comp)) {
-          serializationReqs.insert(protocol);
-        }
-      } else if (auto *protocol = member->getAs<ProtocolType>()) {
-        serializationReqs.insert(protocol->getDecl());
-      }
-    }
-  } else {
-    auto protocol = serializationRequirement->castTo<ProtocolType>()->getDecl();
-    serializationReqs.insert(protocol);
-  }
-
-  return serializationReqs;
 }
 
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
@@ -1261,19 +1233,9 @@ swift::extractDistributedSerializationRequirements(
     if (auto dependentMemberType =
             req.getFirstType()->castTo<DependentMemberType>()) {
       if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
-        auto requirementProto = req.getSecondType();
-        if (auto proto = dyn_cast_or_null<ProtocolDecl>(
-                requirementProto->getAnyNominal())) {
-          serializationReqs.insert(proto);
-        } else {
-          auto serialReqType = requirementProto->castTo<ExistentialType>()
-                                   ->getConstraintType();
-          auto flattenedRequirements =
-              flattenDistributedSerializationTypeToRequiredProtocols(
-                  serialReqType.getPointer());
-          for (auto p : flattenedRequirements) {
-            serializationReqs.insert(p);
-          }
+        auto layout = req.getSecondType()->getExistentialLayout();
+        for (auto p : layout.getProtocols()) {
+          serializationReqs.insert(p);
         }
       }
     }
