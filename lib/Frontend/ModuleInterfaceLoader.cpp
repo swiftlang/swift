@@ -1756,7 +1756,8 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // If the compiler has been asked to be strict with ensuring downstream dependencies
   // get the parent invocation's context, or this is an Explicit build, inherit the
   // extra Clang arguments also.
-  if (LoaderOpts.strictImplicitModuleContext || LoaderOpts.disableImplicitSwiftModule) {
+  if (LoaderOpts.strictImplicitModuleContext || LoaderOpts.disableImplicitSwiftModule ||
+      LoaderOpts.requestedAction == FrontendOptions::ActionType::ScanDependencies) {
     // Inherit any clang-specific state of the compilation (macros, clang flags, etc.)
     subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
     for (auto arg : subClangImporterOpts.ExtraArgs) {
