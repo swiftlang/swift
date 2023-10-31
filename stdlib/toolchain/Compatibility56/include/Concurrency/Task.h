@@ -570,7 +570,7 @@ public:
   /// \c Executing, then \c waitingTask has been added to the
   /// wait queue and will be scheduled when the future completes. Otherwise,
   /// the future has completed and can be queried.
-  /// The waiting task's async context will be intialized with the parameters if
+  /// The waiting task's async context will be initialized with the parameters if
   /// the current's task state is executing.
   __attribute__((visibility("hidden")))
   FutureFragment::Status waitFuture(AsyncTask *waitingTask,
