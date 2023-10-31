@@ -194,11 +194,16 @@ namespace {
 
     SILBasicBlock *createBasicBlock() { return SGF.createBasicBlock(); }
 
-    template <class... Args>
-    JumpDest createJumpDest(Stmt *cleanupLoc, Args... args) {
-      return JumpDest(SGF.createBasicBlock(args...),
+    JumpDest createJumpDest(Stmt *cleanupLoc) {
+      return JumpDest(SGF.createBasicBlock(),
                       SGF.getCleanupsDepth(),
                       CleanupLocation(cleanupLoc));
+    }
+    JumpDest createThrowDest(Stmt *cleanupLoc, ThrownErrorInfo errorInfo) {
+      return JumpDest(SGF.createBasicBlock(FunctionSection::Postmatter),
+                      SGF.getCleanupsDepth(),
+                      CleanupLocation(cleanupLoc),
+                      errorInfo);
     }
   };
 } // end anonymous namespace
@@ -1114,11 +1119,24 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   Type formalExnType = S->getCaughtErrorType();
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
+  SILValue exnArg;
+
+  // FIXME: opaque values
+  if (exnTL.isAddressOnly()) {
+    exnArg = SGF.B.createAllocStack(
+        S, exnTL.getLoweredType());
+    SGF.enterDeallocStackCleanup(exnArg);
+  }
+
   // Create the throw destination at the end of the function.
-  JumpDest throwDest = createJumpDest(S->getBody(),
-                                      FunctionSection::Postmatter);
-  SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
-      exnTL.getLoweredType(), OwnershipKind::Owned);
+  JumpDest throwDest = createThrowDest(S->getBody(),
+                                       ThrownErrorInfo(exnArg));
+
+  // FIXME: opaque values
+  if (!exnTL.isAddressOnly()) {
+    exnArg = throwDest.getBlock()->createPhiArgument(
+        exnTL.getLoweredType(), OwnershipKind::Owned);
+  }
 
   // We always need a continuation block because we might fall out of
   // a catch block.  But we don't need a loop block unless the 'do'
@@ -1452,15 +1470,20 @@ SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
                                      ExecutorBreadcrumb prevExecutor,
-                                     SILResultInfo exnResult,
+                                     SILResultInfo errorResult,
+                                     SILValue indirectErrorAddr,
                                      bool suppressErrorPath) {
-  assert(exnResult.getConvention() == ResultConvention::Owned);
-
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPhiArgument(getSILType(exnResult, fnTy),
+
+  SILValue errorValue;
+  if (errorResult.getConvention() == ResultConvention::Owned) {
+    errorValue = destBB->createPhiArgument(getSILType(errorResult, fnTy),
                                            OwnershipKind::Owned);
+  } else {
+    errorValue = indirectErrorAddr;
+  }
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
@@ -1477,7 +1500,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // We don't want to exit here with a dead cleanup on the stack,
   // so push the scope first.
   FullExpr scope(Cleanups, CleanupLocation(loc));
-  emitThrow(loc, emitManagedRValueWithCleanup(exn));
+  emitThrow(loc, emitManagedRValueWithCleanup(errorValue));
 
   return destBB;
 }
@@ -1493,33 +1516,49 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     return;
   }
 
-  // Claim the exception value.  If we need to handle throwing
-  // cleanups, the correct thing to do here is to recreate the
-  // exception's cleanup when emitting each cleanup we branch through.
-  // But for now we aren't bothering.
-  SILValue exn = exnMV.forward(*this);
+  SmallVector<SILValue, 1> args;
 
-  // Whether the thrown exception is already an Error existential box.
-  SILType existentialBoxType = SILType::getExceptionType(getASTContext());
-  bool isExistentialBox = exn->getType() == existentialBoxType;
+  auto indirectErrorAddr = ThrowDest.getThrownError().IndirectErrorResult;
 
-  // FIXME: Right now, we suppress emission of the willThrow builtin if the
-  // error isn't already the error existential, because swift_willThrow expects
-  // the existential box.
-  if (emitWillThrow && isExistentialBox) {
-    // Generate a call to the 'swift_willThrow' runtime function to allow the
-    // debugger to catch the throw event.
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {exn});
+  // If exnMV was not provided by the caller, we must have an indirect
+  // error result that already stores the thrown error.
+  assert(!exnMV.isInContext() || indirectErrorAddr);
+
+  SILValue exn;
+  if (!exnMV.isInContext()) {
+    // Claim the exception value.  If we need to handle throwing
+    // cleanups, the correct thing to do here is to recreate the
+    // exception's cleanup when emitting each cleanup we branch through.
+    // But for now we aren't bothering.
+    exn = exnMV.forward(*this);
+
+    // Whether the thrown exception is already an Error existential box.
+    SILType existentialBoxType = SILType::getExceptionType(getASTContext());
+    bool isExistentialBox = exn->getType() == existentialBoxType;
+
+    // FIXME: Right now, we suppress emission of the willThrow builtin if the
+    // error isn't already the error existential, because swift_willThrow expects
+    // the existential box.
+    if (emitWillThrow && isExistentialBox) {
+      // Generate a call to the 'swift_willThrow' runtime function to allow the
+      // debugger to catch the throw event.
+      B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
+                      SGM.Types.getEmptyTupleType(), {}, {exn});
+    }
   }
 
-  // If we don't have an existential box, create one to jump to the throw
-  // destination.
   SILBasicBlock &throwBB = *ThrowDest.getBlock();
   if (!throwBB.getArguments().empty()) {
+    assert(exn);
+    assert(!indirectErrorAddr);
+
     auto errorArg = throwBB.getArguments()[0];
+
+    // If we don't have an existential box, create one to jump to the throw
+    // destination.
     SILType errorArgType = errorArg->getType();
     if (exn->getType() != errorArgType) {
+      SILType existentialBoxType = SILType::getExceptionType(getASTContext());
       assert(errorArgType == existentialBoxType);
 
       // FIXME: Callers should provide this conformance from places recorded in
@@ -1541,8 +1580,23 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
       exn = exnMV.forward(*this);
     }
+
+    // A direct error value is passed to the epilog block as a BB argument.
+    args.push_back(exn);
+  } else {
+    assert(indirectErrorAddr);
+
+    // FIXME: opaque values
+
+    // If an error value was provided by the caller, copy it into the
+    // indirect error result. Otherwise we assume the indirect error
+    // result has been initialized.
+    if (exn) {
+      B.createCopyAddr(loc, exn, indirectErrorAddr,
+                       IsTake, IsInitialization);
+    }
   }
 
   // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn, IsForUnwind);
+  Cleanups.emitBranchAndCleanups(ThrowDest, loc, args, IsForUnwind);
 }

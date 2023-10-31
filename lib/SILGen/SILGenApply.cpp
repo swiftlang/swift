@@ -1856,6 +1856,7 @@ static void emitRawApply(SILGenFunction &SGF,
                          CanSILFunctionType substFnType,
                          ApplyOptions options,
                          ArrayRef<SILValue> indirectResultAddrs,
+                         SILValue indirectErrorAddr,
                          SmallVectorImpl<SILValue> &rawResults,
                          ExecutorBreadcrumb prevExecutor) {
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
@@ -1879,6 +1880,10 @@ static void emitRawApply(SILGenFunction &SGF,
   }
 #endif
   argValues.append(indirectResultAddrs.begin(), indirectResultAddrs.end());
+
+  assert(!!indirectErrorAddr == substFnConv.hasIndirectSILErrorResults());
+  if (indirectErrorAddr)
+    argValues.push_back(indirectErrorAddr);
 
   auto inputParams = substFnType->getParameters();
   assert(inputParams.size() == args.size());
@@ -1978,6 +1983,7 @@ static void emitRawApply(SILGenFunction &SGF,
     SILBasicBlock *errorBB =
       SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
                                substFnType->getErrorResult(),
+                               indirectErrorAddr,
                                options.contains(ApplyFlags::DoesNotThrow));
 
     options -= ApplyFlags::DoesNotThrow;
@@ -4876,7 +4882,8 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Emit the call.
   SmallVector<SILValue, 4> rawResults;
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-               /*indirect results*/ {}, rawResults, ExecutorBreadcrumb());
+               /*indirect results*/ {}, /*indirect errors*/ {},
+               rawResults, ExecutorBreadcrumb());
 
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::makeArrayRef(rawResults);
@@ -5411,6 +5418,16 @@ RValue SILGenFunction::emitApply(
   SmallVector<SILValue, 4> indirectResultAddrs;
   resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
 
+  SILValue indirectErrorAddr;
+  if (substFnType->hasErrorResult()) {
+    auto errorResult = substFnType->getErrorResult();
+    if (errorResult.getConvention() == ResultConvention::Indirect) {
+      auto loweredErrorResultType = getSILType(errorResult, substFnType);
+      indirectErrorAddr = B.createAllocStack(loc, loweredErrorResultType);
+      enterDeallocStackCleanup(indirectErrorAddr);
+    }
+  }
+
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
   SILValue lifetimeExtendedSelf;
@@ -5540,7 +5557,8 @@ RValue SILGenFunction::emitApply(
   {
     SmallVector<SILValue, 1> rawDirectResults;
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-                 indirectResultAddrs, rawDirectResults, breadcrumb);
+                 indirectResultAddrs, indirectErrorAddr,
+                 rawDirectResults, breadcrumb);
     assert(rawDirectResults.size() == 1);
     rawDirectResult = rawDirectResults[0];
   }
@@ -5709,12 +5727,22 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-    SILValue error = errorBB->createPhiArgument(
-        fnConv.getSILErrorType(getTypeExpansionContext()),
-        OwnershipKind::Owned);
+
+    SILValue error;
+    bool indirectError = fnConv.hasIndirectSILErrorResults();
+
+    if (!indirectError) {
+      error = errorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+    }
 
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
-    B.createThrow(loc, error);
+
+    if (!indirectError)
+      B.createThrow(loc, error);
+    else
+      B.createThrowAddr(loc);
   }
 
   // Enter the normal path.
