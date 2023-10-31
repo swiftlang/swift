@@ -181,6 +181,9 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], 
     return nil
   }
   let structAddr = elementAddr.struct
+  if structAddr.type.isMoveOnly {
+    return nil
+  }
   let numElements = structAddr.type.getNominalFields(in: firstStore.parentFunction).count
   var elementStores = Array<StoreInst?>(repeating: nil, count: numElements)
   var numStoresFound = 0
