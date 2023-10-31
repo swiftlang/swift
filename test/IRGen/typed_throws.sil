@@ -302,7 +302,7 @@ bb0(%0: $*τ_0_1, %1: $*τ_0_0, %2 : $Builtin.Int64, %3 : $*τ_0_0):
 sil @throwError : $@convention(thin) <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   copy_addr [take] %2 to [init] %0 : $*τ_0_0
-  throw %0 : $*τ_0_0
+  throw_addr
 }
 
 sil @throwError2 : $@convention(thin) <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)
@@ -352,7 +352,7 @@ bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
 sil @throwErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {
 bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
   copy_addr [take] %2 to [init] %0 : $*τ_0_0
-  throw %0 : $*τ_0_0
+  throw_addr
 }
 
 sil @throwError2Async : $@convention(thin) @async <T, V> (Builtin.Int64, @in T) -> (@error_indirect T, @out V)

@@ -2809,6 +2809,7 @@ bool SimplifyCFG::simplifyBlocks() {
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
     case TermKind::DynamicMethodBranchInst:
     case TermKind::ReturnInst:
     case TermKind::UnwindInst:

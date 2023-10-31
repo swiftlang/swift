@@ -932,6 +932,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     return;
 
   case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::UnreachableInst: {
     writeNoOperandLayout(&SI);
     break;

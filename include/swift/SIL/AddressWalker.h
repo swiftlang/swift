@@ -150,6 +150,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
 
       case TermKind::UnreachableInst:
       case TermKind::UnwindInst:
+      case TermKind::ThrowAddrInst:
         llvm_unreachable("Should never be used");
       case TermKind::SwitchEnumInst:
       case TermKind::SwitchValueInst:

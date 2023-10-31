@@ -722,6 +722,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, None, DoesNotRelease)
   TERMINATOR(ThrowInst, throw,
              TermInst, None, DoesNotRelease)
+  TERMINATOR(ThrowAddrInst, throw_addr,
+             TermInst, None, DoesNotRelease)
   TERMINATOR(YieldInst, yield,
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(UnwindInst, unwind,
