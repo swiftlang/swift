@@ -39,11 +39,11 @@ using namespace swift;
 template <typename T>
 static inline llvm::ArrayRef<T>
 unbridgedArrayRef(const BridgedArrayRef bridged) {
-  return bridged.get<T>();
+  return bridged.unbridged<T>();
 }
 
 static inline StringRef unbridged(BridgedStringRef cStr) {
-  return cStr.get();
+  return cStr.unbridged();
 }
 
 static inline ASTContext &unbridged(BridgedASTContext cContext) {
@@ -51,7 +51,7 @@ static inline ASTContext &unbridged(BridgedASTContext cContext) {
 }
 
 static inline SourceLoc unbridged(BridgedSourceLoc cLoc) {
-  return cLoc.get();
+  return cLoc.unbridged();
 }
 
 static inline SourceRange unbridged(BridgedSourceRange cRange) {
@@ -114,13 +114,13 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
 // Define `unbridged` overloads for each AST node.
 #define AST_BRIDGING_WRAPPER(Name)                                             \
   [[maybe_unused]] static Name *unbridged(Bridged##Name bridged) {             \
-    return bridged.get();                                                      \
+    return bridged.unbridged();                                                \
   }
 #include "swift/AST/ASTBridgingWrappers.def"
 
 #define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
   [[maybe_unused]] static Name *unbridged(BridgedNullable##Name bridged) {     \
-    return bridged.get();                                                      \
+    return bridged.unbridged();                                                \
   }
 #define AST_BRIDGING_WRAPPER_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"
@@ -179,7 +179,7 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(SwiftInt i)
     : BridgedDiagnosticArgument(DiagnosticArgument((int)i)) {}
 
 BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
-    : BridgedDiagnosticArgument(DiagnosticArgument(s.get())) {}
+    : BridgedDiagnosticArgument(DiagnosticArgument(s.unbridged())) {}
 
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
@@ -188,7 +188,7 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
                                                uint32_t length,
                                                BridgedStringRef text)
     : BridgedDiagnosticFixIt(DiagnosticInfo::FixIt(
-          CharSourceRange(start.get(), length), text.get(),
+          CharSourceRange(start.unbridged(), length), text.unbridged(),
           llvm::ArrayRef<DiagnosticArgument>())) {}
 
 void BridgedDiagnosticEngine_diagnose(
@@ -197,33 +197,34 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     BridgedSourceLoc highlightStart, uint32_t hightlightLength,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
-  auto *D = bridgedEngine.get();
+  auto *D = bridgedEngine.unbridged();
 
   auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
-  for (auto arg : bridgedArguments.get<BridgedDiagnosticArgument>()) {
-    arguments.push_back(arg.get());
+  for (auto arg : bridgedArguments.unbridged<BridgedDiagnosticArgument>()) {
+    arguments.push_back(arg.unbridged());
   }
-  auto inflight = D->diagnose(loc.get(), diagID, arguments);
+  auto inflight = D->diagnose(loc.unbridged(), diagID, arguments);
 
   // Add highlight.
-  if (highlightStart.get().isValid()) {
-    CharSourceRange highlight(highlightStart.get(), (unsigned)hightlightLength);
+  if (highlightStart.unbridged().isValid()) {
+    CharSourceRange highlight(highlightStart.unbridged(),
+                              (unsigned)hightlightLength);
     inflight.highlightChars(highlight.getStart(), highlight.getEnd());
   }
 
   // Add fix-its.
   for (const BridgedDiagnosticFixIt &fixIt :
-       bridgedFixIts.get<BridgedDiagnosticFixIt>()) {
-    auto range = fixIt.get().getRange();
-    auto text = fixIt.get().getText();
+       bridgedFixIts.unbridged<BridgedDiagnosticFixIt>()) {
+    auto range = fixIt.unbridged().getRange();
+    auto text = fixIt.unbridged().getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
   }
 }
 
 bool BridgedDiagnosticEngine_hadAnyError(
     BridgedDiagnosticEngine bridgedEngine) {
-  return bridgedEngine.get()->hadAnyError();
+  return bridgedEngine.unbridged()->hadAnyError();
 }
 
 namespace {
@@ -357,7 +358,7 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
     BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  assert(cSecondNameLoc.get().isValid() == (bool)cSecondName.raw);
+  assert(cSecondNameLoc.unbridged().isValid() == (bool)cSecondName.raw);
   if (!cSecondName.raw) {
     cSecondName = cFirstName;
     cSecondNameLoc = cFirstNameLoc;
@@ -436,7 +437,7 @@ BridgedConstructorDecl BridgedConstructorDecl_createParsed(
     BridgedParameterList bridgedParameterList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
-  assert(cFailabilityMarkLoc.get().isValid() || !isIUO);
+  assert(cFailabilityMarkLoc.unbridged().isValid() || !isIUO);
 
   ASTContext &context = unbridged(cContext);
 
@@ -687,9 +688,9 @@ BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
     BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc) {
-  auto colonLoc = cColonLoc.get();
+  auto colonLoc = cColonLoc.unbridged();
   assert(colonLoc.isValid() == (bool)cPrecedenceGroupName.raw);
-  assert(colonLoc.isValid() == cPrecedenceGroupLoc.get().isValid());
+  assert(colonLoc.isValid() == cPrecedenceGroupLoc.unbridged().isValid());
 
   ASTContext &context = unbridged(cContext);
   auto operatorKeywordLoc = unbridged(cOperatorKeywordLoc);
@@ -811,7 +812,7 @@ BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
 
 bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
     BridgedNominalTypeDecl decl) {
-  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl.get())) {
+  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl.unbridged())) {
     return structDecl->hasUnreferenceableStorage();
   }
   return false;

@@ -541,7 +541,7 @@ static bool passesRegistered = false;
 // Called from initializeSwiftModules().
 void SILCombine_registerInstructionPass(BridgedStringRef instClassName,
                                         BridgedInstructionPassRunFn runFn) {
-  swiftInstPasses[instClassName.get()] = runFn;
+  swiftInstPasses[instClassName.unbridged()] = runFn;
   passesRegistered = true;
 }
 

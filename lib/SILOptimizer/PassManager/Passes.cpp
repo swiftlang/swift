@@ -275,13 +275,13 @@ static void runBridgedFunctionPass(BridgedFunctionPassRunFn &runFunction,
 // Called from initializeSwiftModules().
 void SILPassManager_registerModulePass(BridgedStringRef name,
                                        BridgedModulePassRunFn runFn) {
-  bridgedModulePassRunFunctions[name.get()] = runFn;
+  bridgedModulePassRunFunctions[name.unbridged()] = runFn;
   passesRegistered = true;
 }
 
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn) {
-  bridgedFunctionPassRunFunctions[name.get()] = runFn;
+  bridgedFunctionPassRunFunctions[name.unbridged()] = runFn;
   passesRegistered = true;
 }
 

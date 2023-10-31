@@ -79,12 +79,12 @@ typedef uintptr_t SwiftUInt;
     Bridged##Name(swift::Node * Nullability ptr) : Ptr(ptr) {}                 \
                                                                                \
     SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
-    swift::Node * Nullability get() const { return Ptr; }                      \
+    swift::Node * Nullability unbridged() const { return Ptr; }                \
   };                                                                           \
                                                                                \
   SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
   inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
-    return bridged.get();                                                      \
+    return bridged.unbridged();                                                \
   }                                                                            \
                                                                                \
   SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
@@ -123,7 +123,7 @@ public:
       : Data(arr.data()), Length(arr.size()) {}
 
   template <typename T>
-  llvm::ArrayRef<T> get() const {
+  llvm::ArrayRef<T> unbridged() const {
     return {static_cast<const T *>(Data), Length};
   }
 #endif
@@ -196,7 +196,7 @@ public:
   BridgedStringRef(llvm::StringRef sref)
       : Data(sref.data()), Length(sref.size()) {}
 
-  llvm::StringRef get() const { return llvm::StringRef(Data, Length); }
+  llvm::StringRef unbridged() const { return llvm::StringRef(Data, Length); }
 #endif
 
   BridgedStringRef() : Data(nullptr), Length(0) {}
@@ -226,7 +226,7 @@ public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedOwnedString(const std::string &stringToCopy);
 
-  llvm::StringRef getRef() const { return llvm::StringRef(Data, Length); }
+  llvm::StringRef unbridgedRef() const { return llvm::StringRef(Data, Length); }
 #endif
 
   void destroy() const;
@@ -258,7 +258,7 @@ public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
 
-  swift::SourceLoc get() const {
+  swift::SourceLoc unbridged() const {
     return swift::SourceLoc(
         llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
   }

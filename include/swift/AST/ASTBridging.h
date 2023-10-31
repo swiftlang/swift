@@ -150,7 +150,7 @@ public:
   BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
     *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
   }
-  const swift::DiagnosticArgument &get() const {
+  const swift::DiagnosticArgument &unbridged() const {
     return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
   }
 #endif
@@ -167,7 +167,7 @@ public:
   BridgedDiagnosticFixIt(const swift::DiagnosticInfo::FixIt &fixit){
     *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
   }
-  const swift::DiagnosticInfo::FixIt &get() const {
+  const swift::DiagnosticInfo::FixIt &unbridged() const {
     return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&storage);
   }
 #endif
