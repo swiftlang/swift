@@ -6743,13 +6743,11 @@ void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
   cacheImplInfo(implInfo);
 
   if (isImplicit()) {
-    auto &evaluator = getASTContext().evaluator;
-    HasStorageRequest request{this};
-    if (!evaluator.hasCachedResult(request))
-      evaluator.cacheOutput(request, implInfo.hasStorage());
-    else {
-      assert(
-        evaluateOrDefault(evaluator, request, false) == implInfo.hasStorage());
+    if (!LazySemanticInfo.HasStorageComputed) {
+      LazySemanticInfo.HasStorageComputed = true;
+      LazySemanticInfo.HasStorage = implInfo.hasStorage();
+    } else {
+      assert(LazySemanticInfo.HasStorage == implInfo.hasStorage());
     }
   }
 }

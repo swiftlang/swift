@@ -983,7 +983,7 @@ class infer_instanceVar1 {
 
   @objc // access-note-move{{infer_instanceVar1.observingAccessorsVar1_}}
   var observingAccessorsVar1_: Int {
-  // CHECK: {{^}} @objc @_hasStorage var observingAccessorsVar1_: Int {
+  // CHECK: {{^}} {{@_hasStorage @objc|@objc @_hasStorage}} var observingAccessorsVar1_: Int {
     willSet {}
     // CHECK-NEXT: {{^}} @objc get {
     // CHECK-NEXT:   return

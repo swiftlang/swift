@@ -311,7 +311,7 @@ SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
               StorageImplInfo(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasStorageRequest,
-              bool(AbstractStorageDecl *), Cached,
+              bool(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
               ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)

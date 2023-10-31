@@ -3585,6 +3585,29 @@ bool HasStorageRequest::evaluate(Evaluator &evaluator,
   return hasStorage;
 }
 
+llvm::Optional<bool> HasStorageRequest::getCachedResult() const {
+  AbstractStorageDecl *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.HasStorageComputed)
+    return static_cast<bool>(decl->LazySemanticInfo.HasStorage);
+  return llvm::None;
+}
+
+void HasStorageRequest::cacheResult(bool hasStorage) const {
+  AbstractStorageDecl *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.HasStorageComputed = true;
+  decl->LazySemanticInfo.HasStorage = hasStorage;
+
+  // Add an attribute for printing, but only to VarDecls.
+  if (isa<ParamDecl>(decl))
+    return;
+  
+  if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+    if (hasStorage && !varDecl->getAttrs().hasAttribute<HasStorageAttr>())
+      varDecl->getAttrs().add(new (varDecl->getASTContext())
+                              HasStorageAttr(/*isImplicit=*/true));
+  }
+}
+
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
@@ -3598,7 +3621,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.
-    if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+    if (var->getParsedAttrs().hasAttribute<HasStorageAttr>()) {
       // The SIL rules for @_hasStorage are slightly different from the non-SIL
       // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
       // and the only thing that determines mutability is the existence of the
