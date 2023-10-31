@@ -8310,6 +8310,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (isConformanceUnavailable(conformance, loc))
       increaseScore(SK_Unavailable, locator);
 
+    unsigned numMissing = 0;
+    conformance.forEachMissingConformance(DC->getParentModule(),
+                                          [&numMissing](auto *missing) {
+                                            ++numMissing;
+                                            return false;
+                                          });
+
+    if (numMissing > 0)
+      increaseScore(SK_MissingSynthesizableConformance, locator, numMissing);
+
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
     if (conformance.isConcrete()) {
