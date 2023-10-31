@@ -54,8 +54,14 @@ public extension NoReflectionChildren {
 
 public var standardError = CFileStream(fp: stderr)
 
+#if os(Android) || canImport(Musl)
+  public typealias FILEPointer = OpaquePointer
+#else
+  public typealias FILEPointer = UnsafeMutablePointer<FILE>
+#endif
+
 public struct CFileStream: TextOutputStream {
-  var fp: UnsafeMutablePointer<FILE>
+  var fp: FILEPointer
 
   public func write(_ string: String) {
     fputs(string, fp)

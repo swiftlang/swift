@@ -103,7 +103,7 @@ static void reportNow(uint32_t flags, const char *message) {
 #endif
 #if SWIFT_STDLIB_HAS_ASL
   asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && !defined(__TERMUX__)
   __android_log_print(ANDROID_LOG_FATAL, "SwiftDemangle", "%s", message);
 #endif
 }
