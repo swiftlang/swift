@@ -209,6 +209,12 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif // __cpp_concepts
+// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Generics::GenericPair<T_0_0, T_0_1>> = isUsableInGenericContext<T_0_0> && isUsableInGenericContext<T_0_1>;
+
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class _impl_GenericPair;
 // CHECK-EMPTY:
