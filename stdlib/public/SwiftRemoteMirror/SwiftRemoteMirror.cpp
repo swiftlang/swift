@@ -314,6 +314,12 @@ swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Add
   return Context->ownsAddress(RemoteAddress(Address));
 }
 
+int
+swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
+  auto Context = ContextRef->nativeContext;
+  return Context->ownsAddress(RemoteAddress(Address), false);
+}
+
 uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object) {
@@ -365,6 +371,26 @@ swift_reflection_copyDemangledNameForTypeRef(
   Demangle::Demangler Dem;
   auto Name = nodeToString(TR->getDemangling(Dem));
   return strdup(Name.c_str());
+}
+
+char *
+swift_reflection_copyNameForTypeRef(SwiftReflectionContextRef ContextRef,
+                                    swift_typeref_t OpaqueTypeRef,
+                                    bool mangled) {
+  auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
+
+  Demangle::Demangler Dem;
+  if (mangled) {
+    auto Mangling = mangleNode(TR->getDemangling(Dem));
+    if (Mangling.isSuccess()) {
+      return strdup(Mangling.result().c_str());
+    }
+  }
+  else {
+    auto Name = nodeToString(TR->getDemangling(Dem));
+    return strdup(Name.c_str());
+  }
+  return nullptr;
 }
 
 SWIFT_REMOTE_MIRROR_LINKAGE
@@ -697,7 +723,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
     }
 
     char *DemangledName =
-        swift_reflection_copyDemangledNameForTypeRef(ContextRef, OpaqueTypeRef);
+        swift_reflection_copyNameForTypeRef(ContextRef, OpaqueTypeRef, false);
     std::cout << "Demangled name: " << DemangledName << "\n";
     free(DemangledName);
   }

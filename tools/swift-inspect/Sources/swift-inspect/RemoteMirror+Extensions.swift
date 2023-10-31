@@ -64,11 +64,11 @@ extension SwiftReflectionContextRef {
     }
   }
 
-  internal func name(type: swift_reflection_ptr_t) -> String? {
+  internal func name(type: swift_reflection_ptr_t, mangled: Bool = false) -> String? {
     let typeref = swift_reflection_typeRefForMetadata(self, UInt(type))
     if typeref == 0 { return nil }
 
-    guard let name = swift_reflection_copyDemangledNameForTypeRef(self, typeref) else {
+    guard let name = swift_reflection_copyNameForTypeRef(self, typeref, mangled) else {
       return nil
     }
     defer { free(name) }

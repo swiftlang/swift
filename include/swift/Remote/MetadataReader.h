@@ -3116,7 +3116,8 @@ private:
         break;
         
       case GenericParamKind::TypePack:
-        assert(false && "Packs not supported here yet");
+        // assert(false && "Packs not supported here yet");
+        return {};
 
       default:
         // We don't know about this kind of parameter.

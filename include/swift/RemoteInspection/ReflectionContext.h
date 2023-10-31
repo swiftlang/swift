@@ -853,24 +853,25 @@ public:
 
   /// Returns true if the address is known to the reflection context.
   /// Currently, that means that either the address falls within the text or
-  /// data segments of a registered image, or the address points to a Metadata
-  /// whose type context descriptor is within the text segment of a registered
-  /// image.
-  bool ownsAddress(RemoteAddress Address) {
+  /// data segments of a registered image, or optionally, the address points
+  /// to a Metadata whose type context descriptor is within the text segment
+  /// of a registered image.
+  bool ownsAddress(RemoteAddress Address, bool checkMetadataDescriptor = true) {
     if (ownsAddress(Address, textRanges))
       return true;
     if (ownsAddress(Address, dataRanges))
       return true;
 
-    // This is usually called on a Metadata address which might have been
-    // on the heap. Try reading it and looking up its type context descriptor
-    // instead.
-    if (auto Metadata = readMetadata(Address.getAddressData()))
-      if (auto DescriptorAddress =
-          super::readAddressOfNominalTypeDescriptor(Metadata, true))
-        if (ownsAddress(RemoteAddress(DescriptorAddress), textRanges))
-          return true;
-
+    if (checkMetadataDescriptor) {
+      // This is usually called on a Metadata address which might have been
+      // on the heap. Try reading it and looking up its type context descriptor
+      // instead.
+      if (auto Metadata = readMetadata(Address.getAddressData()))
+        if (auto DescriptorAddress =
+            super::readAddressOfNominalTypeDescriptor(Metadata, true))
+          if (ownsAddress(RemoteAddress(DescriptorAddress), textRanges))
+            return true;
+    }
     return false;
   }
 
