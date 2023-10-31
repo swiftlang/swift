@@ -398,46 +398,36 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
   // Get Swift type for self and other
   auto selfMetadata = _swift_getClassOfAllocated(self);
-  auto otherMetadata = _swift_getClassOfAllocated(other);
 
-  // Find common parent class
-  const ClassMetadata * parentMetadata = NULL;
-  if (selfMetadata == otherMetadata) {
-    parentMetadata = selfMetadata;
-  } else {
-    // Collect parents of self
-    std::unordered_set<const ClassMetadata *> selfAncestors;
-    for (auto m = selfMetadata; m != NULL; m = m->Superclass) {
-      selfAncestors.emplace(m);
-    }
-    // Find first parent of other that is also a parent of self
-    for (auto m = otherMetadata; m != NULL; m = m->Superclass) {
-      if (selfAncestors.find(m) != selfAncestors.end()) {
-	parentMetadata = m;
-	break;
-      }
-    }
-    // If there's no common parent class, we can't compare them
-    if (parentMetadata == NULL) {
-      return NO;
-    }
-  }
-  // Note: Because `self` subclasses SwiftObject, we know parentMetadata
-  // must be a Swift type or SwiftObject itself.
-
-  // This will work for types that implement Hashable or only Equatable.
-  // In the latter case, there is a risk that `-hash` and `-isEqual:` might
-  // be incompatible.  See notes above for `-hash`
+  // We use Equatable conformance, which will also work for types that implement
+  // Hashable.  If the type implements Equatable but not Hashable, there is a
+  // risk that `-hash` and `-isEqual:` might be incompatible.  See notes above
+  // for `-hash`
   auto equatableConformance =
-    reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
-      swift_conformsToProtocolCommon(
-        parentMetadata, &equatable_support::EquatableProtocolDescriptor));
+    swift_conformsToProtocolCommon(
+      selfMetadata, &equatable_support::EquatableProtocolDescriptor);
   if (equatableConformance == NULL) {
     return NO;
   }
 
-  return _swift_stdlib_Equatable_isEqual_indirect(
-          &self, &other, parentMetadata, equatableConformance);
+  // Is the other object a subclass of the parent that
+  // actually defined this conformance?
+  auto conformingParent =
+    findConformingSuperclass(selfMetadata, equatableConformance->getDescription());
+  auto otherMetadata = _swift_getClassOfAllocated(other);
+  if (_swift_class_isSubclass(otherMetadata, conformingParent)) {
+    // We now have an equatable conformance of a common parent
+    // of both object types:
+    return _swift_stdlib_Equatable_isEqual_indirect(
+      &self,
+      &other,
+      conformingParent,
+      reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+	equatableConformance)
+    );
+  }
+
+  return NO;
 }
 
 - (id)performSelector:(SEL)aSelector {
