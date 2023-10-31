@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t/lazy_typecheck.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
-// RUN: %target-swift-frontend -package-name Package -typecheck -verify %S/../Inputs/lazy_typecheck_client.swift -I %t
+// RUN: %target-swift-frontend -package-name ClientPackage -typecheck -verify %S/../Inputs/lazy_typecheck_client.swift -I %t
 
 // CHECK: import Swift
 
