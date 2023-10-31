@@ -224,24 +224,6 @@ BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
 }
 
 //===----------------------------------------------------------------------===//
-//                                BridgedNominalTypeDecl
-//===----------------------------------------------------------------------===//
-
-BridgedStringRef BridgedNominalTypeDecl::getName() const {
-  return decl->getName().str();
-}
-
-bool BridgedNominalTypeDecl::isGlobalActor() const { return decl->isGlobalActor(); }
-
-//===----------------------------------------------------------------------===//
-//                                BridgedVarDecl
-//===----------------------------------------------------------------------===//
-
-BridgedStringRef BridgedVarDecl::getUserFacingName() const {
-  return decl->getBaseName().userFacingName();
-}
-
-//===----------------------------------------------------------------------===//
 //                                BridgedValue
 //===----------------------------------------------------------------------===//
 
@@ -585,14 +567,13 @@ SwiftInt BridgedMultiValueResult::getIndex() const {
 //                                BridgedTypeArray
 //===----------------------------------------------------------------------===//
 
-BridgedTypeArray BridgedTypeArray::fromReplacementTypes(BridgedSubstitutionMap substMap) {
-  swift::ArrayRef<swift::Type> replTypes = substMap.get().getReplacementTypes();
-  return {replTypes.data(), replTypes.size()};
+BridgedTypeArray 
+BridgedTypeArray::fromReplacementTypes(BridgedSubstitutionMap substMap) {
+  return substMap.get().getReplacementTypes();
 }
 
 BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
-  assert((size_t)index < typeArray.numElements);
-  swift::Type origTy = ((const swift::Type *)typeArray.data)[index];
+  swift::Type origTy = get()[index];
   auto ty = origTy->getCanonicalType();
   if (ty->isLegalSILType())
     return swift::SILType::getPrimitiveObjectType(ty);
@@ -604,8 +585,7 @@ BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
-  assert((size_t)index < typeArray.numElements);
-  return ((const swift::SILType *)typeArray.data)[index];
+  return get()[index];
 }
 
 //===----------------------------------------------------------------------===//
@@ -883,8 +863,7 @@ SwiftInt BridgedInstruction::AllocRefInstBase_getNumTailTypes() const {
 }
 
 BridgedSILTypeArray BridgedInstruction::AllocRefInstBase_getTailAllocatedTypes() const {
-  llvm::ArrayRef<swift::SILType> types = getAs<const swift::AllocRefInstBase>()->getTailAllocatedTypes();
-  return {types.data(), types.size()};
+  return getAs<const swift::AllocRefInstBase>()->getTailAllocatedTypes();
 }
 
 bool BridgedInstruction::AllocRefDynamicInst_isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
@@ -1033,23 +1012,23 @@ SwiftInt BridgedInstruction::FullApplySite_numIndirectResultArguments() const {
 //                     VarDeclInst and DebugVariableInst
 //===----------------------------------------------------------------------===//
 
-OptionalBridgedVarDecl BridgedInstruction::DebugValue_getDecl() const {
+BridgedNullableVarDecl BridgedInstruction::DebugValue_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }
 
-OptionalBridgedVarDecl BridgedInstruction::AllocStack_getDecl() const {
+BridgedNullableVarDecl BridgedInstruction::AllocStack_getDecl() const {
   return {getAs<swift::AllocStackInst>()->getDecl()};
 }
 
-OptionalBridgedVarDecl BridgedInstruction::AllocBox_getDecl() const {
+BridgedNullableVarDecl BridgedInstruction::AllocBox_getDecl() const {
   return {getAs<swift::AllocBoxInst>()->getDecl()};
 }
 
-OptionalBridgedVarDecl BridgedInstruction::GlobalAddr_getDecl() const {
+BridgedNullableVarDecl BridgedInstruction::GlobalAddr_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }
 
-OptionalBridgedVarDecl BridgedInstruction::RefElementAddr_getDecl() const {
+BridgedNullableVarDecl BridgedInstruction::RefElementAddr_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }
 

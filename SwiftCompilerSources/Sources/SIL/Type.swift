@@ -216,11 +216,11 @@ public struct NominalTypeDecl : Equatable, Hashable {
   public var name: StringRef { StringRef(bridged: bridged.getName()) }
 
   public static func ==(lhs: NominalTypeDecl, rhs: NominalTypeDecl) -> Bool {
-    lhs.bridged.decl == rhs.bridged.decl
+    lhs.bridged.raw == rhs.bridged.raw
   }
 
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(bridged.decl)
+    hasher.combine(bridged.raw)
   }
 
   public var isStructWithUnreferenceableStorage: Bool {

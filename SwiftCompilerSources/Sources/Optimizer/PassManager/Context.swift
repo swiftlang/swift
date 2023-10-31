@@ -226,7 +226,7 @@ struct FunctionPassContext : MutatingContext {
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      let nameStr = BridgedStringRef(nameBuffer.baseAddress, nameBuffer.count)
+      let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
       return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
   }
@@ -244,7 +244,7 @@ struct FunctionPassContext : MutatingContext {
   /// Returns nil if no such function or multiple matching functions are found.
   func lookupStdlibFunction(name: StaticString) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
-      let nameStr = BridgedStringRef(nameBuffer.baseAddress, nameBuffer.count)
+      let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
       return _bridged.lookupStdlibFunction(nameStr).function
     }
   }

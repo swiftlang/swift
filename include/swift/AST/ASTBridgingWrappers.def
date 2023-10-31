@@ -31,9 +31,8 @@
 #define AST_BRIDGING_WRAPPER_NONNULL(Name) AST_BRIDGING_WRAPPER(Name)
 #endif
 
-// Each AST node subclass stores a non-null raw value.
 #ifndef DECL
-#define DECL(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##Decl)
+#define DECL(Id, Parent) AST_BRIDGING_WRAPPER_NULLABLE(Id##Decl)
 #endif
 #define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
 #include "swift/AST/DeclNodes.def"
@@ -68,6 +67,10 @@ AST_BRIDGING_WRAPPER_NULLABLE(TypeRepr)
 AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
 AST_BRIDGING_WRAPPER_NULLABLE(TrailingWhereClause)
 AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
+AST_BRIDGING_WRAPPER_NONNULL(TypeAttributes)
+
+// Non-AST types to generate wrappers for.
+AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
 
 #undef AST_BRIDGING_WRAPPER_NONNULL
 #undef AST_BRIDGING_WRAPPER_NULLABLE

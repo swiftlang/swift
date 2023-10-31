@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/CASTBridging.h"
+#include "swift/AST/ASTBridging.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ void swift_ASTGen_addQueuedDiagnostic(
     ptrdiff_t numHighlightRanges);
 void swift_ASTGen_renderQueuedDiagnostics(
     void *_Nonnull queued, ssize_t contextSize, ssize_t colorize,
-    BridgedString *_Nonnull renderedString);
+    BridgedStringRef *_Nonnull renderedString);
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
 // file from here. Fix this egregious oversight!
@@ -43,7 +43,7 @@ void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
 void *_Nullable swift_ASTGen_resolveMacroType(const void *_Nonnull macroType);
 void swift_ASTGen_destroyMacro(void *_Nonnull macro);
 
-void swift_ASTGen_freeBridgedString(BridgedString);
+void swift_ASTGen_freeBridgedString(BridgedStringRef);
 
 void *_Nonnull swift_ASTGen_resolveExecutableMacro(
     const char *_Nonnull moduleName, const char *_Nonnull typeName,
@@ -53,7 +53,7 @@ void swift_ASTGen_destroyExecutableMacro(void *_Nonnull macro);
 ptrdiff_t swift_ASTGen_checkMacroDefinition(
     void *_Nonnull diagEngine, void *_Nonnull sourceFile,
     const void *_Nonnull macroSourceLocation,
-    BridgedString *_Nonnull expansionSourceOutPtr,
+    BridgedStringRef *_Nonnull expansionSourceOutPtr,
     ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
     ptrdiff_t *_Nonnull numReplacements);
 void swift_ASTGen_freeExpansionReplacements(
@@ -63,7 +63,7 @@ ptrdiff_t swift_ASTGen_expandFreestandingMacro(
     void *_Nonnull diagEngine, const void *_Nonnull macro, uint8_t externalKind,
     const char *_Nonnull discriminator, uint8_t rawMacroRole,
     void *_Nonnull sourceFile, const void *_Nullable sourceLocation,
-    BridgedString *_Nonnull evaluatedSourceOut);
+    BridgedStringRef *_Nonnull evaluatedSourceOut);
 
 ptrdiff_t swift_ASTGen_expandAttachedMacro(
     void *_Nonnull diagEngine, const void *_Nonnull macro, uint8_t externalKind,
@@ -75,14 +75,14 @@ ptrdiff_t swift_ASTGen_expandAttachedMacro(
     const void *_Nullable declarationSourceLocation,
     void *_Nullable parentDeclSourceFile,
     const void *_Nullable parentDeclSourceLocation,
-    BridgedString *_Nonnull evaluatedSourceOut);
+    BridgedStringRef *_Nonnull evaluatedSourceOut);
 
 bool swift_ASTGen_initializePlugin(void *_Nonnull handle,
                                    void *_Nullable diagEngine);
 void swift_ASTGen_deinitializePlugin(void *_Nonnull handle);
 bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *_Nonnull handle, const char *_Nonnull libraryPath,
-    const char *_Nonnull moduleName, BridgedString *_Nullable errorOut);
+    const char *_Nonnull moduleName, BridgedStringRef *_Nullable errorOut);
 
 #ifdef __cplusplus
 }

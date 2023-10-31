@@ -357,9 +357,9 @@ final public class FixLifetimeInst : Instruction, UnaryInstruction {}
 public struct VarDecl {
   var bridged: BridgedVarDecl
   
-  public init?(bridged: OptionalBridgedVarDecl) {
-    guard let decl = bridged.decl else { return nil }
-    self.bridged = BridgedVarDecl(decl: decl)
+  public init?(bridged: BridgedNullableVarDecl) {
+    guard let decl = bridged.raw else { return nil }
+    self.bridged = BridgedVarDecl(raw: decl)
   }
   
   public var userFacingName: String { String(bridged.getUserFacingName()) }

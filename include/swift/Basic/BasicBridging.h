@@ -31,8 +31,23 @@
 #include <cassert>
 #include "llvm/CAS/CASReference.h"
 
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
+#endif
+
+// FIXME: We ought to be importing '<swift/bridging>' instead.
+#if __has_attribute(swift_name)
+#define SWIFT_NAME(NAME) __attribute__((swift_name(NAME)))
+#else
+#define SWIFT_NAME(NAME)
+#endif
+
+#if __has_attribute(availability)
+#define SWIFT_UNAVAILABLE(msg) \
+  __attribute__((availability(swift, unavailable, message=msg)))
+#else
+#define SWIFT_UNAVAILABLE(msg)
 #endif
 
 #ifdef PURE_BRIDGING_MODE
@@ -47,67 +62,306 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 typedef intptr_t SwiftInt;
 typedef uintptr_t SwiftUInt;
 
+// Define a bridging wrapper that wraps an underlying C++ pointer type. When
+// importing into Swift, we expose an initializer and accessor that works with
+// `void *`, which is imported as UnsafeMutableRawPointer. Note we can't rely on
+// Swift importing the underlying C++ pointer as an OpaquePointer since that is
+// liable to change with PURE_BRIDGING_MODE, since that changes what we include,
+// and Swift could import the underlying pointee type instead. We need to be
+// careful that the interface we expose remains consistent regardless of
+// PURE_BRIDGING_MODE.
+#define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
+  class Bridged##Name {                                                        \
+    swift::Node * Nullability Ptr;                                             \
+                                                                               \
+  public:                                                                      \
+    SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
+    Bridged##Name(swift::Node * Nullability ptr) : Ptr(ptr) {}                 \
+                                                                               \
+    SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
+    swift::Node * Nullability get() const { return Ptr; }                      \
+  };                                                                           \
+                                                                               \
+  SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
+  inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
+    return bridged.get();                                                      \
+  }                                                                            \
+                                                                               \
+  SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
+  inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
+    return static_cast<swift::Node *>(ptr);                                    \
+  }
+
+// Bridging wrapper macros for convenience.
+#define BRIDGING_WRAPPER_NONNULL(Name) \
+  BRIDGING_WRAPPER_IMPL(Name, Name, _Nonnull)
+
+#define BRIDGING_WRAPPER_NULLABLE(Name) \
+  BRIDGING_WRAPPER_IMPL(Name, Nullable##Name, _Nullable)
+
+//===----------------------------------------------------------------------===//
+// MARK: ArrayRef
+//===----------------------------------------------------------------------===//
+
+class BridgedArrayRef {
+public:
+  SWIFT_UNAVAILABLE("Use '.data' instead")
+  const void *_Nullable Data;
+
+  SWIFT_UNAVAILABLE("Use '.count' instead")
+  size_t Length;
+
+  BridgedArrayRef() : Data(nullptr), Length(0) {}
+
+  SWIFT_NAME("init(data:count:)")
+  BridgedArrayRef(const void *_Nullable data, size_t length)
+      : Data(data), Length(length) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  template <typename T>
+  BridgedArrayRef(llvm::ArrayRef<T> arr)
+      : Data(arr.data()), Length(arr.size()) {}
+
+  template <typename T>
+  llvm::ArrayRef<T> get() const {
+    return {static_cast<const T *>(Data), Length};
+  }
+#endif
+};
+
+SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
+BRIDGED_INLINE
+const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
+
+SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
+
+//===----------------------------------------------------------------------===//
+// MARK: Data
+//===----------------------------------------------------------------------===//
+
+class BridgedData {
+public:
+  SWIFT_UNAVAILABLE("Use '.baseAddress' instead")
+  const char *_Nullable BaseAddress;
+
+  SWIFT_UNAVAILABLE("Use '.count' instead")
+  size_t Length;
+
+  BridgedData() : BaseAddress(nullptr), Length(0) {}
+
+  SWIFT_NAME("init(baseAddress:count:)")
+  BridgedData(const char *_Nullable baseAddress, size_t length)
+      : BaseAddress(baseAddress), Length(length) {}
+};
+
+SWIFT_NAME("getter:BridgedData.baseAddress(self:)")
+BRIDGED_INLINE
+const char *_Nullable BridgedData_baseAddress(BridgedData data);
+
+SWIFT_NAME("getter:BridgedData.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedData_count(BridgedData data);
+
+SWIFT_NAME("BridgedData.free(self:)")
+void BridgedData_free(BridgedData data);
+
+//===----------------------------------------------------------------------===//
+// MARK: Feature
+//===----------------------------------------------------------------------===//
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)           \
+  FeatureName,
+#include "swift/Basic/Features.def"
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: OStream
+//===----------------------------------------------------------------------===//
+
 struct BridgedOStream {
   void * _Nonnull streamAddr;
 };
 
+//===----------------------------------------------------------------------===//
+// MARK: StringRef
+//===----------------------------------------------------------------------===//
+
 class BridgedStringRef {
-  const char * _Nonnull data;
-  size_t length;
+  const char *_Nullable Data;
+  size_t Length;
 
 public:
 #ifdef USED_IN_CPP_SOURCE
-  BridgedStringRef(llvm::StringRef sref) : data(sref.data()), length(sref.size()) {}
+  BridgedStringRef(llvm::StringRef sref)
+      : Data(sref.data()), Length(sref.size()) {}
 
-  llvm::StringRef get() const { return llvm::StringRef(data, length); }
+  llvm::StringRef get() const { return llvm::StringRef(Data, Length); }
 #endif
 
-  BridgedStringRef(const char * _Nullable data, size_t length)
-    : data(data), length(length) {}
+  BridgedStringRef() : Data(nullptr), Length(0) {}
 
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
-    return (const uint8_t * _Nonnull)data;
-  }
-  SwiftInt size() const { return (SwiftInt)length; }
+  SWIFT_NAME("init(data:count:)")
+  BridgedStringRef(const char *_Nullable data, size_t length)
+      : Data(data), Length(length) {}
+
   void write(BridgedOStream os) const;
 };
 
+SWIFT_NAME("getter:BridgedStringRef.data(self:)")
+BRIDGED_INLINE 
+const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str);
+
+SWIFT_NAME("getter:BridgedStringRef.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedStringRef_count(BridgedStringRef str);
+
+SWIFT_NAME("getter:BridgedStringRef.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedStringRef_empty(BridgedStringRef str);
+
 class BridgedOwnedString {
-  char * _Nonnull data;
-  size_t length;
+  char *_Nonnull Data;
+  size_t Length;
 
 public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedOwnedString(const std::string &stringToCopy);
+
+  llvm::StringRef getRef() const { return llvm::StringRef(Data, Length); }
 #endif
 
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nonnull uintData() const {
-    return (const uint8_t * _Nonnull)(data ? data : "");
-  }
-  SwiftInt size() const { return (SwiftInt)length; }
   void destroy() const;
 };
 
+SWIFT_NAME("getter:BridgedOwnedString.data(self:)")
+BRIDGED_INLINE 
+const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str);
+
+SWIFT_NAME("getter:BridgedOwnedString.count(self:)")
+BRIDGED_INLINE SwiftInt BridgedOwnedString_count(BridgedOwnedString str);
+
+SWIFT_NAME("getter:BridgedOwnedString.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedOwnedString_empty(BridgedOwnedString str);
+
+//===----------------------------------------------------------------------===//
+// MARK: SourceLoc
+//===----------------------------------------------------------------------===//
+
 class BridgedSourceLoc {
-  const void * _Nullable opaquePointer;
+  const void *_Nullable Raw;
+
 public:
-  BridgedSourceLoc() : opaquePointer(nullptr) {}
-  BridgedSourceLoc(const void * _Nullable loc) : opaquePointer(loc) {}
+  BridgedSourceLoc() : Raw(nullptr) {}
 
-  bool isValid() const { return opaquePointer != nullptr; }
-  SWIFT_IMPORT_UNSAFE const uint8_t * _Nullable uint8Pointer() const {
-    return (const uint8_t * _Nullable)opaquePointer;
+  SWIFT_NAME("init(raw:)")
+  BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
+
+  swift::SourceLoc get() const {
+    return swift::SourceLoc(
+        llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
   }
-  const char * _Nullable getLoc() const {
-    return (const char * _Nullable)opaquePointer;
-  }
+#endif
+
+  SWIFT_IMPORT_UNSAFE
+  const void *_Nullable getOpaquePointerValue() const { return Raw; }
+
+  SWIFT_NAME("advanced(by:)")
+  BRIDGED_INLINE
+  BridgedSourceLoc advancedBy(size_t n) const;
 };
 
-struct BridgedArrayRef {
-  const void * _Nullable data;
-  size_t numElements;
+SWIFT_NAME("getter:BridgedSourceLoc.isValid(self:)")
+BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc loc);
+
+//===----------------------------------------------------------------------===//
+// MARK: SourceRange
+//===----------------------------------------------------------------------===//
+
+struct BridgedSourceRange {
+  BridgedSourceLoc startLoc;
+  BridgedSourceLoc endLoc;
 };
+
+struct BridgedCharSourceRange {
+  void *_Nonnull start;
+  size_t byteLength;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: Plugins
+//===----------------------------------------------------------------------===//
+
+SWIFT_BEGIN_ASSUME_NONNULL
+
+/// Create a new root 'null' JSON value. Clients must call \c JSON_value_delete
+/// after using it.
+void *JSON_newValue();
+
+/// Parse \p data as a JSON data and return the top-level value. Clients must
+/// call \c JSON_value_delete after using it.
+void *JSON_deserializedValue(BridgedData data);
+
+/// Serialize a value and populate \p result with the result data. Clients
+/// must call \c BridgedData_free after using the \p result.
+void JSON_value_serialize(void *valuePtr, BridgedData *result);
+
+/// Destroy and release the memory for \p valuePtr that is a result from
+/// \c JSON_newValue() or \c JSON_deserializedValue() .
+void JSON_value_delete(void *valuePtr);
+
+bool JSON_value_getAsNull(void *valuePtr);
+bool JSON_value_getAsBoolean(void *valuePtr, bool *result);
+bool JSON_value_getAsString(void *valuePtr, BridgedData *result);
+bool JSON_value_getAsDouble(void *valuePtr, double *result);
+bool JSON_value_getAsInteger(void *valuePtr, int64_t *result);
+bool JSON_value_getAsObject(void *valuePtr, void *_Nullable *_Nonnull result);
+bool JSON_value_getAsArray(void *valuePtr, void *_Nullable *_Nonnull result);
+
+size_t JSON_object_getSize(void *objectPtr);
+BridgedData JSON_object_getKey(void *objectPtr, size_t i);
+bool JSON_object_hasKey(void *objectPtr, const char *key);
+void *JSON_object_getValue(void *objectPtr, const char *key);
+
+size_t JSON_array_getSize(void *arrayPtr);
+void *JSON_array_getValue(void *arrayPtr, size_t index);
+
+void JSON_value_emplaceNull(void *valuePtr);
+void JSON_value_emplaceBoolean(void *valuePtr, bool value);
+void JSON_value_emplaceString(void *valuePtr, const char *value);
+void JSON_value_emplaceDouble(void *valuePtr, double value);
+void JSON_value_emplaceInteger(void *valuePtr, int64_t value);
+void *JSON_value_emplaceNewObject(void *valuePtr);
+void *JSON_value_emplaceNewArray(void *valuePtr);
+
+void JSON_object_setNull(void *objectPtr, const char *key);
+void JSON_object_setBoolean(void *objectPtr, const char *key, bool value);
+void JSON_object_setString(void *objectPtr, const char *key, const char *value);
+void JSON_object_setDouble(void *objectPtr, const char *key, double value);
+void JSON_object_setInteger(void *objectPtr, const char *key, int64_t value);
+void *JSON_object_setNewObject(void *objectPtr, const char *key);
+void *JSON_object_setNewArray(void *objectPtr, const char *key);
+void *JSON_object_setNewValue(void *objectPtr, const char *key);
+
+void JSON_array_pushNull(void *arrayPtr);
+void JSON_array_pushBoolean(void *arrayPtr, bool value);
+void JSON_array_pushString(void *arrayPtr, const char *value);
+void JSON_array_pushDouble(void *arrayPtr, double value);
+void JSON_array_pushInteger(void *arrayPtr, int64_t value);
+void *JSON_array_pushNewObject(void *arrayPtr);
+void *JSON_array_pushNewArray(void *arrayPtr);
+void *JSON_array_pushNewValue(void *arrayPtr);
+
+SWIFT_END_ASSUME_NONNULL
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
+
+#ifndef PURE_BRIDGING_MODE
+// In _not_ PURE_BRIDGING_MODE, bridging functions are inlined and therefore
+// included in the header file. This is because they rely on C++ headers that
+// we don't want to pull in when using "pure bridging mode".
+#include "BasicBridgingImpl.h"
+#endif
 
 #endif

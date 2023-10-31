@@ -19,7 +19,6 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
-#include "swift/Basic/BridgingUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
@@ -438,17 +437,6 @@ bool BridgedInstruction::maySynchronizeNotConsideringSideEffects() const {
 
 bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
   return ::mayBeDeinitBarrierNotConsideringSideEffects(get());
-}
-
-//===----------------------------------------------------------------------===//
-//                               BridgedNominalTypeDecl
-//===----------------------------------------------------------------------===//
-
-bool BridgedNominalTypeDecl::isStructWithUnreferenceableStorage() const {
-  if (auto *structDecl = dyn_cast<swift::StructDecl>(decl)) {
-    return structDecl->hasUnreferenceableStorage();
-  }
-  return false;
 }
 
 void writeCharToStderr(int c) {

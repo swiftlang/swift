@@ -1,4 +1,5 @@
-import CASTBridging
+import ASTBridging
+import BasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 

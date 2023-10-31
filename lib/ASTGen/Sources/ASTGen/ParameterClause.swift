@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CASTBridging
+import ASTBridging
+import BasicBridging
 import SwiftSyntax
 
 // MARK: - ParamDecl

@@ -17,7 +17,7 @@
 // Function implementations should be placed into SILBridgingImpl.h or SILBridging.cpp and
 // required header files should be added there.
 //
-#include "swift/Basic/BasicBridging.h"
+#include "swift/AST/ASTBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
 #include "llvm/ADT/ArrayRef.h"
@@ -39,7 +39,6 @@ struct BridgedFunction;
 struct BridgedBasicBlock;
 struct BridgedSuccessorArray;
 struct OptionalBridgedBasicBlock;
-struct BridgedNominalTypeDecl;
 
 namespace swift {
 class ValueBase;
@@ -130,26 +129,6 @@ struct BridgedType {
   BRIDGED_INLINE SwiftInt getNumTupleElements() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getTupleElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
-};
-
-// AST bridging
-
-struct BridgedNominalTypeDecl {
-  swift::NominalTypeDecl * _Nonnull decl;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
-  bool isStructWithUnreferenceableStorage() const;
-  BRIDGED_INLINE bool isGlobalActor() const;
-};
-
-struct BridgedVarDecl {
-  const swift::VarDecl * _Nonnull decl;
-
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getUserFacingName() const;
-};
-
-struct OptionalBridgedVarDecl {
-  const swift::VarDecl * _Nullable decl;
 };
 
 // SIL Bridging
@@ -432,10 +411,18 @@ struct BridgedSubstitutionMap {
 struct BridgedTypeArray {
   BridgedArrayRef typeArray;
 
+#ifdef USED_IN_CPP_SOURCE
+  BridgedTypeArray(llvm::ArrayRef<swift::Type> types) : typeArray(types) {}
+
+  llvm::ArrayRef<swift::Type> get() const {
+    return typeArray.get<swift::Type>();
+  }
+#endif
+
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedTypeArray fromReplacementTypes(BridgedSubstitutionMap substMap);
 
-  SwiftInt getCount() const { return SwiftInt(typeArray.numElements); }
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedType getAt(SwiftInt index) const;
@@ -444,7 +431,16 @@ struct BridgedTypeArray {
 struct BridgedSILTypeArray {
   BridgedArrayRef typeArray;
 
-  SwiftInt getCount() const { return SwiftInt(typeArray.numElements); }
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSILTypeArray(llvm::ArrayRef<swift::SILType> silTypes)
+      : typeArray(silTypes) {}
+
+  llvm::ArrayRef<swift::SILType> get() const {
+    return typeArray.get<swift::SILType>();
+  }
+#endif
+
+  SwiftInt getCount() const { return SwiftInt(typeArray.Length); }
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedType getAt(SwiftInt index) const;
@@ -654,19 +650,19 @@ struct BridgedInstruction {
   //                   VarDeclInst and DebugVariableInst
   // =========================================================================//
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   DebugValue_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   AllocStack_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   AllocBox_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   GlobalAddr_getDecl() const;
 
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVarDecl
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableVarDecl
   RefElementAddr_getDecl() const;
 
   BRIDGED_INLINE OptionalBridgedSILDebugVariable DebugValue_getVarInfo() const;
@@ -996,7 +992,9 @@ void writeCharToStderr(int c);
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE
-// In _not_ PURE_BRIDGING_MODE, briding functions are inlined and therefore inluded in the header file.
+// In _not_ PURE_BRIDGING_MODE, bridging functions are inlined and therefore
+// included in the header file. This is because they rely on C++ headers that
+// we don't want to pull in when using "pure bridging mode".
 #include "SILBridgingImpl.h"
 #endif
 

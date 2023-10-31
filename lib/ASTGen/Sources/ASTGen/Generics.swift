@@ -1,5 +1,4 @@
-import CASTBridging
-import CBasicBridging
+import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {

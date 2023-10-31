@@ -1,5 +1,5 @@
-import CASTBridging
-import CBasicBridging
+import ASTBridging
+import BasicBridging
 import SwiftSyntax
 
 extension BridgedSourceLoc: ExpressibleByNilLiteral {
@@ -69,9 +69,9 @@ extension BridgedSourceRange {
 }
 
 extension String {
-  mutating func withBridgedString<R>(_ body: (BridgedString) throws -> R) rethrows -> R {
+  mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
-      try body(BridgedString(data: buffer.baseAddress, length: buffer.count))
+      try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
     }
   }
 }
@@ -79,7 +79,7 @@ extension String {
 /// Allocate a copy of the given string as a null-terminated UTF-8 string.
 func allocateBridgedString(
   _ string: String
-) -> BridgedString {
+) -> BridgedStringRef {
   var string = string
   return string.withUTF8 { utf8 in
     let ptr = UnsafeMutablePointer<UInt8>.allocate(
@@ -92,18 +92,18 @@ func allocateBridgedString(
     // null terminate, for client's convenience.
     ptr[utf8.count] = 0
 
-    return BridgedString(data: ptr, length: utf8.count)
+    return BridgedStringRef(data: ptr, count: utf8.count)
   }
 }
 
 @_cdecl("swift_ASTGen_freeBridgedString")
-public func freeBridgedString(bridged: BridgedString) {
+public func freeBridgedString(bridged: BridgedStringRef) {
   bridged.data?.deallocate()
 }
 
-extension BridgedString {
+extension BridgedStringRef {
   var isEmptyInitialized: Bool {
-    return self.data == nil && self.length == 0
+    return self.data == nil && self.count == 0
   }
 }
 

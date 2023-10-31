@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CASTBridging
+import ASTBridging
+import BasicBridging
 import SwiftCompilerPluginMessageHandling
 import SwiftDiagnostics
 import SwiftOperators
@@ -221,7 +222,7 @@ func checkMacroDefinition(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeRawPointer,
   macroLocationPtr: UnsafePointer<UInt8>,
-  externalMacroOutPtr: UnsafeMutablePointer<BridgedString>,
+  externalMacroOutPtr: UnsafeMutablePointer<BridgedStringRef>,
   replacementsPtr: UnsafeMutablePointer<UnsafeMutablePointer<Int>?>,
   numReplacementsPtr: UnsafeMutablePointer<Int>
 ) -> Int {
@@ -397,10 +398,10 @@ public func freeExpansionReplacements(
 // Make an expansion result for '@_cdecl' function caller.
 func makeExpansionOutputResult(
   expandedSource: String?,
-  outputPointer: UnsafeMutablePointer<BridgedString>
+  outputPointer: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   guard var expandedSource = expandedSource else {
-    outputPointer.pointee = BridgedString()
+    outputPointer.pointee = BridgedStringRef()
     return -1
   }
   outputPointer.pointee = allocateBridgedString(expandedSource)
@@ -417,7 +418,7 @@ func expandFreestandingMacro(
   rawMacroRole: UInt8,
   sourceFilePtr: UnsafeRawPointer,
   sourceLocationPtr: UnsafePointer<UInt8>?,
-  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
   assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
@@ -692,7 +693,7 @@ func expandAttachedMacro(
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
   parentDeclSourceFilePtr: UnsafeRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
-  expandedSourceOutPtr: UnsafeMutablePointer<BridgedString>
+  expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
 ) -> Int {
   // We didn't expand anything so far.
   assert(expandedSourceOutPtr.pointee.isEmptyInitialized)
