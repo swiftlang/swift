@@ -57,6 +57,10 @@
 #define BRIDGED_INLINE inline
 #endif
 
+namespace llvm {
+class raw_ostream;
+} // end namespace llvm
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef intptr_t SwiftInt;
@@ -72,14 +76,14 @@ typedef uintptr_t SwiftUInt;
 // PURE_BRIDGING_MODE.
 #define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
   class Bridged##Name {                                                        \
-    swift::Node * Nullability Ptr;                                             \
+    Node * Nullability Ptr;                                                    \
                                                                                \
   public:                                                                      \
     SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
-    Bridged##Name(swift::Node * Nullability ptr) : Ptr(ptr) {}                 \
+    Bridged##Name(Node * Nullability ptr) : Ptr(ptr) {}                        \
                                                                                \
     SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
-    swift::Node * Nullability unbridged() const { return Ptr; }                \
+    Node * Nullability unbridged() const { return Ptr; }                       \
   };                                                                           \
                                                                                \
   SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
@@ -89,15 +93,15 @@ typedef uintptr_t SwiftUInt;
                                                                                \
   SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
   inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
-    return static_cast<swift::Node *>(ptr);                                    \
+    return static_cast<Node *>(ptr);                                           \
   }
 
 // Bridging wrapper macros for convenience.
-#define BRIDGING_WRAPPER_NONNULL(Name) \
-  BRIDGING_WRAPPER_IMPL(Name, Name, _Nonnull)
+#define BRIDGING_WRAPPER_NONNULL(Node, Name) \
+  BRIDGING_WRAPPER_IMPL(Node, Name, _Nonnull)
 
-#define BRIDGING_WRAPPER_NULLABLE(Name) \
-  BRIDGING_WRAPPER_IMPL(Name, Nullable##Name, _Nullable)
+#define BRIDGING_WRAPPER_NULLABLE(Node, Name) \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, _Nullable)
 
 //===----------------------------------------------------------------------===//
 // MARK: ArrayRef
@@ -179,9 +183,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
 // MARK: OStream
 //===----------------------------------------------------------------------===//
 
-struct BridgedOStream {
-  void * _Nonnull streamAddr;
-};
+BRIDGING_WRAPPER_NONNULL(llvm::raw_ostream, OStream)
 
 //===----------------------------------------------------------------------===//
 // MARK: StringRef
