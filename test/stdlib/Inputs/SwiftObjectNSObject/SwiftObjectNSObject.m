@@ -116,6 +116,12 @@ void TestSwiftObjectNSObjectHashValue(id e, NSUInteger hashValue)
   expectTrue([e hash] == hashValue);
 }
 
+void TestSwiftObjectNSObjectDefaultHashValue(id e)
+{
+  NSUInteger hashValue = (NSUInteger)e;
+  TestSwiftObjectNSObjectHashValue(e, hashValue);
+}
+
 void TestSwiftObjectNSObject(id c, id d)
 {
   printf("TestSwiftObjectNSObject\n");

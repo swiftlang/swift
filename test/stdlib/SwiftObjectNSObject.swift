@@ -79,6 +79,8 @@ func TestSwiftObjectNSObjectEquals(_: AnyObject, _: AnyObject)
 func TestSwiftObjectNSObjectNotEquals(_: AnyObject, _: AnyObject)
 @_silgen_name("TestSwiftObjectNSObjectHashValue")
 func TestSwiftObjectNSObjectHashValue(_: AnyObject, _: Int)
+@_silgen_name("TestSwiftObjectNSObjectDefaultHashValue")
+func TestSwiftObjectNSObjectDefaultHashValue(_: AnyObject)
 @_silgen_name("TestSwiftObjectNSObjectAssertNoErrors")
 func TestSwiftObjectNSObjectAssertNoErrors()
 
@@ -101,12 +103,16 @@ func TestHashable(_ h: H)
   TestSwiftObjectNSObjectHashValue(h, h.hashValue)
 }
 
-// Test Obj-C hashValue for Swift types that are not Hashable
-func TestNonHashableHash(_ e: AnyObject)
+// Test Obj-C hashValue for Swift types that are Equatable but not Hashable
+func TestEquatableHash(_ e: AnyObject)
 {
-  // Non-Hashable type should always have the
-  // same hash value in Obj-C
+  // These should have a constant hash value
   TestSwiftObjectNSObjectHashValue(e, 1)
+}
+
+func TestNonEquatableHash(_ e: AnyObject)
+{
+  TestSwiftObjectNSObjectDefaultHashValue(e)
 }
 
 // This check is for NSLog() output from TestSwiftObjectNSObject().
@@ -154,12 +160,14 @@ if #available(OSX 10.12, iOS 10.0, *) {
   TestNonEquatableEquals(F1(i: 1), E(i: 1))
   TestEquatableEquals(H(i:1), E(i:1))
 
-  // Non-Hashable: alway have the same Obj-C hashValue
-  TestNonHashableHash(E(i: 1))
-  TestNonHashableHash(E1(i: 3))
-  TestNonHashableHash(E2(i: 8))
-  TestNonHashableHash(C())
-  TestNonHashableHash(D())
+  // Equatable but not Hashable: alway have the same Obj-C hashValue
+  TestEquatableHash(E(i: 1))
+  TestEquatableHash(E1(i: 3))
+  TestEquatableHash(E2(i: 8))
+
+  // Neither Equatable nor Hashable
+  TestNonEquatableHash(C())
+  TestNonEquatableHash(D())
 
   // Hashable types are also Equatable
   TestEquatableEquals(H(i:1), H(i:1))

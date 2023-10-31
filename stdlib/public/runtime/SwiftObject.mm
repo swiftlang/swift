@@ -375,20 +375,32 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
 - (NSUInteger)hash {
   auto selfMetadata = _swift_getClassOfAllocated(self);
+
+  // If it's Hashable, use that
   auto hashableConformance =
     reinterpret_cast<const hashable_support::HashableWitnessTable *>(
       swift_conformsToProtocolCommon(
 	selfMetadata, &hashable_support::HashableProtocolDescriptor));
-  if (hashableConformance == NULL) {
-    // If a type is Equatable (but not Hashable), we
-    // have to return something here that is compatible
-    // with the `isEqual:` below.  NSObject's default
-    // of `(NSUInteger)self` won't work, so we instead
-    // return a constant fallback value:
+  if (hashableConformance != NULL) {
+    return _swift_stdlib_Hashable_hashValue_indirect(
+      &self, selfMetadata, hashableConformance);
+  }
+
+  // If a type is Equatable (but not Hashable), we
+  // have to return something here that is compatible
+  // with the `isEqual:` below.  NSObject's default
+  // of `(NSUInteger)self` won't work, so we instead
+  // return a constant fallback value:
+  auto equatableConformance =
+    reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &equatable_support::EquatableProtocolDescriptor));
+  if (equatableConformance != nullptr) {
     return (NSUInteger)1;
   }
-  return _swift_stdlib_Hashable_hashValue_indirect(
-    &self, selfMetadata, hashableConformance);
+
+  // Legacy default for types that are neither Hashable nor Equatable.
+  return (NSUInteger)self;
 }
 
 - (BOOL)isEqual:(id)other {
