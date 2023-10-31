@@ -7,9 +7,7 @@
 do {
   struct Test {
     init<T: Sendable>(value: T) {}
-    // expected-note@-1 {{found this candidate}}
     init<T>(value: T) {}
-    // expected-note@-1 {{found this candidate}}
   }
 
   struct SendableOnly {
@@ -23,8 +21,7 @@ do {
   }
 
   func testSendable<T: Sendable>(v: T) {
-    _ = Test(value: v)
-    // expected-error@-1 {{ambiguous use of 'init(value:)'}}
+    _ = Test(value: v) // Ok
     _ = SendableOnly(value: v) // Ok
   }
 }
