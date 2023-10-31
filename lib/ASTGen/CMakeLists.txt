@@ -71,6 +71,8 @@ set(compile_options
   "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
 )
 
-foreach(target swiftASTGen swiftLLVMJSON)
-  target_compile_options(${target} PRIVATE ${compile_options})
-endforeach()
+if(SWIFT_BUILD_SWIFT_SYNTAX)
+  foreach(target swiftASTGen swiftLLVMJSON)
+    target_compile_options(${target} PRIVATE ${compile_options})
+  endforeach()
+endif()
