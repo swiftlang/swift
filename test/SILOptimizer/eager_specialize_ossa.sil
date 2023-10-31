@@ -909,10 +909,10 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // CHECK-IRGEN:   %3 = getelementptr inbounds ptr, ptr %S, i{{.*}} -1
 // CHECK-IRGEN-NEXT:   %S.valueWitnesses = load ptr, ptr %3
 // CHECK-IRGEN-NEXT:   %4 = getelementptr inbounds ptr, ptr %S.valueWitnesses
-// CHECK-IRGEN-NEXT:   %5 = load ptr, ptr %4
+// CHECK-IRGEN-NEXT:   %InitializeWithCopy = load ptr, ptr %4
 // CHECK-IRGEN-arm64e-NEXT:   ptrtoint ptr %4 to i64
 // CHECK-IRGEN-arm64e-NEXT:   call i64 @llvm.ptrauth.blend.i64
-// CHECK-IRGEN-NEXT:   call {{.*}} %5
+// CHECK-IRGEN-NEXT:   call {{.*}} %InitializeWithCopy
 // CHECK-IRGEN-NEXT:   ret void
 // CHECK-IRGEN-NEXT: }
 

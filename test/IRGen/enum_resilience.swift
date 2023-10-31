@@ -310,7 +310,7 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], {{(i64|i32)}} -1
 // CHECK-NEXT: %.valueWitnesses = load ptr, ptr [[WITNESSTABLE_ADDR]]
 // CHECK-NEXT: [[WITNESS_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %.valueWitnesses, i32 7
-// CHECK-NEXT: [[WITNESS_FN:%[0-9]+]] = load ptr, ptr [[WITNESS_ADDR]]
+// CHECK-NEXT: [[WITNESS_FN:%[^,]+]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr {{.*}} to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
 // CHECK-NEXT: call void [[WITNESS_FN]](ptr noalias %0, i32 1, i32 1, ptr [[METADATA]])
