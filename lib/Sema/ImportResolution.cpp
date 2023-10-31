@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "swift-import-resolution"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -602,28 +603,9 @@ UnboundImport::UnboundImport(ImportDecl *ID)
 }
 
 bool UnboundImport::checkNotTautological(const SourceFile &SF) {
-  // Exit early if this is not a self-import.
-  auto modulePath = import.module.getModulePath();
-  if (modulePath.front().Item != SF.getParentModule()->getName() ||
-      // Overlays use an @_exported self-import to load their clang module.
-      import.options.contains(ImportFlags::Exported) ||
-      // Imports of your own submodules are allowed in cross-language libraries.
-      modulePath.size() != 1 ||
-      // SIL files self-import to get decls from the rest of the module.
-      SF.Kind == SourceFileKind::SIL)
-    return true;
-
-  ASTContext &ctx = SF.getASTContext();
-
-  StringRef filename = llvm::sys::path::filename(SF.getFilename());
-  if (filename.empty())
-    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module,
-                       modulePath.front().Item);
-  else
-    ctx.Diags.diagnose(importLoc, diag::sema_import_current_module_with_file,
-                       filename, modulePath.front().Item);
-
-  return false;
+  return swift::dependencies::checkImportNotTautological(
+      import.module.getModulePath(), importLoc, SF,
+      import.options.contains(ImportFlags::Exported));
 }
 
 bool UnboundImport::checkModuleLoaded(ModuleDecl *M, SourceFile &SF) {

@@ -11,7 +11,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-import CrossImportTestModule
+@_exported import CrossImportTestModule
 import EWrapper
 import SubEWrapper
 
