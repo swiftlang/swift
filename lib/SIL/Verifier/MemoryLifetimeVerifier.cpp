@@ -490,16 +490,24 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
 
   TermInst *term = pred->getTerminator();
   if (auto *tai = dyn_cast<TryApplyInst>(term)) {
-    // @out results of try_apply are only valid in the normal-block, but not in
-    // the throw-block.
-    if (tai->getNormalBB() != block)
-      return;
-
     FullApplySite FAS(tai);
-    for (Operand &op : tai->getAllOperands()) {
-      if (FAS.isArgumentOperand(op) &&
-          FAS.getArgumentConvention(op) == SILArgumentConvention::Indirect_Out) {
-        locations.genBits(getSet, killSet, op.get());
+
+    if (block == tai->getNormalBB()) {
+      // @out results of try_apply are only valid in the normal-block.
+      for (Operand &op : tai->getAllOperands()) {
+        if (FAS.isArgumentOperand(op) &&
+            FAS.isIndirectResultOperand(op)) {
+          locations.genBits(getSet, killSet, op.get());
+        }
+      }
+    } else {
+      // @error_indirect results of try_apply are only valid in the error-block.
+      assert(block == tai->getErrorBB());
+      for (Operand &op : tai->getAllOperands()) {
+        if (FAS.isArgumentOperand(op) &&
+            FAS.isIndirectErrorResultOperand(op)) {
+          locations.genBits(getSet, killSet, op.get());
+        }
       }
     }
   } else if (auto *castInst = dyn_cast<CheckedCastAddrBranchInst>(term)) {
