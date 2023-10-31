@@ -178,13 +178,7 @@ Type swift::getDistributedActorSystemResultHandlerType(
   auto module = system->getParentModule();
   Type selfType = system->getSelfInterfaceType();
   auto conformance = module->lookupConformance(selfType, DAS);
-  auto witness =
-      conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
-  if (auto alias = dyn_cast<TypeAliasType>(witness.getPointer())) {
-    return alias->getDecl()->getUnderlyingType();
-  } else {
-    return witness;
-  }
+  return conformance.getTypeWitnessByName(selfType, ctx.Id_ResultHandler);
 }
 
 Type swift::getDistributedActorSystemInvocationEncoderType(NominalTypeDecl *system) {
