@@ -96,7 +96,8 @@ public:
   static void printTypeGenericTraits(
       raw_ostream &os, const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
       ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
-      const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter);
+      const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter,
+      bool isOpaqueLayout = false);
 
   static void printTypePrecedingGenericTraits(raw_ostream &os,
                                               const NominalTypeDecl *typeDecl,

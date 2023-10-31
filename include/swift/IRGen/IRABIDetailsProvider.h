@@ -96,13 +96,16 @@ public:
 
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
     DirectParameter(IRABIDetailsProviderImpl &owner,
                     const irgen::TypeInfo &typeDetails,
-                    const ParamDecl &paramDecl);
+                    const ParamDecl &paramDecl, ParameterConvention convention);
     IRABIDetailsProviderImpl &owner;
     const irgen::TypeInfo &typeDetails;
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 
@@ -111,9 +114,13 @@ public:
   public:
     inline const ParamDecl &getParamDecl() const { return paramDecl; }
 
+    inline ParameterConvention getConvention() const { return convention; }
+
   private:
-    IndirectParameter(const ParamDecl &paramDecl);
+    IndirectParameter(const ParamDecl &paramDecl,
+                      ParameterConvention convention);
     const ParamDecl &paramDecl;
+    ParameterConvention convention;
     friend class LoweredFunctionSignature;
   };
 

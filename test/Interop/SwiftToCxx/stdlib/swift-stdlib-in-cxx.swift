@@ -43,6 +43,7 @@
 
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
+// CHECK: template<class T_0_0>
 
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
