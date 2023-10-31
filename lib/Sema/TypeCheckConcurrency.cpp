@@ -1459,14 +1459,10 @@ void swift::tryDiagnoseExecutorConformance(ASTContext &C,
     }
   }
 
-  // Old UnownedJob based impl is present, warn about it suggesting the new protocol requirement.
-  if (canRemoveOldDecls && unownedEnqueueWitnessDecl) {
-    if (!isStdlibDefaultImplDecl(unownedEnqueueWitnessDecl)) {
-      diags.diagnose(unownedEnqueueWitnessDecl->getLoc(),
-                     diag::executor_enqueue_deprecated_unowned_implementation,
-                     nominalTy);
-    }
-  }
+  // We specifically do allow the old UnownedJob implementation to be present.
+  // In order to ease migration and compatibility for libraries which remain compatible with old Swift versions,
+  // and would be getting this warning in situations they cannot address it.
+
   // Old Job based impl is present, warn about it suggesting the new protocol requirement.
   if (legacyMoveOnlyEnqueueWitnessDecl) {
     if (!isStdlibDefaultImplDecl(legacyMoveOnlyEnqueueWitnessDecl)) {
