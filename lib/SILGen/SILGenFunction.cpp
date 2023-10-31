@@ -1043,15 +1043,18 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
-  emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
-             fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
+  emitProlog(fd, captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(),
+             fd->getResultInterfaceType(), fd->getEffectiveThrownErrorType(),
+             fd->getThrowsLoc());
 
   if (fd->isDistributedActorFactory()) {
     // Synthesize the factory function body
     emitDistributedActorFactory(fd);
   } else {
-    prepareEpilog(fd->getResultInterfaceType(),
-                  fd->getEffectiveThrownErrorType(), CleanupLocation(fd));
+    prepareEpilog(fd,
+                  fd->getResultInterfaceType(),
+                  fd->getEffectiveThrownErrorType(),
+                  CleanupLocation(fd));
 
     if (fd->requiresUnavailableDeclABICompatibilityStubs())
       emitApplyOfUnavailableCodeReached();
@@ -1071,15 +1074,17 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
   OrigFnType = SGM.M.Types.getConstantAbstractionPattern(SILDeclRef(ace));
-  
+
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
+  llvm::Optional<Type> errorIfaceTy;
+  if (auto optErrorTy = ace->getEffectiveThrownType())
+    errorIfaceTy = (*optErrorTy)->mapTypeOutOfContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
     SILDeclRef(ace));
-  emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
-             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc(),
-             OrigFnType);
-  prepareEpilog(resultIfaceTy, ace->getEffectiveThrownType(),
-                CleanupLocation(ace));
+  emitProlog(ace, captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
+             resultIfaceTy, errorIfaceTy, ace->getLoc(), OrigFnType);
+  prepareEpilog(ace, resultIfaceTy, errorIfaceTy,
+                CleanupLocation(ace), OrigFnType);
 
   emitProfilerIncrement(ace);
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
@@ -1553,15 +1558,15 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
 
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog(captureInfo, params, /*selfParam=*/nullptr,
-             dc, interfaceType, /*throws=*/false, SourceLoc());
+  emitProlog(dc, captureInfo, params, /*selfParam=*/nullptr, interfaceType,
+             /*errorType=*/llvm::None, SourceLoc());
   if (EmitProfilerIncrement) {
     // Emit a profiler increment for the top-level value, not looking through
     // any function conversions. This is necessary as the counter would have
     // been recorded for this expression, not the sub-expression.
     emitProfilerIncrement(topLevelValue);
   }
-  prepareEpilog(interfaceType, llvm::None, CleanupLocation(Loc));
+  prepareEpilog(dc, interfaceType, llvm::None, CleanupLocation(Loc));
 
   {
     llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
@@ -1621,10 +1626,14 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     }
   }
 
-  emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
-                  interfaceType, dc, /*throws=*/ false,SourceLoc(),
+  emitBasicProlog(dc,
+                  /*paramList*/ nullptr,
+                  /*selfParam*/ nullptr,
+                  interfaceType,
+                  /*errorType=*/llvm::None,
+                  /*throwsLoc=*/SourceLoc(),
                   /*ignored parameters*/ 0);
-  prepareEpilog(interfaceType, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dc, interfaceType, llvm::None, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();
   const auto i = pbd->getPatternEntryIndexForVarDecl(var);
@@ -1676,11 +1685,11 @@ void SILGenFunction::emitGeneratorFunction(
 
   auto *dc = function.getDecl()->getInnermostDeclContext();
   auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
-  emitProlog(captureInfo, ParameterList::createEmpty(getASTContext()),
-             /*selfParam=*/nullptr, dc, resultInterfaceType, /*throws=*/false,
-             SourceLoc(), pattern);
+  emitProlog(dc, captureInfo, ParameterList::createEmpty(getASTContext()),
+             /*selfParam=*/nullptr, resultInterfaceType,
+             /*errorType=*/llvm::None, SourceLoc(), pattern);
 
-  prepareEpilog(resultInterfaceType, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dc, resultInterfaceType, llvm::None, CleanupLocation(loc));
 
   emitStmt(body);
 

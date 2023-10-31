@@ -883,6 +883,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TypedThrowsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTypedThrowsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability
   MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
     auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
@@ -927,6 +935,14 @@ namespace RuntimeConstants {
     // swift_task_run_inline is only available under task-to-thread execution
     // model.
     return RuntimeAvailability::ConditionallyAvailable;
+  }
+
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
   }
 
 } // namespace RuntimeConstants

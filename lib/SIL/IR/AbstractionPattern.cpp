@@ -1214,6 +1214,78 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
   llvm_unreachable("bad kind");
 }
 
+llvm::Optional<AbstractionPattern>
+AbstractionPattern::getFunctionThrownErrorType() const {
+  switch (getKind()) {
+  case Kind::Invalid:
+    llvm_unreachable("querying invalid abstraction pattern!");
+  case Kind::ObjCCompletionHandlerArgumentsType:
+  case Kind::Tuple:
+    llvm_unreachable("abstraction pattern for tuple cannot be function");
+  case Kind::Opaque:
+    return *this;
+  case Kind::Type: {
+    if (isTypeParameterOrOpaqueArchetype())
+      return getOpaque();
+
+    if (auto errorType = cast<AnyFunctionType>(getType())->getEffectiveThrownErrorType()) {
+      return AbstractionPattern(getGenericSubstitutions(),
+                                getGenericSignatureForFunctionComponent(),
+                                (*errorType)->getCanonicalType());
+    }
+
+    return llvm::None;
+  }
+  case Kind::Discard:
+    llvm_unreachable("don't need to discard function abstractions yet");
+  case Kind::ClangType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::ObjCMethodType:
+    llvm_unreachable("implement me");
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return llvm::None;
+  }
+  llvm_unreachable("bad kind");
+}
+
+llvm::Optional<std::pair<AbstractionPattern, CanType>>
+AbstractionPattern::getFunctionThrownErrorType(
+    CanAnyFunctionType substFnInterfaceType) const {
+  auto optOrigErrorType = getFunctionThrownErrorType();
+  if (!optOrigErrorType)
+    return llvm::None;
+
+  auto &ctx = substFnInterfaceType->getASTContext();
+  auto optErrorType = substFnInterfaceType->getEffectiveThrownErrorType();
+
+  if (isTypeParameterOrOpaqueArchetype()) {
+    if (!optErrorType)
+      return llvm::None;
+
+    if (!(*optErrorType)->isEqual(ctx.getErrorExistentialType())) {
+      llvm::errs() << "unsupported reabstraction\n";
+      abort();
+    }
+
+    return std::make_pair(AbstractionPattern(*optErrorType),
+                          (*optErrorType)->getCanonicalType());
+  }
+
+  if (!optErrorType)
+    optErrorType = ctx.getErrorExistentialType();
+
+  return std::make_pair(*optOrigErrorType,
+                        (*optErrorType)->getCanonicalType());
+}
+
 AbstractionPattern
 AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
                                      CanType swiftCompletionHandlerType) const {
@@ -1939,7 +2011,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::Opaque:
     // Maximally abstracted values are always passed indirectly.
     return Indirect;
-  
+
   case Kind::OpaqueFunction:
   case Kind::OpaqueDerivativeFunction:
   case Kind::PartialCurriedObjCMethodType:
@@ -1953,18 +2025,52 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::PartialCurriedCXXMethodType:
     // Function types are always passed directly
     return Direct;
-      
+
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard:
     // Pass according to the formal type.
     return SILType::isFormallyPassedIndirectly(getType(),
-                                                 TC,
-                                                 getGenericSignatureOrNull())
+                                               TC,
+                                               getGenericSignatureOrNull())
       ? Indirect : Direct;
-  
+
   case Kind::Invalid:
   case Kind::Tuple:
+  case Kind::ObjCCompletionHandlerArgumentsType:
+    llvm_unreachable("should not get here");
+  }
+}
+
+AbstractionPattern::CallingConventionKind
+AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    // Maximally abstracted values are always thrown indirectly.
+    return Indirect;
+
+  case Kind::ClangType:
+  case Kind::Type:
+  case Kind::Discard:
+    // Pass according to the formal type.
+    return SILType::isFormallyThrownIndirectly(getType(),
+                                               TC,
+                                               getGenericSignatureOrNull())
+      ? Indirect : Direct;
+
+  case Kind::Tuple:
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+  case Kind::PartialCurriedObjCMethodType:
+  case Kind::CurriedObjCMethodType:
+  case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CurriedCFunctionAsMethodType:
+  case Kind::CFunctionAsMethodType:
+  case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+  case Kind::Invalid:
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
@@ -2514,14 +2620,28 @@ public:
     if (yieldType) {
       substYieldType = visit(yieldType, yieldPattern);
     }
-    
+
+    CanType newErrorType;
+
+    if (auto optPair = pattern.getFunctionThrownErrorType(func)) {
+      auto errorPattern = optPair->first;
+      auto errorType = optPair->second;
+      newErrorType = visit(errorType, errorPattern);
+    }
+
     auto newResultTy = visit(func.getResult(),
                              pattern.getFunctionResultType());
 
     llvm::Optional<FunctionType::ExtInfo> extInfo;
     if (func->hasExtInfo())
       extInfo = func->getExtInfo();
-    
+
+    if (newErrorType) {
+      if (!extInfo)
+        extInfo = FunctionType::ExtInfo();
+      extInfo = extInfo->withThrows(true, newErrorType);
+    }
+
     return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
                                 newResultTy, extInfo);
   }
@@ -2562,7 +2682,7 @@ const {
   auto substTy = visitor.handleUnabstractedFunctionType(substType, *this,
                                                         substYieldType,
                                                         origYieldType);
-  
+
   auto substSig = buildGenericSignature(TC.Context, GenericSignature(),
                                         std::move(visitor.substGenericParams),
                                         std::move(visitor.substRequirements))

@@ -1553,6 +1553,13 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
       Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + Val);
   }
 
+  if (auto *A = Args.getLastArg(OPT_file_compilation_dir)) {
+    // Forward the -file-compilation-dir flag to correctly set the
+    // debug compilation directory.
+    std::string Val(A->getValue());
+    Opts.ExtraArgs.push_back("-ffile-compilation-dir=" + Val);
+  }
+
   if (FrontendOpts.CASFSRootIDs.empty() &&
       FrontendOpts.ClangIncludeTrees.empty()) {
     if (!workingDirectory.empty()) {
@@ -2811,6 +2818,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 6);
       } else if (version.equals("5.8")) {
         runtimeCompatibilityVersion = llvm::VersionTuple(5, 8);
+      } else if (version.equals("5.11")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 11);
       } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        versionArg->getAsString(Args), version);

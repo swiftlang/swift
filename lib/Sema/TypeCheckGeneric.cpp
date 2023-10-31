@@ -732,12 +732,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
         auto paramOptions = baseOptions;
 
-        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr)) {
-          if (isa<OwnershipTypeRepr>(specifier))
-            paramOptions |= TypeResolutionFlags::HasOwnership;
-
+        if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
-        }
 
         if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);

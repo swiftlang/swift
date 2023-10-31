@@ -563,7 +563,12 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
       locations.setBits(expectedThrowBits, funcArg);
       break;
     case SILArgumentConvention::Indirect_Out:
-      locations.setBits(expectedReturnBits, funcArg);
+      if (funcArg->isIndirectErrorResult()) {
+        locations.setBits(expectedThrowBits, funcArg);
+      } else {
+        assert(funcArg->isIndirectResult());
+        locations.setBits(expectedReturnBits, funcArg);
+      }
       break;
     default:
       break;

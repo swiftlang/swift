@@ -30,9 +30,8 @@ protocol Plain {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
 }
 
-// FIXME: detection of ~Copyable in where-clauses is half-baked.
-protocol RemovedAgain where Self: ~Copyable { // expected-warning {{protocol 'RemovedAgain' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
-    func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
+protocol RemovedAgain where Self: ~Copyable {
+    func requiresCopyableSelf(_ t: AlwaysCopyable<Self>) // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
 }
 
 struct StructContainment<T: ~Copyable> {
@@ -58,4 +57,42 @@ class ClassContainment<T: ~Copyable> {
         storage = t
         checkCopyable(t) // expected-error {{noncopyable type 'T' cannot be substituted for copyable generic parameter 'T' in 'checkCopyable'}}
     }
+}
+
+
+/// ----------------
+
+enum Maybe<Wrapped: ~Copyable>: ~Copyable {
+  case just(Wrapped)
+  case none
+}
+extension Maybe: Copyable where Wrapped: Copyable {}
+
+struct RequireCopyable<T> {}
+// expected-note@-1{{requirement specified as 'NC' : 'Copyable'}}
+// expected-note@-2{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
+// expected-note@-3{{requirement specified as 'Wrapped' : 'Copyable'}}
+// expected-note@-4{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
+
+struct NC: ~Copyable {}
+
+typealias ok1 = RequireCopyable<Int>
+typealias ok2 = RequireCopyable<Maybe<Int>>
+
+typealias err1 = RequireCopyable<Maybe<NC>>
+// expected-error@-1{{type 'NC' does not conform to protocol 'Copyable'}}
+// expected-error@-2{{'RequireCopyable' requires that 'NC' conform to 'Copyable'}}
+
+typealias err2 = RequireCopyable<NC>
+// expected-error@-1{{type 'NC' does not conform to protocol 'Copyable'}}
+
+// plain extension doesn't treat Self as Copyable
+extension Maybe {
+  func check1(_ t: RequireCopyable<Self>) {}
+  // expected-error@-1 {{type 'Wrapped' does not conform to protocol 'Copyable'}}
+  // expected-error@-2 {{'RequireCopyable' requires that 'Wrapped' conform to 'Copyable'}}
+}
+
+extension Maybe where Self: Copyable {
+  func check2(_ t: RequireCopyable<Self>) {}
 }

@@ -1769,6 +1769,7 @@ private:
     case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
+    case TypeKind::Inverse:
     case TypeKind::Placeholder:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:

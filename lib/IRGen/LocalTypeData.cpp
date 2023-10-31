@@ -311,15 +311,15 @@ LocalTypeDataCache::StateAdvancement LocalTypeDataCache::advanceStateInScope(
   key = key.getCachingKey();
 
   auto iterator = Map.find(key);
-  // There's no chain of entries, no no entry which could possibly be used.
+  // There's no chain of entries, so no entry which could possibly be used.
   if (iterator == Map.end())
     return StateAdvancement::NoEntry;
   auto &chain = iterator->second;
 
-  // Scan the chain for entries with the appropriate relationship to the active
-  // dominance scope, and "promote their state".  Any entry whose state is
-  // already at least as complete than `state` is unaffected, and results in
-  // exiting early.
+  // Scan the chain for an entry with the appropriate relationship to the active
+  // dominance scope, and "promote its state".  The existence of a concrete
+  // entry whose state is already at least as complete as `state` is
+  // unaffected, and results in exiting early.
   //
   // There are two cases of interest:
   //

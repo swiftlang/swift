@@ -699,11 +699,12 @@ extension DoubleWidth : UnsignedInteger where Base : UnsignedInteger {
 
     // Left shift both rhs and lhs, then divide and right shift the remainder.
     let shift = rhs.leadingZeroBitCount
+    let high = (lhs >> (Magnitude.bitWidth &- shift)).low
     let rhs = rhs &<< shift
-    let high = (lhs &>> (Magnitude.bitWidth &- shift)).low
     let lhs = lhs &<< shift
-    let (quotient, remainder) =
-      Magnitude._divide((high, lhs.high, lhs.low), by: rhs)
+    let (quotient, remainder) = high == (0 as Low)
+      ? (1, lhs &- rhs)
+      : Magnitude._divide((high, lhs.high, lhs.low), by: rhs)
     return (Magnitude(0, quotient), remainder &>> shift)
   }
 }
@@ -805,6 +806,22 @@ dwTests.test("Arithmetic/unsigned") {
 
   expectEqual(x % 3, 1)
   expectEqual(x % y, x)
+
+  do {
+    let lhs = DoubleWidth<UInt8>((high: 0b0011_0000, low: 0))
+    let rhs = DoubleWidth<UInt8>((high: 0b0010_0000, low: 0))
+    expectEqual(lhs % rhs, 4096)
+  }
+  do {
+    let lhs = DoubleWidth<UInt64>((high: 0xa0c7d7165cf01386, low: 0xbf3f66a93056143f))
+    let rhs = DoubleWidth<UInt64>((high: 0x9ac3a19b1e7d6b83, low: 0x513929792d588736))
+    expectEqual(String(lhs % rhs), "7997221894243298914179865336050715913")
+  }
+  do {
+    let lhs = DoubleWidth<UInt64>((high: 0xea8a9116b7af33b7, low: 0x3d9d6779ddd22ca3))
+    let rhs = DoubleWidth<UInt64>((high: 0xc3673efc7f1f37cc, low: 0x312f661057d0ba94))
+    expectEqual(String(lhs % rhs), "52023287460685389410162512181093036559")
+  }
 }
 
 dwTests.test("Arithmetic/signed") {

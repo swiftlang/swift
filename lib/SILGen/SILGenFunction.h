@@ -392,6 +392,9 @@ public:
   /// postmatter and takes a BB argument of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
 
+  /// Support for typed throws.
+  SILArgument *IndirectErrorResult = nullptr;
+
   /// The destination for coroutine unwinds.  The block will always
   /// be in the postmatter.
   JumpDest CoroutineUnwindDest = JumpDest::invalid();
@@ -1144,15 +1147,15 @@ public:
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
   void
-  emitProlog(CaptureInfo captureInfo, ParameterList *paramList,
-             ParamDecl *selfParam, DeclContext *DC, Type resultType,
-             bool throws, SourceLoc throwsLoc,
+  emitProlog(DeclContext *DC, CaptureInfo captureInfo, ParameterList *paramList,
+             ParamDecl *selfParam, Type resultType,
+             llvm::Optional<Type> errorType, SourceLoc throwsLoc,
              llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
   /// A simpler version of emitProlog
   /// \returns the number of variables in paramPatterns.
   uint16_t emitBasicProlog(
-      ParameterList *paramList, ParamDecl *selfParam, Type resultType,
-      DeclContext *DC, bool throws, SourceLoc throwsLoc,
+      DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
+      Type resultType, llvm::Optional<Type> errorType, SourceLoc throwsLoc,
       unsigned numIgnoredTrailingParameters,
       llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
 
@@ -1169,17 +1172,25 @@ public:
   /// Create (but do not emit) the epilog branch, and save the
   /// current cleanups depth as the destination for return statement branches.
   ///
+  /// \param dc  The declaration context whose generic signature to use for
+  ///            interpreting interface types.
   /// \param directResultType  If given a value, the epilog block will be
   ///                    created with arguments for each direct result of this
   ///                    function, corresponding to the formal return type.
-  /// \param exnType  If not None, create an error epilog block with the given
-  ///                 exception type.
+  /// \param errorType  If not None, create an error epilog block with the given
+  ///                   thrown error type.
   /// \param L           The SILLocation which should be associated with
   ///                    cleanup instructions.
-  void prepareEpilog(llvm::Optional<Type> directResultType, 
-                     llvm::Optional<Type> exnType,
-                     CleanupLocation L);
-  void prepareRethrowEpilog(Type exnType, CleanupLocation l);
+  /// \param origClosureType Overrides the abstraction pattern for lowering the
+  ///                        error type.
+  void prepareEpilog(DeclContext *dc,
+                     llvm::Optional<Type> directResultType, 
+                     llvm::Optional<Type> errorType,
+                     CleanupLocation L,
+                     llvm::Optional<AbstractionPattern> origClosureType = llvm::None);
+  void prepareRethrowEpilog(DeclContext *dc,
+                            AbstractionPattern origErrorType,
+                            Type errorType, CleanupLocation l);
   void prepareCoroutineUnwindEpilog(CleanupLocation l);
   
   /// Branch to and emit the epilog basic block. This will fuse

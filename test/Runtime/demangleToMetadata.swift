@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib -enable-experimental-feature TypedThrows %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -519,6 +519,33 @@ if #available(SwiftStdlib 5.3, *) {
 if #available(SwiftStdlib 5.1, *) {
   DemangleToMetadataTests.test("Concurrency standard substitutions") {
     expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
+
+enum MyBigError: Error {
+  case epicFail
+}
+
+@available(SwiftStdlib 5.11, *)
+func getFnTypeWithThrownError<E: Error>(_: E.Type) -> Any.Type {
+  typealias Fn = (Int) throws(E) -> Void
+  return Fn.self
+}
+
+if #available(SwiftStdlib 5.11, *) {
+  DemangleToMetadataTests.test("typed throws") {
+    typealias Fn = (Int) throws(MyBigError) -> Void
+    expectEqual("ySi4main10MyBigErrorOYKc", _mangledTypeName(Fn.self)!)
+    expectEqual(Fn.self, _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+
+    expectEqual(getFnTypeWithThrownError(MyBigError.self), _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+    // throws(any Error) -> throws
+    expectEqual(getFnTypeWithThrownError((any Error).self), _typeByName("ySiKc")!)
+
+    // throws(Never) -> non-throwing
+    expectEqual(getFnTypeWithThrownError(Never.self), _typeByName("ySic")!)
   }
 }
 

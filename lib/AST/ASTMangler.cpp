@@ -1401,6 +1401,9 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::LValue:
       llvm_unreachable("@lvalue types should not occur in function interfaces");
 
+    case TypeKind::Inverse:
+      llvm_unreachable("inverse types should not appear in interfaces");
+
     case TypeKind::InOut:
       appendType(cast<InOutType>(tybase)->getObjectType(), sig, forDecl);
       return appendOperator("z");
@@ -2825,8 +2828,14 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Ya");
   if (fn->isSendable())
     appendOperator("Yb");
-  if (fn->isThrowing())
-    appendOperator("K");
+  if (auto thrownError = fn->getEffectiveThrownErrorType()) {
+    if ((*thrownError)->isEqual(fn->getASTContext().getErrorExistentialType())){
+      appendOperator("K");
+    } else {
+      appendType(*thrownError, sig);
+      appendOperator("YK");
+    }
+  }
   switch (auto diffKind = fn->getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;

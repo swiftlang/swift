@@ -1001,8 +1001,14 @@ public:
       #undef CASE
       }
 
+      BuiltType thrownError = BuiltType();
+      if (Function->hasThrownError()) {
+        thrownError = readTypeFromMetadata(Function->getThrownError(), false,
+                                           recursion_limit);
+      }
+
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind, globalActor);
+          Parameters, Result, flags, diffKind, globalActor, thrownError);
       TypeCache[TypeCacheKey] = BuiltFunction;
       return BuiltFunction;
     }

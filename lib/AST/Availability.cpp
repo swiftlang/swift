@@ -545,6 +545,10 @@ AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getTypedThrowsAvailability() {
+  return getSwift511Availability();
+}
+
 AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
   return getSwift56Availability();
 }
@@ -750,6 +754,11 @@ AvailabilityContext ASTContext::getSwift59Availability() {
   } else {
     return AvailabilityContext::alwaysAvailable();
   }
+}
+
+AvailabilityContext ASTContext::getSwift511Availability() {
+  // Placeholder
+  return getSwiftFutureAvailability();
 }
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {

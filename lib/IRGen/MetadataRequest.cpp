@@ -1397,7 +1397,8 @@ ParameterFlags irgen::getABIParameterFlags(ParameterTypeFlags flags) {
         .withIsolated(flags.isIsolated());
 }
 
-static FunctionTypeFlags getFunctionTypeFlags(CanFunctionType type) {
+static std::pair<FunctionTypeFlags, ExtendedFunctionTypeFlags>
+getFunctionTypeFlags(CanFunctionType type) {
   bool hasParameterFlags = false;
   for (auto param : type.getParams()) {
     if (!getABIParameterFlags(param.getParameterFlags()).isNone()) {
@@ -1425,7 +1426,10 @@ static FunctionTypeFlags getFunctionTypeFlags(CanFunctionType type) {
     break;
   }
 
-  return FunctionTypeFlags()
+  auto extFlags = ExtendedFunctionTypeFlags()
+      .withTypedThrows(!type->getThrownError().isNull());
+  
+  auto flags = FunctionTypeFlags()
       .withConvention(metadataConvention)
       .withAsync(type->isAsync())
       .withConcurrent(type->isSendable())
@@ -1433,7 +1437,10 @@ static FunctionTypeFlags getFunctionTypeFlags(CanFunctionType type) {
       .withParameterFlags(hasParameterFlags)
       .withEscaping(isEscaping)
       .withDifferentiable(type->isDifferentiable())
-      .withGlobalActor(!type->getGlobalActor().isNull());
+      .withGlobalActor(!type->getGlobalActor().isNull())
+      .withExtendedFlags(extFlags.getIntValue() != 0);
+
+  return std::make_pair(flags, extFlags);
 }
 
 namespace {
@@ -1559,7 +1566,10 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
   auto params = type.getParams();
   bool hasPackExpansion = type->containsPackExpansionParam();
 
-  auto flags = getFunctionTypeFlags(type);
+  FunctionTypeFlags flags;
+  ExtendedFunctionTypeFlags extFlags;
+
+  std::tie(flags, extFlags) = getFunctionTypeFlags(type);
   llvm::Value *flagsVal = nullptr;
   llvm::Value *shapeExpression = nullptr;
   CanPackType packType;
@@ -1615,7 +1625,8 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
   case 2:
   case 3: {
     if (!flags.hasParameterFlags() && !type->isDifferentiable() &&
-        !type->getGlobalActor() && !hasPackExpansion) {
+        !type->getGlobalActor() && !hasPackExpansion &&
+        !flags.hasExtendedFlags()) {
       llvm::SmallVector<llvm::Value *, 8> arguments;
       auto metadataFn = constructSimpleCall(arguments);
       auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
@@ -1669,7 +1680,7 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
         assert(metadataDifferentiabilityKind.isDifferentiable());
         diffKindVal = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, metadataDifferentiabilityKind.getIntValue());
-      } else if (type->getGlobalActor()) {
+      } else if (type->getGlobalActor() || flags.hasExtendedFlags()) {
         diffKindVal = llvm::ConstantInt::get(
             IGF.IGM.SizeTy,
             FunctionMetadataDifferentiabilityKind::NonDifferentiable);
@@ -1695,10 +1706,27 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
     if (Type globalActor = type->getGlobalActor()) {
       arguments.push_back(
           IGF.emitAbstractTypeMetadataRef(globalActor->getCanonicalType()));
+    } else if (flags.hasExtendedFlags()) {
+      arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+    }
+
+    if (flags.hasExtendedFlags()) {
+      auto extFlagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                extFlags.getIntValue());
+      arguments.push_back(extFlagsVal);
+    }
+
+    if (Type thrownError = type->getThrownError()) {
+      arguments.push_back(
+          IGF.emitAbstractTypeMetadataRef(thrownError->getCanonicalType()));
+    } else if (flags.hasExtendedFlags()) {
+      arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
     }
 
     auto getMetadataFn =
-        type->getGlobalActor()
+        flags.hasExtendedFlags()
+            ? IGF.IGM.getGetFunctionMetadataExtendedFunctionPointer()
+        : type->getGlobalActor()
             ? (IGF.IGM.isConcurrencyAvailable()
                    ? IGF.IGM
                          .getGetFunctionMetadataGlobalActorFunctionPointer()

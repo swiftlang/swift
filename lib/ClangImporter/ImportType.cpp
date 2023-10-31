@@ -1909,6 +1909,7 @@ private:
   VISIT(StructType, pass)
   VISIT(ClassType, compose)
   VISIT(ProtocolType, compose)
+  VISIT(InverseType, compose)
 
   Result visitBoundGenericType(BoundGenericType *ty) {
     assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");

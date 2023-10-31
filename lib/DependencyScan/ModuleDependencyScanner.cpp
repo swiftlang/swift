@@ -800,7 +800,7 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
       auto moduleName = dependencyId.ModuleName;
       // Do not look for overlays of main module under scan
       if (moduleName == mainModuleName)
-        return;
+        continue;
       // check if any explicitly imported modules can serve as a
       // secondary module, and add the overlay names to the
       // dependencies list.

@@ -835,6 +835,17 @@ InferredGenericSignatureRequest::evaluate(
   }
 
   auto *moduleForInference = lookupDC->getParentModule();
+  auto &ctx = moduleForInference->getASTContext();
+
+  // After realizing requirements, expand default requirements only for local
+  // generic parameters, as the outer parameters have already been expanded.
+  SmallVector<Type, 4> localGPs;
+  if (genericParamList)
+    for (auto *gtpd : genericParamList->getParams())
+      localGPs.push_back(gtpd->getDeclaredInterfaceType());
+
+  // Expand defaults and eliminate all inverse-conformance requirements.
+  expandDefaultRequirements(ctx, localGPs, requirements, errors);
 
   // Perform requirement inference from function parameter and result
   // types and such.
@@ -864,7 +875,6 @@ InferredGenericSignatureRequest::evaluate(
                           return !req.inferred;
                         });
 
-  auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {

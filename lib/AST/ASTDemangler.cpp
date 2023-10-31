@@ -390,7 +390,8 @@ void ASTBuilder::endPackExpansion() {
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags,
-    FunctionMetadataDifferentiabilityKind diffKind, Type globalActor) {
+    FunctionMetadataDifferentiabilityKind diffKind, Type globalActor,
+    Type thrownError) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -453,9 +454,6 @@ Type ASTBuilder::createFunctionType(
   if (shouldStoreClangType(representation))
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
-
-  // FIXME: Populate thrownError
-  Type thrownError;
 
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),

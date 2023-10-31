@@ -476,7 +476,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
                                      : Limit::None;
     }
     // Otherwise, regular property wrapper backing initializers (for properties)
-    // are treated just like stored property intializers.
+    // are treated just like stored property initializers.
     LLVM_FALLTHROUGH;
   }
   case Kind::StoredPropertyInitializer: {

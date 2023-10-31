@@ -855,10 +855,28 @@ protected:
         ++firstChildIdx;
       }
 
+      BuiltType thrownErrorType = BuiltType();
       bool isThrow = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::ThrowsAnnotation) {
         isThrow = true;
+        ++firstChildIdx;
+      } else if (Node->getChild(firstChildIdx)->getKind()
+                   == NodeKind::TypedThrowsAnnotation) {
+        isThrow = true;
+
+        auto child = Node->getChild(firstChildIdx);
+        if (child->getNumChildren() < 1) {
+          return MAKE_NODE_TYPE_ERROR0(child,
+                                       "Thrown error node is missing child");
+        }
+
+        auto thrownErrorResult =
+            decodeMangledType(child->getChild(0), depth + 1);
+        if (thrownErrorResult.isError())
+          return thrownErrorResult;
+
+        thrownErrorType = thrownErrorResult.getType();
         ++firstChildIdx;
       }
 
@@ -905,8 +923,10 @@ protected:
                             /*forRequirement=*/false);
       if (result.isError())
         return result;
+
       return Builder.createFunctionType(
-          parameters, result.getType(), flags, diffKind, globalActorType);
+          parameters, result.getType(), flags, diffKind, globalActorType,
+          thrownErrorType);
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;

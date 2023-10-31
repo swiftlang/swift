@@ -951,29 +951,10 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
   // For all other nominals, we can simply check the inheritance clause.
 
   // The set of defaults all types start with.
-  auto defaults = getInvertibleProtocols();
-  std::map<KnownProtocolKind, SourceLoc> lastInverse;
+  auto defaults = InvertibleProtocolSet::full();
 
-  // Does correctness checking after inspecting the inheritance clause.
-  // TODO: we can probably move this to `checkInheritanceClause` instead.
-  auto foundInverse = [&](SourceLoc loc, KnownProtocolKind kind) {
-    // do we still have this default?
-    if (defaults.contains(kind)) {
-      defaults.remove(kind);
-      lastInverse.insert({kind, loc});
-
-      // Classes are always copyable.
-      if (isa<ClassDecl>(decl) && kind == KnownProtocolKind::Copyable) {
-        ctx.Diags.diagnose(loc, diag::noncopyable_class);
-        return;
-      }
-
-      return;
-    }
-
-    // diagnose duplicate inverses
-    ctx.Diags.diagnose(loc, diag::inverse_duplicate);
-    ctx.Diags.diagnose(lastInverse[kind], diag::inverse_duplicate_previous);
+  auto foundInverse = [&](SourceLoc loc, InvertibleProtocolKind kind) {
+    defaults.remove(kind);
   };
 
   // Check the inheritance clause for inverses.
@@ -981,16 +962,10 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
   for (size_t i = 0; i < inherited.size(); i++) {
     auto *repr = inherited.getTypeRepr(i);
 
-    if (!dyn_cast_or_null<InverseTypeRepr>(repr)) {
-      continue;
-    }
-
-    auto type = inherited.getResolvedType(i, TypeResolutionStage::Structural);
-    auto kp = type->getKnownProtocol();
-    if (!kp)
-      continue; // diagnosed elsewhere.
-
-    foundInverse(repr->getLoc(), *kp);
+    if (auto type = inherited.getResolvedType(i,
+                                              TypeResolutionStage::Structural))
+      if (auto inverse = type->getAs<InverseType>())
+        foundInverse(repr->getLoc(), inverse->getInverseKind());
   }
 
   // Check the where-clause for a constraint Subject: ~Copyable where Subject
@@ -1011,20 +986,13 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
     if (req.getKind() != RequirementKind::Conformance)
       return false;
 
-    auto constraintTyRepr = repr->getConstraintRepr();
-    if (!dyn_cast_or_null<InverseTypeRepr>(constraintTyRepr))
-      return false;
-
-    auto kp = req.getSecondType()->getKnownProtocol();
-    if (!kp)
-      return false; // diagnosed elsewhere.
-
     auto subject = req.getFirstType();
-    if (!subject)
-      return false;
+    auto constraint = req.getSecondType();
+    auto constraintLoc = repr->getConstraintRepr()->getLoc();
 
-    if (subject->getCanonicalType() == owner->getCanonicalType())
-      foundInverse(constraintTyRepr->getLoc(), *kp);
+    if (auto inverse = constraint->getAs<InverseType>())
+      if (subject->getCanonicalType() == owner->getCanonicalType())
+        foundInverse(constraintLoc, inverse->getInverseKind());
 
     return false;
   };
@@ -1039,7 +1007,7 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
     }
   }
 
-  return !defaults.contains(KnownProtocolKind::Copyable);
+  return !defaults.contains(InvertibleProtocolKind::Copyable);
 }
 
 bool IsEscapableRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
@@ -2443,12 +2411,16 @@ static Type validateParameterType(ParamDecl *decl) {
   Type Ty;
 
   auto *nestedRepr = decl->getTypeRepr();
+  ParamSpecifier ownership = ParamSpecifier::Default;
   while (true) {
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
       nestedRepr = attrTypeRepr->getTypeRepr();
       continue;
     }
     if (auto *specifierTypeRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      if (specifierTypeRepr->getKind() == TypeReprKind::Ownership)
+        ownership = cast<OwnershipTypeRepr>(specifierTypeRepr)->getSpecifier();
+
       nestedRepr = specifierTypeRepr->getBase();
       continue;
     }
@@ -2490,6 +2462,13 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (Ty->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  // Validate the presence of ownership for a noncopyable parameter.
+  if (diagnoseMissingOwnership(ctx, dc, ownership,
+                               decl->getTypeRepr(), Ty, options)) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }

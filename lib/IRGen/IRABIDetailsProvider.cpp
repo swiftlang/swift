@@ -313,12 +313,13 @@ bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
 
 LoweredFunctionSignature::DirectParameter::DirectParameter(
     IRABIDetailsProviderImpl &owner, const irgen::TypeInfo &typeDetails,
-    const ParamDecl &paramDecl)
-    : owner(owner), typeDetails(typeDetails), paramDecl(paramDecl) {}
+    const ParamDecl &paramDecl, ParameterConvention convention)
+    : owner(owner), typeDetails(typeDetails), paramDecl(paramDecl),
+      convention(convention) {}
 
 LoweredFunctionSignature::IndirectParameter::IndirectParameter(
-    const ParamDecl &paramDecl)
-    : paramDecl(paramDecl) {}
+    const ParamDecl &paramDecl, ParameterConvention convention)
+    : paramDecl(paramDecl), convention(convention) {}
 
 bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
     llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
@@ -401,10 +402,11 @@ void LoweredFunctionSignature::visitParameterList(
                                      : silParamMapping[currentSilParam];
     ++currentSilParam;
     if (!isIndirect) {
-      DirectParameter param(owner, abiParam.typeInfo, *paramDecl);
+      DirectParameter param(owner, abiParam.typeInfo, *paramDecl,
+                            abiParam.convention);
       directParamVisitor(param);
     } else {
-      IndirectParameter param(*paramDecl);
+      IndirectParameter param(*paramDecl, abiParam.convention);
       indirectParamVisitor(param);
     }
   }
@@ -432,8 +434,11 @@ void LoweredFunctionSignature::visitParameterList(
 
   if (abiDetails.hasTrailingSelfParam) {
     assert(!abiDetails.hasContextParam);
-    assert(FD->hasImplicitSelfDecl());
-    indirectParamVisitor(IndirectParameter(*FD->getImplicitSelfDecl()));
+    indirectParamVisitor(IndirectParameter(
+        *FD->getImplicitSelfDecl(),
+        FD->getImplicitSelfDecl()->getValueOwnership() == ValueOwnership::Owned
+            ? ParameterConvention::Direct_Owned
+            : ParameterConvention::Direct_Guaranteed));
   } else if (abiDetails.hasContextParam) {
     contextParamVisitor(ContextParameter());
   }

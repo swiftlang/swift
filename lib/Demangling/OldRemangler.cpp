@@ -829,6 +829,11 @@ ManglingError Remangler::mangleThrowsAnnotation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleTypedThrowsAnnotation(Node *node, unsigned depth) {
+  Buffer << "z";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleDifferentiableFunctionType(Node *node,
                                                           unsigned depth) {
   Buffer << "D";

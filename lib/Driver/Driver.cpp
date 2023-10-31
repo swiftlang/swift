@@ -112,6 +112,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
+          .Case("swift-parse-test", DriverKind::ParseTest)
           .Default(llvm::None);
 
   if (Kind.has_value())
@@ -3587,6 +3588,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::APIExtract:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
+  case DriverKind::ParseTest:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

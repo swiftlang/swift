@@ -36,14 +36,14 @@ SourceRange findInverseRemovalRange(const TypeDecl *typeDecl,
   for (size_t i = 0; i < entries.size(); i++) {
     auto entry = entries[i];
 
-    auto *repr = entry.getTypeRepr();
-    if (dyn_cast_or_null<InverseTypeRepr>(repr))
-      if (auto kp = entry.getType()->getKnownProtocol())
-        if (kp == targetProto)
+    if (auto inverse = entry.getType()->getAs<InverseType>())
+      if (auto kp = inverse->getInvertedProtocol()->getKnownProtocol())
+        if (*kp == targetProto)
           return inheritedTypes.getRemovalRange(i);
   }
 
-  // TODO: check where clause.
+  // TODO: just ask HasNoncopyableAnnotationRequest for the annotation?
+  // so we can handle where clauses.
 
   return SourceRange();
 }
@@ -134,6 +134,12 @@ bool IsNoncopyableRequest::evaluate(Evaluator &evaluator,
   assert(!type->hasTypeParameter() && "forgot to mapTypeIntoContext first");
   auto &ctx = type->getASTContext();
 
+  // Pack expansions such as `repeat T` themselves do not have conformances,
+  // so check its pattern type for conformance.
+  if (auto *pet = type->getAs<PackExpansionType>()) {
+    type = pet->getPatternType()->getCanonicalType();
+  }
+
   auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
   if (!copyable)
     llvm_unreachable("missing Copyable protocol!");
@@ -216,7 +222,8 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
   };
 
   // This nominal cannot be Copyable if it contains noncopyable storage.
-  return !HasNoncopyable(nom, nom, /*diagnose=*/true).visit();
+  return !HasNoncopyable(nom, conformance->getDeclContext(),
+                         /*diagnose=*/true).visit();
 }
 
 /// Visit the instance storage of the given nominal type as seen through

@@ -209,6 +209,10 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getConstraintType());
   }
 
+  bool visitInverseType(InverseType *ty) {
+    return doIt(ty->getInvertedProtocol());
+  }
+
   bool visitLValueType(LValueType *ty) {
     return doIt(ty->getObjectType());
   }

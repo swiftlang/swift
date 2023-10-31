@@ -10,7 +10,7 @@ protocol NCProto: ~Copyable, RegularProto {
 
 protocol Hello: ~Copyable {
   func greet(_ s: Self)
-  // expected-error@-1 {{noncopyable parameter must specify its ownership}}
+  // expected-error@-1 {{parameter of noncopyable type 'Self' must specify ownership}}
   // expected-note@-2 {{add 'borrowing' for an immutable reference}}
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
@@ -28,7 +28,7 @@ struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
   deinit {}
 
   func greet(_ f: Self) {}
-  // expected-error@-1 {{noncopyable parameter must specify its ownership}}
+  // expected-error@-1 {{parameter of noncopyable type 'NCThinger<T>' must specify ownership}}
   // expected-note@-2 {{add 'borrowing' for an immutable reference}}
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
@@ -36,14 +36,8 @@ struct NCThinger<T: ~Copyable>: ~Copyable, Hello {
   func salute(_ s: borrowing Self) {}
 
   func setThinger(_ t: T) {}
-  // expected-error@-1 {{noncopyable parameter must specify its ownership}}
+  // expected-error@-1 {{parameter of noncopyable type 'T' must specify ownership}}
   // expected-note@-2 {{add 'borrowing' for an immutable reference}}
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}
 }
-
-struct ExtraNoncopyStruct: ~Copyable, ~Copyable {}
-// expected-error@-1 {{duplicate inverse constraint}}
-// expected-note@-2 {{previous inverse constraint here}}
-
-protocol ExtraNoncopyProto: ~Copyable, ~Copyable {}
