@@ -924,7 +924,13 @@ public:
   /// expansions.
   OrigDeclAttributes getOriginalAttrs() const;
 
-  /// Returns the semantic attributes attached to this declaration,
+  /// Returns the semantic CustomAttrs attached to this declaration,
+  /// including attributes that are generated as the result of member
+  /// attribute macro expansion.
+  DeclAttributes::AttributeKindRange<CustomAttr, false>
+  getSemanticCustomAttrs() const;
+
+  /// Returns all semantic attributes attached to this declaration,
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
