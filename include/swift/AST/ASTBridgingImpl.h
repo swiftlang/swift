@@ -18,15 +18,27 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedASTContext
+//===----------------------------------------------------------------------===//
+
+void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
+  return &bridged.unbridged();
+}
+
+BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
+  return *static_cast<swift::ASTContext *>(ptr);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedNominalTypeDecl
 //===----------------------------------------------------------------------===//
 
 BridgedStringRef BridgedNominalTypeDecl_getName(BridgedNominalTypeDecl decl) {
-  return decl.get()->getName().str();
+  return decl.unbridged()->getName().str();
 }
 
 bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl) {
-  return decl.get()->isGlobalActor();
+  return decl.unbridged()->isGlobalActor();
 }
 
 //===----------------------------------------------------------------------===//
@@ -34,7 +46,7 @@ bool BridgedNominalTypeDecl_isGlobalActor(BridgedNominalTypeDecl decl) {
 //===----------------------------------------------------------------------===//
 
 BridgedStringRef BridgedVarDecl_getUserFacingName(BridgedVarDecl decl) {
-  return decl.get()->getBaseName().userFacingName();
+  return decl.unbridged()->getBaseName().userFacingName();
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

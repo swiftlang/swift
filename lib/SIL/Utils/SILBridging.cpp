@@ -70,7 +70,7 @@ static void setUnimplementedRange(SwiftMetatype metatype,
 /// Registers the metatype of a swift SIL class.
 /// Called by initializeSwiftModules().
 void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metatype) {
-  StringRef className = bridgedClassName.get();
+  StringRef className = bridgedClassName.unbridged();
   nodeMetatypesInitialized = true;
 
   // Handle the important non Node classes.
@@ -141,7 +141,7 @@ void registerBridgedClass(BridgedStringRef bridgedClassName, SwiftMetatype metat
 //===----------------------------------------------------------------------===//
 
 void registerFunctionTest(BridgedStringRef name, void *nativeSwiftInvocation) {
-  new swift::test::FunctionTest(name.get(), nativeSwiftInvocation);
+  new swift::test::FunctionTest(name.unbridged(), nativeSwiftInvocation);
 }
 
 bool BridgedTestArguments::hasUntaken() const {
@@ -227,7 +227,7 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
 BridgedOwnedString BridgedBasicBlock::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
@@ -418,25 +418,25 @@ static_assert((int)BridgedInstruction::AccessKind::Deinit == (int)swift::SILAcce
 BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  get()->print(os);
+  unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
   return str;
 }
 
 bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(get());
+  return ::mayAccessPointer(unbridged());
 }
 
 bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(get());
+  return ::mayLoadWeakOrUnowned(unbridged());
 }
 
 bool BridgedInstruction::maySynchronizeNotConsideringSideEffects() const {
-  return ::maySynchronizeNotConsideringSideEffects(get());
+  return ::maySynchronizeNotConsideringSideEffects(unbridged());
 }
 
 bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
-  return ::mayBeDeinitBarrierNotConsideringSideEffects(get());
+  return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
 }
 
 void writeCharToStderr(int c) {

@@ -44,30 +44,32 @@ SwiftInt BridgedData_count(BridgedData data) {
 //===----------------------------------------------------------------------===//
 
 const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str) {
-  return (const uint8_t *)str.get().data();
+  return (const uint8_t *)str.unbridged().data();
 }
 
 SwiftInt BridgedStringRef_count(BridgedStringRef str) {
-  return (SwiftInt)str.get().size();
+  return (SwiftInt)str.unbridged().size();
 }
 
-bool BridgedStringRef_empty(BridgedStringRef str) { return str.get().empty(); }
+bool BridgedStringRef_empty(BridgedStringRef str) {
+  return str.unbridged().empty();
+}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
 
 const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str) {
-  auto *data = str.getRef().data();
+  auto *data = str.unbridgedRef().data();
   return (const uint8_t *)(data ? data : "");
 }
 
 SwiftInt BridgedOwnedString_count(BridgedOwnedString str) {
-  return (SwiftInt)str.getRef().size();
+  return (SwiftInt)str.unbridgedRef().size();
 }
 
 bool BridgedOwnedString_empty(BridgedOwnedString str) {
-  return str.getRef().empty();
+  return str.unbridgedRef().empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -79,7 +81,7 @@ bool BridgedSourceLoc_isValid(BridgedSourceLoc loc) {
 }
 
 BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {
-  return BridgedSourceLoc(get().getAdvancedLoc(n));
+  return BridgedSourceLoc(unbridged().getAdvancedLoc(n));
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

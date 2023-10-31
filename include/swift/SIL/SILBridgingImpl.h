@@ -45,180 +45,181 @@ SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 //===----------------------------------------------------------------------===//
 
 BridgedOwnedString BridgedType::getDebugDescription() const {
-  return BridgedOwnedString(get().getDebugDescription());
+  return BridgedOwnedString(unbridged().getDebugDescription());
 }
 
 bool BridgedType::isNull() const {
-  return get().isNull();
+  return unbridged().isNull();
 }
 
 bool BridgedType::isAddress() const {
-  return get().isAddress();
+  return unbridged().isAddress();
 }
 
 BridgedType BridgedType::getAddressType() const {
-  return get().getAddressType();
+  return unbridged().getAddressType();
 }
 
 BridgedType BridgedType::getObjectType() const {
-  return get().getObjectType();
+  return unbridged().getObjectType();
 }
 
 bool BridgedType::isTrivial(BridgedFunction f) const {
-  return get().isTrivial(f.getFunction());
+  return unbridged().isTrivial(f.getFunction());
 }
 
 bool BridgedType::isNonTrivialOrContainsRawPointer(BridgedFunction f) const {
-  return get().isNonTrivialOrContainsRawPointer(f.getFunction());
+  return unbridged().isNonTrivialOrContainsRawPointer(f.getFunction());
 }
 
 bool BridgedType::isValueTypeWithDeinit() const {
-  return get().isValueTypeWithDeinit();
+  return unbridged().isValueTypeWithDeinit();
 }
 
 bool BridgedType::isLoadable(BridgedFunction f) const {
-  return get().isLoadable(f.getFunction());
+  return unbridged().isLoadable(f.getFunction());
 }
 
 bool BridgedType::isReferenceCounted(BridgedFunction f) const {
-  return get().isReferenceCounted(f.getFunction());
+  return unbridged().isReferenceCounted(f.getFunction());
 }
 
 bool BridgedType::isUnownedStorageType() const {
-  return get().isUnownedStorageType();
+  return unbridged().isUnownedStorageType();
 }
 
 bool BridgedType::hasArchetype() const {
-  return get().hasArchetype();
+  return unbridged().hasArchetype();
 }
 
 bool BridgedType::isNominalOrBoundGenericNominal() const {
-  return get().getNominalOrBoundGenericNominal() != nullptr;
+  return unbridged().getNominalOrBoundGenericNominal() != nullptr;
 }
 
 BridgedNominalTypeDecl BridgedType::getNominalOrBoundGenericNominal() const {
-  return {get().getNominalOrBoundGenericNominal()};
+  return {unbridged().getNominalOrBoundGenericNominal()};
 }
 
 bool BridgedType::isClassOrBoundGenericClass() const {
-  return get().getClassOrBoundGenericClass() != 0;
+  return unbridged().getClassOrBoundGenericClass() != 0;
 }
 
 bool BridgedType::isStructOrBoundGenericStruct() const {
-  return get().getStructOrBoundGenericStruct() != nullptr;
+  return unbridged().getStructOrBoundGenericStruct() != nullptr;
 }
 
 bool BridgedType::isTuple() const {
-  return get().isTuple();
+  return unbridged().isTuple();
 }
 
 bool BridgedType::isEnumOrBoundGenericEnum() const {
-  return get().getEnumOrBoundGenericEnum() != nullptr;
+  return unbridged().getEnumOrBoundGenericEnum() != nullptr;
 }
 
 bool BridgedType::isFunction() const {
-  return get().isFunction();
+  return unbridged().isFunction();
 }
 
 bool BridgedType::isMetatype() const {
-  return get().isMetatype();
+  return unbridged().isMetatype();
 }
 
 bool BridgedType::isNoEscapeFunction() const {
-  return get().isNoEscapeFunction();
+  return unbridged().isNoEscapeFunction();
 }
 
 bool BridgedType::isAsyncFunction() const {
-  return get().isAsyncFunction();
+  return unbridged().isAsyncFunction();
 }
 
 BridgedType::TraitResult BridgedType::canBeClass() const {
-  return (TraitResult)get().canBeClass();
+  return (TraitResult)unbridged().canBeClass();
 }
 
 bool BridgedType::isMoveOnly() const {
-  return get().isMoveOnly();
+  return unbridged().isMoveOnly();
 }
 
 bool BridgedType::isEscapable() const {
-  return get().isEscapable();
+  return unbridged().isEscapable();
 }
 
 bool BridgedType::isOrContainsObjectiveCClass() const {
-  return get().isOrContainsObjectiveCClass();
+  return unbridged().isOrContainsObjectiveCClass();
 }
 
 bool BridgedType::isBuiltinInteger() const {
-  return get().isBuiltinInteger();
+  return unbridged().isBuiltinInteger();
 }
 
 bool BridgedType::isBuiltinFloat() const {
-  return get().isBuiltinFloat();
+  return unbridged().isBuiltinFloat();
 }
 
 bool BridgedType::isBuiltinVector() const {
-  return get().isBuiltinVector();
+  return unbridged().isBuiltinVector();
 }
 
 BridgedType BridgedType::getBuiltinVectorElementType() const {
-  return get().getBuiltinVectorElementType();
+  return unbridged().getBuiltinVectorElementType();
 }
 
 bool BridgedType::isBuiltinFixedWidthInteger(SwiftInt width) const {
-  return get().isBuiltinFixedWidthInteger((unsigned)width);
+  return unbridged().isBuiltinFixedWidthInteger((unsigned)width);
 }
 
 bool BridgedType::isExactSuperclassOf(BridgedType t) const {
-  return get().isExactSuperclassOf(t.get());
+  return unbridged().isExactSuperclassOf(t.unbridged());
 }
 
 BridgedType BridgedType::getInstanceTypeOfMetatype(BridgedFunction f) const {
-  return get().getInstanceTypeOfMetatype(f.getFunction());
+  return unbridged().getInstanceTypeOfMetatype(f.getFunction());
 }
 
 BridgedType::MetatypeRepresentation BridgedType::getRepresentationOfMetatype(BridgedFunction f) const {
-  return BridgedType::MetatypeRepresentation(get().getRepresentationOfMetatype(f.getFunction()));
+  return BridgedType::MetatypeRepresentation(
+      unbridged().getRepresentationOfMetatype(f.getFunction()));
 }
 
 bool BridgedType::isCalleeConsumedFunction() const {
-  return get().isCalleeConsumedFunction();
+  return unbridged().isCalleeConsumedFunction();
 }
 
 bool BridgedType::isMarkedAsImmortal() const {
-  return get().isMarkedAsImmortal();
+  return unbridged().isMarkedAsImmortal();
 }
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
-  return get().getCaseIdxOfEnumType(name.get());
+  return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }
 
 SwiftInt BridgedType::getNumNominalFields() const {
-  return get().getNumNominalFields();
+  return unbridged().getNumNominalFields();
 }
 
 
 BridgedType BridgedType::getFieldType(SwiftInt idx, BridgedFunction f) const {
-  return get().getFieldType(idx, f.getFunction());
+  return unbridged().getFieldType(idx, f.getFunction());
 }
 
 SwiftInt BridgedType::getFieldIdxOfNominalType(BridgedStringRef name) const {
-  return get().getFieldIdxOfNominalType(name.get());
+  return unbridged().getFieldIdxOfNominalType(name.unbridged());
 }
 
 BridgedStringRef BridgedType::getFieldName(SwiftInt idx) const {
-  return get().getFieldName(idx);
+  return unbridged().getFieldName(idx);
 }
 
 SwiftInt BridgedType::getNumTupleElements() const {
-  return get().getNumTupleElements();
+  return unbridged().getNumTupleElements();
 }
 
 BridgedType BridgedType::getTupleElementType(SwiftInt idx) const {
-  return get().getTupleElementType(idx);
+  return unbridged().getTupleElementType(idx);
 }
 
 BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
-  auto fnType = get().getAs<swift::SILFunctionType>();
+  auto fnType = unbridged().getAs<swift::SILFunctionType>();
   auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
   return swift::SILType::getPrimitiveObjectType(newTy);
 }
@@ -350,7 +351,7 @@ BridgedSubstitutionMap::BridgedSubstitutionMap() : BridgedSubstitutionMap(swift:
 }
 
 bool BridgedSubstitutionMap::isEmpty() const {
-  return get().empty();
+  return unbridged().empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -483,7 +484,7 @@ bool BridgedFunction::isGenericFunction() const {
 }
 
 bool BridgedFunction::hasSemanticsAttr(BridgedStringRef attrName) const {
-  return getFunction()->hasSemanticsAttr(attrName.get());
+  return getFunction()->hasSemanticsAttr(attrName.unbridged());
 }
 
 bool BridgedFunction::hasUnsafeNonEscapableResult() const {
@@ -556,11 +557,11 @@ OptionalBridgedInstruction BridgedGlobalVar::getFirstStaticInitInst() const {
 //===----------------------------------------------------------------------===//
 
 BridgedInstruction BridgedMultiValueResult::getParent() const {
-  return {get()->getParent()};
+  return {unbridged()->getParent()};
 }
 
 SwiftInt BridgedMultiValueResult::getIndex() const {
-  return (SwiftInt)get()->getIndex();
+  return (SwiftInt)unbridged()->getIndex();
 }
 
 //===----------------------------------------------------------------------===//
@@ -569,11 +570,11 @@ SwiftInt BridgedMultiValueResult::getIndex() const {
 
 BridgedTypeArray 
 BridgedTypeArray::fromReplacementTypes(BridgedSubstitutionMap substMap) {
-  return substMap.get().getReplacementTypes();
+  return substMap.unbridged().getReplacementTypes();
 }
 
 BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
-  swift::Type origTy = get()[index];
+  swift::Type origTy = unbridged()[index];
   auto ty = origTy->getCanonicalType();
   if (ty->isLegalSILType())
     return swift::SILType::getPrimitiveObjectType(ty);
@@ -585,7 +586,7 @@ BridgedType BridgedTypeArray::getAt(SwiftInt index) const {
 //===----------------------------------------------------------------------===//
 
 BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
-  return get()[index];
+  return unbridged()[index];
 }
 
 //===----------------------------------------------------------------------===//
@@ -593,65 +594,65 @@ BridgedType BridgedSILTypeArray::getAt(SwiftInt index) const {
 //===----------------------------------------------------------------------===//
 
 OptionalBridgedInstruction BridgedInstruction::getNext() const {
-  auto iter = std::next(get()->getIterator());
-  if (iter == get()->getParent()->end())
+  auto iter = std::next(unbridged()->getIterator());
+  if (iter == unbridged()->getParent()->end())
     return {nullptr};
   return {iter->asSILNode()};
 }
 
 OptionalBridgedInstruction BridgedInstruction::getPrevious() const {
-  auto iter = std::next(get()->getReverseIterator());
-  if (iter == get()->getParent()->rend())
+  auto iter = std::next(unbridged()->getReverseIterator());
+  if (iter == unbridged()->getParent()->rend())
     return {nullptr};
   return {iter->asSILNode()};
 }
 
 BridgedBasicBlock BridgedInstruction::getParent() const {
-  assert(!get()->isStaticInitializerInst() &&
+  assert(!unbridged()->isStaticInitializerInst() &&
          "cannot get the parent of a static initializer instruction");
-  return {get()->getParent()};
+  return {unbridged()->getParent()};
 }
 
 BridgedInstruction BridgedInstruction::getLastInstOfParent() const {
-  return {get()->getParent()->back().asSILNode()};
+  return {unbridged()->getParent()->back().asSILNode()};
 }
 
 bool BridgedInstruction::isDeleted() const {
-  return get()->isDeleted();
+  return unbridged()->isDeleted();
 }
 
 BridgedOperandArray BridgedInstruction::getOperands() const {
-  auto operands = get()->getAllOperands();
+  auto operands = unbridged()->getAllOperands();
   return {{operands.data()}, (SwiftInt)operands.size()};
 }
 
 BridgedOperandArray BridgedInstruction::getTypeDependentOperands() const {
-  auto typeOperands = get()->getTypeDependentOperands();
+  auto typeOperands = unbridged()->getTypeDependentOperands();
   return {{typeOperands.data()}, (SwiftInt)typeOperands.size()};
 }
 
 void BridgedInstruction::setOperand(SwiftInt index, BridgedValue value) const {
-  get()->setOperand((unsigned)index, value.getSILValue());
+  unbridged()->setOperand((unsigned)index, value.getSILValue());
 }
 
 BridgedLocation BridgedInstruction::getLocation() const {
-  return get()->getDebugLocation();
+  return unbridged()->getDebugLocation();
 }
 
 BridgedMemoryBehavior BridgedInstruction::getMemBehavior() const {
-  return (BridgedMemoryBehavior)get()->getMemoryBehavior();
+  return (BridgedMemoryBehavior)unbridged()->getMemoryBehavior();
 }
 
 bool BridgedInstruction::mayRelease() const {
-  return get()->mayRelease();
+  return unbridged()->mayRelease();
 }
 
 bool BridgedInstruction::mayHaveSideEffects() const {
-  return get()->mayHaveSideEffects();
+  return unbridged()->mayHaveSideEffects();
 }
 
 bool BridgedInstruction::maySuspend() const {
-  return get()->maySuspend();
+  return unbridged()->maySuspend();
 }
 
 SwiftInt BridgedInstruction::MultipleValueInstruction_getNumResults() const {
@@ -668,22 +669,22 @@ BridgedSuccessorArray BridgedInstruction::TermInst_getSuccessors() const {
 }
 
 OptionalBridgedOperand BridgedInstruction::ForwardingInst_singleForwardedOperand() const {
-  return {swift::ForwardingOperation(get()).getSingleForwardingOperand()};
+  return {swift::ForwardingOperation(unbridged()).getSingleForwardingOperand()};
 }
 
 BridgedOperandArray BridgedInstruction::ForwardingInst_forwardedOperands() const {
   auto operands =
-    swift::ForwardingOperation(get()).getForwardedOperands();
+      swift::ForwardingOperation(unbridged()).getForwardedOperands();
   return {{operands.data()}, (SwiftInt)operands.size()};
 }
 
 BridgedValue::Ownership BridgedInstruction::ForwardingInst_forwardingOwnership() const {
-  auto *forwardingInst = swift::ForwardingInstruction::get(get());
+  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
   return castOwnership(forwardingInst->getForwardingOwnershipKind());
 }
 
 bool BridgedInstruction::ForwardingInst_preservesOwnership() const {
-  return swift::ForwardingInstruction::get(get())->preservesOwnership();
+  return swift::ForwardingInstruction::get(unbridged())->preservesOwnership();
 }
 
 BridgedStringRef BridgedInstruction::CondFailInst_getMessage() const {
@@ -839,7 +840,7 @@ SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
 }
 
 SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() const {
-  return swift::ApplySite(get()).getCalleeArgIndexOfFirstAppliedArg();
+  return swift::ApplySite(unbridged()).getCalleeArgIndexOfFirstAppliedArg();
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
@@ -946,7 +947,8 @@ void BridgedInstruction::AllocRefInst_setIsBare() const {
 }
 
 void BridgedInstruction::TermInst_replaceBranchTarget(BridgedBasicBlock from, BridgedBasicBlock to) const {
-  getAs<swift::TermInst>()->replaceBranchTarget(from.get(), to.get());
+  getAs<swift::TermInst>()->replaceBranchTarget(from.unbridged(),
+                                                to.unbridged());
 }
 
 SwiftInt BridgedInstruction::KeyPathInst_getNumComponents() const {
@@ -989,22 +991,22 @@ BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const 
 }
 
 BridgedSubstitutionMap BridgedInstruction::ApplySite_getSubstitutionMap() const {
-  auto as = swift::ApplySite(get());
+  auto as = swift::ApplySite(unbridged());
   return as.getSubstitutionMap();
 }
 
 BridgedArgumentConvention BridgedInstruction::ApplySite_getArgumentConvention(SwiftInt calleeArgIdx) const {
-  auto as = swift::ApplySite(get());
+  auto as = swift::ApplySite(unbridged());
   auto conv = as.getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
   return castToArgumentConvention(conv.Value);
 }
 
 SwiftInt BridgedInstruction::ApplySite_getNumArguments() const {
-  return swift::ApplySite(get()).getNumArguments();
+  return swift::ApplySite(unbridged()).getNumArguments();
 }
 
 SwiftInt BridgedInstruction::FullApplySite_numIndirectResultArguments() const {
-  auto fas = swift::FullApplySite(get());
+  auto fas = swift::FullApplySite(unbridged());
   return fas.getNumIndirectSILResults();
 }
 
@@ -1052,65 +1054,66 @@ BridgedInstruction::AllocBox_getVarInfo() const {
 //===----------------------------------------------------------------------===//
 
 OptionalBridgedBasicBlock BridgedBasicBlock::getNext() const {
-  auto iter = std::next(get()->getIterator());
-  if (iter == get()->getParent()->end())
+  auto iter = std::next(unbridged()->getIterator());
+  if (iter == unbridged()->getParent()->end())
     return {nullptr};
   return {&*iter};
 }
 
 OptionalBridgedBasicBlock BridgedBasicBlock::getPrevious() const {
-  auto iter = std::next(get()->getReverseIterator());
-  if (iter == get()->getParent()->rend())
+  auto iter = std::next(unbridged()->getReverseIterator());
+  if (iter == unbridged()->getParent()->rend())
     return {nullptr};
   return {&*iter};
 }
 
 BridgedFunction BridgedBasicBlock::getFunction() const {
-  return {get()->getParent()};
+  return {unbridged()->getParent()};
 }
 
 OptionalBridgedInstruction BridgedBasicBlock::getFirstInst() const {
-  if (get()->empty())
+  if (unbridged()->empty())
     return {nullptr};
-  return {get()->front().asSILNode()};
+  return {unbridged()->front().asSILNode()};
 }
 
 OptionalBridgedInstruction BridgedBasicBlock::getLastInst() const {
-  if (get()->empty())
+  if (unbridged()->empty())
     return {nullptr};
-  return {get()->back().asSILNode()};
+  return {unbridged()->back().asSILNode()};
 }
 
 SwiftInt BridgedBasicBlock::getNumArguments() const {
-  return get()->getNumArguments();
+  return unbridged()->getNumArguments();
 }
 
 BridgedArgument BridgedBasicBlock::getArgument(SwiftInt index) const {
-  return {get()->getArgument(index)};
+  return {unbridged()->getArgument(index)};
 }
 
 BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedValue::Ownership ownership) const {
-  return {get()->createPhiArgument(type.get(), BridgedValue::castToOwnership(ownership))};
+  return {unbridged()->createPhiArgument(
+      type.unbridged(), BridgedValue::castToOwnership(ownership))};
 }
 
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {
-  get()->eraseArgument(index);
+  unbridged()->eraseArgument(index);
 }
 
 void BridgedBasicBlock::moveAllInstructionsToBegin(BridgedBasicBlock dest) const {
-  dest.get()->spliceAtBegin(get());
+  dest.unbridged()->spliceAtBegin(unbridged());
 }
 
 void BridgedBasicBlock::moveAllInstructionsToEnd(BridgedBasicBlock dest) const {
-  dest.get()->spliceAtEnd(get());
+  dest.unbridged()->spliceAtEnd(unbridged());
 }
 
 void BridgedBasicBlock::moveArgumentsTo(BridgedBasicBlock dest) const {
-  dest.get()->moveArgumentList(get());
+  dest.unbridged()->moveArgumentList(unbridged());
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {
-  return {get()->pred_begin().getSuccessorRef()};
+  return {unbridged()->pred_begin().getSuccessorRef()};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1184,108 +1187,114 @@ BridgedInstruction BridgedBuilder::createBuiltinBinaryFunction(BridgedStringRef 
                                                BridgedType operandType, BridgedType resultType,
                                                BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {get().createBuiltinBinaryFunction(regularLoc(),
-                                                name.get(),
-                                                operandType.get(), resultType.get(),
-                                                arguments.getValues(argValues))};
+  return {unbridged().createBuiltinBinaryFunction(
+      regularLoc(), name.unbridged(), operandType.unbridged(),
+      resultType.unbridged(), arguments.getValues(argValues))};
 }
 
 BridgedInstruction BridgedBuilder::createCondFail(BridgedValue condition, BridgedStringRef message) const {
-  return {get().createCondFail(regularLoc(), condition.getSILValue(), message.get())};
+  return {unbridged().createCondFail(regularLoc(), condition.getSILValue(),
+                                     message.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createIntegerLiteral(BridgedType type, SwiftInt value) const {
-  return {get().createIntegerLiteral(regularLoc(), type.get(), value)};
+  return {
+      unbridged().createIntegerLiteral(regularLoc(), type.unbridged(), value)};
 }
 
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
                                     bool hasDynamicLifetime, bool isLexical, bool wasMoved) const {
-  return {get().createAllocStack(regularLoc(), type.get(), llvm::None,
-                                         hasDynamicLifetime, isLexical, wasMoved)};
+  return {unbridged().createAllocStack(regularLoc(), type.unbridged(),
+                                       llvm::None, hasDynamicLifetime,
+                                       isLexical, wasMoved)};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
-  return {get().createDeallocStack(regularLoc(), operand.getSILValue())};
+  return {unbridged().createDeallocStack(regularLoc(), operand.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) const {
-  return {get().createDeallocStackRef(regularLoc(), operand.getSILValue())};
+  return {
+      unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
-  return {get().createUncheckedRefCast(regularLoc(), op.getSILValue(), type.get())};
+  return {unbridged().createUncheckedRefCast(regularLoc(), op.getSILValue(),
+                                             type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
-  return {get().createUpcast(regularLoc(), op.getSILValue(), type.get())};
+  return {unbridged().createUpcast(regularLoc(), op.getSILValue(),
+                                   type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
-  return {get().createLoad(regularLoc(), op.getSILValue(), (swift::LoadOwnershipQualifier)ownership)};
+  return {unbridged().createLoad(regularLoc(), op.getSILValue(),
+                                 (swift::LoadOwnershipQualifier)ownership)};
 }
 
 BridgedInstruction BridgedBuilder::createBeginDeallocRef(BridgedValue reference, BridgedValue allocation) const {
-  return {get().createBeginDeallocRef(regularLoc(), reference.getSILValue(), allocation.getSILValue())};
+  return {unbridged().createBeginDeallocRef(
+      regularLoc(), reference.getSILValue(), allocation.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createEndInitLetRef(BridgedValue op) const {
-  return {get().createEndInitLetRef(regularLoc(), op.getSILValue())};
+  return {unbridged().createEndInitLetRef(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRetain(BridgedValue op) const {
-  auto b = get();
+  auto b = unbridged();
   return {b.createStrongRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createStrongRelease(BridgedValue op) const {
-  auto b = get();
+  auto b = unbridged();
   return {b.createStrongRelease(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createUnownedRetain(BridgedValue op) const {
-  auto b = get();
+  auto b = unbridged();
   return {b.createUnownedRetain(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createUnownedRelease(BridgedValue op) const {
-  auto b = get();
+  auto b = unbridged();
   return {b.createUnownedRelease(regularLoc(), op.getSILValue(), b.getDefaultAtomicity())};
 }
 
 BridgedInstruction BridgedBuilder::createFunctionRef(BridgedFunction function) const {
-  return {get().createFunctionRef(regularLoc(), function.getFunction())};
+  return {unbridged().createFunctionRef(regularLoc(), function.getFunction())};
 }
 
 BridgedInstruction BridgedBuilder::createCopyValue(BridgedValue op) const {
-  return {get().createCopyValue(regularLoc(), op.getSILValue())};
+  return {unbridged().createCopyValue(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createBeginBorrow(BridgedValue op) const {
-  return {get().createBeginBorrow(regularLoc(), op.getSILValue())};
+  return {unbridged().createBeginBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createEndBorrow(BridgedValue op) const {
-  return {get().createEndBorrow(regularLoc(), op.getSILValue())};
+  return {unbridged().createEndBorrow(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValue to,
                                   bool takeSource, bool initializeDest) const {
-  return {get().createCopyAddr(regularLoc(),
-                                   from.getSILValue(), to.getSILValue(),
-                                   swift::IsTake_t(takeSource),
-                                   swift::IsInitialization_t(initializeDest))};
+  return {unbridged().createCopyAddr(
+      regularLoc(), from.getSILValue(), to.getSILValue(),
+      swift::IsTake_t(takeSource), swift::IsInitialization_t(initializeDest))};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op) const {
-  return {get().createDestroyValue(regularLoc(), op.getSILValue())};
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
-  return {get().createDestroyAddr(regularLoc(), op.getSILValue())};
+  return {unbridged().createDestroyAddr(regularLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDebugStep() const {
-  return {get().createDebugStep(regularLoc())};
+  return {unbridged().createDebugStep(regularLoc())};
 }
 
 BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSubstitutionMap subMap,
@@ -1296,10 +1305,9 @@ BridgedInstruction BridgedBuilder::createApply(BridgedValue function, BridgedSub
   if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
   if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
 
-  return {get().createApply(regularLoc(),
-                                function.getSILValue(), subMap.get(),
-                                arguments.getValues(argValues),
-                                applyOpts, specInfo.data)};
+  return {unbridged().createApply(
+      regularLoc(), function.getSILValue(), subMap.unbridged(),
+      arguments.getValues(argValues), applyOpts, specInfo.data)};
 }
 
 BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, OptionalBridgedBasicBlock defaultBlock,
@@ -1316,119 +1324,133 @@ BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, Op
   llvm::SmallVector<std::pair<swift::EnumElementDecl *, swift::SILBasicBlock *>, 16> convertedCases;
   for (auto c : cases) {
     assert(mappedElements.count(c.first) && "wrong enum element index");
-    convertedCases.push_back({mappedElements[c.first], c.second.get()});
+    convertedCases.push_back({mappedElements[c.first], c.second.unbridged()});
   }
-  return {get().createSwitchEnum(regularLoc(),
-                                       enumVal.getSILValue(),
-                                       defaultBlock.get(), convertedCases)};
+  return {unbridged().createSwitchEnum(regularLoc(), enumVal.getSILValue(),
+                                       defaultBlock.unbridged(),
+                                       convertedCases)};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
                                            BridgedType resultType) const {
   swift::SILValue en = enumVal.getSILValue();
-  return {get().createUncheckedEnumData(regularLoc(), enumVal.getSILValue(),
-                                            en->getType().getEnumElement(caseIdx), resultType.get())};
+  return {unbridged().createUncheckedEnumData(
+      regularLoc(), enumVal.getSILValue(),
+      en->getType().getEnumElement(caseIdx), resultType.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,
                               BridgedType resultType) const {
-  swift::EnumElementDecl *caseDecl = resultType.get().getEnumElement(caseIdx);
+  swift::EnumElementDecl *caseDecl =
+      resultType.unbridged().getEnumElement(caseIdx);
   swift::SILValue pl = payload.getSILValue();
-  return {get().createEnum(regularLoc(), pl, caseDecl, resultType.get())};
+  return {unbridged().createEnum(regularLoc(), pl, caseDecl,
+                                 resultType.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createThinToThickFunction(BridgedValue fn, BridgedType resultType) const {
-  return {get().createThinToThickFunction(regularLoc(), fn.getSILValue(), resultType.get())};
+  return {unbridged().createThinToThickFunction(regularLoc(), fn.getSILValue(),
+                                                resultType.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {get().createBranch(regularLoc(), destBlock.get(), arguments.getValues(argValues))};
+  return {unbridged().createBranch(regularLoc(), destBlock.unbridged(),
+                                   arguments.getValues(argValues))};
 }
 
 BridgedInstruction BridgedBuilder::createUnreachable() const {
-  return {get().createUnreachable(regularLoc())};
+  return {unbridged().createUnreachable(regularLoc())};
 }
 
 BridgedInstruction BridgedBuilder::createObject(BridgedType type,
                                                 BridgedValueArray arguments,
                                                 SwiftInt numBaseElements) const {
   llvm::SmallVector<swift::SILValue, 16> argValues;
-  return {get().createObject(swift::ArtificialUnreachableLocation(),
-                                 type.get(), arguments.getValues(argValues), numBaseElements)};
+  return {unbridged().createObject(
+      swift::ArtificialUnreachableLocation(), type.unbridged(),
+      arguments.getValues(argValues), numBaseElements)};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalAddr(BridgedGlobalVar global) const {
-  return {get().createGlobalAddr(regularLoc(), global.getGlobal())};
+  return {unbridged().createGlobalAddr(regularLoc(), global.getGlobal())};
 }
 
 BridgedInstruction BridgedBuilder::createGlobalValue(BridgedGlobalVar global, bool isBare) const {
-  return {get().createGlobalValue(regularLoc(), global.getGlobal(), isBare)};
+  return {
+      unbridged().createGlobalValue(regularLoc(), global.getGlobal(), isBare)};
 }
 
 BridgedInstruction BridgedBuilder::createStruct(BridgedType type, BridgedValueArray elements) const {
   llvm::SmallVector<swift::SILValue, 16> elementValues;
-  return {get().createStruct(regularLoc(), type.get(), elements.getValues(elementValues))};
+  return {unbridged().createStruct(regularLoc(), type.unbridged(),
+                                   elements.getValues(elementValues))};
 }
 
 BridgedInstruction BridgedBuilder::createStructExtract(BridgedValue str, SwiftInt fieldIndex) const {
   swift::SILValue v = str.getSILValue();
-  return {get().createStructExtract(regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
+  return {unbridged().createStructExtract(
+      regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 
 BridgedInstruction BridgedBuilder::createStructElementAddr(BridgedValue addr, SwiftInt fieldIndex) const {
   swift::SILValue v = addr.getSILValue();
-  return {get().createStructElementAddr(regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
+  return {unbridged().createStructElementAddr(
+      regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 
 BridgedInstruction BridgedBuilder::createDestructureStruct(BridgedValue str) const {
-  return {get().createDestructureStruct(regularLoc(), str.getSILValue())};
+  return {unbridged().createDestructureStruct(regularLoc(), str.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createTuple(BridgedType type, BridgedValueArray elements) const {
   llvm::SmallVector<swift::SILValue, 16> elementValues;
-  return {get().createTuple(regularLoc(), type.get(), elements.getValues(elementValues))};
+  return {unbridged().createTuple(regularLoc(), type.unbridged(),
+                                  elements.getValues(elementValues))};
 }
 
 BridgedInstruction BridgedBuilder::createTupleExtract(BridgedValue str, SwiftInt elementIndex) const {
   swift::SILValue v = str.getSILValue();
-  return {get().createTupleExtract(regularLoc(), v, elementIndex)};
+  return {unbridged().createTupleExtract(regularLoc(), v, elementIndex)};
 }
 
 BridgedInstruction BridgedBuilder::createTupleElementAddr(BridgedValue addr, SwiftInt elementIndex) const {
   swift::SILValue v = addr.getSILValue();
-  return {get().createTupleElementAddr(regularLoc(), v, elementIndex)};
+  return {unbridged().createTupleElementAddr(regularLoc(), v, elementIndex)};
 }
 
 BridgedInstruction BridgedBuilder::createDestructureTuple(BridgedValue str) const {
-  return {get().createDestructureTuple(regularLoc(), str.getSILValue())};
+  return {unbridged().createDestructureTuple(regularLoc(), str.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue dst,
                                SwiftInt ownership) const {
-  return {get().createStore(regularLoc(), src.getSILValue(), dst.getSILValue(),
-                                (swift::StoreOwnershipQualifier)ownership)};
+  return {unbridged().createStore(regularLoc(), src.getSILValue(),
+                                  dst.getSILValue(),
+                                  (swift::StoreOwnershipQualifier)ownership)};
 }
 
 BridgedInstruction BridgedBuilder::createInitExistentialRef(BridgedValue instance,
                                             BridgedType type,
                                             BridgedInstruction useConformancesOf) const {
   auto *src = useConformancesOf.getAs<swift::InitExistentialRefInst>();
-  return {get().createInitExistentialRef(regularLoc(), type.get(),
-                                             src->getFormalConcreteType(),
-                                             instance.getSILValue(),
-                                             src->getConformances())};
+  return {unbridged().createInitExistentialRef(
+      regularLoc(), type.unbridged(), src->getFormalConcreteType(),
+      instance.getSILValue(), src->getConformances())};
 }
 
 BridgedInstruction BridgedBuilder::createMetatype(BridgedType type,
                                                   BridgedType::MetatypeRepresentation representation) const {
-  auto *mt = swift::MetatypeType::get(type.get().getASTType(), (swift::MetatypeRepresentation)representation);
+  auto *mt =
+      swift::MetatypeType::get(type.unbridged().getASTType(),
+                               (swift::MetatypeRepresentation)representation);
   auto t = swift::SILType::getPrimitiveObjectType(swift::CanType(mt));
-  return {get().createMetatype(regularLoc(), t)};
+  return {unbridged().createMetatype(regularLoc(), t)};
 }
 
 BridgedInstruction BridgedBuilder::createEndCOWMutation(BridgedValue instance, bool keepUnique) const {
-  return {get().createEndCOWMutation(regularLoc(), instance.getSILValue(), keepUnique)};
+  return {unbridged().createEndCOWMutation(regularLoc(), instance.getSILValue(),
+                                           keepUnique)};
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

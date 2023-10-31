@@ -177,7 +177,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   case BridgedExternalMacro: {
     // An external macro described as ModuleName.TypeName. Get both identifiers.
     assert(!replacements && "External macro doesn't have replacements");
-    StringRef externalMacroStr = externalMacroName.get();
+    StringRef externalMacroStr = externalMacroName.unbridged();
     StringRef externalModuleName, externalTypeName;
     std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
 
@@ -219,7 +219,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
     return handleExternalMacroDefinition(ctx, expansion);
 
   // Expansion string text.
-  StringRef expansionText = externalMacroName.get();
+  StringRef expansionText = externalMacroName.unbridged();
 
   // Copy over the replacements.
   SmallVector<ExpandedMacroReplacement, 2> replacementsVec;
@@ -286,7 +286,7 @@ initializeExecutablePlugin(ASTContext &ctx,
         executablePlugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
         &bridgedErrorOut);
 
-    auto errorOut = bridgedErrorOut.get();
+    auto errorOut = bridgedErrorOut.unbridged();
     if (!loaded) {
       SWIFT_DEFER { swift_ASTGen_freeBridgedString(errorOut); };
       return llvm::createStringError(
@@ -1091,10 +1091,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
         getRawMacroRole(macroRole), astGenSourceFile,
         expansion->getSourceRange().Start.getOpaquePointerValue(),
         &evaluatedSourceOut);
-    if (!evaluatedSourceOut.get().data())
+    if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        evaluatedSourceOut.get(),
+        evaluatedSourceOut.unbridged(),
         adjustMacroExpansionBufferName(*discriminator));
     swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
@@ -1371,10 +1371,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
-    if (!evaluatedSourceOut.get().data())
+    if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
     evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-        evaluatedSourceOut.get(),
+        evaluatedSourceOut.unbridged(),
         adjustMacroExpansionBufferName(*discriminator));
     swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;

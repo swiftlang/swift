@@ -57,6 +57,10 @@
 #define BRIDGED_INLINE inline
 #endif
 
+namespace llvm {
+class raw_ostream;
+} // end namespace llvm
+
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 typedef intptr_t SwiftInt;
@@ -72,32 +76,32 @@ typedef uintptr_t SwiftUInt;
 // PURE_BRIDGING_MODE.
 #define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
   class Bridged##Name {                                                        \
-    swift::Node * Nullability Ptr;                                             \
+    Node * Nullability Ptr;                                                    \
                                                                                \
   public:                                                                      \
     SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
-    Bridged##Name(swift::Node * Nullability ptr) : Ptr(ptr) {}                 \
+    Bridged##Name(Node * Nullability ptr) : Ptr(ptr) {}                        \
                                                                                \
     SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
-    swift::Node * Nullability get() const { return Ptr; }                      \
+    Node * Nullability unbridged() const { return Ptr; }                       \
   };                                                                           \
                                                                                \
   SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
   inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
-    return bridged.get();                                                      \
+    return bridged.unbridged();                                                \
   }                                                                            \
                                                                                \
   SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
   inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
-    return static_cast<swift::Node *>(ptr);                                    \
+    return static_cast<Node *>(ptr);                                           \
   }
 
 // Bridging wrapper macros for convenience.
-#define BRIDGING_WRAPPER_NONNULL(Name) \
-  BRIDGING_WRAPPER_IMPL(Name, Name, _Nonnull)
+#define BRIDGING_WRAPPER_NONNULL(Node, Name) \
+  BRIDGING_WRAPPER_IMPL(Node, Name, _Nonnull)
 
-#define BRIDGING_WRAPPER_NULLABLE(Name) \
-  BRIDGING_WRAPPER_IMPL(Name, Nullable##Name, _Nullable)
+#define BRIDGING_WRAPPER_NULLABLE(Node, Name) \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, _Nullable)
 
 //===----------------------------------------------------------------------===//
 // MARK: ArrayRef
@@ -123,7 +127,7 @@ public:
       : Data(arr.data()), Length(arr.size()) {}
 
   template <typename T>
-  llvm::ArrayRef<T> get() const {
+  llvm::ArrayRef<T> unbridged() const {
     return {static_cast<const T *>(Data), Length};
   }
 #endif
@@ -179,9 +183,7 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedFeature {
 // MARK: OStream
 //===----------------------------------------------------------------------===//
 
-struct BridgedOStream {
-  void * _Nonnull streamAddr;
-};
+BRIDGING_WRAPPER_NONNULL(llvm::raw_ostream, OStream)
 
 //===----------------------------------------------------------------------===//
 // MARK: StringRef
@@ -196,7 +198,7 @@ public:
   BridgedStringRef(llvm::StringRef sref)
       : Data(sref.data()), Length(sref.size()) {}
 
-  llvm::StringRef get() const { return llvm::StringRef(Data, Length); }
+  llvm::StringRef unbridged() const { return llvm::StringRef(Data, Length); }
 #endif
 
   BridgedStringRef() : Data(nullptr), Length(0) {}
@@ -226,7 +228,7 @@ public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedOwnedString(const std::string &stringToCopy);
 
-  llvm::StringRef getRef() const { return llvm::StringRef(Data, Length); }
+  llvm::StringRef unbridgedRef() const { return llvm::StringRef(Data, Length); }
 #endif
 
   void destroy() const;
@@ -258,7 +260,7 @@ public:
 #ifdef USED_IN_CPP_SOURCE
   BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
 
-  swift::SourceLoc get() const {
+  swift::SourceLoc unbridged() const {
     return swift::SourceLoc(
         llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
   }
@@ -279,15 +281,61 @@ BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc loc);
 // MARK: SourceRange
 //===----------------------------------------------------------------------===//
 
-struct BridgedSourceRange {
-  BridgedSourceLoc startLoc;
-  BridgedSourceLoc endLoc;
+class BridgedSourceRange {
+public:
+  SWIFT_NAME("start")
+  BridgedSourceLoc Start;
+
+  SWIFT_NAME("end")
+  BridgedSourceLoc End;
+
+  SWIFT_NAME("init(start:end:)")
+  BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
+      : Start(start), End(end) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSourceRange(swift::SourceRange range)
+      : Start(range.Start), End(range.End) {}
+
+  swift::SourceRange unbridged() const {
+    return swift::SourceRange(Start.unbridged(), End.unbridged());
+  }
+#endif
 };
 
-struct BridgedCharSourceRange {
-  void *_Nonnull start;
-  size_t byteLength;
+class BridgedCharSourceRange {
+public:
+  SWIFT_UNAVAILABLE("Use '.start' instead")
+  BridgedSourceLoc Start;
+
+  SWIFT_UNAVAILABLE("Use '.byteLength' instead")
+  unsigned ByteLength;
+
+  SWIFT_NAME("init(start:byteLength:)")
+  BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
+      : Start(start), ByteLength(byteLength) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedCharSourceRange(swift::CharSourceRange range)
+      : Start(range.getStart()), ByteLength(range.getByteLength()) {}
+
+  swift::CharSourceRange unbridged() const {
+    return swift::CharSourceRange(Start.unbridged(), ByteLength);
+  }
+#endif
 };
+
+SWIFT_NAME("getter:BridgedCharSourceRange.start(self:)")
+inline BridgedSourceLoc
+BridgedCharSourceRange_start(BridgedCharSourceRange range) {
+  return range.Start;
+}
+
+SWIFT_NAME("getter:BridgedCharSourceRange.byteLength(self:)")
+inline SwiftInt
+BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
+  return static_cast<SwiftInt>(range.ByteLength);
+}
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins
