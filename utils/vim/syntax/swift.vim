@@ -180,9 +180,9 @@ syn region swiftString contains=swiftInterpolationRegion
       \ start=/"/ skip=/\\\\\|\\"/ end=/"/
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
-syn region swiftComment contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftComment contains=swiftComment,swiftTodo
       \ start="/\*" end="\*/"
-syn region swiftLineComment contains=swiftComment,swiftTodo
+syn region swiftLineComment contains=swiftTodo
       \ start="//" end="$"
 
 syn match swiftDecimal
