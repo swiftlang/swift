@@ -989,8 +989,12 @@ enum ScoreKind: unsigned int {
   /// ambiguity tie-breakers should go after this; anything else
   /// should be added above.
   SK_UnappliedFunction,
+  /// A type with a missing conformance(s) that has be synthesized
+  /// or diagnosed later, such types are allowed to appear in
+  /// a valid solution.
+  SK_MissingSynthesizableConformance,
 
-  SK_LastScoreKind = SK_UnappliedFunction,
+  SK_LastScoreKind = SK_MissingSynthesizableConformance,
 };
 
 /// The number of score kinds.
@@ -1154,6 +1158,9 @@ struct Score {
 
     case SK_UnappliedFunction:
       return "use of overloaded unapplied function";
+
+    case SK_MissingSynthesizableConformance:
+      return "type with missing synthesizable conformance";
     }
   }
 
