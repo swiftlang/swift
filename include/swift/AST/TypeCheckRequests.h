@@ -4600,6 +4600,25 @@ public:
   void cacheResult(bool isSkipped) const;
 };
 
+class SemanticDeclAttrsRequest
+    : public SimpleRequest<SemanticDeclAttrsRequest,
+                           DeclAttributes(const Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  DeclAttributes evaluate(Evaluator &evaluator, const Decl *) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<DeclAttributes> getCachedResult() const;
+  void cacheResult(DeclAttributes) const;
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

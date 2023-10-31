@@ -351,7 +351,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -374,7 +374,10 @@ protected:
     /// a local context, but should behave like a top-level
     /// declaration for name lookup purposes. This is used by
     /// lldb.
-    Hoisted : 1
+    Hoisted : 1,
+
+    /// Whether the set of semantic attributes has been computed.
+    SemanticAttrsComputed : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -1088,6 +1091,14 @@ public:
 
   void setEscapedFromIfConfig(bool Escaped) {
     Bits.Decl.EscapedFromIfConfig = Escaped;
+  }
+
+  bool getSemanticAttrsComputed() const {
+    return Bits.Decl.SemanticAttrsComputed;
+  }
+
+  void setSemanticAttrsComputed(bool Computed) {
+    Bits.Decl.SemanticAttrsComputed = Computed;
   }
 
   /// \returns the unparsed comment attached to this declaration.
