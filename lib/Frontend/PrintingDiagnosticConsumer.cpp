@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/AST/ASTBridging.h"
+#include "swift/AST/CASTBridging.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/LLVM.h"
@@ -466,13 +466,11 @@ void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
 void PrintingDiagnosticConsumer::flush(bool includeTrailingBreak) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   if (queuedDiagnostics) {
-    BridgedStringRef bridgedRenderedString{nullptr, 0};
+    BridgedString renderedString{nullptr, 0};
     swift_ASTGen_renderQueuedDiagnostics(queuedDiagnostics, /*contextSize=*/2,
-                                         ForceColors ? 1 : 0,
-                                         &bridgedRenderedString);
-    auto renderedString = bridgedRenderedString.get();
-    if (renderedString.data()) {
-      Stream.write(renderedString.data(), renderedString.size());
+                                         ForceColors ? 1 : 0, &renderedString);
+    if (renderedString.data) {
+      Stream.write((const char *)renderedString.data, renderedString.length);
       swift_ASTGen_freeBridgedString(renderedString);
     }
     swift_ASTGen_destroyQueuedDiagnostics(queuedDiagnostics);

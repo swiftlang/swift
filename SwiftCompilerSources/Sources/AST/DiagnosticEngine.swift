@@ -52,16 +52,16 @@ public struct DiagnosticFixIt {
 }
 
 public struct DiagnosticEngine {
-  private let bridged: BridgedDiagnosticEngine
+  private let bridged: BridgedDiagEngine
 
-  public init(bridged: BridgedDiagnosticEngine) {
+  public init(bridged: BridgedDiagEngine) {
     self.bridged = bridged
   }
-  public init?(bridged: BridgedNullableDiagnosticEngine) {
-    guard let raw = bridged.raw else {
+  public init?(bridged: BridgedOptionalDiagnosticEngine) {
+    guard let object = bridged.object else {
       return nil
     }
-    self.bridged = BridgedDiagnosticEngine(raw: raw)
+    self.bridged = BridgedDiagEngine(object: object)
   }
 
   public func diagnose(_ position: SourceLoc?,
@@ -91,10 +91,10 @@ public struct DiagnosticEngine {
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in
-          bridged.diagnose(at: bridgedSourceLoc, id, bridgedArgsRef,
-                           highlightAt: highlightStart,
-                           highlightLength: highlightLength,
-                           fixIts: bridgedFixItsRef)
+          DiagnosticEngine_diagnose(bridged, bridgedSourceLoc,
+                                    id, bridgedArgsRef,
+                                    highlightStart, highlightLength,
+                                    bridgedFixItsRef)
         }
       }
     }

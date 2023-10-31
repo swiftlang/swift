@@ -1,5 +1,5 @@
-import ASTBridging
-import BasicBridging
+import CASTBridging
+import CBasicBridging
 // Needed to use BumpPtrAllocator
 @_spi(BumpPtrAllocator) import SwiftSyntax
 
@@ -421,7 +421,7 @@ extension Collection {
       }
     }
 
-    return .init(data: baseAddress, count: self.count)
+    return .init(data: baseAddress, numElements: self.count)
   }
 }
 
@@ -435,7 +435,7 @@ extension LazyCollectionProtocol {
     let buffer = astgen.allocator.allocate(Element.self, count: self.count)
     _ = buffer.initialize(from: self)
 
-    return .init(data: buffer.baseAddress, count: self.count)
+    return .init(data: buffer.baseAddress, numElements: self.count)
   }
 }
 
@@ -465,7 +465,7 @@ extension Optional where Wrapped: LazyCollectionProtocol {
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,
   ctx: UnsafeMutableRawPointer,

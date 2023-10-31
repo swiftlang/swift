@@ -184,9 +184,7 @@ protocol EscapeVisitorWithResult : EscapeVisitor {
   var result: Result { get }
 }
 
-// FIXME: This ought to be marked private, but that triggers a compiler bug
-// in debug builds (rdar://117413192)
-struct DefaultVisitor : EscapeVisitor {}
+private struct DefaultVisitor : EscapeVisitor {}
 
 struct EscapeUtilityTypes {
 

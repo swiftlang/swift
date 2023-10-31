@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
+#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
@@ -2089,8 +2090,8 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
   auto *Ptr = TokStart;
-  CompletelyErroneous =
-      regexLiteralLexingFn(&Ptr, BufferEnd, MustBeRegex, Diags);
+  CompletelyErroneous = regexLiteralLexingFn(
+      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.

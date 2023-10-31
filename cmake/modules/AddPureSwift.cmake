@@ -37,11 +37,6 @@ function(_add_host_swift_compile_options name)
      target_link_options(${name} PRIVATE ${_cov_flags})
   endif()
 
-  if("${BRIDGING_MODE}" STREQUAL "PURE")
-    target_compile_options(${name} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -DPURE_BRIDGING_MODE>")
-  endif()
-
   # The compat56 library is not available in current toolchains. The stage-0
   # compiler will build fine since the builder compiler is not aware of the 56
   # compat library, but the stage-1 and subsequent stage compilers will fail as

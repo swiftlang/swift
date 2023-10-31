@@ -10,14 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Building the BasicBridging module requires a bunch of '-Xcc' args, which
-// don't currently end up in the module interface. So import as
-// @_implementationOnly.
-@_implementationOnly import BasicBridging
+import CBasicBridging
 
 extension String {
   init(_ data: BridgedData) {
-    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.count)
+    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: Int(data.size))
     self = buffer.withMemoryRebound(to: UInt8.self) { buffer in
       String(decoding: buffer, as: UTF8.self)
     }
@@ -37,14 +34,14 @@ public struct LLVMJSON {
     var data: BridgedData = BridgedData()
     JSON_value_serialize(valuePtr, &data)
     assert(data.baseAddress != nil)
-    defer { data.free() }
-    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.count)
+    defer { BridgedData_free(data) }
+    let buffer = UnsafeBufferPointer(start: data.baseAddress, count: data.size)
     return try body(buffer)
   }
 
   /// Decode a JSON data to a Swift value.
   public static func decode<T: Decodable>(_ type: T.Type, from json: UnsafeBufferPointer<Int8>) throws -> T {
-    let data = BridgedData(baseAddress: json.baseAddress, count: json.count)
+    let data = BridgedData(baseAddress: json.baseAddress, size: json.count)
     let valuePtr = JSON_deserializedValue(data)
     defer { JSON_value_delete(valuePtr) }
 

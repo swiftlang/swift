@@ -1,5 +1,4 @@
-import ASTBridging
-import BasicBridging
+import CASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
@@ -254,7 +253,7 @@ extension ASTGenVisitor {
 
     // Handle type attributes.
     if !node.attributes.isEmpty {
-      let typeAttributes = BridgedTypeAttributes()
+      let typeAttributes = TypeAttributes_create()
       for attributeElt in node.attributes {
         // FIXME: Ignoring #ifs entirely. We want to provide a filtered view,
         // but we don't have that ability right now.
@@ -270,7 +269,7 @@ extension ASTGenVisitor {
         let nameSyntax = identType.name
         var name = nameSyntax.text
         let typeAttrKind = name.withBridgedString { bridgedName in
-          BridgedTypeAttrKind(from: bridgedName)
+          TypeAttrKind_fromString(bridgedName)
         }
         let atLoc = attribute.atSign.bridgedSourceLoc(in: self)
         let attrLoc = nameSyntax.bridgedSourceLoc(in: self)
@@ -291,7 +290,7 @@ extension ASTGenVisitor {
           .pack_owned, .pack_guaranteed, .pack_inout, .pack_out,
           .pseudogeneric, .yields, .yield_once, .yield_many, .thin, .thick,
           .count, .unimplementable:
-          typeAttributes.addSimpleAttr(kind: typeAttrKind, atLoc: atLoc, attrLoc: attrLoc)
+          TypeAttributes_addSimpleAttr(typeAttributes, typeAttrKind, atLoc, attrLoc)
 
         case .opened, .pack_element, .differentiable, .convention,
           ._opaqueReturnTypeOf:
@@ -303,7 +302,7 @@ extension ASTGenVisitor {
       type = BridgedAttributedTypeRepr.createParsed(
         self.ctx,
         base: type,
-        consumingAttributes: typeAttributes
+        attributes: typeAttributes
       )
     }
 
@@ -342,7 +341,7 @@ extension ASTGenVisitor {
 @_cdecl("swift_ASTGen_buildTypeRepr")
 @usableFromInline
 func buildTypeRepr(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafeRawPointer,
   typeLocPtr: UnsafePointer<UInt8>,
   dc: UnsafeMutableRawPointer,

@@ -1,5 +1,4 @@
-import ASTBridging
-import BasicBridging
+import CASTBridging
 import SwiftOperators
 import SwiftSyntax
 import SwiftSyntaxMacros

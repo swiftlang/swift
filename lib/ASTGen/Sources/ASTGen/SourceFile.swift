@@ -1,4 +1,5 @@
-import ASTBridging
+import CASTBridging
+import CBasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
@@ -101,7 +102,7 @@ extension Syntax {
 /// Emit diagnostics within the given source file.
 @_cdecl("swift_ASTGen_emitParserDiagnostics")
 public func emitParserDiagnostics(
-  diagEnginePtr: UnsafeMutableRawPointer,
+  diagEnginePtr: UnsafeMutablePointer<UInt8>,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
   downgradePlaceholderErrorsToWarnings: CInt

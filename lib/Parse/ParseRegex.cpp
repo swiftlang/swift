@@ -14,7 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/BridgingUtils.h"
 #include "swift/Parse/Parser.h"
 
 // Regex parser delivered via Swift modules.
@@ -38,12 +40,12 @@ ParserResult<Expr> Parser::parseExprRegexLiteral() {
   auto capturesBuf = Context.AllocateUninitialized<uint8_t>(
       RegexLiteralExpr::getCaptureStructureSerializationAllocationSize(
           regexText.size()));
-  bool hadError = regexLiteralParsingFn(
-      regexText.str().c_str(), &version,
-      /*captureStructureOut*/ capturesBuf.data(),
-      /*captureStructureSize*/ capturesBuf.size(),
-      /*diagBaseLoc*/ {(const uint8_t *)(Tok.getLoc().getOpaquePointerValue())},
-      &Diags);
+  bool hadError =
+      regexLiteralParsingFn(regexText.str().c_str(), &version,
+                            /*captureStructureOut*/ capturesBuf.data(),
+                            /*captureStructureSize*/ capturesBuf.size(),
+                            /*diagBaseLoc*/ {(const uint8_t *)(Tok.getLoc().getOpaquePointerValue())},
+                            getBridgedDiagnosticEngine(&Diags));
   auto loc = consumeToken();
   SourceMgr.recordRegexLiteralStartLoc(loc);
 

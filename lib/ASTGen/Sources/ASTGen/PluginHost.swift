@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
-import BasicBridging
+import CASTBridging
+import CBasicBridging
 import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
 import swiftLLVMJSON
@@ -58,7 +58,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   opaqueHandle: UnsafeMutableRawPointer,
   libraryPath: UnsafePointer<CChar>,
   moduleName: UnsafePointer<CChar>,
-  errorOut: UnsafeMutablePointer<BridgedStringRef>?
+  errorOut: UnsafeMutablePointer<BridgedString>?
 ) -> Bool {
   let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
 
@@ -119,7 +119,7 @@ struct CompilerPlugin {
 
   private func sendMessage(_ message: HostToPluginMessage) throws {
     let hadError = try LLVMJSON.encoding(message) { (data) -> Bool in
-      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, count: data.count))
+      return Plugin_sendMessage(opaqueHandle, BridgedData(baseAddress: data.baseAddress, size: data.count))
     }
     if hadError {
       throw PluginError.failedToSendMessage
@@ -127,13 +127,13 @@ struct CompilerPlugin {
   }
 
   private func waitForNextMessage() throws -> PluginToHostMessage {
-    var result = BridgedData()
+    var result: BridgedData = BridgedData()
     let hadError = Plugin_waitForNextMessage(opaqueHandle, &result)
-    defer { result.free() }
+    defer { BridgedData_free(result) }
     guard !hadError else {
       throw PluginError.failedToReceiveMessage
     }
-    let data = UnsafeBufferPointer(start: result.baseAddress, count: result.count)
+    let data = UnsafeBufferPointer(start: result.baseAddress, count: Int(result.size))
     return try LLVMJSON.decode(PluginToHostMessage.self, from: data)
   }
 
@@ -365,7 +365,7 @@ class PluginDiagnosticsEngine {
     let start = bridgedSourceLoc(at: range.startOffset, in: range.fileName)
     let end = bridgedSourceLoc(at: range.endOffset, in: range.fileName)
 
-    if !start.isValid || !end.isValid {
+    if start.raw == nil || end.raw == nil {
       return nil
     }
     return (start: start, end: end)

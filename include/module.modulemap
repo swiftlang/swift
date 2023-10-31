@@ -4,10 +4,18 @@ module BasicBridging {
   export *
 }
 
+module CBasicBridging {
+  header "swift/Basic/CBasicBridging.h"
+}
+
 module ASTBridging {
   header "swift/AST/ASTBridging.h"
   requires cplusplus
   export *
+}
+
+module CASTBridging {
+  header "swift/AST/CASTBridging.h"
 }
 
 module SILBridging {
