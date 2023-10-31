@@ -47,7 +47,7 @@ static inline StringRef unbridged(BridgedStringRef cStr) {
 }
 
 static inline ASTContext &unbridged(BridgedASTContext cContext) {
-  return *static_cast<ASTContext *>(cContext.raw);
+  return cContext.unbridged();
 }
 
 static inline SourceLoc unbridged(BridgedSourceLoc cLoc) {
@@ -55,11 +55,11 @@ static inline SourceLoc unbridged(BridgedSourceLoc cLoc) {
 }
 
 static inline SourceRange unbridged(BridgedSourceRange cRange) {
-  return SourceRange(unbridged(cRange.startLoc), unbridged(cRange.endLoc));
+  return cRange.unbridged();
 }
 
 static inline Identifier unbridged(BridgedIdentifier cIdentifier) {
-  return Identifier::getFromOpaquePointer(const_cast<void *>(cIdentifier.raw));
+  return cIdentifier.unbridged();
 }
 
 static TypeAttrKind unbridged(BridgedTypeAttrKind kind) {
@@ -88,7 +88,7 @@ BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
     str = str.drop_front().drop_back();
   }
 
-  return {unbridged(cContext).getIdentifier(str).getAsOpaquePointer()};
+  return unbridged(cContext).getIdentifier(str);
 }
 
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
@@ -227,23 +227,21 @@ bool BridgedDiagnosticEngine_hadAnyError(
   return bridgedEngine.unbridged()->hadAnyError();
 }
 
-namespace {
-struct BridgedDiagnosticImpl {
+struct BridgedDiagnostic::Impl {
   typedef llvm::MallocAllocator Allocator;
 
   InFlightDiagnostic inFlight;
   std::vector<StringRef> textBlobs;
 
-  BridgedDiagnosticImpl(InFlightDiagnostic inFlight,
-                        std::vector<StringRef> textBlobs)
+  Impl(InFlightDiagnostic inFlight, std::vector<StringRef> textBlobs)
       : inFlight(std::move(inFlight)), textBlobs(std::move(textBlobs)) {}
 
-  BridgedDiagnosticImpl(const BridgedDiagnosticImpl &) = delete;
-  BridgedDiagnosticImpl(BridgedDiagnosticImpl &&) = delete;
-  BridgedDiagnosticImpl &operator=(const BridgedDiagnosticImpl &) = delete;
-  BridgedDiagnosticImpl &operator=(BridgedDiagnosticImpl &&) = delete;
+  Impl(const Impl &) = delete;
+  Impl(Impl &&) = delete;
+  Impl &operator=(const Impl &) = delete;
+  Impl &operator=(Impl &&) = delete;
 
-  ~BridgedDiagnosticImpl() {
+  ~Impl() {
     inFlight.flush();
 
     Allocator allocator;
@@ -252,10 +250,9 @@ struct BridgedDiagnosticImpl {
     }
   }
 };
-} // namespace
 
-static inline BridgedDiagnosticImpl *unbridged(BridgedDiagnostic cDiag) {
-  return static_cast<BridgedDiagnosticImpl *>(cDiag.raw);
+static inline BridgedDiagnostic::Impl *unbridged(BridgedDiagnostic cDiag) {
+  return cDiag.unbridged();
 }
 
 BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
@@ -263,7 +260,7 @@ BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
                                            BridgedDiagnosticSeverity severity,
                                            BridgedDiagnosticEngine cDiags) {
   StringRef origText = unbridged(cText);
-  BridgedDiagnosticImpl::Allocator alloc;
+  BridgedDiagnostic::Impl::Allocator alloc;
   StringRef text = origText.copy(alloc);
 
   SourceLoc loc = unbridged(cLoc);
@@ -288,7 +285,7 @@ BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
   }
 
   DiagnosticEngine &diags = *unbridged(cDiags);
-  return {new BridgedDiagnosticImpl{diags.diagnose(loc, diagID, text), {text}}};
+  return new BridgedDiagnostic::Impl{diags.diagnose(loc, diagID, text), {text}};
 }
 
 /// Highlight a source range as part of the diagnostic.
@@ -298,7 +295,7 @@ void BridgedDiagnostic_highlight(BridgedDiagnostic cDiag,
   SourceLoc startLoc = unbridged(cStartLoc);
   SourceLoc endLoc = unbridged(cEndLoc);
 
-  BridgedDiagnosticImpl *diag = unbridged(cDiag);
+  BridgedDiagnostic::Impl *diag = unbridged(cDiag);
   diag->inFlight.highlightChars(startLoc, endLoc);
 }
 
@@ -312,17 +309,17 @@ void BridgedDiagnostic_fixItReplace(BridgedDiagnostic cDiag,
   SourceLoc endLoc = unbridged(cEndLoc);
 
   StringRef origReplaceText = unbridged(cReplaceText);
-  BridgedDiagnosticImpl::Allocator alloc;
+  BridgedDiagnostic::Impl::Allocator alloc;
   StringRef replaceText = origReplaceText.copy(alloc);
 
-  BridgedDiagnosticImpl *diag = unbridged(cDiag);
+  BridgedDiagnostic::Impl *diag = unbridged(cDiag);
   diag->textBlobs.push_back(replaceText);
   diag->inFlight.fixItReplaceChars(startLoc, endLoc, replaceText);
 }
 
 /// Finish the given diagnostic and emit it.
 void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
-  BridgedDiagnosticImpl *diag = unbridged(cDiag);
+  BridgedDiagnostic::Impl *diag = unbridged(cDiag);
   delete diag;
 }
 
@@ -358,10 +355,15 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cFirstNameLoc, BridgedIdentifier cSecondName,
     BridgedSourceLoc cSecondNameLoc, BridgedNullableTypeRepr opaqueType,
     BridgedNullableExpr opaqueDefaultValue) {
-  assert(cSecondNameLoc.unbridged().isValid() == (bool)cSecondName.raw);
-  if (!cSecondName.raw) {
-    cSecondName = cFirstName;
-    cSecondNameLoc = cFirstNameLoc;
+  auto firstName = cFirstName.unbridged();
+  auto firstNameLoc = cFirstNameLoc.unbridged();
+  auto secondName = cSecondName.unbridged();
+  auto secondNameLoc = cSecondNameLoc.unbridged();
+
+  assert(secondNameLoc.isValid() == secondName.nonempty());
+  if (secondName.empty()) {
+    secondName = firstName;
+    secondNameLoc = firstNameLoc;
   }
 
   auto *declContext = unbridged(cDeclContext);
@@ -378,8 +380,8 @@ BridgedParamDecl BridgedParamDecl_createParsed(
   }
 
   auto *paramDecl = new (unbridged(cContext)) ParamDecl(
-      unbridged(cSpecifierLoc), unbridged(cFirstNameLoc), unbridged(cFirstName),
-      unbridged(cSecondNameLoc), unbridged(cSecondName), declContext);
+      unbridged(cSpecifierLoc), firstNameLoc, firstName, secondNameLoc,
+      secondName, declContext);
   paramDecl->setTypeRepr(unbridged(opaqueType));
   paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
   paramDecl->setDefaultArgumentKind(defaultArgumentKind);
@@ -632,8 +634,8 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
   SmallVector<PrimaryAssociatedTypeName, 2> primaryAssociatedTypeNames;
   for (auto &pair : unbridgedArrayRef<BridgedIdentifierAndSourceLoc>(
            cPrimaryAssociatedTypeNames)) {
-    primaryAssociatedTypeNames.emplace_back(unbridged(pair.name),
-                                            unbridged(pair.nameLoc));
+    primaryAssociatedTypeNames.emplace_back(unbridged(pair.Name),
+                                            unbridged(pair.NameLoc));
   }
 
   ASTContext &context = unbridged(cContext);
@@ -689,7 +691,7 @@ BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc) {
   auto colonLoc = cColonLoc.unbridged();
-  assert(colonLoc.isValid() == (bool)cPrecedenceGroupName.raw);
+  assert(colonLoc.isValid() == cPrecedenceGroupName.unbridged().nonempty());
   assert(colonLoc.isValid() == cPrecedenceGroupLoc.unbridged().isValid());
 
   ASTContext &context = unbridged(cContext);
@@ -736,14 +738,14 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
   for (auto &pair :
        unbridgedArrayRef<BridgedIdentifierAndSourceLoc>(cHigherThanNames)) {
     higherThanNames.push_back(
-        {unbridged(pair.nameLoc), unbridged(pair.name), nullptr});
+        {unbridged(pair.NameLoc), unbridged(pair.Name), nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
   for (auto &pair :
        unbridgedArrayRef<BridgedIdentifierAndSourceLoc>(cLowerThanNames)) {
     lowerThanNames.push_back(
-        {unbridged(pair.nameLoc), unbridged(pair.name), nullptr});
+        {unbridged(pair.NameLoc), unbridged(pair.Name), nullptr});
   }
 
   auto *decl = PrecedenceGroupDecl::create(
@@ -766,7 +768,7 @@ BridgedImportDecl BridgedImportDecl_createParsed(
   ImportPath::Builder builder;
   for (auto &element :
        unbridgedArrayRef<BridgedIdentifierAndSourceLoc>(cImportPathElements)) {
-    builder.push_back(unbridged(element.name), unbridged(element.nameLoc));
+    builder.push_back(unbridged(element.Name), unbridged(element.NameLoc));
   }
 
   ASTContext &context = unbridged(cContext);
@@ -969,15 +971,15 @@ BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cRBLoc) {
   llvm::SmallVector<ASTNode, 6> nodes;
   for (auto node : unbridgedArrayRef<BridgedASTNode>(elements)) {
-    if (node.kind == ASTNodeKindExpr) {
-      auto expr = (Expr *)node.ptr;
+    if (node.Kind == ASTNodeKindExpr) {
+      auto expr = (Expr *)node.Raw;
       nodes.push_back(expr);
-    } else if (node.kind == ASTNodeKindStmt) {
-      auto stmt = (Stmt *)node.ptr;
+    } else if (node.Kind == ASTNodeKindStmt) {
+      auto stmt = (Stmt *)node.Raw;
       nodes.push_back(stmt);
     } else {
-      assert(node.kind == ASTNodeKindDecl);
-      auto decl = (Decl *)node.ptr;
+      assert(node.Kind == ASTNodeKindDecl);
+      auto decl = (Decl *)node.Raw;
       nodes.push_back(decl);
 
       // Variable declarations are part of the list on par with pattern binding

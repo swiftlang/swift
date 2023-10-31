@@ -281,15 +281,61 @@ BRIDGED_INLINE bool BridgedSourceLoc_isValid(BridgedSourceLoc loc);
 // MARK: SourceRange
 //===----------------------------------------------------------------------===//
 
-struct BridgedSourceRange {
-  BridgedSourceLoc startLoc;
-  BridgedSourceLoc endLoc;
+class BridgedSourceRange {
+public:
+  SWIFT_NAME("start")
+  BridgedSourceLoc Start;
+
+  SWIFT_NAME("end")
+  BridgedSourceLoc End;
+
+  SWIFT_NAME("init(start:end:)")
+  BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
+      : Start(start), End(end) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedSourceRange(swift::SourceRange range)
+      : Start(range.Start), End(range.End) {}
+
+  swift::SourceRange unbridged() const {
+    return swift::SourceRange(Start.unbridged(), End.unbridged());
+  }
+#endif
 };
 
-struct BridgedCharSourceRange {
-  void *_Nonnull start;
-  size_t byteLength;
+class BridgedCharSourceRange {
+public:
+  SWIFT_UNAVAILABLE("Use '.start' instead")
+  BridgedSourceLoc Start;
+
+  SWIFT_UNAVAILABLE("Use '.byteLength' instead")
+  unsigned ByteLength;
+
+  SWIFT_NAME("init(start:byteLength:)")
+  BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
+      : Start(start), ByteLength(byteLength) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedCharSourceRange(swift::CharSourceRange range)
+      : Start(range.getStart()), ByteLength(range.getByteLength()) {}
+
+  swift::CharSourceRange unbridged() const {
+    return swift::CharSourceRange(Start.unbridged(), ByteLength);
+  }
+#endif
 };
+
+SWIFT_NAME("getter:BridgedCharSourceRange.start(self:)")
+inline BridgedSourceLoc
+BridgedCharSourceRange_start(BridgedCharSourceRange range) {
+  return range.Start;
+}
+
+SWIFT_NAME("getter:BridgedCharSourceRange.byteLength(self:)")
+inline SwiftInt
+BridgedCharSourceRange_byteLength(BridgedCharSourceRange range) {
+  return static_cast<SwiftInt>(range.ByteLength);
+}
 
 //===----------------------------------------------------------------------===//
 // MARK: Plugins

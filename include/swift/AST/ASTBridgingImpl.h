@@ -18,6 +18,18 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
+// MARK: BridgedASTContext
+//===----------------------------------------------------------------------===//
+
+void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
+  return &bridged.unbridged();
+}
+
+BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
+  return *static_cast<swift::ASTContext *>(ptr);
+}
+
+//===----------------------------------------------------------------------===//
 // MARK: BridgedNominalTypeDecl
 //===----------------------------------------------------------------------===//
 
