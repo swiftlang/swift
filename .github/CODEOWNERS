@@ -213,6 +213,7 @@
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham
 /utils/update-checkout*                                       @shahmishal
 /utils/update_checkout/                                       @shahmishal
+/utils/vim/                                                   @compnerd
 
 # validation-test
 # TODO: /validation-test/IRGen/
