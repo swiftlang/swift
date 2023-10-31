@@ -97,7 +97,7 @@ getDistributedSerializationRequirementProtocols(
 /// If so, we can emit slightly nicer diagnostics.
 bool checkDistributedSerializationRequirementIsExactlyCodable(
     ASTContext &C,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements);
+    Type type);
 
 /// Get the `SerializationRequirement`, explode it into the specific
 /// protocol requirements and insert them into `requirements`.
