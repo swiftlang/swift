@@ -41,6 +41,8 @@ public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
   }
 
   private func getPage(at address: Address) throws -> UnsafeRawBufferPointer {
+    precondition((address & Address(pageMask)) == 0)
+
     if let page = cache[address] {
       return page
     }
