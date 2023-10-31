@@ -3952,17 +3952,6 @@ bool ValueDecl::isUsableFromInline() const {
   return false;
 }
 
-bool ValueDecl::skipAccessCheckIfInterface(const DeclContext *useDC,
-                                           AccessLevel useAcl,
-                                           AccessScope declScope) const {
-  if (!useDC || useAcl != AccessLevel::Package || !declScope.isPackage() ||
-      !isUsableFromInline() ||
-      getDeclContext()->getParentModule() == useDC->getParentModule())
-    return false;
-  auto useSF = useDC->getParentSourceFile();
-  return useSF && useSF->Kind == SourceFileKind::Interface;
-}
-
 bool ValueDecl::shouldHideFromEditor() const {
   // Hide private stdlib declarations.
   if (isPrivateStdlibDecl(/*treatNonBuiltinProtocolsAsPublic*/ false) ||
@@ -4293,19 +4282,16 @@ static bool checkAccessUsingAccessScopes(const DeclContext *useDC,
   AccessScope accessScope = getAccessScopeForFormalAccess(
       VD, access, useDC,
       /*treatUsableFromInlineAsPublic*/ includeInlineable);
-  if (accessScope.getDeclContext() == useDC) return true;
-  if (!AccessScope(useDC).isChildOf(accessScope)) {
-    // Grant access if this VD is an inlinable package decl referenced by
-    // another module in an interface file.
-    if (VD->skipAccessCheckIfInterface(useDC, access, accessScope))
-      return true;
+  if (accessScope.getDeclContext() == useDC)
+    return true;
+  if (!AccessScope(useDC).isChildOf(accessScope))
     return false;
-  }
   // useDC is null only when caller wants to skip non-public type checks.
-  if (!useDC) return true;
-
+  if (!useDC)
+    return true;
   // Check SPI access
-  if (!VD->isSPI()) return true;
+  if (!VD->isSPI())
+    return true;
   auto useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
   return !useSF || useSF->isImportedAsSPI(VD) ||
          VD->getDeclContext()->getParentModule() == useDC->getParentModule();
@@ -4426,14 +4412,6 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return useSF && useSF->hasTestableOrPrivateImport(access, sourceModule);
   }
   case AccessLevel::Package: {
-    auto srcFile = sourceDC->getParentSourceFile();
-
-    // srcFile could be null if VD decl is from an imported .swiftmodule
-    if (srcFile && srcFile->Kind == SourceFileKind::Interface) {
-      // If source file is interface, package decls must be usableFromInline or
-      // inlinable, and are accessed only within the defining module so return true
-      return true;
-    }
     auto srcPkg = sourceDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     auto usePkg = useDC->getPackageContext(/*lookupIfNotCurrent*/ true);
     return srcPkg && usePkg && usePkg->isSamePackageAs(srcPkg);

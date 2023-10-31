@@ -210,6 +210,8 @@ public:
   /// Equality check via package name instead of pointer comparison.
   /// Returns false if the name is empty.
   bool isSamePackageAs(PackageUnit *other) {
+    if (!other)
+      return false;
     return !(getName().empty()) && getName() == other->getName();
   }
 };
