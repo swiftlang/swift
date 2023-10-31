@@ -20,6 +20,7 @@
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 
 #include <chrono>
 #include <ctime>
@@ -46,7 +47,7 @@ struct SwiftParseTestOptions {
           clEnumValN(Executor::SwiftParser, "swift-parser", "SwiftParser"),
           clEnumValN(Executor::LibParse, "lib-parse", "libParse")));
 
-  llvm::cl::opt<unsigned int> Iteration = llvm::cl::opt<unsigned int>(
+  llvm::cl::opt<unsigned int> Iterations = llvm::cl::opt<unsigned int>(
       "n", llvm::cl::desc("iteration"), llvm::cl::init(1));
 
   llvm::cl::opt<bool> SkipBodies = llvm::cl::opt<bool>(
@@ -60,7 +61,8 @@ struct SwiftParseTestOptions {
 struct LibParseExecutor {
   constexpr static StringRef name = "libParse";
 
-  static void performParse(llvm::MemoryBufferRef buffer, ExecuteOptions opts) {
+  static llvm::Error performParse(llvm::MemoryBufferRef buffer,
+                                  ExecuteOptions opts) {
     SourceManager SM;
     unsigned bufferID =
         SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(buffer));
@@ -87,19 +89,26 @@ struct LibParseExecutor {
     Parser parser(bufferID, *SF, /*SILParserState=*/nullptr);
     SmallVector<ASTNode> items;
     parser.parseTopLevelItems(items);
+
+    return llvm::Error::success();
   }
 };
 
 struct SwiftParserExecutor {
   constexpr static StringRef name = "SwiftParser";
 
-  static void performParse(llvm::MemoryBufferRef buffer, ExecuteOptions opts) {
+  static llvm::Error performParse(llvm::MemoryBufferRef buffer,
+                                  ExecuteOptions opts) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     // TODO: Implement 'ExecuteOptionFlag::SkipBodies'
     auto sourceFile = swift_ASTGen_parseSourceFile(
         buffer.getBufferStart(), buffer.getBufferSize(), /*moduleName=*/"",
         buffer.getBufferIdentifier().data(), /*ASTContext=*/nullptr);
     swift_ASTGen_destroySourceFile(sourceFile);
+    return llvm::Error::success();
+#else
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "SwiftParser is not supported")
 #endif
   }
 };
@@ -131,7 +140,8 @@ loadSources(ArrayRef<std::string> filePaths,
   }
 }
 
-/// Measure the duration of \p body execution.
+/// Measure the duration of \p body execution. Returns a pair of "wall clock
+/// time" and "CPU time".
 template <typename Duration>
 static std::pair<Duration, Duration> measure(llvm::function_ref<void()> body) {
   auto cStart = std::clock();
@@ -154,7 +164,7 @@ static std::pair<Duration, Duration> measure(llvm::function_ref<void()> body) {
 /// Parse all \p buffers using \c Executor , \p iteration times, and print out
 /// the measurement to the \c stdout.
 template <typename Executor>
-static void
+static llvm::Error
 perform(const SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> &buffers,
         ExecuteOptions opts, unsigned iteration, uintmax_t totalBytes,
         uintmax_t totalLines) {
@@ -163,13 +173,21 @@ perform(const SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> &buffers,
   llvm::outs() << "parser: " << Executor::name << "\n";
 
   using duration_t = std::chrono::nanoseconds;
+  // Wall clock time.
   auto tDuration = duration_t::zero();
+  // CPU time.
   auto cDuration = duration_t::zero();
+
+  llvm::Error err = llvm::Error::success();
+  (void)bool(err);
 
   for (unsigned i = 0; i < iteration; i++) {
     for (auto &buffer : buffers) {
-      std::pair<duration_t, duration_t> elapsed = measure<duration_t>(
-          [&] { Executor::performParse(buffer->getMemBufferRef(), opts); });
+      std::pair<duration_t, duration_t> elapsed = measure<duration_t>([&] {
+        err = Executor::performParse(buffer->getMemBufferRef(), opts);
+      });
+      if (err)
+        return err;
       tDuration += elapsed.first;
       cDuration += elapsed.second;
     }
@@ -183,12 +201,15 @@ perform(const SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> &buffers,
                << llvm::format("cpu time (ms):        %8d\n", cDisplay);
 
   if (cDuration.count() > 0) {
+    // Throughputs are based on CPU time.
     auto byteTPS = totalBytes * duration_t::period::den / cDuration.count();
     auto lineTPS = totalLines * duration_t::period::den / cDuration.count();
 
     llvm::outs() << llvm::format("throughput (byte/s):  %8d\n", byteTPS)
                  << llvm::format("throughput (line/s):  %8d\n", lineTPS);
   }
+
+  return llvm::Error::success();
 }
 
 } // namespace
@@ -199,7 +220,7 @@ int swift_parse_test_main(ArrayRef<const char *> args, const char *argv0,
   llvm::cl::ParseCommandLineOptions(args.size(), args.data(),
                                     "Swift parse test\n");
 
-  unsigned iteration = options.Iteration;
+  unsigned iterations = options.Iterations;
   ExecuteOptions execOptions;
   if (options.SkipBodies)
     execOptions |= ExecuteOptionFlag::SkipBodies;
@@ -216,23 +237,31 @@ int swift_parse_test_main(ArrayRef<const char *> args, const char *argv0,
   llvm::outs() << llvm::format("file count:  %8d\n", buffers.size())
                << llvm::format("total bytes: %8d\n", byteCount)
                << llvm::format("total lines: %8d\n", lineCount)
-               << llvm::format("iterations:  %8d\n", iteration);
+               << llvm::format("iterations:  %8d\n", iterations);
+
+  llvm::Error err = llvm::Error::success();
+  (void)bool(err);
+
   for (auto mode : options.Executors) {
     switch (mode) {
     case Executor::SwiftParser:
-#if SWIFT_BUILD_SWIFT_SYNTAX
-      perform<SwiftParserExecutor>(buffers, execOptions, iteration, byteCount,
-                                   lineCount);
+      err = perform<SwiftParserExecutor>(buffers, execOptions, iterations,
+                                         byteCount, lineCount);
       break;
-#else
-      llvm::errs() << "error: SwiftParser is not enabled\n";
-      return 1;
-#endif
     case Executor::LibParse:
-      perform<LibParseExecutor>(buffers, execOptions, iteration, byteCount,
-                                lineCount);
+      err = perform<LibParseExecutor>(buffers, execOptions, iterations,
+                                      byteCount, lineCount);
       break;
     }
+    if (err)
+      break;
+  }
+
+  if (err) {
+    llvm::handleAllErrors(std::move(err), [](llvm::ErrorInfoBase &info) {
+      llvm::errs() << "error: " << info.message() << "\n";
+    });
+    return 1;
   }
 
   return 0;
