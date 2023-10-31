@@ -31,4 +31,9 @@ func throwsAnything() throws {
     // swallow this error
     _ = e
   } // implicit rethrow
+
+  // CHECK: force_try_expr{{.*}}thrown_error="MyError"
+  try! printOrFail("boom")
+  // CHECK: optional_try_expr{{.*}}thrown_error="MyError"
+  try? printOrFail("ssshhhhh")
 }

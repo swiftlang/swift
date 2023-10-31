@@ -1918,6 +1918,7 @@ public:
 /// should dynamically assert if it does.
 class ForceTryExpr final : public AnyTryExpr {
   SourceLoc ExclaimLoc;
+  Type thrownError;
 
 public:
   ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
@@ -1926,6 +1927,15 @@ public:
       ExclaimLoc(exclaimLoc) {}
 
   SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::ForceTry;
@@ -1937,6 +1947,7 @@ public:
 /// Optional. If the code does throw, \c nil is produced.
 class OptionalTryExpr final : public AnyTryExpr {
   SourceLoc QuestionLoc;
+  Type thrownError;
 
 public:
   OptionalTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc questionLoc,
@@ -1945,6 +1956,15 @@ public:
       QuestionLoc(questionLoc) {}
 
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  /// Retrieve the type of the error thrown from the subexpression.
+  Type getThrownError() const { return thrownError; }
+
+  /// Set the type of the error thrown from the subexpression.
+  void setThrownError(Type type) {
+    assert(!thrownError || thrownError->isEqual(type));
+    thrownError = type;
+  }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::OptionalTry;

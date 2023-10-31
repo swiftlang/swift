@@ -1175,8 +1175,8 @@ void checkInitializerEffects(Initializer *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
 void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
-/// Whether the given expression can throw.
-bool canThrow(ASTContext &ctx, Expr *expr);
+/// Whether the given expression can throw, and if so, the thrown type.
+llvm::Optional<Type> canThrow(ASTContext &ctx, Expr *expr);
 
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.

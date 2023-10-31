@@ -3102,6 +3102,10 @@ private:
     if (!Flags.has(ContextFlags::HasTryThrowSite))
       diagnoseRedundantTry(E);
 
+    if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
+      E->setThrownError(*thrownError);
+    }
+
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
   }
@@ -3116,6 +3120,10 @@ private:
     // Warn about 'try' expressions that weren't actually needed.
     if (!Flags.has(ContextFlags::HasTryThrowSite))
       diagnoseRedundantTry(E);
+
+    if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
+      E->setThrownError(*thrownError);
+    }
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
     return ShouldNotRecurse;
@@ -3351,11 +3359,14 @@ void TypeChecker::checkPropertyWrapperEffects(
   expr->walk(LocalFunctionEffectsChecker());
 }
 
-bool TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
+llvm::Optional<Type> TypeChecker::canThrow(ASTContext &ctx, Expr *expr) {
   ApplyClassifier classifier(ctx);
   auto classification = classifier.classifyExpr(expr, EffectKind::Throws);
-  return classification.getConditionalKind(EffectKind::Throws) !=
-      ConditionalEffectKind::None;
+  if (classification.getConditionalKind(EffectKind::Throws) ==
+        ConditionalEffectKind::None)
+    return llvm::None;
+
+  return classification.getThrownError();
 }
 
 Type TypeChecker::catchErrorType(ASTContext &ctx, DoCatchStmt *stmt) {
