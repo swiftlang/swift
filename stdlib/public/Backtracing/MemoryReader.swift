@@ -245,8 +245,8 @@ extension MemoryReader {
         throw MemserverError(message: "Unreadable at \(hex(addr))")
       }
 
-      if done + Int(reply.len) > bytes.count {
-        throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(bytes.count) bytes")
+      if buffer.count - done < Int(reply.len) {
+        throw MemserverError(message: "Overrun at \(hex(addr)) trying to read \(buffer.count) bytes")
       }
 
       let ret = try safeRead(fd,
