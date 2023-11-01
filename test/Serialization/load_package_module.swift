@@ -19,11 +19,11 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibInterface.swiftinterface) -I %t
 // RUN: %FileCheck %s --check-prefix=CHECK-PUBLIC < %t/LibInterface.swiftinterface
 // CHECK-PUBLIC: -module-name LibInterface
-// CHECK-PUBLIC-NOT: -package-name
+// CHECK-PUBLIC: -package-name
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/LibInterface.private.swiftinterface) -module-name LibInterface -I %t
 // RUN: %FileCheck %s --check-prefix=CHECK-PRIVATE < %t/LibInterface.private.swiftinterface
-// CHECK-PRIVATE: swift-module-flags-ignorable-private: -package-name libPkg
+// CHECK-PRIVATE: -package-name libPkg
 
 // RUN: not %target-swift-frontend -typecheck %t/ClientLoadInterface.swift -package-name otherPkg -I %t 2> %t/resultX.output
 // RUN: %FileCheck %s -check-prefix CHECK-X < %t/resultX.output
