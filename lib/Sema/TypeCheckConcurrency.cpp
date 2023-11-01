@@ -5933,7 +5933,8 @@ ActorReferenceResult ActorReferenceResult::forReference(
       declIsolation.isGlobalActor()) {
     auto *init = dyn_cast<ConstructorDecl>(fromDC);
     auto *decl = declRef.getDecl();
-    if (init && init->isDesignatedInit() && isStoredProperty(decl)) {
+    if (init && init->isDesignatedInit() && isStoredProperty(decl) &&
+        (!actorInstance || actorInstance->isSelf())) {
       auto type =
           fromDC->mapTypeIntoContext(declRef.getDecl()->getInterfaceType());
       if (!isSendableType(fromDC->getParentModule(), type)) {
