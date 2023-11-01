@@ -90,7 +90,8 @@ void SILGenFunction::prepareRethrowEpilog(
     rethrowBB->createPhiArgument(loweredErrorType, OwnershipKind::Owned);
   }
 
-  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
+  ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc,
+                       ThrownErrorInfo(IndirectErrorResult));
 }
 
 void SILGenFunction::prepareCoroutineUnwindEpilog(CleanupLocation cleanupLoc) {
@@ -403,12 +404,21 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
 void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   SILValue exn;
   SILLocation throwLoc = topLevel;
-  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc, &exn))
+
+  if (!prepareExtraEpilog(*this, ThrowDest, throwLoc,
+                          !IndirectErrorResult ? &exn : nullptr)) {
     return;
+  }
 
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
-  B.createThrow(CleanupLocation(throwLoc), exn);
+  // FIXME: opaque values
+  if (!IndirectErrorResult) {
+    B.createThrow(CleanupLocation(throwLoc), exn);
+  } else {
+    assert(IndirectErrorResult);
+    B.createThrowAddr(CleanupLocation(throwLoc));
+  }
 
   ThrowDest = JumpDest::invalid();
 }

@@ -1094,6 +1094,10 @@ final public class ThrowInst : TermInst, UnaryInstruction {
   public override var isFunctionExiting: Bool { true }
 }
 
+final public class ThrowAddrInst : TermInst {
+  public override var isFunctionExiting: Bool { true }
+}
+
 final public class YieldInst : TermInst {
 }
 

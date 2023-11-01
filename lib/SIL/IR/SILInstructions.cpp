@@ -1699,6 +1699,7 @@ bool TermInst::isFunctionExiting() const {
     return false;
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     return true;
   }
@@ -1719,6 +1720,7 @@ bool TermInst::isProgramTerminating() const {
   case TermKind::CheckedCastAddrBranchInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
   case TermKind::TryApplyInst:
   case TermKind::YieldInst:
@@ -1745,6 +1747,7 @@ const Operand *TermInst::forwardedOperand() const {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::YieldInst:
   case TermKind::TryApplyInst:
   case TermKind::CondBranchInst:

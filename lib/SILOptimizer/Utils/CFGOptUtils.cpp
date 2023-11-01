@@ -510,6 +510,7 @@ static bool isSafeNonExitTerminator(TermInst *ti) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
     return false;
   // yield is special because it can do arbitrary,

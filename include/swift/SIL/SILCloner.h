@@ -3136,6 +3136,14 @@ SILCloner<ImplClass>::visitThrowInst(ThrowInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitThrowAddrInst(ThrowAddrInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createThrowAddr(getOpLocation(Inst->getLoc())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitUnwindInst(UnwindInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(

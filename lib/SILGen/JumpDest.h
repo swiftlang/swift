@@ -27,6 +27,13 @@ namespace swift {
   
 namespace Lowering {
 
+struct LLVM_LIBRARY_VISIBILITY ThrownErrorInfo {
+  SILValue IndirectErrorResult;
+
+  explicit ThrownErrorInfo(SILValue IndirectErrorResult)
+    : IndirectErrorResult(IndirectErrorResult) {}
+};
+
 /// The destination of a direct jump.  Swift currently does not
 /// support indirect branches or goto, so the jump mechanism only
 /// needs to worry about branches out of scopes, not into them.
@@ -34,11 +41,17 @@ class LLVM_LIBRARY_VISIBILITY JumpDest {
   SILBasicBlock *Block = nullptr;
   CleanupsDepth Depth = CleanupsDepth::invalid();
   CleanupLocation CleanupLoc;
+  llvm::Optional<ThrownErrorInfo> ThrownError;
+
 public:
   JumpDest(CleanupLocation L) : CleanupLoc(L) {}
   
-  JumpDest(SILBasicBlock *block, CleanupsDepth depth, CleanupLocation l)
-    : Block(block), Depth(depth), CleanupLoc(l) {}
+  JumpDest(SILBasicBlock *block,
+           CleanupsDepth depth,
+           CleanupLocation l,
+           llvm::Optional<ThrownErrorInfo> ThrownError = llvm::None)
+    : Block(block), Depth(depth), CleanupLoc(l),
+      ThrownError(ThrownError) {}
 
   SILBasicBlock *getBlock() const { return Block; }
   SILBasicBlock *takeBlock() {
@@ -49,7 +62,14 @@ public:
   CleanupsDepth getDepth() const { return Depth; }
   CleanupLocation getCleanupLocation() const { return CleanupLoc; }
 
+  ThrownErrorInfo getThrownError() const {
+    assert(ThrownError);
+    return *ThrownError;
+  }
+
   JumpDest translate(CleanupsDepth NewDepth) && {
+    assert(!ThrownError);
+
     JumpDest NewValue(Block, NewDepth, CleanupLoc);
     Block = nullptr;
     Depth = CleanupsDepth::invalid();

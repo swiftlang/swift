@@ -5457,6 +5457,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createThrow(InstLoc, Val);
       break;
     }
+    case SILInstructionKind::ThrowAddrInst: {
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createThrowAddr(InstLoc);
+      break;
+    }
     case SILInstructionKind::UnwindInst: {
       if (parseSILDebugLocation(InstLoc, B))
         return true;

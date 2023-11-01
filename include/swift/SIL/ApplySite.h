@@ -741,6 +741,14 @@ public:
       && (getCalleeArgIndex(op) < getNumIndirectSILResults());
   }
 
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectErrorResultOperand(const Operand &op) const {
+    return isArgumentOperand(op)
+      && (getCalleeArgIndex(op) >= getNumIndirectSILResults())
+      && (getCalleeArgIndex(op) < getNumIndirectSILErrorResults());
+  }
+
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
 
   static bool classof(const SILInstruction *inst) {

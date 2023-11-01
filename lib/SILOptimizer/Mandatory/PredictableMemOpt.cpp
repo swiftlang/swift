@@ -2754,6 +2754,7 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
             LLVM_FALLTHROUGH;
           case TermKind::ReturnInst:
           case TermKind::ThrowInst:
+          case TermKind::ThrowAddrInst:
           case TermKind::UnwindInst:
           case TermKind::YieldInst: {
             // These terminators can never be non-consuming uses of an owned

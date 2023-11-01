@@ -384,9 +384,9 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   switch (Term->getTermKind()) {
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
+  case TermKind::ThrowAddrInst:
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
-
   case TermKind::UnreachableInst:
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
@@ -490,6 +490,7 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::BranchInst:
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
+  case TermKind::ThrowAddrInst:
     return;
 
   case TermKind::ReturnInst:

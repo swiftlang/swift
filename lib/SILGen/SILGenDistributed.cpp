@@ -479,6 +479,8 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
         OwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+
+    // FIXME: typed throws
     B.createThrow(loc, error);
   }
 }

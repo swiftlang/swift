@@ -613,8 +613,8 @@ the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
 
-- SIL function types may provide an optional error result, written by
-  placing ``@error`` on a result.  An error result is always
+- SIL function types may provide an optional direct error result, written by
+  placing ``@error`` on a result.  A direct error result is always
   implicitly ``@owned``.  Only functions with a native calling
   convention may have an error result.
 
@@ -8005,6 +8005,28 @@ the basic block argument will be the operand of the ``throw``.
 ``throw`` does not retain or release its operand or any other values.
 
 A function must not contain more than one ``throw`` instruction.
+
+throw_addr
+``````````
+::
+
+  sil-terminator ::= 'throw_addr'
+
+  throw_addr
+  // indirect error result must be initialized at this point
+
+Exits the current function and returns control to the calling
+function. The current function must have an indirect error result,
+and so the function must have been invoked with a ``try_apply``
+instruction. Control will resume in the error destination of
+that instruction.
+
+The function is responsible for initializing its error result
+before the ``throw_addr``. 
+
+``throw_addr`` does not retain or release any values.
+
+A function must not contain more than one ``throw_addr`` instruction.
 
 yield
 `````
