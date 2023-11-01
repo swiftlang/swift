@@ -938,11 +938,13 @@ CompilerInstance::getInputBuffersIfPresent(const InputFile &input) {
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
   using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+  // Avoid memory-mapping when the compiler is run for IDE inspection,
+  // since that would prevent the user from saving the file.
   FileOrError inputFileOrErr =
     swift::vfs::getFileOrSTDIN(getFileSystem(), input.getFileName(),
                               /*FileSize*/-1,
                               /*RequiresNullTerminator*/true,
-                              /*IsVolatile*/false,
+                              /*IsVolatile*/getInvocation().isIDEInspection(),
       /*Bad File Descriptor Retry*/getInvocation().getFrontendOptions()
                                .BadFileDescriptorRetryCount);
   if (!inputFileOrErr) {
