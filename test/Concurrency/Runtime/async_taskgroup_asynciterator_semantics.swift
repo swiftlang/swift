@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
 
 struct Boom: Error {}
 

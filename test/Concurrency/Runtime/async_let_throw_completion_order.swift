@@ -6,6 +6,7 @@
 // rdar://82123254
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: freestanding
 
 struct Bad: Error {}
 
