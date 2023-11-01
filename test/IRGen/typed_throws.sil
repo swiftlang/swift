@@ -346,7 +346,7 @@ bb0(%0: $*τ_0_0, %1 : $Builtin.Int64, %2 : $*τ_0_0):
 }
 
 // CHECK: define{{.*}} swifttailcc void @throwErrorAsync(ptr swiftasync %0, i64 %1, ptr noalias %2, ptr %"\CF\84_0_0", ptr %3)
-// CHECK:   call ptr {{%[0-9]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
+// CHECK:   call ptr {{%[^,]+}}(ptr noalias %3, ptr noalias %2, ptr %"\CF\84_0_0")
 // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr {{%[0-9]+}}, i1 false, ptr @throwErrorAsync.0, ptr {{%[0-9]+}}, ptr {{%[0-9]+}}, ptr inttoptr (i64 1 to ptr))
 
 sil @throwErrorAsync : $@convention(thin) @async <τ_0_0> (Builtin.Int64, @in τ_0_0) -> @error_indirect τ_0_0 {

@@ -89,7 +89,7 @@ public final class ClassWithIntField {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<Class::ClassWithIntField> {
-// CHECK-NEXT:   SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return Class::_impl::$s5Class0A12WithIntFieldCMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };

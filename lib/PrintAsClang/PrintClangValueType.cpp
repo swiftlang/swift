@@ -651,7 +651,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
   }
   os << "> {\n";
   os << "  static ";
-  ClangSyntaxPrinter(os).printInlineForThunk();
+  ClangSyntaxPrinter(os).printInlineForHelperFunction();
   os << "void * _Nonnull getTypeMetadata() {\n";
   os << "    return ";
   if (!typeDecl->hasClangNode()) {

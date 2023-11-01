@@ -461,6 +461,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                     IGF.getOptions().PointerAuth.ValueWitnesses,
                                         slot, index);
 
+  witness->setName(getValueWitnessName(index));
   return FunctionPointer::createSigned(FunctionPointer::Kind::Function, witness,
                                        authInfo, signature);
 }

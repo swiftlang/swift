@@ -204,7 +204,7 @@ public struct Strct {
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialTemplateInt> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplateInt> {
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return _impl::$sSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
@@ -243,7 +243,7 @@ public struct Strct {
 // CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<ns::NonTrivialTemplateTrivial> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ns::NonTrivialTemplateTrivial> {
-// CHECK-NEXT:   static SWIFT_INLINE_THUNK void * _Nonnull getTypeMetadata() {
+// CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return _impl::$sSo2nsO0037NonTrivialTemplateTrivialinNS_CsGGkdcVMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
