@@ -841,7 +841,8 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
     return false;
 
   // Match initialization stores into ElementBuffer. E.g.
-  // %83 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
+  // %82 = struct_extract %element_buffer : $UnsafeMutablePointer<Int>
+  // %83 = mark_dependence %82 : $Builtin.RawPointer on ArrayVal
   // %84 = pointer_to_address %83 : $Builtin.RawPointer to strict $*Int
   // store %85 to %84 : $*Int
   // %87 = integer_literal $Builtin.Word, 1
@@ -850,12 +851,27 @@ bool swift::ArraySemanticsCall::mapInitializationStores(
 
   // If this an ArrayUninitializedIntrinsic then the ElementBuffer is a
   // builtin.RawPointer. Otherwise, it is an UnsafeMutablePointer, which would
-  // be struct-extracted to obtain a builtin.RawPointer.
-  SILValue UnsafeMutablePointerExtract =
-      (getKind() == ArrayCallKind::kArrayUninitialized)
-          ? dyn_cast_or_null<StructExtractInst>(
-                getSingleNonDebugUser(ElementBuffer))
-          : ElementBuffer;
+  // be struct-extracted to obtain a builtin.RawPointer. In this case
+  // mark_dependence can be an operand of the struct_extract or its user.
+
+  SILValue UnsafeMutablePointerExtract;
+  if (getKind() == ArrayCallKind::kArrayUninitializedIntrinsic) {
+    UnsafeMutablePointerExtract = dyn_cast_or_null<MarkDependenceInst>(
+        getSingleNonDebugUser(ElementBuffer));
+  } else {
+    auto user = getSingleNonDebugUser(ElementBuffer);
+    // Match mark_dependence (struct_extract or
+    // struct_extract (mark_dependence
+    if (auto *MDI = dyn_cast_or_null<MarkDependenceInst>(user)) {
+      UnsafeMutablePointerExtract =
+          dyn_cast_or_null<StructExtractInst>(getSingleNonDebugUser(MDI));
+    } else {
+      if (auto *SEI = dyn_cast_or_null<StructExtractInst>(user)) {
+        UnsafeMutablePointerExtract =
+            dyn_cast_or_null<MarkDependenceInst>(getSingleNonDebugUser(SEI));
+      }
+    }
+  }
   if (!UnsafeMutablePointerExtract)
     return false;
 
