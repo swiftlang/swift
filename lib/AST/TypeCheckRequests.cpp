@@ -2069,9 +2069,15 @@ void ExpandPeerMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 
 DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
                                                   const Decl *decl) const {
+  // Expand attributes contributed by attached macros.
   auto mutableDecl = const_cast<Decl *>(decl);
   (void)evaluateOrDefault(evaluator, ExpandMemberAttributeMacros{mutableDecl},
                           {});
+
+  // Trigger requests that cause additional semantic attributes to be added.
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    (void)afd->isTransparent();
+  }
   return decl->getAttrs();
 }
 
