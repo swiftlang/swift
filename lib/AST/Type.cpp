@@ -4168,15 +4168,20 @@ ClangTypeInfo AnyFunctionType::getCanonicalClangTypeInfo() const {
 ASTExtInfo
 AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   assert(hasExtInfo());
+
+  CanGenericSignature genericSig;
+  if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
+    genericSig = genericFnTy->getGenericSignature().getCanonicalSignature();
+
   Type globalActor = getGlobalActor();
   if (globalActor)
-    globalActor = globalActor->getCanonicalType();
+    globalActor = globalActor->getReducedType(genericSig);
 
   // When there is an explicitly-specified thrown error, canonicalize it's type.
   auto bits = Bits.AnyFunctionType.ExtInfoBits;
   Type thrownError = getThrownError();
   if (thrownError) {
-    thrownError = thrownError->getCanonicalType();
+    thrownError = thrownError->getReducedType(genericSig);
 
     //   - If the thrown error is `any Error`, the function throws and we
     //     drop the thrown error.
