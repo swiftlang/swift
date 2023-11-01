@@ -31,16 +31,16 @@ let swiftSetttings: [SwiftSetting] = [
     "-Xcc", "-I../../../build/Default/swift/include",
     "-Xcc", "-I../../../build/Default/llvm/include",
     "-Xcc", "-I../../../build/Default/llvm/tools/clang/include",
+
+    // FIXME: Needed to work around an availability issue with CxxStdlib
+    "-Xfrontend", "-disable-target-os-checking",
   ]),
 ]
 
 let package = Package(
   name: "swiftSwiftCompiler",
   platforms: [
-    // We need at least macOS 13 here to avoid hitting an availability error
-    // for CxxStdlib. It's only needed for the package though, the CMake build
-    // works fine with a lower deployment target.
-    .macOS(.v13)
+    .macOS(.v10_15)
   ],
   products: [
     .library(name: "swiftASTGen", targets: ["swiftASTGen"]),
