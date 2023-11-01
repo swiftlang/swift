@@ -1531,3 +1531,41 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
     super.x = 10
   }
 }
+
+// expected-note@+1 2 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+class NonSendable {}
+
+actor ProtectNonSendable {
+  // expected-note@+1 {{property declared here}}
+  let ns = NonSendable()
+
+  init() {}
+
+  @MainActor init(fromMain: Void) {
+    // expected-warning@+1 {{actor-isolated property 'ns' can not be referenced from the main actor; this is an error in Swift 6}}
+    _ = self.ns
+  }
+}
+
+@MainActor
+class ReferenceActor {
+  let a: ProtectNonSendable
+
+  init() async {
+    self.a = ProtectNonSendable()
+
+    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    _ = a.ns
+  }
+}
+
+actor AnotherActor {
+  let a: ProtectNonSendable
+
+  init() {
+    self.a = ProtectNonSendable()
+
+    // expected-warning@+1 {{non-sendable type 'NonSendable' in asynchronous access to actor-isolated property 'ns' cannot cross actor boundary}}
+    _ = a.ns
+  }
+}
