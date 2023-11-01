@@ -97,11 +97,9 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst,
         cast<LoadInst>(inst)->getOwnershipQualifier();
     // If the load creates a copy, it is dead, since we know that if at all it
     // is used, it is only in a destroy_value instruction.
-    return (loadOwnershipQual == LoadOwnershipQualifier::Copy ||
+    return (loadOwnershipQual == LoadOwnershipQualifier::Take ||
+            loadOwnershipQual == LoadOwnershipQualifier::Copy ||
             loadOwnershipQual == LoadOwnershipQualifier::Trivial);
-    // TODO: we can handle load [take] but we would have to know that the
-    // operand has been consumed. Note that OperandOwnershipKind map does not
-    // say this for load.
   }
   case SILInstructionKind::PartialApplyInst: {
     bool onlyTrivialArgs = true;
@@ -250,10 +248,19 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       if (!operandValue)
         continue;
 
-      if (fixLifetimes && operand.isConsuming()) {
-        SILBuilderWithScope builder(inst);
-        auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
-        getCallbacks().createdNewInst(dvi);
+      if (fixLifetimes) {
+        LoadInst *li = nullptr;
+        if (operand.isConsuming()) {
+          SILBuilderWithScope builder(inst);
+          auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
+          getCallbacks().createdNewInst(dvi);
+        } else if ((li = dyn_cast<LoadInst>(inst)) &&
+                   li->getOwnershipQualifier() ==
+                       LoadOwnershipQualifier::Take) {
+          SILBuilderWithScope builder(inst);
+          auto *dai = builder.createDestroyAddr(inst->getLoc(), operandValue);
+          getCallbacks().createdNewInst(dai);
+        }
       }
       auto *operDef = operandValue->getDefiningInstruction();
       operand.drop();
@@ -419,4 +426,3 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     nextInsts.clear();
   }
 }
-
