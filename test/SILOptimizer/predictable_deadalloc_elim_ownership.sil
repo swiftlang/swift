@@ -156,8 +156,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
 // CHECK: bb0([[ARG0:%.*]] : @owned $Builtin.NativeObject, [[ARG1:%.*]] : $*Builtin.NativeObject):
 // CHECK-NOT: alloc_stack
 // CHECK:  destroy_value [[ARG0]]
-// CHECK:  [[ARG1_LOADED:%.*]] = load [take] [[ARG1]]
-// CHECK:  destroy_value [[ARG1_LOADED]]
+// CHECK:  destroy_addr [[ARG1]]
 // CHECK: } // end sil function 'simple_init_take'
 sil [ossa] @simple_init_take : $@convention(thin) (@owned Builtin.NativeObject, @in Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.NativeObject):
