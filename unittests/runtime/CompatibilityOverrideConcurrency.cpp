@@ -37,8 +37,8 @@ T getEmptyValue() {
   return T();
 }
 template <>
-ExecutorRef getEmptyValue() {
-  return ExecutorRef::generic();
+SerialExecutorRef getEmptyValue() {
+  return SerialExecutorRef::generic();
 }
 } // namespace
 
@@ -147,11 +147,11 @@ static Job fakeJob{{JobKind::DefaultActorInline},
                    nullptr};
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_enqueue) {
-  swift_task_enqueue(&fakeJob, ExecutorRef::generic());
+  swift_task_enqueue(&fakeJob, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_job_run) {
-  swift_job_run(&fakeJob, ExecutorRef::generic());
+  swift_job_run(&fakeJob, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor) {
@@ -159,7 +159,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor)
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_switch) {
-  swift_task_switch(nullptr, nullptr, ExecutorRef::generic());
+  swift_task_switch(nullptr, nullptr, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_enqueueGlobal) {

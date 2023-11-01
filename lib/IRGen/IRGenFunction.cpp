@@ -562,7 +562,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   std::atomic<size_t> awaitSynchronization;
   //   SwiftError *errResult;
   //   Result *result;
-  //   ExecutorRef resumeExecutor;
+  //   SerialExecutorRef resumeExecutor;
   // };
   //
   // We need fill out this context essentially as if we were calling

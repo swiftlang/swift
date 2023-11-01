@@ -54,7 +54,7 @@ class TaskExecutorWitnessTable;
 ///   bits off before accessing the witness table, so setting them
 ///   in the future should back-deploy as long as the witness table
 ///   reference is still present.
-class ExecutorRef {
+class SerialExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
   uintptr_t Implementation;
 
@@ -80,7 +80,7 @@ class ExecutorRef {
 
   static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
 
-  constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
+  constexpr SerialExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
 
 public:
@@ -89,35 +89,35 @@ public:
   /// environment, it's presumed to be okay to switch synchronously
   /// to an actor.  As an executor request, this represents a request
   /// to drop whatever the current actor is.
-  constexpr static ExecutorRef generic() {
-    return ExecutorRef(nullptr, 0);
+  constexpr static SerialExecutorRef generic() {
+    return SerialExecutorRef(nullptr, 0);
   }
 
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
-  static ExecutorRef forDefaultActor(DefaultActor *actor) {
+  static SerialExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
-    return ExecutorRef(actor, 0);
+    return SerialExecutorRef(actor, 0);
   }
 
   /// Given a pointer to a serial executor and its SerialExecutor
   /// conformance, return an executor reference for it.
-  static ExecutorRef forOrdinary(HeapObject *identity,
+  static SerialExecutorRef forOrdinary(HeapObject *identity,
                            const SerialExecutorWitnessTable *witnessTable) {
     assert(identity);
     assert(witnessTable);
     auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
         static_cast<uintptr_t>(ExecutorKind::Ordinary);
-    return ExecutorRef(identity, wtable);
+    return SerialExecutorRef(identity, wtable);
   }
 
-  static ExecutorRef forComplexEquality(HeapObject *identity,
+  static SerialExecutorRef forComplexEquality(HeapObject *identity,
                                         const SerialExecutorWitnessTable *witnessTable) {
     assert(identity);
     assert(witnessTable);
     auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
                   static_cast<uintptr_t>(ExecutorKind::ComplexEquality);
-    return ExecutorRef(identity, wtable);
+    return SerialExecutorRef(identity, wtable);
   }
 
   HeapObject *getIdentity() const {
@@ -163,7 +163,7 @@ public:
 
   /// Do we have to do any work to start running as the requested
   /// executor?
-  bool mustSwitchToRun(ExecutorRef newExecutor) const {
+  bool mustSwitchToRun(SerialExecutorRef newExecutor) const {
     return Identity != newExecutor.Identity;
   }
 
@@ -175,13 +175,17 @@ public:
     return Implementation & WitnessTableMask;
   }
 
-  bool operator==(ExecutorRef other) const {
+  bool operator==(SerialExecutorRef other) const {
     return Identity == other.Identity;
   }
-  bool operator!=(ExecutorRef other) const {
+  bool operator!=(SerialExecutorRef other) const {
     return !(*this == other);
   }
 };
+
+/// Deprecated name for "SerialExecutorRef"; When it was first introduced it was ExecutorRef,
+/// but it always meant specifically a serial executor.
+typedef SerialExecutorRef ExecutorRef;
 
 class TaskExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
@@ -250,7 +254,7 @@ public:
 
 //  /// Do we have to do any work to start running as the requested
 //  /// executor?
-//  bool mustSwitchToRun(ExecutorRef newExecutor) const {
+//  bool mustSwitchToRun(TaskExecutorRef newExecutor) const {
 //    return Identity != newExecutor.Identity;
 //  }
 
@@ -266,10 +270,6 @@ public:
     return !(*this == other);
   }
 };
-
-// Historically the 'ExecutorRef' was introduced initially, however it always has meant specifically
-// a SERIAL executor. This typedef fixes up this confusion and especially since now there is also a TaskExecutor.
-typedef ExecutorRef SerialExecutorRef;
 
 using JobInvokeFunction =
   SWIFT_CC(swiftasync)

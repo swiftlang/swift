@@ -76,7 +76,7 @@ static void run(llvm::function_ref<void()> fn) {
     auto job = globalQueue.back();
     globalQueue.pop_back();
 
-    swift_job_run(job, ExecutorRef::generic());
+    swift_job_run(job, SerialExecutorRef::generic());
   }
 
   EXPECT_EQ(FinishedIndex, progressIndex);
@@ -173,9 +173,9 @@ static AsyncTask *createAndEnqueueTask(JobPriority priority,
                                        Fn &&fn) {
   auto task = createTaskWithContext<AsyncContext, Fn>(priority, std::move(fn))
            .first;
-  ExecutorRef executor = ExecutorRef::generic();
+  SerialExecutorRef executor = SerialExecutorRef::generic();
   if (actor) {
-     executor = ExecutorRef::forDefaultActor(actor);
+     executor = SerialExecutorRef::forDefaultActor(actor);
   }
   swift_task_enqueueTaskOnExecutor(task, executor);
   return task;
@@ -268,7 +268,7 @@ TEST(ActorTest, validateTestHarness) {
         return context->ResumeParent(context);
       });
 
-    ExecutorRef executor = ExecutorRef::generic();
+    SerialExecutorRef executor = SerialExecutorRef::generic();
     swift_task_enqueueTaskOnExecutor(task0, executor);
     swift_task_enqueueTaskOnExecutor(task1, executor);
     swift_task_enqueueTaskOnExecutor(task2, executor);
@@ -295,7 +295,7 @@ TEST(ActorTest, actorSwitch) {
             EXPECT_PROGRESS(2);
             auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
-            EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
+            EXPECT_EQ(SerialExecutorRef::forDefaultActor(context->get<1>()),
                       executor);
             EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
             auto continuation = prepareContinuation<Context>(
@@ -307,12 +307,12 @@ TEST(ActorTest, actorSwitch) {
                 return context->ResumeParent(context);
               });
             return swift_task_switch(context, continuation,
-                                     ExecutorRef::generic());
+                                     SerialExecutorRef::generic());
           });
         return swift_task_switch(context, continuation,
-                 ExecutorRef::forDefaultActor(context->get<1>()));
+                 SerialExecutorRef::forDefaultActor(context->get<1>()));
       });
-    swift_task_enqueueTaskOnExecutor(task0, ExecutorRef::generic());
+    swift_task_enqueueTaskOnExecutor(task0, SerialExecutorRef::generic());
     EXPECT_PROGRESS(0);
   });
 }
@@ -339,7 +339,7 @@ TEST(ActorTest, actorContention) {
             EXPECT_PROGRESS(2);
             auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
-            EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
+            EXPECT_EQ(SerialExecutorRef::forDefaultActor(context->get<1>()),
                       executor);
             auto task = swift_task_getCurrent();
             EXPECT_EQ(task, context->get<0>());
@@ -350,12 +350,12 @@ TEST(ActorTest, actorContention) {
                 EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
                 return context->ResumeParent(context);
               });
-            swift_task_enqueueTaskOnExecutor(task, ExecutorRef::generic());
+            swift_task_enqueueTaskOnExecutor(task, SerialExecutorRef::generic());
           });
 
-        swift_task_enqueueTaskOnExecutor(task, ExecutorRef::forDefaultActor(context->get<1>()));
+        swift_task_enqueueTaskOnExecutor(task, SerialExecutorRef::forDefaultActor(context->get<1>()));
       });
-    swift_task_enqueueTaskOnExecutor(task0, ExecutorRef::generic());
+    swift_task_enqueueTaskOnExecutor(task0, SerialExecutorRef::generic());
 
     auto task1 = createTaskStoring(JobPriority::Background,
                                    (AsyncTask*) nullptr, actor,
@@ -363,7 +363,7 @@ TEST(ActorTest, actorContention) {
         EXPECT_PROGRESS(3);
         auto executor = swift_task_getCurrentExecutor();
         EXPECT_FALSE(executor.isGeneric());
-        EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
+        EXPECT_EQ(SerialExecutorRef::forDefaultActor(context->get<1>()),
                   executor);
         EXPECT_EQ(nullptr, context->get<0>());
         auto task = swift_task_getCurrent();
@@ -378,9 +378,9 @@ TEST(ActorTest, actorContention) {
             return context->ResumeParent(context);
           });
 
-       swift_task_enqueueTaskOnExecutor(task, ExecutorRef::generic());
+       swift_task_enqueueTaskOnExecutor(task, SerialExecutorRef::generic());
       });
-    swift_task_enqueueTaskOnExecutor(task1, ExecutorRef::forDefaultActor(actor));
+    swift_task_enqueueTaskOnExecutor(task1, SerialExecutorRef::forDefaultActor(actor));
 
     EXPECT_PROGRESS(0);
   });

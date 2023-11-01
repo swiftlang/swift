@@ -1925,7 +1925,7 @@ llvm::Type *SignatureExpansion::getErrorRegisterType() {
 
 void SignatureExpansion::expandAsyncReturnType() {
   // Build up the signature of the return continuation function.
-  // void (AsyncTask *, ExecutorRef, AsyncContext *, DirectResult0, ...,
+  // void (AsyncTask *, SerialExecutorRef, AsyncContext *, DirectResult0, ...,
   //                                                 DirectResultN, Error*);
   ResultIRType = IGM.VoidTy;
   addAsyncParameters();

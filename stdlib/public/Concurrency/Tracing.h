@@ -23,7 +23,7 @@ namespace swift {
 class AsyncLet;
 class AsyncTask;
 class ContinuationAsyncContext;
-class ExecutorRef;
+class SerialExecutorRef;
 struct HeapObject;
 class Job;
 class TaskGroup;

@@ -247,6 +247,6 @@ swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
   while (!condition(conditionContext)) {
     auto job = claimNextFromCooperativeGlobalQueue();
     if (!job) return;
-    swift_job_run(job, ExecutorRef::generic());
+    swift_job_run(job, SerialExecutorRef::generic());
   }
 }

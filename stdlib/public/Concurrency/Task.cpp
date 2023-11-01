@@ -166,7 +166,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
     // Run the new task on the same thread now - this should run the new task to
     // completion. All swift tasks in task-to-thread model run on generic
     // executor
-    swift_job_run(this, ExecutorRef::generic());
+    swift_job_run(this, SerialExecutorRef::generic());
 
     SWIFT_TASK_DEBUG_LOG("[RunInline] Switching back from running %p to now running %p", this, oldTask);
 
@@ -282,7 +282,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
-    waitingTask->flagAsAndEnqueueOnExecutor(ExecutorRef::generic());
+    waitingTask->flagAsAndEnqueueOnExecutor(SerialExecutorRef::generic());
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -341,15 +341,15 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
-static ExecutorRef executorForEnqueuedJob(Job *job) {
+static SerialExecutorRef executorForEnqueuedJob(Job *job) {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
-  return ExecutorRef::generic();
+  return SerialExecutorRef::generic();
 #else
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
-    return ExecutorRef::generic();
+    return SerialExecutorRef::generic();
   else
-    return ExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
+    return SerialExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
                     _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 #endif
 }
@@ -646,7 +646,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   #endif
 
   // Collect the options we know about.
-  ExecutorRef executor = ExecutorRef::generic();
+  SerialExecutorRef executor = SerialExecutorRef::generic();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
   bool hasAsyncLetResultBuffer = false;
@@ -1081,7 +1081,7 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
       /*initialContextSize=*/closureContextSize);
 
   // Run the task.
-  swift_job_run(taskAndContext.Task, ExecutorRef::generic());
+  swift_job_run(taskAndContext.Task, SerialExecutorRef::generic());
   // Under the task-to-thread concurrency model, the task should always have
   // completed by this point.
 
@@ -1265,7 +1265,7 @@ static AsyncTask *swift_task_suspendImpl() {
 
 SWIFT_CC(swift)
 static void
-swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, ExecutorRef executor)
+swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task, SerialExecutorRef executor)
 {
   task->flagAsAndEnqueueOnExecutor(executor);
 }
@@ -1332,7 +1332,7 @@ static AsyncTask *swift_continuation_initImpl(ContinuationAsyncContext *context,
   // Set the generic executor as the target executor unless there's
   // an executor override.
   if (!flags.hasExecutorOverride())
-    context->ResumeToExecutor = ExecutorRef::generic();
+    context->ResumeToExecutor = SerialExecutorRef::generic();
 
   // We can initialize this with a relaxed store because resumption
   // must happen-after this call.
@@ -1654,7 +1654,7 @@ void (*swift::swift_task_asyncMainDrainQueue_hook)(
 SWIFT_CC(swift)
 static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   AsyncTask * originalTask = _swift_task_clearCurrent();
-  ExecutorRef mainExecutor = swift_task_getMainExecutor();
+  SerialExecutorRef mainExecutor = swift_task_getMainExecutor();
   if (!swift_task_isCurrentExecutor(mainExecutor))
     swift_Concurrency_fatalError(0, "Not on the main executor");
   swift_retain(task);
