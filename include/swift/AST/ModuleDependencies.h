@@ -123,6 +123,10 @@ using ModuleDependencyIDSetVector =
 
 namespace dependencies {
   std::string createEncodedModuleKindAndName(ModuleDependencyID id);
+  bool checkImportNotTautological(const ImportPath::Module, 
+                                  const SourceLoc,
+                                  const SourceFile&,
+                                  bool);
 }
 
 /// Base class for the variant storage of ModuleDependencyInfo.
