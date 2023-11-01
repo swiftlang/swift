@@ -396,6 +396,11 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
       swift_conformsToProtocolCommon(
 	selfMetadata, &equatable_support::EquatableProtocolDescriptor));
   if (equatableConformance != nullptr) {
+    const char *clsName = class_getName([self class]);
+    warning(0,
+	    "Obj-C `-hash` invoked on a Swift object of type %s that is not Hashable; "
+	    "this can lead to severe performance problems",
+	    clsName);
     return (NSUInteger)1;
   }
 
