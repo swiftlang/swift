@@ -351,7 +351,7 @@ protected:
   // for the inline bitfields.
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -374,7 +374,10 @@ protected:
     /// a local context, but should behave like a top-level
     /// declaration for name lookup purposes. This is used by
     /// lldb.
-    Hoisted : 1
+    Hoisted : 1,
+
+    /// Whether the set of semantic attributes has been computed.
+    SemanticAttrsComputed : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
@@ -921,7 +924,13 @@ public:
   /// expansions.
   OrigDeclAttributes getOriginalAttrs() const;
 
-  /// Returns the semantic attributes attached to this declaration,
+  /// Returns the semantic CustomAttrs attached to this declaration,
+  /// including attributes that are generated as the result of member
+  /// attribute macro expansion.
+  DeclAttributes::AttributeKindRange<CustomAttr, false>
+  getSemanticCustomAttrs() const;
+
+  /// Returns all semantic attributes attached to this declaration,
   /// including attributes that are generated as the result of member
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
@@ -1088,6 +1097,14 @@ public:
 
   void setEscapedFromIfConfig(bool Escaped) {
     Bits.Decl.EscapedFromIfConfig = Escaped;
+  }
+
+  bool getSemanticAttrsComputed() const {
+    return Bits.Decl.SemanticAttrsComputed;
+  }
+
+  void setSemanticAttrsComputed(bool Computed) {
+    Bits.Decl.SemanticAttrsComputed = Computed;
   }
 
   /// \returns the unparsed comment attached to this declaration.
