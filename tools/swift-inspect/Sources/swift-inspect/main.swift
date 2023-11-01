@@ -42,6 +42,10 @@ internal struct BacktraceOptions: ParsableArguments {
   }
 }
 
+internal struct GenericMetadataOptions: ParsableArguments {
+  @Flag(help: "Show allocations in mangled form")
+  var mangled: Bool = false
+}
 
 internal func inspect(options: UniversalOptions,
                       _ body: (any RemoteProcess) throws -> Void) throws {

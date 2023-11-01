@@ -33,6 +33,9 @@ internal struct DumpGenericMetadata: ParsableCommand {
   @OptionGroup()
   var backtraceOptions: BacktraceOptions
 
+  @OptionGroup()
+  var genericMetadataOptions: GenericMetadataOptions
+
   func run() throws {
     try inspect(options: options) { process in
       let allocations: [swift_metadata_allocation_t] =
@@ -43,9 +46,8 @@ internal struct DumpGenericMetadata: ParsableCommand {
         if pointer == 0 { return nil }
 
         return Metadata(ptr: pointer,
-                        allocation: allocations.last(where: { pointer >= $0.ptr }),
-                        name: process.context.name(type: pointer) ??
-                        "<unknown>",
+                        allocation: allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + UInt64($0.size) }),
+                        name: (process.context.name(type: pointer, mangled: genericMetadataOptions.mangled) ?? "<unknown>"),
                         isArrayOfClass: process.context.isArrayOfClass(pointer))
       }
 
@@ -54,12 +56,17 @@ internal struct DumpGenericMetadata: ParsableCommand {
               ? nil
               : try process.context.allocationStacks
 
+      var errorneousMetadata: [(ptr: swift_reflection_ptr_t, name: String)] = []
+
       print("Address", "Allocation", "Size", "Offset", "isArrayOfClass", "Name", separator: "\t")
       generics.forEach {
         print("\(hex: $0.ptr)", terminator: "\t")
         if let allocation = $0.allocation, let offset = $0.offset {
           print("\(hex: allocation.ptr)\t\(allocation.size)\t\(offset)", terminator: "\t")
         } else {
+          if (swift_reflection_ownsAddressStrict(process.context, UInt($0.ptr))) == 0 {
+            errorneousMetadata.append((ptr: $0.ptr, name: $0.name))
+          }
           print("???\t??\t???", terminator: "\t")
         }
         print($0.isArrayOfClass, terminator: "\t")
@@ -72,6 +79,14 @@ internal struct DumpGenericMetadata: ParsableCommand {
           }
         }
       }
+
+      if errorneousMetadata.count > 0 {
+        print("Error: The following metadata was not found in any DATA or AUTH segments, may be garbage.")
+        errorneousMetadata.forEach {
+          print("\(hex: $0.ptr)\t\($0.name)")
+        }
+      }
+
     }
   }
 }
