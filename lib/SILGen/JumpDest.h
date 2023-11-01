@@ -29,9 +29,14 @@ namespace Lowering {
 
 struct LLVM_LIBRARY_VISIBILITY ThrownErrorInfo {
   SILValue IndirectErrorResult;
+  bool Discard;
 
-  explicit ThrownErrorInfo(SILValue IndirectErrorResult)
-    : IndirectErrorResult(IndirectErrorResult) {}
+  explicit ThrownErrorInfo(SILValue indirectErrorAddr, bool discard=false)
+    : IndirectErrorResult(indirectErrorAddr), Discard(discard) {}
+
+  static ThrownErrorInfo forDiscard() {
+    return ThrownErrorInfo(SILValue(), /*discard=*/true);
+  }
 };
 
 /// The destination of a direct jump.  Swift currently does not
