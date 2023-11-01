@@ -388,19 +388,28 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 
   // If a type is Equatable (but not Hashable), we
   // have to return something here that is compatible
-  // with the `isEqual:` below.  NSObject's default
-  // of `(NSUInteger)self` won't work, so we instead
-  // return a constant fallback value:
+  // with the `isEqual:` below.
   auto equatableConformance =
     reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
       swift_conformsToProtocolCommon(
 	selfMetadata, &equatable_support::EquatableProtocolDescriptor));
   if (equatableConformance != nullptr) {
-    const char *clsName = class_getName([self class]);
-    warning(0,
-	    "Obj-C `-hash` invoked on a Swift object of type %s that is not Hashable; "
-	    "this can lead to severe performance problems",
-	    clsName);
+    // Warn once per class about this
+    auto selfClass = [self class];
+    static Lazy<std::unordered_set<Class>> warned;
+    static LazyMutex warnedLock;
+    LazyMutex::ScopedLock guard(warnedLock);
+    auto result = warned.get().insert(selfClass);
+    auto inserted = std::get<1>(result);
+    if (inserted) {
+      const char *clsName = class_getName([self class]);
+      warning(0,
+	      "Obj-C `-hash` method was invoked on a Swift object of type `%s` "
+	      "that is Equatable but not Hashable; "
+	      "this can lead to severe performance problems.\n",
+	      clsName);
+    }
+    // Constant value (yuck!) is the only choice here
     return (NSUInteger)1;
   }
 

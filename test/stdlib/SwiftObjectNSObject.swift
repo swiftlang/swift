@@ -16,6 +16,7 @@
 // RUN: %target-build-swift %s -g -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
 // RUN: %target-codesign %t/SwiftObjectNSObject
 // RUN: %target-run %t/SwiftObjectNSObject 2> %t/log.txt
+// RUN: cat %t/log.txt 1>&2
 // RUN: %FileCheck %s < %t/log.txt
 // REQUIRES: executable_test
 
@@ -115,10 +116,16 @@ func TestNonEquatableHash(_ e: AnyObject)
   TestSwiftObjectNSObjectDefaultHashValue(e)
 }
 
-// This check is for NSLog() output from TestSwiftObjectNSObject().
+// Check NSLog() output from TestSwiftObjectNSObject().
+
 // CHECK: c ##SwiftObjectNSObject.C##
 // CHECK-NEXT: d ##SwiftObjectNSObject.D##
 // CHECK-NEXT: S ##{{.*}}SwiftObject##
+
+// Full message is longer, but this is the essential part...
+// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E` {{.*}} Equatable but not Hashable
+// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E1` {{.*}} Equatable but not Hashable
+// CHECK-NEXT: Obj-C `-hash` {{.*}} type `SwiftObjectNSObject.E2` {{.*}} Equatable but not Hashable
 
 // Temporarily disable this test on older OSes until we have time to
 // look into why it's failing there. rdar://problem/47870743
@@ -185,4 +192,7 @@ if #available(OSX 10.12, iOS 10.0, *) {
   fputs("c ##SwiftObjectNSObject.C##\n", stderr)
   fputs("d ##SwiftObjectNSObject.D##\n", stderr)
   fputs("S ##Swift._SwiftObject##\n", stderr)
+  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E` ... Equatable but not Hashable", stderr)
+  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E1` ... Equatable but not Hashable", stderr)
+  fputs("Obj-C `-hash` ... type `SwiftObjectNSObject.E2` ... Equatable but not Hashable", stderr)
 }
