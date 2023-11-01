@@ -151,7 +151,7 @@
 /// ``` 
 /// Will be imported as `struct CustomUserType: @unchecked Sendable`
 #define SWIFT_UNCHECKED_SENDABLE \
-  __attribute__((swift_attr("@Sendable)))
+  __attribute__((swift_attr("@Sendable")))
 
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
