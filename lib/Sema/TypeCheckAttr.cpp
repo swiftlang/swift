@@ -1579,7 +1579,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   llvm::SmallVector<AvailableAttr *, 4> availableAttrs;
   llvm::SmallVector<BackDeployedAttr *, 4> backDeployedAttrs;
   llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
-  for (auto attr : D->getSemanticAttrs()) {
+  for (auto attr : D->getExpandedAttrs()) {
     if (!attr->isValid()) continue;
 
     // If Attr.def says that the attribute cannot appear on this kind of

@@ -1281,7 +1281,7 @@ public:
   }
 
   void checkAttachedMacrosAccess(const Decl *D) {
-    for (auto customAttrC : D->getSemanticCustomAttrs()) {
+    for (auto customAttrC : D->getExpandedAttrs().getAttributes<CustomAttr>()) {
       auto customAttr = const_cast<CustomAttr *>(customAttrC);
       auto *macroDecl = D->getResolvedMacro(customAttr);
       if (macroDecl) {
