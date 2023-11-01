@@ -44,6 +44,7 @@ KNOWN_SDK_TYPE_DECL(Concurrency, Job, StructDecl, 0) // TODO: remove in favor of
 KNOWN_SDK_TYPE_DECL(Concurrency, ExecutorJob, StructDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnownedJob, StructDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, Executor, NominalTypeDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, TaskExecutor, NominalTypeDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, SerialExecutor, NominalTypeDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnownedSerialExecutor, NominalTypeDecl, 0)
 

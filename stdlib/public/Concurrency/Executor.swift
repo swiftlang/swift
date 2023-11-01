@@ -99,6 +99,48 @@ public protocol SerialExecutor: Executor {
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 }
 
+/// An executor that may be used as preferred executor by a task.
+///
+/// A task with executor preference will execute nonisolated functions on this executor,
+/// rather than using the default global executor. Default actors also are able to run
+/// on a task's preferred executor.
+@available(SwiftStdlib 9999, *)
+public protocol TaskExecutor: Executor {
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  func enqueue(_ job: UnownedJob)
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  func enqueue(_ job: consuming Job)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  func enqueue(_ job: consuming ExecutorJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  /// Convert this executor value to the optimized form of borrowed
+  /// executor references.
+  ///
+  /// When forming an unowned executor reference you MUST guarantee
+  /// that the executor will be kept alive (retained) until all tasks
+  /// run by that executor have completed.
+  func asUnownedTaskExecutor() -> UnownedTaskExecutor
+}
+
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Executor {
@@ -204,6 +246,39 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   public var _isComplexEquality: Bool {
     _executor_isComplexEquality(self)
+  }
+
+}
+
+@available(SwiftStdlib 9999, *)
+@frozen
+public struct UnownedTaskExecutor: Sendable {
+  #if compiler(>=5.5) && $BuiltinExecutor
+  @usableFromInline
+  internal var executor: Builtin.Executor
+
+  /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
+  /// which needs to reach for this from an @_transparent function which prevents @_spi use.
+  public var _executor: Builtin.Executor {
+    self.executor
+  }
+  #endif
+
+  @inlinable
+  public init(_ executor: Builtin.Executor) {
+    #if compiler(>=5.5) && $BuiltinExecutor
+    self.executor = executor
+    #endif
+  }
+
+  @inlinable
+  public init<E: TaskExecutor>(_ executor: __shared E) {
+    // FIXME: #if compiler(>=9999) && $BuiltinBuildExecutor
+    #if $BuiltinBuildTaskExecutor
+    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
 }

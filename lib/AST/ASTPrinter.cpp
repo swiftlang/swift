@@ -3086,6 +3086,10 @@ static bool usesFeatureBuiltinExecutor(Decl *decl) {
   return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
 }
 
+static bool usesFeatureBuiltinBuildTaskExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }

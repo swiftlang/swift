@@ -426,6 +426,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
     return;
   }
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinaryTaskExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinaryTaskExecutorRef(IGF, actor, type, conf, out);
+    return;
+  }
   if (Builtin.ID == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef) {
     auto actor = args.claimNext();
     auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();

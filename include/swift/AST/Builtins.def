@@ -1004,6 +1004,11 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiff
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
                                    "buildOrdinarySerialExecutorRef", "n", Special)
 
+/// Build a Builtin.Executor value from an "ordinary" task executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
+                                   "buildOrdinaryTaskExecutorRef", "n", Special)
+
 /// Build a Builtin.Executor value from an "complex equality" serial executor
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildComplexEqualitySerialExecutorRef,

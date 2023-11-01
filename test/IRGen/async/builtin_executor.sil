@@ -23,6 +23,12 @@ actor MyCustomActor : SerialExecutor {
 }
 sil_vtable MyCustomActor {}
 
+final class CustomTaskExecutor : TaskExecutor {
+  func enqueue(_ job: consuming ExecutorJob)
+  final nonisolated func asUnownedTaskExecutor() -> UnownedTaskExecutor
+}
+sil_vtable CustomTaskExecutor {}
+
 // CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_none()
 sil @test_none : $() -> Optional<Builtin.Executor> {
 bb0:
@@ -62,5 +68,18 @@ bb0(%0 : $MyCustomActor):
   // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1
   // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
   %1 = builtin "buildOrdinarySerialExecutorRef"<MyCustomActor>(%0 : $MyCustomActor) : $Builtin.Executor
+  return %1 : $Builtin.Executor
+}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_build_custom_task_exec(ptr %0)
+sil @test_build_custom_task_exec : $(@guaranteed CustomTaskExecutor) -> Builtin.Executor {
+bb0(%0 : $CustomTaskExecutor):
+  // CHECK:      [[T0:%.*]] = ptrtoint ptr %0 to [[INT]]
+  // CHECK-NEXT: [[T1:%.*]] = call ptr @"$s4test18CustomTaskExecutorCACSchAAWl"()
+  // CHECK-NEXT: [[T2:%.*]] = ptrtoint ptr [[T1]] to [[INT]]
+  // CHECK:      [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
+  // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1
+  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
+  %1 = builtin "buildOrdinaryTaskExecutorRef"<CustomTaskExecutor>(%0 : $CustomTaskExecutor) : $Builtin.Executor
   return %1 : $Builtin.Executor
 }

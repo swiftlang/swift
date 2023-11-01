@@ -174,6 +174,23 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
   out.add(impl);
 }
 
+void irgen::emitBuildOrdinaryTaskExecutorRef(IRGenFunction &IGF,
+                                             llvm::Value *executor,
+                                             CanType executorType,
+                                             ProtocolConformanceRef executorConf,
+                                             Explosion &out) {
+  // The implementation word of an "ordinary" task executor is
+  // just the witness table pointer with no flags set.
+  llvm::Value *identity =
+    IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl =
+    emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
+
+  out.add(identity);
+  out.add(impl);
+}
+
 void irgen::emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
                                                llvm::Value *executor,
                                                CanType executorType,

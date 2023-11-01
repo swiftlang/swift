@@ -54,6 +54,13 @@ void emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                         ProtocolConformanceRef executorConformance,
                                         Explosion &out);
 
+/// Emit the buildOrdinaryTaskExecutorRef builtin.
+void emitBuildOrdinaryTaskExecutorRef(IRGenFunction &IGF,
+                                      llvm::Value *executor,
+                                      CanType executorType,
+                                      ProtocolConformanceRef executorConformance,
+                                      Explosion &out);
+
 /// Emit the buildComplexEqualitySerialExecutorRef builtin.
 void emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
                                         llvm::Value *executor,

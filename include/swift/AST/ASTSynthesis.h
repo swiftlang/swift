@@ -50,6 +50,7 @@ enum SingletonTypeSynthesizer {
   _void,
   _word,
   _serialExecutor,
+  _taskExecutor,
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -68,6 +69,9 @@ inline Type synthesizeType(SynthesisContext &SC,
                                              SC.Context);
   case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
+      ->getDeclaredInterfaceType();
+  case _taskExecutor:
+    return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
       ->getDeclaredInterfaceType();
   }
 }

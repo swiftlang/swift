@@ -28,8 +28,9 @@ class AsyncTask;
 class DefaultActor;
 class Job;
 class SerialExecutorWitnessTable;
+class TaskExecutorWitnessTable;
 
-/// An unmanaged reference to an executor.
+/// An unmanaged reference to an serial executor.
 ///
 /// This type corresponds to the type Optional<Builtin.Executor> in
 /// Swift.  The representation of nil in Optional<Builtin.Executor>
@@ -181,6 +182,94 @@ public:
     return !(*this == other);
   }
 };
+
+class TaskExecutorRef {
+  HeapObject *Identity; // Not necessarily Swift reference-countable
+  uintptr_t Implementation;
+
+  // We future-proof the ABI here by masking the low bits off the
+  // implementation pointer before using it as a witness table.
+  //
+  // We have 3 bits for future use remaining here.
+  enum: uintptr_t {
+    WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
+  };
+
+  /// The kind is stored in the free bits in the `Implementation` witness table reference.
+  enum class TaskExecutorKind : uintptr_t {
+    /// Ordinary executor.
+    Ordinary = 0b00,
+  };
+
+  static_assert(static_cast<uintptr_t>(TaskExecutorKind::Ordinary) == 0);
+
+  constexpr TaskExecutorRef(HeapObject *identity, uintptr_t implementation)
+    : Identity(identity), Implementation(implementation) {}
+
+public:
+
+  constexpr static TaskExecutorRef undefined() {
+    return TaskExecutorRef(nullptr, 0);
+  }
+
+  /// Given a pointer to a serial executor and its TaskExecutor
+  /// conformance, return an executor reference for it.
+  static TaskExecutorRef forOrdinary(HeapObject *identity,
+                           const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    auto wtable = reinterpret_cast<uintptr_t>(witnessTable) |
+        static_cast<uintptr_t>(TaskExecutorKind::Ordinary);
+    return TaskExecutorRef(identity, wtable);
+  }
+
+  HeapObject *getIdentity() const {
+    return Identity;
+  }
+
+  /// Is this the generic executor reference?
+  bool isUndefined() const {
+    return Identity == 0;
+  }
+
+  TaskExecutorKind getExecutorKind() const {
+    return static_cast<TaskExecutorKind>(Implementation & ~WitnessTableMask);
+  }
+
+  /// Is this an ordinary executor reference?
+  /// These executor references are the default kind, and have no special treatment elsewhere in the system.
+  bool isOrdinary() const {
+    return getExecutorKind() == TaskExecutorKind::Ordinary;
+  }
+
+  const SerialExecutorWitnessTable *getTaskExecutorWitnessTable() const {
+    assert(!isUndefined());
+    auto table = Implementation & WitnessTableMask;
+    return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
+  }
+
+//  /// Do we have to do any work to start running as the requested
+//  /// executor?
+//  bool mustSwitchToRun(ExecutorRef newExecutor) const {
+//    return Identity != newExecutor.Identity;
+//  }
+
+  /// Get the raw value of the Implementation field, for tracing.
+  uintptr_t getRawImplementation() const {
+    return Implementation & WitnessTableMask;
+  }
+
+  bool operator==(TaskExecutorRef other) const {
+    return Identity == other.Identity;
+  }
+  bool operator!=(TaskExecutorRef other) const {
+    return !(*this == other);
+  }
+};
+
+// Historically the 'ExecutorRef' was introduced initially, however it always has meant specifically
+// a SERIAL executor. This typedef fixes up this confusion and especially since now there is also a TaskExecutor.
+typedef ExecutorRef SerialExecutorRef;
 
 using JobInvokeFunction =
   SWIFT_CC(swiftasync)

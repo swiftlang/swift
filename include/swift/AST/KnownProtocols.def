@@ -86,6 +86,7 @@ PROTOCOL(FixedWidthInteger)
 PROTOCOL(RangeReplaceableCollection)
 PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
+PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
 
 PROTOCOL_(BridgedNSError)
