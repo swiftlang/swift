@@ -142,10 +142,12 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
       heapAllocatedContext = true;
       decl->setInterfaceType(astCtx.TheRawPointerType);
     } else { // Otherwise the payload is the linear map tuple.
-      auto linearMapStructTy = getLinearMapTupleType(predBB)->getCanonicalType();
+      auto *linearMapStructTy = getLinearMapTupleType(predBB);
+      assert(linearMapStructTy && "must have linear map struct type for predecessor BB");
+      auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
       decl->setInterfaceType(
-          linearMapStructTy->hasArchetype()
-              ? linearMapStructTy->mapTypeOutOfContext() : linearMapStructTy);
+          canLinearMapStructTy->hasArchetype()
+              ? canLinearMapStructTy->mapTypeOutOfContext() : canLinearMapStructTy);
     }
     // Create enum element and enum case declarations.
     auto *paramList = ParameterList::create(astCtx, {decl});
@@ -331,10 +333,28 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   }
 
   // Add linear map fields to the linear map tuples.
-  for (auto &origBB : *original) {
+  //
+  // Now we need to be very careful as we're having a very subtle
+  // chicken-and-egg problem. We need lowered branch trace enum type for the
+  // linear map typle type. However branch trace enum type lowering depends on
+  // the lowering of its elements (at very least, the type classification of
+  // being trivial / non-trivial). As the lowering is cached we need to ensure
+  // we compute lowered type for the branch trace enum when the corresponding
+  // EnumDecl is fully complete: we cannot add more entries without causing some
+  // very subtle issues later on. However, the elements of the enum are linear
+  // map tuples of predecessors, that correspondingly may contain branch trace
+  // enums of corresponding predecessor BBs.
+  //
+  // Traverse all BBs in reverse post-order traversal order to ensure we process
+  // each BB before its predecessors.
+  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(original);
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto *origBB = *Iter;
     SmallVector<TupleTypeElt, 4> linearTupleTypes;
-    if (!origBB.isEntry()) {
-      CanType traceEnumType = getBranchingTraceEnumLoweredType(&origBB).getASTType();
+    if (!origBB->isEntry()) {
+      populateBranchingTraceDecl(origBB, loopInfo);
+
+      CanType traceEnumType = getBranchingTraceEnumLoweredType(origBB).getASTType();
       linearTupleTypes.emplace_back(traceEnumType,
                                     astCtx.getIdentifier(traceEnumFieldName));
     }
@@ -343,7 +363,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
       // Do not add linear map fields for semantic member accessors, which have
       // special-case pullback generation. Linear map tuples should be empty.
     } else {
-      for (auto &inst : origBB) {
+      for (auto &inst : *origBB) {
         if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
           // Add linear map field to struct for active `apply` instructions.
           // Skip array literal intrinsic applications since array literal
@@ -363,11 +383,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
       }
     }
 
-    linearMapTuples.insert({&origBB, TupleType::get(linearTupleTypes, astCtx)});
+    linearMapTuples.insert({origBB, TupleType::get(linearTupleTypes, astCtx)});
   }
-
-  for (auto &origBB : *original)
-    populateBranchingTraceDecl(&origBB, loopInfo);
 
   // Print generated linear map structs and branching trace enums.
   // These declarations do not show up with `-emit-sil` because they are
