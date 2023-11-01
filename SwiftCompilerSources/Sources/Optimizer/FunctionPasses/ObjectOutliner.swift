@@ -269,10 +269,7 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is UpcastInst,
        is BeginDeallocRefInst,
        is RefTailAddrInst,
-       is RefElementAddrInst,
-       is StructInst,
-       is PointerToAddressInst,
-       is IndexAddrInst:
+       is RefElementAddrInst:
     for instUse in (inst as! SingleValueInstruction).uses {
       if !isValidUseOfObject(instUse) {
         return false
