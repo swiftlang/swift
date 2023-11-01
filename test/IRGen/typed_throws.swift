@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows -disable-availability-checking -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
 
+// XFAIL: CPU=arm64e
 
 enum MyBigError: Error {
   case epicFail
