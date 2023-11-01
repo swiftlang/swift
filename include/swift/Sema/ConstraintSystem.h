@@ -979,6 +979,10 @@ enum ScoreKind: unsigned int {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// A type with a missing conformance(s) that has be synthesized
+  /// or diagnosed later, such types are allowed to appear in
+  /// a valid solution.
+  SK_MissingSynthesizableConformance,
   /// An unapplied reference to a function. The purpose of this
   /// score bit is to prune overload choices that are functions
   /// when a solution has already been found using property.
@@ -989,12 +993,8 @@ enum ScoreKind: unsigned int {
   /// ambiguity tie-breakers should go after this; anything else
   /// should be added above.
   SK_UnappliedFunction,
-  /// A type with a missing conformance(s) that has be synthesized
-  /// or diagnosed later, such types are allowed to appear in
-  /// a valid solution.
-  SK_MissingSynthesizableConformance,
 
-  SK_LastScoreKind = SK_MissingSynthesizableConformance,
+  SK_LastScoreKind = SK_UnappliedFunction,
 };
 
 /// The number of score kinds.
