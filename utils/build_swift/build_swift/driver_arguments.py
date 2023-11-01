@@ -705,6 +705,9 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-lint',
+           toggle_true('sourcekitlsp_lint'),
+           help='verify that sourcekit-lsp Source code is formatted correctly')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',

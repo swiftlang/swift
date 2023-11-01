@@ -48,11 +48,11 @@ enum ASTNode {
   var bridged: BridgedASTNode {
     switch self {
     case .expr(let e):
-      return BridgedASTNode(ptr: e.raw, kind: .expr)
+      return BridgedASTNode(raw: e.raw, kind: .expr)
     case .stmt(let s):
-      return BridgedASTNode(ptr: s.raw, kind: .stmt)
+      return BridgedASTNode(raw: s.raw, kind: .stmt)
     case .decl(let d):
-      return BridgedASTNode(ptr: d.raw, kind: .decl)
+      return BridgedASTNode(raw: d.raw, kind: .decl)
     default:
       fatalError("Must be expr, stmt, or decl.")
     }

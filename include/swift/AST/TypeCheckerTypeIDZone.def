@@ -523,3 +523,6 @@ SWIFT_REQUEST(TypeChecker, IsFunctionBodySkippedRequest,
 SWIFT_REQUEST(TypeChecker, IsCCompatibleFuncDeclRequest,
               bool(const FuncDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
+              DeclAttributes(const Decl *),
+              Cached, NoLocationInfo)

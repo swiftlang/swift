@@ -26,30 +26,72 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
-  class DiagnosticArgument;
-  class DiagnosticEngine;
+class ASTContext;
+class DiagnosticArgument;
+class DiagnosticEngine;
 }
 
 //===----------------------------------------------------------------------===//
 // MARK: Identifier
 //===----------------------------------------------------------------------===//
 
-struct BridgedIdentifier {
-  const void *_Nullable raw;
+class BridgedIdentifier {
+public:
+  SWIFT_UNAVAILABLE("Use '.raw' instead")
+  const void *_Nullable Raw;
+
+  BridgedIdentifier() : Raw(nullptr) {}
+
+  SWIFT_NAME("init(raw:)")
+  BridgedIdentifier(const void *_Nullable raw) : Raw(raw) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  BridgedIdentifier(swift::Identifier ident)
+      : Raw(ident.getAsOpaquePointer()) {}
+
+  swift::Identifier unbridged() const {
+    return swift::Identifier::getFromOpaquePointer(Raw);
+  }
+#endif
 };
 
+SWIFT_NAME("getter:BridgedIdentifier.raw(self:)")
+inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
+  return ident.Raw;
+}
+
 struct BridgedIdentifierAndSourceLoc {
-  BridgedIdentifier name;
-  BridgedSourceLoc nameLoc;
+  SWIFT_NAME("name")
+  BridgedIdentifier Name;
+
+  SWIFT_NAME("nameLoc")
+  BridgedSourceLoc NameLoc;
 };
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
 
-struct BridgedASTContext {
-  void *_Nonnull raw;
+class BridgedASTContext {
+  swift::ASTContext * _Nonnull Ctx;
+
+public:
+#ifdef USED_IN_CPP_SOURCE
+  SWIFT_UNAVAILABLE("Use init(raw:) instead")
+  BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
+
+  SWIFT_UNAVAILABLE("Use '.raw' instead")
+  swift::ASTContext &unbridged() const { return *Ctx; }
+#endif
 };
+
+SWIFT_NAME("getter:BridgedASTContext.raw(self:)")
+BRIDGED_INLINE
+void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged);
+
+SWIFT_NAME("BridgedASTContext.init(raw:)")
+BRIDGED_INLINE
+BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr);
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
@@ -70,8 +112,11 @@ enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
 };
 
 struct BridgedASTNode {
-  void *_Nonnull ptr;
-  ASTNodeKind kind;
+  SWIFT_NAME("raw")
+  void *_Nonnull Raw;
+
+  SWIFT_NAME("kind")
+  ASTNodeKind Kind;
 };
 
 // Forward declare the underlying AST node type for each wrapper.
@@ -81,11 +126,12 @@ namespace swift {
 } // end namespace swift
 
 // Define the bridging wrappers for each AST node.
-#define AST_BRIDGING_WRAPPER(Name) BRIDGING_WRAPPER_NONNULL(Name)
+#define AST_BRIDGING_WRAPPER(Name) BRIDGING_WRAPPER_NONNULL(swift::Name, Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
 // For nullable nodes, also define a nullable variant.
-#define AST_BRIDGING_WRAPPER_NULLABLE(Name) BRIDGING_WRAPPER_NULLABLE(Name)
+#define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
+  BRIDGING_WRAPPER_NULLABLE(swift::Name, Name)
 #define AST_BRIDGING_WRAPPER_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
@@ -150,7 +196,7 @@ public:
   BridgedDiagnosticArgument(const swift::DiagnosticArgument &arg) {
     *reinterpret_cast<swift::DiagnosticArgument *>(&storage) = arg;
   }
-  const swift::DiagnosticArgument &get() const {
+  const swift::DiagnosticArgument &unbridged() const {
     return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
   }
 #endif
@@ -167,7 +213,7 @@ public:
   BridgedDiagnosticFixIt(const swift::DiagnosticInfo::FixIt &fixit){
     *reinterpret_cast<swift::DiagnosticInfo::FixIt *>(&storage) = fixit;
   }
-  const swift::DiagnosticInfo::FixIt &get() const {
+  const swift::DiagnosticInfo::FixIt &unbridged() const {
     return *reinterpret_cast<const swift::DiagnosticInfo::FixIt *>(&storage);
   }
 #endif
@@ -184,8 +230,18 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
   BridgedNote,
 };
 
-struct BridgedDiagnostic {
-  void *_Nonnull raw;
+class BridgedDiagnostic {
+public:
+  struct Impl;
+
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  Impl *_Nonnull Raw;
+
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  BridgedDiagnostic(Impl *_Nonnull raw) : Raw(raw) {}
+
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  Impl *_Nonnull unbridged() const { return Raw; }
 };
 
 // FIXME: Can we bridge InFlightDiagnostic?

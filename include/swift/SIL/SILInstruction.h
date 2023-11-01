@@ -9168,6 +9168,7 @@ public:
     case TermKind::UnreachableInst:
     case TermKind::ReturnInst:
     case TermKind::ThrowInst:
+    case TermKind::ThrowAddrInst:
     case TermKind::YieldInst:
     case TermKind::CondBranchInst:
     case TermKind::BranchInst:
@@ -9295,8 +9296,7 @@ public:
   }
 };
 
-/// ThrowInst - Throw a typed error (which, in our system, is
-/// essentially just a funny kind of return).
+/// ThrowInst - Throw a typed error, returning it via the direct error result.
 class ThrowInst
   : public UnaryInstructionBase<SILInstructionKind::ThrowInst, TermInst>
 {
@@ -9315,6 +9315,30 @@ public:
     // No successors.
     return SuccessorListTy();
   }
+};
+
+/// ThrowAddrInst - Throw a typed error, previously stored in the indirect
+/// error result.
+class ThrowAddrInst
+  : public InstructionBase<SILInstructionKind::ThrowAddrInst, TermInst>
+{
+  friend SILBuilder;
+
+  /// Constructs a ThrowAddrInst representing a throw out of the current
+  /// function.
+  ///
+  /// \param DebugLoc The location of the throw.
+  ThrowAddrInst(SILDebugLocation DebugLoc)
+      : InstructionBase(DebugLoc) {}
+
+public:
+  SuccessorListTy getSuccessors() {
+    // No successors.
+    return SuccessorListTy();
+  }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
 /// UnwindInst - Continue unwinding out of this function.  Currently this is

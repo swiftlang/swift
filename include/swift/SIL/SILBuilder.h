@@ -2484,6 +2484,11 @@ public:
         new (getModule()) ThrowInst(getSILDebugLocation(Loc), errorValue));
   }
 
+  ThrowAddrInst *createThrowAddr(SILLocation Loc) {
+    return insertTerminator(
+        new (getModule()) ThrowAddrInst(getSILDebugLocation(Loc)));
+  }
+
   UnwindInst *createUnwind(SILLocation loc) {
     return insertTerminator(
         new (getModule()) UnwindInst(getSILDebugLocation(loc)));

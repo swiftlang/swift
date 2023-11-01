@@ -1725,7 +1725,7 @@ void namelookup::forEachPotentialAttachedMacro(
   // We intentionally avoid calling `forEachAttachedMacro` in order to avoid
   // a request cycle.
   auto moduleScopeCtx = decl->getDeclContext()->getModuleScopeContext();
-  for (auto attrConst : decl->getSemanticAttrs().getAttributes<CustomAttr>()) {
+  for (auto attrConst : decl->getSemanticCustomAttrs()) {
     auto *attr = const_cast<CustomAttr *>(attrConst);
     UnresolvedMacroReference macroRef(attr);
     auto macroName = macroRef.getMacroName();

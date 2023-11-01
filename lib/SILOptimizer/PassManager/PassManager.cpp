@@ -1480,7 +1480,8 @@ bool BridgedPassContext::tryDeleteDeadClosure(BridgedInstruction closure, bool n
 BridgedPassContext::DevirtResult BridgedPassContext::tryDevirtualizeApply(BridgedInstruction apply,
                                                                           bool isMandatory) const {
   auto cha = invocation->getPassManager()->getAnalysis<ClassHierarchyAnalysis>();
-  auto result = ::tryDevirtualizeApply(ApplySite(apply.get()), cha, nullptr, isMandatory);
+  auto result = ::tryDevirtualizeApply(ApplySite(apply.unbridged()), cha,
+                                       nullptr, isMandatory);
   if (result.first) {
     OptionalBridgedInstruction newApply(result.first.getInstruction()->asSILNode());
     return {newApply, result.second};
@@ -1497,11 +1498,11 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
 void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
   SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
   InstructionDeleter deleter;
-  SILInliner::inlineFullApply(FullApplySite(apply.get()),
-                              mandatoryInline ? SILInliner::InlineKind::MandatoryInline
-                                              : SILInliner::InlineKind::PerformanceInline,
-                              funcBuilder,
-                              deleter);
+  SILInliner::inlineFullApply(FullApplySite(apply.unbridged()),
+                              mandatoryInline
+                                  ? SILInliner::InlineKind::MandatoryInline
+                                  : SILInliner::InlineKind::PerformanceInline,
+                              funcBuilder, deleter);
 }
 
 static const irgen::TypeInfo &getTypeInfoOfBuiltin(swift::SILType type, irgen::IRGenModule &IGM) {
@@ -1521,7 +1522,7 @@ SwiftInt BridgedPassContext::getStaticSize(BridgedType type) const {
   irgen::IRGenModule *IGM = invocation->getIRGenModule();
   if (!IGM)
     return -1;
-  auto &ti = getTypeInfoOfBuiltin(type.get(), *IGM);
+  auto &ti = getTypeInfoOfBuiltin(type.unbridged(), *IGM);
   llvm::Constant *c = ti.getStaticSize(*IGM);
   return integerValueFromConstant(c);
 }
@@ -1530,7 +1531,7 @@ SwiftInt BridgedPassContext::getStaticAlignment(BridgedType type) const {
   irgen::IRGenModule *IGM = invocation->getIRGenModule();
   if (!IGM)
     return -1;
-  auto &ti = getTypeInfoOfBuiltin(type.get(), *IGM);
+  auto &ti = getTypeInfoOfBuiltin(type.unbridged(), *IGM);
   llvm::Constant *c = ti.getStaticAlignmentMask(*IGM);
   return integerValueFromConstant(c, 1);
 }
@@ -1539,13 +1540,15 @@ SwiftInt BridgedPassContext::getStaticStride(BridgedType type) const {
   irgen::IRGenModule *IGM = invocation->getIRGenModule();
   if (!IGM)
     return -1;
-  auto &ti = getTypeInfoOfBuiltin(type.get(), *IGM);
+  auto &ti = getTypeInfoOfBuiltin(type.unbridged(), *IGM);
   llvm::Constant *c = ti.getStaticStride(*IGM);
   return integerValueFromConstant(c);
 }
 
 swift::SILVTable * BridgedPassContext::specializeVTableForType(BridgedType type, BridgedFunction function) const {
-  return ::specializeVTableForType(type.get(), function.getFunction()->getModule(), invocation->getTransform());
+  return ::specializeVTableForType(type.unbridged(),
+                                   function.getFunction()->getModule(),
+                                   invocation->getTransform());
 }
 
 bool BridgedPassContext::specializeClassMethodInst(BridgedInstruction cm) const {
@@ -1599,10 +1602,10 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
 }
 
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
-  return {SILGlobalVariable::create(*invocation->getPassManager()->getModule(),
-                                    isPrivate ? SILLinkage::Private : SILLinkage::Public,
-                                    IsNotSerialized,
-                                    name.get(), type.get())};
+  return {SILGlobalVariable::create(
+      *invocation->getPassManager()->getModule(),
+      isPrivate ? SILLinkage::Private : SILLinkage::Public, IsNotSerialized,
+      name.unbridged(), type.unbridged())};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
@@ -1622,7 +1625,7 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
 OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRef name) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SmallVector<ValueDecl *, 1> results;
-  mod->getASTContext().lookupInSwiftModule(name.get(), results);
+  mod->getASTContext().lookupInSwiftModule(name.unbridged(), results);
   if (results.size() != 1)
     return {nullptr};
 
@@ -1640,7 +1643,7 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
   if (SimplifyInstructionTest.empty() && SILDisablePass.empty())
     return true;
 
-  StringRef instName = getSILInstructionName(inst.get()->getKind());
+  StringRef instName = getSILInstructionName(inst.unbridged()->getKind());
 
   if (SILPassManager::isInstructionPassDisabled(instName))
     return false;
@@ -1656,7 +1659,8 @@ bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const 
 }
 
 bool FullApplySite_canInline(BridgedInstruction apply) {
-  return swift::SILInliner::canInlineApplySite(swift::FullApplySite(apply.get()));
+  return swift::SILInliner::canInlineApplySite(
+      swift::FullApplySite(apply.unbridged()));
 }
 
 // TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
@@ -1666,7 +1670,7 @@ BridgedCalleeAnalysis::CalleeList BridgedCalleeAnalysis::getCallees(BridgedValue
 
 // TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
 BridgedCalleeAnalysis::CalleeList BridgedCalleeAnalysis::getDestructors(BridgedType type, bool isExactType) const {
-  return ca->getDestructors(type.get(), isExactType);
+  return ca->getDestructors(type.unbridged(), isExactType);
 }
 
 // Need to put ClonerWithFixedLocation into namespace swift to forward reference
@@ -1716,8 +1720,9 @@ BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedPassContext context)
   context.invocation->notifyNewCloner();
 }
 
-BridgedCloner::BridgedCloner(BridgedInstruction inst, BridgedPassContext context)
-  : cloner(new ClonerWithFixedLocation(inst.get())) {
+BridgedCloner::BridgedCloner(BridgedInstruction inst,
+                             BridgedPassContext context)
+    : cloner(new ClonerWithFixedLocation(inst.unbridged())) {
   context.invocation->notifyNewCloner();
 }
 
@@ -1736,6 +1741,6 @@ bool BridgedCloner::isValueCloned(BridgedValue v) const {
 }
 
 void BridgedCloner::clone(BridgedInstruction inst) {
-  cloner->cloneInst(inst.get());
+  cloner->cloneInst(inst.unbridged());
 }
 

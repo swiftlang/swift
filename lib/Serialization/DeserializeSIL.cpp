@@ -2999,6 +2999,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst = Builder.createUnwind(Loc);
     break;
   }
+  case SILInstructionKind::ThrowAddrInst: {
+    ResultInst = Builder.createThrowAddr(Loc);
+    break;
+  }
   case SILInstructionKind::YieldInst: {
     SILBasicBlock *unwindBB = getBBForReference(Fn, ListOfValues.back());
     ListOfValues = ListOfValues.drop_back();

@@ -41,7 +41,6 @@ import SIL
 ///
 let objectOutliner = FunctionPass(name: "object-outliner") {
   (function: Function, context: FunctionPassContext) in
-
   for inst in function.instructions {
     if let ari = inst as? AllocRefInstBase {
       if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
@@ -83,6 +82,10 @@ private func findEndCOWMutation(of object: Value) -> EndCOWMutationInst? {
     switch use.instruction {
     case let uci as UpcastInst:
       if let ecm = findEndCOWMutation(of: uci) {
+        return ecm
+      }
+    case let urci as UncheckedRefCastInst:
+      if let ecm = findEndCOWMutation(of: urci) {
         return ecm
       }
     case let mv as MoveValueInst:
@@ -147,7 +150,7 @@ private func findInitStores(of object: Value,
         return false
       }
     default:
-      if !isValidUseOfObject(use.instruction) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -174,6 +177,18 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
       if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores) {
         return false
       }
+    case let atp as AddressToPointerInst:
+      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
+    case let mdi as MarkDependenceInst:
+      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
+    case let pta as PointerToAddressInst:
+      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores) {
+        return false
+      }
     case let store as StoreInst:
       if store.source.type.isTuple {
         // This kind of SIL is never generated because tuples are stored with separated stores to tuple_element_addr.
@@ -184,7 +199,7 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
         return false
       }
     default:
-      if !isValidUseOfObject(use.instruction) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -198,7 +213,7 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
       if !handleStore(store, index: index, stores: &stores) {
         return false
       }
-    } else if !isValidUseOfObject(use.instruction) {
+    } else if !isValidUseOfObject(use) {
       return false
     }
   }
@@ -215,7 +230,8 @@ private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreIns
   return false
 }
 
-private func isValidUseOfObject(_ inst: Instruction) -> Bool {
+private func isValidUseOfObject(_ use: Operand) -> Bool {
+  let inst = use.instruction
   switch inst {
   case is DebugValueInst,
        is LoadInst,
@@ -225,6 +241,17 @@ private func isValidUseOfObject(_ inst: Instruction) -> Bool {
        is StrongReleaseInst,
        is FixLifetimeInst,
        is EndCOWMutationInst:
+    return true
+
+  case let mdi as MarkDependenceInst:
+    if (use == mdi.baseOperand) {
+      return true;
+    }
+    for mdiUse in mdi.uses {
+      if !isValidUseOfObject(mdiUse) {
+        return false
+      }
+    }
     return true
 
   case is StructElementAddrInst,
@@ -238,9 +265,12 @@ private func isValidUseOfObject(_ inst: Instruction) -> Bool {
        is UpcastInst,
        is BeginDeallocRefInst,
        is RefTailAddrInst,
-       is RefElementAddrInst:
-    for use in (inst as! SingleValueInstruction).uses {
-      if !isValidUseOfObject(use.instruction) {
+       is RefElementAddrInst,
+       is StructInst,
+       is PointerToAddressInst,
+       is IndexAddrInst:
+    for instUse in (inst as! SingleValueInstruction).uses {
+      if !isValidUseOfObject(instUse) {
         return false
       }
     }
@@ -342,6 +372,8 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       context.erase(instruction: endMutation)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
+    case let urci as UncheckedRefCastInst:
+      worklist.pushIfNotVisited(usersOf: urci)
     case let moveValue as MoveValueInst:
       worklist.pushIfNotVisited(usersOf: moveValue)
     case is DeallocRefInst, is DeallocStackRefInst:

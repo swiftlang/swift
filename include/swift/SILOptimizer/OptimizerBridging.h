@@ -84,7 +84,7 @@ struct BridgedCalleeAnalysis {
     CalleeList(swift::CalleeList list) {
       *reinterpret_cast<swift::CalleeList *>(&storage) = list;
     }
-    swift::CalleeList get() const {
+    swift::CalleeList unbridged() const {
       return *reinterpret_cast<const swift::CalleeList *>(&storage);
     }
 #endif

@@ -1469,6 +1469,7 @@ public:
   void visitCondBranchInst(CondBranchInst *i);
   void visitReturnInst(ReturnInst *i);
   void visitThrowInst(ThrowInst *i);
+  void visitThrowAddrInst(ThrowAddrInst *i);
   void visitUnwindInst(UnwindInst *i);
   void visitYieldInst(YieldInst *i);
   void visitSwitchValueInst(SwitchValueInst *i);
@@ -4251,23 +4252,34 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
                               getSILModule());
+  assert(!conv.hasIndirectSILErrorResults());
+
   if (!isAsync()) {
     if (conv.isTypedError()) {
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
-      if (!conv.hasIndirectSILErrorResults()) {
-        Explosion errorResult = getLoweredExplosion(i->getOperand());
-        auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
-              IGM.getMaximalTypeExpansionContext())));
-        ti.initialize(*this, errorResult, getCallerTypedErrorResultSlot(), false);
-      }
+      Explosion errorResult = getLoweredExplosion(i->getOperand());
+      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+            IGM.getMaximalTypeExpansionContext())));
+      ti.initialize(*this, errorResult, getCallerTypedErrorResultSlot(), false);
+
       Builder.CreateStore(flag, getCallerErrorResultSlot());
     } else {
       Explosion errorResult = getLoweredExplosion(i->getOperand());
       Builder.CreateStore(errorResult.claimNext(), getCallerErrorResultSlot());
     }
-    // Async functions just return to the continuation.
-  } else if (isAsync()) {
+
+    // Create a normal return, but leaving the return value undefined.
+    auto fnTy = CurFn->getFunctionType();
+    auto retTy = fnTy->getReturnType();
+    if (retTy->isVoidTy()) {
+      Builder.CreateRetVoid();
+    } else {
+      Builder.CreateRet(llvm::UndefValue::get(retTy));
+    }
+
+  // Async functions just return to the continuation.
+  } else {
     // Store the exception to the error slot.
     auto exn = getLoweredExplosion(i->getOperand());
 
@@ -4276,13 +4288,9 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     if (conv.isTypedError()) {
-      if (conv.hasIndirectSILErrorResults()) {
-        (void)exn.claimAll();
-      } else {
-        auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
-              IGM.getMaximalTypeExpansionContext())));
-        ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
-      }
+      auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(conv.getSILErrorType(
+            IGM.getMaximalTypeExpansionContext())));
+      ti.initialize(*this, exn, getCallerTypedErrorResultSlot(), false);
       llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
       flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
       assert(exn.empty() && "Unclaimed typed error results");
@@ -4293,16 +4301,44 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
     Explosion empty;
     emitAsyncReturn(*this, layout, funcResultType,
                     i->getFunction()->getLoweredFunctionType(), empty, exn);
-    return;
   }
+}
 
-  // Create a normal return, but leaving the return value undefined.
-  auto fnTy = CurFn->getFunctionType();
-  auto retTy = fnTy->getReturnType();
-  if (retTy->isVoidTy()) {
-    Builder.CreateRetVoid();
+void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
+  SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
+                              getSILModule());
+  assert(conv.isTypedError());
+  assert(conv.hasIndirectSILErrorResults());
+
+  if (!isAsync()) {
+    llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+    flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
+    Builder.CreateStore(flag, getCallerErrorResultSlot());
+
+    // Create a normal return, but leaving the return value undefined.
+    auto fnTy = CurFn->getFunctionType();
+    auto retTy = fnTy->getReturnType();
+    if (retTy->isVoidTy()) {
+      Builder.CreateRetVoid();
+    } else {
+      Builder.CreateRet(llvm::UndefValue::get(retTy));
+    }
+
+  // Async functions just return to the continuation.
   } else {
-    Builder.CreateRet(llvm::UndefValue::get(retTy));
+    auto layout = getAsyncContextLayout(*this);
+    auto funcResultType = CurSILFn->mapTypeIntoContext(
+        conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+
+    llvm::Constant *flag = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+    flag = llvm::ConstantExpr::getIntToPtr(flag, IGM.Int8PtrTy);
+
+    Explosion exn;
+    exn.add(flag);
+
+    Explosion empty;
+    emitAsyncReturn(*this, layout, funcResultType,
+                    i->getFunction()->getLoweredFunctionType(), empty, exn);
   }
 }
 

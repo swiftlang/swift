@@ -93,6 +93,7 @@ public:
   }
   
   bool empty() const { return Pointer == nullptr; }
+  bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
     return str().equals(string);
@@ -180,7 +181,7 @@ public:
       return static_cast<const void *>(Pointer);
   }
   
-  static Identifier getFromOpaquePointer(void *P) {
+  static Identifier getFromOpaquePointer(const void *P) {
     return Identifier((const char*)P);
   }
 

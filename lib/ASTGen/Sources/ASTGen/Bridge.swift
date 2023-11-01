@@ -64,7 +64,7 @@ extension BridgedSourceLoc {
 extension BridgedSourceRange {
   @inline(__always)
   init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {
-    self.init(startLoc: startToken.bridgedSourceLoc(in: astgen), endLoc: endToken.bridgedSourceLoc(in: astgen))
+    self.init(start: startToken.bridgedSourceLoc(in: astgen), end: endToken.bridgedSourceLoc(in: astgen))
   }
 }
 

@@ -20,7 +20,6 @@ public protocol Executor: AnyObject, Sendable {
   // Do not deprecate the UnownedJob enqueue in that configuration just yet - as we cannot introduce the replacements.
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @available(SwiftStdlib 5.1, *)
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func enqueue(_ job: UnownedJob)
 

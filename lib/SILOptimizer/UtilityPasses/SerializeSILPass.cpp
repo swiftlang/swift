@@ -270,6 +270,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::UnreachableInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::ThrowAddrInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::BranchInst:

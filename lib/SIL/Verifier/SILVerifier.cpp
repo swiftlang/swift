@@ -6244,7 +6244,8 @@ public:
         require(!FoundReturnBlock,
                 "more than one return block in function");
         FoundReturnBlock = true;
-      } else if (isa<ThrowInst>(BB.getTerminator())) {
+      } else if (isa<ThrowInst>(BB.getTerminator()) ||
+                 isa<ThrowAddrInst>(BB.getTerminator())) {
         require(!FoundThrowBlock,
                 "more than one throw block in function");
         FoundThrowBlock = true;

@@ -27,7 +27,7 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 
 void BridgedStringRef::write(BridgedOStream os) const {
-  static_cast<raw_ostream *>(os.streamAddr)->write(Data, Length);
+  os.unbridged()->write(Data, Length);
 }
 
 //===----------------------------------------------------------------------===//

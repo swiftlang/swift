@@ -2690,12 +2690,22 @@ public:
 
   void visitForceTryExpr(ForceTryExpr *E, StringRef label) {
     printCommon(E, "force_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E, StringRef label) {
     printCommon(E, "optional_try_expr", label);
+
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    printFieldQuoted(E->getThrownError().getString(PO), "thrown_error", TypeColor);
+
     printRec(E->getSubExpr());
     printFoot();
   }

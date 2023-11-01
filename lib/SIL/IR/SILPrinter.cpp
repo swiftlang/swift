@@ -2625,6 +2625,10 @@ public:
     *this << getIDAndType(TI->getOperand());
   }
 
+  void visitThrowAddrInst(ThrowAddrInst *TAI) {
+    // no operands
+  }
+
   void visitUnwindInst(UnwindInst *UI) {
     // no operands
   }

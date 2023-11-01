@@ -389,7 +389,8 @@ public:
   JumpDest FailDest = JumpDest::invalid();
 
   /// The destination for throws.  The block will always be in the
-  /// postmatter and takes a BB argument of the exception type.
+  /// postmatter. For a direct error return, it takes a BB argument
+  /// of the exception type.
   JumpDest ThrowDest = JumpDest::invalid();
 
   /// Support for typed throws.
@@ -1989,7 +1990,8 @@ public:
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
                                       ExecutorBreadcrumb prevExecutor,
-                                      SILResultInfo exnResult,
+                                      SILResultInfo errorResult,
+                                      SILValue indirectErrorAddr,
                                       bool isSuppressed);
 
   /// Emit a dynamic member reference.
