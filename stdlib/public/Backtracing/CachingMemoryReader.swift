@@ -75,7 +75,7 @@ public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
       let maxBytes = pageSize - offset
       let chunk = min(remaining, maxBytes)
 
-      buffer[done..<done+chunk].copyBytes(from: page[offset...])
+      buffer[done..<done+chunk].copyBytes(from: page[offset..<offset+chunk])
 
       offset = 0
       done += chunk

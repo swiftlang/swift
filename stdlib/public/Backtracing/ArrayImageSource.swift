@@ -42,7 +42,7 @@ struct ArrayImageSource<T>: ImageSource {
         throw ArrayImageSourceError.outOfBoundsRead(addr, requested)
       }
 
-      buffer.copyBytes(from: $0[Int(addr)...])
+      buffer.copyBytes(from: $0[Int(addr)..<Int(addr+requested)])
     }
   }
 }
