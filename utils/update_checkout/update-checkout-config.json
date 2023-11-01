@@ -595,7 +595,6 @@
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "main",
@@ -603,7 +602,11 @@
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
                 "swift-experimental-string-processing": "swift/main",
-                "wasi-libc": "wasi-sdk-20"
+                "wasi-libc": "wasi-sdk-20",
+                "curl": "curl-8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.11.5",
+                "zlib": "v1.3"
             }
         },
         "release/5.4": {
