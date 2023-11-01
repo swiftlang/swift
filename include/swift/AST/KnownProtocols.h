@@ -73,15 +73,6 @@ llvm::Optional<InvertibleProtocolKind>
 /// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
 KnownProtocolKind getKnownProtocolKind(InvertibleProtocolKind ip);
 
-/// Describes the way an inverse was applied to a TypeDecl.
-enum class InverseMarkingKind: uint8_t {
-  None,            // No inverse marking is present
-  Inferred,        // Inverse is inferred based on generic parameters.
-  Explicit,        // Inverse is explicitly present.
-
-  LAST = Explicit
-};
-
 } // end namespace swift
 
 #endif

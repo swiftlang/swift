@@ -19,34 +19,12 @@
 #include "TypeCheckInvertible.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/InverseMarking.h"
 #include "TypeChecker.h"
 
 namespace swift {
 
 /// MARK: diagnostic utilities
-
-/// Finds a SourceRange to remove an inverse of \c kp applied to the type decl.
-static
-SourceRange findInverseRemovalRange(const TypeDecl *typeDecl,
-                                    KnownProtocolKind targetProto) {
-  auto inheritedTypes = typeDecl->getInherited();
-
-  // Check inheritance clause.
-  auto entries = inheritedTypes.getEntries();
-  for (size_t i = 0; i < entries.size(); i++) {
-    auto entry = entries[i];
-
-    if (auto inverse = entry.getType()->getAs<InverseType>())
-      if (auto kp = inverse->getInvertedProtocol()->getKnownProtocol())
-        if (*kp == targetProto)
-          return inheritedTypes.getRemovalRange(i);
-  }
-
-  // TODO: just ask NoncopyableAnnotationRequest for the annotation?
-  // so we can handle where clauses.
-
-  return SourceRange();
-}
 
 /// Adds the appropriate fix-it to make the given nominal conform to \c proto.
 static void addConformanceFixIt(const NominalTypeDecl *nominal,
@@ -78,17 +56,18 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
                                      Type nonConformingTy,
                                      KnownProtocolKind kp) {
   auto *module = enclosingNom->getParentModule();
+  auto &ctx = enclosingNom->getASTContext();
 
   // First and most universal suggestion, add the inverse to the enclosing type.
   {
-    auto diag = enclosingNom->diagnose(diag::add_inverse_for_containment,
+    auto diag = enclosingNom->diagnose(diag::add_inverse,
                                        enclosingNom,
                                        getProtocolName(kp));
     addConformanceFixIt(enclosingNom, diag, kp, /*inverse=*/true);
   }
 
-  // If it's a generic parameter defined in the same module, suggest removing
-  // the ~KP constraint
+  // If it's a generic parameter defined in the same module, point to the
+  // parameter that must have had the inverse applied to it somewhere.
   if (auto genericArchetype = nonConformingTy->getAs<ArchetypeType>()) {
     auto interfaceType = genericArchetype->getInterfaceType();
     if (auto genericParamType =
@@ -96,32 +75,39 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
       auto *genericParamTypeDecl = genericParamType->getDecl();
       if (genericParamTypeDecl &&
           genericParamTypeDecl->getModuleContext() == module) {
-        auto diag = genericParamTypeDecl->diagnose(
-            diag::remove_inverse_on_generic_parameter_for_conformance,
+        genericParamTypeDecl->diagnose(
+            diag::note_inverse_preventing_conformance,
             nonConformingTy, getProtocolName(kp));
-
-        if (auto range = findInverseRemovalRange(genericParamTypeDecl, kp))
-          diag.fixItRemove(range);
       }
     }
+    return;
+  }
 
-    // If the offending type is a nominal defined in the same module...
-  } else if (auto nominal = nonConformingTy->getAnyNominal()) {
-    if (nominal->getModuleContext() == module) {
-      // if it has a ~KP on it explicitly, suggest removing it.
-      if (auto range = findInverseRemovalRange(nominal, kp)) {
-        nominal->diagnose(
-                diag::remove_inverse_on_nominal_for_conformance,
-                nominal, getProtocolName(kp))
-            .fixItRemove(range);
-      } else if (kp == KnownProtocolKind::Copyable) {
-        // Otherwise, it became noncopyable due to a ~Copyable on one of its
-        // generic params, so suggest adding an explicit Copyable in the
-        // inheritance clause.
-        auto diag = nominal->diagnose(
-            diag::add_explicit_protocol_for_conformance,
-            nominal, getProtocolName(kp));
-        addConformanceFixIt(nominal, diag, kp, /*inverse=*/false);
+  if (kp == KnownProtocolKind::Copyable) {
+    // If the offending type is a nominal with a SourceLoc, explain why it's
+    // not Copyable.
+    if (auto nominal = nonConformingTy->getAnyNominal()) {
+      if (nominal->getLoc(/*SerializedOK=*/false)) {
+        auto inverse = nominal->getNoncopyableMarking().getInverse();
+        auto loc = inverse.getLoc();
+
+        switch (inverse.getKind()) {
+        case InverseMarking::Kind::None:
+          assert(false && "how did it become noncopyable then?");
+          break;
+        case InverseMarking::Kind::Inferred:
+          assert(loc);
+          ctx.Diags.diagnose(loc,
+                             diag::note_inverse_preventing_conformance_implicit,
+                             nominal, getProtocolName(kp));
+          break;
+        case InverseMarking::Kind::Explicit:
+          assert(loc);
+          ctx.Diags.diagnose(loc,
+                             diag::note_inverse_preventing_conformance_explicit,
+                             nominal, getProtocolName(kp));
+          break;
+        }
       }
     }
   }
@@ -264,35 +250,115 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 }
 
 /// Produces implicit ProtocolConformances for known protocols. Does _not_ check
-/// whether the conformance is valid. That's done in a different step
-/// (see `TypeChecker::checkConformancesInContext`).
+/// whether the conformance is valid. Nor does it recursively check whether
+/// stored properties implicitly conform, so there is no risk of a
+/// request-evaluator cycle.
+///
+/// (the conformance is checked in `TypeChecker::checkConformancesInContext`).
 ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
                                                     NominalTypeDecl *nominal,
                                                     KnownProtocolKind kp) {
   auto &ctx = nominal->getASTContext();
   auto *proto = ctx.getProtocol(kp);
+  auto ip = getInvertibleProtocolKind(kp);
+  if (!ip)
+    llvm_unreachable("not an invertible protocol");
 
-  switch (kp) {
-  case KnownProtocolKind::Copyable: {
-    if (nominal->canBeNoncopyable())
-      return nullptr; // it's not Copyable.
-
-    // TODO: generate conditional conformances implied by ~Copyable on generic params.
-
-    // form a full unconditional conformance to Copyable.
+  // Generates a conformance for the nominal to the protocol.
+  // The conformanceDC specifies THE decl context to use for the conformance.
+  auto generateConformance =
+      [&](DeclContext *conformanceDC) -> ProtocolConformance * {
+    // Form a conformance.
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete,
+        conformanceDC, ProtocolConformanceState::Complete,
         /*isUnchecked=*/false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
     nominal->registerProtocolConformance(conformance, /*synthesized=*/true);
     return conformance;
+  };
+
+  auto generateConditionalConformance = [&]() -> ProtocolConformance * {
+    // Generate an extension with a conditional conformance to Copyable that
+    // requires all generic parameters to be Copyable.
+    auto protoTy = proto->getDeclaredInterfaceType();
+    auto dc = nominal->getDeclContext();
+
+    // extension Nominal: P { ... }
+    SmallVector<InheritedEntry, 1> inherited;
+    inherited.emplace_back(TypeLoc::withoutLoc(protoTy));
+    auto *ext = ExtensionDecl::create(ctx, SourceLoc(), nullptr,
+                                      ctx.AllocateCopy(inherited),
+                                      dc, nullptr);
+    ext->setImplicit();
+
+    // Build a generic signature for this extension that looks like this:
+    // <T_1..., T_n where T_1: Copyable, ... T_n: Copyable>
+    auto genericSig = nominal->getGenericSignature();
+    auto params = genericSig.getGenericParams();
+    SmallVector<Requirement, 2> reqs;
+
+    for (auto param : params)
+      reqs.push_back({RequirementKind::Conformance, param, protoTy});
+
+    genericSig = buildGenericSignature(ctx, genericSig, {}, reqs);
+    ext->setGenericSignature(genericSig);
+
+    // Bind the extension.
+    evaluator.cacheOutput(ExtendedTypeRequest{ext},
+                          nominal->getDeclaredInterfaceType());
+    ext->setExtendedNominal(nominal);
+    nominal->addExtension(ext);
+
+    // Make it accessible to getTopLevelDecls()
+    if (auto file = dyn_cast<FileUnit>(nominal->getModuleScopeContext()))
+      file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
+
+    // Then reate the conformance using the extension as the conformance's
+    // DeclContext, which is how we register these conditional requirements
+    // with the conformance.
+    return generateConformance(ext);
+  };
+
+  DeclContext *conformanceDC = nominal;
+
+  switch (*ip) {
+  case InvertibleProtocolKind::Copyable: {
+    auto marking = nominal->getNoncopyableMarking();
+
+    // An explicit Copyable takes precedece over any ~Copyable marking.
+    if (marking.getPositive().getKind() == InverseMarking::Kind::Explicit) {
+      // If they also explicitly wrote ~Copyable, then diagnose that.
+      auto inverse = marking.getInverse();
+      if (inverse.getKind() == InverseMarking::Kind::Explicit) {
+        ctx.Diags.diagnose(inverse.getLoc(),
+                           diag::noncopyable_but_copyable,
+                           nominal);
+      }
+
+      return generateConformance(nominal);
+    }
+
+    // Unexpected to have Kind::Inferred marking for Copyable; it's assumed.
+    assert(marking.getPositive().getKind() == InverseMarking::Kind::None);
+
+    // Check what kind of inverse we have to determine whether to generate a
+    // conformance for Copyable.
+    switch (marking.getInverse().getKind()) {
+    case InverseMarking::Kind::Explicit:
+      return nullptr; // No Copyable conformance will be inferred.
+
+    case InverseMarking::Kind::Inferred:
+      return generateConditionalConformance();
+
+    case InverseMarking::Kind::None:
+      // If there's no inverse, we infer Copyable.
+      return generateConformance(nominal);
+    } // end inner switch
   }
-  default:
-    llvm_unreachable("not invertible");
-  }
+  } // end outer switch
 }
 
 }

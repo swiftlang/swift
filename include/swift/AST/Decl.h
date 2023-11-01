@@ -94,6 +94,7 @@ namespace swift {
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
+  struct InverseMarking;
   class ParameterList;
   class ParameterTypeFlags;
   class Pattern;
@@ -3117,16 +3118,6 @@ class TypeDecl : public ValueDecl {
 private:
   ArrayRef<InheritedEntry> Inherited;
 
-  struct {
-    /// Whether the "noncopyableAnnotationKind" field has been computed yet.
-    unsigned isNoncopyableAnnotationComputed : 1;
-
-    unsigned noncopyableAnnotationKind : 2;
-    static_assert((unsigned)InverseMarkingKind::LAST < 4);
-
-  } LazySemanticInfo = { };
-  friend class NoncopyableAnnotationRequest;
-
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
@@ -3157,12 +3148,10 @@ public:
   /// Is it possible for this type to lack a Copyable constraint?
   /// If you need a more precise answer, ask this Decl's corresponding
   /// Type if it `isNoncopyable` instead of using this.
-  bool canBeNoncopyable() const {
-    return getNoncopyableMarking() != InverseMarkingKind::None;
-  }
+  bool canBeNoncopyable() const;
 
   /// Determine how the ~Copyable was applied to this TypeDecl, if at all.
-  InverseMarkingKind getNoncopyableMarking() const;
+  InverseMarking getNoncopyableMarking() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&

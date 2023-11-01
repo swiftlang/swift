@@ -430,8 +430,8 @@ public:
 /// Determine the kind of noncopyable marking present for this declaration.
 class NoncopyableAnnotationRequest
     : public SimpleRequest<NoncopyableAnnotationRequest,
-                           InverseMarkingKind(TypeDecl *),
-                           RequestFlags::SeparatelyCached> {
+                           InverseMarking(TypeDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -439,13 +439,11 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  InverseMarkingKind evaluate(Evaluator &evaluator, TypeDecl *decl) const;
+  InverseMarking evaluate(Evaluator &evaluator, TypeDecl *decl) const;
 
 public:
-  // Separate caching.
+  // Caching.
   bool isCached() const { return true; }
-  llvm::Optional<InverseMarkingKind> getCachedResult() const;
-  void cacheResult(InverseMarkingKind value) const;
 };
 
 /// Determine whether the given declaration is escapable.

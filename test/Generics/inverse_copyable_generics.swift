@@ -2,17 +2,25 @@
 
 // REQUIRES: asserts
 
-public struct Cond<T: ~Copyable>: ~Copyable {}
-extension Cond: Copyable where T: Copyable {} // expected-note {{requirement from conditional conformance}}
+// Check support for explicit conditional conformance
+public struct ExplicitCond<T: ~Copyable>: ~Copyable {}
+extension ExplicitCond: Copyable where T: Copyable {}
+// expected-note@-1 {{requirement from conditional conformance}}
+// expected-note@-2 {{requirement from conditional conformance of 'ExplicitCondAlias<NC>' (aka 'ExplicitCond<NC>') to 'Copyable'}}
 
-public typealias AlwaysCopyable<T> = Cond<T>
-public typealias CondAlias<T> = Cond<T> where T: ~Copyable
+public typealias ExplicitCondAlias<T> = ExplicitCond<T> where T: ~Copyable
+public typealias AlwaysCopyable<T> = ExplicitCond<T>
 
 func checkCopyable<T>(_ t: T) {} // expected-note {{generic parameter 'T' has an implicit Copyable requirement}}
 
-func test<C, NC: ~Copyable>(_ a: Cond<C>, _ b: borrowing Cond<NC>) {
-  checkCopyable(a)
-  checkCopyable(b) // expected-error {{global function 'checkCopyable' requires that 'NC' conform to 'Copyable'}}
+func test<C, NC: ~Copyable>(
+  _ a1: ExplicitCond<C>, _ b1: borrowing ExplicitCond<NC>,
+  _ a2: ExplicitCondAlias<C>, _ b2: borrowing ExplicitCondAlias<NC>
+  ) {
+  checkCopyable(a1)
+  checkCopyable(b1) // expected-error {{global function 'checkCopyable' requires that 'NC' conform to 'Copyable'}}
+  checkCopyable(a2)
+  checkCopyable(b2) // expected-error {{global function 'checkCopyable' requires that 'NC' conform to 'Copyable'}}
 }
 
 // FIXME: we should expect a warning/error that NC actually did require Copyable
@@ -26,25 +34,27 @@ protocol Removed: ~Copyable {
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
   // expected-error@-1 {{type 'Self' does not conform to protocol 'Copyable'}}
 }
-protocol Plain {
+protocol Plain<T> {
+  associatedtype T: ~Copyable
   func requiresCopyableSelf(_ t: AlwaysCopyable<Self>)
+  func requiresCopyableT(_ t: AlwaysCopyable<T>)
+  // expected-error@-1 {{type 'Self.T' does not conform to protocol 'Copyable'}}
 }
 
 protocol RemovedAgain where Self: ~Copyable {
     func requiresCopyableSelf(_ t: AlwaysCopyable<Self>) // expected-error {{type 'Self' does not conform to protocol 'Copyable'}}
 }
 
-struct StructContainment<T: ~Copyable> {
-    // expected-note@-1 {{consider removing '~Copyable' from generic parameter 'T' so it conforms to the 'Copyable' protocol}}
-    // expected-note@-2 {{consider removing implicit 'Copyable' conformance from generic struct 'StructContainment'}}
+struct StructContainment<T: ~Copyable> : Copyable {
+    // expected-note@-1 {{consider adding '~Copyable' to generic struct 'StructContainment'}}{{50-50=, ~Copyable}}
 
-    var storage: T
-    // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has noncopyable type 'T'}}
+    var storage: Maybe<T>
+    // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has noncopyable type 'Maybe<T>'}}
 }
 
-enum EnumContainment<T: ~Copyable> {
-    // expected-note@-1{{consider removing '~Copyable' from generic parameter 'T' so it conforms to the 'Copyable' protocol}}
-    // expected-note@-2{{consider removing implicit 'Copyable' conformance from generic enum 'EnumContainment'}}
+enum EnumContainment<T: ~Copyable> : Copyable {
+    // expected-note@-1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
+    // expected-note@-2{{consider adding '~Copyable' to generic enum 'EnumContainment'}}{{46-46=, ~Copyable}}
 
     case some(T) // expected-error {{associated value 'some' of 'Copyable'-conforming generic enum 'EnumContainment' has noncopyable type 'T'}}
     case other(Int)
@@ -59,14 +69,22 @@ class ClassContainment<T: ~Copyable> {
     }
 }
 
+// expected-note@+1 {{consider adding '~Copyable' to generic struct 'ConditionalContainment'}}{{45-45=: ~Copyable}}
+struct ConditionalContainment<T: ~Copyable> {
+  var x: T
+  var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has noncopyable type 'NC'}}
+}
+
+func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
+
 
 /// ----------------
 
-enum Maybe<Wrapped: ~Copyable>: ~Copyable {
+// expected-note@+1 {{generic enum 'Maybe' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
+enum Maybe<Wrapped: ~Copyable> {
   case just(Wrapped)
   case none
 }
-extension Maybe: Copyable where Wrapped: Copyable {}
 
 struct RequireCopyable<T> {}
 // expected-note@-1{{requirement specified as 'NC' : 'Copyable'}}
@@ -75,6 +93,7 @@ struct RequireCopyable<T> {}
 // expected-note@-4{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
 
 struct NC: ~Copyable {}
+// expected-note@-1 2{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
 
 typealias ok1 = RequireCopyable<Int>
 typealias ok2 = RequireCopyable<Maybe<Int>>
@@ -96,3 +115,13 @@ extension Maybe {
 extension Maybe where Self: Copyable {
   func check2(_ t: RequireCopyable<Self>) {}
 }
+
+// expected-note@+1 {{consider adding '~Copyable' to generic struct 'CornerCase'}}{{33-33=: ~Copyable}}
+struct CornerCase<T: ~Copyable> {
+  let t: T
+  let nc: NC // expected-error {{stored property 'nc' of 'Copyable'-conforming generic struct 'CornerCase' has noncopyable type 'NC'}}
+}
+
+func chk(_ t: CornerCase<NC>) {}
+// expected-error@-1 {{parameter of noncopyable type 'CornerCase<NC>' must specify ownership}}
+// expected-note@-2 3{{add}}

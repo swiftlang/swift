@@ -314,35 +314,6 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// NoncopyableAnnotationRequest computation.
-//----------------------------------------------------------------------------//
-
-llvm::Optional<InverseMarkingKind>
-NoncopyableAnnotationRequest::getCachedResult() const {
-  auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
-    return static_cast<InverseMarkingKind>(
-              decl->LazySemanticInfo.noncopyableAnnotationKind);
-
-  return llvm::None;
-}
-
-void NoncopyableAnnotationRequest::cacheResult(InverseMarkingKind value) const {
-  auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
-  decl->LazySemanticInfo.noncopyableAnnotationKind =
-      static_cast<unsigned>(value);
-
-  if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    // Add an attribute for printing
-    if (value == InverseMarkingKind::Explicit
-        && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
-      decl->getAttrs().add(new(decl->getASTContext())
-                               MoveOnlyAttr(/*Implicit=*/true));
-  }
-}
-
-//----------------------------------------------------------------------------//
 // isEscapable computation.
 //----------------------------------------------------------------------------//
 
