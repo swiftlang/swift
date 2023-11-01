@@ -3448,8 +3448,7 @@ bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
     importedModule->getImportedModules(reexportedModules,
                                        ModuleDecl::ImportFilterKind::Exported);
     for (const ImportedModule &reexportedModule : reexportedModules) {
-      if (!module->isNonSwiftModule() &&
-          module == reexportedModule.importedModule)
+      if (module == reexportedModule.importedModule)
         return true;
     }
   }
