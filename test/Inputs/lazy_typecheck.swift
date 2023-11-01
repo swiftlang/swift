@@ -206,6 +206,8 @@ public class PublicClass {
 
 public class PublicDerivedClass: PublicClass {}
 
+open class PublicClassSynthesizedDesignatedInit {}
+
 class InternalClass: NoTypecheckProto {
   init(x: NoTypecheck) {}
 }
