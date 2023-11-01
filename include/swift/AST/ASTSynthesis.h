@@ -67,10 +67,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);
-  case _executorProtocol:
-    return SC.Context.getProtocol(KnownProtocolKind::Executor)
-      ->getDeclaredInterfaceType();
-    case _serialExecutor:
+  case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
   case _taskExecutor:
