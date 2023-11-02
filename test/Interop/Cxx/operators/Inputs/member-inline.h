@@ -431,4 +431,13 @@ private:
   T *p;
 };
 
+struct DerivedFromConstIteratorPrivatelyWithUsingDecl : private ConstIterator {
+  using ConstIterator::operator*;
+};
+
+struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl
+    : private AmbiguousOperatorStar {
+  using AmbiguousOperatorStar::operator*;
+};
+
 #endif

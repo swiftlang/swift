@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberInline -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
 // CHECK: struct LoadableIntWrapper {
 // CHECK:   func successor() -> LoadableIntWrapper
@@ -239,6 +239,29 @@
 // CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromConstIterator {
+// CHECK-NEXT:   init()
+// TODO:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// TODO: `var pointee` should be printed here
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromConstIteratorPrivatelyWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var pointee: Int32 { get }
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
+// CHECK-NEXT: }
+
+// CHECK: struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var pointee: Int32
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   mutating func __operatorStar() -> UnsafeMutablePointer<Int32>
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   func __operatorStar() -> UnsafePointer<Int32>
 // CHECK-NEXT: }
