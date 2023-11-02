@@ -633,6 +633,25 @@ struct LLVM_LIBRARY_VISIBILITY UnenforcedFormalAccess : FormalAccess {
   void finishImpl(SILGenFunction &SGF) override;
 };
 
+// A formal access that keeps an LValue alive across an expression that uses an
+// unsafe pointer into that LValue. This supports emitLValueToPointer, which
+// handles InoutToPointerExpr. This formal access is nested within whatever
+// formal access is needed for the LValue itself and emits a fix_lifetime
+// instruction after the apply.
+struct LLVM_LIBRARY_VISIBILITY LValueToPointerFormalAccess : FormalAccess {
+  static SILValue enter(SILGenFunction &SGF, SILLocation loc, SILValue address);
+
+  SILValue address;
+
+  LValueToPointerFormalAccess(SILLocation loc, SILValue address,
+                              CleanupHandle cleanup)
+    : FormalAccess(sizeof(*this), FormalAccess::Unenforced, loc, cleanup),
+    address(address) {}
+
+  // Only called at the end formal evaluation scope. Emit fix_lifetime.
+  void finishImpl(SILGenFunction &SGF) override;
+};
+
 } // namespace Lowering
 } // namespace swift
 

@@ -5934,6 +5934,67 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   }
 }
 
+namespace {
+/// Cleanup to insert fix_lifetime on an LValue address.
+class FixLifetimeLValueCleanup : public Cleanup {
+  friend LValueToPointerFormalAccess;
+
+  FormalEvaluationContext::stable_iterator depth;
+
+public:
+  FixLifetimeLValueCleanup() : depth() {}
+
+  LValueToPointerFormalAccess &getFormalAccess(SILGenFunction &SGF) const {
+    auto &access = *SGF.FormalEvalContext.find(depth);
+    return static_cast<LValueToPointerFormalAccess &>(access);
+  }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    getFormalAccess(SGF).finish(SGF);
+  }
+
+  SILValue getAddress(SILGenFunction &SGF) const {
+    return getFormalAccess(SGF).address;
+  }
+
+  void dump(SILGenFunction &SGF) const override {
+#ifndef NDEBUG
+    llvm::errs() << "FixLifetimeLValueCleanup "
+                 << "State:" << getState() << " "
+                 << "Address: " << getAddress(SGF) << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+SILValue LValueToPointerFormalAccess::enter(SILGenFunction &SGF,
+                                            SILLocation loc,
+                                            SILValue address) {
+  auto &lowering = SGF.getTypeLowering(address->getType().getObjectType());
+  SILValue pointer = SGF.B.createAddressToPointer(
+    loc, address, SILType::getRawPointerType(SGF.getASTContext()),
+    /*needsStackProtection=*/ true);
+  if (!lowering.isTrivial()) {
+    assert(SGF.isInFormalEvaluationScope() &&
+           "Must be in formal evaluation scope");
+    auto &cleanup = SGF.Cleanups.pushCleanup<FixLifetimeLValueCleanup>();
+    CleanupHandle handle = SGF.Cleanups.getTopCleanup();
+    SGF.FormalEvalContext.push<LValueToPointerFormalAccess>(loc, address,
+                                                            handle);
+    cleanup.depth = SGF.FormalEvalContext.stable_begin();
+  }
+  return pointer;
+}
+
+// Address-to-pointer conversion always requires either a fix_lifetime or
+// mark_dependence. Emitting a fix_lifetime immediately after the call as
+// opposed to a mark_dependence allows the lvalue's lifetime to be optimized
+// outside of this narrow scope.
+void LValueToPointerFormalAccess::finishImpl(SILGenFunction &SGF) {
+  SGF.B.emitFixLifetime(loc, address);
+}
+
 /// Convert an l-value to a pointer type: unsafe, unsafe-mutable, or
 /// autoreleasing-unsafe-mutable.
 ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
@@ -5979,9 +6040,8 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
   // Get the lvalue address as a raw pointer.
   SILValue address =
     emitAddressOfLValue(loc, std::move(lv)).getUnmanagedValue();
-  address = B.createAddressToPointer(loc, address,
-                               SILType::getRawPointerType(getASTContext()),
-              /*needsStackProtection=*/ true);
+
+  SILValue pointer = LValueToPointerFormalAccess::enter(*this, loc, address);
   
   // Disable nested writeback scopes for any calls evaluated during the
   // conversion intrinsic.
@@ -5996,7 +6056,7 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
                                                        getPointerProtocol());
   return emitApplyOfLibraryIntrinsic(
              loc, converter, subMap,
-             ManagedValue::forObjectRValueWithoutOwnership(address),
+             ManagedValue::forObjectRValueWithoutOwnership(pointer),
              SGFContext())
       .getAsSingleValue(*this, loc);
 }
