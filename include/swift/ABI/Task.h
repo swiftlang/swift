@@ -412,11 +412,11 @@ public:
 
   // ==== Task Executor Preference ---------------------------------------------
 
-  ExecutorRef getPreferredTaskExecutor();
+  TaskExecutorRef getPreferredTaskExecutor();
 
   /// Only to be used during task creation.
   /// Otherwise use `swift_task_pushTaskExecutorPreference` and `swift_task_popTaskExecutorPreference`.
-  void pushTaskExecutorPreference(ExecutorRef preferred);
+  void pushTaskExecutorPreference(TaskExecutorRef preferred);
 
   void dropTaskExecutorPreferenceRecord();
 

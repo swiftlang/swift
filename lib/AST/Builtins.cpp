@@ -1609,7 +1609,7 @@ static ValueDecl *getBuildOrdinaryExecutorRef(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
-                                      _conformsTo(_typeparam(0), _executorProtocol)),
+                                      _conformsTo(_typeparam(0), _taskExecutor)),
                             _parameters(_typeparam(0)),
                             _executor);
 }
