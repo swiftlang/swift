@@ -821,7 +821,7 @@ static bool doesAccessorHaveBody(AccessorDecl *accessor) {
   auto *storage = accessor->getStorage();
 
   // NSManaged getters and setters don't have bodies.
-  if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>(/*AllowInvalid=*/true))
     if (accessor->isGetterOrSetter())
       return false;
 
