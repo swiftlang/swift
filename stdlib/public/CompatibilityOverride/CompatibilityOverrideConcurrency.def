@@ -108,26 +108,26 @@
 
 OVERRIDE_ACTOR(task_enqueue, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (Job *job, ExecutorRef executor),
+               swift::, (Job *job, SerialExecutorRef executor),
                (job, executor))
 
 OVERRIDE_ACTOR(job_run, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (Job *job, ExecutorRef executor),
+               swift::, (Job *job, SerialExecutorRef executor),
                (job, executor))
 
-OVERRIDE_ACTOR(task_getCurrentExecutor, ExecutorRef,
+OVERRIDE_ACTOR(task_getCurrentExecutor, SerialExecutorRef,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                swift::, ,)
 
 OVERRIDE_ACTOR(task_isCurrentExecutor, bool,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-               swift::, (ExecutorRef executor), (executor))
+               swift::, (SerialExecutorRef executor), (executor))
 
 OVERRIDE_ACTOR(task_switch, void,
                SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
                swift::, (SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
-               TaskContinuationFunction *resumeFunction, ExecutorRef newExecutor),
+               TaskContinuationFunction *resumeFunction, SerialExecutorRef newExecutor),
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
@@ -200,7 +200,7 @@ OVERRIDE_TASK(task_suspend, AsyncTask *,
 
 OVERRIDE_TASK(task_enqueueTaskOnExecutor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (AsyncTask *task, ExecutorRef newExecutor), (task, newExecutor))
+              (AsyncTask *task, SerialExecutorRef newExecutor), (task, newExecutor))
 
 OVERRIDE_TASK(continuation_init, AsyncTask *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

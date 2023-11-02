@@ -50,7 +50,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
+      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -158,6 +158,7 @@ function(handle_swift_sources
         ${IS_FRAGILE_arg}
         ${ONLY_SWIFTMODULE_arg}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
+        DEPLOYMENT_VERSION_OSX ${SWIFTSOURCES_DEPLOYMENT_VERSION_OSX}
         MACCATALYST_BUILD_FLAVOR "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
@@ -225,7 +226,7 @@ function(_add_target_variant_swift_compile_flags
   cmake_parse_arguments(
     VARIANT             # prefix
     ""                  # options
-    "MACCATALYST_BUILD_FLAVOR"  # single-value args
+    "MACCATALYST_BUILD_FLAVOR;DEPLOYMENT_VERSION_OSX"  # single-value args
     ""                  # multi-value args
     ${ARGN})
 
@@ -236,6 +237,10 @@ function(_add_target_variant_swift_compile_flags
 
   if("${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+    if("${sdk}" STREQUAL "OSX" AND DEFINED VARIANT_DEPLOYMENT_VERSION_OSX)
+      set(sdk_deployment_version ${VARIANT_DEPLOYMENT_VERSION_OSX})
+    endif()
+
     get_target_triple(target target_variant "${sdk}" "${arch}"
     MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
     DEPLOYMENT_VERSION "${sdk_deployment_version}")
@@ -382,7 +387,7 @@ function(_compile_swift_files
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
     "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE"
-    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
+    "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
 
@@ -455,6 +460,7 @@ function(_compile_swift_files
       "${SWIFT_STDLIB_BUILD_TYPE}"
       "${SWIFT_STDLIB_ASSERTIONS}"
       swift_flags
+      DEPLOYMENT_VERSION_OSX ${SWIFTFILE_DEPLOYMENT_VERSION_OSX}
       MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
       )
 

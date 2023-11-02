@@ -660,7 +660,7 @@ void swift_task_localsCopyTo(AsyncTask* target);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
                        TaskContinuationFunction *resumeFunction,
-                       ExecutorRef newExecutor);
+                       SerialExecutorRef newExecutor);
 
 /// Mark a task for enqueue on a new executor and then enqueue it.
 ///
@@ -671,7 +671,7 @@ void swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeToContext,
 /// synchronously when possible.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void
-swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
+swift_task_enqueueTaskOnExecutor(AsyncTask *task, SerialExecutorRef executor);
 
 /// Enqueue the given job to run asynchronously on the given executor.
 ///
@@ -681,7 +681,7 @@ swift_task_enqueueTaskOnExecutor(AsyncTask *task, ExecutorRef executor);
 /// Generally you should call swift_task_switch to switch execution
 /// synchronously when possible.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_enqueue(Job *job, ExecutorRef executor);
+void swift_task_enqueue(Job *job, SerialExecutorRef executor);
 
 /// Enqueue the given job to run asynchronously on the global
 /// execution pool.
@@ -716,7 +716,7 @@ bool swift_task_isOnExecutor(
     const SerialExecutorWitnessTable *wtable);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_executor_isComplexEquality(ExecutorRef ref);
+bool swift_executor_isComplexEquality(SerialExecutorRef ref);
 
 /// Return the 64bit TaskID (if the job is an AsyncTask),
 /// or the 32bits of the job Id otherwise.
@@ -886,7 +886,7 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_job_run(Job *job, ExecutorRef executor);
+void swift_job_run(Job *job, SerialExecutorRef executor);
 
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -894,19 +894,19 @@ AsyncTask *swift_task_getCurrent(void);
 
 /// Return the current thread's active executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getCurrentExecutor(void);
+SerialExecutorRef swift_task_getCurrentExecutor(void);
 
 /// Return the main-actor executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getMainExecutor(void);
+SerialExecutorRef swift_task_getMainExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_isCurrentExecutor(ExecutorRef executor);
+bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
-    uintptr_t line, ExecutorRef executor);
+    uintptr_t line, SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);

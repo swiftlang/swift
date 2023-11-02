@@ -400,7 +400,7 @@ private:
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it
-  void flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor);
+  void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
@@ -790,7 +790,7 @@ public:
 
   /// The executor that should be resumed to.
   /// Public ABI.
-  ExecutorRef ResumeToExecutor;
+  SerialExecutorRef ResumeToExecutor;
 
 #if defined(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   /// In a task-to-thread model, instead of voluntarily descheduling the task

@@ -438,7 +438,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
   auto dc = var->getDeclContext();
   llvm::TinyPtrVector<CustomAttr *> result;
 
-  for (auto attr : var->getSemanticCustomAttrs()) {
+  for (auto attr : var->getExpandedAttrs().getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto *nominal = evaluateOrDefault(

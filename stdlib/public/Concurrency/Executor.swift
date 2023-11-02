@@ -98,6 +98,42 @@ public protocol SerialExecutor: Executor {
   func isSameExclusiveExecutionContext(other: Self) -> Bool
 }
 
+/// An executor that may be used as preferred executor by a task.
+///
+/// A task with executor preference will execute nonisolated functions on this executor,
+/// rather than using the default global executor. Default actors also are able to run
+/// on a task's preferred executor.
+@available(SwiftStdlib 9999, *)
+public protocol TaskExecutor: Executor {
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  func enqueue(_ job: UnownedJob)
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
+  func enqueue(_ job: consuming Job)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  // This requirement is repeated here as a non-override so that we
+  // get a redundant witness-table entry for it.  This allows us to
+  // avoid drilling down to the base conformance just for the basic
+  // work-scheduling operation.
+  @_nonoverride
+  func enqueue(_ job: consuming ExecutorJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  // TODO: Implement: func asUnownedTaskExecutor() -> UnownedTaskExecutor
+}
+
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Executor {

@@ -1664,7 +1664,8 @@ ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
   SmallVector<unsigned, 2> bufferIDs;
-  for (auto customAttrConst : nominal->getSemanticCustomAttrs()) {
+  for (auto customAttrConst :
+       nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
     auto customAttr = const_cast<CustomAttr *>(customAttrConst);
     auto *macro = nominal->getResolvedMacro(customAttr);
 

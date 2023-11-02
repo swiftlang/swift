@@ -188,7 +188,7 @@ void irgen::emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
     emitWitnessTableRef(IGF, executorType, executorConf);
   impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
 
-  // NOTE: Refer to ExecutorRef::ExecutorKind for the flag values.
+  // NOTE: Refer to SerialExecutorRef::ExecutorKind for the flag values.
   llvm::IntegerType *IntPtrTy = IGF.IGM.IntPtrTy;
   auto complexEqualityExecutorKindFlag =
       llvm::Constant::getIntegerValue(IntPtrTy, APInt(IntPtrTy->getBitWidth(),

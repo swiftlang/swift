@@ -1150,6 +1150,8 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
 
+  auto attrs = D->getSemanticAttrs();
+
   // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
 
@@ -1205,7 +1207,7 @@ void PrintAST::printAttributes(const Decl *D) {
     // If the declaration is implicitly @objc, print the attribute now.
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isObjC() && !isa<EnumElementDecl>(VD) &&
-          !VD->getAttrs().hasAttribute<ObjCAttr>()) {
+          !attrs.hasAttribute<ObjCAttr>()) {
         Printer.printAttrName("@objc");
         Printer << " ";
       }
@@ -1235,13 +1237,13 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DAK_Borrowing);
   }
 
-  D->getAttrs().print(Printer, Options, D);
+  attrs.print(Printer, Options, D);
 
   // Print the implicit 'final' attribute.
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     auto VarD = dyn_cast<VarDecl>(D);
     if (VD->isFinal() &&
-        !VD->getAttrs().hasAttribute<FinalAttr>() &&
+        !attrs.hasAttribute<FinalAttr>() &&
         // Don't print a redundant 'final' if printing a 'let' or 'static' decl.
         !(VarD && VarD->isLet()) &&
         getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic &&

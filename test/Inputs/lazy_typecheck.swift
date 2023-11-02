@@ -128,6 +128,9 @@ public struct PublicStruct {
   public var publicProperty: Int
   public var publicPropertyInferredType = ""
   @PublicWrapper public var publicWrappedProperty = 3.14
+  @_transparent public var publicTransparentProperty: Int {
+    get { return 1 }
+  }
 
   public init(x: Int) {
     self.publicProperty = 1

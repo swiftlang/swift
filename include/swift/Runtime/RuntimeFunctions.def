@@ -2310,7 +2310,7 @@ FUNCTION(TaskCreate,
 
 // void swift_task_switch(AsyncContext *resumeContext,
 //                        TaskContinuationFunction *resumeFunction,
-//                        ExecutorRef newExecutor);
+//                        SerialExecutorRef newExecutor);
 FUNCTION(TaskSwitchFunc,
          swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
@@ -2372,7 +2372,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// ExecutorRef swift_task_getCurrentExecutor();
+// SerialExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
          ConcurrencyAvailability,
@@ -2382,7 +2382,7 @@ FUNCTION(TaskGetCurrentExecutor,
          EFFECT(Concurrency),
          MEMEFFECTS(ArgMemOnly))
 
-// ExecutorRef swift_task_getMainExecutor();
+// SerialExecutorRef swift_task_getMainExecutor();
 FUNCTION(TaskGetMainExecutor,
          swift_task_getMainExecutor, SwiftCC,
          ConcurrencyAvailability,

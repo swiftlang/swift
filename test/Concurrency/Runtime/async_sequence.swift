@@ -8,6 +8,7 @@
 
 // TODO: This crashes on linux for some strange reason
 // REQUIRES: OS=macosx
+// UNSUPPORTED: freestanding
 
 import StdlibUnittest
 

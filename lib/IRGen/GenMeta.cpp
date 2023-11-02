@@ -6561,6 +6561,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator:
   case KnownProtocolKind::Executor:
   case KnownProtocolKind::SerialExecutor:
+  case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

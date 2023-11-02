@@ -24,6 +24,8 @@ add_swift_target_library(swiftCxx STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_ONLY IS
     # For functionality that depends on the C++ stdlib, use C++ stdlib overlay (`swiftstd` module).
     -Xcc -nostdinc++
 
+    DEPLOYMENT_VERSION_OSX ${COMPATIBILITY_MINIMUM_DEPLOYMENT_VERSION_OSX}
+
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     DEPENDS ${SWIFT_CXX_DEPS}
     INSTALL_IN_COMPONENT compiler

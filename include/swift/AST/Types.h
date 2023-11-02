@@ -352,6 +352,9 @@ enum class TypeMatchFlags {
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
+// Forward declare the ErrorType as otherwise we will match `lldb::ErrorType`.
+class ErrorType;
+
 /// Base class for all types which describe the Swift and SIL ASTs.
 ///
 /// See TypeNodes.def for a succinct description of the full class hierarchy.
@@ -1693,7 +1696,7 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType)
 
 /// BuiltinExecutorType - The builtin executor-ref type.  In C, this
-/// is the ExecutorRef struct type.
+/// is the SerialExecutorRef struct type.
 class BuiltinExecutorType : public BuiltinType {
   friend class ASTContext;
   BuiltinExecutorType(const ASTContext &C)
