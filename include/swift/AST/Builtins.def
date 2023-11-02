@@ -874,7 +874,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
-// Retrieve the ExecutorRef on which the current asynchronous
+// Retrieve the SerialExecutorRef on which the current asynchronous
 // function is executing, or nil if the function isn't running
 // anywhere in particular.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)

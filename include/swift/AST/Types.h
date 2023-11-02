@@ -1696,7 +1696,7 @@ public:
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType)
 
 /// BuiltinExecutorType - The builtin executor-ref type.  In C, this
-/// is the ExecutorRef struct type.
+/// is the SerialExecutorRef struct type.
 class BuiltinExecutorType : public BuiltinType {
   friend class ASTContext;
   BuiltinExecutorType(const ASTContext &C)

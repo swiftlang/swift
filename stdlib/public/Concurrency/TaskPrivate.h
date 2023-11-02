@@ -135,7 +135,7 @@ _swift_task_getDispatchQueueSerialExecutorWitnessTable() {
 // information along to the executor that it is enqueued into.
 SWIFT_CC(swift)
 void
-swift_executor_escalate(ExecutorRef executor, AsyncTask *task, JobPriority newPriority);
+swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task, JobPriority newPriority);
 
 /*************** Methods for Status records manipulation ******************/
 
@@ -935,7 +935,7 @@ inline void AsyncTask::flagAsRunning() {
 /// onto by the original enqueueing thread.
 ///
 /// rdar://88366470 (Direct handoff behaviour when tasks switch executors)
-inline void AsyncTask::flagAsAndEnqueueOnExecutor(ExecutorRef newExecutor) {
+inline void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */

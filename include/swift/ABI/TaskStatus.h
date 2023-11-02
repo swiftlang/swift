@@ -321,7 +321,7 @@ class TaskDependencyStatusRecord : public TaskStatusRecord {
     // (potentially intrusively), so that the appropriate escalation effect
     // (which may be different for each type of executor) can happen if a task
     // is escalated while enqueued.
-    ExecutorRef Executor;
+    SerialExecutorRef Executor;
   } DependentOn;
 
   // Enum specifying the type of dependency this task has
@@ -359,7 +359,7 @@ public:
       DependentOn.TaskGroup = taskGroup;
   }
 
-  TaskDependencyStatusRecord(AsyncTask *waitingTask, ExecutorRef executor) :
+  TaskDependencyStatusRecord(AsyncTask *waitingTask, SerialExecutorRef executor) :
     TaskStatusRecord(TaskStatusRecordKind::TaskDependency),
         DependencyKind(EnqueuedOnExecutor), WaitingTask(waitingTask) {
       DependentOn.Executor = executor;
@@ -369,7 +369,7 @@ public:
     return record->getKind() == TaskStatusRecordKind::TaskDependency;
   }
 
-  void updateDependencyToEnqueuedOn(ExecutorRef executor) {
+  void updateDependencyToEnqueuedOn(SerialExecutorRef executor) {
     DependencyKind = EnqueuedOnExecutor;
     DependentOn.Executor = executor;
   }
