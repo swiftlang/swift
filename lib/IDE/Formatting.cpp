@@ -461,7 +461,8 @@ private:
         return true;
       }
     }
-    for (auto *customAttr : D->getOriginalAttrs().getAttributes<CustomAttr, true>()) {
+    for (auto *customAttr :
+         D->getParsedAttrs().getAttributes<CustomAttr, true>()) {
       if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;
@@ -1341,7 +1342,8 @@ private:
         return true;
       }
     }
-    for (auto *customAttr : D->getOriginalAttrs().getAttributes<CustomAttr, true>()) {
+    for (auto *customAttr :
+         D->getParsedAttrs().getAttributes<CustomAttr, true>()) {
       if (auto *Repr = customAttr->getTypeRepr()) {
         if (!Repr->walk(*this))
           return false;

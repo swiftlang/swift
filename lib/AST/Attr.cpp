@@ -860,13 +860,16 @@ SourceLoc DeclAttributes::getStartLoc(bool forModifiers) const {
 }
 
 llvm::Optional<const DeclAttribute *>
-OrigDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
+ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
+  if (Attr->isImplicit())
+    return llvm::None;
+
   auto declLoc = decl->getStartLoc();
   auto *mod = decl->getModuleContext();
   auto *declFile = mod->getSourceFileContainingLocation(declLoc);
   auto *attrFile = mod->getSourceFileContainingLocation(Attr->getLocation());
   if (!declFile || !attrFile)
-    return Attr;
+    return llvm::None;
 
   // Only attributes in the same buffer as the declaration they're attached to
   // are part of the original attribute list.
