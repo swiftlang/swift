@@ -5374,6 +5374,7 @@ public:
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
+  friend class HasStorageRequest;
   friend class SetterAccessLevelRequest;
   friend class IsGetterMutatingRequest;
   friend class IsSetterMutatingRequest;
@@ -5440,6 +5441,8 @@ private:
   llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
 
   struct {
+    unsigned HasStorageComputed : 1;
+    unsigned HasStorage : 1;
     unsigned IsGetterMutatingComputed : 1;
     unsigned IsGetterMutating : 1;
     unsigned IsSetterMutatingComputed : 1;
@@ -5508,7 +5511,6 @@ public:
   ReadWriteImplKind getReadWriteImpl() const {
     return getImplInfo().getReadWriteImpl();
   }
-
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.

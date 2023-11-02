@@ -167,6 +167,14 @@ public struct PublicGenericStruct<T> {
   }
 }
 
+@frozen public struct FrozenPublicStruct {
+  private(set) var varWithPrivateSetter: Int = 1
+
+  public init(_ varWithPrivateSetter: Int) {
+    self.varWithPrivateSetter = varWithPrivateSetter
+  }
+}
+
 struct InternalStruct: NoTypecheckProto {
   var x: NoTypecheck
 

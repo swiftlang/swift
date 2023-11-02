@@ -32,7 +32,7 @@ func testGobalVars() {
   let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
 }
 
-func testPublicStruct() {
+func testPublicStructs() {
   let s = PublicStruct(x: 1)
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
@@ -42,6 +42,8 @@ func testPublicStruct() {
   let _: Int = s.publicTransparentProperty
   PublicStruct.publicStaticMethod()
   PublicStruct.activeMethod()
+
+  let _ = FrozenPublicStruct(1)
 }
 
 func testPublicClasses() {
