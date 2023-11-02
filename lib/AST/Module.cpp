@@ -3441,6 +3441,16 @@ bool SourceFile::importsModuleAsWeakLinked(const ModuleDecl *module) const {
         importedModule->getUnderlyingModuleIfOverlay();
     if (module == clangModule)
       return true;
+
+    // Traverse the exported modules of this weakly-linked module to ensure
+    // that we weak-link declarations from its exported peers.
+    SmallVector<ImportedModule, 8> reexportedModules;
+    importedModule->getImportedModules(reexportedModules,
+                                       ModuleDecl::ImportFilterKind::Exported);
+    for (const ImportedModule &reexportedModule : reexportedModules) {
+      if (module == reexportedModule.importedModule)
+        return true;
+    }
   }
   return false;
 }
