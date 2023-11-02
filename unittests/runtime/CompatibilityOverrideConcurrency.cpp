@@ -282,7 +282,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_getTaskExecutorPreference) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, task_pushTaskExecutorPreference) {
-  swift_task_pushTaskExecutorPreference(ExecutorRef::generic());
+  swift_task_pushTaskExecutorPreference(TaskExecutorRef::undefined());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, task_popTaskExecutorPreference) {

@@ -549,7 +549,7 @@ ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
 
 SWIFT_CC(swift)
 TaskExecutorPreferenceStatusRecord*
-swift::swift_task_pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
+swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   auto task = swift_task_getCurrent();
   assert(task && "Executor preference can only be called from async contexts.");
 
@@ -564,7 +564,7 @@ swift::swift_task_pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
   return record;
 }
 
-void AsyncTask::pushTaskExecutorPreference(ExecutorRef preferredExecutor) {
+void AsyncTask::pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
   fprintf(stderr, "[%s:%d](%s) create task preference record [%p] for task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,

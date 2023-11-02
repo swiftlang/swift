@@ -278,14 +278,14 @@ public:
 
 class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
 private:
-  const ExecutorRef Preferred;
+  const TaskExecutorRef Preferred;
 
 public:
-  TaskExecutorPreferenceStatusRecord(ExecutorRef executor)
+  TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor)
       : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
         Preferred(executor) {}
 
-  ExecutorRef getPreferredExecutor() { return Preferred; }
+  TaskExecutorRef getPreferredExecutor() { return Preferred; }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::TaskExecutorPreference;

@@ -547,7 +547,7 @@ ExecutorRef swift_task_getPreferredTaskExecutor();
 /// Push an executor preference onto the current task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorPreferenceStatusRecord*
-swift_task_pushTaskExecutorPreference(ExecutorRef executor);
+swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
@@ -913,10 +913,10 @@ SerialExecutorRef swift_task_getMainExecutor(void);
 
 /// Return the generic (default global concurrent) executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getGenericExecutor(void);
+SerialExecutorRef swift_task_getGenericExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getPreferredTaskExecutor(void);
+TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);

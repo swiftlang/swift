@@ -220,12 +220,12 @@ bool SerialExecutorRef::isMainExecutor() const {
 /************************ GENERIC EXECUTOR ***********************************/
 /*****************************************************************************/
 
-ExecutorRef swift::swift_task_getGenericExecutor() {
+SerialExecutorRef swift::swift_task_getGenericExecutor() {
 #if !SWIFT_CONCURRENCY_ENABLE_DISPATCH
   // FIXME: this isn't right for the non-cooperative environment
-  return ExecutorRef::generic();
+  return SerialExecutorRef::generic();
 #else
-  return ExecutorRef::generic();
+  return SerialExecutorRef::generic();
 #endif
 }
 
