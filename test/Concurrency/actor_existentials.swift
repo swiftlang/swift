@@ -49,7 +49,7 @@ func from_isolated_concrete(_ x: isolated A) async {
 actor Act {
     var i = 0 // expected-note {{mutation of this property is only permitted within the actor}}
 }
-let act = Act()
+nonisolated let act = Act()
 
 func bad() async {
     // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}

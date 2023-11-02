@@ -61,6 +61,8 @@ actor Someone {
   }
 }
 
+@MainActor let global = TestStaticVar()
+
 @MainActor
 struct TestStaticVar {
   @MainActor static let shared = TestStaticVar()
@@ -89,6 +91,7 @@ struct TestStaticVar {
 
       tests.test("MainActor.assertIsolated() from static let initializer") {
         _ = await TestStaticVar.shared
+        _ = await global
       }
 
       #if !os(WASI)
