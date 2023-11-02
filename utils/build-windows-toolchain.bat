@@ -25,8 +25,9 @@ echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
+set ec=%errorlevel%
 del %TEMP%\call-build.cmd
-exit /b
+exit /b %ec%
 
 :Start
 
@@ -43,7 +44,7 @@ set BuildRoot=%SourceRoot%\build
 
 md %BuildRoot%
 subst T: /d
-subst T: %BuildRoot% || (exit /b)
+subst T: %BuildRoot% || (exit /b 1)
 set BuildRoot=T:
 
 :: Identify the PackageRoot
@@ -70,7 +71,7 @@ if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 set SkipPackagingArg=-SkipPackaging
 if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
-call :CloneRepositories || (exit /b)
+call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
@@ -80,7 +81,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BuildType %CMAKE_BUILD_TYPE% ^
   %SkipPackagingArg% ^
   %TestArg% ^
-  -Stage %PackageRoot%
+  -Stage %PackageRoot% || (exit /b 1)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache
