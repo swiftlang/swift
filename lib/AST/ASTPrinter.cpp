@@ -3573,13 +3573,17 @@ static bool usesFeatureSendNonSendable(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
+static bool usesFeatureGlobalConcurrency(Decl *decl) {
+  return false;
+}
 
 static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureInferSendableMethods(Decl *decl) { return false; }
+static bool usesFeatureInferSendableFromCaptures(Decl *decl) {
+  return false;
+}
 
 static bool usesFeaturePlaygroundExtendedCallbacks(Decl *decl) {
   return false;

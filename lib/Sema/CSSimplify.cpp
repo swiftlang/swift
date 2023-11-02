@@ -9524,10 +9524,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Delay solving member constraint for unapplied methods
   // where the base type has a conditional Sendable conformance
-  if (ctx.LangOpts.hasFeature(Feature::InferSendableMethods)) {
-    if (functionRefKind == FunctionRefKind::Unapplied) {
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    if (isPartialApplication(memberLocator)) {
       auto sendableProtocol =
-          DC->getParentModule()->getASTContext().getProtocol(
+          Context.getProtocol(
               KnownProtocolKind::Sendable);
       auto baseConformance = DC->getParentModule()->lookupConformance(
           instanceTy, sendableProtocol);
@@ -9535,21 +9535,14 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (llvm::any_of(
               baseConformance.getConditionalRequirements(),
               [&](const auto &req) {
-                switch (req.getKind()) {
-                case RequirementKind::Conformance: {
-                  if (auto secondType =
-                          req.getSecondType()->template getAs<ProtocolType>()) {
-                    return req.getFirstType()->hasTypeVariable() &&
-                           secondType->getDecl()->isSpecificProtocol(
-                               KnownProtocolKind::Sendable);
-                  }
-                }
-                case RequirementKind::Superclass:
-                case RequirementKind::SameType:
-                case RequirementKind::SameShape:
-                case RequirementKind::Layout:
+                if (req.getKind() != RequirementKind::Conformance)
                   return false;
+
+                if (auto protocolTy = req.getSecondType()->template getAs<ProtocolType>()) {
+                  return req.getFirstType()->hasTypeVariable() &&
+                         protocolTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable);
                 }
+                return false;
               })) {
         result.OverallResult = MemberLookupResult::Unsolved;
         return result;

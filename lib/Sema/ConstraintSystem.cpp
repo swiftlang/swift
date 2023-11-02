@@ -1611,6 +1611,7 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
     ConstraintLocatorBuilder locator) {
+
   return swift::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue,
       GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
@@ -1712,12 +1713,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
-    if (ctx.LangOpts.hasFeature(Feature::InferSendableMethods)) {
+    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (funcDecl->getDeclContext()->isLocalContext()) {
+      if (!funcDecl->getDeclContext()->isTypeContext() && !funcDecl->getDeclContext()->isLocalContext() ) {
         funcType =
-            funcType->withExtInfo(funcType->getExtInfo().withConcurrent())
-                ->getAs<AnyFunctionType>();
+            funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
     }
 
@@ -2426,10 +2426,7 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
-
-bool isPartialApplication(ConstraintSystem &cs,
-                            const AbstractFunctionDecl *member,
-                            ConstraintLocator *locator) {
+bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
   // If this is a compiler synthesized implicit conversion, let's skip
   // the check because the base of `UDE` is not the base of the injected
   // initializer.
@@ -2442,7 +2439,7 @@ bool isPartialApplication(ConstraintSystem &cs,
     return false;
 
   auto baseTy =
-      cs.simplifyType(cs.getType(UDE->getBase()))->getWithoutSpecifierType();
+      simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
 
   // If base is a metatype it would be ignored (unless this is an initializer
   // call), but if it is some other type it means that we have a single
@@ -2451,14 +2448,12 @@ bool isPartialApplication(ConstraintSystem &cs,
   if (!baseTy->is<MetatypeType>())
     ++level;
 
-  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
-    level += 1;
+  if (auto *call = dyn_cast_or_null<CallExpr>(getParentExpr(UDE))) {
+    if (UDE == call->getFn()->getSemanticsProvidingExpr())
+      level += 1;
   }
 
-  if (level == 2)
-    return false;
-
-  return true;
+  return level < 2;
 }
 
 DeclReferenceType
@@ -2669,37 +2664,21 @@ ConstraintSystem::getTypeOfMemberReference(
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
-    auto &ctx = DC->getASTContext();
-    auto *parentModule = useDC->getParentModule();
-    bool inferredSendable =
-        ctx.LangOpts.hasFeature(Feature::InferSendableMethods);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
 
-    bool isPartialApply;
-    isPartialApply = isPartialApplication(*this, funcDecl, locator);
-   
-    if (inferredSendable && isPartialApply) {
-//      auto sendableProtocol = parentModule->getASTContext().getProtocol(
-//          KnownProtocolKind::Sendable);
-//      auto baseConformance =
-//          parentModule->lookupConformance(baseOpenedTy, sendableProtocol);
-      
-      if (isSendableType(parentModule, baseOpenedTy)) {
+    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+      if (isPartialApplication(locator) &&
+          isSendableType(DC->getParentModule(), baseOpenedTy)) {
         // Add @Sendable to functions without conditional conformances
         functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
       }
+      // Unapplied values should always be Sendable
+      info = info.withConcurrent();
     }
 
-    // FIXME: Verify ExtInfo state is correct, not working by accident.
-    FunctionType::ExtInfo info;
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
-
-    // Add @Sendable to openedType if possible
-    if (inferredSendable) {
-      auto origFnType = openedType->castTo<FunctionType>();
-      openedType =
-          origFnType->withExtInfo(origFnType->getExtInfo().withConcurrent());
-    }
   }
 
   // Adjust the opened type for concurrency.

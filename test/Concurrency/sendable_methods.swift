@@ -1,5 +1,18 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InferSendableMethods
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking
+// RUN: %target-swift-emit-silgen %s -verify -enable-experimental-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
+
+func outer() {
+    @Sendable func sendable() {}
+
+    func nonSendable() {}
+
+    let _ : @Sendable () -> Void = sendable
+    let _ : @Sendable () -> Void = nonSendable // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+}
+
 
 final class C : Sendable {
   func f() {}
@@ -19,13 +32,6 @@ protocol P : Sendable {
   init()
 }
 
-func g<T>(_ f: @escaping @Sendable (T) -> (@Sendable () -> Void)) where T: P {
-  Task {
-    let instance = T()
-    f(instance)()
-  }
-}
-
 final class InferredSendableC: P {
   func f() { }
 }
@@ -40,29 +46,56 @@ enum InferredSendableE: P {
   func f() { }
 }
 
-struct GenericS<T>: P {
-    init(_: T) { }
-
-    func f() { }
-}
-
 final class GenericC<T>: P {
   func f() { }
 }
 
-// Conditional Conformances
-extension GenericS : Sendable where T : Sendable { }
-extension GenericC : Sendable where T : Sendable { }
+struct GenericS<T> : P {
+  init(_: T) { }
+
+  init() { }
+
+  func f() { }
+
+  func g() async { }
+}
 
 class NonSendable {
   func f() {}
 }
 
+func g<T>(_ f: @escaping @Sendable (T) -> (@Sendable () -> Void)) where T: P {
+  Task {
+    let instance = T()
+    f(instance)()
+  }
+}
+// Unapplied Func Parameters
+g(GenericS<NonSendable>.f)  // ok because unapplied references don't capture state
+g(GenericC<NonSendable>.f)
+g(InferredSendableS.f)
+g(InferredSendableC.f)
+g(InferredSendableE.f)
+g(GenericS<Int>.f)
+g(GenericC<Int>.f)
+
+struct GenericQ<T> {
+
+  func f() { }
+}
+
+func g2<T>(_ f: @Sendable (T) -> (@Sendable () -> Void)) { }
+g2(GenericQ<NonSendable>.f) // ok because unapplied references don't capture state
+
+
+// Conditional Conformances
+//extension GenericS : Sendable where T : Sendable { }
+//extension GenericC : Sendable where T : Sendable { }
+
 extension E {
   init(){
     self = .a
   }
-  
 }
 
 extension InferredSendableE {
@@ -71,31 +104,28 @@ extension InferredSendableE {
   }
 }
 
-// Unapplied Func Parameter
-g(InferredSendableS.f)
-g(InferredSendableC.f)
-g(InferredSendableE.f)
-
-g(GenericS<Int>.f)
-g(GenericC<Int>.f)
-
-g(GenericS<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
-g(GenericC<NonSendable>.f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
-
-g(GenericS(NonSendable()).f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races
-g(GenericS(1).f)
+// Partial Apply Parameters
+func h(_ f: (@Sendable () -> Void)) {  }
+h(GenericQ<NonSendable>().f) // ok
+h(GenericS(NonSendable()).f) // ok
+h(GenericS<Int>().f)
+h(GenericS(1).f)
+h(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
 
 func executeAsTask (_ f: @escaping  @Sendable () -> Void) {
   Task {
     f()
   }
 }
-
-// Partial Apply Parameter
-executeAsTask(C().f)
 executeAsTask(S().f)
+executeAsTask(C().f)
 executeAsTask(E().f)
 executeAsTask(NonSendable().f) // expected-warning{{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+do {
+  let f = S.f
+  let _ : @Sendable () -> () = f(S())
+}
 
 // Declarations
 let us:  @Sendable (GenericS<Int>) -> (@Sendable () -> Void) = GenericS<Int>.f
@@ -124,8 +154,7 @@ let helloworld:  @Sendable () -> Void = World.greet
 class NonSendableC {
     var x: Int = 0
 
-    // TO-DO: Invalidate Sendable annotation in follow-up PR
-    @Sendable func inc() {
+    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in Swift 6}}
         x += 1
     }
 }
@@ -139,7 +168,41 @@ let work: @Sendable () -> Int = doWork
 Task<Int, Never>.detached(priority: nil, operation: doWork)
 Task<Int, Never>.detached(priority: nil, operation: work)
 
-func generic<T>(_: T) {
-    Task<Int, Never>.detached(priority: nil, operation: T)
+// generic argument for `T` should be inferred as `@escaping @Sendable`
+func generic2<T>(_ f: T) { }
+
+// CHECK-LABEL: sil hidden [ossa] @$s16sendable_methods12testGeneric2yyF : $@convention(thin) () -> ()
+// CHECK: [[F:%.*]] = alloc_stack $@Sendable @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <GenericS<Int>, @Sendable () -> ()>
+// CHECK: [[GENERIC_2_FN:%.*]] = function_ref @$s16sendable_methods8generic2yyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[GENERIC_2_FN]]<@Sendable (GenericS<Int>) -> @Sendable () -> ()>([[F]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+func testGeneric2() {
+  generic2(GenericS<Int>.f)
 }
-generic(GenericS<Int>.f) // generic argument for `T` should be inferred as `@escaping @Sendable`
+
+actor TestActor {}
+
+@globalActor
+struct SomeGlobalActor {
+  static var shared: TestActor { TestActor() }
+}
+
+@SomeGlobalActor
+let globalValue: NonSendable = NonSendable()
+
+
+@SomeGlobalActor
+// CHECK-LABEL: sil hidden [ossa] @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> ()
+//
+// CHECK: [[F2:%.*]] = alloc_stack $@Sendable @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <GenericS<String>, @Sendable () -> ()>
+// CHECK: [[GENERIC_3_FN:%.*]] = function_ref @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[GENERIC_3_FN]]<@Sendable (GenericS<String>) -> @Sendable () -> ()>([[F2]]) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+//
+// CHECK: [[F3:%.*]] = alloc_stack $@Sendable @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <GenericS<NonSendable>, @Sendable () -> ()>
+// CHECK: [[GENERIC_3_FN:%.*]] = function_ref @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NEXT: {{.*}} = apply [[GENERIC_3_FN]]<@Sendable (GenericS<NonSendable>) -> @Sendable () -> ()>([[F3]]) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+func generic3<T>(_ x: T) async {
+
+  await generic3(GenericS<String>.f)
+
+  await generic3(GenericS<NonSendable>.f)
+}

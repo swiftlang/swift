@@ -5481,8 +5481,6 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   bool strictChecking = contextRequiresStrictConcurrencyChecking(
       dc, getType, isolatedByPreconcurrency);
 
-  auto &ctx = dc->getASTContext();
-
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
 
