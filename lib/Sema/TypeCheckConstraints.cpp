@@ -144,6 +144,10 @@ bool TypeVariableType::Implementation::isKeyPathType() const {
   return locator && locator->isKeyPathType();
 }
 
+bool TypeVariableType::Implementation::isKeyPathRoot() const {
+  return locator && locator->isKeyPathRoot();
+}
+
 bool TypeVariableType::Implementation::isKeyPathValue() const {
   return locator && locator->isKeyPathValue();
 }

@@ -491,6 +491,10 @@ public:
   /// a type of a key path expression.
   bool isKeyPathType() const;
 
+  /// Determine whether this type variable represents a root type of a key path
+  /// expression.
+  bool isKeyPathRoot() const;
+
   /// Determine whether this type variable represents a value type of a key path
   /// expression.
   bool isKeyPathValue() const;
