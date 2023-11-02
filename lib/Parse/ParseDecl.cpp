@@ -5695,9 +5695,7 @@ bool Parser::isStartOfFreestandingMacroExpansion() {
   return false;
 }
 
-void Parser::consumeDecl(ParserPosition BeginParserPosition,
-                         ParseDeclOptions Flags,
-                         bool IsTopLevel) {
+void Parser::consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel) {
   SourceLoc CurrentLoc = Tok.getLoc();
 
   SourceLoc EndLoc = PreviousLoc;
@@ -5706,8 +5704,7 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
 
   State->setIDEInspectionDelayedDeclState(
       SourceMgr, L->getBufferID(), IDEInspectionDelayedDeclKind::Decl,
-      Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
-      BeginParserPosition.PreviousLoc);
+      CurDeclContext, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
 
   while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
     consumeToken();
@@ -5823,8 +5820,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
         }
       });
     if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
-      consumeDecl(BeginParserPosition, Flags,
-                  CurDeclContext->isModuleScopeContext());
+      consumeDecl(BeginParserPosition, CurDeclContext->isModuleScopeContext());
       return makeParserError();
     }
 
@@ -6165,7 +6161,7 @@ ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
         !isa<TopLevelCodeDecl>(CurDeclContext) &&
         !isa<AbstractClosureExpr>(CurDeclContext)) {
       // Only consume non-toplevel decls.
-      consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
+      consumeDecl(BeginParserPosition, /*IsTopLevel=*/false);
 
       return makeParserError();
     }
@@ -8903,7 +8899,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
       State->takeIDEInspectionDelayedDeclState();
     State->setIDEInspectionDelayedDeclState(
         SourceMgr, L->getBufferID(), IDEInspectionDelayedDeclKind::FunctionBody,
-        PD_Default, AFD, BodyRange, BodyPreviousLoc);
+        AFD, BodyRange, BodyPreviousLoc);
   };
 
   bool HasNestedTypeDeclarations;
