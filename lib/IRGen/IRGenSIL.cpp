@@ -1417,6 +1417,9 @@ public:
   void visitMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *mai) {
     llvm_unreachable("Valid only when ownership is enabled");
   }
+  void visitTupleAddrConstructorInst(TupleAddrConstructorInst *i) {
+    llvm_unreachable("Valid only in raw SIL");
+  }
   void visitDestroyAddrInst(DestroyAddrInst *i);
 
   void visitBindMemoryInst(BindMemoryInst *i);

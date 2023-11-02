@@ -1460,6 +1460,18 @@ TupleInst *TupleInst::create(SILDebugLocation Loc, SILType Ty,
   return ::new (Buffer) TupleInst(Loc, Ty, Elements, forwardingOwnershipKind);
 }
 
+TupleAddrConstructorInst *TupleAddrConstructorInst::create(
+    SILDebugLocation Loc, SILValue DestAddr, ArrayRef<SILValue> Elements,
+    IsInitialization_t IsInitOfDest, SILModule &M) {
+  assert(DestAddr->getType().isAddress());
+  auto Size = totalSizeToAlloc<swift::Operand>(Elements.size() + 1);
+  auto Buffer = M.allocateInst(Size, alignof(TupleAddrConstructorInst));
+  llvm::SmallVector<SILValue, 16> Data;
+  Data.push_back(DestAddr);
+  copy(Elements, std::back_inserter(Data));
+  return ::new (Buffer) TupleAddrConstructorInst(Loc, Data, IsInitOfDest);
+}
+
 bool TupleExtractInst::isTrivialEltOfOneRCIDTuple() const {
   auto *F = getFunction();
 

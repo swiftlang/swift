@@ -2181,6 +2181,17 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst *Inst) {
                                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitTupleAddrConstructorInst(
+    TupleAddrConstructorInst *Inst) {
+  auto Elements = getOpValueArray<8>(Inst->getElements());
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst, getBuilder().createTupleAddrConstructor(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getDestValue()), Elements,
+                                    Inst->isInitializationOfDest()));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {

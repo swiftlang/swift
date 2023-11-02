@@ -1644,6 +1644,15 @@ public:
 
   TupleInst *createTuple(SILLocation loc, ArrayRef<SILValue> elts);
 
+  TupleAddrConstructorInst *
+  createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
+                             ArrayRef<SILValue> Elements,
+                             IsInitialization_t IsInitOfDest) {
+    return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
+                                                   DestAddr, Elements,
+                                                   IsInitOfDest, getModule()));
+  }
+
   EnumInst *createEnum(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType Ty) {
     return createEnum(Loc, Operand, Element, Ty,

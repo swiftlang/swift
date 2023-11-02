@@ -5328,6 +5328,64 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createTuple(InstLoc, Ty, OpList);
       break;
     }
+    case SILInstructionKind::TupleAddrConstructorInst: {
+      // First parse [init] or [assign].
+      StringRef InitOrAssign;
+      SILValue DestValue;
+      SourceLoc WithLoc, DestToken;
+      Identifier WithToken;
+
+      if (!parseSILOptional(InitOrAssign, *this) ||
+          parseTypedValueRef(DestValue, DestToken, B) ||
+          parseSILIdentifier(WithToken, WithLoc,
+                             diag::expected_tok_in_sil_instr, "with"))
+        return true;
+
+      auto IsInit =
+          llvm::StringSwitch<std::optional<IsInitialization_t>>(InitOrAssign)
+              .Case("init", IsInitialization_t::IsInitialization)
+              .Case("assign", IsInitialization_t::IsNotInitialization)
+              .Default({});
+      if (!IsInit) {
+        P.diagnose(WithLoc, diag::expected_tok_in_sil_instr,
+                   "[init] | [assign]");
+        return true;
+      }
+
+      if (WithToken.str() != "with") {
+        P.diagnose(WithLoc, diag::expected_tok_in_sil_instr, "with");
+        return true;
+      }
+
+      // If there is no type, parse the simple form.
+      if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")) {
+        P.diagnose(WithLoc, diag::expected_tok_in_sil_instr, "(");
+        return true;
+      }
+
+      // Then parse our tuple element list.
+      SmallVector<TupleTypeElt, 4> TypeElts;
+      if (P.Tok.isNot(tok::r_paren)) {
+        do {
+          if (parseTypedValueRef(Val, B))
+            return true;
+          OpList.push_back(Val);
+          TypeElts.push_back(Val->getType().getRawASTType());
+        } while (P.consumeIf(tok::comma));
+      }
+
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")")) {
+        P.diagnose(WithLoc, diag::expected_tok_in_sil_instr, ")");
+        return true;
+      }
+
+      if (parseSILDebugLocation(InstLoc, B))
+        return true;
+
+      ResultVal =
+          B.createTupleAddrConstructor(InstLoc, DestValue, OpList, *IsInit);
+      break;
+    }
     case SILInstructionKind::EnumInst: {
       SILType Ty;
       SILDeclRef Elt;
