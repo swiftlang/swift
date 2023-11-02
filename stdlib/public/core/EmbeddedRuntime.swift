@@ -196,23 +196,31 @@ fileprivate func refcountPointer(for object: UnsafeMutablePointer<HeapObject>) -
   return UnsafeMutablePointer<Int>(UnsafeRawPointer(object).advanced(by: MemoryLayout<Int>.size)._rawValue)
 }
 
-fileprivate func loadRelaxed(_ refcount: UnsafeMutablePointer<Int>) -> Int {
-  Int(Builtin.atomicload_monotonic_Word(refcount._rawValue))
+fileprivate func loadRelaxed(_ atomic: UnsafeMutablePointer<Int>) -> Int {
+  Int(Builtin.atomicload_monotonic_Word(atomic._rawValue))
 }
 
-fileprivate func loadAcquire(_ refcount: UnsafeMutablePointer<Int>) -> Int {
-  Int(Builtin.atomicload_acquire_Word(refcount._rawValue))
+fileprivate func loadAcquire(_ atomic: UnsafeMutablePointer<Int>) -> Int {
+  Int(Builtin.atomicload_acquire_Word(atomic._rawValue))
 }
 
-fileprivate func subFetchAcquireRelease(_ refcount: UnsafeMutablePointer<Int>, n: Int) -> Int {
-  let oldValue = Int(Builtin.atomicrmw_sub_acqrel_Word(refcount._rawValue, n._builtinWordValue))
+fileprivate func subFetchAcquireRelease(_ atomic: UnsafeMutablePointer<Int>, n: Int) -> Int {
+  let oldValue = Int(Builtin.atomicrmw_sub_acqrel_Word(atomic._rawValue, n._builtinWordValue))
   return oldValue - n
 }
 
-fileprivate func addRelaxed(_ refcount: UnsafeMutablePointer<Int>, n: Int) {
-  _ = Builtin.atomicrmw_add_monotonic_Word(refcount._rawValue, n._builtinWordValue)
+fileprivate func addRelaxed(_ atomic: UnsafeMutablePointer<Int>, n: Int) {
+  _ = Builtin.atomicrmw_add_monotonic_Word(atomic._rawValue, n._builtinWordValue)
 }
 
+fileprivate func compareExchangeRelaxed(_ atomic: UnsafeMutablePointer<Int>, expectedOldValue: Int, desiredNewValue: Int) -> Bool {
+  let (_, won) = Builtin.cmpxchg_monotonic_monotonic_Word(atomic._rawValue, expectedOldValue._builtinWordValue, desiredNewValue._builtinWordValue)
+  return Bool(won)
+}
+
+fileprivate func storeRelease(_ atomic: UnsafeMutablePointer<Int>, newValue: Int) {
+  Builtin.atomicstore_release_Word(atomic._rawValue, newValue._builtinWordValue)
+}
 
 
 /// Exclusivity checking
@@ -233,11 +241,24 @@ public func swift_endAccess(buffer: UnsafeMutableRawPointer) {
 
 @_silgen_name("swift_once")
 public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c) (UnsafeMutableRawPointer)->()), context: UnsafeMutableRawPointer) {
-  // TODO/FIXME: The following only works in single-threaded environments.
-  if predicate.pointee == 0 {
-    predicate.pointee = 1
+  let checkedLoadAcquire = { predicate in
+    let value = loadAcquire(predicate)
+    assert(value == -1 || value == 0 || value == 1)
+    return value
+  }
+
+  if checkedLoadAcquire(predicate) < 0 { return }
+
+  let won = compareExchangeRelaxed(predicate, expectedOldValue: 0, desiredNewValue: 1)
+  if won {
     fn(context)
-    predicate.pointee = -1
+    storeRelease(predicate, newValue: -1)
+    return
+  }
+
+  // TODO: This should really use an OS provided lock
+  while checkedLoadAcquire(predicate) >= 0 {
+    // spin
   }
 }
 
