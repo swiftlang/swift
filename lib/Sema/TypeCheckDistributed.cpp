@@ -761,19 +761,34 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
           auto candidates = nominal->lookupDirect(func->getName());
           if (candidates.size() > 1) {
             auto firstDecl = dyn_cast<AbstractFunctionDecl>(candidates.back());
-            for (auto decl : candidates) {
-              if (decl == firstDecl) {
-                decl->diagnose(
-                    diag::distributed_func_cannot_overload_on_async_only,
-                    decl->getName());
-              } else {
-                decl->diagnose(
-                    diag::distributed_func_other_ambiguous_overload_here,
-                    decl->getName());
+            for (auto candidate: candidates) {
+              if (auto candidateFunc = dyn_cast<AbstractFunctionDecl>(candidate)) {
+                assert(candidateFunc->getParameters()->size() ==
+                       firstDecl->getParameters()->size());
+                bool allSame = true;
+                for (size_t i = 0; i < candidateFunc->getParameters()->size(); ++i) {
+                  auto lhs = firstDecl->getParameters()->get(i);
+                  auto rhs = candidateFunc->getParameters()->get(i);
+                  if (!lhs->getInterfaceType()->isEqual(rhs->getInterfaceType())) {
+                    allSame = false;
+                    break;
+                  }
+                }
+
+                if (candidate != firstDecl && // can't be ambiguous with itself
+                    allSame && // diagnose if ambiguous
+                    !diagnosedAmbiguity.contains(func->getName())) {
+                  candidate->diagnose(
+                      diag::distributed_func_cannot_overload_on_async_only,
+                      candidate->getName());
+                  diagnosedAmbiguity.insert(func->getName());
+                } else if (diagnosedAmbiguity.contains(func->getName())) {
+                  candidate->diagnose(
+                      diag::distributed_func_other_ambiguous_overload_here,
+                      candidate->getName());
+                }
               }
             }
-
-            diagnosedAmbiguity.insert(func->getName());
           }
         }
       }
