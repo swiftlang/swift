@@ -46,10 +46,6 @@
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
-        "icu": {
-            "remote": { "id": "unicode-org/icu" },
-            "platforms": [ "Linux" ]
-        },
         "yams": {
             "remote": { "id": "jpsim/Yams" }
         },
@@ -88,7 +84,19 @@
         "llvm-project": {
             "remote": { "id": "apple/llvm-project" } },
         "wasi-libc": {
-            "remote": { "id": "WebAssembly/wasi-libc" } }
+            "remote": { "id": "WebAssembly/wasi-libc" } },
+        "curl": {
+          "remote": { "id": "curl/curl" }
+        },
+        "icu": {
+          "remote": { "id": "unicode-org/icu" }
+        },
+        "libxml2": {
+          "remote": { "id": "gnome/libxml2" }
+        },
+        "zlib": {
+          "remote": { "id": "madler/zlib" }
+        }
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
@@ -119,7 +127,6 @@
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "main",
@@ -134,7 +141,11 @@
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
                 "swift-experimental-string-processing": "swift/main",
-                "wasi-libc": "wasi-sdk-20"
+                "wasi-libc": "wasi-sdk-20",
+                "curl": "curl-8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.11.5",
+                "zlib": "v1.3"
             }
         },
         "release/5.10": {
@@ -584,7 +595,6 @@
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "main",
@@ -592,7 +602,11 @@
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
                 "swift-experimental-string-processing": "swift/main",
-                "wasi-libc": "wasi-sdk-20"
+                "wasi-libc": "wasi-sdk-20",
+                "curl": "curl-8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.11.5",
+                "zlib": "v1.3"
             }
         },
         "release/5.4": {

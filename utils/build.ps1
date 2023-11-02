@@ -69,6 +69,10 @@ An array of names of projects to run tests for.
 .PARAMETER Stage
 The path to a directory where built msi's and the installer executable should be staged (for CI).
 
+.PARAMETER BuildTo
+The name of a build step after which the script should terminate.
+For example: -BuildTo ToolsSupportCore
+
 .PARAMETER ToBatch
 When set, runs the script in a special mode which outputs a listing of command invocations
 in batch file format instead of executing them.
@@ -98,6 +102,7 @@ param(
   [bool] $DefaultsLLD = $true,
   [string[]] $Test = @(),
   [string] $Stage = "",
+  [string] $BuildTo = "",
   [switch] $ToBatch
 )
 
@@ -234,6 +239,13 @@ $SDKArchs = @($SDKs | ForEach-Object {
 })
 
 # Build functions
+function Invoke-BuildStep([string]$Name) {
+  & $Name @Args
+  if ($Name.Replace("Build-", "") -eq $BuildTo) {
+    exit 0
+  }
+}
+
 function Get-ProjectBinaryCache($Arch, $ID) {
   return "$BinaryCache\" + ($Arch.BuildID + $ID)
 }
@@ -878,14 +890,14 @@ function Build-ZLib($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\zlib `
-    -Bin "$($Arch.BinaryCache)\zlib-1.2.11" `
-    -InstallTo $LibraryRoot\zlib-1.2.11\usr `
+    -Bin "$($Arch.BinaryCache)\zlib-1.3" `
+    -InstallTo $LibraryRoot\zlib-1.3\usr `
     -Arch $Arch `
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
-      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.2.11\usr\bin\$ArchName";
-      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.2.11\usr\lib\$ArchName";
+      INSTALL_BIN_DIR = "$LibraryRoot\zlib-1.3\usr\bin\$ArchName";
+      INSTALL_LIB_DIR = "$LibraryRoot\zlib-1.3\usr\lib\$ArchName";
     }
 }
 
@@ -894,8 +906,8 @@ function Build-XML2($Arch) {
 
   Build-CMakeProject `
     -Src $SourceCache\libxml2 `
-    -Bin "$($Arch.BinaryCache)\libxml2-2.9.12" `
-    -InstallTo "$LibraryRoot\libxml2-2.9.12\usr" `
+    -Bin "$($Arch.BinaryCache)\libxml2-2.11.5" `
+    -InstallTo "$LibraryRoot\libxml2-2.11.5\usr" `
     -Arch $Arch `
     -BuildTargets default `
     -Defines @{
@@ -946,8 +958,8 @@ function Build-CURL($Arch) {
       CURL_ZLIB = "YES";
       ENABLE_UNIX_SOCKETS = "NO";
       ENABLE_THREADED_RESOLVER = "NO";
-      ZLIB_ROOT = "$LibraryRoot\zlib-1.2.11\usr";
-      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.2.11\usr\lib\$ArchName\zlibstatic.lib";
+      ZLIB_ROOT = "$LibraryRoot\zlib-1.3\usr";
+      ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$ArchName\zlibstatic.lib";
     }
 }
 
@@ -1076,11 +1088,11 @@ function Build-Foundation($Arch, [switch]$Test = $false) {
         ICU_I18N_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicuin69.lib";
         ICU_ROOT = "$LibraryRoot\icu-69.1\usr";
         ICU_UC_LIBRARY_RELEASE = "$LibraryRoot\icu-69.1\usr\lib\$ShortArch\sicuuc69.lib";
-        LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.9.12\usr\lib\$ShortArch\libxml2s.lib";
-        LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.9.12\usr\include\libxml2";
+        LIBXML2_LIBRARY = "$LibraryRoot\libxml2-2.11.5\usr\lib\$ShortArch\libxml2s.lib";
+        LIBXML2_INCLUDE_DIR = "$LibraryRoot\libxml2-2.11.5\usr\include\libxml2";
         LIBXML2_DEFINITIONS = "/DLIBXML_STATIC";
-        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.2.11\usr\lib\$ShortArch\zlibstatic.lib";
-        ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.2.11\usr\include";
+        ZLIB_LIBRARY = "$LibraryRoot\zlib-1.3\usr\lib\$ShortArch\zlibstatic.lib";
+        ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3\usr\include";
         dispatch_DIR = "$DispatchBinaryCache\cmake\modules";
       } + $TestingDefines)
   }
@@ -1189,13 +1201,13 @@ function Install-Platform($Arch) {
 }
 
 function Build-SQLite($Arch) {
-  $SrcPath = "$SourceCache\sqlite-3.36.0"
+  $SrcPath = "$SourceCache\sqlite-3.43.2"
 
   # Download the sources
   if (-not (Test-Path $SrcPath)) {
-    $ZipPath = "$env:TEMP\sqlite-amalgamation-3360000.zip"
+    $ZipPath = "$env:TEMP\sqlite-amalgamation-3430200.zip"
     if (-not $ToBatch) { Remove-item $ZipPath -ErrorAction Ignore | Out-Null }
-    Invoke-Program curl.exe -- -sL https://sqlite.org/2021/sqlite-amalgamation-3360000.zip -o $ZipPath
+    Invoke-Program curl.exe -- -sL https://sqlite.org/2023/sqlite-amalgamation-3430200.zip -o $ZipPath
 
     if (-not $ToBatch) { New-Item -Type Directory -Path $SrcPath -ErrorAction Ignore | Out-Null }
     Invoke-Program "$UnixToolsBinDir\unzip.exe" -- -j -o $ZipPath -d $SrcPath
@@ -1225,8 +1237,8 @@ install(FILES sqlite3.h sqlite3ext.h DESTINATION include)
 
   Build-CMakeProject `
     -Src $SrcPath `
-    -Bin "$($Arch.BinaryCache)\sqlite-3.36.0" `
-    -InstallTo $LibraryRoot\sqlite-3.36.0\usr `
+    -Bin "$($Arch.BinaryCache)\sqlite-3.43.2" `
+    -InstallTo $LibraryRoot\sqlite-3.43.2\usr `
     -Arch $Arch `
     -BuildTargets default `
     -Defines @{
@@ -1297,8 +1309,8 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
         CMAKE_INSTALL_PREFIX = "$($Arch.ToolchainInstallRoot)\usr";
         BUILD_SHARED_LIBS = "YES";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
-        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.36.0\usr\include";
-        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.36.0\usr\lib\SQLite3.lib";
+        SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
+        SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
       })
   }
 }
@@ -1348,8 +1360,8 @@ function Build-Driver($Arch) {
       LLBuild_DIR = "$BinaryCache\4\cmake\modules";
       Yams_DIR = "$BinaryCache\5\cmake\modules";
       ArgumentParser_DIR = "$BinaryCache\6\cmake\modules";
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.36.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.36.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
     }
 }
 
@@ -1435,8 +1447,8 @@ function Build-PackageManager($Arch) {
       SwiftCollections_DIR = "$BinaryCache\9\cmake\modules";
       SwiftASN1_DIR = "$BinaryCache\10\cmake\modules";
       SwiftCertificates_DIR = "$BinaryCache\11\cmake\modules";
-      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.36.0\usr\include";
-      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.36.0\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.43.2\usr\include";
+      SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.43.2\usr\lib\SQLite3.lib";
     }
 }
 
@@ -1596,23 +1608,23 @@ if (-not $SkipBuild) {
 
 if (-not $SkipBuild) {
   Ensure-SwiftToolchain $HostArch
-  Build-BuildTools $HostArch
-  Build-Compilers $HostArch
+  Invoke-BuildStep Build-BuildTools $HostArch
+  Invoke-BuildStep Build-Compilers $HostArch
 }
 
 foreach ($Arch in $SDKArchs) {
   if (-not $SkipBuild) {
-    Build-ZLib $Arch
-    Build-XML2 $Arch
-    Build-CURL $Arch
-    Build-ICU $Arch
-    Build-LLVM $Arch
+    Invoke-BuildStep Build-ZLib $Arch
+    Invoke-BuildStep Build-XML2 $Arch
+    Invoke-BuildStep Build-CURL $Arch
+    Invoke-BuildStep Build-ICU $Arch
+    Invoke-BuildStep Build-LLVM $Arch
 
     # Build platform: SDK, Redist and XCTest
-    Build-Runtime $Arch
-    Build-Dispatch $Arch
-    Build-Foundation $Arch
-    Build-XCTest $Arch
+    Invoke-BuildStep Build-Runtime $Arch
+    Invoke-BuildStep Build-Dispatch $Arch
+    Invoke-BuildStep Build-Foundation $Arch
+    Invoke-BuildStep Build-XCTest $Arch
   }
 }
 
@@ -1629,33 +1641,33 @@ if (-not $ToBatch) {
 }
 
 if (-not $SkipBuild) {
-  Build-SQLite $HostArch
-  Build-System $HostArch
-  Build-ToolsSupportCore $HostArch
-  Build-LLBuild $HostArch
-  Build-Yams $HostArch
-  Build-ArgumentParser $HostArch
-  Build-Driver $HostArch
-  Build-Crypto $HostArch
-  Build-Collections $HostArch
-  Build-ASN1 $HostArch
-  Build-Certificates $HostArch
-  Build-PackageManager $HostArch
-  Build-IndexStoreDB $HostArch
-  Build-Syntax $HostArch
-  Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-SQLite $HostArch
+  Invoke-BuildStep Build-System $HostArch
+  Invoke-BuildStep Build-ToolsSupportCore $HostArch
+  Invoke-BuildStep Build-LLBuild $HostArch
+  Invoke-BuildStep Build-Yams $HostArch
+  Invoke-BuildStep Build-ArgumentParser $HostArch
+  Invoke-BuildStep Build-Driver $HostArch
+  Invoke-BuildStep Build-Crypto $HostArch
+  Invoke-BuildStep Build-Collections $HostArch
+  Invoke-BuildStep Build-ASN1 $HostArch
+  Invoke-BuildStep Build-Certificates $HostArch
+  Invoke-BuildStep Build-PackageManager $HostArch
+  Invoke-BuildStep Build-IndexStoreDB $HostArch
+  Invoke-BuildStep Build-Syntax $HostArch
+  Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
 
 Install-HostToolchain
 
 if (-not $SkipBuild) {
-  Build-Inspect $HostArch
-  Build-Format $HostArch
-  Build-DocC $HostArch
+  Invoke-BuildStep Build-Inspect $HostArch
+  Invoke-BuildStep Build-Format $HostArch
+  Invoke-BuildStep Build-DocC $HostArch
 }
 
 if (-not $SkipPackaging) {
-  Build-Installer
+  Invoke-BuildStep Build-Installer
 }
 
 if ($Test -contains "swift") { Build-Compilers $HostArch -Test }
