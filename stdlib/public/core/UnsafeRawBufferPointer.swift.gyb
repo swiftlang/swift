@@ -115,8 +115,23 @@ public struct Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(count >= 0, "${Self} with negative count")
     _debugPrecondition(count == 0 || start != nil,
       "${Self} has a nil start and nonzero count")
+
+    self.init(_uncheckedStart: start, count: _assumeNonNegative(count))
+  }
+
+  @_alwaysEmitIntoClient
+  internal init(
+    _uncheckedStart start: Unsafe${Mutable}RawPointer?,
+    count: Int
+  ) {
+    _internalInvariant(count >= 0, "${Self} with negative count")
+    _internalInvariant(
+      count == 0 || start != nil,
+      "${Self} has a nil start and nonzero count"
+    )
+
     _position = start
-    _end = start.map { $0 + _assumeNonNegative(count) }
+    _end = start.map { $0 + count }
   }
 }
 
@@ -400,6 +415,22 @@ extension Unsafe${Mutable}RawBufferPointer {
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
+  // The public version of this doesn't use this method because this unsafely
+  // unwraps the base address. The public store bytes uses
+  // _unsafelyUnwrappedUnchecked, should the public ones too..?
+  internal func _uncheckedLoad<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(offset >= 0, "${Self}.load with negative offset")
+    _internalInvariant(
+      offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.load out of bounds"
+    )
+
+    return baseAddress._unsafelyUnwrappedUnchecked.load(fromByteOffset: offset, as: T.self)
+  }
+
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -439,6 +470,22 @@ extension Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.load out of bounds")
     return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
+  // The public version of this doesn't use this method because this unsafely
+  // unwraps the base address. The public store bytes uses
+  // _unsafelyUnwrappedUnchecked, should the public ones too..?
+  internal func _uncheckedLoadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _internalInvariant(offset >= 0, "${Self}.load with negative offset")
+    _internalInvariant(
+      offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.load out of bounds"
+    )
+
+    return baseAddress._unsafelyUnwrappedUnchecked.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
 %  if mutable:
@@ -487,6 +534,21 @@ extension Unsafe${Mutable}RawBufferPointer {
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.storeBytes out of bounds")
 
+    _uncheckedStoreBytes(of: value, toByteOffset: offset, as: type)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedStoreBytes<T>(
+    of value: T,
+    toByteOffset offset: Int = 0,
+    as type: T.Type
+  ) {
+    _internalInvariant(offset >= 0, "${Self}.storeBytes with negative offset")
+    _internalInvariant(
+      offset + MemoryLayout<T>.size <= self.count,
+      "${Self}.storeBytes out of bounds"
+    )
+
     let pointer = baseAddress._unsafelyUnwrappedUnchecked
     pointer.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
@@ -528,6 +590,17 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyMemory source has too many elements")
+
+    _uncheckedCopyMemory(from: source)
+  }
+
+  @_alwaysEmitIntoClient
+  internal func _uncheckedCopyMemory(from source: UnsafeRawBufferPointer) {
+    _internalInvariant(
+      source.count <= self.count,
+      "${Self}.copyMemory source has too many element"
+    )
+
     if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
       baseAddress.copyMemory(from: sourceAddress, byteCount: source.count)
     }
