@@ -16,6 +16,7 @@
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -50,34 +51,93 @@ static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
   return false;
 }
 
-static AccessStorage getAccessStorageFromAddr(SILValue value) {
-  assert(value->getType().isAddress());
-  auto accessStorage = AccessStorage::compute(value);
-  if (accessStorage && accessStorage.getRoot()) {
-    if (auto definingInst = accessStorage.getRoot().getDefiningInstruction()) {
-      if (isa<InitExistentialAddrInst, CopyValueInst>(definingInst))
-        // look through these because AccessStorage does not
-        return getAccessStorageFromAddr(definingInst->getOperand(0));
-    }
+namespace {
+
+struct UseDefChainVisitor
+    : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
+
+  SILValue visitAll(SILValue sourceAddr) {
+    SILValue result = visit(sourceAddr);
+    if (!result)
+      return sourceAddr;
+
+    while (SILValue nextAddr = visit(result))
+      result = nextAddr;
+
+    return result;
   }
 
-  return accessStorage;
-}
+  SILValue visitBase(SILValue base, AccessStorage::Kind kind) {
+    // If we are passed a project_box, we want to return the box itself. The
+    // reason for this is that the project_box is considered to be non-aliasing
+    // memory. We want to treat it as part of the box which is
+    // aliasing... meaning that we need to merge.
+    if (kind == AccessStorage::Box)
+      return cast<ProjectBoxInst>(base)->getOperand();
+    return SILValue();
+  }
+
+  SILValue visitNonAccess(SILValue) { return SILValue(); }
+
+  SILValue visitPhi(SILPhiArgument *phi) {
+    llvm_unreachable("Should never hit this");
+  }
+
+  // Override AccessUseDefChainVisitor to ignore access markers and find the
+  // outer access base.
+  SILValue visitNestedAccess(BeginAccessInst *access) {
+    return visitAll(access->getSource());
+  }
+
+  SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr,
+                            AccessStorageCast castType) {
+    return sourceAddr->get();
+  }
+
+  SILValue visitAccessProjection(SingleValueInstruction *inst,
+                                 Operand *sourceAddr) {
+    // See if this access projection is into a single element value. If so, we
+    // do not want to treat this as a merge.
+    if (auto p = Projection(inst)) {
+      switch (p.getKind()) {
+      case ProjectionKind::Upcast:
+      case ProjectionKind::RefCast:
+      case ProjectionKind::BitwiseCast:
+      case ProjectionKind::TailElems:
+      case ProjectionKind::Box:
+      case ProjectionKind::Class:
+        llvm_unreachable("Shouldn't see this here");
+      case ProjectionKind::Index:
+        break;
+      case ProjectionKind::Enum:
+        break;
+      case ProjectionKind::Tuple: {
+        break;
+      }
+      case ProjectionKind::Struct:
+        break;
+      }
+    }
+
+    return sourceAddr->get();
+  }
+};
+
+} // namespace
 
 static SILValue getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
     return getUnderlyingObject(value);
   }
 
-  if (auto accessStorage = getAccessStorageFromAddr(value)) {
-    if (accessStorage.getKind() == AccessRepresentation::Kind::Global)
-      // globals don't reduce
-      return value;
-    assert(accessStorage.getRoot());
-    return accessStorage.getRoot();
-  }
-
-  return value;
+  UseDefChainVisitor visitor;
+  SILValue base = visitor.visitAll(value);
+  assert(base);
+  if (isa<GlobalAddrInst>(base))
+    return value;
+  if (base->getType().isObject())
+    return getUnderlyingObject(base);
+  return base;
 }
 
 namespace {
