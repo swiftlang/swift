@@ -417,16 +417,18 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
-                                  bool isDynamicOverloadComparison = false) {
+                                  bool isDynamicOverloadComparison = false,
+                                  bool allowMissingConformances = true) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
-                               dc, decl1, decl2, isDynamicOverloadComparison},
+                               dc, decl1, decl2, isDynamicOverloadComparison,
+                               allowMissingConformances},
                            false);
 }
 
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
-    bool isDynamicOverloadComparison) const {
+    bool isDynamicOverloadComparison, bool allowMissingConformances) const {
   auto &C = decl1->getASTContext();
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, ConstraintSystemOptions());
@@ -759,9 +761,16 @@ bool CompareDeclSpecializationRequest::evaluate(
     // Solve the system.
     auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-    // Ban value-to-optional conversions.
-    if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-      return completeResult(true);
+    if (solution) {
+      auto score = solution->getFixedScore();
+
+      // Ban value-to-optional conversions and
+      // missing conformances if they are disallowed.
+      if (score.Data[SK_ValueToOptional] == 0 &&
+          (allowMissingConformances ||
+           score.Data[SK_MissingSynthesizableConformance] == 0))
+        return completeResult(true);
+    }
   }
 
   // If the first function has fewer effective parameters than the
@@ -1121,12 +1130,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
     if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
     if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }

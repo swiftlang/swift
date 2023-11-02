@@ -984,6 +984,10 @@ enum ScoreKind: unsigned int {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// A type with a missing conformance(s) that has be synthesized
+  /// or diagnosed later, such types are allowed to appear in
+  /// a valid solution.
+  SK_MissingSynthesizableConformance,
   /// An unapplied reference to a function. The purpose of this
   /// score bit is to prune overload choices that are functions
   /// when a solution has already been found using property.
@@ -1159,6 +1163,9 @@ struct Score {
 
     case SK_UnappliedFunction:
       return "use of overloaded unapplied function";
+
+    case SK_MissingSynthesizableConformance:
+      return "type with missing synthesizable conformance";
     }
   }
 
