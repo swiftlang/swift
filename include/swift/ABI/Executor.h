@@ -30,7 +30,7 @@ class Job;
 class SerialExecutorWitnessTable;
 class TaskExecutorWitnessTable;
 
-/// An unmanaged reference to an serial executor.
+/// An unmanaged reference to a serial executor.
 ///
 /// This type corresponds to the type Optional<Builtin.Executor> in
 /// Swift.  The representation of nil in Optional<Builtin.Executor>
@@ -246,10 +246,10 @@ public:
     return getExecutorKind() == TaskExecutorKind::Ordinary;
   }
 
-  const SerialExecutorWitnessTable *getTaskExecutorWitnessTable() const {
+  const TaskExecutorWitnessTable *getTaskExecutorWitnessTable() const {
     assert(!isUndefined());
     auto table = Implementation & WitnessTableMask;
-    return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
+    return reinterpret_cast<const TaskExecutorWitnessTable*>(table);
   }
 
 //  /// Do we have to do any work to start running as the requested
