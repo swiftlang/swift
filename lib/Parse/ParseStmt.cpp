@@ -407,11 +407,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
-      ParserResult<Decl> DeclResult = 
-          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
-                    IsAtStartOfLineOrPreviousHadSemi,
-                    /*IfConfigsAreDeclAttrs=*/true,
-                    [&](Decl *D) {
+      ParserResult<Decl> DeclResult =
+          parseDecl(IsAtStartOfLineOrPreviousHadSemi,
+                    /*IfConfigsAreDeclAttrs=*/true, [&](Decl *D) {
                       TmpDecls.push_back(D);
 
                       // Any function after a 'guard' statement is marked as
