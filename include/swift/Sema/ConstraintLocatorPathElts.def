@@ -281,6 +281,9 @@ SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
 
+/// A fallback type for some AST location (i.e. key path literal).
+SIMPLE_LOCATOR_PATH_ELT(FallbackType)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

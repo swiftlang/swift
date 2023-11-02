@@ -2497,7 +2497,7 @@ bool ContextualFailure::diagnoseAsError() {
   if (path.empty()) {
     if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
       emitDiagnosticAt(KPE->getLoc(),
-                       diag::expr_smart_keypath_value_covert_to_contextual_type,
+                       diag::expr_keypath_type_covert_to_contextual_type,
                        getFromType(), getToType());
       return true;
     }
@@ -2741,6 +2741,11 @@ bool ContextualFailure::diagnoseAsError() {
 
   case ConstraintLocator::PatternMatch: {
     diagnostic = diag::cannot_match_value_with_pattern;
+    break;
+  }
+
+  case ConstraintLocator::KeyPathValue: {
+    diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
     break;
   }
 
@@ -7646,7 +7651,7 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
         paramFnType->getParams().front().getPlainType()->isEqual(kpRootType)))
     return false;
 
-  emitDiagnostic(diag::expr_smart_keypath_value_covert_to_contextual_type,
+  emitDiagnostic(diag::expr_keypath_value_covert_to_contextual_type,
                  kpValueType, paramFnType->getResult());
   return true;
 }

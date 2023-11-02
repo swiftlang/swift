@@ -363,7 +363,7 @@ func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> V
 }
 
 func testTupleLabelMismatchKeyPath() {
-  // Very Cursed.
   let _: KeyPath<(x: Int, y: Int), Int> = \(a: Int, b: Int).x
-  // expected-warning@-1 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+// expected-error@-1 {{key path with root type '(x: Int, y: Int)' cannot be applied to a base of type '(a: Int, b: Int)'}}
+// expected-error@-2 {{value of tuple type '(a: Int, b: Int)' has no member 'x'}}
 }
