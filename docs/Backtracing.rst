@@ -27,7 +27,6 @@ Swift now supports:
 
   * Automatic crash catching and backtrace generation out of the box.
   * Built-in symbolication.
-  * A choice of unwind algorithms, including "fast", DWARF and SEH.
   * Interactive(!) crash/runtime error catching.
 
 Crash catching is enabled by default, and won't interfere with any system-wide
@@ -61,10 +60,7 @@ follows:
 +-----------------+---------+--------------------------------------------------+
 | unwind          | auto    | Specifies which unwind algorithm to use.         |
 |                 |         | ``auto`` means to choose appropriately for the   |
-|                 |         | platform.  Other options are ``fast``, which     |
-|                 |         | does a naïve stack walk; and ``precise``, which  |
-|                 |         | uses exception handling data to perform an       |
-|                 |         | unwind.                                          |
+|                 |         | platform.                                        |
 +-----------------+---------+--------------------------------------------------+
 | preset          | auto    | Specifies which set of preset formatting options |
 |                 |         | to use.  Options are ``friendly``, ``medium`` or |
@@ -106,7 +102,7 @@ follows:
 |                 |         | to the runtime library, or using ``SWIFT_ROOT``. |
 +-----------------+---------+--------------------------------------------------+
 
-(*) On macOS, this defaults to ``tty`` rather than ``yes``.
+(*) On macOS, this defaults to ``no`` rather than ``yes``.
 
 Backtrace limits
 ----------------
@@ -179,10 +175,10 @@ triggered automatically by the runtime.
 System specifics
 ----------------
 
-macOS
-^^^^^
+Signal Handling
+^^^^^^^^^^^^^^^
 
-On macOS, we catch crashes and other events using a signal handler.  At time of
+On macOS and Linux, program crashes are caught using a signal handler. At time of
 writing, this is installed for the following signals:
 
 +--------------+--------------------------+-------------------------------------+
@@ -217,9 +213,43 @@ finds that there is already a handler for that signal.  Similarly if something
 else has already configured an alternate signal stack, it will leave that
 stack alone.
 
-Once the backtracer has finished handling the crash, it will allow the crashing
-program to continue and crash normally, which will result in the usual Crash
-Reporter log file being generated.
+macOS
+^^^^^
+
+The backtracer is not active by default on macOS.  You can enable it by setting
+``SWIFT_BACKTRACE`` to ``enable=yes``, which is sufficient if you build your
+programs using Xcode.  If you are using some other build tool to build your
+program, you will need to sign the program with the entitlement
+``com.apple.security.get-task-allow`` in order for the backtracer to work.  This
+is the same entitlement you would need to make various other tools work on your
+program, so you may already be doing this.  If not, you will need to make a
+property list file containing the entitlements you wish to sign your program
+with, e.g. ::
+
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+  <key>com.apple.security.get-task-allow</key>
+  <true/>
+  </dict>
+  </plist>
+
+and then to sign your program you should do::
+
+  $ codesign --force --sign - --entitlements entitlements.plist \
+      /path/to/your/program
+
+Note that programs with the ``com.apple.security.get-task-allow`` entitlement
+will not be accepted for distribution in the App Store, and will be rejected by
+notarization.  The entitlement is strictly for debugging purposes only and
+software should not be shipped to end users with it enabled.
+
+On macOS, we catch crashes and other events using a signal handler.  Once the
+backtracer has finished handling the crash, it will allow the crashing program
+to continue and crash normally, which will result in the usual Crash Reporter
+log file being generated.
 
 Crash catching *cannot* be enabled for setuid binaries.  This is intentional as
 doing so might create a security hole.
@@ -229,3 +259,59 @@ Other Darwin (iOS, tvOS)
 
 Crash catching is not enabled for non-macOS Darwin.  You should continue to look
 at the system-provided crash logs.
+
+Linux
+^^^^^
+
+Frame Pointers
+""""""""""""""
+
+The backtracer currently does a simple frame-pointer based unwind.  As a result,
+if you compile your code with ``-fomit-frame-pointer``, which is often the
+default for release builds on Intel Linux, you may find that you get incomplete
+backtraces.
+
+If you wish to get a more complete backtrace, at a small cost in performance,
+you can add the compiler flags ``-Xcc -fno-omit-frame-pointer`` when building
+your Swift program.
+
+Static Linking Support
+""""""""""""""""""""""
+
+For users who statically link their binaries and do not wish to ship the Swift
+runtime library alongside them, there is a statically linked copy of
+``swift-backtrace``, named ``swift-backtrace-static`` , in the ``libexec``
+directory alongside the normal ``swift-backtrace`` binary.
+
+By default, to locate ``swift-backtrace``, the runtime will attempt to look in
+the following locations::
+
+    <swift-root>/libexec/swift/<platform>
+    <swift-root>/libexec/swift/<platform>/<arch>
+    <swift-root>/libexec/swift
+    <swift-root>/libexec/swift/<arch>
+    <swift-root>/bin
+    <swift-root>/bin/<arch>
+    <swift-root>
+
+where ``<swift-root>`` by default is determined from the path to the runtime
+library, ``libswiftCore``, ``<platform>`` is the name Swift gives to the platform
+(in this case most likely ``linux``) and ``<arch>`` is the name Swift uses for
+the CPU architecture (e.g. ``x86_64``, ``arm64`` and so on).
+
+When the runtime is statically linked with _your_ binary, the runtime will
+instead determine ``<swift-root>`` in the above patterns relative to *your
+binary*.  For example, if your binary is installed in e.g. ``/usr/bin``,
+``<swift-root>`` would be ``/usr``.
+
+You will therefore need to install a copy of ``swift-backtrace-static``, renamed
+to ``swift-backtrace``, in one of the locations above; the simplest option will
+often be to put it in the same directory as your own binary.
+
+You can also explicitly specify the value of ``<swift-root>`` using the
+environment variable ``SWIFT_ROOT``, or you can explicitly specify the location
+of the backtracer using
+``SWIFT_BACKTRACE=swift-backtrace=<path-to-swift-backtrace>``.
+
+If the runtime is unable to locate the backtracer, it will allow your program to
+crash as it would have done anyway.
