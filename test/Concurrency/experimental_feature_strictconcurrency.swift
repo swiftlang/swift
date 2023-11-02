@@ -45,6 +45,8 @@ final class TestNonsendable {
   init() {}
 }
 
+nonisolated(unsafe) let immutableNonisolatedUnsafeTopLevelGlobal = TestNonsendable()
+
 @propertyWrapper
 public struct TestWrapper {
   public init() {}
