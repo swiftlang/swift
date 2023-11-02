@@ -512,6 +512,11 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
     if (var->getAttrs().hasAttribute<NonisolatedAttr>())
       return true;
 
+    // Static 'let's are initialized upon first access, so they cannot be
+    // synchronously accessed across actors.
+    if (var->isStatic())
+      return false;
+
     // If it's distributed, generally variable access is not okay...
     if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominalParent->isDistributedActor())
