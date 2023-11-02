@@ -183,10 +183,6 @@ public:
   }
 };
 
-/// Deprecated name for "SerialExecutorRef"; When it was first introduced it was ExecutorRef,
-/// but it always meant specifically a serial executor.
-typedef SerialExecutorRef ExecutorRef;
-
 class TaskExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
   uintptr_t Implementation;
