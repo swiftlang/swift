@@ -35,6 +35,9 @@
     },
     {
       "name": "const-extract-complete-metadata"
+    },
+    {
+      "name": "ld-path-driver-option"
     }
   ]
 }
