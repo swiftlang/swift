@@ -9547,6 +9547,25 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
   return genericParamType->getDecl();
 }
 
+bool OpaqueTypeDecl::exportUnderlyingType() const {
+  auto mod = getDeclContext()->getParentModule();
+  if (mod->getResilienceStrategy() != ResilienceStrategy::Resilient)
+    return true;
+
+  ValueDecl *namingDecl = getNamingDecl();
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl))
+    return AFD->getResilienceExpansion() == ResilienceExpansion::Minimal;
+
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(namingDecl)) {
+    for (auto *accessor : ASD->getAllAccessors())
+      if (accessor->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        return true;
+    return false;
+  }
+
+  llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
+}
+
 llvm::Optional<unsigned>
 OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&

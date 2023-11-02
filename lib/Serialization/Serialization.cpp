@@ -4490,11 +4490,14 @@ public:
     }
     uint8_t rawAccessLevel =
         getRawStableAccessLevel(opaqueDecl->getFormalAccess());
+    bool exportDetails = opaqueDecl->exportUnderlyingType();
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
                                  interfaceSigID, interfaceTypeID, genericSigID,
-                                 underlyingSubsID, rawAccessLevel);
+                                 underlyingSubsID, rawAccessLevel,
+                                 exportDetails);
     writeGenericParams(opaqueDecl->getGenericParams());
 
     // Serialize all of the conditionally available substitutions expect the

@@ -4221,11 +4221,13 @@ public:
     GenericSignatureID genericSigID;
     SubstitutionMapID underlyingTypeSubsID;
     uint8_t rawAccessLevel;
+    bool exportUnderlyingType;
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
                                               interfaceTypeID, genericSigID,
                                               underlyingTypeSubsID,
-                                              rawAccessLevel);
+                                              rawAccessLevel,
+                                              exportUnderlyingType);
     
     auto declContext = MF.getDeclContext(contextID);
     auto interfaceSigOrErr = MF.getGenericSignatureChecked(interfaceSigID);
@@ -4261,16 +4263,25 @@ public:
     else
       opaqueDecl->setGenericSignature(GenericSignature());
 
-    auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl);
-    if (MF.getResilienceStrategy() == ResilienceStrategy::Resilient &&
-        !MF.FileContext->getParentModule()->isMainModule() &&
-        AFD && AFD->getResilienceExpansion() != ResilienceExpansion::Minimal) {
+    if (!MF.FileContext->getParentModule()->isMainModule() &&
+        !exportUnderlyingType) {
       // Do not try to read the underlying type information if the function
       // is not inlinable in clients. This reflects the swiftinterface behavior
       // in where clients are only aware of the underlying type when the body
       // of the function is public.
+      LLVM_DEBUG(
+        llvm::dbgs() << "Ignoring underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n";
+        );
 
     } else if (underlyingTypeSubsID) {
+      LLVM_DEBUG(
+        llvm::dbgs() << "Loading underlying information for opaque type of '";
+        llvm::dbgs() << namingDecl->getName();
+        llvm::dbgs() << "'\n";
+        );
+
       auto subMapOrError = MF.getSubstitutionMapChecked(underlyingTypeSubsID);
       if (!subMapOrError) {
         // If the underlying type references internal details, ignore it.
