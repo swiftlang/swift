@@ -2112,7 +2112,6 @@ public:
     }
 
     if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
-        builtinKind == BuiltinValueKind::BuildOrdinaryTaskExecutorRef ||
         builtinKind == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
       require(arguments.size() == 1,

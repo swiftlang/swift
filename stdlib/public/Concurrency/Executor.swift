@@ -119,7 +119,7 @@ public protocol TaskExecutor: Executor {
   // avoid drilling down to the base conformance just for the basic
   // work-scheduling operation.
   @_nonoverride
-  @available(*, deprecated, message: "Implement 'enqueue(_: __owned ExecutorJob)' instead")
+  @available(*, deprecated, message: "Implement 'enqueue(_: consuming ExecutorJob)' instead")
   func enqueue(_ job: consuming Job)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -132,13 +132,7 @@ public protocol TaskExecutor: Executor {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  /// Convert this executor value to the optimized form of borrowed
-  /// executor references.
-  ///
-  /// When forming an unowned executor reference you MUST guarantee
-  /// that the executor will be kept alive (retained) until all tasks
-  /// run by that executor have completed.
-  func asUnownedTaskExecutor() -> UnownedTaskExecutor
+  // TODO: Implement: func asUnownedTaskExecutor() -> UnownedTaskExecutor
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -246,39 +240,6 @@ public struct UnownedSerialExecutor: Sendable {
   @available(SwiftStdlib 5.9, *)
   public var _isComplexEquality: Bool {
     _executor_isComplexEquality(self)
-  }
-
-}
-
-@available(SwiftStdlib 9999, *)
-@frozen
-public struct UnownedTaskExecutor: Sendable {
-  #if compiler(>=5.5) && $BuiltinExecutor
-  @usableFromInline
-  internal var executor: Builtin.Executor
-
-  /// SPI: Do not use. Cannot be marked @_spi, since we need to use it from Distributed module
-  /// which needs to reach for this from an @_transparent function which prevents @_spi use.
-  public var _executor: Builtin.Executor {
-    self.executor
-  }
-  #endif
-
-  @inlinable
-  public init(_ executor: Builtin.Executor) {
-    #if compiler(>=5.5) && $BuiltinExecutor
-    self.executor = executor
-    #endif
-  }
-
-  @inlinable
-  public init<E: TaskExecutor>(_ executor: __shared E) {
-    // FIXME: #if compiler(>=9999) && $BuiltinBuildExecutor
-    #if $BuiltinBuildTaskExecutor
-    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
 }

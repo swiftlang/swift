@@ -988,7 +988,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::RefCounting | RuntimeEffect::Deallocating;
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Allocating;
-    case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
     case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
