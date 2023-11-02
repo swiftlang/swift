@@ -295,7 +295,9 @@ the following locations::
     <swift-root>
 
 where ``<swift-root>`` by default is determined from the path to the runtime
-library, ``libswiftCore``.
+library, ``libswiftCore``, ``<platform>`` is the name Swift gives to the platform
+(in this case most likely ``linux``) and ``<arch>`` is the name Swift uses for
+the CPU architecture (e.g. ``x86_64``, ``arm64`` and so on).
 
 When the runtime is statically linked with _your_ binary, the runtime will
 instead determine ``<swift-root>`` in the above patterns relative to *your
