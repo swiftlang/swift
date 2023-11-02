@@ -15,7 +15,7 @@
 ////////////////////////
 
 /// Classes are always non-sendable, so this is non-sendable
-class NonSendableKlass { // expected-complete-note 9{{}}
+class NonSendableKlass { // expected-complete-note 16{{}}
   var field: NonSendableKlass? = nil
 
   func asyncCall() async {}
@@ -43,6 +43,15 @@ func useValue<T>(_ x: T) {}
 @MainActor func transferToMain<T>(_ t: T) async {}
 
 var booleanFlag: Bool { false }
+
+struct SingleFieldKlassBox { // expected-complete-note 2{{consider making struct 'SingleFieldKlassBox' conform to the 'Sendable' protocol}}
+  var k = NonSendableKlass()
+}
+
+struct TwoFieldKlassBox {
+  var k1 = NonSendableKlass()
+  var k2 = NonSendableKlass()
+}
 
 ////////////////////////////
 // MARK: Actor Self Tests //
@@ -187,10 +196,9 @@ extension Actor {
     let closure: () -> () = {
       print(self.klass)
     }
-    // NOTE: We do not error on this today since we assign into 1 and that makes
-    // x assign fresh. It will be fixed in a forthcoming commit.
+
     let x = (closure, 1)
-    await transferToMain(x)
+    await transferToMain(x) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-complete-warning @-1 {{passing argument of non-sendable type '(() -> (), Int)' into main actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
@@ -490,4 +498,122 @@ func testConversionsAndSendable(a: Actor, f: @Sendable () -> Void, f2: () -> Voi
   await a.useNonSendableFunction(f2) // expected-tns-warning {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
   // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> Void' into actor-isolated context may introduce data races}}
   // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+}
+
+///////////////////////////////////////////////
+// Multiple Field Var Assignment Merge Tests //
+///////////////////////////////////////////////
+
+func singleFieldVarMergeTest() async {
+  var box = SingleFieldKlassBox()
+  box = SingleFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  // But since box has only a single element, this doesn't race.
+  box.k = NonSendableKlass()
+  useValue(box.k)
+  useValue(box)
+
+  // We transfer the box back to main.
+  await transferToMain(box)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'SingleFieldKlassBox' into main actor-isolated context may introduce data races}}
+
+  // And reassign over the entire box, so again we can use it again.
+  box = SingleFieldKlassBox()
+
+  useValue(box)
+  useValue(box.k)
+
+  await transferToMain(box) // expected-tns-warning {{passing argument of non-sendable type 'SingleFieldKlassBox' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'SingleFieldKlassBox' into main actor-isolated context may introduce data races}}
+  
+
+  // But if we use box.k here, we emit an error since we didn't reinitialize at
+  // all.
+  useValue(box.k) // expected-tns-note {{access here could race}}
+}
+
+func multipleFieldVarMergeTest1() async {
+  var box = TwoFieldKlassBox()
+  box = TwoFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+  
+
+  // So even if we reassign over k1, since we did a merge, this should error.
+  box.k1 = NonSendableKlass() // expected-tns-note {{access here could race}}
+  useValue(box) // expected-tns-note {{access here could race}}
+}
+
+func multipleFieldVarMergeTest2() async {
+  var box = TwoFieldKlassBox()
+  box = TwoFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k1)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  // But if we assign over box completely, we can use it again.
+  box = TwoFieldKlassBox()
+
+  useValue(box.k1)
+  useValue(box.k2)
+  useValue(box)
+
+  await transferToMain(box.k2)
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  // But if we assign over box completely, we can use it again.
+  box = TwoFieldKlassBox()
+
+  useValue(box.k1)
+  useValue(box.k2)
+  useValue(box)
+}
+
+func multipleFieldTupleMergeTest1() async {
+  var box = (NonSendableKlass(), NonSendableKlass())
+  box = (NonSendableKlass(), NonSendableKlass())
+
+  // This transfers the entire region.
+  await transferToMain(box.0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  // So even if we reassign over k1, since we did a merge, this should error.
+  box.0 = NonSendableKlass() // expected-tns-note {{access here could race}}
+  useValue(box) // expected-tns-note {{access here could race}}
+}
+
+// TODO: Tuples today do not work since I need to change how we assign into
+// tuple addresses to use a single instruction. Today SILGen always uses
+// multiple values. I am going to fix this in a subsequent commit.
+func multipleFieldTupleMergeTest2() async {
+  var box = (NonSendableKlass(), NonSendableKlass())
+
+  // This transfers the entire region.
+  await transferToMain(box.0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  let box2 = (NonSendableKlass(), NonSendableKlass())
+  // But if we assign over box completely, we can use it again.
+  box = box2 // expected-tns-note {{access here could race}}
+
+  useValue(box.0) // expected-tns-note {{access here could race}}
+  useValue(box.1) // expected-tns-note {{access here could race}}
+  useValue(box) // expected-tns-note {{access here could race}}
+
+  await transferToMain(box.1) // expected-tns-note {{access here could race}}
+  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
+
+  // But if we assign over box completely, we can use it again.
+  box = (NonSendableKlass(), NonSendableKlass()) // expected-tns-note {{access here could race}}
+
+  useValue(box.0) // expected-tns-note {{access here could race}}
+  useValue(box.1) // expected-tns-note {{access here could race}}
+  useValue(box) // expected-tns-note {{access here could race}}
 }

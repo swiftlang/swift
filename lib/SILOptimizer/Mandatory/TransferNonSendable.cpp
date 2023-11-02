@@ -55,6 +55,7 @@ namespace {
 
 struct UseDefChainVisitor
     : public AccessUseDefChainVisitor<UseDefChainVisitor, SILValue> {
+  bool isMerge = false;
 
   SILValue visitAll(SILValue sourceAddr) {
     SILValue result = visit(sourceAddr);
@@ -91,6 +92,8 @@ struct UseDefChainVisitor
 
   SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr,
                             AccessStorageCast castType) {
+    // If we do not have an identity cast, mark this as a merge.
+    isMerge |= castType != AccessStorageCast::Identity;
     return sourceAddr->get();
   }
 
@@ -108,13 +111,22 @@ struct UseDefChainVisitor
       case ProjectionKind::Class:
         llvm_unreachable("Shouldn't see this here");
       case ProjectionKind::Index:
+        // Index is always a merge.
+        isMerge = true;
         break;
       case ProjectionKind::Enum:
+        // Enum is never a merge since it always has a single field.
         break;
       case ProjectionKind::Tuple: {
+        // These are merges if we have multiple fields.
+        auto *tti = cast<TupleElementAddrInst>(inst);
+        isMerge |= tti->getOperand()->getType().getNumTupleElements() > 1;
         break;
       }
       case ProjectionKind::Struct:
+        // These are merges if we have multiple fields.
+        auto *sea = cast<StructElementAddrInst>(inst);
+        isMerge |= sea->getOperand()->getType().getNumNominalFields() > 1;
         break;
       }
     }
@@ -161,6 +173,13 @@ static Expr *getExprForPartitionOp(const PartitionOp &op) {
   assert(expr && "PartitionOp's source location should correspond to"
                  "an AST node");
   return expr;
+}
+
+static bool isProjectedFromAggregate(SILValue value) {
+  assert(value->getType().isAddress());
+  UseDefChainVisitor visitor;
+  visitor.visitAll(value);
+  return visitor.isMerge;
 }
 
 //===----------------------------------------------------------------------===//
@@ -873,8 +892,18 @@ public:
   /// merges, to ensure any aliases of tgt are also updated.
   void translateSILStore(SILValue dest, SILValue src) {
     if (auto nonSendableTgt = tryToTrackValue(dest)) {
-      // Stores to unaliased storage can be treated as assignments, not merges.
-      if (nonSendableTgt.value().isNoAlias())
+      // In the following situations, we can perform an assign:
+      //
+      // 1. A store to unaliased storage.
+      // 2. A store that is to an entire value.
+      //
+      // DISCUSSION: If we have case 2, we need to merge the regions since we
+      // are not overwriting the entire region of the value. This does mean that
+      // we artificially include the previous region that was stored
+      // specifically in this projection... but that is better than
+      // miscompiling. For memory like this, we probably need to track it on a
+      // per field basis to allow for us to assign.
+      if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
         return translateSILAssign(dest, src);
 
       // Stores to possibly aliased storage must be treated as merges.
@@ -982,8 +1011,13 @@ public:
     // NOTE: translateSILLookThrough asserts that this property is true.
     case SILInstructionKind::BeginAccessInst:
     case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::BeginDeallocRefInst:
+    case SILInstructionKind::RefToBridgeObjectInst:
+    case SILInstructionKind::BridgeObjectToRefInst:
     case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::EndCOWMutationInst:
     case SILInstructionKind::ProjectBoxInst:
+    case SILInstructionKind::EndInitLetRefInst:
     case SILInstructionKind::InitEnumDataAddrInst:
     case SILInstructionKind::OpenExistentialAddrInst:
     case SILInstructionKind::StructElementAddrInst:
@@ -992,6 +1026,11 @@ public:
     case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     case SILInstructionKind::UpcastInst:
       return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
+
+    case SILInstructionKind::UnconditionalCheckedCastInst:
+      if (SILDynamicCastInst(inst).isRCIdentityPreserving())
+        return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
+      return translateSILAssign(inst);
 
     // Just make the result part of the operand's region without requiring.
     //
@@ -1011,7 +1050,6 @@ public:
     case SILInstructionKind::OpenExistentialRefInst:
     case SILInstructionKind::PointerToAddressInst:
     case SILInstructionKind::ProjectBlockStorageInst:
-    case SILInstructionKind::RefElementAddrInst:
     case SILInstructionKind::RefToUnmanagedInst:
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::TailAddrInst:
@@ -1021,6 +1059,14 @@ public:
     case SILInstructionKind::UncheckedEnumDataInst:
     case SILInstructionKind::UncheckedOwnershipConversionInst:
     case SILInstructionKind::UnmanagedToRefInst:
+
+    // RefElementAddrInst is not considered to be a lookThrough since we want to
+    // consider the address projected from the class to be a separate value that
+    // is in the same region as the parent operand. The reason that we want to
+    // do this is to ensure that if we assign into the ref_element_addr memory,
+    // we do not consider writes into the struct that contains the
+    // ref_element_addr to be merged into.
+    case SILInstructionKind::RefElementAddrInst:
       return translateSILAssign(inst);
 
     /// Enum inst is handled specially since if it does not have an argument,
