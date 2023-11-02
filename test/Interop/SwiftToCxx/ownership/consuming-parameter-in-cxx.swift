@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits-evo.h -enable-library-evolution
 // RUN: %FileCheck %s < %t/inits-evo.h
 // RUN: %check-interop-cxx-header-in-clang(%t/inits-evo.h)
+// REQUIRES: rdar117805261
 
 public final class AKlass {
     public init() {}
