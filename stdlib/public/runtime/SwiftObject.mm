@@ -36,6 +36,7 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "swift/shims/RuntimeShims.h"
 #include "swift/shims/AssertionReporting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
@@ -52,6 +53,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
+#include <unordered_set>
 #if SWIFT_OBJC_INTEROP
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # import <Foundation/Foundation.h>
