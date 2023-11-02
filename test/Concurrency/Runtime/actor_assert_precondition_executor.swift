@@ -61,6 +61,15 @@ actor Someone {
   }
 }
 
+@MainActor
+struct TestStaticVar {
+  @MainActor static let shared = TestStaticVar()
+
+  init() {
+    checkPreconditionMainActor()
+  }
+}
+
 @main struct Main {
   static func main() async {
     let tests = TestSuite("AssertPreconditionActorExecutor")
@@ -76,6 +85,10 @@ actor Someone {
 
       tests.test("MainActor.preconditionIsolated(): from Main friend") {
         await MainFriend().callCheckMainActor()
+      }
+
+      tests.test("MainActor.assertIsolated() from static let initializer") {
+        _ = await TestStaticVar.shared
       }
 
       #if !os(WASI)
