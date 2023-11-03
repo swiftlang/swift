@@ -40,10 +40,16 @@ func testPublicStructs() {
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
   let _: Int = s.publicTransparentProperty
+  let _: Int = s.publicDynamicProperty
   PublicStruct.publicStaticMethod()
   PublicStruct.activeMethod()
 
   let _ = FrozenPublicStruct(1)
+}
+
+extension PublicStruct {
+  @_dynamicReplacement(for: publicDynamicProperty)
+  var replacementVar: Int
 }
 
 func testPublicClasses() {
