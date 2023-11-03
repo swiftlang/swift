@@ -1,0 +1,17 @@
+# RUN: %empty-directory(%t)
+# RUN: %empty-directory(%t/Xcode)
+
+# Build system generation for 'swift' depends on several LLVM tools
+# (e.g. llvm-tblgen). This is why we still build them with '--skip-build' or
+# '--skip-build-llvm' set, and have an additional '--build-llvm' option to
+# actually skip building that bare minimum too.
+#
+# To save time, borrow these dependencies from the current build directories,
+# and test Xcode project generation only for 'swift'.
+
+# RUN: ln -s %swift_obj_root/../cmark-%target-os-%target-arch %t/Xcode/cmark-%target-os-%target-arch
+# RUN: ln -s %swift_obj_root/../llvm-%target-os-%target-arch %t/Xcode/llvm-%target-os-%target-arch
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --cmake %cmake --swift-darwin-supported-archs="$(uname -m)" --build-subdir="Xcode" --skip-build-cmark --build-llvm=0 --xcode
+
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
