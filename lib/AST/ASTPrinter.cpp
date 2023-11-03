@@ -1239,20 +1239,6 @@ void PrintAST::printAttributes(const Decl *D) {
 
   attrs.print(Printer, Options, D);
 
-  // Print the implicit 'final' attribute.
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    auto VarD = dyn_cast<VarDecl>(D);
-    if (VD->isFinal() &&
-        !attrs.hasAttribute<FinalAttr>() &&
-        // Don't print a redundant 'final' if printing a 'let' or 'static' decl.
-        !(VarD && VarD->isLet()) &&
-        getCorrectStaticSpelling(D) != StaticSpellingKind::KeywordStatic &&
-        VD->getKind() != DeclKind::Accessor) {
-      Printer.printAttrName("final");
-      Printer << " ";
-    }
-  }
-
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
