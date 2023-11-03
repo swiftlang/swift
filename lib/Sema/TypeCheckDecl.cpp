@@ -944,9 +944,7 @@ bool HasNoncopyableAnnotationRequest::evaluate(Evaluator &evaluator, TypeDecl *d
 
   // Handle the legacy '@_moveOnly' attribute
   if (decl->getAttrs().hasAttribute<MoveOnlyAttr>()) {
-    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl)
-               || (ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses)
-                   && isa<ClassDecl>(decl)));
+    assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
     return true;
   }
 

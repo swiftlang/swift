@@ -2,7 +2,8 @@
 
 func posix_close(_ t: Int) {}
 
-struct GoodFileDescriptor: ~Copyable {
+@_moveOnly
+struct GoodFileDescriptor {
   let _fd: Int = 0
 
   var rawFileDescriptor: Int {
@@ -24,7 +25,8 @@ struct GoodFileDescriptor: ~Copyable {
   } // expected-note {{consumed again here}}
 }
 
-struct BadFileDescriptor: ~Copyable {
+@_moveOnly
+struct BadFileDescriptor {
   let _fd: Int = 0
 
   deinit {}
@@ -57,7 +59,7 @@ final class Wallet {
   var ticket1: Ticket = .green
 }
 
-enum Ticket: ~Copyable {
+@_moveOnly enum Ticket {
   case green
   case yellow
   case red

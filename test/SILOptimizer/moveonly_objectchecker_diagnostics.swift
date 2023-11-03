@@ -922,12 +922,14 @@ public func finalClassConsumeFieldArg2(_ x2: consuming FinalKlass) {
 // Aggregate Struct //
 //////////////////////
 
-public struct KlassPair: ~Copyable {
+@_moveOnly
+public struct KlassPair {
     var lhs: Klass
     var rhs: Klass
 }
 
-public struct AggStruct: ~Copyable {
+@_moveOnly
+public struct AggStruct {
     var lhs: Klass
     var center: Int32
     var rhs: Klass
@@ -1362,7 +1364,8 @@ public func aggStructConsumeFieldError4(_ x2: __owned AggStruct) {
 // Aggregate Generic Struct //
 //////////////////////////////
 
-public struct AggGenericStruct<T>: ~Copyable { // FIXME: for better test coverage this should probably use the generic parameter!
+@_moveOnly
+public struct AggGenericStruct<T> { // FIXME: for better test coverage this should probably use the generic parameter!
     var lhs: Klass
     var rhs: UnsafeRawPointer
     var pair: KlassPair
@@ -2096,7 +2099,8 @@ public func aggGenericStructConsumeGrandFieldOwnedArg2<T>(_ x2: consuming AggGen
 // Enum Test Cases //
 /////////////////////
 
-public enum EnumTy: ~Copyable {
+@_moveOnly
+public enum EnumTy {
     case klass(Klass)
     case int(Int)
 
@@ -4014,12 +4018,14 @@ func sameCallSiteConsumeAndUse(_ k: __owned Klass) { // expected-error {{'k' use
 ////////////////////////////////
 
 enum EnumSwitchTests {
-    enum E2: ~Copyable {
+    @_moveOnly
+    enum E2 {
         case lhs(CopyableKlass)
         case rhs(Klass)
     }
 
-    enum E: ~Copyable {
+    @_moveOnly
+    enum E {
         case first(KlassPair)
         case second(AggStruct)
         case third(CopyableKlass)
@@ -4075,7 +4081,8 @@ func enumSwitchTest2(_ e: consuming EnumSwitchTests.E) {
 // Empty Struct Guaranteed Argument Test //
 ///////////////////////////////////////////
 
-struct EmptyStruct: ~Copyable {
+@_moveOnly
+struct EmptyStruct {
   var bool: Bool { false }
   func doSomething() {}
   mutating func doSomething2() {}
@@ -4132,7 +4139,8 @@ func testEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-struct StructContainingEmptyStruct: ~Copyable {
+@_moveOnly
+struct StructContainingEmptyStruct {
   var x: EmptyStruct
 }
 
@@ -4186,7 +4194,8 @@ func testStructContainingEmptyStruct() {
 
 // Make sure that we handle a struct that recursively holds an empty struct
 // correctly.
-struct StructContainingTwoEmptyStruct: ~Copyable {
+@_moveOnly
+struct StructContainingTwoEmptyStruct {
   var x: EmptyStruct
   var y: EmptyStruct
 }
@@ -4238,12 +4247,14 @@ func testStructContainingTwoEmptyStruct() {
 // Enum Containing Empty Struct //
 //////////////////////////////////
 
-enum MyEnum2: ~Copyable {
+@_moveOnly
+enum MyEnum2 {
 case first(EmptyStruct)
 case second(String)
 }
 
-enum MyEnum: ~Copyable {
+@_moveOnly
+enum MyEnum {
 case first(EmptyStruct)
 case second(String)
 case third(MyEnum2)

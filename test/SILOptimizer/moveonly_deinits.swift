@@ -5,7 +5,8 @@ class Klass {}
 var globalMoveOnlyStruct = MoveOnlyStruct()
 var globalMoveOnlyEnum = MoveOnlyEnum.lhs(Klass())
 
-struct MoveOnlyStruct: ~Copyable {
+@_moveOnly
+struct MoveOnlyStruct {
     var k = Klass()
 
     deinit {
@@ -27,7 +28,8 @@ struct MoveOnlyStruct: ~Copyable {
     } // expected-note {{consumed again here}}
 }
 
-enum MoveOnlyEnum: ~Copyable {
+@_moveOnly
+enum MoveOnlyEnum {
     case lhs(Klass)
     case rhs(Klass)
 
