@@ -128,7 +128,7 @@ static std::vector<std::string> getClangDepScanningInvocationArguments(
 }
 
 ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
-     const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
      StringRef moduleOutputPath, RemapPathCallback callback) {
   const auto &ctx = Impl.SwiftContext;
   ModuleDependencyVector result;
@@ -146,7 +146,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
           ("-fapinotes-swift-version=" +
            ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())};
 
-  for (const auto &clangModuleDep : clangDependencies) {
+  for (auto &clangModuleDep : clangDependencies) {
     // File dependencies for this module.
     std::vector<std::string> fileDeps;
     for (const auto &fileDep : clangModuleDep.FileDeps) {
@@ -201,9 +201,9 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
                                         new clang::IgnoringDiagConsumer());
 
     llvm::SmallVector<const char*> clangArgs;
-    llvm::for_each(clangModuleDep.BuildArguments, [&](const std::string &Arg) {
-      clangArgs.push_back(Arg.c_str());
-    });
+    llvm::for_each(
+        clangModuleDep.getBuildArguments(),
+        [&](const std::string &Arg) { clangArgs.push_back(Arg.c_str()); });
 
     bool success = clang::CompilerInvocation::CreateFromArgs(
         depsInvocation, clangArgs, clangDiags);

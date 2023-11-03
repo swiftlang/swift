@@ -476,7 +476,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
                                      : Limit::None;
     }
     // Otherwise, regular property wrapper backing initializers (for properties)
-    // are treated just like stored property intializers.
+    // are treated just like stored property initializers.
     LLVM_FALLTHROUGH;
   }
   case Kind::StoredPropertyInitializer: {
@@ -1004,6 +1004,9 @@ bool SILDeclRef::isNativeToForeignThunk() const {
     // onto.
     if (getDecl()->hasClangNode())
       return false;
+    // No thunk is required if the decl directly references an external decl.
+    if (getDecl()->getAttrs().hasAttribute<ExternAttr>())
+      return false;
 
     // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
     return kind == Kind::Func || kind == Kind::Initializer ||
@@ -1144,7 +1147,12 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       if (!NameA->Name.empty() && !isThunk()) {
         return NameA->Name.str();
       }
-      
+
+    if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
+      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @extern should be rejected by typechecker");
+      return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
+    }
+
     // Use a given cdecl name for native-to-foreign thunks.
     if (auto CDeclA = getDecl()->getAttrs().getAttribute<CDeclAttr>())
       if (isNativeToForeignThunk()) {

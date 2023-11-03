@@ -65,7 +65,10 @@ enum ID {
 #undef OPTION
 };
 
-#define PREFIX(NAME, VALUE) static const char *const NAME[] = VALUE;
+#define PREFIX(NAME, VALUE)                                                    \
+  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+      NAME##_init, std::size(NAME##_init) - 1);
 #include "SwiftCacheToolOptions.inc"
 #undef PREFIX
 
@@ -78,9 +81,9 @@ static const OptTable::Info InfoTable[] = {
 #undef OPTION
 };
 
-class CacheToolOptTable : public llvm::opt::OptTable {
+class CacheToolOptTable : public llvm::opt::GenericOptTable {
 public:
-  CacheToolOptTable() : OptTable(InfoTable) {}
+  CacheToolOptTable() : GenericOptTable(InfoTable) {}
 };
 
 class SwiftCacheToolInvocation {
@@ -100,18 +103,14 @@ public:
     Instance.addDiagnosticConsumer(&PDC);
   }
 
-  std::unique_ptr<llvm::opt::OptTable> createOptTable() {
-    return std::unique_ptr<OptTable>(new CacheToolOptTable());
-  }
-
   int parseArgs(ArrayRef<const char *> Args) {
     auto &Diags = Instance.getDiags();
 
-    std::unique_ptr<llvm::opt::OptTable> Table = createOptTable();
+    CacheToolOptTable Table;
     unsigned MissingIndex;
     unsigned MissingCount;
     llvm::opt::InputArgList ParsedArgs =
-        Table->ParseArgs(Args, MissingIndex, MissingCount);
+        Table.ParseArgs(Args, MissingIndex, MissingCount);
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                      ParsedArgs.getArgString(MissingIndex), MissingCount);
@@ -121,8 +120,8 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName =
           llvm::sys::path::stem(MainExecutablePath).str();
-      Table->printHelp(llvm::outs(), ExecutableName.c_str(), "Swift Cache Tool",
-                       0, 0, /*ShowAllAliases*/ false);
+      Table.printHelp(llvm::outs(), ExecutableName.c_str(), "Swift Cache Tool",
+                      0, 0, /*ShowAllAliases*/ false);
       return 0;
     }
 

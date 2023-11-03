@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
 // RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete %s
-// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation %s
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -82,8 +82,8 @@ final class NewExecutor: SerialExecutor {
 }
 
 // Good impl, but missing the ownership keyword
-final class MissingOwnership: SerialExecutor {
-  func enqueue(_ job: ExecutorJob) {} // expected-error{{noncopyable parameter must specify its ownership}}
+final class MissingOwnership: SerialExecutor { // expected-error {{type 'MissingOwnership' does not conform to protocol 'Executor'}}
+  func enqueue(_ job: ExecutorJob) {} // expected-error{{parameter of noncopyable type 'ExecutorJob' must specify ownership}}
   // expected-note@-1{{add 'borrowing' for an immutable reference}}
   // expected-note@-2{{add 'inout' for a mutable reference}}
   // expected-note@-3{{add 'consuming' to take the value from the caller}}

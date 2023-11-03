@@ -102,8 +102,24 @@ llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   llvm_unreachable("bad KnownProtocolKind");
 }
 
-KnownProtocolSet swift::getInvertibleProtocols() {
-  return { KnownProtocolKind::Copyable };
+/// Maps a KnownProtocol to the set of InvertibleProtocols, if a mapping exists.
+llvm::Optional<InvertibleProtocolKind>
+    swift::getInvertibleProtocolKind(KnownProtocolKind kp) {
+  switch (kp) {
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    case KnownProtocolKind::Id: return InvertibleProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  default: return llvm::None;
+  }
+}
+
+/// Returns the KnownProtocolKind corresponding to an InvertibleProtocolKind.
+KnownProtocolKind swift::getKnownProtocolKind(InvertibleProtocolKind ip) {
+  switch (ip) {
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    case InvertibleProtocolKind::Id: return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+  }
 }
 
 namespace {
@@ -444,6 +460,7 @@ struct ASTContext::Implementation {
     llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
     llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
+    llvm::DenseMap<Type, InverseType *> InverseTypes;
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
@@ -669,8 +686,7 @@ ASTContext::ASTContext(
                             UnresolvedType(*this)),
       TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
       TheEmptyPackType(PackType::get(*this, {})),
-      TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                              /*HasExplicitAnyObject=*/false)),
+      TheAnyType(ProtocolCompositionType::theAnyType(*this)),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -1056,8 +1072,7 @@ CanType ASTContext::getAnyObjectConstraint() const {
   }
 
   getImpl().AnyObjectType = CanType(
-    ProtocolCompositionType::get(
-      *this, {}, /*HasExplicitAnyObject=*/true));
+    ProtocolCompositionType::theAnyObjectType(*this));
   return getImpl().AnyObjectType;
 }
 
@@ -1474,7 +1489,11 @@ AbstractFunctionDecl *ASTContext::getOnReturnOnDistributedTargetInvocationResult
 
 FuncDecl *ASTContext::getDoneRecordingOnDistributedInvocationEncoder(
     NominalTypeDecl *nominal) const {
-  for (auto result : nominal->lookupDirect(Id_doneRecording)) {
+
+  llvm::SmallVector<ValueDecl *, 2> results;
+  nominal->lookupQualified(nominal, DeclNameRef(Id_doneRecording),
+                           SourceLoc(), NL_QualifiedDefault, results);
+  for (auto result : results) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)
       continue;
@@ -3628,13 +3647,14 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
 
 ProtocolCompositionType *
 ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               InvertibleProtocolSet Inverses,
                                bool HasExplicitAnyObject) {
-  assert(Members.size() != 1 || HasExplicitAnyObject);
+  assert(Members.size() != 1 || HasExplicitAnyObject || !Inverses.empty());
 
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
+  ProtocolCompositionType::Profile(ID, Members, Inverses, HasExplicitAnyObject);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
@@ -3657,6 +3677,7 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   auto mem = C.Allocate(size, alignof(ProtocolCompositionType), arena);
   auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
                                                   Members,
+                                                  Inverses,
                                                   HasExplicitAnyObject,
                                                   properties);
   C.getImpl().getArena(arena).ProtocolCompositionTypes.InsertNode(
@@ -3815,6 +3836,28 @@ ExistentialMetatypeType::ExistentialMetatypeType(
 
 Type ExistentialMetatypeType::getExistentialInstanceType() {
   return ExistentialType::get(getInstanceType());
+}
+
+InvertibleProtocolKind InverseType::getInverseKind() const {
+  return *getInvertibleProtocolKind(*protocol->getKnownProtocol());
+}
+
+Type InverseType::get(Type invertedProto) {
+  auto &C = invertedProto->getASTContext();
+
+  auto properties = invertedProto->getRecursiveProperties();
+  auto arena = getArena(properties);
+
+  auto &entry = C.getImpl().getArena(arena).InverseTypes[invertedProto];
+  if (entry)
+    return entry;
+
+  const ASTContext *canonicalContext =
+      invertedProto->isCanonical() ? &C : nullptr;
+
+  return entry = new (C, arena) InverseType(invertedProto,
+                                            canonicalContext,
+                                            properties);
 }
 
 ModuleType *ModuleType::get(ModuleDecl *M) {
@@ -6173,6 +6216,17 @@ BuiltinTupleDecl *ASTContext::getBuiltinTupleDecl() {
 
   result = new (*this) BuiltinTupleDecl(Id_TheTupleType, dc);
   result->setAccess(AccessLevel::Public);
+
+  // Avoid going through InferredGenericSignatureRequest and directly set the
+  // generic signature to <each Element>
+  {
+    GenericParamList *list = result->getGenericParams();
+    assert(list->size() == 1);
+    auto paramTy = (*list->begin())->getDeclaredInterfaceType()
+                                   ->castTo<GenericTypeParamType>();
+    auto baseSig = GenericSignature::get({paramTy}, {});
+    result->setGenericSignature(baseSig);
+  }
 
   // Cook up conditional conformances to Sendable and Copyable.
   auto buildFakeExtension = [&](ProtocolDecl *proto) {

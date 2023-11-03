@@ -1210,16 +1210,17 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 }
 
 void SILGenFunction::emitProlog(
-    CaptureInfo captureInfo, ParameterList *paramList, ParamDecl *selfParam,
-    DeclContext *DC, Type resultType, bool throws, SourceLoc throwsLoc,
+    DeclContext *DC, CaptureInfo captureInfo,
+    ParameterList *paramList, ParamDecl *selfParam, Type resultType,
+    llvm::Optional<Type> errorType, SourceLoc throwsLoc,
     llvm::Optional<AbstractionPattern> origClosureType) {
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
 
-  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
-                                   DC, throws, throwsLoc,
+  uint16_t ArgNo = emitBasicProlog(DC, paramList, selfParam, resultType,
+                                   errorType, throwsLoc,
                                    /*ignored parameters*/
                                      captureInfo.getCaptures().size(),
                                    origClosureType);
@@ -1281,6 +1282,7 @@ void SILGenFunction::emitProlog(
           return false;
 
         case ActorIsolation::Nonisolated:
+        case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Unspecified:
           return false;
         }
@@ -1332,6 +1334,7 @@ void SILGenFunction::emitProlog(
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -1384,6 +1387,7 @@ void SILGenFunction::emitProlog(
     switch (actorIsolation.getKind()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance: {
@@ -1572,6 +1576,7 @@ SILGenFunction::emitExecutor(SILLocation loc, ActorIsolation isolation,
   switch (isolation.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
     return llvm::None;
 
   case ActorIsolation::ActorInstance: {
@@ -1597,8 +1602,9 @@ void SILGenFunction::emitHopToActorValue(SILLocation loc, ManagedValue actor) {
       getActorIsolationOfContext(FunctionDC, [](AbstractClosureExpr *CE) {
         return CE->getActorIsolation();
       });
-  if (isolation != ActorIsolation::Nonisolated
-      && isolation != ActorIsolation::Unspecified) {
+  if (isolation != ActorIsolation::Nonisolated &&
+      isolation != ActorIsolation::NonisolatedUnsafe &&
+      isolation != ActorIsolation::Unspecified) {
     // TODO: Explicit hop with no hop-back should only be allowed in nonisolated
     // async functions. But it needs work for any closure passed to
     // Task.detached, which currently has unspecified isolation.
@@ -1722,18 +1728,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   assert(!resultType->is<PackExpansionType>());
 
   // If the return type is address-only, emit the indirect return argument.
-  auto &resultTI =
-    SGF.SGM.Types.getTypeLowering(origResultType, resultTypeInContext,
-                                  SGF.getTypeExpansionContext());
-  
+
   // The calling convention always uses minimal resilience expansion.
-  auto &resultTIConv = SGF.SGM.Types.getTypeLowering(
+  auto resultConvType = SGF.SGM.Types.getLoweredType(
       resultTypeInContext, TypeExpansionContext::minimal());
-  auto resultConvType = resultTIConv.getLoweredType();
-
-  auto &ctx = SGF.getASTContext();
-
-  SILType resultSILType = resultTI.getLoweredType().getAddressType();
 
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
@@ -1743,19 +1741,64 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
         || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
       return;
   }
+
+  auto &ctx = SGF.getASTContext();
   auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
   var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
+  auto &resultTI =
+    SGF.SGM.Types.getTypeLowering(origResultType, resultTypeInContext,
+                                  SGF.getTypeExpansionContext());
+  SILType resultSILType = resultTI.getLoweredType().getAddressType();
   auto *arg = SGF.F.begin()->createFunctionArgument(resultSILType, var);
   (void)arg;
 }
 
+static void emitIndirectErrorParameter(SILGenFunction &SGF,
+                                       Type errorType,
+                                       AbstractionPattern origErrorType,
+                                       DeclContext *DC) {
+  CanType errorTypeInContext =
+    DC->mapTypeIntoContext(errorType)->getCanonicalType();
+
+  // If the error type is address-only, emit the indirect error argument.
+
+  // The calling convention always uses minimal resilience expansion.
+  auto errorConvType = SGF.SGM.Types.getLoweredType(
+      origErrorType, errorTypeInContext, TypeExpansionContext::minimal());
+
+  // And the abstraction pattern may force an indirect return even if the
+  // concrete type wouldn't normally be returned indirectly.
+  if (!SILModuleConventions::isThrownIndirectlyInSIL(errorConvType,
+                                                     SGF.SGM.M)) {
+    if (!SILModuleConventions(SGF.SGM.M).useLoweredAddresses()
+        || origErrorType.getErrorConvention(SGF.SGM.Types)
+            != AbstractionPattern::Indirect)
+      return;
+  }
+
+  auto &ctx = SGF.getASTContext();
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
+                                 ctx.getIdentifier("$error"), SourceLoc(),
+                                 ctx.getIdentifier("$error"),
+                                 DC);
+  var->setSpecifier(ParamSpecifier::InOut);
+  var->setInterfaceType(errorType);
+
+  auto &errorTI =
+    SGF.SGM.Types.getTypeLowering(origErrorType, errorTypeInContext,
+                                  SGF.getTypeExpansionContext());
+  SILType errorSILType = errorTI.getLoweredType().getAddressType();
+  assert(SGF.IndirectErrorResult == nullptr);
+  SGF.IndirectErrorResult = SGF.F.begin()->createFunctionArgument(errorSILType, var);
+}
+
 uint16_t SILGenFunction::emitBasicProlog(
-    ParameterList *paramList, ParamDecl *selfParam, Type resultType,
-    DeclContext *DC, bool throws, SourceLoc throwsLoc,
+    DeclContext *DC, ParameterList *paramList, ParamDecl *selfParam,
+    Type resultType, llvm::Optional<Type> errorType, SourceLoc throwsLoc,
     unsigned numIgnoredTrailingParameters,
     llvm::Optional<AbstractionPattern> origClosureType) {
   // Create the indirect result parameters.
@@ -1765,9 +1808,24 @@ uint16_t SILGenFunction::emitBasicProlog(
   AbstractionPattern origResultType = origClosureType
     ? origClosureType->getFunctionResultType()
     : AbstractionPattern(genericSig.getCanonicalSignature(),
-                         CanType(resultType));
+                         resultType->getCanonicalType());
   
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
+
+  llvm::Optional<AbstractionPattern> origErrorType;
+  if (errorType) {
+    if (origClosureType &&
+        !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+      origErrorType =
+          origClosureType->getFunctionThrownErrorType();
+    } else {
+      origErrorType =
+          AbstractionPattern(genericSig.getCanonicalSignature(),
+                             (*errorType)->getCanonicalType());
+    }
+
+    emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
+  }
 
   // Emit the argument variables in calling convention order.
   unsigned ArgNo =
@@ -1775,14 +1833,16 @@ uint16_t SILGenFunction::emitBasicProlog(
       .emitParams(origClosureType, paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
-  if (throws) {
-     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
-    ManagedValue Undef = emitUndef(NativeErrorTy);
-    SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
+  if (errorType && IndirectErrorResult == nullptr) {
+    CanType errorTypeInContext =
+      DC->mapTypeIntoContext(*errorType)->getCanonicalType();
+    auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
+    ManagedValue undef = emitUndef(loweredErrorTy);
+    SILDebugVariable dbgVar("$error", /*Constant*/ false, ++ArgNo);
     RegularLocation loc = RegularLocation::getAutoGeneratedLocation();
     if (throwsLoc.isValid())
       loc = throwsLoc;
-    B.createDebugValue(loc, Undef.getValue(), DbgVar);
+    B.createDebugValue(loc, undef.getValue(), dbgVar);
   }
 
   return ArgNo;

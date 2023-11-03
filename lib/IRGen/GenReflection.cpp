@@ -176,6 +176,20 @@ public:
 
 llvm::Optional<llvm::VersionTuple>
 getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+  // The Swift 5.11 runtime is the first version able to demangle types
+  // that involve typed throws.
+  bool usesTypedThrows = type.findIf([](CanType t) -> bool {
+    if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      if (!fn.getThrownError().isNull())
+        return true;
+    }
+
+    return false;
+  });
+  if (usesTypedThrows) {
+    return llvm::VersionTuple(5, 11);
+  }
+
   // The Swift 5.5 runtime is the first version able to demangle types
   // related to concurrency.
   bool needsConcurrency = type.findIf([](CanType t) -> bool {
@@ -714,13 +728,6 @@ protected:
     return var;
   }
 
-  // Helpers to guide the C++ type system into converting lambda arguments
-  // to llvm::Optional<function_ref>
-  llvm::GlobalVariable *emit(llvm::function_ref<GetAddrOfEntityFn> getAddr,
-                             const char *section) {
-    return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
-                section);
-  }
   llvm::GlobalVariable *emit(llvm::NoneType none, const char *section) {
     return emit(llvm::Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
                 section);

@@ -343,6 +343,28 @@ private:
     return OperandArgument{operand};
   }
 
+  SILValue parseResultComponent(SILInstruction *within) {
+    if (!consumePrefix("result"))
+      return nullptr;
+    if (empty()) {
+      auto result = within->getResult(0);
+      return result;
+    }
+    if (auto subscript = parseSubscript()) {
+      auto index = subscript->get<unsigned long long>();
+      auto result = within->getResult(index);
+      return result;
+    }
+    llvm_unreachable("bad suffix after 'result'!?");
+  }
+
+  llvm::Optional<Argument> parseResultReference(SILInstruction *within) {
+    auto result = parseResultComponent(within);
+    if (!result)
+      return llvm::None;
+    return ValueArgument{result};
+  }
+
   SILArgument *parseBlockArgumentComponent(SILBasicBlock *block) {
     if (!consumePrefix("argument"))
       return nullptr;
@@ -414,6 +436,8 @@ private:
       return InstructionArgument{instruction};
     if (auto arg = parseOperandReference(instruction))
       return arg;
+    if (auto res = parseResultReference(instruction))
+      return res;
     llvm_unreachable("unhandled suffix after 'instruction'!?");
   }
 

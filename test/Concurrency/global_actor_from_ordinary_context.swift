@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify
 // RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-sns- -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-sns- -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -133,7 +133,7 @@ func fromAsync() async {
 }
 
 // expected-minimal-and-targeted-note @+2 {{mutation of this var is only permitted within the actor}}
-// expected-complete-and-sns-error @+1 {{top-level code variables cannot have a global actor}}
+// expected-complete-and-tns-error @+1 {{top-level code variables cannot have a global actor}}
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }

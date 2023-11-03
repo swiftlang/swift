@@ -1,12 +1,9 @@
-import CBasicBridging
 import CASTBridging
-
+import CBasicBridging
 import SwiftDiagnostics
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
-
-@_spi(ExperimentalLanguageFeatures)
-import SwiftParser
+import SwiftSyntax
 
 /// Describes a source file that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
@@ -31,7 +28,7 @@ extension Parser.ExperimentalFeatures {
     guard let context = context else { return }
 
     func mapFeature(_ bridged: BridgedFeature, to feature: Self) {
-      if ASTContext_langOptsHasFeature(context, bridged) {
+      if context.langOptsHasFeature(bridged) {
         insert(feature)
       }
     }
@@ -45,8 +42,10 @@ extension Parser.ExperimentalFeatures {
 /// ExportedSourceFile instance.
 @_cdecl("swift_ASTGen_parseSourceFile")
 public func parseSourceFile(
-  buffer: UnsafePointer<UInt8>, bufferLength: Int,
-  moduleName: UnsafePointer<UInt8>, filename: UnsafePointer<UInt8>,
+  buffer: UnsafePointer<UInt8>,
+  bufferLength: Int,
+  moduleName: UnsafePointer<UInt8>,
+  filename: UnsafePointer<UInt8>,
   ctxPtr: UnsafeMutableRawPointer?
 ) -> UnsafeRawPointer {
   let buffer = UnsafeBufferPointer(start: buffer, count: bufferLength)
@@ -57,8 +56,11 @@ public func parseSourceFile(
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
   exportedPtr.initialize(
     to: .init(
-      buffer: buffer, moduleName: String(cString: moduleName),
-      fileName: String(cString: filename), syntax: sourceFile)
+      buffer: buffer,
+      moduleName: String(cString: moduleName),
+      fileName: String(cString: filename),
+      syntax: sourceFile
+    )
   )
 
   return UnsafeRawPointer(exportedPtr)
@@ -106,7 +108,8 @@ public func emitParserDiagnostics(
   downgradePlaceholderErrorsToWarnings: CInt
 ) -> CInt {
   return sourceFilePtr.withMemoryRebound(
-    to: ExportedSourceFile.self, capacity: 1
+    to: ExportedSourceFile.self,
+    capacity: 1
   ) { sourceFile in
     var anyDiags = false
 
@@ -124,7 +127,9 @@ public func emitParserDiagnostics(
       }
 
       let diagnosticSeverity: DiagnosticSeverity
-      if downgradePlaceholderErrorsToWarnings == 1 && diag.diagMessage.diagnosticID == StaticTokenError.editorPlaceholder.diagnosticID {
+      if downgradePlaceholderErrorsToWarnings == 1
+        && diag.diagMessage.diagnosticID == StaticTokenError.editorPlaceholder.diagnosticID
+      {
         diagnosticSeverity = .warning
       } else {
         diagnosticSeverity = diag.diagMessage.severity

@@ -108,20 +108,6 @@ func doit() {
 }
 doit()
 
-//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr [[ARGUMENT1_METADATA:%[0-9]+]], ptr [[ARGUMENT2_METADATA:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
-//      CHECK: entry:
-//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
-// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
-// CHECK-SAME:     ptr [[ARGUMENT1_METADATA]], 
-// CHECK-SAME:     ptr [[ARGUMENT2_METADATA]], 
-// CHECK-SAME:     ptr undef, 
-// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMn
-// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMz
-//      CHECK:   )
-//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
-//      CHECK: }
-
-
 //             CHECK: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_4]]LLCyAA9Argument1ACLLCySiGAGGMb"([[INT]] {{%[0-9]+}}) {{#[0-9]}} {{(section)?.*}}{
 //             CHECK: entry:
 //             CHECK:  call swiftcc %swift.metadata_response @"$s4main9Argument1[[UNIQUE_ID_1]]LLCySiGMb"([[INT]] 0)
@@ -141,3 +127,16 @@ doit()
 //       CHECK-apple:  [[METADATA_RESPONSE:%[0-9]+]] = insertvalue %swift.metadata_response [[PARTIAL_METADATA_RESPONSE]], [[INT]] 0, 1
 //       CHECK-apple:  ret %swift.metadata_response [[METADATA_RESPONSE]]
 //             CHECK: }
+
+//      CHECK: define internal swiftcc %swift.metadata_response @"$s4main5Value[[UNIQUE_ID_1]]LLCMa"([[INT]] [[METADATA_REQUEST:%[0-9]+]], ptr [[ARGUMENT1_METADATA:%[0-9]+]], ptr [[ARGUMENT2_METADATA:%[0-9]+]]) #{{[0-9]+}} {{(section)?.*}}{
+//      CHECK: entry:
+//      CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateCanonicalPrespecializedGenericMetadata(
+// CHECK-SAME:     [[INT]] [[METADATA_REQUEST]], 
+// CHECK-SAME:     ptr [[ARGUMENT1_METADATA]], 
+// CHECK-SAME:     ptr [[ARGUMENT2_METADATA]], 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMn
+// CHECK-SAME:     $s4main5Value[[UNIQUE_ID_1]]LLCMz
+//      CHECK:   )
+//      CHECK:   ret %swift.metadata_response {{%[0-9]+}}
+//      CHECK: }

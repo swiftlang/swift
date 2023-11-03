@@ -349,8 +349,8 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
   _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
 
   // These are currently not peepholed.
-  _ = [i].self as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
-  _ = (try [i]) as Magic as [String] // expected-warning {{coercion from '[Int]' to '[String]' may fail; use 'as?' or 'as!' instead}}
+  _ = [i].self as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = (try [i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 
   // These are wrong, but make sure we don't warn about the value cast always succeeding.
@@ -750,4 +750,11 @@ do {
     _ = a is Issue68825 // expected-error {{cannot find type 'Issue68825' in scope}}
     _ = a is String // OK
   }
+}
+
+// rdar://115603144 - casting `any Sendable` to a collection warns about cast failure although the cast could succeed at runtime
+func test_existential_sendable_cast(v: any Sendable) {
+  let _ = v as! [Any] // Ok
+  let _ = v as! [String: Any] // Ok
+  let _ = v as! Set<Int> // Ok
 }

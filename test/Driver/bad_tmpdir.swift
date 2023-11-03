@@ -5,7 +5,7 @@
 // test is somewhat artificially limited to macOS.
 //
 // REQUIRES: OS=macosx
-
+// REQUIRES: rdar117411265
 // (https://github.com/apple/swift/issues/54796) This test is failing on
 // next branch.
 // XFAIL: *

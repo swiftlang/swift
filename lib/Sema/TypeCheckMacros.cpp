@@ -16,8 +16,8 @@
 
 #include "TypeCheckMacros.h"
 #include "../AST/InlinableText.h"
-#include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -37,6 +37,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
@@ -45,43 +46,6 @@
 #include "llvm/Config/config.h"
 
 using namespace swift;
-
-extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
-extern "C" void swift_ASTGen_destroyMacro(void *macro);
-
-extern "C" void swift_ASTGen_freeBridgedString(BridgedString);
-
-extern "C" void *swift_ASTGen_resolveExecutableMacro(const char *moduleName,
-                                                     const char *typeName,
-                                                     void *opaquePluginHandle);
-extern "C" void swift_ASTGen_destroyExecutableMacro(void *macro);
-
-extern "C" ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *diagEngine, void *sourceFile, const void *macroSourceLocation,
-    BridgedString *expansionSourceOutPtr, ptrdiff_t **replacementsPtr,
-    ptrdiff_t *numReplacements);
-extern "C" void swift_ASTGen_freeExpansionReplacements(
-    ptrdiff_t *replacementsPtr,
-    ptrdiff_t numReplacements);
-
-extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, const void *macro, uint8_t externalKind,
-    const char *discriminator, uint8_t rawMacroRole, void *sourceFile,
-    const void *sourceLocation, BridgedString *evaluatedSourceOut);
-
-extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, const void *macro, uint8_t externalKind,
-    const char *discriminator, const char *qualifiedType,
-    const char *conformances, uint8_t rawMacroRole, void *customAttrSourceFile,
-    const void *customAttrSourceLocation, void *declarationSourceFile,
-    const void *declarationSourceLocation, void *parentDeclSourceFile,
-    const void *parentDeclSourceLocation, BridgedString *evaluatedSourceOut);
-
-extern "C" bool swift_ASTGen_initializePlugin(void *handle, void *diagEngine);
-extern "C" void swift_ASTGen_deinitializePlugin(void *handle);
-extern "C" bool swift_ASTGen_pluginServerLoadLibraryPlugin(
-    void *handle, const char *libraryPath, const char *moduleName,
-    BridgedString *errorOut);
 
 static inline StringRef toStringRef(BridgedString bridged) {
   return {reinterpret_cast<const char *>(bridged.data), size_t(bridged.length)};
@@ -926,8 +890,12 @@ static CharSourceRange getExpansionInsertionRange(MacroRole role,
     return CharSourceRange(rightBraceLoc, 0);
   }
   case MacroRole::Peer: {
-    SourceLoc afterDeclLoc =
-        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    SourceLoc endLoc = target.getEndLoc();
+    if (auto var = dyn_cast<VarDecl>(target.get<Decl *>())) {
+      if (auto binding = var->getParentPatternBinding())
+        endLoc = binding->getEndLoc();
+    }
+    SourceLoc afterDeclLoc = Lexer::getLocForEndOfToken(sourceMgr, endLoc);
     return CharSourceRange(afterDeclLoc, 0);
     break;
   }
@@ -1315,7 +1283,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   std::string conformanceList;
   {
     llvm::raw_string_ostream OS(conformanceList);
-    if (role == MacroRole::Extension) {
+    if (role == MacroRole::Extension || role == MacroRole::Member) {
       llvm::interleave(
           conformances,
           [&](const ProtocolDecl *protocol) {

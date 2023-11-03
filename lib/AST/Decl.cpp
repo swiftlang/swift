@@ -493,6 +493,29 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
       macroName);
 }
 
+Type Decl::getResolvedCustomAttrType(CustomAttr *attr) const {
+  if (auto ty = attr->getType())
+    return ty;
+
+  auto dc = getDeclContext();
+  auto *nominal = evaluateOrDefault(
+      getASTContext().evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  if (!nominal)
+    return Type();
+
+  CustomAttrTypeKind kind;
+  if (nominal->isGlobalActor()) {
+    kind = CustomAttrTypeKind::GlobalActor;
+  } else if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    kind = CustomAttrTypeKind::PropertyWrapper;
+  } else {
+    kind = CustomAttrTypeKind::NonGeneric;
+  }
+
+  return evaluateOrDefault(getASTContext().evaluator,
+                           CustomAttrTypeRequest{attr, dc, kind}, Type());
+}
+
 bool Decl::isExposedToClients() const {
   return DeclExportabilityVisitor().visit(this);
 }
@@ -1558,8 +1581,10 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 
 InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
     : TypeLoc(typeLoc), isUnchecked(false) {
-  if (auto typeRepr = typeLoc.getTypeRepr())
-    isUnchecked = typeRepr->findUncheckedAttrLoc().isValid();
+  if (auto typeRepr = typeLoc.getTypeRepr()) {
+    isUnchecked = typeRepr->findAttrLoc(TAK_unchecked).isValid();
+    isRetroactive = typeRepr->findAttrLoc(TAK_retroactive).isValid();
+  }
 }
 
 InheritedTypes::InheritedTypes(
@@ -1583,6 +1608,61 @@ InheritedTypes::InheritedTypes(const class Decl *decl) {
     Decl = nullptr;
     Entries = ArrayRef<InheritedEntry>();
   }
+}
+
+ASTContext &InheritedTypes::getASTContext() const {
+  if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
+    return typeDecl->getASTContext();
+  } else {
+    return Decl.get<const ExtensionDecl *>()->getASTContext();
+  }
+}
+
+SourceLoc InheritedTypes::getColonLoc() const {
+  if (Entries.size() == 0)
+    return SourceLoc();
+
+  SourceLoc precedingTok;
+  if (auto typeDecl = Decl.dyn_cast<const TypeDecl *>()) {
+    precedingTok = typeDecl->getNameLoc();
+  } else {
+    auto *ext = Decl.get<const ExtensionDecl *>();
+    precedingTok = ext->getSourceRange().End;
+  }
+
+  auto &ctx = getASTContext();
+  return Lexer::getLocForEndOfToken(ctx.SourceMgr, precedingTok);
+}
+
+SourceRange InheritedTypes::getRemovalRange(unsigned i) const {
+  auto inheritedClause = getEntries();
+  auto &ctx = getASTContext();
+
+  // If there is just one entry, remove the entire inheritance clause.
+  if (inheritedClause.size() == 1) {
+    SourceLoc end = inheritedClause[i].getSourceRange().End;
+    return SourceRange(getColonLoc(),
+                       Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
+  }
+
+  // If we're at the first entry, remove from the start of this entry to the
+  // start of the next entry.
+  if (i == 0) {
+    return SourceRange(inheritedClause[i].getSourceRange().Start,
+                       inheritedClause[i+1].getSourceRange().Start);
+  }
+
+  // Otherwise, remove from the end of the previous entry to the end of this
+  // entry.
+  SourceLoc afterPriorLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                 inheritedClause[i-1].getSourceRange().End);
+
+  SourceLoc afterMyEndLoc =
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                 inheritedClause[i].getSourceRange().End);
+
+  return SourceRange(afterPriorLoc, afterMyEndLoc);
 }
 
 InheritedTypes::InheritedTypes(const TypeDecl *typeDecl) : Decl(typeDecl) {
@@ -1761,14 +1841,15 @@ Type ExtensionDecl::getExtendedType() const {
 }
 
 bool ExtensionDecl::isObjCImplementation() const {
-  return getAttrs().hasAttribute<ObjCImplementationAttr>();
+  return getAttrs().hasAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
 }
 
 llvm::Optional<Identifier>
 ExtensionDecl::getCategoryNameForObjCImplementation() const {
   assert(isObjCImplementation());
 
-  auto attr = getAttrs().getAttribute<ObjCImplementationAttr>();
+  auto attr = getAttrs()
+                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
   if (attr->isCategoryNameInvalid())
     return llvm::None;
 
@@ -2402,6 +2483,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
 
         switch (getActorIsolation(type)) {
           case ActorIsolation::Unspecified:
+          case ActorIsolation::NonisolatedUnsafe:
           case ActorIsolation::GlobalActorUnsafe:
             break;
 
@@ -3556,12 +3638,6 @@ bool ValueDecl::isFinal() const {
                            getAttrs().hasAttribute<FinalAttr>());
 }
 
-bool ValueDecl::isMoveOnly() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsMoveOnlyRequest{const_cast<ValueDecl *>(this)},
-                           getAttrs().hasAttribute<MoveOnlyAttr>());
-}
-
 bool ValueDecl::isEscapable() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsEscapableRequest{const_cast<ValueDecl *>(this)},
@@ -4249,6 +4325,7 @@ isObjCMemberImplementation(const ValueDecl *VD,
                     ? cast<AccessorDecl>(VD)->getStorage()
                     : VD;
       return !attrDecl->isFinal()
+                  && !attrDecl->getAttrs().hasAttribute<NonObjCAttr>()
                   && !attrDecl->getAttrs().hasAttribute<OverrideAttr>()
                   && getAccessLevel() >= AccessLevel::Internal;
     }
@@ -4786,6 +4863,14 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
+bool TypeDecl::isNoncopyable() const {
+  // NOTE: must answer true iff it is unconditionally noncopyable.
+  return evaluateOrDefault(getASTContext().evaluator,
+                           HasNoncopyableAnnotationRequest{
+                               const_cast<TypeDecl *>(this)},
+                           true); // default to true for safety
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -4844,7 +4929,7 @@ int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
 }
 
 bool NominalTypeDecl::isFormallyResilient() const {
-  // Private and (unversioned) internal types always have a
+  // Private, (unversioned) internal, and package types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true).isPublic())
@@ -7832,6 +7917,15 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
+bool VarDecl::isGlobalStorage() const {
+  if (!hasStorage()) {
+    return false;
+  }
+  const auto *dc = getDeclContext();
+  return isStatic() || dc->isModuleScopeContext() ||
+         (dc->isTypeContext() && !isInstanceMember());
+}
+
 bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
@@ -10439,6 +10533,7 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       switch (auto isolation = closure->getActorIsolation()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
         return false;
@@ -10479,22 +10574,15 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getActorIsolation(vd);
 
   // In the context of the initializing or default-value expression of a
-  // stored property, the isolation varies between instance and type members:
+  // stored property:
   //   - For a static stored property, the isolation matches the VarDecl.
   //     Static properties are initialized upon first use, so the isolation
   //     of the initializer must match the isolation required to access the
   //     property.
-  //   - For a field of a nominal type, the expression can require a specific
-  //     actor isolation. That default expression may only be used from inits
-  //     that meet the required isolation.
+  //   - For a field of a nominal type, the expression can require the same
+  //     actor isolation as the field itself. That default expression may only
+  //     be used from inits that meet the required isolation.
   if (auto *var = dcToUse->getNonLocalVarDecl()) {
-    auto &ctx = dc->getASTContext();
-    if (ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues) &&
-        var->isInstanceMember() &&
-        !var->getAttrs().hasAttribute<LazyAttr>()) {
-      return ActorIsolation::forNonisolated();
-    }
-
     return getActorIsolation(var);
   }
 

@@ -42,7 +42,7 @@ let package = Package(
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
-        "swiftLLVMJSON"
+        "swiftLLVMJSON",
       ],
       path: "Sources/ASTGen",
       swiftSettings: swiftSetttings

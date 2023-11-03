@@ -14,20 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
-#include "swift/Basic/Dwarf.h"
-#include "swift/Demangling/ManglingMacros.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
-#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -36,22 +36,25 @@
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/HeaderSearchOptions.h"
-#include "clang/Basic/CodeGenOptions.h"
-#include "llvm/IR/IRBuilder.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/PreprocessorOptions.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/Frontend/Debug/Options.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Support/ModRef.h"
 
 #include "Callee.h"
 #include "ConformanceDescription.h"
@@ -96,26 +99,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &ClangContext = Importer->getClangASTContext();
 
   auto &CGO = Importer->getCodeGenOpts();
-  if (CGO.OpaquePointers) {
-    LLVMContext.setOpaquePointers(true);
-  } else {
-    LLVMContext.setOpaquePointers(false);
-  }
-
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
   CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
   case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
   switch (Opts.DebugInfoFormat) {
@@ -759,9 +756,10 @@ IRGenModule::~IRGenModule() {
 // They have to be non-local because otherwise we'll get warnings when
 // a particular x-macro expansion doesn't use one.
 namespace RuntimeConstants {
-  const auto ReadNone = llvm::Attribute::ReadNone;
-  const auto ReadOnly = llvm::Attribute::ReadOnly;
-  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
+  const auto ReadNone = llvm::MemoryEffects::none();
+  const auto ReadOnly = llvm::MemoryEffects::readOnly();
+  const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
+  const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
@@ -885,6 +883,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability TypedThrowsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTypedThrowsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability
   MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
     auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
@@ -931,6 +937,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::ConditionallyAvailable;
   }
 
+  RuntimeAvailability ParameterizedExistentialAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getParameterizedExistentialRuntimeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -944,6 +958,16 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
+
+static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effects) {
+    if (effects.empty())
+      return llvm::MemoryEffects::unknown();
+    llvm::MemoryEffects mergedEffects = llvm::MemoryEffects::none();
+    for (auto effect : effects)
+        mergedEffects |= effect;
+    return mergedEffects;
+}
+
 
 namespace {
 bool isStandardLibrary(const llvm::Module &M) {
@@ -984,15 +1008,12 @@ llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                  /*isVararg*/ false);
 }
 
-llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
-                      llvm::Constant *&cache,
-                      const char *name,
-                      llvm::CallingConv::ID cc,
-                      RuntimeAvailability availability,
-                      llvm::ArrayRef<llvm::Type*> retTypes,
-                      llvm::ArrayRef<llvm::Type*> argTypes,
-                      ArrayRef<Attribute::AttrKind> attrs,
-                      IRGenModule *IGM) {
+llvm::Constant *swift::getRuntimeFn(
+    llvm::Module &Module, llvm::Constant *&cache, const char *name,
+    llvm::CallingConv::ID cc, RuntimeAvailability availability,
+    llvm::ArrayRef<llvm::Type *> retTypes,
+    llvm::ArrayRef<llvm::Type *> argTypes, ArrayRef<Attribute::AttrKind> attrs,
+    ArrayRef<llvm::MemoryEffects> memEffects, IRGenModule *IGM) {
 
   if (cache)
     return cache;
@@ -1045,7 +1066,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     if (!isStandardLibrary(Module) && IsExternal &&
         ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
-    
+
     if (IsExternal && isWeakLinked
         && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
@@ -1062,6 +1083,13 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
       else
         buildFnAttr.addAttribute(Attr);
     }
+
+    llvm::MemoryEffects mergedEffects = mergeMemoryEffects(memEffects);
+    if (mergedEffects != llvm::MemoryEffects::unknown()) {
+      buildFnAttr.addAttribute(llvm::Attribute::getWithMemoryEffects(
+          Module.getContext(), mergedEffects));
+    }
+
     fn->addFnAttrs(buildFnAttr);
     fn->addRetAttrs(buildRetAttr);
     fn->addParamAttrs(0, buildFirstParamAttr);
@@ -1110,9 +1138,10 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT) \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS), \
-                QUOTE(ATTRS), QUOTE(EFFECT))
+#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
+                 MEMEFFECTS)                                                   \
+  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS),       \
+                QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
@@ -1120,15 +1149,19 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define ATTRS(...) { __VA_ARGS__ }
 #define NO_ATTRS {}
 #define EFFECT(...) { __VA_ARGS__ }
+#define UNKNOWN_MEMEFFECTS                                                     \
+  {}
+#define MEMEFFECTS(...)                                                        \
+  { __VA_ARGS__ }
 
 #define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
-                      EFFECT)                                                  \
+                      EFFECT, MEMEFFECTS)                                      \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
                         AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
-                        this);                                                 \
+                        MEMEFFECTS, this);                                     \
   }                                                                            \
   FunctionPointer IRGenModule::get##ID##FunctionPointer() {                    \
     using namespace RuntimeConstants;                                          \
@@ -1143,6 +1176,12 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
         attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
       else                                                                     \
         attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
+    }                                                                          \
+    llvm::MemoryEffects effects = mergeMemoryEffects(MEMEFFECTS);              \
+    if (effects != llvm::MemoryEffects::unknown()) {                           \
+      attrs = attrs.addFnAttribute(                                            \
+          getLLVMContext(),                                                    \
+          llvm::Attribute::getWithMemoryEffects(getLLVMContext(), effects));   \
     }                                                                          \
     auto sig = Signature(fnTy, attrs, CC);                                     \
     return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,     \
@@ -1186,7 +1225,7 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
   llvm::Constant *IRGenModule::get##NAME() {                                   \
     if (NAME)                                                                  \
       return NAME;                                                             \
-    NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy);            \
+    NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
     if (useDllStorage() && !isStandardLibrary())                               \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
@@ -1445,7 +1484,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
     buffer += library;
-    if (!library.endswith_insensitive(".lib"))
+    if (!library.ends_with_insensitive(".lib"))
       buffer += ".lib";
     if (quote)
       buffer += '"';
@@ -1789,7 +1828,7 @@ void IRGenModule::emitAutolinkInfo() {
   StringRef AutolinkSectionName = Autolink.getSectionNameMetadata();
 
   auto *Metadata = Module.getOrInsertNamedMetadata(AutolinkSectionName);
-  llvm::SmallSetVector<llvm::MDNode *, 4> Entries;
+  swift::SmallSetVector<llvm::MDNode *, 4> Entries;
 
   // Collect the linker options already in the module (from ClangCodeGen).
   for (auto Entry : Metadata->operands()) {

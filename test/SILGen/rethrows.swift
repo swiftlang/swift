@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-sil -module-name rethrows -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name rethrows -Xllvm -sil-disable-pass=simplification -verify %s | %FileCheck %s
 
 @discardableResult
 func rethrower(_ fn: () throws -> Int) rethrows -> Int {

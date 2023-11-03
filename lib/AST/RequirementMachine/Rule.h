@@ -14,6 +14,7 @@
 #define SWIFT_RULE_H
 
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/None.h"
 
 #include "Symbol.h"
 #include "Term.h"

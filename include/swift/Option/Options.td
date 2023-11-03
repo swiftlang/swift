@@ -991,8 +991,8 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
-    Flags<[FrontendOption]>,
-    HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
+  Flags<[FrontendOption]>,
+  HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 def coverage_prefix_map : Separate<["-"], "coverage-prefix-map">,
   Flags<[FrontendOption]>,
   HelpText<"Remap source paths in coverage info">, MetaVarName<"<prefix=replacement>">;
@@ -1007,6 +1007,10 @@ def file_compilation_dir : Separate<["-"], "file-compilation-dir">,
 def debug_info_format : Joined<["-"], "debug-info-format=">,
   Flags<[FrontendOption]>,
   HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+def dwarf_version : Joined<["-"], "dwarf-version=">,
+  Flags<[FrontendOption]>,
+  HelpText<"DWARF debug info version to produce if requested">,
+  MetaVarName<"<version>">;
 
 def prefix_serialized_debugging_options : Flag<["-"], "prefix-serialized-debugging-options">,
   Flags<[FrontendOption]>,
@@ -1900,6 +1904,19 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
   Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path with a plugin server executable">,
   MetaVarName<"<path>#<plugin-server-path>">;
+  
+def cas_backend: Flag<["-"], "cas-backend">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Enable using CASBackend for object file output">;
+
+def cas_backend_mode: Joined<["-"], "cas-backend-mode=">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"CASBackendMode for output kind">,
+  MetaVarName<"native|casid|verify">;
+
+def cas_emit_casid_file: Flag<["-"], "cas-emit-casid-file">,
+  Flags<[FrontendOption, NoDriverOption]>,
+  HelpText<"Emit .casid file next to object file when CAS Backend is enabled">;
 
 def load_plugin_library:
   Separate<["-"], "load-plugin-library">, Group<plugin_search_Group>,

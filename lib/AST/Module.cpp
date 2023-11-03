@@ -626,7 +626,7 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
   // 'names' in macro role attributes). Since expansions are cached, it doesn't
   // cause duplicated expansions, but different 'unexpandedDecl' may report the
   // same 'ValueDecl'.
-  SmallSetVector<ValueDecl *, 4> macroExpandedDecls;
+  llvm::SmallSetVector<ValueDecl *, 4> macroExpandedDecls;
   for (MissingDecl *unexpandedDecl : unexpandedDecls) {
     unexpandedDecl->forEachMacroExpandedDecl([&](ValueDecl *vd) {
       macroExpandedDecls.insert(vd);
@@ -1331,6 +1331,11 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::getTopLevelDeclsWithAuxiliaryDecls(
+    SmallVectorImpl<Decl *> &Results) const {
+  FORWARD(getTopLevelDeclsWithAuxiliaryDecls, (Results));
+}
+
 void ModuleDecl::dumpDisplayDecls() const {
   SmallVector<Decl *, 32> Decls;
   getDisplayDecls(Decls);
@@ -1681,12 +1686,12 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol,
                                                      bool allowMissing) {
   // If we are recursively checking for implicit conformance of a nominal
-  // type to Sendable, fail without evaluating this request. This
+  // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
   LookupConformanceInModuleRequest request{{this, type, protocol}};
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
-      GetImplicitSendableRequest icvRequest{nominal};
+      ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request))
         return ProtocolConformanceRef::forInvalid();
@@ -1795,16 +1800,21 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
-  // Only metatypes of Copyable types are Copyable.
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) &&
-      !metatypeType->getInstanceType()->isNoncopyable()) {
-    return ProtocolConformanceRef(
-        ctx.getBuiltinConformance(type, protocol,
-                                  BuiltinConformanceKind::Synthesized));
+  if (!ctx.LangOpts.hasFeature(swift::Feature::NoncopyableGenerics) &&
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
+    // Only metatypes of Copyable types are Copyable.
+    if (metatypeType->getInstanceType()->isNoncopyable()) {
+      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+    } else {
+      return ProtocolConformanceRef(
+          ctx.getBuiltinConformance(type, protocol,
+                                    BuiltinConformanceKind::Synthesized));
+    }
   }
 
-  // All metatypes are Sendable
-  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+  // All metatypes are Sendable and Copyable
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -1876,9 +1886,10 @@ LookupConformanceInModuleRequest::evaluate(
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
-    // All archetypes conform to Copyable since they represent a generic.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
-      return ProtocolConformanceRef(protocol);
+    // Without noncopyable generics, all archetypes are Copyable
+    if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable))
+        return ProtocolConformanceRef(protocol);
 
     // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
@@ -1972,7 +1983,8 @@ LookupConformanceInModuleRequest::evaluate(
   if (!nominal->lookupConformance(protocol, conformances)) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       // Try to infer Sendable conformance.
-      GetImplicitSendableRequest cvRequest{nominal};
+      ImplicitKnownProtocolConformanceRequest
+          cvRequest{nominal, KnownProtocolKind::Sendable};
       if (auto conformance = evaluateOrDefault(
               ctx.evaluator, cvRequest, nullptr)) {
         conformances.clear();
@@ -2001,16 +2013,27 @@ LookupConformanceInModuleRequest::evaluate(
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
     } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      // Only move-only nominals are not Copyable
-      if (nominal->isMoveOnly()) {
-        return ProtocolConformanceRef::forInvalid();
+
+      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+        // Return an abstract conformance to maintain legacy compatability.
+        // We only need to do this until we are properly dealing with or
+        // omitting Copyable conformances in modules/interfaces.
+
+        if (nominal->isNoncopyable())
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        else
+          return ProtocolConformanceRef(protocol);
+      }
+
+      // Try to infer Copyable conformance.
+      ImplicitKnownProtocolConformanceRequest
+          cvRequest{nominal, KnownProtocolKind::Copyable};
+      if (auto conformance = evaluateOrDefault(
+          ctx.evaluator, cvRequest, nullptr)) {
+        conformances.clear();
+        conformances.push_back(conformance);
       } else {
-        // Specifically do not create a concrete conformance to Copyable. At
-        // this stage, we don't even want Copyable to appear in swiftinterface
-        // files, which will happen for a marker protocol that's registered
-        // in a nominal type's conformance table. We can reconsider this
-        // decision later once there's a clearer picture of noncopyable generics
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
     } else {
       // Was unable to infer the missing conformance.
@@ -2909,6 +2932,23 @@ ModuleDecl::getDeclaringModuleAndBystander() {
   return *(declaringModuleAndBystander = {nullptr, Identifier()});
 }
 
+bool ModuleDecl::isClangOverlayOf(ModuleDecl *potentialUnderlying) {
+  return getUnderlyingModuleIfOverlay() == potentialUnderlying;
+}
+
+bool ModuleDecl::isSameModuleLookingThroughOverlays(
+  ModuleDecl *other) {
+  if (this == other) {
+    return true;
+  }
+
+  if (this->isClangOverlayOf(other) || other->isClangOverlayOf(this)) {
+    return true;
+  }
+
+  return false;
+}
+
 bool ModuleDecl::isCrossImportOverlayOf(ModuleDecl *other) {
   ModuleDecl *current = this;
   ModuleDecl *otherClang = other->getUnderlyingModuleIfOverlay();
@@ -3060,7 +3100,9 @@ void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
 void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   std::set<DeclKind> MajorDeclKinds = {DeclKind::Class, DeclKind::Enum,
     DeclKind::Extension, DeclKind::Protocol, DeclKind::Struct};
-  for (auto decl : getTopLevelDecls()) {
+  SmallVector<Decl *> topLevelDecls;
+  getTopLevelDeclsWithAuxiliaryDecls(topLevelDecls);
+  for (auto decl : topLevelDecls) {
     if (!decl->shouldPrintInContext(PO))
       continue;
     // For a major decl, we print an empty line before it.
@@ -4155,14 +4197,18 @@ void FileUnit::getTopLevelDeclsWhereAttributesMatch(
 
 void FileUnit::getTopLevelDeclsWithAuxiliaryDecls(
     SmallVectorImpl<Decl*> &results) const {
+
+  std::function<void(Decl *)> addResult;
+  addResult = [&](Decl *decl) {
+    results.push_back(decl);
+    decl->visitAuxiliaryDecls(addResult);
+  };
+
   SmallVector<Decl *, 32> nonExpandedDecls;
   nonExpandedDecls.reserve(results.capacity());
   getTopLevelDecls(nonExpandedDecls);
   for (auto *decl : nonExpandedDecls) {
-    decl->visitAuxiliaryDecls([&](Decl *auxDecl) {
-      results.push_back(auxDecl);
-    });
-    results.push_back(decl);
+    addResult(decl);
   }
 }
 

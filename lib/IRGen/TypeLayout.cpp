@@ -2246,13 +2246,13 @@ bool EnumTypeLayoutEntry::buildSinglePayloadRefCountString(
       auto tzCount = mask.countTrailingZeros();
       auto shiftedMask = mask.lshr(tzCount);
       auto toCount = shiftedMask.countTrailingOnes();
-      if (mask.countPopulation() > 64 || toCount != mask.countPopulation() ||
+      if (mask.popcount() > 64 || toCount != mask.popcount() ||
           (tzCount % toCount != 0)) {
         // We currently don't handle cases with non-contiguous or > 64 bits of
         // extra inhabitants
         isSimple = false;
       } else {
-        xiBitCount = std::min(64u, mask.countPopulation());
+        xiBitCount = std::min(64u, mask.popcount());
         xiBitOffset = mask.countTrailingZeros();
         zeroTagValue = lowValue.extractBitsAsZExtValue(xiBitCount, xiBitOffset);
       }

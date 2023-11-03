@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/Runtime.swift
-// RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
+// RUN: %target-build-swift -parse-stdlib -module-name a -enable-experimental-feature Extern %t/Runtime.swift -o %t.out
 // RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
@@ -24,8 +24,7 @@ import SwiftShims
 #error("Unsupported platform")
 #endif
 
-@_silgen_name("swift_demangle")
-public
+@extern(c, "swift_demangle")
 func _stdlib_demangleImpl(
   mangledName: UnsafePointer<CChar>?,
   mangledNameLength: UInt,

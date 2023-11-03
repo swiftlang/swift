@@ -95,6 +95,10 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
+option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
+        "Emit api descriptors for the standard library"
+        FALSE)
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
@@ -163,6 +167,10 @@ set(SWIFT_STDLIB_EXTRA_C_COMPILE_FLAGS "" CACHE STRING
 option(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK
        "Should stdlib be built with -experimental-hermetic-seal-at-link"
        FALSE)
+
+option(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS
+      "Should stdlib be built with -experimental-feature NoncopyableGenerics"
+      FALSE)
 
 option(SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
        "Build stdlib without a custom implementation of MetadataAllocator, relying on malloc+free instead."

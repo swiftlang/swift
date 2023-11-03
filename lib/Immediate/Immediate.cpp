@@ -42,7 +42,10 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+
+// TODO: Replace pass manager
+//       Removed in: d623b2f95fd559901f008a0588dddd0949a8db01
+/* #include "llvm/Transforms/IPO/PassManagerBuilder.h" */
 
 #define DEBUG_TYPE "swift-immediate"
 
@@ -255,15 +258,15 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                           const IRGenOptions &IRGenOpts,
                           const SILOptions &SILOpts,
                           std::unique_ptr<SILModule> &&SM) {
-  
+
   auto &Context = CI.getASTContext();
-  
+
   // Load libSwiftCore to setup process arguments.
   //
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
   // Setup interpreted process arguments.
-  using ArgOverride = void (* SWIFT_CC(swift))(const char **, int);
+  using ArgOverride = void (*SWIFT_CC(swift))(const char **, int);
 #if defined(_WIN32)
   auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {
@@ -273,15 +276,15 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   }
   auto module = static_cast<HMODULE>(stdlib);
   auto emplaceProcessArgs = reinterpret_cast<ArgOverride>(
-    GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
+      GetProcAddress(module, "_swift_stdlib_overrideUnsafeArgvArgc"));
   if (emplaceProcessArgs == nullptr)
     return -1;
 #else
   // In case the compiler is built with swift modules, it already has the stdlib
   // linked to. First try to lookup the symbol with the standard library
   // resolving.
-  auto emplaceProcessArgs
-     = (ArgOverride)dlsym(RTLD_DEFAULT, "_swift_stdlib_overrideUnsafeArgvArgc");
+  auto emplaceProcessArgs =
+      (ArgOverride)dlsym(RTLD_DEFAULT, "_swift_stdlib_overrideUnsafeArgvArgc");
 
   if (dlerror()) {
     // If this does not work (= the Swift modules are not linked to the tool),
@@ -293,8 +296,8 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
       return -1;
     }
     dlerror();
-    emplaceProcessArgs
-            = (ArgOverride)dlsym(stdlib, "_swift_stdlib_overrideUnsafeArgvArgc");
+    emplaceProcessArgs =
+        (ArgOverride)dlsym(stdlib, "_swift_stdlib_overrideUnsafeArgvArgc");
     if (dlerror())
       return -1;
   }

@@ -382,7 +382,15 @@ void IRGenModule::addVTableTypeMetadata(
   using VCallVisibility = llvm::GlobalObject::VCallVisibility;
   VCallVisibility vis = VCallVisibility::VCallVisibilityPublic;
   auto AS = decl->getFormalAccessScope();
-  if (AS.isFileScope()) {
+  if (decl->isObjC()) {
+    // Swift methods are called from Objective-C via objc_MsgSend
+    // and thus such call sites are not taken into consideration
+    // by VFE in GlobalDCE. We cannot for the timebeing at least
+    // safely eliminate a virtual function that might be called from
+    // Objective-C. Setting vcall_visibility to public ensures this is
+    // prevented.
+    vis = VCallVisibility::VCallVisibilityPublic;
+  } else if (AS.isFileScope()) {
     vis = VCallVisibility::VCallVisibilityTranslationUnit;
   } else if (AS.isPrivate() || AS.isInternal()) {
     vis = VCallVisibility::VCallVisibilityLinkageUnit;
@@ -6138,7 +6146,7 @@ namespace {
             IGF.IGM.getGetForeignTypeMetadataFunctionPointer(),
             {request.get(IGF), candidate});
         call->addFnAttr(llvm::Attribute::NoUnwind);
-        call->addFnAttr(llvm::Attribute::ReadNone);
+        call->setDoesNotAccessMemory();
 
         return MetadataResponse::handle(IGF, request, call);
       });

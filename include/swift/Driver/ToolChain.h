@@ -18,7 +18,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Option.h"
 
 #include <memory>

@@ -340,6 +340,13 @@ public:
     return isAddressOnly(type, tc, sig, TypeExpansionContext::minimal());
   }
 
+  /// Return true if this type must be thrown indirectly.
+  static bool isFormallyThrownIndirectly(CanType type,
+                                         Lowering::TypeConverter &tc,
+                                         CanGenericSignature sig) {
+    return isAddressOnly(type, tc, sig, TypeExpansionContext::minimal());
+  }
+
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
   bool isLoadable(const SILFunction &F) const {
@@ -877,6 +884,11 @@ public:
   }
 
   bool isMarkedAsImmortal() const;
+
+  bool isActor() const { return getASTType()->isActorType(); }
+
+  /// Returns true if this function conforms to the Sendable protocol.
+  bool isSendable(SILFunction *fn) const;
 
   ProtocolConformanceRef conformsToProtocol(SILFunction *fn,
                                             ProtocolDecl *protocol) const;

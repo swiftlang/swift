@@ -16,6 +16,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 
+#include "llvm/ADT/Optional.h"
+
 #include <string>
 #include <vector>
 

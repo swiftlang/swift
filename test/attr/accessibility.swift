@@ -5,26 +5,26 @@ private // expected-note {{modifier already specified here}}
 private // expected-error {{duplicate modifier}}
 func duplicateAttr() {}
 
-private // expected-note {{modifier already specified here}}
-public // expected-error {{duplicate modifier}}
+private // expected-note {{previous modifier specified here}}
+public // expected-error {{multiple incompatible access-level modifiers specified}}
 func duplicateAttrChanged() {}
 
-private // expected-note 2 {{modifier already specified here}}
-public // expected-error {{duplicate modifier}}
-internal // expected-error {{duplicate modifier}}
+private // expected-note 2 {{previous modifier specified here}}
+public // expected-error {{multiple incompatible access-level modifiers specified}}
+internal // expected-error {{multiple incompatible access-level modifiers specified}}
 func triplicateAttrChanged() {}
 
-private // expected-note 3 {{modifier already specified here}}
-public // expected-error {{duplicate modifier}}
-package // expected-error {{duplicate modifier}}
-internal // expected-error {{duplicate modifier}}
+private // expected-note 3 {{previous modifier specified here}}
+public // expected-error {{multiple incompatible access-level modifiers specified}}
+package // expected-error {{multiple incompatible access-level modifiers specified}}
+internal // expected-error {{multiple incompatible access-level modifiers specified}}
 func quadruplicateAttrChanged() {}
 
-private // expected-note 4 {{modifier already specified here}}
-public // expected-error {{duplicate modifier}}
-package // expected-error {{duplicate modifier}}
-internal // expected-error {{duplicate modifier}}
-fileprivate // expected-error {{duplicate modifier}}
+private // expected-note 4 {{previous modifier specified here}}
+public // expected-error {{multiple incompatible access-level modifiers specified}}
+package // expected-error {{multiple incompatible access-level modifiers specified}}
+internal // expected-error {{multiple incompatible access-level modifiers specified}}
+fileprivate // expected-error {{multiple incompatible access-level modifiers specified}}
 func quintuplicateAttrChanged() {}
 
 private(set)
@@ -51,22 +51,22 @@ internal(set)
 package
 var customSetter6 = 0
 
-private(set) // expected-note {{modifier already specified here}}
-public(set) // expected-error {{duplicate modifier}}
+private(set) // expected-note {{previous modifier specified here}}
+public(set) // expected-error {{multiple incompatible access-level modifiers specified}}
 var customSetterDuplicateAttr = 0
 
-private(set) // expected-note {{modifier already specified here}}
-public // expected-note {{modifier already specified here}}
-public(set) // expected-error {{duplicate modifier}}
-private // expected-error {{duplicate modifier}}
+private(set) // expected-note {{previous modifier specified here}}
+public // expected-note {{previous modifier specified here}}
+public(set) // expected-error {{multiple incompatible access-level modifiers specified}}
+private // expected-error {{multiple incompatible access-level modifiers specified}}
 var customSetterDuplicateAttrsAllAround = 0
 
-private(set) // expected-note {{modifier already specified here}}
-package(set) // expected-error {{duplicate modifier}}
+private(set) // expected-note {{previous modifier specified here}}
+package(set) // expected-error {{multiple incompatible access-level modifiers specified}}
 var customSetterDuplicateAttr2 = 0
 
-package(set) // expected-note {{modifier already specified here}}
-public(set) // expected-error {{duplicate modifier}}
+package(set) // expected-note {{previous modifier specified here}}
+public(set) // expected-error {{multiple incompatible access-level modifiers specified}}
 public var customSetterDuplicateAttr3 = 0
 
 private(get) // expected-error{{expected 'set' as subject of 'private' modifier}}

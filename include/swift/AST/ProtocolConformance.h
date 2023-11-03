@@ -306,6 +306,11 @@ public:
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
 
+  /// Determines whether this conformance is retroactive; that is, if the
+  /// conformance's declaration is in a different module from both the
+  /// conforming type and the protocol.
+  bool isRetroactive() const;
+
   /// Print a parseable and human-readable description of the identifying
   /// information of the protocol conformance.
   void printName(raw_ostream &os,

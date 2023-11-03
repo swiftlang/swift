@@ -55,6 +55,7 @@ TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
 TYPE_ATTR(Sendable)
+TYPE_ATTR(retroactive)
 TYPE_ATTR(unchecked)
 TYPE_ATTR(_local)
 TYPE_ATTR(_noMetadata)
@@ -420,8 +421,8 @@ DECL_ATTR(_section, Section,
 DECL_ATTR(_rawLayout, RawLayout,
   OnStruct | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   146)
-DECL_ATTR(_extern, Extern,
-  OnFunc | ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+DECL_ATTR(extern, Extern,
+  OnFunc | AllowMultipleAttributes | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   147)
 SIMPLE_DECL_ATTR(_nonEscapable, NonEscapable,
   OnNominalType | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
@@ -498,7 +499,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
 SIMPLE_DECL_ATTR(reasync, Reasync,
   OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   109)
-CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
+CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   112)
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,

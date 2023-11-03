@@ -33,6 +33,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -540,6 +541,13 @@ public:
   ///  module if one exists.
   ModuleDecl *getUnderlyingModuleIfOverlay() const;
 
+  /// Returns true if this module is the Clang overlay of \p other.
+  bool isClangOverlayOf(ModuleDecl *other);
+
+  /// Returns true if this module is the same module or either module is a clang
+  /// overlay of the other.
+  bool isSameModuleLookingThroughOverlays(ModuleDecl *other);
+
   /// Returns true if this module is an underscored cross import overlay
   /// declared by \p other or its underlying clang module, either directly or
   /// transitively (via intermediate cross-import overlays - for cross-imports
@@ -958,6 +966,10 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
+
+  /// Finds all top-level decls of this module including auxiliary decls.
+  void
+  getTopLevelDeclsWithAuxiliaryDecls(SmallVectorImpl<Decl *> &Results) const;
 
   void getExportedPrespecializations(SmallVectorImpl<Decl *> &results) const;
 

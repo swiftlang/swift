@@ -40,6 +40,8 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Alignment.h"
 
 using namespace swift;
 using namespace irgen;
@@ -363,14 +365,14 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
         continue;
     }
 
-    auto offset =
+    Size offset =
         Size(i * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-    auto alignment = IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+    llvm::Align alignment = IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
     // Load metadata describing argument value from argument types buffer.
     auto typeLoc = IGF.emitAddressAtOffset(
         argumentTypes, Offset(offset), IGM.TypeMetadataPtrTy,
-        Alignment(alignment), "arg_type_loc");
+        Alignment(alignment.value()), "arg_type_loc");
 
     auto *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
@@ -693,7 +695,7 @@ void DistributedAccessor::emit() {
   }
 
   // Add all of the substitutions to the explosion
-  if (auto *genericEnvironment = Target->getGenericEnvironment()) {
+  if (Target->isGeneric()) {
     // swift.type **
     llvm::Value *substitutionBuffer =
         IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
@@ -719,12 +721,12 @@ void DistributedAccessor::emit() {
     for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
       auto offset =
           Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-      auto alignment =
-          IGM.DataLayout.getABITypeAlignment(IGM.TypeMetadataPtrTy);
+      llvm::Align alignment =
+          IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
 
-      auto substitution =
-          IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
-                                  IGM.TypeMetadataPtrTy, Alignment(alignment));
+      auto substitution = IGF.emitAddressAtOffset(
+          substitutionBuffer, Offset(offset), IGM.TypeMetadataPtrTy,
+          Alignment(alignment.value()));
       arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
     }
 
@@ -817,7 +819,9 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
   // is passed indirectly. This is good for structs and enums because
   // `decodeNextArgument` is a mutating method, but not for classes because
   // in that case heap object is mutated directly.
-  if (isa<ClassDecl>(decoderDecl)) {
+  bool usesDispatchThunk = false;
+
+  if (auto classDecl = dyn_cast<ClassDecl>(decoderDecl)) {
     auto selfTy = methodTy->getSelfParameter().getSILStorageType(
         IGM.getSILModule(), methodTy, expansionContext);
 
@@ -836,15 +840,28 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
                        instance);
 
     decoder = instance.claimNext();
+
+    /// When using library evolution functions have another "dispatch thunk"
+    /// so we must use this instead of the decodeFn directly.
+    usesDispatchThunk =
+        getMethodDispatch(decodeFn) == swift::MethodDispatch::Class &&
+        classDecl->hasResilientMetadata();
   }
 
-  auto *decodeSIL = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
-  auto *fnPtr = IGM.getAddrOfSILFunction(decodeSIL, NotForDefinition,
-                                         /*isDynamicallyReplaceable=*/false);
+  FunctionPointer methodPtr;
 
-  auto methodPtr = FunctionPointer::forDirect(
-    classifyFunctionPointerKind(decodeSIL), fnPtr,
-    /*secondaryValue=*/nullptr, signature);
+  if (usesDispatchThunk) {
+    auto fnPtr = IGM.getAddrOfDispatchThunk(SILDeclRef(decodeFn), NotForDefinition);
+    methodPtr = FunctionPointer::createUnsigned(
+        methodTy, fnPtr, signature, /*useSignature=*/true);
+  } else {
+    SILFunction *decodeSILFn = IGM.getSILModule().lookUpFunction(SILDeclRef(decodeFn));
+    auto fnPtr = IGM.getAddrOfSILFunction(decodeSILFn, NotForDefinition,
+        /*isDynamicallyReplaceable=*/false);
+    methodPtr = FunctionPointer::forDirect(
+        classifyFunctionPointerKind(decodeSILFn), fnPtr,
+        /*secondaryValue=*/nullptr, signature);
+  }
 
   return {decoder, decoderTy, witnessTable, methodPtr, methodTy};
 }

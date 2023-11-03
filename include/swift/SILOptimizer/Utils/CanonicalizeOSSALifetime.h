@@ -256,7 +256,7 @@ private:
   ///
   /// These blocks are not necessarily in the pruned live blocks since
   /// pruned liveness does not consider destroy_values.
-  SmallSetVector<SILBasicBlock *, 8> consumingBlocks;
+  llvm::SmallSetVector<SILBasicBlock *, 8> consumingBlocks;
 
   /// Record all interesting debug_value instructions here rather then treating
   /// them like a normal use. An interesting debug_value is one that may lie

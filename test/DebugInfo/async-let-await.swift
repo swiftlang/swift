@@ -3,6 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  
@@ -12,7 +13,7 @@ public func getVegetables() async -> [String] {
 public func chopVegetables() async throws -> [String] {
   let veggies = await getVegetables()
   // CHECK-NOT: {{^define }}
-  // CHECK:  call void @llvm.dbg.declare(metadata ptr %0, metadata ![[V:[0-9]+]], metadata !DIExpression(DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_plus_uconst, {{[0-9]+}})
+  // CHECK:  call void @llvm.dbg.declare(metadata ptr %0, metadata ![[V:[0-9]+]], metadata !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_deref, DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_plus_uconst, {{[0-9]+}})
   // CHECK: ![[V]] = !DILocalVariable(name: "veggies"
   return veggies.map { "chopped \($0)" }
 }

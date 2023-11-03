@@ -108,7 +108,7 @@ static VarDecl *addImplicitDistributedActorIDProperty(
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
   // mark as @_compilerInitialized, since we synthesize the initializing
   // assignment during SILGen.
   propDecl->getAttrs().add(
@@ -158,7 +158,7 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   auto idProperty = nominal->getDistributedActorIDProperty();
   // If the id was not yet synthesized, we need to ensure that eventually
@@ -333,7 +333,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto *makeInvocationArgs = ArgumentList::createImplicit(C, {});
     auto makeInvocationCallExpr =
         CallExpr::createImplicit(C, makeInvocationExpr, makeInvocationArgs);
-    makeInvocationCallExpr->setThrows(false);
+    makeInvocationCallExpr->setThrows(nullptr);
 
     auto invocationEncoderPB = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, invocationPattern, makeInvocationCallExpr,
@@ -524,6 +524,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   {
     auto doneRecordingDecl =
         C.getDoneRecordingOnDistributedInvocationEncoder(invocationEncoderDecl);
+    assert(doneRecordingDecl && "Could not find 'doneRecording' ad-hoc requirement witness.");
     auto doneRecordingDeclRef =
         UnresolvedDeclRefExpr::createImplicit(C, doneRecordingDecl->getName());
 
@@ -734,7 +735,8 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->getAttrs().add(new (C) NonisolatedAttr(/*isImplicit=*/true));
+  thunk->getAttrs().add(
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   if (isa<ClassDecl>(DC))
     thunk->getAttrs().add(new (C) FinalAttr(/*isImplicit=*/true));

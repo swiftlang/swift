@@ -1066,7 +1066,7 @@ void IRGenModule::addObjCClassStub(llvm::Constant *classPtr) {
 
 void IRGenModule::addRuntimeResolvableType(GenericTypeDecl *type) {
   // Collect the nominal type records we emit into a special section.
-  if (type->isMoveOnly()) {
+  if (type->isNoncopyable()) {
     // Older runtimes should not be allowed to discover noncopyable types, since
     // they will try to expose them dynamically as copyable types. Record
     // noncopyable type descriptors in a separate vector so that future
@@ -1250,12 +1250,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
     return false;
 
   if (f.getDynamicallyReplacedFunction())
-    return false;
-
-  // Needed by lldb to print global variables which are propagated by the
-  // mandatory GlobalOpt.
-  if (m.getOptions().OptMode == OptimizationMode::NoOptimization &&
-      f.isGlobalInit())
     return false;
 
   return true;
@@ -2410,7 +2404,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
     // an associated DeclContext and are serialized into the current module.  As
     // a result, we explicitly handle SIL Functions here. We do not expect other
     // types to be referenced directly.
-    isKnownLocal = entity.getSILFunction()->isStaticallyLinked();
+    if (const auto *MD = entity.getSILFunction()->getParentModule())
+      isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
   }
 
   bool weakImported = entity.isWeakImported(swiftModule);
@@ -2757,11 +2752,6 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   if (gvar) {
     if (forDefinition) {
       updateLinkageForDefinition(*this, gvar, entity);
-
-      if (var->getStaticInitializerValue()) {
-        assert(gvar->hasInitializer() &&
-               "global variable referenced before created");
-      }
     }
     if (forDefinition && !gvar->hasInitializer())
       initVal = getGlobalInitValue(var, storageType, fixedAlignment);
@@ -2935,8 +2925,10 @@ static void addLLVMFunctionAttributes(SILFunction *f, Signature &signature) {
   }
 
   if (isReadOnlyFunction(f)) {
-    attrs = attrs.addFnAttribute(signature.getType()->getContext(),
-                                 llvm::Attribute::ReadOnly);
+    auto &ctx = signature.getType()->getContext();
+    attrs =
+        attrs.addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                      ctx, llvm::MemoryEffects::readOnly()));
   }
 }
 
@@ -3575,6 +3567,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // Mark as llvm.used if @_used, set section if @_section
   if (f->markedAsUsed())
     addUsedGlobal(fn);
+
   if (!f->section().empty())
     fn->setSection(f->section());
 
@@ -3589,6 +3582,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     attrBuilder.addAttribute("wasm-import-module", f->wasmImportModuleName());
   }
   fn->addFnAttrs(attrBuilder);
+
+  // Also mark as llvm.used any functions that should be kept for the debugger.
+  // Only definitions should be kept.
+  if (f->shouldBePreservedForDebugger() && !fn->isDeclaration())
+    addUsedGlobal(fn);
 
   // If `hasCReferences` is true, then the function is either marked with
   // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition

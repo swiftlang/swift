@@ -209,6 +209,7 @@ cmake ^
 
   -D CMAKE_Swift_COMPILER="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin/swiftc.exe" ^
   -D CMAKE_Swift_FLAGS="-sdk %BuildRoot%/toolchains/5.9.0/Library/Developer/Platforms/Windows.platform/Developer/SDKs/Windows.sdk" ^
+  -D SWIFT_CLANG_LOCATION="%BuildRoot%/toolchains/5.9.0/Library/Developer/Toolchains/unknown-Asserts-development.xctoolchain/usr/bin" ^
 
   -D LLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc ^
 
@@ -1010,6 +1011,10 @@ move %PackageRoot%\online\Release\amd64\*.msi %BuildRoot%\artifacts\online\ || (
 
 :: Workaround for lack of control over Jenkins ...
 copy %BuildRoot%\artifacts\offline\installer.exe %BuildRoot%\artifacts\
+
+:: Detach the engine for CodeSigning simplicity
+md %BuildRoot%\artifacts\offline\extracted\
+"WiX-4.0.1\tools\net6.0\any\wix.exe" burn detach %BuildRoot%\artifacts\offline\installer.exe -engine %BuildRoot%\artifacts\installer-engine.exe -intermediateFolder %BuildRoot%\artifacts\offline\extracted\
 
 goto :eof
 endlocal

@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
 // RUN: %target-swift-frontend -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -swift-version 6 -I %t %s %s -emit-sil -o /dev/null -verify -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: asserts
 

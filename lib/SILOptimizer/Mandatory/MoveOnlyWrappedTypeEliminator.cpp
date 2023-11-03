@@ -51,10 +51,10 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
-  const SmallSetVector<SILArgument *, 8> &touchedArgs;
+  const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs;
 
   SILMoveOnlyWrappedTypeEliminatorVisitor(
-      const SmallSetVector<SILArgument *, 8> &touchedArgs)
+      const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs)
       : touchedArgs(touchedArgs) {}
 
   bool visitSILInstruction(SILInstruction *inst) {
@@ -294,8 +294,8 @@ static bool isMoveOnlyWrappedTrivial(SILValue value) {
 bool SILMoveOnlyWrappedTypeEliminator::process() {
   bool madeChange = true;
 
-  SmallSetVector<SILArgument *, 8> touchedArgs;
-  SmallSetVector<SILInstruction *, 8> touchedInsts;
+  llvm::SmallSetVector<SILArgument *, 8> touchedArgs;
+  llvm::SmallSetVector<SILInstruction *, 8> touchedInsts;
 
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {

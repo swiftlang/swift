@@ -433,7 +433,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
     // We can match the suffix of the type so long as everything preceding the
     // match is neither a lowercase letter nor a '_'. This ignores type
     // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
-    if (typeWord.endswith_insensitive(nameWord) &&
+    if (typeWord.ends_with_insensitive(nameWord) &&
         !clang::isLowercase(typeWord[typeWord.size() - nameWord.size()])) {
       // Check that everything preceding the match is neither a lowercase letter
       // nor a '_'.
@@ -446,7 +446,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
 
     // We can match a prefix so long as everything following the match is
     // a number.
-    if (typeWord.startswith_insensitive(nameWord)) {
+    if (typeWord.starts_with_insensitive(nameWord)) {
       for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
         if (!clang::isDigit(typeWord[i])) return false;
       }

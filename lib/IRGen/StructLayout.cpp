@@ -71,7 +71,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   auto deinit = (decl && decl->getValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = (decl && decl->isMoveOnly())
+  auto copyable = (decl && decl->isNoncopyable())
     ? IsNotCopyable : IsCopyable;
 
   // Handle a raw layout specification on a struct.
@@ -440,7 +440,7 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
 
       // The padding can be used as spare bits by enum layout.
       auto numBits = Size(paddingRequired).getValueInBits();
-      auto mask = llvm::APInt::getAllOnesValue(numBits);
+      auto mask = llvm::APInt::getAllOnes(numBits);
       CurSpareBits.push_back(SpareBitVector::fromAPInt(mask));
     }
   }

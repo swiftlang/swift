@@ -57,6 +57,11 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   SmallVectorImpl<StructuralRequirement> &result,
                                   SmallVectorImpl<RequirementError> &errors);
 
+void expandDefaultRequirements(ASTContext &ctx,
+                               SmallVectorImpl<Type> const& subjects,
+                               SmallVectorImpl<StructuralRequirement> &result,
+                               SmallVectorImpl<RequirementError> &errors);
+
 // Defined in ConcreteContraction.cpp.
 bool performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,

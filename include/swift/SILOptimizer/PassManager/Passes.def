@@ -367,7 +367,7 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
-PASS(SendNonSendable, "send-non-sendable",
+PASS(TransferNonSendable, "transfer-non-sendable",
      "Checks calls that send non-sendable values between isolation domains")
 PASS(SILGenCleanup, "silgen-cleanup",
      "Cleanup SIL in preparation for diagnostics")
@@ -493,6 +493,8 @@ SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 SWIFT_SILCOMBINE_PASS(RetainValueInst)
 SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
+SWIFT_SILCOMBINE_PASS(CopyValueInst)
+SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

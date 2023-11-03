@@ -88,7 +88,7 @@ class MoveOnlyBorrowToDestructureTransformPass : public SILFunctionTransform {
 
     auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
 
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         moveIntroducersToProcess;
     DiagnosticEmitter diagnosticEmitter(getFunction());
 

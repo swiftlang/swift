@@ -433,51 +433,58 @@ void ValueStorageMap::replaceValue(SILValue oldValue, SILValue newValue) {
 }
 
 #ifndef NDEBUG
-void ValueStorage::dump() const {
-  llvm::dbgs() << "projectedStorageID: " << projectedStorageID << "\n";
-  llvm::dbgs() << "projectedOperandNum: " << projectedOperandNum << "\n";
-  llvm::dbgs() << "isDefProjection: " << isDefProjection << "\n";
-  llvm::dbgs() << "isUseProjection: " << isUseProjection << "\n";
-  llvm::dbgs() << "isRewritten: " << isRewritten << "\n";
-  llvm::dbgs() << "initializes: " << initializes << "\n";
+void ValueStorage::print(llvm::raw_ostream &OS) const {
+  OS << "projectedStorageID: " << projectedStorageID << "\n";
+  OS << "projectedOperandNum: " << projectedOperandNum << "\n";
+  OS << "isDefProjection: " << isDefProjection << "\n";
+  OS << "isUseProjection: " << isUseProjection << "\n";
+  OS << "isRewritten: " << isRewritten << "\n";
+  OS << "initializes: " << initializes << "\n";
 }
-void ValueStorageMap::ValueStoragePair::dump() const {
-  llvm::dbgs() << "value: ";
-  value->dump();
-  llvm::dbgs() << "address:  ";
+void ValueStorage::dump() const { print(llvm::dbgs()); }
+void ValueStorageMap::ValueStoragePair::print(llvm::raw_ostream &OS) const {
+  OS << "value: ";
+  value->print(OS);
+  OS << "address:  ";
   if (storage.storageAddress)
-    storage.storageAddress->dump();
+    storage.storageAddress->print(OS);
   else
-    llvm::dbgs() << "UNKNOWN!\n";
-  storage.dump();
+    OS << "UNKNOWN!\n";
+  storage.print(OS);
 }
-void ValueStorageMap::dumpProjections(SILValue value) {
+void ValueStorageMap::ValueStoragePair::dump() const { print(llvm::dbgs()); }
+void ValueStorageMap::printProjections(SILValue value,
+                                       llvm::raw_ostream &OS) const {
   for (auto *pair : getProjections(value)) {
-    pair->dump();
+    pair->print(OS);
   }
 }
-void ValueStorageMap::dump() {
-  llvm::dbgs() << "ValueStorageMap:\n";
+void ValueStorageMap::dumpProjections(SILValue value) const {
+  printProjections(value, llvm::dbgs());
+}
+void ValueStorageMap::print(llvm::raw_ostream &OS) const {
+  OS << "ValueStorageMap:\n";
   for (unsigned ordinal : indices(valueVector)) {
     auto &valStoragePair = valueVector[ordinal];
-    llvm::dbgs() << "value: ";
-    valStoragePair.value->dump();
+    OS << "value: ";
+    valStoragePair.value->print(OS);
     auto &storage = valStoragePair.storage;
     if (storage.isUseProjection) {
-      llvm::dbgs() << "  use projection: ";
+      OS << "  use projection: ";
       if (!storage.isRewritten)
-        valueVector[storage.projectedStorageID].value->dump();
+        valueVector[storage.projectedStorageID].value->print(OS);
     } else if (storage.isDefProjection) {
-      llvm::dbgs() << "  def projection: ";
+      OS << "  def projection: ";
       if (!storage.isRewritten)
-        valueVector[storage.projectedStorageID].value->dump();
+        valueVector[storage.projectedStorageID].value->print(OS);
     }
     if (storage.storageAddress) {
-      llvm::dbgs() << "  storage: ";
-      storage.storageAddress->dump();
+      OS << "  storage: ";
+      storage.storageAddress->print(OS);
     }
   }
 }
+void ValueStorageMap::dump() const { print(llvm::dbgs()); }
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -1439,7 +1446,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   // The phi operand projections are computed first to give them priority. Then
   // we determine if the phi itself can share storage with one of its users.
   CoalescedPhi coalescedPhi;
-  coalescedPhi.coalesce(phi, pass.valueStorageMap);
+  coalescedPhi.coalesce(phi, pass.valueStorageMap, pass.domInfo);
 
   SmallVector<SILValue, 4> coalescedValues;
   coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
@@ -1747,8 +1754,16 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
     assert(storage.isRewritten && "Source value should be rewritten");
 
-    if (storage.isUseProjection)
-      return;
+    // If the operand projects into one of its users and this user is that one
+    // into which it projects, then the memory was already initialized.  If it's
+    // another user, however, that memory is _not_initialized.
+    if (storage.isUseProjection) {
+      auto *aggregate = dyn_cast<SingleValueInstruction>(operand->getUser());
+      if (aggregate && (storage.projectedStorageID ==
+                        pass.valueStorageMap.getOrdinal(aggregate))) {
+        return;
+      }
+    }
 
     auto destAddr =
         materializeProjectionIntoUse(operand, /*intoPhiOperand*/ false);

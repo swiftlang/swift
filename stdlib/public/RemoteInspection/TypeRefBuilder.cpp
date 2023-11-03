@@ -348,14 +348,22 @@ RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
     }
   }
 
-  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
-  // until we find the field descriptor we're looking for.
+  // If the heuristic didn't work, iterate over every reflection info
+  // that the external cache hasn't processed.
   for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
     if (ExternalTypeRefCache && ExternalTypeRefCache->isReflectionInfoCached(i))
       continue;
     if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
       return *FD;
   }
+
+  // If we still haven't found the field descriptor go over every reflection
+  // info, even the ones the external cache supposedly processed.
+  // TODO: if we find the field descriptor here there is a bug somewhere (most
+  // likely on the external cache). Log this somehow.
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+    if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+      return *FD;
 
   return nullptr;
 }

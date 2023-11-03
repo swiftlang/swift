@@ -48,7 +48,7 @@ public:
   }
 
   template <typename... ArgTy>
-  typename std::result_of<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
+  typename std::invoke_result<T *(ArgTy...)>::type operator()(ArgTy... arg) const {
     static_assert(std::is_function<T>::value,
                   "T must be an explicit function type");
     return this->get()(std::forward<ArgTy>(arg)...);

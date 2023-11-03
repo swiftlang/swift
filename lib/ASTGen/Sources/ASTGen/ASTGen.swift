@@ -1,9 +1,8 @@
 import CASTBridging
 import CBasicBridging
-
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator)
-import SwiftSyntax
+@_spi(BumpPtrAllocator) import SwiftSyntax
+
 import struct SwiftDiagnostics.Diagnostic
 
 extension UnsafePointer {
@@ -13,35 +12,47 @@ extension UnsafePointer {
 }
 
 enum ASTNode {
-  case decl(UnsafeMutableRawPointer)
-  case stmt(UnsafeMutableRawPointer)
-  case expr(UnsafeMutableRawPointer)
-  case type(UnsafeMutableRawPointer)
-  case misc(UnsafeMutableRawPointer)
+  case decl(BridgedDecl)
+  case stmt(BridgedStmt)
+  case expr(BridgedExpr)
+  case type(BridgedTypeRepr)
 
-  var rawValue: UnsafeMutableRawPointer {
-    switch self {
-    case .decl(let ptr):
-      return ptr
-    case .stmt(let ptr):
-      return ptr
-    case .expr(let ptr):
-      return ptr
-    case .type(let ptr):
-      return ptr
-    case .misc(let ptr):
-      return ptr
+  var castToExpr: BridgedExpr {
+    guard case .expr(let bridged) = self else {
+      fatalError("Expected an expr")
     }
+    return bridged
+  }
+
+  var castToStmt: BridgedStmt {
+    guard case .stmt(let bridged) = self else {
+      fatalError("Expected a stmt")
+    }
+    return bridged
+  }
+
+  var castToDecl: BridgedDecl {
+    guard case .decl(let bridged) = self else {
+      fatalError("Expected a decl")
+    }
+    return bridged
+  }
+
+  var castToType: BridgedTypeRepr {
+    guard case .type(let bridged) = self else {
+      fatalError("Expected a type")
+    }
+    return bridged
   }
 
   var bridged: BridgedASTNode {
     switch self {
     case .expr(let e):
-      return BridgedASTNode(ptr: e, kind: .expr)
+      return BridgedASTNode(ptr: e.raw, kind: .expr)
     case .stmt(let s):
-      return BridgedASTNode(ptr: s, kind: .stmt)
+      return BridgedASTNode(ptr: s.raw, kind: .stmt)
     case .decl(let d):
-      return BridgedASTNode(ptr: d, kind: .decl)
+      return BridgedASTNode(ptr: d.raw, kind: .decl)
     default:
       fatalError("Must be expr, stmt, or decl.")
     }
@@ -92,11 +103,25 @@ struct ASTGenVisitor {
       let swiftASTNodes = generate(element)
       switch swiftASTNodes {
       case .decl(let d):
-        out.append(d)
+        out.append(d.raw)
       case .stmt(let s):
-        out.append(TopLevelCodeDecl_createStmt(astContext: self.ctx, declContext: self.declContext, startLoc: loc, statement: s, endLoc: loc))
+        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          stmt: s,
+          endLoc: loc
+        )
+        out.append(topLevelDecl.raw)
       case .expr(let e):
-        out.append(TopLevelCodeDecl_createExpr(astContext: self.ctx, declContext: self.declContext, startLoc: loc, expression: e, endLoc: loc))
+        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
+          self.ctx,
+          declContext: self.declContext,
+          startLoc: loc,
+          expr: e,
+          endLoc: loc
+        )
+        out.append(topLevelDecl.raw)
       default:
         fatalError("Top level nodes must be decls, stmts, or exprs.")
       }
@@ -131,150 +156,134 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: DeclSyntax) -> ASTNode {
-    return generate(Syntax(node))
+  func generate(_ node: DeclSyntax) -> BridgedDecl {
+    return generate(Syntax(node)).castToDecl
   }
 
-  func generate(_ node: ExprSyntax) -> ASTNode {
-    return generate(Syntax(node))
+  func generate(_ node: ExprSyntax) -> BridgedExpr {
+    return generate(Syntax(node)).castToExpr
   }
 
   func generate(_ node: PatternSyntax) -> ASTNode {
     return generate(Syntax(node))
   }
 
-  func generate(_ node: StmtSyntax) -> ASTNode {
-    return generate(Syntax(node))
+  func generate(_ node: StmtSyntax) -> BridgedStmt {
+    return generate(Syntax(node)).castToStmt
   }
 
-  func generate(_ node: TypeSyntax) -> ASTNode {
-    return generate(Syntax(node))
+  func generate(_ node: TypeSyntax) -> BridgedTypeRepr {
+    return generate(Syntax(node)).castToType
   }
 
   func generate(_ node: some SyntaxChildChoices) -> ASTNode {
     return self.generate(Syntax(node))
   }
-    
+
   func generate(_ node: Syntax) -> ASTNode {
     switch node.as(SyntaxEnum.self) {
     case .actorDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .arrayElement(let node):
-      return generate(node)
+      return .expr(generate(node))
     case .arrayExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .arrayType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .associatedTypeDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .attributedType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .booleanLiteralExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .classDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .closureExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .codeBlock(let node):
-      return generate(node)
+      return .stmt(generate(node).asStmt)
     case .codeBlockItem(let node):
       return generate(node)
     case .compositionType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .conditionElement(let node):
       return generate(node)
     case .declReferenceExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .deinitializerDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .dictionaryType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .enumCaseDecl(let node):
-      return generate(node)
-    case .enumCaseElement(let node):
-      return generate(node)
-    case .enumCaseParameter(let node):
-      return generate(node)
-    case .enumCaseParameterClause(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .enumDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .expressionStmt(let node):
-     return generate(node)
+      return .stmt(generate(node))
     case .extensionDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .functionCallExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .functionDecl(let node):
-      return generate(node)
-    case .functionParameter(let node):
-      return generate(node)
-    case .functionParameterClause(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .functionType(let node):
-      return generate(node)
-    case .genericParameter(let node):
-      return generate(node)
-    case .genericParameterClause(let node):
-      return generate(node)
-    case .genericWhereClause(let node):
-      return generate(node)
+      return .type(generate(node))
     case .identifierPattern(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .identifierType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .ifExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .implicitlyUnwrappedOptionalType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .importDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .initializerClause(let node):
-      return generate(node)
+      return .expr(generate(node))
     case .initializerDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .integerLiteralExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .labeledExprList:
       fatalError("case does not correspond to an ASTNode")
     case .memberAccessExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .memberBlockItem(let node):
-      return generate(node)
+      return .decl(generate(node))
     case .memberType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .metatypeType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .namedOpaqueReturnType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .nilLiteralExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .operatorDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .optionalType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .packExpansionType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .precedenceGroupDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .protocolDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .returnStmt(let node):
-      return generate(node)
+      return .stmt(generate(node).asStmt)
     case .someOrAnyType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .stringLiteralExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .structDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .tupleExpr(let node):
-      return generate(node)
+      return .expr(generate(node).asExpr)
     case .tupleType(let node):
-      return generate(node)
+      return .type(generate(node))
     case .typeAliasDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     case .variableDecl(let node):
-      return generate(node)
+      return .decl(generate(node).asDecl)
     default:
       fatalError("not implemented")
     }
@@ -284,11 +293,11 @@ extension ASTGenVisitor {
 // Misc visits.
 // TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
 extension ASTGenVisitor {
-  public func generate(_ node: MemberBlockItemSyntax) -> ASTNode {
+  public func generate(_ node: MemberBlockItemSyntax) -> BridgedDecl {
     generate(node.decl)
   }
 
-  public func generate(_ node: InitializerClauseSyntax) -> ASTNode {
+  public func generate(_ node: InitializerClauseSyntax) -> BridgedExpr {
     generate(node.value)
   }
 
@@ -300,7 +309,7 @@ extension ASTGenVisitor {
     generate(node.item)
   }
 
-  public func generate(_ node: ArrayElementSyntax) -> ASTNode {
+  public func generate(_ node: ArrayElementSyntax) -> BridgedExpr {
     generate(node.expression)
   }
 
@@ -314,7 +323,7 @@ extension ASTGenVisitor {
 // 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(_ node: TypeSyntax?) -> ASTNode? {
+  func generate(_ node: TypeSyntax?) -> BridgedTypeRepr? {
     guard let node else {
       return nil
     }
@@ -323,7 +332,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: ExprSyntax?) -> ASTNode? {
+  func generate(_ node: ExprSyntax?) -> BridgedExpr? {
     guard let node else {
       return nil
     }
@@ -342,7 +351,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: GenericParameterClauseSyntax?) -> ASTNode? {
+  func generate(_ node: GenericParameterClauseSyntax?) -> BridgedGenericParamList? {
     guard let node else {
       return nil
     }
@@ -351,7 +360,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: GenericWhereClauseSyntax?) -> ASTNode? {
+  func generate(_ node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause? {
     guard let node else {
       return nil
     }
@@ -360,7 +369,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: EnumCaseParameterClauseSyntax?) -> ASTNode? {
+  func generate(_ node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList? {
     guard let node else {
       return nil
     }

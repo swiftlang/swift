@@ -610,6 +610,7 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe:
       return false;
@@ -658,10 +659,11 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   assert(selfLV);
 
   // Emit the prolog.
-  emitBasicProlog(ctor->getParameters(),
+  emitBasicProlog(ctor,
+                  ctor->getParameters(),
                   /*selfParam=*/nullptr,
-                  ctor->getResultInterfaceType(), ctor,
-                  ctor->hasThrows(),
+                  ctor->getResultInterfaceType(),
+                  ctor->getEffectiveThrownErrorType(),
                   ctor->getThrowsLoc(),
                   /*ignored parameters*/ 1);
   emitConstructorMetatypeArg(*this, ctor);
@@ -680,7 +682,9 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
-  prepareEpilog(llvm::None, ctor->getEffectiveThrownErrorType(),
+  prepareEpilog(ctor,
+                llvm::None,
+                ctor->getEffectiveThrownErrorType(),
                 CleanupLocation(ctor));
 
   // If the constructor can fail, set up an alternative epilog for constructor
@@ -749,7 +753,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                            {selfDecl->getTypeInContext()},
                                            {}),
                       selfLV.getLValueAddress());
-    } else if (isa<StructDecl>(nominal) && nominal->isMoveOnly()
+    } else if (isa<StructDecl>(nominal) && nominal->isNoncopyable()
                && nominal->getStoredProperties().empty()) {
       auto *si = B.createStruct(ctor, lowering.getLoweredType(), {});
       B.emitStoreValueOperation(ctor, si, selfLV.getLValueAddress(),
@@ -1105,9 +1109,11 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
-  uint16_t ArgNo = emitBasicProlog(ctor->getParameters(), /*selfParam=*/nullptr,
-                                   TupleType::getEmpty(F.getASTContext()), ctor,
-                                   ctor->hasThrows(), ctor->getThrowsLoc(),
+  uint16_t ArgNo = emitBasicProlog(ctor,
+                                   ctor->getParameters(), /*selfParam=*/nullptr,
+                                   TupleType::getEmpty(F.getASTContext()),
+                                   ctor->getEffectiveThrownErrorType(),
+                                   ctor->getThrowsLoc(),
                                    /*ignored parameters*/ 1);
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getTypeInContext());
@@ -1185,7 +1191,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit the block until after we've emitted the body.
-  prepareEpilog(llvm::None, ctor->getEffectiveThrownErrorType(),
+  prepareEpilog(ctor,
+                llvm::None,
+                ctor->getEffectiveThrownErrorType(),
                 CleanupLocation(endOfInitLoc));
 
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
@@ -1554,6 +1562,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // 'nonisolated' expressions can be evaluated from anywhere
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::GlobalActor:
@@ -1680,7 +1689,7 @@ void SILGenFunction::emitIVarInitializer(SILDeclRef ivarInitializer) {
   VarLocs[selfDecl] = VarLoc::get(selfArg);
 
   auto cleanupLoc = CleanupLocation(loc);
-  prepareEpilog(llvm::None, llvm::None, cleanupLoc);
+  prepareEpilog(cd, llvm::None, llvm::None, cleanupLoc);
 
   // Emit the initializers.
   emitMemberInitializers(cd, selfDecl, cd);
@@ -1732,9 +1741,11 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
   auto accessedProperties = accessor->getAccessedProperties();
 
   // Emit `newValue` argument.
-  emitBasicProlog(accessor->getParameters(), /*selfParam=*/nullptr,
-                  TupleType::getEmpty(F.getASTContext()), accessor,
-                  /*throws=*/false, /*throwsLoc=*/SourceLoc(),
+  emitBasicProlog(accessor,
+                  accessor->getParameters(), /*selfParam=*/nullptr,
+                  TupleType::getEmpty(F.getASTContext()),
+                  /*errorType=*/llvm::None,
+                  /*throwsLoc=*/SourceLoc(),
                   /*ignored parameters*/
                   accessedProperties.size());
 
@@ -1750,7 +1761,8 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
     }
   }
 
-  prepareEpilog(accessor->getResultInterfaceType(),
+  prepareEpilog(accessor,
+                accessor->getResultInterfaceType(),
                 accessor->getEffectiveThrownErrorType(),
                 CleanupLocation(accessor));
 

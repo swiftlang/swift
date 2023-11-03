@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CFTypeInfo.h"
+#include "ClangClassTemplateNamePrinter.h"
 #include "ClangDiagnosticConsumer.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Parser.h"
@@ -45,6 +47,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Import Name"
@@ -257,10 +260,8 @@ static const char AltErrorSuffix[] = "WithError";
 /// \param method The Clang method.
 static OptionalTypeKind getResultOptionality(
                           const clang::ObjCMethodDecl *method) {
-  auto &clangCtx = method->getASTContext();
-
   // If nullability is available on the type, use it.
-  if (auto nullability = method->getReturnType()->getNullability(clangCtx)) {
+  if (auto nullability = method->getReturnType()->getNullability()) {
     return translateNullability(*nullability);
   }
 
@@ -1226,8 +1227,7 @@ bool swift::isCompletionHandlerParamName(StringRef paramName) {
 }
 
 // Determine whether the given type is a nullable NSError type.
-static bool isNullableNSErrorType(
-    clang::ASTContext &clangCtx, clang::QualType type) {
+static bool isNullableNSErrorType(clang::QualType type) {
   auto objcPtrType = type->getAs<clang::ObjCObjectPointerType>();
   if (!objcPtrType)
     return false;
@@ -1237,7 +1237,7 @@ static bool isNullableNSErrorType(
     return false;
 
   // If nullability is specified, check it.
-  if (auto nullability = type->getNullability(clangCtx)) {
+  if (auto nullability = type->getNullability()) {
     switch (translateNullability(*nullability)) {
     case OTK_None:
       return false;
@@ -1388,12 +1388,11 @@ llvm::Optional<ForeignAsyncConvention::Info> NameImporter::considerAsyncImport(
     completionHandlerParamTypes = prototype->getParamTypes();
   }
 
-  auto &clangCtx = clangDecl->getASTContext();
   for (unsigned paramIdx : indices(completionHandlerParamTypes)) {
     auto paramType = completionHandlerParamTypes[paramIdx];
 
     // We are only interested in nullable NSError parameters.
-    if (!isNullableNSErrorType(clangCtx, paramType))
+    if (!isNullableNSErrorType(paramType))
       continue;
 
     // If this is the first nullable error parameter, note that.
@@ -2216,111 +2215,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       return importNameImpl(classTemplateSpecDecl->getSpecializedTemplate(),
                             version, givenName);
     if (!isa<clang::ClassTemplatePartialSpecializationDecl>(D)) {
-      auto getSwiftBuiltinTypeName =
-          [&](const clang::BuiltinType *builtin) -> std::optional<std::string> {
-        Type swiftType = nullptr;
-        switch (builtin->getKind()) {
-        case clang::BuiltinType::Void:
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),
-                                                 "Void");
-          break;
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
-        case clang::BuiltinType::CLANG_BUILTIN_KIND:                           \
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),   \
-                                                 #SWIFT_TYPE_NAME);            \
-          break;
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)            \
-        case clang::BuiltinType::CLANG_BUILTIN_KIND:                           \
-          swiftType = swiftCtx.getNamedSwiftType(swiftCtx.getStdlibModule(),   \
-                                                 #SWIFT_TYPE_NAME);            \
-          break;
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-        default:
-          break;
-        }
-
-        if (swiftType) {
-          if (swiftType->is<NominalType>()) {
-            return swiftType->getStringAsComponent();
-          }
-        }
-        return std::nullopt;
-      };
-
-      // When constructing the name of a C++ template, don't expand all the
-      // template, only expand one layer. Here we want to prioritize
-      // readability over total completeness.
-      llvm::SmallString<128> storage;
-      llvm::raw_svector_ostream buffer(storage);
-      D->printName(buffer);
-      buffer << "<";
-      llvm::interleaveComma(classTemplateSpecDecl->getTemplateArgs().asArray(),
-                            buffer,
-                            [&buffer, this, version, &getSwiftBuiltinTypeName](const clang::TemplateArgument& arg) {
-        // Use import name here so builtin types such as "int" map to their
-        // Swift equivalent ("Int32").
-        if (arg.getKind() == clang::TemplateArgument::Type) {
-          auto ty = arg.getAsType().getTypePtr();
-          if (auto builtin = dyn_cast<clang::BuiltinType>(ty)) {
-            if (auto swiftTypeName = getSwiftBuiltinTypeName(builtin)) {
-              buffer << *swiftTypeName;
-              return;
-            }
-          } else {
-            // FIXME: Generalize this to cover pointer to
-            // builtin type too.
-            // Check if this a struct/class
-            // or a pointer/reference to a struct/class.
-            auto *tagDecl = ty->getAsTagDecl();
-            enum class TagTypeDecorator {
-              None,
-              UnsafePointer,
-              UnsafeMutablePointer
-            };
-            TagTypeDecorator decorator = TagTypeDecorator::None;
-            if (!tagDecl && ty->isPointerType()) {
-              tagDecl = ty->getPointeeType()->getAsTagDecl();
-              if (tagDecl) {
-                bool isReferenceType = false;
-                if (auto *rd = dyn_cast<clang::RecordDecl>(tagDecl))
-                  isReferenceType = ClangImporter::Implementation::
-                      recordHasReferenceSemantics(rd, swiftCtx);
-                if (!isReferenceType)
-                  decorator = ty->getPointeeType().isConstQualified()
-                                  ? TagTypeDecorator::UnsafePointer
-                                  : TagTypeDecorator::UnsafeMutablePointer;
-              }
-            }
-            if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
-              if (decorator != TagTypeDecorator::None)
-                buffer << (decorator == TagTypeDecorator::UnsafePointer
-                               ? "UnsafePointer"
-                               : "UnsafeMutablePointer")
-                       << '<';
-              importNameImpl(namedArg, version, clang::DeclarationName())
-                  .getDeclName()
-                  .print(buffer);
-              if (decorator != TagTypeDecorator::None)
-                buffer << '>';
-              return;
-            }
-          }
-        } else if (arg.getKind() == clang::TemplateArgument::Integral) {
-          buffer << "_";
-          if (arg.getIntegralType()->isBuiltinType()) {
-            if (auto swiftTypeName = getSwiftBuiltinTypeName(
-                    arg.getIntegralType()->getAs<clang::BuiltinType>())) {
-              buffer << *swiftTypeName << "_";
-            }
-          }
-          arg.getAsIntegral().print(buffer, true);
-          return;
-        }
-        buffer << "_";
-      });
-      buffer << ">";
-
-      baseName = swiftCtx.getIdentifier(buffer.str()).get();
+      auto name = printClassTemplateSpecializationName(classTemplateSpecDecl,
+                                                       swiftCtx, this, version);
+      baseName = swiftCtx.getIdentifier(name).get();
     }
   }
 
@@ -2393,14 +2290,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           method->getDeclContext(), getNonNullArgs(method, params),
           result.getErrorInfo()
               ? llvm::Optional<unsigned>(
-                    result.getErrorInfo()->ErrorParameterIndex)
+                    static_cast<unsigned int>(result.getErrorInfo()->ErrorParameterIndex))
               : llvm::None,
           method->hasRelatedResultType(), method->isInstanceMethod(),
-          result.getAsyncInfo().transform(
+          swift::transform(result.getAsyncInfo(),
               [](const ForeignAsyncConvention::Info &info) {
                 return info.completionHandlerParamIndex();
               }),
-          result.getAsyncInfo().transform(
+          swift::transform(result.getAsyncInfo(),
               [&](const ForeignAsyncConvention::Info &info) {
                 return method->getDeclName().getObjCSelector().getNameForSlot(
                     info.completionHandlerParamIndex());

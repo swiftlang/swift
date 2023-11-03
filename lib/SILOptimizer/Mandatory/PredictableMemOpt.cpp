@@ -187,7 +187,7 @@ struct AvailableValue {
 
   /// If this gets too expensive in terms of copying, we can use an arena and a
   /// FrozenPtrSet like we do in ARC.
-  SmallSetVector<StoreInst *, 1> InsertionPoints;
+  llvm::SmallSetVector<StoreInst *, 1> InsertionPoints;
 
   /// Just for updating.
   SmallVectorImpl<PMOMemoryUse> *Uses;

@@ -70,6 +70,11 @@ inline bool isOptimizableSemanticFunction(SILFunction *function) {
 /// within another semantic function, or from a "trivial" wrapper.
 bool isNestedSemanticCall(FullApplySite apply);
 
+// Strips down simple function conversion operations until a base SILValue is
+// reached.
+//
+// Returns a nullptr if `val` is not a function conversion instruction.
+SILValue stripFunctionConversions(SILValue val);
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

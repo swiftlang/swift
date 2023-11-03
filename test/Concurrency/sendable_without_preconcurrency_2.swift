@@ -3,13 +3,13 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 // RUN: %target-swift-frontend -strict-concurrency=targeted -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
 // RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null
-// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend -strict-concurrency=complete -verify-additional-prefix complete- -disable-availability-checking -I %t %s -verify -emit-sil -o /dev/null -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
 import StrictModule // no remark: we never recommend @preconcurrency due to an explicitly non-Sendable (via -warn-concurrency) type
-import NonStrictModule // expected-remark{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'NonStrictModule'}}
+import NonStrictModule // expected-warning{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'NonStrictModule'}}
 
 actor A {
   func f() -> [StrictStruct: NonStrictClass] { [:] }
@@ -37,7 +37,7 @@ func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClas
   }
 }
 
-extension NonStrictStruct: @unchecked Sendable { }
+extension NonStrictStruct: @unchecked @retroactive Sendable { }
 
 class StrictSubclass: StrictClass {
   override func send(_ body: () -> ()) {}

@@ -455,7 +455,7 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   derived.addMemberToConformanceContext(pbDecl, /*insertAtHead=*/true);
   derived.addMemberToConformanceContext(propDecl, /*insertAtHead=*/true);
@@ -484,7 +484,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
-      new (C) NonisolatedAttr(/*IsImplicit=*/true));
+      new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // IMPORTANT: `id` MUST be the first field of a distributed actor, and
   // `actorSystem` MUST be the second field, because for a remote instance
@@ -619,14 +619,14 @@ static Expr *constructDistributedUnownedSerialExecutor(ASTContext &ctx,
     auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
                                                     ctorAppliedType);
     selfApply->setImplicit(true);
-    selfApply->setThrows(false);
+    selfApply->setThrows(nullptr);
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
     auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
-    call->setThrows(false);
+    call->setThrows(nullptr);
     return call;
   }
 
@@ -685,7 +685,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
                                       ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(), {}, {}));
   CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
   isLocalActorCall->setType(ctx.getBoolType());
-  isLocalActorCall->setThrows(false);
+  isLocalActorCall->setThrows(nullptr);
 
   GuardStmt* guardElseRemoteReturnExec;
   {
@@ -724,7 +724,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
     CallExpr *buildRemoteExecutorCall = CallExpr::createImplicit(ctx, buildRemoteExecutorExpr,
                                                                  argListForBuildRemoteExecutor);
     buildRemoteExecutorCall->setType(ctx.getUnownedSerialExecutorType());
-    buildRemoteExecutorCall->setThrows(false);
+    buildRemoteExecutorCall->setThrows(nullptr);
 
     SmallVector<ASTNode, 1> statements = {
         new(ctx) ReturnStmt(SourceLoc(), buildRemoteExecutorCall)
@@ -782,7 +782,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
                                                    /*implicit*/ true));
-  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+  property->getAttrs().add(
+      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // Make the property implicitly final.
   property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));

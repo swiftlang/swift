@@ -11,19 +11,22 @@ _ = atan2test(0.0, 0.0)
 
 
 // Ordinary Swift definitions
-// The unused internal and private functions are expected to be eliminated.
+// The unused internal and private functions are expected to be kept as they 
+// may be used from the debugger in unoptimized builds.
 
 public   func PlainPublic()   { }
 internal func PlainInternal() { }
 private  func PlainPrivate()  { }
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname11PlainPublic
-// CHECK-NOT: PlainInternal
-// CHECK-NOT: PlainPrivate
+// CHECK: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s7asmname13PlainInternalyyF
+// CHECK: define{{( dllexport)?}}{{( protected)?}} internal swiftcc void @"$s7asmname12PlainPrivate
 
 
 // Swift _silgen_name definitions
-// The private function is expected to be eliminated
-// but the internal function must survive for C use.
+// The private function is expected 
+// to be eliminated as it may be used from the
+// debugger in unoptimized builds,
+// and the internal function must survive for C use.
 // Only the C-named definition is emitted.
 
 @_silgen_name("silgen_name_public")   public   func SilgenNamePublic()   { }
@@ -31,13 +34,13 @@ private  func PlainPrivate()  { }
 @_silgen_name("silgen_name_private")  private  func SilgenNamePrivate()  { }
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @silgen_name_public
 // CHECK: define hidden swiftcc void @silgen_name_internal
-// CHECK-NOT: silgen_name_private
+// CHECK: define internal swiftcc void @silgen_name_private
 // CHECK-NOT: SilgenName
 
 
 // Swift cdecl definitions
-// The private functions are expected to be eliminated
-// but the internal functions must survive for C use.
+// The private functions are expected to be kept as it may be used from the debugger,
+// and the internal functions must survive for C use.
 // Both a C-named definition and a Swift-named definition are emitted.
 
 @_cdecl("cdecl_public")   public   func CDeclPublic()   { }
@@ -47,4 +50,4 @@ private  func PlainPrivate()  { }
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s7asmname11CDeclPublic
 // CHECK: define hidden void @cdecl_internal
 // CHECK: define hidden swiftcc void @"$s7asmname13CDeclInternal
-// CHECK-NOT: cdecl_private
+// CHECK: define internal void @cdecl_private()

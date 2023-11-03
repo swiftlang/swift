@@ -14,6 +14,42 @@ extension BridgedIdentifier: ExpressibleByNilLiteral {
   }
 }
 
+extension BridgedStmt? {
+  var asNullable: BridgedNullableStmt {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedExpr? {
+  var asNullable: BridgedNullableExpr {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedTypeRepr? {
+  var asNullable: BridgedNullableTypeRepr {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedGenericParamList? {
+  var asNullable: BridgedNullableGenericParamList {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedTrailingWhereClause? {
+  var asNullable: BridgedNullableTrailingWhereClause {
+    .init(raw: self?.raw)
+  }
+}
+
+extension BridgedParameterList? {
+  var asNullable: BridgedNullableParameterList {
+    .init(raw: self?.raw)
+  }
+}
+
 extension BridgedSourceLoc {
   /// Form a source location at the given absolute position in `buffer`.
   init(
@@ -21,7 +57,7 @@ extension BridgedSourceLoc {
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
-    self = SourceLoc_advanced(BridgedSourceLoc(raw: buffer.baseAddress!), position.utf8Offset)
+    self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
   }
 }
 
@@ -40,24 +76,21 @@ extension String {
   }
 }
 
-/// Allocate a copy of the given string as a UTF-8 string.
+/// Allocate a copy of the given string as a null-terminated UTF-8 string.
 func allocateBridgedString(
-  _ string: String,
-  nullTerminated: Bool = false
+  _ string: String
 ) -> BridgedString {
   var string = string
   return string.withUTF8 { utf8 in
-    let capacity = utf8.count + (nullTerminated ? 1 : 0)
     let ptr = UnsafeMutablePointer<UInt8>.allocate(
-      capacity: capacity
+      capacity: utf8.count + 1
     )
     if let baseAddress = utf8.baseAddress {
       ptr.initialize(from: baseAddress, count: utf8.count)
     }
 
-    if nullTerminated {
-      ptr[utf8.count] = 0
-    }
+    // null terminate, for client's convenience.
+    ptr[utf8.count] = 0
 
     return BridgedString(data: ptr, length: utf8.count)
   }
@@ -93,7 +126,7 @@ extension Optional where Wrapped: SyntaxProtocol {
     guard let self else {
       return nil
     }
-    
+
     return self.bridgedSourceLoc(in: astgen)
   }
 }
@@ -106,7 +139,7 @@ extension TokenSyntax {
   func bridgedIdentifier(in astgen: ASTGenVisitor) -> BridgedIdentifier {
     var text = self.text
     return text.withBridgedString { bridged in
-      ASTContext_getIdentifier(astgen.ctx, bridged)
+      astgen.ctx.getIdentifier(bridged)
     }
   }
 

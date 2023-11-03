@@ -2,6 +2,7 @@
 
 @interface ObjCBaseClass
 
+- (instancetype)init __attribute__((unavailable));
 
 // Need two initializers to reproduce certain conflict bugs.
 - (instancetype)initFromSuperclass:(int)param  __attribute__((objc_designated_initializer));
@@ -158,6 +159,20 @@
 @end
 
 @interface ObjCImplSubclass : ObjCClass
+
+@end
+
+@interface ObjCBasicInitClass : ObjCBaseClass
+
+- (nonnull instancetype)init __attribute__((objc_designated_initializer));
+
+@end
+
+@interface ObjCImplRootClass
+
+@end
+
+@interface ObjCImplGenericClass<T> : NSObject
 
 @end
 

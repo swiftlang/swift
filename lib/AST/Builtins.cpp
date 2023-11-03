@@ -132,8 +132,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   // AnyObject is the empty class-constrained existential.
   if (Name == "AnyObject")
     return CanType(
-      ProtocolCompositionType::get(Context, {},
-                                   /*HasExplicitAnyObject=*/true));
+      ProtocolCompositionType::theAnyObjectType(Context));
 
   return Type();
 }
@@ -2166,7 +2165,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide2Argument:
   case IITDescriptor::Subdivide4Argument:
   case IITDescriptor::PPCQuad:
-  case IITDescriptor::AnyPtrToElt:
+  case IITDescriptor::AArch64Svcount:
     // These types cannot be expressed in swift yet.
     return Type();
 
@@ -2211,14 +2210,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Argument:
     return getTypeArgument(D.getArgumentNumber());
 
-  // A pointer to a type argument.
-  case IITDescriptor::PtrToArgument: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
-    if (!argType) return Type();
-    unsigned addrspace = 0; // An apparent limitation of LLVM.
-    return makePointer(argType, addrspace);
-  }
-
   // A vector of the same width as a type argument.
   case IITDescriptor::SameVecWidthArgument: {
     Type maybeVectorType = getTypeArgument(D.getArgumentNumber());
@@ -2228,15 +2219,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     return maybeMakeVectorized(eltType, maybeVectorType);
   }
 
-  // A pointer to the element type of a type argument, which must be a vector.
-  case IITDescriptor::PtrToElt: {
-    Type argType = getTypeArgument(D.getArgumentNumber());
-    if (!argType) return Type();
-    auto vecType = argType->getAs<BuiltinVectorType>();
-    if (!vecType) return Type();
-    unsigned addrspace = 0; // An apparent limitation of LLVM.
-    return makePointer(vecType->getElementType(), addrspace);
-  }
 
   // A struct, which we translate as a tuple.
   case IITDescriptor::Struct: {

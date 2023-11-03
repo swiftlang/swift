@@ -82,7 +82,7 @@ public func ~=(x: NSObject, y: NSObject) -> Bool {
   return true
 }
 
-extension NSObject : Equatable, Hashable {
+extension NSObject : @retroactive Equatable, @retroactive Hashable {
   public static func == (lhs: NSObject, rhs: NSObject) -> Bool {
     return lhs.isEqual(rhs)
   }

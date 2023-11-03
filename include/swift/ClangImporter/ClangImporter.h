@@ -436,7 +436,7 @@ public:
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1> bridgeClangModuleDependencies(
-      const clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
+      clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>

@@ -926,6 +926,8 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'k':
     return createType(
         createWithChild(Node::Kind::NoDerivative, popTypeAndGetChild()));
+  case 'K':
+    return createWithChild(Node::Kind::TypedThrowsAnnotation, popTypeAndGetChild());
   case 't':
     return createType(
         createWithChild(Node::Kind::CompileTimeConst, popTypeAndGetChild()));
@@ -1530,7 +1532,10 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   addChild(FuncType, ClangType);
   addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
-  addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode([](Node::Kind kind) {
+    return kind == Node::Kind::ThrowsAnnotation ||
+      kind == Node::Kind::TypedThrowsAnnotation;
+  }));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
@@ -1572,7 +1577,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
         == Node::Kind::DifferentiableFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
-        == Node::Kind::ThrowsAnnotation)
+        == Node::Kind::ThrowsAnnotation ||
+      FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::TypedThrowsAnnotation)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ConcurrentFunctionType)

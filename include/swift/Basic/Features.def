@@ -107,9 +107,11 @@ LANGUAGE_FEATURE(
 LANGUAGE_FEATURE(AttachedMacros, 389, "Attached macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(ExtensionMacros, 402, "Extension macros", hasSwiftSwiftParser)
 LANGUAGE_FEATURE(MoveOnly, 390, "noncopyable types", true)
+LANGUAGE_FEATURE(MoveOnlyResilientTypes, 390, "non-@frozen noncopyable types with library evolution", true)
 LANGUAGE_FEATURE(ParameterPacks, 393, "Value and type parameter packs", true)
 SUPPRESSIBLE_LANGUAGE_FEATURE(LexicalLifetimes, 0, "@_eagerMove/@_noEagerMove/@_lexicalLifetimes annotations", true)
 LANGUAGE_FEATURE(FreestandingMacros, 397, "freestanding declaration macros", true)
+SUPPRESSIBLE_LANGUAGE_FEATURE(RetroactiveAttribute, 364, "@retroactive", true)
 
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
 UPCOMING_FEATURE(ForwardTrailingClosures, 286, 6)
@@ -142,7 +144,6 @@ EXPERIMENTAL_FEATURE(NoImplicitCopy, true)
 EXPERIMENTAL_FEATURE(OldOwnershipOperatorSpellings, true)
 EXPERIMENTAL_FEATURE(MoveOnlyEnumDeinits, true)
 EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
-EXPERIMENTAL_FEATURE(MoveOnlyResilientTypes, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialConsumption, true)
 
 EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
@@ -217,8 +218,8 @@ EXPERIMENTAL_FEATURE(BuiltinModule, true)
 // Enable strict concurrency.
 EXPERIMENTAL_FEATURE(StrictConcurrency, true)
 
-/// Defer Sendable checking to SIL diagnostic phase.
-EXPERIMENTAL_FEATURE(SendNonSendable, false)
+/// Region Based Isolation testing using the TransferNonSendable pass
+EXPERIMENTAL_FEATURE(RegionBasedIsolation, false)
 
 /// Within strict concurrency, narrow global variable isolation requirements.
 EXPERIMENTAL_FEATURE(GlobalConcurrency, false)
@@ -255,6 +256,9 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// Enable non-escapable type attributes and function attributes that support
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
+
+/// Enable the `@extern` attribute.
+EXPERIMENTAL_FEATURE(Extern, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

@@ -3273,6 +3273,12 @@ ManglingError Remangler::mangleThrowsAnnotation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleTypedThrowsAnnotation(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "YK";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleEmptyList(Node *node, unsigned depth) {
   Buffer << 'y';
   return ManglingError::Success;

@@ -24,6 +24,7 @@
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Requirement.h"
@@ -636,8 +637,11 @@ public:
 
   bool isPlaceholder();
 
-  /// Returns true if this is a noncopyable type.
+  /// DEPRECIATED: Returns true if this is a noncopyable type.
   bool isNoncopyable();
+
+  /// Returns true if this type lacks conformance to Copyable in the context.
+  bool isNoncopyable(const DeclContext *dc);
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -897,6 +901,12 @@ public:
   /// Determines whether this type is an actor type.
   bool isActorType();
 
+  /// Returns true if this type is a Sendable type.
+  bool isSendableType(DeclContext *declContext);
+
+  /// Returns true if this type is a Sendable type.
+  bool isSendableType(ModuleDecl *parentModule);
+
   /// Determines whether this type conforms or inherits (if it's a protocol
   /// type) from `DistributedActor`.
   bool isDistributedActor();
@@ -927,6 +937,9 @@ public:
     BufferPointerTypeKind Ignore;
     return getAnyBufferPointerElementType(Ignore);
   }
+
+  /// If this type is a known protocol, return its kind.
+  llvm::Optional<KnownProtocolKind> getKnownProtocol();
 
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
@@ -1520,6 +1533,48 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
+
+/// InverseType represents the "inverse" of a ProtocolType as a constraint.
+/// An inverse represents the _absence_ of an implicit constraint to the given
+/// protocol.
+///
+/// Otherwise, an inverse is not a real type! It's an annotation for other types
+/// to signal whether an implicit requirement on that type should be omitted.
+/// Because that annotation is expressed in the surface language as if it _were_
+/// a type (that is, as a type constraint) we still model it as a Type through
+/// typechecking.
+class InverseType final : public TypeBase {
+  Type protocol;
+
+  InverseType(Type type,
+              const ASTContext *canonicalContext,
+              RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Inverse, canonicalContext, properties),
+        protocol(type) {
+    assert(protocol->is<ProtocolType>());
+  }
+
+public:
+  /// Produce an inverse constraint type for the given protocol type.
+  static Type get(Type protocolType);
+
+
+  /// Obtain the underlying \c ProtocolType that was inverted.
+  Type getInvertedProtocol() const {
+    return protocol;
+  }
+
+  /// Get known kind of inverse this type represents.
+  InvertibleProtocolKind getInverseKind() const;
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Inverse;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(InverseType, Type)
+  PROXY_CAN_TYPE_SIMPLE_GETTER(getInvertedProtocol)
+END_CAN_TYPE_WRAPPER(InverseType, Type)
 
 /// ErrorType - Represents the type of an erroneously constructed declaration,
 /// expression, or type. When creating ErrorTypes, an associated error
@@ -5726,12 +5781,36 @@ class ProtocolCompositionType final : public TypeBase,
     public llvm::FoldingSetNode,
     private llvm::TrailingObjects<ProtocolCompositionType, Type> {
   friend TrailingObjects;
+
+  // TODO(kavon): this could probably be folded into the existing Bits field
+  // or we could just store the InverseType's in the Members array.
+  InvertibleProtocolSet Inverses;
   
 public:
   /// Retrieve an instance of a protocol composition type with the
-  /// given set of members.
+  /// given set of members. A "hidden member" is an implicit constraint that
+  /// is present for all protocol compositions.
+  ///
+  /// \param Members the regular members of this composition.
+  /// \param Inverses the set of inverses that are a member of the composition,
+  ///                 i.e., if \c IP is in this set, then \c ~IP is a member of
+  ///                 this composition.
+  /// \param HasExplicitAnyObject indicates whether this composition should be
+  /// treated as if \c AnyObject was a member.
+  static Type get(const ASTContext &C, ArrayRef<Type> Members,
+                  InvertibleProtocolSet Inverses,
+                  bool HasExplicitAnyObject);
+
+  /// Retrieve an instance of a protocol composition type with the
+  /// given set of members. Assumes no inverses are present in \c Members.
   static Type get(const ASTContext &C, ArrayRef<Type> Members,
                   bool HasExplicitAnyObject);
+
+  /// Constructs a protocol composition corresponding to the `Any` type.
+  static Type theAnyType(const ASTContext &C);
+
+  /// Constructs a protocol composition corresponding to the `AnyObject` type.
+  static Type theAnyObjectType(const ASTContext &C);
 
   /// Canonical protocol composition types are minimized only to a certain
   /// degree to preserve ABI compatibility. This routine enables performing
@@ -5755,11 +5834,14 @@ public:
     return {getTrailingObjects<Type>(), Bits.ProtocolCompositionType.Count};
   }
 
+  InvertibleProtocolSet getInverses() const { return Inverses; }
+
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getMembers(), hasExplicitAnyObject());
+    Profile(ID, getMembers(), getInverses(), hasExplicitAnyObject());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<Type> Members,
+                      InvertibleProtocolSet Inverses,
                       bool HasExplicitAnyObject);
 
   /// True if the composition requires the concrete conforming type to
@@ -5780,12 +5862,15 @@ public:
 private:
   static ProtocolCompositionType *build(const ASTContext &C,
                                         ArrayRef<Type> Members,
+                                        InvertibleProtocolSet Inverses,
                                         bool HasExplicitAnyObject);
 
   ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
+                          InvertibleProtocolSet inverses,
                           bool hasExplicitAnyObject,
                           RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties) {
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx, properties),
+      Inverses(inverses) {
     Bits.ProtocolCompositionType.HasExplicitAnyObject = hasExplicitAnyObject;
     Bits.ProtocolCompositionType.Count = members.size();
     std::uninitialized_copy(members.begin(), members.end(),
@@ -7210,7 +7295,8 @@ inline bool TypeBase::isConstraintType() const {
 inline bool CanType::isConstraintTypeImpl(CanType type) {
   return (isa<ProtocolType>(type) ||
           isa<ProtocolCompositionType>(type) ||
-          isa<ParameterizedProtocolType>(type));
+          isa<ParameterizedProtocolType>(type) ||
+          isa<InverseType>(type));
 }
 
 inline bool TypeBase::isExistentialType() {
@@ -7226,6 +7312,7 @@ inline bool CanType::isExistentialTypeImpl(CanType type) {
          isa<ProtocolCompositionType>(type) ||
          isa<ExistentialType>(type) ||
          isa<ParameterizedProtocolType>(type);
+  // TODO(kavon): treat InverseType as an existential, etc?
 }
 
 inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
@@ -7332,6 +7419,10 @@ inline Type TypeBase::getNominalParent() {
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
+
+//inline TypeDecl *TypeBase::getAnyTypeDecl() {
+//  return getCanonicalType().getAnyTypeDecl();
+//}
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
   if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))

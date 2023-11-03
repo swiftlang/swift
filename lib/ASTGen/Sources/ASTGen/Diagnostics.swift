@@ -76,7 +76,9 @@ struct DuplicateSyntaxError: ASTGenError {
   init(duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
     precondition(duplicate.kind == original.kind, "Expected duplicate and original to be of same kind")
 
-    guard let duplicateParent = duplicate.parent, let originalParent = original.parent, duplicateParent == originalParent, duplicateParent.kind.isSyntaxCollection else {
+    guard let duplicateParent = duplicate.parent, let originalParent = original.parent,
+      duplicateParent == originalParent, duplicateParent.kind.isSyntaxCollection
+    else {
       preconditionFailure("Expected a shared syntax collection parent")
     }
 

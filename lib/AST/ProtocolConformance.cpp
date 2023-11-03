@@ -178,6 +178,26 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
+bool ProtocolConformance::isRetroactive() const {
+  auto extensionModule = getDeclContext()->getParentModule();
+  auto protocolModule = getProtocol()->getParentModule();
+  if (extensionModule->isSameModuleLookingThroughOverlays(protocolModule)) {
+    return false;
+  }
+
+  auto conformingTypeDecl =
+      ConformingType->getNominalOrBoundGenericNominal();
+  if (conformingTypeDecl) {
+    auto conformingTypeModule = conformingTypeDecl->getParentModule();
+    if (extensionModule->
+        isSameModuleLookingThroughOverlays(conformingTypeModule)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
@@ -1027,7 +1047,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (isMoveOnly()) {
+    if (isNoncopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;
@@ -1211,6 +1231,9 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
   // Concrete types may synthesize some conformances
   if (!isa<ProtocolDecl>(nominal)) {
     trySynthesize(KnownProtocolKind::Sendable);
+
+    if (nominal->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      trySynthesize(KnownProtocolKind::Copyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

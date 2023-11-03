@@ -32,7 +32,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/DriverTool/DriverTool.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errno.h"
@@ -109,6 +109,10 @@ extern int swift_api_extract_main(ArrayRef<const char *> Args,
 
 /// Run 'swift-cache-tool'
 extern int swift_cache_tool_main(ArrayRef<const char *> Args, const char *Argv0,
+                                 void *MainAddr);
+
+/// Run 'swift-parse-test'
+extern int swift_parse_test_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
 
 /// Determine if the given invocation should run as a "subcommand".
@@ -379,6 +383,9 @@ static int run_driver(StringRef ExecName,
     return swift_cache_tool_main(
         TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],
         (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::ParseTest:
+    return swift_parse_test_main(argv, argv[0],
+                                 (void *)(intptr_t)getExecutablePath);
   default:
     break;
   }

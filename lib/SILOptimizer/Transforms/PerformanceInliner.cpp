@@ -120,6 +120,9 @@ class SILPerformanceInliner {
     /// call overhead itself.
     RemovedCallBenefit = 20,
 
+    /// The benefit of inlining a `begin_apply`.
+    RemovedCoroutineCallBenefit = 300,
+
     /// The benefit if the operand of an apply gets constant, e.g. if a closure
     /// is passed to an apply instruction in the callee.
     RemovedClosureBenefit = RemovedCallBenefit + 50,
@@ -209,6 +212,8 @@ class SILPerformanceInliner {
           &bbIt);
 
   bool isAutoDiffLinearMapWithControlFlow(FullApplySite AI);
+
+  bool isTupleWithAllocsOrPartialApplies(SILValue retVal);
 
   bool isProfitableToInline(
       FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
@@ -316,14 +321,8 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
         // Extract a member from a struct/tuple/enum.
         val = pi->getOperand(0);
         continue;
-      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
-        val = ti->getOperand();
-        continue;
-      } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
-        val = cfi->getOperand();
-        continue;
-      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
-        val = cvt->getOperand();
+      } else if (auto base = stripFunctionConversions(inst)) {
+        val = base;
         continue;
       }
       return false;
@@ -364,6 +363,29 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
   return false;
 }
 
+// Checks if the given value is a tuple containing allocated objects
+// or partial applies.
+//
+// Returns true if the number of allocated objects or partial applies is
+// greater than 0, and false otherwise. 
+// 
+// Returns false if the value is not a tuple.
+bool SILPerformanceInliner::isTupleWithAllocsOrPartialApplies(SILValue val) {
+  if (auto *ti = dyn_cast<TupleInst>(val)) {
+    for (auto i : range(ti->getNumOperands())) {
+      SILValue val = ti->getOperand(i);
+
+      if (auto base = stripFunctionConversions(val))
+        val = base;
+
+      if (isa<AllocationInst>(val) || isa<PartialApplyInst>(val))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 bool SILPerformanceInliner::isProfitableToInline(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
@@ -373,7 +395,8 @@ bool SILPerformanceInliner::isProfitableToInline(
   bool IsGeneric = AI.hasSubstitutions();
 
   // Start with a base benefit.
-  int BaseBenefit = RemovedCallBenefit;
+  int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
+                                            : RemovedCallBenefit;
 
   // Osize heuristic.
   //
@@ -479,6 +502,9 @@ bool SILPerformanceInliner::isProfitableToInline(
         if (def && (isa<FunctionRefInst>(def) || isa<PartialApplyInst>(def)))
           BlockW.updateBenefit(Benefit, RemovedClosureBenefit);
         else if (isAutoDiffLinearMapWithControlFlow(FAI)) {
+          // TODO: Do we need to tweak inlining benefits given to pullbacks
+          // (with and without control-flow)?
+
           // For linear maps in Swift Autodiff, callees may be passed as an
           // argument, however, they may be hidden behind a branch-tracing
           // enum (tracing execution flow of the original function).
@@ -583,7 +609,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         // Inlining functions which return an allocated object or partial_apply
         // most likely has a benefit in the caller, because e.g. it can enable
         // de-virtualization.
-        if (isa<AllocationInst>(retVal) || isa<PartialApplyInst>(retVal)) {
+        if (isa<AllocationInst>(retVal) || isa<PartialApplyInst>(retVal) || isTupleWithAllocsOrPartialApplies(retVal)) {
           BlockW.updateBenefit(Benefit, RemovedCallBenefit + 10);
           returnsAllocation = true;
         }

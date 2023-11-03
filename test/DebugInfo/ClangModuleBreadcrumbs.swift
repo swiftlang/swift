@@ -16,29 +16,29 @@ import OtherClangModule.SubModule
 let _ = someFunc(0)
 
 // Check for Clang module breadcrumbs.
-// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}Swift
+// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}Swift
 // CHECK-SAME:           ClangModule
 // CHECK-SAME:           dwoId:
 
-// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}}, {{.*}} producer: "{{.*}}Swift
+// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}}, {{.*}} producer: "{{.*}}Swift
 // CHECK-SAME:           OtherClangModule
 // CHECK-SAME:           dwoId:
 
-// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}clang
+// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}clang
 // CHECK-SAME:           ClangModule
 // CHECK-SAME:           dwoId:
 
 // NONE: DICompileUnit({{.*}}
 // NONE-NOT: DICompileUnit({{.*}}ClangModule
 
-// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}Swift
+// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}Swift
 // REMAP-SAME:           PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}ClangModule
 // REMAP-SAME:           dwoId:
 
-// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}Swift
+// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}Swift
 // REMAP-SAME:           PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}OtherClangModule
 // REMAP-SAME:           dwoId:
 
-// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}clang
+// REMAP: !DICompileUnit(language: DW_LANG_{{ObjC|C99|C11}},{{.*}} producer: "{{.*}}clang
 // REMAP-SAME:           PREFIX{{/|\\\\}}{{.*}}{{/|\\\\}}ClangModule
 // REMAP-SAME:           dwoId:

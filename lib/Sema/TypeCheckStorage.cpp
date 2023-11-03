@@ -748,7 +748,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getAttrs().hasAttribute<BorrowedAttr>())
     return usesBorrowed(DiagKind::BorrowedAttr);
 
-  if (storage->getValueInterfaceType()->isNoncopyable())
+  auto *dc = storage->getDeclContext();
+  if (storage->getValueInterfaceType()->isNoncopyable(dc))
     return usesBorrowed(DiagKind::NoncopyableType);
 
   return OpaqueReadOwnership::Owned;
@@ -1353,7 +1354,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
                                         Argument::unlabeled(Val));
   DSCE->setImplicit();
   DSCE->setType(copyMethodType);
-  DSCE->setThrows(false);
+  DSCE->setThrows(nullptr);
 
   Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil->setType(copyMethodType->getParams()[0].getParameterType());
@@ -1362,7 +1363,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
       ArgumentList::forImplicitCallTo(copyMethod->getParameters(), {Nil}, Ctx);
   auto *Call = CallExpr::createImplicit(Ctx, DSCE, argList);
   Call->setType(copyMethodType->getResult());
-  Call->setThrows(false);
+  Call->setThrows(nullptr);
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
@@ -1848,7 +1849,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
       DSCE->setType(type);
-      DSCE->setThrows(false);
+      DSCE->setThrows(nullptr);
       Callee = DSCE;
     }
 
@@ -1863,7 +1864,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
-    Call->setThrows(false);
+    Call->setThrows(nullptr);
 
     SetterBody.push_back(Call);
   };
@@ -2031,7 +2032,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
       if (auto funcType = type->getAs<FunctionType>())
         type = funcType->getResult();
       DSCE->setType(type);
-      DSCE->setThrows(false);
+      DSCE->setThrows(nullptr);
       Callee = DSCE;
     }
 
@@ -2039,7 +2040,7 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
     if (auto funcType = type->getAs<FunctionType>())
       type = funcType->getResult();
     Call->setType(type);
-    Call->setThrows(false);
+    Call->setThrows(nullptr);
 
     body.push_back(Call);
   };

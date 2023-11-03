@@ -205,6 +205,26 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether the given declaration has
+/// a C-compatible interface.
+class IsCCompatibleFuncDeclRequest :
+    public SimpleRequest<IsCCompatibleFuncDeclRequest,
+                         bool(FuncDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
 
 /// Computes the kind of initializer for a given \c ConstructorDecl
@@ -407,9 +427,10 @@ public:
   void cacheResult(bool value) const;
 };
 
-/// Determine whether the given declaration is 'moveOnly'.
-class IsMoveOnlyRequest
-    : public SimpleRequest<IsMoveOnlyRequest, bool(ValueDecl *),
+/// Determine whether the given declaration has any markings that would cause it
+/// to not have an implicit, unconditional conformance to Copyable.
+class HasNoncopyableAnnotationRequest
+    : public SimpleRequest<HasNoncopyableAnnotationRequest, bool(TypeDecl *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -418,7 +439,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  bool evaluate(Evaluator &evaluator, TypeDecl *decl) const;
 
 public:
   // Separate caching.
@@ -426,7 +447,6 @@ public:
   llvm::Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
-
 
 /// Determine whether the given declaration is escapable.
 class IsEscapableRequest
@@ -446,6 +466,25 @@ public:
   bool isCached() const { return true; }
   llvm::Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Determine whether the given type is noncopyable. Assumes type parameters
+/// have become archetypes.
+class IsNoncopyableRequest
+    : public SimpleRequest<IsNoncopyableRequest, bool(CanType),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, CanType type) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 /// Determine whether the given declaration is 'dynamic''.
@@ -3779,11 +3818,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Retrieve the implicit conformance for the given nominal type to
-/// the Sendable protocol.
-class GetImplicitSendableRequest :
-    public SimpleRequest<GetImplicitSendableRequest,
-                         ProtocolConformance *(NominalTypeDecl *),
+/// Compute the implicit conformance for the given nominal type to
+/// an known protocol, if implicit conformances are permitted.
+class ImplicitKnownProtocolConformanceRequest :
+    public SimpleRequest<ImplicitKnownProtocolConformanceRequest,
+                         ProtocolConformance *(NominalTypeDecl *, KnownProtocolKind),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3792,7 +3831,7 @@ private:
   friend SimpleRequest;
 
   ProtocolConformance *evaluate(
-      Evaluator &evaluator, NominalTypeDecl *nominal) const;
+      Evaluator &evaluator, NominalTypeDecl *nominal, KnownProtocolKind kp) const;
 
 public:
   // Caching

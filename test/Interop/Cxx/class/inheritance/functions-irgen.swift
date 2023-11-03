@@ -13,5 +13,5 @@ let _ = testGetX()
 // CHECK: = call i32 @[[SYNTH_METHOD:.*]](ptr %[[SELF_PTR]])
 
 // CHECK: define {{.*}}linkonce_odr{{.*}} i32 @[[SYNTH_METHOD]](ptr {{.*}} %[[THIS_PTR:.*]])
-// CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i64 4
-// CHECK: call noundef i32 @{{.*}}(ptr {{.*}} %[[ADD_PTR]])
+// CHECK: %[[ADD_PTR:.*]] = getelementptr inbounds i8, ptr %{{.*}}, i{{32|64}} 4
+// CHECK: call{{.*}} i32 @{{.*}}(ptr {{.*}} %[[ADD_PTR]])

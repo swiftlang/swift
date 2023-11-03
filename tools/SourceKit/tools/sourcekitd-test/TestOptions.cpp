@@ -12,6 +12,7 @@
 
 #include "TestOptions.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -36,7 +37,10 @@ enum Opt {
 };
 
 // Create prefix string literals used in Options.td.
-#define PREFIX(NAME, VALUE) const char *const NAME[] = VALUE;
+#define PREFIX(NAME, VALUE)                                                    \
+  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+      NAME##_init, std::size(NAME##_init) - 1);
 #include "Options.inc"
 #undef PREFIX
 
@@ -53,9 +57,9 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 };
 
 // Create OptTable class for parsing actual command line arguments
-class TestOptTable : public llvm::opt::OptTable {
+class TestOptTable : public llvm::opt::GenericOptTable {
 public:
-  TestOptTable() : OptTable(InfoTable, std::size(InfoTable)){}
+  TestOptTable() : GenericOptTable(InfoTable) {}
 };
 
 } // end anonymous namespace
@@ -151,6 +155,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
         .Case("diags", SourceKitRequest::Diagnostics)
+        .Case("semantic-tokens", SourceKitRequest::SemanticTokens)
         .Case("compile", SourceKitRequest::Compile)
         .Case("compile.close", SourceKitRequest::CompileClose)
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)

@@ -203,6 +203,9 @@ function(swift_install_symlink_component component)
   # otherwise.
   install(DIRECTORY DESTINATION "${ARG_DESTINATION}" COMPONENT ${component})
   install(SCRIPT ${INSTALL_SYMLINK}
-          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})"
+          CODE "install_symlink(${ARG_LINK_NAME}
+                                ${ARG_TARGET}
+                                ${ARG_DESTINATION}
+                                ${SWIFT_COPY_OR_SYMLINK})"
           COMPONENT ${component})
 endfunction()

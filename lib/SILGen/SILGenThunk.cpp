@@ -32,6 +32,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -107,6 +108,23 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isNativeToForeignThunk() && "native-to-foreign thunks only");
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
+}
+
+void SILGenModule::emitDistributedThunkForDecl(
+    llvm::PointerUnion<AbstractFunctionDecl *, VarDecl *> varOrAFD) {
+  FuncDecl *thunkDecl =
+      varOrAFD.is<AbstractFunctionDecl *>()
+          ? varOrAFD.get<AbstractFunctionDecl *>()->getDistributedThunk()
+          : varOrAFD.get<VarDecl *>()->getDistributedThunk();
+  if (!thunkDecl)
+    return;
+
+  if (thunkDecl->isBodySkipped())
+    return;
+
+  auto thunk = SILDeclRef(thunkDecl).asDistributed();
+  emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+                         getFunction(thunk, ForDefinition));
 }
 
 void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
@@ -325,9 +343,9 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       // Check for an error if the convention includes one.
       // Increment the error and flag indices if present.  They do not account
       // for the fact that they are preceded by the block_storage arguments.
-      auto errorIndex = convention.completionHandlerErrorParamIndex().transform(
+      auto errorIndex = swift::transform(convention.completionHandlerErrorParamIndex(),
           [](auto original) { return original + 1; });
-      auto flagIndex = convention.completionHandlerFlagParamIndex().transform(
+      auto flagIndex = swift::transform(convention.completionHandlerFlagParamIndex(),
           [](auto original) { return original + 1; });
 
       FuncDecl *resumeIntrinsic;

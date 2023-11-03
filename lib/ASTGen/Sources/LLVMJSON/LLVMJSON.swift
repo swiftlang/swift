@@ -71,20 +71,21 @@ fileprivate struct LLVMJSONDecoding: Decoder {
 
   var valuePtr: UnsafeMutableRawPointer
   var codingPath: [CodingKey]
-  var userInfo: [CodingUserInfoKey : Any]
+  var userInfo: [CodingUserInfoKey: Any]
 
-  init(from valuePtr: UnsafeMutableRawPointer, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey : Any] = [:]) {
+  init(from valuePtr: UnsafeMutableRawPointer, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
     self.valuePtr = valuePtr
     self.codingPath = codingPath
     self.userInfo = userInfo
   }
 
-  func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key : CodingKey {
+  func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> where Key: CodingKey {
     var objectPtr: UnsafeMutableRawPointer? = nil
     if JSON_value_getAsObject(valuePtr, &objectPtr) {
       throw DecodingError.typeMismatch(
         KeyedContainer<Key>.self,
-        .init(codingPath: codingPath, debugDescription: "type mismatch"))
+        .init(codingPath: codingPath, debugDescription: "type mismatch")
+      )
     }
     return KeyedDecodingContainer(KeyedContainer<Key>(objectPtr: objectPtr!, codingPath: codingPath))
   }
@@ -94,7 +95,8 @@ fileprivate struct LLVMJSONDecoding: Decoder {
     if JSON_value_getAsArray(valuePtr, &arrayPtr) {
       throw DecodingError.typeMismatch(
         UnkeyedContainer.self,
-        .init(codingPath: codingPath, debugDescription: "type mismatch"))
+        .init(codingPath: codingPath, debugDescription: "type mismatch")
+      )
     }
     return UnkeyedContainer(arrayPtr: arrayPtr!, codingPath: codingPath)
   }
@@ -195,7 +197,7 @@ extension LLVMJSONDecoding.SingleValueContainer: SingleValueDecodingContainer {
     try _decodeInteger(UInt64.self)
   }
 
-  func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+  func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
     let decoder = LLVMJSONDecoding(from: valuePtr, codingPath: codingPath)
     return try T.init(from: decoder)
   }
@@ -210,7 +212,7 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
     var keys: [Key] = []
     let size = JSON_object_getSize(objectPtr)
     keys.reserveCapacity(size)
-    for i in 0 ..< size {
+    for i in 0..<size {
       let keyData = JSON_object_getKey(objectPtr, i)
       if let key = Key(stringValue: String(keyData)) {
         keys.append(key);
@@ -238,10 +240,11 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
   }
 
   private func _getSingle(forKey key: Key) throws -> SingleContainer {
-    SingleContainer(valuePtr: try _getValueOrThrow(forKey: key),
-                    codingPath: codingPath + [key])
+    SingleContainer(
+      valuePtr: try _getValueOrThrow(forKey: key),
+      codingPath: codingPath + [key]
+    )
   }
-
 
   private func _typeMismatchError(_ type: Any.Type, forKey key: Key) -> DecodingError {
     DecodingError.typeMismatch(type, .init(codingPath: codingPath + [key], debugDescription: "type misatch"))
@@ -307,7 +310,7 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
     try _getSingle(forKey: key).decode(type)
   }
 
-  func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T : Decodable {
+  func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
     try _getSingle(forKey: key).decode(type)
   }
 
@@ -381,12 +384,15 @@ extension LLVMJSONDecoding.KeyedContainer: KeyedDecodingContainerProtocol {
     return try decode(type, forKey: key)
   }
 
-  func decodeIfPresent<T>(_ type: T.Type, forKey key: Key) throws -> T? where T : Decodable {
+  func decodeIfPresent<T>(_ type: T.Type, forKey key: Key) throws -> T? where T: Decodable {
     guard contains(key) else { return nil }
     return try decode(type, forKey: key)
   }
 
-  func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+  func nestedContainer<NestedKey: CodingKey>(
+    keyedBy type: NestedKey.Type,
+    forKey key: Key
+  ) throws -> KeyedDecodingContainer<NestedKey> {
     var objectPtr: UnsafeMutableRawPointer? = nil
     if JSON_value_getAsObject(try _getValueOrThrow(forKey: key), &objectPtr) {
       throw _typeMismatchError(KeyedDecodingContainer<NestedKey>.self, forKey: key)
@@ -439,7 +445,8 @@ extension LLVMJSONDecoding.UnkeyedContainer: UnkeyedDecodingContainer {
     guard !isAtEnd else {
       throw DecodingError.valueNotFound(
         Bool.self,
-        .init(codingPath: codingPath, debugDescription: "tried to decode too many"))
+        .init(codingPath: codingPath, debugDescription: "tried to decode too many")
+      )
     }
     let index = currentIndex
     currentIndex += 1
@@ -447,8 +454,10 @@ extension LLVMJSONDecoding.UnkeyedContainer: UnkeyedDecodingContainer {
   }
 
   private mutating func _getSingle() throws -> SingleContainer {
-    SingleContainer(valuePtr: try _getValueOrThrow(),
-                    codingPath: codingPath + [IndexKey(intValue: currentIndex)])
+    SingleContainer(
+      valuePtr: try _getValueOrThrow(),
+      codingPath: codingPath + [IndexKey(intValue: currentIndex)]
+    )
   }
 
   mutating func decodeNil() throws -> Bool {
@@ -511,17 +520,23 @@ extension LLVMJSONDecoding.UnkeyedContainer: UnkeyedDecodingContainer {
     try _getSingle().decode(type)
   }
 
-  mutating func decode<T>(_ type: T.Type) throws -> T where T : Decodable {
+  mutating func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
     try _getSingle().decode(type)
   }
 
   private func _typeMismatchError(_ type: Any.Type) -> DecodingError {
     DecodingError.typeMismatch(
-      type, .init(codingPath: codingPath + [IndexKey(intValue: currentIndex)],
-                  debugDescription: "type misatch"))
+      type,
+      .init(
+        codingPath: codingPath + [IndexKey(intValue: currentIndex)],
+        debugDescription: "type misatch"
+      )
+    )
   }
 
-  mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> where NestedKey : CodingKey {
+  mutating func nestedContainer<NestedKey: CodingKey>(
+    keyedBy type: NestedKey.Type
+  ) throws -> KeyedDecodingContainer<NestedKey> {
     var objectPtr: UnsafeMutableRawPointer? = nil
     let newPath = codingPath + [IndexKey(intValue: currentIndex)]
     if JSON_value_getAsObject(try _getValueOrThrow(), &objectPtr) {
@@ -566,15 +581,15 @@ fileprivate struct LLVMJSONEncoding: Encoder {
 
   var valuePtr: UnsafeMutableRawPointer
   var codingPath: [CodingKey]
-  var userInfo: [CodingUserInfoKey : Any]
+  var userInfo: [CodingUserInfoKey: Any]
 
-  init(to valuePtr: UnsafeMutableRawPointer, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey : Any] = [:]) {
+  init(to valuePtr: UnsafeMutableRawPointer, codingPath: [CodingKey] = [], userInfo: [CodingUserInfoKey: Any] = [:]) {
     self.valuePtr = valuePtr
     self.codingPath = codingPath
     self.userInfo = userInfo
   }
 
-  func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key : CodingKey {
+  func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
     let objectPtr = JSON_value_emplaceNewObject(valuePtr)
     return KeyedEncodingContainer(KeyedContainer(objectPtr: objectPtr, codingPath: codingPath))
   }
@@ -653,13 +668,16 @@ extension LLVMJSONEncoding.KeyedContainer: KeyedEncodingContainerProtocol {
     JSON_object_setInteger(objectPtr, key.stringValue, Int64(value))
   }
 
-  mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
+  mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
     let valuePtr = JSON_object_setNewValue(objectPtr, key.stringValue)
     let encoder = LLVMJSONEncoding(to: valuePtr, codingPath: codingPath + [key])
     try value.encode(to: encoder)
   }
 
-  mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+  mutating func nestedContainer<NestedKey: CodingKey>(
+    keyedBy keyType: NestedKey.Type,
+    forKey key: Key
+  ) -> KeyedEncodingContainer<NestedKey> {
     let nestedObjectPtr = JSON_object_setNewObject(objectPtr, key.stringValue)
     return KeyedEncodingContainer(KeyedContainer(objectPtr: nestedObjectPtr, codingPath: codingPath + [key]))
   }
@@ -755,18 +773,23 @@ extension LLVMJSONEncoding.UnkeyedContainer: UnkeyedEncodingContainer {
     JSON_array_pushInteger(arrayPtr, Int64(value))
   }
 
-  mutating func encode<T>(_ value: T) throws where T : Encodable {
+  mutating func encode<T>(_ value: T) throws where T: Encodable {
     let key = IndexKey(intValue: self.count)
     let valuePtr = JSON_array_pushNewValue(arrayPtr)
     let encoder = LLVMJSONEncoding(to: valuePtr, codingPath: codingPath + [key])
     try value.encode(to: encoder)
   }
 
-  mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
+  mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey>
+  where NestedKey: CodingKey {
     let key = IndexKey(intValue: self.count)
     let nestedObjectPtr = JSON_array_pushNewObject(arrayPtr)
-    return KeyedEncodingContainer(KeyedContainer(objectPtr: nestedObjectPtr,
-                                                 codingPath: codingPath + [key]))
+    return KeyedEncodingContainer(
+      KeyedContainer(
+        objectPtr: nestedObjectPtr,
+        codingPath: codingPath + [key]
+      )
+    )
   }
 
   mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
@@ -841,7 +864,7 @@ extension LLVMJSONEncoding.SingleValueContainer: SingleValueEncodingContainer {
     JSON_value_emplaceInteger(valuePtr, Int64(value));
   }
 
-  mutating func encode<T>(_ value: T) throws where T : Encodable {
+  mutating func encode<T>(_ value: T) throws where T: Encodable {
     let encoder = LLVMJSONEncoding(to: valuePtr, codingPath: codingPath)
     try value.encode(to: encoder)
   }

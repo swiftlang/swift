@@ -801,11 +801,28 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return true;
 
-  if (getASTContext().SILOpts.SkipNonExportableDecls &&
-      !D->isExposedToClients())
-    return true;
+  if (!getASTContext().SILOpts.SkipNonExportableDecls)
+    return false;
 
-  return false;
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    do {
+      if (afd->isExposedToClients())
+        return false;
+
+      // If this function is nested within another function that is exposed to
+      // clients then it should be emitted.
+      auto dc = afd->getDeclContext()->getAsDecl();
+      afd = dc ? dyn_cast<AbstractFunctionDecl>(dc) : nullptr;
+    } while (afd);
+
+    // We didn't find a parent function that is exposed.
+    return true;
+  }
+
+  if (D->isExposedToClients())
+    return false;
+
+  return true;
 }
 
 void SILGenModule::visit(Decl *D) {
@@ -1399,13 +1416,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       emitNativeToForeignThunk(thunk);
   }
 
-  if (auto thunkDecl = AFD->getDistributedThunk()) {
-    if (!thunkDecl->isBodySkipped()) {
-      auto thunk = SILDeclRef(thunkDecl).asDistributed();
-      emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
-                             getFunction(thunk, ForDefinition));
-    }
-  }
+  emitDistributedThunkForDecl(AFD);
 
   if (AFD->isBackDeployed(M.getASTContext())) {
     // Emit the fallback function that will be used when the original function
@@ -1601,7 +1612,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
 void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
                                           DestructorDecl *dd) {
-  assert(cd->isMoveOnly());
+  assert(cd->isNoncopyable());
 
   emitAbstractFuncDecl(dd);
 

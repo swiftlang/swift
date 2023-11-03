@@ -850,9 +850,9 @@ NativeConventionSchema::getCoercionTypes(
                                               paddingSize.getQuantity());
           elts.push_back(padding);
         }
-        if (!packed &&
-            !begin.isMultipleOf(clang::CharUnits::fromQuantity(
-                IGM.DataLayout.getABITypeAlignment(type))))
+
+        if (!packed && !begin.isMultipleOf(clang::CharUnits::fromQuantity(
+                           IGM.DataLayout.getABITypeAlign(type))))
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
@@ -891,7 +891,7 @@ NativeConventionSchema::getCoercionTypes(
         }
         if (!packed &&
             !begin.isMultipleOf(clang::CharUnits::fromQuantity(
-                IGM.DataLayout.getABITypeAlignment(type))))
+                IGM.DataLayout.getABITypeAlign(type))))
           packed = true;
         elts.push_back(type);
         expandedTyIndicesMap.push_back(idx - 1);
@@ -1151,10 +1151,10 @@ namespace {
       case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
       case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
-      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
         llvm_unreachable("OpenCL type in ABI lowering");
 
       // We should never see ARM SVE types at all.
@@ -1171,6 +1171,10 @@ namespace {
 #define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
         llvm_unreachable("RISC-V V type in ABI lowering");
+
+#define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+        llvm_unreachable("WASM type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
@@ -4841,7 +4845,7 @@ Address IRGenFunction::getCallerTypedErrorResultSlot() {
 /// insertion point that most blocks should be inserted before.
 void IRGenFunction::emitBBForReturn() {
   ReturnBB = createBasicBlock("return");
-  CurFn->getBasicBlockList().push_back(ReturnBB);
+  CurFn->insert(CurFn->end(), ReturnBB);
 }
 
 llvm::BasicBlock *IRGenFunction::createExceptionUnwindBlock() {
@@ -4882,8 +4886,8 @@ void IRGenFunction::createExceptionTrapScope(
 void IRGenFunction::emitPrologue() {
   // Set up the IRBuilder.
   llvm::BasicBlock *EntryBB = createBasicBlock("entry");
-  assert(CurFn->getBasicBlockList().empty() && "prologue already emitted?");
-  CurFn->getBasicBlockList().push_back(EntryBB);
+  assert(CurFn->empty() && "prologue already emitted?");
+  CurFn->insert(CurFn->end(), EntryBB);
   Builder.SetInsertPoint(EntryBB);
 
   // Set up the alloca insertion point.
@@ -4980,7 +4984,7 @@ void IRGenFunction::emitEpilogue() {
     CurFn->setPersonalityFn(IGM.getForeignExceptionHandlingPersonalityFunc());
   }
   for (auto *bb : ExceptionUnwindBlocks)
-    CurFn->getBasicBlockList().push_back(bb);
+    CurFn->insert(CurFn->end(), bb);
 }
 
 std::pair<Address, Size>
@@ -4996,10 +5000,10 @@ irgen::allocateForCoercion(IRGenFunction &IGF,
     ? fromTy
     : toTy;
 
-  auto alignment = std::max(DL.getABITypeAlignment(fromTy),
-                            DL.getABITypeAlignment(toTy));
+  llvm::Align alignment =
+      std::max(DL.getABITypeAlign(fromTy), DL.getABITypeAlign(toTy));
 
-  auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment),
+  auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment.value()),
                                  basename + ".coerced");
   
   Size size(std::max(fromSize, toSize));

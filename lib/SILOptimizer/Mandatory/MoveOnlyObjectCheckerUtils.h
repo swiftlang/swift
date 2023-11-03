@@ -169,7 +169,7 @@ struct OSSACanonicalizer {
 /// must checks to process.
 bool searchForCandidateObjectMarkUnresolvedNonCopyableValueInsts(
     SILFunction *fn,
-    SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
+    llvm::SmallSetVector<MarkUnresolvedNonCopyableValueInst *, 32>
         &moveIntroducersToProcess,
     DiagnosticEmitter &diagnosticEmitter);
 

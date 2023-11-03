@@ -51,6 +51,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::MemberOfObjCImplementationExtension:
     return DiagnosticBehavior::Unspecified;
 
   case ObjCReason::ExplicitlyIBInspectable:
@@ -88,6 +89,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::MemberOfObjCImplementationExtension:
   case ObjCReason::ExplicitlyObjCByAccessNote:
     return static_cast<unsigned>(reason);
 
@@ -137,6 +139,7 @@ void ObjCReason::describe(const Decl *D) const {
   case ObjCReason::MemberOfObjCExtension:
   case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCImplementationExtension:
   case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     // No additional note required.
@@ -179,6 +182,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for structs.
   if (auto *SD = T->getStructOrBoundGenericStruct()) {
+    if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
+      // This can be a non-trivial C++ record.
+      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class)
+          .highlight(TypeRange)
+          .limitBehavior(behavior);
+      return;
+    }
     diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
         .highlight(TypeRange)
         .limitBehavior(behavior);
@@ -482,6 +492,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     return false;
 
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
   }
@@ -1456,9 +1467,12 @@ static llvm::Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   }
 
   // A member implementation of an @objcImplementation extension is @objc.
-  if (VD->isObjCMemberImplementation())
-    // FIXME: New ObjCReason::Kind?
-    return ObjCReason(ObjCReason::ImplicitlyObjC);
+  if (VD->isObjCMemberImplementation()) {
+    auto ext = VD->getDeclContext()->getAsDecl();
+    auto attr = ext->getAttrs()
+                  .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+    return ObjCReason(ObjCReason::MemberOfObjCImplementationExtension, attr);
+  }
 
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
@@ -2881,7 +2895,7 @@ class ObjCImplementationChecker {
     return diag;
   }
 
-  SmallSetVector<ValueDecl *, 16> unmatchedRequirements;
+  llvm::SmallSetVector<ValueDecl *, 16> unmatchedRequirements;
 
   /// Candidates with their explicit ObjC names, if any.
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
@@ -2945,17 +2959,76 @@ private:
     return nullptr;
   }
 
+  void diagnoseVTableUse(ValueDecl *member) {
+    if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+      for (auto accessor : storage->getAllAccessors()) {
+        diagnoseVTableUse(accessor);
+      }
+      return;
+    }
+
+    auto afd = dyn_cast_or_null<AbstractFunctionDecl>(member);
+    if (!afd || !afd->needsNewVTableEntry())
+      return;
+
+    // Don't diagnose if we already diagnosed an unrelated ObjC interop issue,
+    // like an un-representable type. If there's an `@objc` attribute on the
+    // member, this will be indicated by its `isInvalid()` bit; otherwise we'll
+    // use the enclosing extension's `@_objcImplementation` attribute.
+    DeclAttribute *attr = afd->getAttrs()
+                              .getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
+    if (!attr)
+      attr = member->getDeclContext()->getAsDecl()->getAttrs()
+                 .getAttribute<ObjCImplementationAttr>(/*AllowInvalid=*/true);
+    assert(attr && "expected @_objcImplementation on context of member checked "
+                   "by ObjCImplementationChecker");
+    if (attr->isInvalid())
+      return;
+
+    if (auto init = dyn_cast<ConstructorDecl>(afd)) {
+      if (!init->isObjC() && (init->isRequired() ||
+                              !init->isConvenienceInit())) {
+        // Swift-only initializers have to be convenience.
+        diagnose(afd, diag::objc_implementation_init_must_be_convenience,
+                 afd, init->isRequired());
+
+        // Add appropriate fix-it to 'convenience'.
+        if (auto requiredMod = init->getAttrs().getAttribute<RequiredAttr>())
+          diagnose(afd,
+                   diag::objc_implementation_init_turn_required_to_convenience)
+            .fixItReplace(requiredMod->getRange(), "convenience");
+        else
+          diagnose(afd,
+                   diag::objc_implementation_init_turn_designated_to_convenience)
+            .fixItInsert(afd->getAttributeInsertionLoc(/*forModifier=*/true),
+                         "convenience ");
+
+        return;
+      }
+    }
+
+    // Emit a vague fallback diagnostic.
+    diagnose(afd, diag::objc_implementation_member_requires_vtable, afd);
+  }
+
   void addRequirements(IterableDeclContext *idc) {
     assert(idc->getDecl()->hasClangNode());
     for (Decl *_member : idc->getMembers()) {
-      // Skip accessors; we'll match their storage instead. Also skip overrides;
-      // the override checker handles those.
+      // Skip accessors; we'll match their storage instead.
       auto member = dyn_cast<ValueDecl>(_member);
-      if (!member || isa<AccessorDecl>(member) || member->getOverriddenDecl())
+      if (!member || isa<AccessorDecl>(member))
+        continue;
+
+      ASTContext &ctx = member->getASTContext();
+
+      // Also skip overrides, unless they override an unavailable decl, which
+      // makes them not formally overrides anymore.
+      if (member->getOverriddenDecl() &&
+          !member->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
         continue;
 
       // Skip alternate Swift names for other language modes.
-      if (member->getAttrs().isUnavailable(member->getASTContext()))
+      if (member->getAttrs().isUnavailable(ctx))
         continue;
 
       // Skip async versions of members. We'll match against the completion
@@ -2978,8 +3051,12 @@ private:
 
       // Skip non-member implementations.
       // FIXME: Should we consider them if they were only rejected for privacy?
-      if (!member->isObjCMemberImplementation())
+      if (!member->isObjCMemberImplementation()) {
+        // No member of an `@_objcImplementation` extension should need a vtable
+        // entry.
+        diagnoseVTableUse(member);
         continue;
+      }
 
       // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
       // in `matchRequirementsAtThreshold()`, so just precompute it.
@@ -3096,8 +3173,8 @@ private:
 
     // Requirements and candidates that have been matched (even ambiguously) and
     // should be removed from our unmatched lists.
-    SmallSetVector<ValueDecl *, 16> requirementsToRemove;
-    SmallSetVector<ValueDecl *, 16> candidatesToRemove;
+    llvm::SmallSetVector<ValueDecl *, 16> requirementsToRemove;
+    llvm::SmallSetVector<ValueDecl *, 16> candidatesToRemove;
 
     // First, loop through unsatisfied candidates and try the requirements.
     for (const auto &pair : unmatchedCandidates) {
@@ -3363,6 +3440,8 @@ private:
     case MatchOutcome::Match:
     case MatchOutcome::MatchWithExplicitObjCName:
       // Successful outcomes!
+      // If this member will require a vtable entry, diagnose that now.
+      diagnoseVTableUse(cand);
       return;
 
     case MatchOutcome::WrongImplicitObjCName:
@@ -3528,14 +3607,26 @@ public:
       diagnose(cand, diag::member_of_objc_implementation_not_objc_or_final,
                cand, cand->getDeclContext()->getSelfClassDecl());
 
-      if (canBeRepresentedInObjC(cand))
-        diagnose(cand, diag::fixit_add_private_for_objc_implementation,
-                 cand->getDescriptiveKind())
-            .fixItInsert(cand->getAttributeInsertionLoc(true), "private ");
+      if (canBeRepresentedInObjC(cand)) {
+        auto diagnostic =
+            diagnose(cand, diag::fixit_add_private_for_objc_implementation,
+                     cand->getDescriptiveKind());
+        if (auto modifier = cand->getAttrs().getAttribute<AccessControlAttr>())
+          diagnostic.fixItReplace(modifier->getRange(), "private");
+        else
+          diagnostic.fixItInsert(cand->getAttributeInsertionLoc(true),
+                                 "private ");
+      }
 
-      diagnose(cand, diag::fixit_add_final_for_objc_implementation,
-               cand->getDescriptiveKind())
-          .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
+      // Initializers can't be 'final', but they can be '@nonobjc'
+      if (isa<ConstructorDecl>(cand))
+        diagnose(cand, diag::fixit_add_nonobjc_for_objc_implementation,
+                 cand->getDescriptiveKind())
+            .fixItInsert(cand->getAttributeInsertionLoc(false), "@nonobjc ");
+      else
+        diagnose(cand, diag::fixit_add_final_for_objc_implementation,
+                 cand->getDescriptiveKind())
+            .fixItInsert(cand->getAttributeInsertionLoc(true), "final ");
     }
   }
 };

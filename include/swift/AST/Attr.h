@@ -176,12 +176,20 @@ protected:
       kind : NumExposureKindBits
     );
 
+    SWIFT_INLINE_BITFIELD(ExternAttr, DeclAttribute, NumExternKindBits,
+      kind : NumExternKindBits
+    );
+
     SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 1,
       isUnchecked : 1
     );
 
     SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 1,
       isCategoryNameInvalid : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(NonisolatedAttr, DeclAttribute, 1,
+      isUnsafe : 1
     );
   } Bits;
   // clang-format on
@@ -2335,22 +2343,48 @@ public:
   }
 };
 
-/// Define the `@_extern` attribute, used to import external declarations in
+/// Define the `@extern` attribute, used to import external declarations in
 /// the specified way to interoperate with Swift.
 class ExternAttr : public DeclAttribute {
-public:
-  ExternAttr(StringRef ModuleName, StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit),
-      ModuleName(ModuleName), Name(Name) {}
+  SourceLoc LParenLoc, RParenLoc;
 
-  ExternAttr(StringRef ModuleName, StringRef Name, bool Implicit)
-    : ExternAttr(ModuleName, Name, SourceLoc(), SourceRange(), Implicit) {}
+public:
+  ExternAttr(llvm::Optional<StringRef> ModuleName,
+             llvm::Optional<StringRef> Name, SourceLoc AtLoc,
+             SourceLoc LParenLoc, SourceLoc RParenLoc, SourceRange Range,
+             ExternKind Kind, bool Implicit)
+      : DeclAttribute(DAK_Extern, AtLoc, Range, Implicit), LParenLoc(LParenLoc),
+        RParenLoc(RParenLoc), ModuleName(ModuleName), Name(Name) {
+    Bits.ExternAttr.kind = static_cast<unsigned>(Kind);
+  }
+
+  ExternAttr(llvm::Optional<StringRef> ModuleName,
+             llvm::Optional<StringRef> Name, ExternKind Kind, bool Implicit)
+      : ExternAttr(ModuleName, Name, SourceLoc(), SourceLoc(), SourceLoc(),
+                   SourceRange(), Kind, Implicit) {}
 
   /// The module name to import the named declaration in it
-  const StringRef ModuleName;
+  /// Used for Wasm import declaration.
+  const llvm::Optional<StringRef> ModuleName;
 
   /// The declaration name to import
-  const StringRef Name;
+  /// std::nullopt if the declaration name is not specified with @extern(c)
+  const llvm::Optional<StringRef> Name;
+
+  SourceLoc getLParenLoc() const { return LParenLoc; }
+  SourceLoc getRParenLoc() const { return RParenLoc; }
+
+  /// Returns the kind of extern.
+  ExternKind getExternKind() const {
+    return static_cast<ExternKind>(Bits.ExternAttr.kind);
+  }
+
+  /// Returns the C name of the given declaration.
+  /// \p forDecl is the func decl that the attribute belongs to.
+  StringRef getCName(const FuncDecl *forDecl) const;
+
+  /// Find an ExternAttr with the given kind in the given DeclAttributes.
+  static ExternAttr *find(DeclAttributes &attrs, ExternKind kind);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Extern;
@@ -2401,6 +2435,26 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjCImplementation;
+  }
+};
+
+/// Represents nonisolated modifier.
+class NonisolatedAttr final : public DeclAttribute {
+public:
+  NonisolatedAttr(SourceLoc atLoc, SourceRange range, bool unsafe,
+                  bool implicit)
+      : DeclAttribute(DAK_Nonisolated, atLoc, range, implicit) {
+    Bits.NonisolatedAttr.isUnsafe = unsafe;
+    assert((isUnsafe() == unsafe) && "not enough bits for unsafe state");
+  }
+
+  NonisolatedAttr(bool unsafe, bool implicit)
+      : NonisolatedAttr({}, {}, unsafe, implicit) {}
+
+  bool isUnsafe() const { return Bits.NonisolatedAttr.isUnsafe; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Nonisolated;
   }
 };
 

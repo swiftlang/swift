@@ -1934,7 +1934,7 @@ public:
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
       FunctionMetadataDifferentiabilityKind diffKind,
-      BuiltType globalActorType) const {
+      BuiltType globalActorType, BuiltType thrownError) const {
     assert(
         (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
         (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
@@ -1969,20 +1969,18 @@ public:
       flags = flags.withGlobalActor(true);
     }
 
+    ExtendedFunctionTypeFlags extFlags;
+    if (thrownError) {
+      flags = flags.withExtendedFlags(true);
+      extFlags = extFlags.withTypedThrows(true);
+    }
+
     return BuiltType(
-      flags.hasGlobalActor()
-        ? swift_getFunctionTypeMetadataGlobalActor(flags, diffKind, paramTypes.data(),
+        swift_getExtendedFunctionTypeMetadata(
+            flags, diffKind, paramTypes.data(),
             flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-            result.getMetadata(), globalActorType.getMetadata())
-        : flags.isDifferentiable()
-          ? swift_getFunctionTypeMetadataDifferentiable(
-                flags, diffKind, paramTypes.data(),
-                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-                result.getMetadata())
-          : swift_getFunctionTypeMetadata(
-                flags, paramTypes.data(),
-                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-                result.getMetadata()));
+            result.getMetadata(), globalActorType.getMetadataOrNull(), extFlags,
+            thrownError.getMetadataOrNull()));
   }
 
   TypeLookupErrorOr<BuiltType> createImplFunctionType(

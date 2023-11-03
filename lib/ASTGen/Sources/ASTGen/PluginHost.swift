@@ -12,9 +12,9 @@
 
 import CASTBridging
 import CBasicBridging
+import SwiftCompilerPluginMessageHandling
 import SwiftSyntax
 import swiftLLVMJSON
-import SwiftCompilerPluginMessageHandling
 
 enum PluginError: String, Error, CustomStringConvertible {
   case stalePlugin = "plugin is stale"
@@ -47,7 +47,7 @@ public func _initializePlugin(
 public func _deinitializePlugin(
   opaqueHandle: UnsafeMutableRawPointer
 ) {
-  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
   plugin.deinitialize()
 }
 
@@ -60,7 +60,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
   moduleName: UnsafePointer<CChar>,
   errorOut: UnsafeMutablePointer<BridgedString>?
 ) -> Bool {
-  let plugin =  CompilerPlugin(opaqueHandle: opaqueHandle)
+  let plugin = CompilerPlugin(opaqueHandle: opaqueHandle)
 
   if plugin.capability?.features.contains(.loadPluginLibrary) != true {
     errorOut?.pointee = allocateBridgedString("compiler plugin not loaded: '\(libraryPath); invalid plugin server")
@@ -81,7 +81,7 @@ func swift_ASTGen_pluginServerLoadLibraryPlugin(
       assert(diagnostics.isEmpty)
       return true
     }
-    var errorMsgs = diagnostics.map({$0.message}).joined(separator: ", ");
+    var errorMsgs = diagnostics.map({ $0.message }).joined(separator: ", ");
     errorOut?.pointee = allocateBridgedString(errorMsgs);
     return false
   } catch {
@@ -234,7 +234,8 @@ class PluginDiagnosticsEngine {
       message: diagnostic.message + (messageSuffix ?? ""),
       severity: diagnostic.severity,
       position: diagnostic.position,
-      highlights: diagnostic.highlights)
+      highlights: diagnostic.highlights
+    )
 
     // Emit Fix-Its.
     for fixIt in diagnostic.fixIts {
@@ -242,7 +243,8 @@ class PluginDiagnosticsEngine {
         message: fixIt.message,
         severity: .note,
         position: diagnostic.position,
-        fixItChanges: fixIt.changes)
+        fixItChanges: fixIt.changes
+      )
     }
 
     // Emit any notes as follow-ons.
@@ -250,7 +252,8 @@ class PluginDiagnosticsEngine {
       emitSingle(
         message: note.message,
         severity: .note,
-        position: note.position)
+        position: note.position
+      )
     }
   }
   /// Emit single C++ diagnostic.
@@ -274,10 +277,12 @@ class PluginDiagnosticsEngine {
     // Emit the diagnostic
     var mutableMessage = message
     let diag = mutableMessage.withBridgedString { bridgedMessage in
-      Diagnostic_create(
-        bridgedDiagEngine, bridgedSeverity,
-        bridgedSourceLoc(at: position),
-        bridgedMessage)
+      BridgedDiagnostic(
+        at: bridgedSourceLoc(at: position),
+        message: bridgedMessage,
+        severity: bridgedSeverity,
+        engine: bridgedDiagEngine
+      )
     }
 
     // Emit highlights
@@ -285,7 +290,7 @@ class PluginDiagnosticsEngine {
       guard let (startLoc, endLoc) = bridgedSourceRange(for: highlight) else {
         continue
       }
-      Diagnostic_highlight(diag, startLoc, endLoc)
+      diag.highlight(start: startLoc, end: endLoc)
     }
 
     // Emit changes for a Fix-It.
@@ -295,12 +300,15 @@ class PluginDiagnosticsEngine {
       }
       var newText = change.newText
       newText.withBridgedString { bridgedFixItText in
-        Diagnostic_fixItReplace(
-          diag, startLoc, endLoc, bridgedFixItText)
+        diag.fixItReplace(
+          start: startLoc,
+          end: endLoc,
+          replacement: bridgedFixItText
+        )
       }
     }
 
-    Diagnostic_finish(diag)
+    diag.finish()
   }
 
   /// Emit diagnostics.
@@ -328,7 +336,8 @@ class PluginDiagnosticsEngine {
   /// Produce the C++ source location for a given position based on a
   /// syntax node.
   private func bridgedSourceLoc(
-    at offset: Int, in fileName: String
+    at offset: Int,
+    in fileName: String
   ) -> BridgedSourceLoc {
     // Find the corresponding exported source file.
     guard let exportedSourceFile = exportedSourceFileByName[fileName] else {
@@ -339,7 +348,7 @@ class PluginDiagnosticsEngine {
     guard let bufferBaseAddress = exportedSourceFile.pointee.buffer.baseAddress else {
       return nil
     }
-    return SourceLoc_advanced(BridgedSourceLoc(raw: bufferBaseAddress), offset)
+    return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)
   }
 
   /// C++ source location from a position value from a plugin.
@@ -359,7 +368,7 @@ class PluginDiagnosticsEngine {
     if start.raw == nil || end.raw == nil {
       return nil
     }
-    return (start: start, end: end )
+    return (start: start, end: end)
   }
 }
 
@@ -391,7 +400,9 @@ extension PluginMessage.Syntax {
         fileName: fileName,
         offset: loc.offset,
         line: loc.line,
-        column: loc.column))
+        column: loc.column
+      )
+    )
   }
 
   init?(syntax: Syntax) {

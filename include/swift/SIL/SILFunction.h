@@ -303,7 +303,7 @@ private:
   /// empty.
   StringRef WasmExportName;
 
-  /// Name of a Wasm import module and field if @_extern(wasm) attribute
+  /// Name of a Wasm import module and field if @extern(wasm) attribute
   llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
@@ -423,9 +423,6 @@ private:
 
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
-
-  /// The function is in a statically linked module.
-  unsigned IsStaticallyLinked : 1;
 
   /// If true, the function has lexical lifetimes even if the module does not.
   unsigned ForceEnableLexicalLifetimes : 1;
@@ -698,12 +695,6 @@ public:
     WasDeserializedCanonical = val;
   }
 
-  bool isStaticallyLinked() const { return IsStaticallyLinked; }
-
-  void setIsStaticallyLinked(bool value) {
-    IsStaticallyLinked = value;
-  }
-
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
   }
@@ -869,6 +860,10 @@ public:
   /// indicates that the object's definition might be required outside the
   /// current SILModule.
   bool isPossiblyUsedExternally() const;
+
+  /// Helper method which returns whether this function should be preserved so
+  /// it can potentially be used in the debugger.
+  bool shouldBePreservedForDebugger() const;
 
   /// In addition to isPossiblyUsedExternally() it returns also true if this
   /// is a (private or internal) vtable method which can be referenced by
@@ -1293,14 +1288,14 @@ public:
   StringRef wasmExportName() const { return WasmExportName; }
   void setWasmExportName(StringRef value) { WasmExportName = value; }
 
-  /// Return Wasm import module name if @_extern(wasm) was used otherwise empty
+  /// Return Wasm import module name if @extern(wasm) was used otherwise empty
   StringRef wasmImportModuleName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->first;
     return StringRef();
   }
 
-  /// Return Wasm import field name if @_extern(wasm) was used otherwise empty
+  /// Return Wasm import field name if @extern(wasm) was used otherwise empty
   StringRef wasmImportFieldName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->second;

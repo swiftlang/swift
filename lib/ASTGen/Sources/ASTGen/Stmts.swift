@@ -2,49 +2,43 @@ import CASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func generate(_ node: CodeBlockSyntax) -> ASTNode {
-    .stmt(
-      BraceStmt_create(
-        self.ctx,
-        node.leftBrace.bridgedSourceLoc(in: self),
-        self.generate(node.statements),
-        node.rightBrace.bridgedSourceLoc(in: self)
-      )
+  public func generate(_ node: CodeBlockSyntax) -> BridgedBraceStmt {
+    BridgedBraceStmt.createParsed(
+      self.ctx,
+      lBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
+      elements: self.generate(node.statements),
+      rBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
     )
   }
 
-  func makeIfStmt(_ node: IfExprSyntax) -> ASTNode {
-    let conditions = node.conditions.map { self.generate($0).rawValue }
+  func makeIfStmt(_ node: IfExprSyntax) -> BridgedIfStmt {
+    let conditions = node.conditions.map(self.generate)
     assert(conditions.count == 1)  // TODO: handle multiple conditions.
 
-    return .stmt(
-      IfStmt_create(
-        self.ctx,
-        node.ifKeyword.bridgedSourceLoc(in: self),
-        conditions.first!,
-        self.generate(node.body).rawValue,
-        node.elseKeyword.bridgedSourceLoc(in: self),
-        self.generate(node.elseBody)?.rawValue
-      )
+    return .createParsed(
+      self.ctx,
+      ifKeywordLoc: node.ifKeyword.bridgedSourceLoc(in: self),
+      condition: conditions.first!.castToExpr,
+      thenStmt: self.generate(node.body).asStmt,
+      elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
+      elseStmt: (self.generate(node.elseBody)?.castToStmt).asNullable
     )
   }
 
-  public func generate(_ node: ExpressionStmtSyntax) -> ASTNode {
+  public func generate(_ node: ExpressionStmtSyntax) -> BridgedStmt {
     switch Syntax(node.expression).as(SyntaxEnum.self) {
     case .ifExpr(let e):
-      return makeIfStmt(e)
+      return makeIfStmt(e).asStmt
     default:
       fatalError("Unhandled case!")
     }
   }
 
-  public func generate(_ node: ReturnStmtSyntax) -> ASTNode {
-    .stmt(
-      ReturnStmt_create(
-        self.ctx,
-        node.returnKeyword.bridgedSourceLoc(in: self),
-        self.generate(node.expression)?.rawValue
-      )
+  public func generate(_ node: ReturnStmtSyntax) -> BridgedReturnStmt {
+    .createParsed(
+      self.ctx,
+      returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
+      expr: self.generate(node.expression).asNullable
     )
   }
 }

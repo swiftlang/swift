@@ -506,6 +506,12 @@ isDispatchQueueOperationName(StringRef name);
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
 
+/// Derive an implicit conformance for the given nominal type to
+/// the Sendable protocol. You want to be using
+/// `ImplicitKnownProtocolConformanceRequest` instead of this.
+ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
+                                                       NominalTypeDecl *nominal);
+
 /// Check whether we are in an actor's initializer or deinitializer.
 /// \returns nullptr iff we are not in such a declaration. Otherwise,
 ///          returns a pointer to the declaration.

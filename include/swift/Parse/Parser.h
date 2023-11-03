@@ -1095,7 +1095,7 @@ public:
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
 
-  /// Parse the @_extern attribute.
+  /// Parse the @extern attribute.
   bool parseExternAttribute(DeclAttributes &Attributes, bool &DiscardAttribute,
                             StringRef AttrName, SourceLoc AtLoc, SourceLoc Loc);
 

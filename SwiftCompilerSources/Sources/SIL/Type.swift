@@ -111,6 +111,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return idx >= 0 ? idx : nil
   }
 
+  public func getFunctionType(withNoEscape: Bool) -> Type {
+    bridged.getFunctionTypeWithNoEscape(withNoEscape).type
+  }
+
   public var description: String {
     String(taking: bridged.getDebugDescription())
   }

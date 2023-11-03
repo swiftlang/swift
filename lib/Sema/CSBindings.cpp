@@ -317,7 +317,7 @@ void BindingSet::inferTransitiveProtocolRequirements(
     // class, make it a "representative" and let it infer
     // supertypes and direct protocol requirements from
     // other members and their equivalence classes.
-    SmallSetVector<TypeVariableType *, 4> equivalenceClass;
+    llvm::SmallSetVector<TypeVariableType *, 4> equivalenceClass;
     {
       SmallVector<TypeVariableType *, 4> workList;
       workList.push_back(currentVar);
@@ -1079,6 +1079,10 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
     // open closure before attempting such disjunction.
     return boundType->lookThroughAllOptionalTypes()->is<TypeVariableType>();
   }
+
+  // Don't prioritize type variables that don't have any direct bindings.
+  if (Bindings.empty())
+    return false;
 
   return !involvesTypeVariables();
 }

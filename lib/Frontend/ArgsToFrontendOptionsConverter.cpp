@@ -22,7 +22,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -322,8 +322,6 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SkipNonExportableDecls |=
       Args.hasArg(OPT_experimental_skip_non_exportable_decls);
-  // FIXME: Remove this with rdar://117020997
-  Opts.SkipNonExportableDecls |= Args.hasArg(OPT_experimental_lazy_typecheck);
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
@@ -385,6 +383,17 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_block_list_file)) {
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
+
+  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
+    Opts.CASObjMode = llvm::StringSwitch<llvm::CASBackendMode>(A->getValue())
+                          .Case("native", llvm::CASBackendMode::Native)
+                          .Case("casid", llvm::CASBackendMode::CASID)
+                          .Case("verify", llvm::CASBackendMode::Verify)
+                          .Default(llvm::CASBackendMode::Native);
+  }
+
+  Opts.UseCASBackend = Args.hasArg(OPT_cas_backend);
+  Opts.EmitCASIDFile = Args.hasArg(OPT_cas_emit_casid_file);
 
   return false;
 }

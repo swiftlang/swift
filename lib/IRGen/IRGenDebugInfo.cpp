@@ -29,7 +29,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/Basic/Compiler.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -1190,7 +1189,7 @@ private:
       return createPointerSizedStruct(Scope, Name, FwdDecl, File, Line, Flags,
                                       MangledName);
     } else {
-      unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(0);
+      unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return createOpaqueStruct(Scope, Name, File, Line, SizeInBits, 0, Flags,
                                 MangledName);
     }
@@ -1201,7 +1200,7 @@ private:
                                          llvm::DIFile *File, unsigned Line,
                                          llvm::DINode::DIFlags Flags,
                                          StringRef MangledName) {
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, 0);
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
         Scope, "ptr", File, 0, PtrSize, 0, 0, Flags, PtrTy)};
@@ -1216,7 +1215,7 @@ private:
                                  llvm::DIType *PointeeTy, llvm::DIFile *File,
                                  unsigned Line, llvm::DINode::DIFlags Flags,
                                  StringRef MangledName) {
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     llvm::Metadata *Elements[] = {
         DBuilder.createMemberType(
             Scope, "ptr", File, 0, PtrSize, 0, 0, Flags,
@@ -1232,7 +1231,7 @@ private:
 
   llvm::DIType *createFixedValueBufferStruct(llvm::DIType *PointeeTy) {
     unsigned Line = 0;
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagArtificial;
     llvm::DIFile *File = MainFile;
     llvm::DIScope *Scope = TheCU;
@@ -1276,7 +1275,7 @@ private:
     auto FnTy = DBuilder.createSubroutineType(Params, Flags);
     llvm::DIType *DITy;
     if (FunTy->getRepresentation() == SILFunctionType::Representation::Thick) {
-      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(0))
+      if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(clang::LangAS::Default))
         // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
         DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy,
                                               MainFile, 0, Flags, MangledName);
@@ -1285,7 +1284,7 @@ private:
         DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
                                   AlignInBits, Flags, MangledName);
     } else {
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
                                       Flags, MangledName);
     }
@@ -1363,6 +1362,7 @@ private:
                                ? 0
                                : DbgTy.getAlignment().getValue() * SizeOfByte;
     unsigned Encoding = 0;
+    uint32_t NumExtraInhabitants = 0;
     llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
     TypeBase *BaseTy = DbgTy.getType();
@@ -1386,6 +1386,8 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned;
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1393,6 +1395,8 @@ private:
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
       if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
         SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
@@ -1401,11 +1405,13 @@ private:
       // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
       SizeInBits = FloatTy->getBitWidth();
       Encoding = llvm::dwarf::DW_ATE_float;
+      if (auto DbgTyNumExtraInhabitants = DbgTy.getNumExtraInhabitants())
+        NumExtraInhabitants = *DbgTyNumExtraInhabitants;
       break;
     }
 
     case TypeKind::BuiltinNativeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
                                             /* DWARFAddressSpace */ llvm::None,
                                             MangledName);
@@ -1413,7 +1419,7 @@ private:
     }
 
     case TypeKind::BuiltinBridgeObject: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
                                             /* DWARFAddressSpace */ llvm::None,
                                             MangledName);
@@ -1421,21 +1427,21 @@ private:
     }
 
     case TypeKind::BuiltinRawPointer: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
     }
 
     case TypeKind::BuiltinRawUnsafeContinuation: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
     }
 
     case TypeKind::BuiltinJob: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
       return DBuilder.createPointerType(nullptr, PtrSize, 0,
                                         /* DWARFAddressSpace */ llvm::None,
                                         MangledName);
@@ -1494,7 +1500,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope, Decl->getNameStr(), File,
                                       FwdDeclLine, Flags, MangledName);
     }
@@ -1529,7 +1535,7 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
                                       File, FwdDeclLine, Flags, MangledName);
@@ -1555,7 +1561,7 @@ private:
 
       // TODO: We may want to peek at Decl->isObjC() and set this
       // attribute accordingly.
-      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
       return createPointerSizedStruct(Scope,
                                       Decl ? Decl->getNameStr() : MangledName,
                                       File, FwdDeclLine, Flags, MangledName);
@@ -1726,7 +1732,8 @@ private:
       DebugTypeInfo AliasedDbgTy(
           AliasedTy, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
           DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
-          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer());
+          DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
+          DbgTy.getNumExtraInhabitants());
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, 0, Scope);
     }
@@ -1762,6 +1769,7 @@ private:
     case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
+    case TypeKind::Inverse:
     case TypeKind::Placeholder:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:
@@ -1774,7 +1782,9 @@ private:
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
-    return DBuilder.createBasicType(MangledName, SizeInBits, Encoding);
+    return DBuilder.createBasicType(MangledName, SizeInBits, Encoding,
+                                    llvm::DINode::FlagZero,
+                                    NumExtraInhabitants);
   }
 
   /// Determine if there exists a name mangling for the given type.
@@ -2769,7 +2779,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       // Advance the offset for the next piece.
       OffsetInBits += SizeInBits;
       SizeInBits = IGM.DataLayout.getTypeSizeInBits(Piece->getType());
-      AlignInBits = IGM.DataLayout.getABITypeAlignment(Piece->getType());
+      AlignInBits = IGM.DataLayout.getABITypeAlign(Piece->getType()).value();
       if (!AlignInBits)
         AlignInBits = SizeOfByte;
 
@@ -2854,7 +2864,8 @@ struct DbgIntrinsicEmitter {
                             llvm::Instruction *InsertBefore) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, InsertBefore);
-    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL,
+    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
                                             InsertBefore);
   }
 
@@ -2864,7 +2875,8 @@ struct DbgIntrinsicEmitter {
                             llvm::BasicBlock *Block) {
     if (ForceDbgDeclare == AddrDbgInstrKind::DbgDeclare)
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
-    return DIBuilder.insertDbgAddrIntrinsic(Addr, VarInfo, Expr, DL, Block);
+    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
 };
 
@@ -2959,15 +2971,15 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
         InsertPt = &EntryBlock;
       }
     } else {
-      // For llvm.dbg.addr, we just want to insert the intrinsic at the current
+      // For llvm.dbg.value, we just want to insert the intrinsic at the current
       // insertion point. This is because our contract with the coroutine
       // splitter is that the coroutine splitter just needs to emit the
-      // llvm.dbg.addr where we placed them. It shouldn't move them or do
+      // llvm.dbg.value where we placed them. It shouldn't move them or do
       // anything special with it. Instead, we have previously inserted extra
       // debug_value clones previously after each instruction at the SIL level
       // that corresponds with a funclet edge. This operation effectively sets
       // up the rest of the pipeline to be stupid and just emit the
-      // llvm.dbg.addr in the correct places. This is done by the SILOptimizer
+      // llvm.dbg.value in the correct places. This is done by the SILOptimizer
       // pass DebugInfoCanonicalizer.
       auto InsertBefore = Builder.GetInsertPoint();
       if (InsertBefore != ParentBlock->end()) {
@@ -3056,12 +3068,12 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   static const char *Tau = SWIFT_UTF8("\u03C4");
   llvm::raw_svector_ostream OS(Buf);
   OS << '$' << Tau << '_' << Depth << '_' << Index;
-  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(0);
+  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
   assert(PtrWidthInBits % 8 == 0);
   auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(PtrWidthInBits / 8),
-      Alignment(CI.getTargetInfo().getPointerAlign(0)));
+      Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
@@ -3082,7 +3094,7 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(0),
+  Type IntTy = BuiltinIntegerType::get(CI.getTargetInfo().getPointerWidth(clang::LangAS::Default),
                                        IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);

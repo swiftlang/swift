@@ -578,6 +578,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
   endif()
 
+  if(SWIFT_STDLIB_EXPERIMENTAL_NONCOPYABLE_GENERICS)
+    list(APPEND swift_flags "-enable-experimental-feature" "NoncopyableGenerics")
+  endif()
+
   if (SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES)
     list(APPEND swift_flags "-Xfrontend" "-enable-relative-protocol-witness-tables")
     list(APPEND swift_flags "-Xfrontend" "-swift-async-frame-pointer=never")
@@ -656,6 +660,12 @@ function(_compile_swift_files
            "-emit-private-module-interface-path" "${private_interface_file}")
     endif()
 
+    if(SWIFT_STDLIB_EMIT_API_DESCRIPTORS AND NOT SWIFTFILE_IS_FRAGILE)
+      set(api_descriptor_file "${module_base}.api.json")
+      list(APPEND swift_module_flags
+            "-emit-api-descriptor-path" "${api_descriptor_file}")
+    endif()
+
     if (NOT SWIFTFILE_IS_STDLIB_CORE)
       list(APPEND swift_module_flags
            "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
@@ -714,6 +724,13 @@ function(_compile_swift_files
         set(maccatalyst_private_interface_file)
       endif()
 
+      if(SWIFT_STDLIB_EMIT_API_DESCRIPTORS AND NOT SWIFTFILE_IS_FRAGILE)
+        set(maccatalyst_api_descriptor_file "${maccatalyst_module_base}.api.json")
+        list(APPEND maccatalyst_module_outputs "${maccatalyst_api_descriptor_file}")
+      else()
+        set(maccatalyst_api_descriptor_file)
+      endif()
+
       swift_install_in_component(DIRECTORY ${maccatalyst_specific_module_dir}
                                  DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${maccatalyst_library_subdir}"
                                  COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
@@ -736,6 +753,9 @@ function(_compile_swift_files
   if(interface_file)
     list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
     list(APPEND module_outputs_static "${interface_file_static}" "${private_interface_file_static}")
+  endif()
+  if(api_descriptor_file)
+      list(APPEND module_outputs "${api_descriptor_file}")
   endif()
 
   swift_install_in_component(DIRECTORY "${specific_module_dir}"
@@ -854,6 +874,14 @@ function(_compile_swift_files
       list(INSERT maccatalyst_swift_module_flags ${private_interface_file_index} "${maccatalyst_private_interface_file}")
       math(EXPR old_interface_file_index "${private_interface_file_index} + 1")
       list(REMOVE_AT maccatalyst_swift_module_flags ${old_interface_file_index})
+    endif()
+
+    # Remove original api descriptor
+    list(FIND maccatalyst_swift_module_flags "${api_descriptor_file}" api_descriptor_file_index)
+    if(NOT api_descriptor_file_index EQUAL -1)
+      list(INSERT maccatalyst_swift_module_flags ${api_descriptor_file_index} "${maccatalyst_api_descriptor_file}")
+      math(EXPR old_api_descriptor_file_index "${api_descriptor_file_index} + 1")
+      list(REMOVE_AT maccatalyst_swift_module_flags ${old_api_descriptor_file_index})
     endif()
 
     # We still need to change the main swift flags
@@ -1157,4 +1185,3 @@ function(_compile_swift_files
       LANGUAGE C
       OBJECT_DEPENDS "${source_files}")
 endfunction()
-

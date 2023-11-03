@@ -125,6 +125,9 @@ public:
   /// What kind of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
+  /// DWARF output format version number.
+  std::optional<uint8_t> DWARFVersion;
+
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
@@ -178,7 +181,8 @@ public:
     SymbolGraph,     // swift-symbolgraph
     APIExtract,      // swift-api-extract
     APIDigester,     // swift-api-digester
-    CacheTool        // swift-cache-tool
+    CacheTool,       // swift-cache-tool
+    ParseTest,       // swift-parse-test
   };
 
   class InputInfoMap;

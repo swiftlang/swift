@@ -202,7 +202,7 @@ void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
 llvm::Optional<bool> IsObjCRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isObjCComputed)
-    return decl->LazySemanticInfo.isObjC;
+    return static_cast<bool>(decl->LazySemanticInfo.isObjC);
 
   return llvm::None;
 }
@@ -298,7 +298,7 @@ void HasSelfOrAssociatedTypeRequirementsRequest::cacheResult(bool value) const {
 llvm::Optional<bool> IsFinalRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isFinalComputed)
-    return decl->LazySemanticInfo.isFinal;
+    return static_cast<bool>(decl->LazySemanticInfo.isFinal);
 
   return llvm::None;
 }
@@ -314,26 +314,28 @@ void IsFinalRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isMoveOnly computation.
+// hasNoncopyableAnnotation computation.
 //----------------------------------------------------------------------------//
 
-llvm::Optional<bool> IsMoveOnlyRequest::getCachedResult() const {
+llvm::Optional<bool> HasNoncopyableAnnotationRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
-  if (decl->LazySemanticInfo.isMoveOnlyComputed)
-    return decl->LazySemanticInfo.isMoveOnly;
+  if (decl->LazySemanticInfo.isNoncopyableAnnotationComputed)
+    return static_cast<bool>(decl->LazySemanticInfo.hasNoncopyableAnnotation);
 
   return llvm::None;
 }
 
-void IsMoveOnlyRequest::cacheResult(bool value) const {
+void HasNoncopyableAnnotationRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.isMoveOnlyComputed = true;
-  decl->LazySemanticInfo.isMoveOnly = value;
+  decl->LazySemanticInfo.isNoncopyableAnnotationComputed = true;
+  decl->LazySemanticInfo.hasNoncopyableAnnotation = value;
 
-  // Add an attribute for printing
-  if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
-    decl->getAttrs().add(new (decl->getASTContext())
-                             MoveOnlyAttr(/*Implicit=*/true));
+  if (!decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
+    // Add an attribute for printing
+    if (value && !decl->getAttrs().hasAttribute<MoveOnlyAttr>())
+      decl->getAttrs().add(new(decl->getASTContext())
+                               MoveOnlyAttr(/*Implicit=*/true));
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -343,7 +345,7 @@ void IsMoveOnlyRequest::cacheResult(bool value) const {
 llvm::Optional<bool> IsEscapableRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isEscapableComputed)
-    return decl->LazySemanticInfo.isEscapable;
+    return static_cast<bool>(decl->LazySemanticInfo.isEscapable);
 
   return llvm::None;
 }
@@ -366,7 +368,7 @@ void IsEscapableRequest::cacheResult(bool value) const {
 llvm::Optional<bool> IsDynamicRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isDynamicComputed)
-    return decl->LazySemanticInfo.isDynamic;
+    return static_cast<bool>(decl->LazySemanticInfo.isDynamic);
 
   return llvm::None;
 }
@@ -668,7 +670,7 @@ void SelfAccessKindRequest::cacheResult(SelfAccessKind value) const {
 llvm::Optional<bool> IsGetterMutatingRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.IsGetterMutatingComputed)
-    return storage->LazySemanticInfo.IsGetterMutating;
+    return static_cast<bool>(storage->LazySemanticInfo.IsGetterMutating);
   return llvm::None;
 }
 
@@ -684,7 +686,7 @@ void IsGetterMutatingRequest::cacheResult(bool value) const {
 llvm::Optional<bool> IsSetterMutatingRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.IsSetterMutatingComputed)
-    return storage->LazySemanticInfo.IsSetterMutating;
+    return static_cast<bool>(storage->LazySemanticInfo.IsSetterMutating);
   return llvm::None;
 }
 
@@ -734,7 +736,7 @@ void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
 llvm::Optional<bool> RequiresOpaqueAccessorsRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
-    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+    return static_cast<bool>(storage->LazySemanticInfo.RequiresOpaqueAccessors);
   return llvm::None;
 }
 
@@ -752,7 +754,7 @@ llvm::Optional<bool>
 RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
-    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+    return static_cast<bool>(storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
   return llvm::None;
 }
 
@@ -814,7 +816,7 @@ llvm::Optional<bool>
 IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
   auto *decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isIUOComputed)
-    return decl->LazySemanticInfo.isIUO;
+    return static_cast<bool>(decl->LazySemanticInfo.isIUO);
   return llvm::None;
 }
 
@@ -950,7 +952,7 @@ void IsStaticRequest::cacheResult(bool result) const {
 llvm::Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
   auto *decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
-    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+    return static_cast<bool>(decl->LazySemanticInfo.NeedsNewVTableEntry);
   return llvm::None;
 }
 
@@ -1739,7 +1741,11 @@ void swift::simple_display(
       break;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       out << "nonisolated";
+      if (state == ActorIsolation::NonisolatedUnsafe) {
+        out << "(unsafe)";
+      }
       break;
 
     case ActorIsolation::Unspecified:

@@ -17,6 +17,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/Serialization/Validation.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 
 namespace llvm {
@@ -119,7 +120,7 @@ public:
     const unsigned IsScoped : 1;
 
     static unsigned rawControlFromKind(ImportFilterKind importKind) {
-      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+      return llvm::countr_zero(static_cast<unsigned>(importKind));
     }
     ImportFilterKind getImportControl() const {
       return static_cast<ImportFilterKind>(1 << RawImportControl);
@@ -132,7 +133,7 @@ public:
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader),
           IsScoped(isScoped) {
-      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+      assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }

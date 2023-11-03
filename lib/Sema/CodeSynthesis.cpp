@@ -339,7 +339,14 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
-    addNonIsolatedToSynthesized(decl, ctor);
+
+    // FIXME: If 'IsolatedDefaultValues' is enabled, the memberwise init
+    // should be 'nonisolated' if none of the memberwise-initialized properties
+    // are global actor isolated and have non-Sendable type, and none of the
+    // initial values require global actor isolation.
+    if (!ctx.LangOpts.hasFeature(Feature::IsolatedDefaultValues)) {
+      addNonIsolatedToSynthesized(decl, ctor);
+    }
   }
 
   // If we are defining a default initializer for a class that has a superclass,
@@ -419,7 +426,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
       ctx, {className, initName, file, line, column});
   auto *call = CallExpr::createImplicit(ctx, ref, argList);
   call->setType(ctx.getNeverType());
-  call->setThrows(false);
+  call->setThrows(nullptr);
 
   SmallVector<ASTNode, 2> stmts;
   stmts.push_back(call);
@@ -580,7 +587,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
       DotSyntaxCallExpr::create(ctx, ctorRefExpr, SourceLoc(), superArg, type);
-  superclassCtorRefExpr->setThrows(false);
+  superclassCtorRefExpr->setThrows(nullptr);
 
   auto *bodyParams = ctor->getParameters();
   auto *ctorArgs = buildForwardingArgumentList(bodyParams->getArray(), ctx);
@@ -590,7 +597,13 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   if (auto *funcTy = type->getAs<FunctionType>())
     type = funcTy->getResult();
   superclassCallExpr->setType(type);
-  superclassCallExpr->setThrows(superclassCtor->hasThrows());
+  if (auto thrownInterfaceType = ctor->getEffectiveThrownErrorType()) {
+    Type superThrownType = ctor->mapTypeIntoContext(*thrownInterfaceType);
+    superclassCallExpr->setThrows(
+        ThrownErrorDestination::forMatchingContextType(superThrownType));
+  } else {
+    superclassCallExpr->setThrows(nullptr);
+  }
 
   Expr *expr = superclassCallExpr;
 
@@ -1621,7 +1634,8 @@ bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,
     return false;
 
   ASTContext &ctx = nominal->getASTContext();
-  value->getAttrs().add(new (ctx) NonisolatedAttr(/*isImplicit=*/true));
+  value->getAttrs().add(
+      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
   return true;
 }
 

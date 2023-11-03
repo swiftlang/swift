@@ -779,8 +779,17 @@ public:
           Dem);
     }
 
-    if (F->getFlags().isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (F->getFlags().isThrowing()) {
+      if (auto thrownError = F->getThrownError()) {
+        auto node = Dem.createNode(Node::Kind::TypedThrowsAnnotation);
+        auto thrownErrorNode = visit(thrownError);
+        node->addChild(thrownErrorNode, Dem);
+        funcNode->addChild(node, Dem);
+      } else {
+        funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+      }
+    }
+
     if (F->getFlags().isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
@@ -1025,6 +1034,24 @@ Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
+llvm::Optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+  NodePointer node = getDemangling(Dem);
+  if (!node)
+    return {};
+
+  // The mangled tree stored in this typeref implicitly assumes the type and
+  // global mangling, so add those back in.
+  auto typeMangling = Dem.createNode(Node::Kind::TypeMangling);
+  typeMangling->addChild(node, Dem);
+  auto global = Dem.createNode(Node::Kind::Global);
+  global->addChild(node, Dem);
+
+  auto mangling = mangleNode(global);
+  if (!mangling.isSuccess())
+    return {};
+  return mangling.result();
+}
+
 bool TypeRef::isConcrete() const {
   GenericArgumentMap Subs;
   return TypeRefIsConcrete(Subs).visit(this);
@@ -1148,12 +1175,16 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError())
+      thrownErrorType = visit(F->getThrownError());
+
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *
@@ -1285,10 +1316,14 @@ public:
     if (F->getGlobalActor())
       globalActorType = visit(F->getGlobalActor());
 
+    const TypeRef *thrownErrorType = nullptr;
+    if (F->getThrownError())
+      thrownErrorType = visit(F->getThrownError());
+
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
                                    F->getDifferentiabilityKind(),
-                                   globalActorType);
+                                   globalActorType, thrownErrorType);
   }
 
   const TypeRef *

@@ -90,7 +90,8 @@ inline bool isEmbedded(CanType t) {
 }
 
 inline bool isMetadataAllowedInEmbedded(CanType t) {
-  return isa<ClassType>(t) || isa<BoundGenericClassType>(t);
+  return isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
+         isa<DynamicSelfType>(t);
 }
 
 inline bool isEmbedded(Decl *d) {

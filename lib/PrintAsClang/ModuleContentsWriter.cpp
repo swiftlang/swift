@@ -326,7 +326,8 @@ public:
         (void)addImport(CD);
       }
     } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
-      forwardDeclare(PD);
+      if (!PD->isMarkerProtocol())
+        forwardDeclare(PD);
     } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
       bool imported = false;
       if (TAD->hasClangNode())

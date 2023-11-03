@@ -68,6 +68,7 @@ enum class SourceKitRequest {
   GlobalConfiguration,
   DependencyUpdated,
   Diagnostics,
+  SemanticTokens,
   Compile,
   CompileClose,
   SyntacticMacroExpansion,

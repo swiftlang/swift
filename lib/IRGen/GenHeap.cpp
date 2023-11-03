@@ -713,7 +713,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Error:
     llvm_unreachable("Unsupported reference-counting style");
   }
-  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+  return APInt::getAllOnes(getPointerSize().getValueInBits());
 }
 
 llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
@@ -1999,7 +1999,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
   metadata->setName(object->getName() + ".Type");
   metadata->setCallingConv(IGF.IGM.getOptions().PlatformCCallingConvention);
   metadata->setDoesNotThrow();
-  metadata->addFnAttr(llvm::Attribute::ReadOnly);
+  metadata->setOnlyReadsMemory();
   return metadata;
 }
 

@@ -835,6 +835,17 @@ InferredGenericSignatureRequest::evaluate(
   }
 
   auto *moduleForInference = lookupDC->getParentModule();
+  auto &ctx = moduleForInference->getASTContext();
+
+  // After realizing requirements, expand default requirements only for local
+  // generic parameters, as the outer parameters have already been expanded.
+  SmallVector<Type, 4> localGPs;
+  if (genericParamList)
+    for (auto *gtpd : genericParamList->getParams())
+      localGPs.push_back(gtpd->getDeclaredInterfaceType());
+
+  // Expand defaults and eliminate all inverse-conformance requirements.
+  expandDefaultRequirements(ctx, localGPs, requirements, errors);
 
   // Perform requirement inference from function parameter and result
   // types and such.
@@ -849,8 +860,11 @@ InferredGenericSignatureRequest::evaluate(
   // Finish by adding any remaining requirements. This is used to introduce
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
+  SmallVector<Requirement, 4> rawAddedRequirements;
   for (const auto &req : addedRequirements)
-    requirements.push_back({req, SourceLoc(), /*wasInferred=*/true});
+    desugarRequirement(req, SourceLoc(), rawAddedRequirements, errors);
+  for (const auto &req : rawAddedRequirements)
+    requirements.push_back({req, SourceLoc(), /*inferred=*/true});
 
   // Re-order requirements so that inferred requirements appear last. This
   // ensures that if an inferred requirement is redundant with some other
@@ -861,7 +875,6 @@ InferredGenericSignatureRequest::evaluate(
                           return !req.inferred;
                         });
 
-  auto &ctx = moduleForInference->getASTContext();
   auto &rewriteCtx = ctx.getRewriteContext();
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {

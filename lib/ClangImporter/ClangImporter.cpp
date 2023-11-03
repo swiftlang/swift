@@ -51,6 +51,7 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
+#include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
@@ -111,7 +112,7 @@ namespace {
     void InclusionDirective(
         clang::SourceLocation HashLoc, const clang::Token &IncludeTok,
         StringRef FileName, bool IsAngled, clang::CharSourceRange FilenameRange,
-        llvm::Optional<clang::FileEntryRef> File, StringRef SearchPath,
+        clang::OptionalFileEntryRef File, StringRef SearchPath,
         StringRef RelativePath, const clang::Module *Imported,
         clang::SrcMgr::CharacteristicKind FileType) override {
       handleImport(Imported);
@@ -286,7 +287,7 @@ private:
   void InclusionDirective(clang::SourceLocation HashLoc,
                           const clang::Token &IncludeTok, StringRef FileName,
                           bool IsAngled, clang::CharSourceRange FilenameRange,
-                          llvm::Optional<clang::FileEntryRef> File,
+                          clang::OptionalFileEntryRef File,
                           StringRef SearchPath, StringRef RelativePath,
                           const clang::Module *Imported,
                           clang::SrcMgr::CharacteristicKind FileType) override {
@@ -376,11 +377,12 @@ public:
   }
 
   void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
-                          bool IsModuleFile, bool IsMissing) override {
+                          bool IsModuleFile, clang::FileManager *fileManager,
+                          bool IsMissing) override {
     if (FileCollector)
       FileCollector->addFile(Filename);
     clang::DependencyCollector::maybeAddDependency(
-        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
+        Filename, FromModule, IsSystem, IsModuleFile, fileManager, IsMissing);
   }
 };
 } // end anonymous namespace
@@ -440,7 +442,7 @@ ClangImporter::~ClangImporter() {
 static bool clangSupportsPragmaAttributeWithSwiftAttr() {
   clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
      clang::AttributeCommonInfo::AT_SwiftAttr,
-     clang::AttributeCommonInfo::AS_GNU);
+     clang::AttributeCommonInfo::Form::GNU());
   auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
   return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
 }
@@ -890,8 +892,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
       clang::DisableValidationForModuleKind::None;
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
-  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
-  invocation->getLangOpts()->CacheGeneratedPCH = true;
+  invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
+  invocation->getLangOpts().CacheGeneratedPCH = true;
   // If the underlying invocation is allowing PCH errors, then it "can be read",
   // even if it has its error bit set. Thus, don't override
   // `AllowPCHWithCompilerErrors`.
@@ -1734,15 +1736,15 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
 /// Returns the appropriate source input language based on language options.
 static clang::Language getLanguageFromOptions(
-    const clang::LangOptions *LangOpts) {
-  if (LangOpts->OpenCL)
+    const clang::LangOptions &LangOpts) {
+  if (LangOpts.OpenCL)
     return clang::Language::OpenCL;
-  if (LangOpts->CUDA)
+  if (LangOpts.CUDA)
     return clang::Language::CUDA;
-  if (LangOpts->ObjC)
-    return LangOpts->CPlusPlus ?
+  if (LangOpts.ObjC)
+    return LangOpts.CPlusPlus ?
         clang::Language::ObjCXX : clang::Language::ObjC;
-  return LangOpts->CPlusPlus ? clang::Language::CXX : clang::Language::C;
+  return LangOpts.CPlusPlus ? clang::Language::CXX : clang::Language::C;
 }
 
 /// Wraps the given frontend action in an index data recording action if the
@@ -1792,9 +1794,9 @@ bool ClangImporter::emitBridgingPCH(
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
-  auto LangOpts = invocation.getLangOpts();
-  LangOpts->NeededByPCHOrCompilationUsesPCH = true;
-  LangOpts->CacheGeneratedPCH = cached;
+  auto &LangOpts = invocation.getLangOpts();
+  LangOpts.NeededByPCHOrCompilationUsesPCH = true;
+  LangOpts.CacheGeneratedPCH = cached;
 
   auto language = getLanguageFromOptions(LangOpts);
   auto inputFile = clang::FrontendInputFile(headerPath, language);
@@ -1822,7 +1824,7 @@ bool ClangImporter::runPreprocessor(
     StringRef inputPath, StringRef outputPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
-  auto LangOpts = invocation.getLangOpts();
+  auto &LangOpts = invocation.getLangOpts();
   auto &OutputOpts = invocation.getPreprocessorOutputOpts();
   OutputOpts.ShowCPP = 1;
   OutputOpts.ShowComments = 0;
@@ -1849,10 +1851,10 @@ bool ClangImporter::emitPrecompiledModule(
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
-  auto LangOpts = invocation.getLangOpts();
-  LangOpts->setCompilingModule(clang::LangOptions::CMK_ModuleMap);
-  LangOpts->ModuleName = moduleName.str();
-  LangOpts->CurrentModule = LangOpts->ModuleName;
+  auto &LangOpts = invocation.getLangOpts();
+  LangOpts.setCompilingModule(clang::LangOptions::CMK_ModuleMap);
+  LangOpts.ModuleName = moduleName.str();
+  LangOpts.CurrentModule = LangOpts.ModuleName;
 
   auto language = getLanguageFromOptions(LangOpts);
 
@@ -2036,7 +2038,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // For explicit module build, module should always exist but module map might
   // not be exist. Go straight to module loader.
-  if (Instance->getInvocation().getLangOpts()->ImplicitModules) {
+  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
     // Look up the top-level module first, to see if it exists at all.
     clang::Module *clangModule = clangHeaderSearch.lookupModule(
         realModuleName, /*ImportLoc=*/clang::SourceLocation(),
@@ -3093,7 +3095,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      llvm::Optional<clang::FileEntryRef> LocRef =
+      clang::OptionalFileEntryRef LocRef =
           ClangSM.getFileEntryRefForID(ClangSM.getFileID(ClangLoc));
       if (!LocRef || *LocRef != File)
         return false;
@@ -4718,7 +4720,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
     builtinFnRefExpr->setType(fnType);
     auto *argList = ArgumentList::createImplicit(ctx, {arg});
     auto callExpr = CallExpr::create(ctx, builtinFnRefExpr, argList, /*implicit*/ true);
-    callExpr->setThrows(false);
+    callExpr->setThrows(nullptr);
     return callExpr;
   };
 
@@ -4746,7 +4748,7 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
   // This will be "Optional<UnsafeMutablePointer<Base>>"
   casted->setType(cast<FunctionType>(staticCastRefExpr->getType().getPointer())
                       ->getResult());
-  casted->setThrows(false);
+  casted->setThrows(nullptr);
 
   SubstitutionMap pointeeSubst = SubstitutionMap::get(
       ctx.getUnsafeMutablePointerDecl()->getGenericSignature(),
@@ -4990,7 +4992,6 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMember = static_cast<FuncDecl *>(context);
   auto baseStruct =
       cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
-  auto baseType = baseStruct->getDeclaredType();
 
   auto forwardedFunc = synthesizeBaseFunctionDeclCall(
       *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), ctx,
@@ -5031,13 +5032,13 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMemberDotCallExpr =
       DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), selfArg);
   baseMemberDotCallExpr->setType(baseMember->getMethodInterfaceType());
-  baseMemberDotCallExpr->setThrows(false);
+  baseMemberDotCallExpr->setThrows(nullptr);
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, forwardingParams);
   auto *baseMemberCallExpr = CallExpr::createImplicit(
       ctx, baseMemberDotCallExpr, argList);
   baseMemberCallExpr->setType(baseMember->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(false);
+  baseMemberCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
                                          /*implicit=*/true);
@@ -5262,7 +5263,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto baseMemberDotCallExpr =
       DotSyntaxCallExpr::create(ctx, baseMemberExpr, SourceLoc(), selfArg);
   baseMemberDotCallExpr->setType(baseGetterMethod->getMethodInterfaceType());
-  baseMemberDotCallExpr->setThrows(false);
+  baseMemberDotCallExpr->setThrows(nullptr);
 
   ArgumentList *argumentList;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -5278,7 +5279,7 @@ synthesizeBaseClassFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto *baseMemberCallExpr =
       CallExpr::createImplicit(ctx, baseMemberDotCallExpr, argumentList);
   baseMemberCallExpr->setType(baseGetterMethod->getResultInterfaceType());
-  baseMemberCallExpr->setThrows(false);
+  baseMemberCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), baseMemberCallExpr,
                                          /*implicit=*/true);
@@ -6442,7 +6443,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     auto selfArg = createSelfArg(thunkDecl);
     auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
                                                  SourceLoc(), selfArg);
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
@@ -6453,7 +6454,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
     auto *memberCall =
         DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
                                   Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
   }
@@ -6461,7 +6462,7 @@ synthesizeDependentTypeThunkParamForwarding(AbstractFunctionDecl *afd, void *con
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
   specializedFuncCallExpr->setType(specializedFuncDecl->getResultInterfaceType());
-  specializedFuncCallExpr->setThrows(false);
+  specializedFuncCallExpr->setThrows(nullptr);
 
   Expr *resultExpr = nullptr;
   if (specializedFuncCallExpr->getType()->isEqual(
@@ -6574,7 +6575,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     auto selfArg = createSelfArg(thunkDecl);
     auto *memberCall = DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef,
                                                  SourceLoc(), selfArg);
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     auto resultType = specializedFuncDecl->getInterfaceType()->getAs<FunctionType>()->getResult();
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
@@ -6585,7 +6586,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
     auto *memberCall =
         DotSyntaxCallExpr::create(ctx, specializedFuncDeclRef, SourceLoc(),
                                   Argument::unlabeled(selfTypeExpr));
-    memberCall->setThrows(false);
+    memberCall->setThrows(nullptr);
     specializedFuncDeclRef = memberCall;
     specializedFuncDeclRef->setType(resultType);
   }
@@ -6593,7 +6594,7 @@ synthesizeForwardingThunkBody(AbstractFunctionDecl *afd, void *context) {
   auto argList = ArgumentList::createImplicit(ctx, forwardingParams);
   auto *specializedFuncCallExpr = CallExpr::createImplicit(ctx, specializedFuncDeclRef, argList);
   specializedFuncCallExpr->setType(thunkDecl->getResultInterfaceType());
-  specializedFuncCallExpr->setThrows(false);
+  specializedFuncCallExpr->setThrows(nullptr);
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(), specializedFuncCallExpr,
                                          /*implicit=*/true);

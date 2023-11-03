@@ -957,6 +957,10 @@ public:
   unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
                                          const CustomAttr *attr) const;
 
+  /// Returns the resolved type for the give custom attribute attached to this
+  /// declaration.
+  Type getResolvedCustomAttrType(CustomAttr *attr) const;
+
   /// Determines if this declaration is exposed to clients of the module it is
   /// defined in. For example, `public` declarations are exposed to clients.
   bool isExposedToClients() const;
@@ -1573,10 +1577,14 @@ struct InheritedEntry : public TypeLoc {
   /// Whether there was an @unchecked attribute.
   bool isUnchecked = false;
 
+  /// Whether there was an @retroactive attribute.
+  bool isRetroactive = false;
+
   InheritedEntry(const TypeLoc &typeLoc);
 
-  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked)
-    : TypeLoc(typeLoc), isUnchecked(isUnchecked) { }
+  InheritedEntry(const TypeLoc &typeLoc, bool isUnchecked, bool isRetroactive)
+    : TypeLoc(typeLoc), isUnchecked(isUnchecked), isRetroactive(isRetroactive) {
+    }
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -1595,6 +1603,9 @@ public:
   bool empty() const { return Entries.empty(); }
   size_t size() const { return Entries.size(); }
   IntRange<size_t> const getIndices() { return indices(Entries); }
+
+  /// Returns the ASTContext associated with the wrapped declaration.
+  ASTContext &getASTContext() const;
 
   /// Returns the `TypeRepr *` for the entry of the inheritance clause at the
   /// given index.
@@ -1615,6 +1626,10 @@ public:
   /// NOTE: The `Type` associated with the entry may not be resolved yet.
   const InheritedEntry &getEntry(unsigned i) const { return Entries[i]; }
 
+  // Retrieve the location of the colon character introducing the inheritance
+  // clause.
+  SourceLoc getColonLoc() const;
+
   /// Returns the source location of the beginning of the inheritance clause.
   SourceLoc getStartLoc() const {
     return getEntries().front().getSourceRange().Start;
@@ -1624,6 +1639,10 @@ public:
   SourceLoc getEndLoc() const {
     return getEntries().back().getSourceRange().End;
   }
+
+  /// Compute the SourceRange to be used when removing entry \c i from the
+  /// inheritance clause. Accounts for commas and colons as-needed.
+  SourceRange getRemovalRange(unsigned i) const;
 };
 
 /// ExtensionDecl - This represents a type extension containing methods
@@ -2606,12 +2625,6 @@ private:
     /// optional result.
     unsigned isIUO : 1;
 
-    /// Whether the "isMoveOnly" bit has been computed yet.
-    unsigned isMoveOnlyComputed : 1;
-
-    /// Whether this declaration can not be copied and thus is move only.
-    unsigned isMoveOnly : 1;
-
     /// Whether the "isEscapable" bit has been computed yet.
     unsigned isEscapable : 1;
 
@@ -2623,7 +2636,6 @@ private:
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
-  friend class IsMoveOnlyRequest;
   friend class IsEscapableRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
@@ -2927,9 +2939,6 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
-  /// Is this declaration 'moveOnly'?
-  bool isMoveOnly() const;
-
   /// Is this declaration escapable?
   bool isEscapable() const;
 
@@ -3105,7 +3114,17 @@ public:
 
 /// This is a common base class for declarations which declare a type.
 class TypeDecl : public ValueDecl {
+private:
   ArrayRef<InheritedEntry> Inherited;
+
+  struct {
+    /// Whether the "hasNoncopyableAnnotation" bit has been computed yet.
+    unsigned isNoncopyableAnnotationComputed : 1;
+
+    /// Whether this declaration had a noncopyable inverse written somewhere.
+    unsigned hasNoncopyableAnnotation : 1;
+  } LazySemanticInfo = { };
+  friend class HasNoncopyableAnnotationRequest;
 
 protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -3133,6 +3152,10 @@ public:
   InheritedTypes getInherited() const { return InheritedTypes(this); }
 
   void setInherited(ArrayRef<InheritedEntry> i) { Inherited = i; }
+
+  /// Is this type _always_ noncopyable? Will answer 'false' if the type is
+  /// conditionally copyable.
+  bool isNoncopyable() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_TypeDecl &&
@@ -5001,7 +5024,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// \c None if it hasn't yet been computed.
   llvm::Optional<bool> getCachedHasSelfOrAssociatedTypeRequirements() {
     if (Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirementsValid)
-      return Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements;
+      return static_cast<bool>(Bits.ProtocolDecl.HasSelfOrAssociatedTypeRequirements);
 
     return llvm::None;
   }
@@ -6109,7 +6132,10 @@ public:
   /// True if this is a top-level global variable from the main source file.
   bool isTopLevelGlobal() const { return Bits.VarDecl.IsTopLevelGlobal; }
   void setTopLevelGlobal(bool b) { Bits.VarDecl.IsTopLevelGlobal = b; }
-  
+
+  /// True if this is any storage of static duration (global scope or static).
+  bool isGlobalStorage() const;
+
   /// Retrieve the custom attributes that attach property wrappers to this
   /// property. The returned list contains all of the attached property wrapper
   /// attributes in source order, which means the outermost wrapper attribute

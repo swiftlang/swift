@@ -112,6 +112,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
+          .Case("swift-parse-test", DriverKind::ParseTest)
           .Default(llvm::None);
 
   if (Kind.has_value())
@@ -1095,7 +1096,7 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
-  buildJobs(TopLevelActions, OI, OFM ? OFM.getPointer() : nullptr,
+  buildJobs(TopLevelActions, OI, OFM ? &*OFM : nullptr,
             workingDirectory, TC, *C);
 
   if (DriverPrintDerivedOutputFileMap) {
@@ -1683,6 +1684,16 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                    OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
                      ? "-gline-tables-only"
                      : "-gdwarf_types");
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_dwarf_version)) {
+    unsigned vers;
+    if (!StringRef(A->getValue()).getAsInteger(10, vers) && vers >= 2 &&
+        vers <= 5)
+      OI.DWARFVersion = vers;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
@@ -3577,6 +3588,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::APIExtract:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
+  case DriverKind::ParseTest:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

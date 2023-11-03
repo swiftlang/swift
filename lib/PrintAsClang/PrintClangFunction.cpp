@@ -30,6 +30,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -280,6 +281,25 @@ public:
         if (isa<clang::ObjCContainerDecl>(cd->getClangDecl()))
           os << " __strong";
         printInoutTypeModifier();
+      }
+      if (isa<clang::CXXRecordDecl>(cd->getClangDecl())) {
+        if (std::find_if(
+                cd->getClangDecl()->getAttrs().begin(),
+                cd->getClangDecl()->getAttrs().end(), [](clang::Attr *attr) {
+                  if (auto *sa = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+                    llvm::StringRef value = sa->getAttribute();
+                    if ((value.startswith("retain:") ||
+                         value.startswith("release:")) &&
+                        !value.endswith(":immortal"))
+                      return true;
+                  }
+                  return false;
+                }) != cd->getClangDecl()->getAttrs().end()) {
+          // This is a shared FRT. Do not bridge it back to
+          // C++ as its ownership is not managed automatically
+          // in C++ yet.
+          return ClangRepresentation::unsupported;
+        }
       }
       // FIXME: Mark that this is only ObjC representable.
       return ClangRepresentation::representable;
@@ -966,7 +986,7 @@ void DeclAndTypeClangFunctionPrinter::printTypeImplTypeSpecifier(
 
 void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
-    bool isIndirect, std::string directTypeEncoding, bool isSelf) {
+    bool isIndirect, std::string directTypeEncoding, bool forceSelf) {
   auto namePrinter = [&]() { ClangSyntaxPrinter(os).printIdentifier(name); };
   if (!isKnownCxxType(type, typeMapping) &&
       !hasKnownOptionalNullableCxxMapping(type)) {
@@ -1007,9 +1027,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
         } else {
             ClangValueTypePrinter(os, cPrologueOS, interopContext)
                 .printParameterCxxToCUseScaffold(
-                                                 moduleContext,
-                                                 [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
-                                                 namePrinter, isSelf);
+                    moduleContext,
+                    [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
+                    namePrinter, forceSelf);
         }
         if (!directTypeEncoding.empty())
           os << ')';
@@ -1153,6 +1173,82 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       break;
     }
   }
+
+  auto getParamName = [&](const ParamDecl &param, size_t paramIndex,
+                          bool isConsumed) {
+    std::string paramName;
+    if (isConsumed)
+      paramName = "consumedParamCopy_";
+    if (param.isSelfParameter()) {
+      if (isConsumed)
+        paramName += "this";
+      else
+        paramName = "*this";
+    } else if (param.getName().empty()) {
+      llvm::raw_string_ostream paramOS(paramName);
+      if (!isConsumed)
+        paramOS << "_";
+      paramOS << paramIndex;
+    } else {
+      StringRef nameStr = param.getName().str();
+      if (isConsumed)
+        paramName += nameStr.str();
+      else
+        paramName = nameStr;
+      renameCxxParameterIfNeeded(FD, paramName);
+    }
+    return paramName;
+  };
+
+  // Check if we need to copy any parameters that are consumed by Swift,
+  // to ensure that Swift does not destroy the value that's owned by C++.
+  // FIXME: Support non-copyable types here as well between C++ -> Swift.
+  // FIXME: class types can be optimized down to an additional retain right
+  // here.
+  size_t paramIndex = 1;
+  auto emitParamCopyForConsume = [&](const ParamDecl &param) {
+    auto name = getParamName(param, paramIndex, /*isConsumed=*/false);
+    auto consumedName = getParamName(param, paramIndex, /*isConsumed=*/true);
+    std::string paramType;
+
+    llvm::raw_string_ostream typeOS(paramType);
+
+    CFunctionSignatureTypePrinter typePrinter(
+        typeOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
+        interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
+        moduleContext, declPrinter, FunctionSignatureTypeUse::TypeReference);
+    auto result = typePrinter.visit(param.getInterfaceType(), OTK_None,
+                                    /*isInOutParam=*/false);
+    assert(!result.isUnsupported());
+    typeOS.flush();
+
+    os << "  alignas(alignof(" << paramType << ")) char copyBuffer_"
+       << consumedName << "[sizeof(" << paramType << ")];\n";
+    os << "  auto &" << consumedName << " = *(new(copyBuffer_" << consumedName
+       << ") " << paramType << "(" << name << "));\n";
+    os << "  swift::" << cxx_synthesis::getCxxImplNamespaceName()
+       << "::ConsumedValueStorageDestroyer<" << paramType << "> storageGuard_"
+       << consumedName << "(" << consumedName << ");\n";
+  };
+  signature.visitParameterList(
+      [&](const LoweredFunctionSignature::IndirectResultValue &) {},
+      [&](const LoweredFunctionSignature::DirectParameter &param) {
+        if (isConsumedParameter(param.getConvention()))
+          emitParamCopyForConsume(param.getParamDecl());
+        ++paramIndex;
+      },
+      [&](const LoweredFunctionSignature::IndirectParameter &param) {
+        if (isConsumedParameter(param.getConvention()))
+          emitParamCopyForConsume(param.getParamDecl());
+        ++paramIndex;
+      },
+      [&](const LoweredFunctionSignature::GenericRequirementParameter
+              &genericRequirementParam) {},
+      [&](const LoweredFunctionSignature::MetadataSourceParameter
+              &metadataSrcParam) {},
+      [&](const LoweredFunctionSignature::ContextParameter &) {},
+      [&](const LoweredFunctionSignature::ErrorResultValue &) {});
+
   auto printCallToCFunc = [&](llvm::Optional<StringRef> additionalParam) {
     if (indirectFunctionVar)
       os << "(* " << *indirectFunctionVar << ')';
@@ -1168,13 +1264,14 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
       needsComma = true;
     };
     auto printParamUse = [&](const ParamDecl &param, bool isIndirect,
+                             bool isConsumed,
 
                              std::string directTypeEncoding) {
       emitNewParam();
-      std::string paramName;
       if (param.isSelfParameter()) {
         bool needsStaticSelf = isa<ConstructorDecl>(FD) || isStaticMethod;
         if (needsStaticSelf) {
+          // Static self value is just the type's metadata value.
           os << "swift::TypeMetadataTrait<";
           CFunctionSignatureTypePrinter typePrinter(
               os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
@@ -1187,19 +1284,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           os << ">::getTypeMetadata()";
           return;
         }
-        paramName = "*this";
-      } else if (param.getName().empty()) {
-        llvm::raw_string_ostream paramOS(paramName);
-        paramOS << "_" << paramIndex;
-      } else {
-        paramName = param.getName().str().str();
-        renameCxxParameterIfNeeded(FD, paramName);
       }
+      auto paramName = getParamName(param, paramIndex, isConsumed);
       ++paramIndex;
       printCxxToCFunctionParameterUse(param.getInterfaceType(), paramName,
                                       param.getModuleContext(), param.isInOut(),
                                       isIndirect, directTypeEncoding,
-                                      param.isSelfParameter());
+                                      !isConsumed && param.isSelfParameter());
     };
 
     signature.visitParameterList(
@@ -1211,10 +1302,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         },
         [&](const LoweredFunctionSignature::DirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/false,
+                        isConsumedParameter(param.getConvention()),
                         encodeTypeInfo(param, moduleContext, typeMapping));
         },
         [&](const LoweredFunctionSignature::IndirectParameter &param) {
           printParamUse(param.getParamDecl(), /*isIndirect=*/true,
+                        isConsumedParameter(param.getConvention()),
                         /*directTypeEncoding=*/"");
         },
         [&](const LoweredFunctionSignature::GenericRequirementParameter

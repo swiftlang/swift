@@ -506,9 +506,9 @@ public:
     return StringRef(Result.data(), Result.size());
   }
 
-  template<typename T, typename Vector, typename Set>
+  template<typename T, typename Vector, typename Set, unsigned N>
   MutableArrayRef<T>
-  AllocateCopy(llvm::SetVector<T, Vector, Set> setVector,
+  AllocateCopy(llvm::SetVector<T, Vector, Set, N> setVector,
                AllocationArena arena = AllocationArena::Permanent) const {
     return MutableArrayRef<T>(AllocateCopy<T>(setVector.begin(),
                                               setVector.end(),
@@ -914,6 +914,9 @@ public:
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
+  /// Get the runtime availability of support for typed throws.
+  AvailabilityContext getTypedThrowsAvailability();
+
   /// Get the runtime availability of getters and setters of multi payload enum
   /// tag single payloads.
   AvailabilityContext getMultiPayloadEnumTagSinglePayload();
@@ -982,6 +985,10 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift59Availability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.9
+  /// compiler for the target platform.
+  AvailabilityContext getSwift511Availability();
+  
   // Note: Update this function if you add a new getSwiftXYAvailability above.
   /// Get the runtime availability for a particular version of Swift (5.0+).
   AvailabilityContext

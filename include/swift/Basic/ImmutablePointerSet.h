@@ -48,10 +48,11 @@
 #ifndef SWIFT_BASIC_IMMUTABLEPOINTERSET_H
 #define SWIFT_BASIC_IMMUTABLEPOINTERSET_H
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/Support/Allocator.h"
+#include "swift/Basic/STLExtras.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Allocator.h"
 #include <algorithm>
 #include <type_traits>
 

@@ -121,6 +121,10 @@ typedef struct {
   /// The path to the .swiftSourceInfo file.
   swiftscan_string_ref_t module_source_info_path;
 
+  /// (Swift) module dependencies by means of being overlays of
+  /// Clang module dependencies
+  swiftscan_string_set_t *swift_overlay_module_dependencies;
+
   /// (Clang) header dependencies of this binary module.
   /// Typically pre-compiled bridging header.
   swiftscan_string_set_t *header_dependencies;

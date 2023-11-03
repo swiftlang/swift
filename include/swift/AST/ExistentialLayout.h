@@ -31,11 +31,13 @@ struct ExistentialLayout {
 
   ExistentialLayout() {
     hasExplicitAnyObject = false;
+    hasInverseCopyable = false;
     containsNonObjCProtocol = false;
     containsParameterized = false;
   }
 
   ExistentialLayout(CanProtocolType type);
+  ExistentialLayout(CanInverseType type);
   ExistentialLayout(CanProtocolCompositionType type);
   ExistentialLayout(CanParameterizedProtocolType type);
 
@@ -44,6 +46,9 @@ struct ExistentialLayout {
 
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
+
+  /// Whether the existential contains an explicit '& ~Copyable' constraint.
+  bool hasInverseCopyable : 1;
 
   /// Whether any protocol members are non-@objc.
   bool containsNonObjCProtocol : 1;
@@ -105,6 +110,10 @@ private:
   /// Zero or more primary associated type requirements from a
   /// ParameterizedProtocolType
   ArrayRef<Type> sameTypeRequirements;
+
+  /// Existentials allow a relaxed notion of \c ValueDecl::isObjC
+  /// that includes `Sendable` protocol.
+  static bool isObjCProtocol(ProtocolDecl *P);
 };
 
 }

@@ -132,7 +132,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto *callExpr = DotSyntaxCallExpr::create(
         C, ref, SourceLoc(), Argument::unlabeled(base), fnType);
     callExpr->setImplicit();
-    callExpr->setThrows(false);
+    callExpr->setThrows(nullptr);
     cmpFuncExpr = callExpr;
   } else {
     cmpFuncExpr = new (C) DeclRefExpr(cmpFunc, DeclNameLoc(),
@@ -144,7 +144,7 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto *cmpExpr =
       BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
                          fnType->castTo<FunctionType>()->getResult());
-  cmpExpr->setThrows(false);
+  cmpExpr->setThrows(nullptr);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -563,7 +563,8 @@ deriveHashable_hashInto(
   // The derived hash(into:) for an actor must be non-isolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
       derived.Nominal->isActor())
-    hashDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
+    hashDecl->getAttrs().add(
+        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
 
   derived.addMembersToConformanceContext({hashDecl});
 
@@ -859,7 +860,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
-  callExpr->setThrows(false);
+  callExpr->setThrows(nullptr);
 
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
@@ -928,7 +929,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // The derived hashValue of an actor must be nonisolated.
   if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
       derived.Nominal->isActor())
-    hashValueDecl->getAttrs().add(new (C) NonisolatedAttr(/*IsImplicit*/ true));
+    hashValueDecl->getAttrs().add(
+        new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
 
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);

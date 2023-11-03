@@ -3868,7 +3868,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   }
 
   // move-only types (and their metatypes) cannot match with existential types.
-  if (type1->getMetatypeInstanceType()->isNoncopyable()) {
+  if (type1->getMetatypeInstanceType()->isNoncopyable(DC)) {
     // tailor error message
     if (shouldAttemptFixes()) {
       auto *fix = MustBeCopyable::create(*this,
@@ -7058,6 +7058,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::TypeVariable:
       llvm_unreachable("type variables should have already been handled by now");
 
+    case TypeKind::Inverse:
+      llvm_unreachable("unexpected inverse type in constraint solver");
+
     case TypeKind::DependentMember: {
       // If types are identical, let's consider this constraint solved
       // even though they are dependent members, they would be resolved
@@ -8034,6 +8037,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleType in constraint");
+
+  case TypeKind::Inverse:
+    llvm_unreachable("unexpected inverse type in constraint solver");
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
@@ -11877,9 +11883,9 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
   if (type1->isTypeVariableOrMember() || type2->isTypeVariableOrMember())
     return formUnsolved();
 
-  // Move-only types can't be involved in a bridging conversion since a bridged
+  // Noncopyable types can't be involved in bridging conversions since a bridged
   // type assumes the ability to copy.
-  if (type1->isNoncopyable()) {
+  if (type1->isNoncopyable(DC)) {
     return SolutionKind::Error;
   }
 
@@ -12248,6 +12254,16 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // { root in root[keyPath: kp] }.
       boundRoot = fnTy->getParams()[0].getParameterType();
       boundValue = fnTy->getResult();
+
+      // Key paths never throw, so if the function has a thrown error type
+      // that is a type variable, infer it to be Never.
+      if (auto thrownError = fnTy->getThrownError()) {
+        if (thrownError->isTypeVariableOrMember()) {
+          (void)matchTypes(
+            thrownError, getASTContext().getNeverType(),
+            ConstraintKind::Equal, TMF_GenerateConstraints, locator);
+        }
+      }
     }
 
     if (boundRoot &&

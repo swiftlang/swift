@@ -37,6 +37,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -193,6 +194,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 
 static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
                               ResponseReceiver Rec);
+
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec);
 
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
@@ -580,12 +585,12 @@ handleRequestGlobalConfiguration(const RequestDict &Req,
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<unsigned> CompletionMaxASTContextReuseCount =
-        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
-            .transform([](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> CompletionCheckDependencyInterval =
-        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval)
-            .transform([](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionMaxASTContextReuseCount = swift::transform(
+        Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount),
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> CompletionCheckDependencyInterval = swift::transform(
+        Req.getOptionalInt64(KeyCompletionCheckDependencyInterval),
+        [](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
         Config->update(CompletionMaxASTContextReuseCount,
@@ -1674,10 +1679,12 @@ handleRequestCollectVariableType(const RequestDict &Req,
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
 
-    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).transform(
-        [](int64_t v) -> unsigned { return v; });
-    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).transform(
-        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Offset =
+        swift::transform(Req.getOptionalInt64(KeyOffset),
+                         [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length =
+        swift::transform(Req.getOptionalInt64(KeyLength),
+                         [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
     return Lang.collectVariableTypes(
@@ -1862,6 +1869,32 @@ handleRequestDiagnostics(const RequestDict &Req,
                         [Rec](const RequestResult<DiagnosticsResult> &Result) {
                           reportDiagnostics(Result, Rec);
                         });
+    return;
+  });
+}
+
+static void
+handleRequestSemanticTokens(const RequestDict &Req,
+                            SourceKitCancellationToken CancellationToken,
+                            ResponseReceiver Rec) {
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
+    auto PrimaryFilePath = getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Lang.getSemanticTokens(
+        *PrimaryFilePath, InputBufferName, Args, std::move(vfsOptions),
+        CancellationToken,
+        [Rec](const RequestResult<SemanticTokensResult> &Result) {
+          reportSemanticTokens(Result, Rec);
+        });
     return;
   });
 }
@@ -2100,6 +2133,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestRelatedIdents, handleRequestRelatedIdents)
   HANDLE_REQUEST(RequestActiveRegions, handleRequestActiveRegions)
   HANDLE_REQUEST(RequestDiagnostics, handleRequestDiagnostics)
+  HANDLE_REQUEST(RequestSemanticTokens, handleRequestSemanticTokens)
   HANDLE_REQUEST(RequestSyntacticMacroExpansion,
                  handleRequestSyntacticMacroExpansion)
 
@@ -2721,6 +2755,32 @@ static void reportDiagnostics(const RequestResult<DiagnosticsResult> &Result,
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
   fillDiagnosticInfo(Dict, DiagResults, /*DiagStage*/ None);
+  Rec(RespBuilder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportSemanticTokens
+//===----------------------------------------------------------------------===//
+
+static void
+reportSemanticTokens(const RequestResult<SemanticTokensResult> &Result,
+                     ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  TokenAnnotationsArrayBuilder SemanticAnnotations;
+  for (auto SemaTok : Result.value()) {
+    UIdent Kind = SemaTok.getUIdentForKind();
+    if (Kind.isValid()) {
+      SemanticAnnotations.add(Kind, SemaTok.ByteOffset, SemaTok.Length,
+                              SemaTok.getIsSystem());
+    }
+  }
+  Dict.setCustomBuffer(KeySemanticTokens, SemanticAnnotations.createBuffer());
   Rec(RespBuilder.createResponse());
 }
 

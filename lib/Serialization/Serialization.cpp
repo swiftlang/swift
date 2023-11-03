@@ -40,8 +40,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Version.h"
@@ -1416,6 +1416,7 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(GlobalActorUnsafe)
 #undef CASE
@@ -2628,7 +2629,7 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
   return false;
 }
 
-static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
+static void collectDependenciesFromType(swift::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
   if (!ty)
@@ -2644,7 +2645,7 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
 }
 
 static void
-collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
+collectDependenciesFromRequirement(swift::SmallSetVector<Type, 4> &seen,
                                    const Requirement &req,
                                    const DeclContext *excluding) {
   collectDependenciesFromType(seen, req.getFirstType(), excluding);
@@ -2653,7 +2654,7 @@ collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
 }
 
 static SmallVector<Type, 4> collectDependenciesFromType(Type ty) {
-  llvm::SmallSetVector<Type, 4> result;
+  swift::SmallSetVector<Type, 4> result;
   collectDependenciesFromType(result, ty, /*excluding*/nullptr);
   return result.takeVector();
 }
@@ -3022,7 +3023,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       if (D->getResolvedMacro(const_cast<CustomAttr *>(theAttr)))
         return;
 
-      auto typeID = S.addTypeRef(theAttr->getType());
+      auto typeID = S.addTypeRef(
+          D->getResolvedCustomAttrType(const_cast<CustomAttr *>(theAttr)));
       if (!typeID && !S.allowCompilerErrors()) {
         llvm::PrettyStackTraceString message("CustomAttr has no type");
         abort();
@@ -3134,11 +3136,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<ExternAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExternDeclAttrLayout::Code];
       llvm::SmallString<32> blob;
-      blob.append(theAttr->ModuleName);
-      blob.append(theAttr->Name);
+      auto moduleName = theAttr->ModuleName.value_or(StringRef());
+      auto name = theAttr->Name.value_or(StringRef());
+      blob.append(moduleName);
+      blob.append(name);
       ExternDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-          theAttr->ModuleName.size(), theAttr->Name.size(), blob);
+          (unsigned)theAttr->getExternKind(),
+          moduleName.size(), name.size(), blob);
       return;
     }
 
@@ -3165,6 +3170,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DocumentationDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
           metadataIDPair.second, hasVisibility, visibility);
+      return;
+    }
+
+    case DAK_Nonisolated: {
+      auto *theAttr = cast<NonisolatedAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
+      NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                            theAttr->isUnsafe(),
+                                            theAttr->isImplicit());
       return;
     }
 
@@ -3455,10 +3469,15 @@ private:
   void writeForeignAsyncConvention(const ForeignAsyncConvention &fac) {
     using namespace decls_block;
     TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
-    unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
-      .transform([](unsigned index) { return index + 1; }).value_or(0);
-    unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
-      .transform([](unsigned index) { return index + 1; }).value_or(0);
+
+    unsigned rawErrorParameterIndex =
+        swift::transform(fac.completionHandlerErrorParamIndex(),
+                         [](unsigned index) { return index + 1; })
+            .value_or(0);
+    unsigned rawErrorFlagParameterIndex =
+        swift::transform(fac.completionHandlerFlagParamIndex(),
+                         [](unsigned index) { return index + 1; })
+            .value_or(0);
     auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
     ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                              completionHandlerTypeID,
@@ -3832,7 +3851,7 @@ public:
     size_t numInherited = addInherited(
         extension->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencies;
+    swift::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
       dependencies, extendedType, /*excluding*/nullptr);
     for (Requirement req : extension->getGenericRequirements()) {
@@ -3993,7 +4012,7 @@ public:
 
     auto underlying = typeAlias->getUnderlyingType();
 
-    llvm::SmallSetVector<Type, 4> dependencies;
+    swift::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
                                 /*excluding*/nullptr);
     for (Requirement req : typeAlias->getGenericRequirements()) {
@@ -4066,7 +4085,7 @@ public:
         addConformances(theStruct, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(theStruct->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
       collectDependenciesFromRequirement(dependencyTypes, req,
                                          /*excluding*/nullptr);
@@ -4106,7 +4125,7 @@ public:
         addConformances(theEnum, ConformanceLookupKind::All, data);
     size_t numInherited = addInherited(theEnum->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
       if (!nextElt->hasAssociatedValues())
         continue;
@@ -4159,7 +4178,7 @@ public:
         addConformances(theClass, ConformanceLookupKind::NonInherited, data);
     size_t numInherited = addInherited(theClass->getInherited(), data);
 
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
       // FIXME: Nested types can still be a problem here: it's possible that (for
       // whatever reason) they won't be able to be deserialized, in which case
@@ -4209,7 +4228,7 @@ public:
     auto contextID = S.addDeclContextRef(proto->getDeclContext());
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    swift::SmallSetVector<Type, 4> dependencyTypes;
 
     unsigned numInherited = addInherited(
         proto->getInherited(), inheritedAndDependencyTypes);
@@ -5124,6 +5143,10 @@ public:
 
   void visitModuleType(const ModuleType *) {
     llvm_unreachable("modules are currently not first-class values");
+  }
+
+  void visitInverseType(const InverseType *) {
+    llvm_unreachable("inverse types should not escape the type checker");
   }
 
   void visitInOutType(const InOutType *) {

@@ -217,6 +217,12 @@ BridgedType BridgedType::getTupleElementType(SwiftInt idx) const {
   return get().getTupleElementType(idx);
 }
 
+BridgedType BridgedType::getFunctionTypeWithNoEscape(bool withNoEscape) const {
+  auto fnType = get().getAs<swift::SILFunctionType>();
+  auto newTy = fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape(true));
+  return swift::SILType::getPrimitiveObjectType(newTy);
+}
+
 //===----------------------------------------------------------------------===//
 //                                BridgedNominalTypeDecl
 //===----------------------------------------------------------------------===//
@@ -1350,6 +1356,10 @@ BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedV
   swift::EnumElementDecl *caseDecl = resultType.get().getEnumElement(caseIdx);
   swift::SILValue pl = payload.getSILValue();
   return {get().createEnum(regularLoc(), pl, caseDecl, resultType.get())};
+}
+
+BridgedInstruction BridgedBuilder::createThinToThickFunction(BridgedValue fn, BridgedType resultType) const {
+  return {get().createThinToThickFunction(regularLoc(), fn.getSILValue(), resultType.get())};
 }
 
 BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, BridgedValueArray arguments) const {

@@ -100,6 +100,7 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForNonTransparentFuncOME(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
+      hasAccessMarkerHandler(false),
       prespecializedFunctionDeclsImported(false), SerializeSILAction(),
       Types(TC) {
   assert(!context.isNull());
@@ -679,7 +680,7 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
 
 SILFunction *
 SILModule::lookUpMoveOnlyDeinitFunction(const NominalTypeDecl *nomDecl) {
-  assert(nomDecl->isMoveOnly());
+  assert(nomDecl->isNoncopyable());
 
   auto *tbl = lookUpMoveOnlyDeinit(nomDecl);
 

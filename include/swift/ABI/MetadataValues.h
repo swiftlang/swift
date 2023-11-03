@@ -1037,7 +1037,8 @@ class TargetFunctionTypeFlags {
     GlobalActorMask        = 0x10000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
-    // NOTE: The next bit will need to introduce a separate flags word.
+    ExtendedFlagsMask      = 0x80000000U,
+    // NOTE: No more room for flags here. Use TargetExtendedFunctionTypeFlags.
   };
   int_type Data;
 
@@ -1099,6 +1100,12 @@ public:
         (Data & ~GlobalActorMask) | (globalActor ? GlobalActorMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withExtendedFlags(bool extendedFlags) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~ExtendedFlagsMask) | (extendedFlags ? ExtendedFlagsMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -1127,6 +1134,10 @@ public:
     return bool (Data & GlobalActorMask);
   }
 
+  bool hasExtendedFlags() const {
+    return bool (Data & ExtendedFlagsMask);
+  }
+
   int_type getIntValue() const {
     return Data;
   }
@@ -1143,6 +1154,43 @@ public:
   }
 };
 using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
+
+/// Extended flags in a function type metadata record.
+template <typename int_type>
+class TargetExtendedFunctionTypeFlags {
+  enum : int_type {
+    TypedThrowsMask        = 0x00000001U,
+  };
+  int_type Data;
+
+  constexpr TargetExtendedFunctionTypeFlags(int_type Data) : Data(Data) {}
+public:
+  constexpr TargetExtendedFunctionTypeFlags() : Data(0) {}
+
+  constexpr TargetExtendedFunctionTypeFlags<int_type>
+  withTypedThrows(bool typedThrows) const {
+    return TargetExtendedFunctionTypeFlags<int_type>(
+               (Data & ~TypedThrowsMask) | (typedThrows ? TypedThrowsMask : 0));
+  }
+
+  bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
+
+  int_type getIntValue() const {
+    return Data;
+  }
+
+  static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
+    return TargetExtendedFunctionTypeFlags(Data);
+  }
+
+  bool operator==(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(TargetExtendedFunctionTypeFlags<int_type> other) const {
+    return Data != other.Data;
+  }
+};
+using ExtendedFunctionTypeFlags = TargetExtendedFunctionTypeFlags<uint32_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {

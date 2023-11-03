@@ -1046,6 +1046,7 @@ void LifetimeChecker::injectActorHops() {
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::GlobalActor:
     return;
@@ -2747,7 +2748,7 @@ static void updateControlVariable(SILLocation Loc,
   
   // If the mask is all ones, do a simple store, otherwise do a
   // load/or/store sequence to mask in the bits.
-  if (!Bitmask.isAllOnesValue()) {
+  if (!Bitmask.isAllOnes()) {
     SILValue Tmp =
         B.createLoad(Loc, ControlVariable, LoadOwnershipQualifier::Trivial);
     if (!OrFn.get())

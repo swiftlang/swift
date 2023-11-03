@@ -60,6 +60,10 @@ struct Pair<T> {
   var y : T
 }
 
+struct Box<T> {
+  var t: T
+}
+
 struct Box2<T, U> {
     var v1: T
     var v2: U
@@ -1427,10 +1431,8 @@ nopers(%error : @owned $any Error):
 
 // CHECK-LABEL: sil [ossa] @f262_testTryApplyIntoPhi : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
-// CHECK:         [[STACK:%[^,]+]] = alloc_stack
-// CHECK:         try_apply undef<R>([[STACK]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
+// CHECK:         try_apply undef<R>([[ADDR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]]
 // CHECK:       [[NORMAL]]({{%[^,]+}} : $()):
-// CHECK:         copy_addr [take] [[STACK]] to [init] [[ADDR]]
 // CHECK:         br [[EXIT:bb[0-9]+]]                                          
 // CHECK:       [[EXIT]]:                                              
 // CHECK:         return {{%[^,]+}} : $()                                 
@@ -2264,15 +2266,13 @@ bb3:
 // Test the result being stored into an @out enum.
 // CHECK-LABEL: sil [ossa] @test_checked_cast_br4 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*Optional<T>, [[INSTANCE:%[^,]+]] : @owned $TestGeneric<Element>):
-// CHECK:         [[TEMP:%[^,]+]] = alloc_stack $Optional<T>
 // CHECK:         [[CAST_SOURCE_ADDR:%[^,]+]] = alloc_stack $TestGeneric<Element>
 // CHECK:         store [[INSTANCE]] to [init] [[CAST_SOURCE_ADDR]]
-// CHECK:         [[CAST_DEST_ADDR:%[^,]+]] = init_enum_data_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK:         [[CAST_DEST_ADDR:%[^,]+]] = init_enum_data_addr [[OUT_ADDR]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK:         checked_cast_addr_br take_on_success TestGeneric<Element> in [[CAST_SOURCE_ADDR]] : $*TestGeneric<Element> to T in [[CAST_DEST_ADDR]] : $*T, [[SUCCESS:bb[0-9]+]]
 // CHECK:       [[SUCCESS]]:
 // CHECK:         dealloc_stack [[CAST_SOURCE_ADDR]]
-// CHECK:         inject_enum_addr [[TEMP]] : $*Optional<T>, #Optional.some!enumelt
-// CHECK:         copy_addr [take] [[TEMP]] to [init] [[OUT_ADDR]]
+// CHECK:         inject_enum_addr [[OUT_ADDR]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-LABEL: } // end sil function 'test_checked_cast_br4'
 sil [ossa] @test_checked_cast_br4 : $@convention(method) <Element><T> (@owned TestGeneric<Element>) -> @out Optional<T> {
 bb0(%3 : @owned $TestGeneric<Element>):
@@ -2708,6 +2708,44 @@ entry:
   end_borrow %lifetime : $T
   dealloc_stack %addr : $*T
   destroy_value %instance : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_struct_1_two_use_projections : {{.*}} {
+// CHECK:         [[S_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
+// CHECK:         [[S_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S_ADDR]] : $*Box<T>, #Box.t  
+// CHECK:         apply undef<T>([[S_FIELD_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
+// CHECK:       [[RIGHT]]:                                              
+// CHECK:         destroy_addr [[S_ADDR]] : $*Box<T>                      
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[LEFT]]:                                              
+// CHECK:         [[S2_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Box<T>, #Box.t  
+// CHECK:         copy_addr [take] [[S_FIELD_ADDR]] to [init] [[S2_FIELD_ADDR]]
+// CHECK:         destroy_addr [[S2_ADDR]] : $*Box<T>                      
+// CHECK:         br [[EXIT]]                                          
+// CHECK:       [[EXIT]]:                                              
+// CHECK:         dealloc_stack [[S2_ADDR]] : $*Box<T>                     
+// CHECK:         dealloc_stack [[S_ADDR]] : $*Box<T>                     
+// CHECK-LABEL: } // end sil function 'test_struct_1_two_use_projections'
+sil [ossa] @test_struct_1_two_use_projections : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %s2 = struct $Box<T>(%box : $T)
+  destroy_value %s2 : $Box<T>
+  br exit
+
+right:
+  %s = struct $Box<T>(%box : $T)
+  destroy_value %s : $Box<T>
+  br exit
+
+exit:
   %retval = tuple ()
   return %retval : $()
 }

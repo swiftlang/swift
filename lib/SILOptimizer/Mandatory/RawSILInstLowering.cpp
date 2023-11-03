@@ -181,7 +181,7 @@ static void emitInitAccessorInitialValueArgument(
 static void
 lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
                                 AssignByWrapperInst *inst,
-                                SmallSetVector<SILValue, 8> &toDelete) {
+                                llvm::SmallSetVector<SILValue, 8> &toDelete) {
   LLVM_DEBUG(llvm::dbgs() << "  *** Lowering " << *inst << "\n");
 
   ++numAssignRewritten;
@@ -263,7 +263,7 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
 static void
 lowerAssignOrInitInstruction(SILBuilderWithScope &b,
                              AssignOrInitInst *inst,
-                             SmallSetVector<SILValue, 8> &toDelete) {
+                             llvm::SmallSetVector<SILValue, 8> &toDelete) {
   LLVM_DEBUG(llvm::dbgs() << "  *** Lowering " << *inst << "\n");
 
   ++numAssignRewritten;
@@ -422,7 +422,7 @@ static bool lowerRawSILOperations(SILFunction &fn) {
   bool changed = false;
 
   for (auto &bb : fn) {
-    SmallSetVector<SILValue, 8> toDelete;
+    llvm::SmallSetVector<SILValue, 8> toDelete;
 
     auto i = bb.begin(), e = bb.end();
     while (i != e) {

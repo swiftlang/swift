@@ -117,6 +117,30 @@ static SILValue getMember(SILInstruction *inst, ProjectionPath &projStack) {
   return SILValue();
 }
 
+SILValue swift::stripFunctionConversions(SILValue val) {
+  SILValue result = nullptr;
+
+  for (;;) {
+    if (auto ti = dyn_cast<ThinToThickFunctionInst>(val)) {
+      val = ti->getOperand();
+      result = val;
+      continue;
+    } else if (auto cfi = dyn_cast<ConvertFunctionInst>(val)) {
+      val = cfi->getOperand();
+      result = val;
+      continue;
+    } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(val)) {
+      val = cvt->getOperand();
+      result = val;
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  return result;
+}
+
 SILInstruction *ConstantTracker::getDef(SILValue val,
                                         ProjectionPath &projStack) {
 
@@ -137,14 +161,8 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         // A value loaded from memory.
         val = loadedVal;
         continue;
-      } else if (auto ti = dyn_cast<ThinToThickFunctionInst>(inst)) {
-        val = ti->getOperand();
-        continue;
-      } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
-        val = cfi->getOperand();
-        continue;
-      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
-        val = cvt->getOperand();
+      } else if (auto base = stripFunctionConversions(inst)) {
+        val = base;
         continue;
       }
       return inst;

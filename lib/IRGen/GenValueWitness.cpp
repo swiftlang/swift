@@ -925,8 +925,8 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
     auto shiftedMask = mask.lshr(tzCount);
     auto toCount = shiftedMask.countTrailingOnes();
     if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.countPopulation() > 64 ||
-         toCount != mask.countPopulation() ||
+        (mask.popcount() > 64 ||
+         toCount != mask.popcount() ||
          (tzCount % toCount != 0))) {
       return IGM.getEnumFnGetEnumTagFn();
     } else {
@@ -962,7 +962,7 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
     auto shiftedMask = mask.lshr(tzCount);
     auto toCount = shiftedMask.countTrailingOnes();
     if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-        (mask.countPopulation() > 64 || toCount != mask.countPopulation() ||
+        (mask.popcount() > 64 || toCount != mask.popcount() ||
          (tzCount % toCount != 0))) {
       return nullptr;
     } else {

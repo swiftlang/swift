@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null
 // RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=targeted
 // RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete
-// RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-experimental-feature SendNonSendable
+// RUN: %target-swift-frontend  -disable-availability-checking -enable-experimental-flow-sensitive-concurrent-captures -verify -emit-sil %s -o - >/dev/null -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: asserts

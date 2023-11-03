@@ -220,6 +220,8 @@ class DeadFunctionAndGlobalElimination {
     for (const SILInstruction &initInst : *global) {
       if (auto *fRef = dyn_cast<FunctionRefInst>(&initInst))
         ensureAlive(fRef->getReferencedFunction());
+      if (auto *gRef = dyn_cast<GlobalAddrInst>(&initInst))
+        ensureAlive(gRef->getReferencedGlobal());
     }
   }
 

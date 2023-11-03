@@ -3,8 +3,8 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/other_global_actor_inference.swiftmodule -module-name other_global_actor_inference -warn-concurrency %S/Inputs/other_global_actor_inference.swift
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify
 // RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-sns-
-// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature SendNonSendable -verify-additional-prefix complete-sns-
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -I %t -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -324,17 +324,30 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
   
+  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
+    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context; this is an error in Swift 6}}
     self.wrappedValue = wrappedValue
   }
 }
 
 @propertyWrapper
-public struct WrapperOnMainActor2<Wrapped> {
+public struct WrapperOnMainActorNonSendable<Wrapped> {
+  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
+  @MainActor public var wrappedValue: Wrapped
+
+  public init(wrappedValue: Wrapped) {
+    // expected-warning@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a non-isolated context; this is an error in Swift 6}}
+    self.wrappedValue = wrappedValue
+  }
+}
+
+@propertyWrapper
+public struct WrapperOnMainActorSendable<Wrapped: Sendable> {
   @MainActor public var wrappedValue: Wrapped
 
   public init(wrappedValue: Wrapped) {
@@ -547,15 +560,15 @@ struct WrapperOnUnsafeActor<Wrapped> {
 struct HasWrapperOnUnsafeActor {
   @WrapperOnUnsafeActor var synced: Int = 0
   // expected-note @-1 3{{property declared here}}
-  // expected-complete-sns-note @-2 3{{property declared here}}
+  // expected-complete-tns-note @-2 3{{property declared here}}
 
   func testUnsafeOkay() {
-    // expected-complete-sns-note @-1 {{add '@OtherGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'OtherGlobalActor'}}
-    // expected-complete-sns-note @-2 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
-    // expected-complete-sns-note @-3 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
-    _ = synced // expected-complete-sns-error {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
-    _ = $synced // expected-complete-sns-error {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
-    _ = _synced // expected-complete-sns-error {{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
+    // expected-complete-tns-note @-1 {{add '@OtherGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'OtherGlobalActor'}}
+    // expected-complete-tns-note @-2 {{add '@SomeGlobalActor' to make instance method 'testUnsafeOkay()' part of global actor 'SomeGlobalActor'}}
+    // expected-complete-tns-note @-3 {{add '@MainActor' to make instance method 'testUnsafeOkay()' part of global actor 'MainActor'}}
+    _ = synced // expected-complete-tns-error {{main actor-isolated property 'synced' can not be referenced from a non-isolated context}}
+    _ = $synced // expected-complete-tns-error {{global actor 'SomeGlobalActor'-isolated property '$synced' can not be referenced from a non-isolated context}}
+    _ = _synced // expected-complete-tns-error {{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced from a non-isolated context}}
   }
 
   nonisolated func testErrors() {
@@ -631,7 +644,7 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 // defer bodies inherit global actor-ness
 @MainActor
 var statefulThingy: Bool = false // expected-note {{var declared here}}
-// expected-complete-sns-error @-1 {{top-level code variables cannot have a global actor}}
+// expected-complete-tns-error @-1 {{top-level code variables cannot have a global actor}}
 
 @MainActor
 func useFooInADefer() -> String { // expected-note {{calls to global function 'useFooInADefer()' from outside of its actor context are implicitly asynchronous}}

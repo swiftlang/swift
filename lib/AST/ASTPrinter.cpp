@@ -1035,12 +1035,6 @@ public:
         Options.TransformContext->isPrintingSynthesizedExtension() &&
         isa<ExtensionDecl>(D);
 
-    SWIFT_DEFER {
-      D->visitAuxiliaryDecls([&](Decl *auxDecl) {
-        visit(auxDecl);
-      });
-    };
-
     if (!shouldPrint(D, true) && !Synthesize)
       return false;
 
@@ -2579,6 +2573,9 @@ void PrintAST::printInherited(const Decl *decl) {
   interleave(TypesToPrint, [&](InheritedEntry inherited) {
     if (inherited.isUnchecked)
       Printer << "@unchecked ";
+    if (inherited.isRetroactive &&
+        !llvm::is_contained(Options.ExcludeAttrList, TAK_retroactive))
+      Printer << "@retroactive ";
 
     printTypeLoc(inherited);
   }, [&]() {
@@ -3049,6 +3046,18 @@ static bool usesFeatureGlobalActors(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureRetroactiveAttribute(Decl *decl) {
+  auto ext = dyn_cast<ExtensionDecl>(decl);
+  if (!ext)
+    return false;
+
+  ArrayRef<InheritedEntry> entries = ext->getInherited().getEntries();
+  return std::find_if(entries.begin(), entries.end(), 
+    [](const InheritedEntry &entry) {
+      return entry.isRetroactive;
+    }) != entries.end();
+}
+
 static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
   auto typeMatches = [kind](Type type) {
     return type.findIf([&](Type type) {
@@ -3327,14 +3336,16 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 static bool usesFeatureMoveOnly(Decl *decl) {
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (nominal->isMoveOnly())
+      if (nominal->isNoncopyable())
         return true;
   }
 
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-      if (value->isMoveOnly())
-        return true;
+  if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
+    if (typeDecl->isNoncopyable())
+      return true;
+  }
 
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
     // Check for move-only types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasMoveOnly = type.findIf([](Type type) {
@@ -3475,6 +3486,14 @@ suppressingFeatureNoAsyncAvailability(PrintOptions &options,
   action();
 }
 
+static void suppressingFeatureRetroactiveAttribute(
+  PrintOptions &options,
+  llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<PrintOptions> originalOptions(options);
+  options.ExcludeAttrList.push_back(TAK_retroactive);
+  action();
+}
+
 static bool usesFeatureReferenceBindings(Decl *decl) {
   auto *vd = dyn_cast<VarDecl>(decl);
   return vd && vd->getIntroducer() == VarDecl::Introducer::InOut;
@@ -3550,9 +3569,7 @@ static bool usesFeatureParameterPacks(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureSendNonSendable(Decl *decl) {
-  return false;
-}
+static bool usesFeatureRegionBasedIsolation(Decl *decl) { return false; }
 
 static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
 
@@ -3585,6 +3602,10 @@ static bool usesFeatureTypedThrows(Decl *decl) {
     return func->getThrownTypeRepr() != nullptr;
 
   return false;
+}
+
+static bool usesFeatureExtern(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ExternAttr>();
 }
 
 /// Suppress the printing of a particular feature.
@@ -4481,13 +4502,20 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
                              bool NeedIndent) {
   IndentRAII IndentMore(*this, NeedIndent);
   bool PrintedSomething = false;
+
+  std::function<void(Decl *)> printDecl;
+  printDecl = [&](Decl *d) {
+    if (d->shouldPrintInContext(Options))
+      visit(d);
+    d->visitAuxiliaryDecls(printDecl);
+  };
+
   for (auto element : Elements) {
     PrintedSomething = true;
     Printer.printNewline();
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
-      if (decl->shouldPrintInContext(Options))
-        visit(decl);
+      printDecl(decl);
     } else if (auto stmt = element.dyn_cast<Stmt*>()) {
       visit(stmt);
     } else {
@@ -6174,6 +6202,11 @@ public:
       Printer << "<<unresolvedtype>>";
     else
       Printer << "_";
+  }
+
+  void visitInverseType(InverseType *T) {
+    Printer << "~";
+    visit(T->getInvertedProtocol());
   }
 
   void visitPlaceholderType(PlaceholderType *T) {
@@ -7892,7 +7925,8 @@ swift::getInheritedForPrinting(
     }
 
     Results.push_back({TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()),
-                       isUnchecked});
+                       isUnchecked,
+                       /*isRetroactive=*/false});
   }
 }
 

@@ -6,7 +6,7 @@
 
 import Foundation
 import ObjCConcurrency
-// expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
+// expected-warning@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 @available(SwiftStdlib 5.5, *)
 @MainActor func onlyOnMainActor() { }

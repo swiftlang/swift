@@ -722,9 +722,9 @@ static SILValue tryRewriteToPartialApplyStack(
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   SSAPrunedLiveness closureLiveness(cvt->getFunction(), &discoveredBlocks);
   closureLiveness.initializeDef(closureOp);
-  
-  SmallSetVector<SILValue, 4> borrowedOriginals;
-  
+
+  llvm::SmallSetVector<SILValue, 4> borrowedOriginals;
+
   unsigned appliedArgStartIdx =
         newPA->getOrigCalleeType()->getNumParameters() - newPA->getNumArguments();
 

@@ -1113,7 +1113,7 @@ public:
 
     // If this is a nominal type that is move only, emit a deinit table for it.
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isMoveOnly()) {
+      if (nom->isNoncopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
       }
     }
@@ -1135,7 +1135,6 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
-      assert(conformance->isComplete());
       if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(normal);
     }
@@ -1179,7 +1178,7 @@ public:
     if (auto *cd = dyn_cast<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isMoveOnly()) {
+      if (nom->isNoncopyable()) {
         return SGM.emitMoveOnlyDestructor(nom, dd);
       }
     }
@@ -1224,12 +1223,7 @@ public:
       SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 
@@ -1300,7 +1294,6 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
-        assert(conformance->isComplete());
         if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);
       }
@@ -1406,12 +1399,7 @@ public:
       }
     }
 
-    if (auto *thunk = vd->getDistributedThunk()) {
-      auto thunkRef = SILDeclRef(thunk).asDistributed();
-      SGM.emitFunctionDefinition(thunkRef,
-                                 SGM.getFunction(thunkRef, ForDefinition));
-    }
-
+    SGM.emitDistributedThunkForDecl(vd);
     visitAbstractStorageDecl(vd);
   }
 

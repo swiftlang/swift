@@ -34,7 +34,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -167,7 +167,7 @@ class ImportResolver final : public DeclVisitor<ImportResolver> {
   /// We use a \c SmallSetVector here because this doubles as the worklist for
   /// cross-importing, so we want to keep it in order; this is feasible
   /// because this set is usually fairly small.
-  SmallSetVector<AttributedImport<ImportedModule>, 64> crossImportableModules;
+  llvm::SmallSetVector<AttributedImport<ImportedModule>, 32> crossImportableModules;
 
   /// The subset of \c crossImportableModules which may declare cross-imports.
   ///

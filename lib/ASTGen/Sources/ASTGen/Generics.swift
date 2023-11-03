@@ -3,19 +3,17 @@ import CBasicBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  func generate(_ node: GenericParameterClauseSyntax) -> ASTNode {
-    .misc(
-      GenericParamList_create(
-        astContext: self.ctx,
-        leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
-        parameters: node.parameters.lazy.map { self.generate($0).rawValue }.bridgedArray(in: self),
-        genericWhereClause: self.generate(node.genericWhereClause)?.rawValue,
-        rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
-      )
+  func generate(_ node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
+    .createParsed(
+      self.ctx,
+      leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
+      parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
+      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
+      rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
     )
   }
 
-  func generate(_ node: GenericParameterSyntax) -> ASTNode {
+  func generate(_ node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
     var genericParameterIndex: Int?
@@ -29,35 +27,33 @@ extension ASTGenVisitor {
       preconditionFailure("Node not part of the parent?")
     }
 
-    return .decl(
-      GenericTypeParamDecl_create(
-        astContext: self.ctx,
-        declContext: self.declContext,
-        eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
-        name: name,
-        nameLoc: nameLoc,
-        inheritedType: self.generate(node.inheritedType)?.rawValue,
-        index: genericParameterIndex
-      )
+    return .createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
+      name: name,
+      nameLoc: nameLoc,
+      inheritedType: self.generate(node.inheritedType).asNullable,
+      index: genericParameterIndex
     )
   }
 
-  func generate(_ node: GenericWhereClauseSyntax) -> ASTNode {
+  func generate(_ node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
     let requirements = node.requirements.lazy.map {
       switch $0.requirement {
       case .conformanceRequirement(let conformance):
         return BridgedRequirementRepr(
           SeparatorLoc: conformance.colon.bridgedSourceLoc(in: self),
           Kind: .typeConstraint,
-          FirstType: self.generate(conformance.leftType).rawValue,
-          SecondType: self.generate(conformance.rightType).rawValue
+          FirstType: self.generate(conformance.leftType),
+          SecondType: self.generate(conformance.rightType)
         )
       case .sameTypeRequirement(let sameType):
         return BridgedRequirementRepr(
           SeparatorLoc: sameType.equal.bridgedSourceLoc(in: self),
           Kind: .sameType,
-          FirstType: self.generate(sameType.leftType).rawValue,
-          SecondType: self.generate(sameType.rightType).rawValue
+          FirstType: self.generate(sameType.leftType),
+          SecondType: self.generate(sameType.rightType)
         )
       case .layoutRequirement(_):
         // FIXME: Implement layout requirement translation.
@@ -65,12 +61,10 @@ extension ASTGenVisitor {
       }
     }
 
-    return .misc(
-      TrailingWhereClause_create(
-        astContext: self.ctx,
-        whereKeywordLoc: node.whereKeyword.bridgedSourceLoc(in: self),
-        requirements: requirements.bridgedArray(in: self)
-      )
+    return BridgedTrailingWhereClause.createParsed(
+      self.ctx,
+      whereKeywordLoc: node.whereKeyword.bridgedSourceLoc(in: self),
+      requirements: requirements.bridgedArray(in: self)
     )
   }
 }

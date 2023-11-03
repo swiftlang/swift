@@ -73,14 +73,14 @@ static Expr *constructUnownedSerialExecutor(ASTContext &ctx,
     auto selfApply = ConstructorRefCallExpr::create(ctx, initRef, metatypeRef,
                                                     ctorAppliedType);
     selfApply->setImplicit(true);
-    selfApply->setThrows(false);
+    selfApply->setThrows(nullptr);
 
     // Call the constructor, building an expression of type
     // UnownedSerialExecutor.
     auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {arg});
     auto call = CallExpr::createImplicit(ctx, selfApply, argList);
     call->setType(executorType);
-    call->setThrows(false);
+    call->setThrows(nullptr);
     return call;
   }
 
@@ -147,7 +147,8 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
                                                    SourceLoc(), SourceRange(),
                                                    /*implicit*/ true));
-  property->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+  property->getAttrs().add(
+      new (ctx) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
 
   // Make the property implicitly final.
   property->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));

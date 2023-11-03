@@ -2518,18 +2518,21 @@ private:
     AbstractionPattern origResultType;
     ClaimedParamsRef paramsToEmit;
     SILFunctionTypeRepresentation functionRepresentation;
-    
+    bool implicitlyAsync;
+
     DefaultArgumentStorage(SILLocation loc,
                            ConcreteDeclRef defaultArgsOwner,
                            unsigned destIndex,
                            CanType resultType,
                            AbstractionPattern origResultType,
                            ClaimedParamsRef paramsToEmit,
-                           SILFunctionTypeRepresentation functionRepresentation)
+                           SILFunctionTypeRepresentation functionRepresentation,
+                           bool implicitlyAsync)
       : loc(loc), defaultArgsOwner(defaultArgsOwner), destIndex(destIndex),
         resultType(resultType), origResultType(origResultType),
         paramsToEmit(paramsToEmit),
-        functionRepresentation(functionRepresentation)
+        functionRepresentation(functionRepresentation),
+        implicitlyAsync(implicitlyAsync)
     {}
   };
   struct BorrowedLValueStorage {
@@ -2656,13 +2659,15 @@ public:
                   CanType resultType,
                   AbstractionPattern origResultType,
                   ClaimedParamsRef params,
-                  SILFunctionTypeRepresentation functionTypeRepresentation)
+                  SILFunctionTypeRepresentation functionTypeRepresentation,
+                  bool implicitlyAsync)
     : Kind(DefaultArgument) {
     Value.emplace<DefaultArgumentStorage>(Kind, loc, defaultArgsOwner,
                                           destIndex,
                                           resultType,
                                           origResultType, params,
-                                          functionTypeRepresentation);
+                                          functionTypeRepresentation,
+                                          implicitlyAsync);
   }
 
   DelayedArgument(DelayedArgument &&other)
@@ -3261,7 +3266,7 @@ public:
                                     defArg->getParamIndex(),
                                     substParamType, origParamType,
                                     claimNextParameters(numParams),
-                                    Rep);
+                                    Rep, defArg->isImplicitlyAsync());
       Args.push_back(ManagedValue());
 
       maybeEmitForeignArgument();
@@ -4255,7 +4260,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
-                                                  info.resultType);
+                                                  info.resultType,
+                                                  info.implicitlyAsync);
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
@@ -5515,6 +5521,7 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
     }
@@ -6524,9 +6531,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
   if (selfParam.isConsumed() && !base.hasCleanup()) {
     base = base.copyUnmanaged(SGF, loc);
   }
-
-  // If the parameter is indirect, we need to drop the value into
-  // temporary memory.
+  // If the parameter is indirect, we'll need to drop the value into
+  // temporary memory. Make a copy scoped to the current formal access that
+  // we can materialize later.
   if (SGF.silConv.isSILIndirect(selfParam)) {
     // It's a really bad idea to materialize when we're about to
     // pass a value to an inout argument, because it's a really easy
@@ -6536,14 +6543,17 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     // itself).
     assert(!selfParam.isIndirectMutating() &&
            "passing unmaterialized r-value as inout argument");
-
-    base = base.formallyMaterialize(SGF, loc);
-    auto shouldTake = IsTake_t(base.hasCleanup());
-    base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
-                                    SGF.getTypeLowering(baseLoweredType),
-                                    SGFContext(), shouldTake);
+           
+    // Avoid copying the base if it's move-only. It should be OK to do in this
+    // case since the move-only base will be accessed in a formal access scope
+    // as well. This isn't always true for copyable bases so be less aggressive
+    // in that case.
+    if (base.getType().isMoveOnly()) {
+      base = base.formalAccessBorrow(SGF, loc);
+    } else {
+      base = base.formalAccessCopy(SGF, loc);
+    }
   }
-
   return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
 }
 

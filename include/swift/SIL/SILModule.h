@@ -393,6 +393,10 @@ private:
   /// This gets set in OwnershipModelEliminator pass.
   bool regDeserializationNotificationHandlerForAllFuncOME;
 
+  // True if a DeserializationNotificationHandler is set for
+  // AccessMarkerElimination.
+  bool hasAccessMarkerHandler;
+
   bool prespecializedFunctionDeclsImported;
 
   /// Action to be executed for serializing the SILModule.
@@ -443,6 +447,13 @@ public:
   }
   void setRegisteredDeserializationNotificationHandlerForAllFuncOME() {
     regDeserializationNotificationHandlerForAllFuncOME = true;
+  }
+
+  bool checkHasAccessMarkerHandler() {
+    return hasAccessMarkerHandler;
+  }
+  void setHasAccessMarkerHandler() {
+    hasAccessMarkerHandler = true;
   }
 
   /// Returns the instruction which defines the given root local archetype,

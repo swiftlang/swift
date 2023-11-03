@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-SKIP
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test -experimental-skip-non-exportable-decls | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP
 
+import Swift
+
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF
 private func privateFunc() {}
@@ -10,8 +12,38 @@ private func privateFunc() {}
 // CHECK-SKIP-NOT: s4Test12internalFuncyyF
 internal func internalFunc() {}
 
+// CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test022internalFuncWithNestedC0yyF : $@convention(thin) () -> () {
+// CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF
+internal func internalFuncWithNestedFunc() {
+  func nested() {}
+  nested()
+}
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyF6nestedL_yyF : $@convention(thin) () -> () {
+// CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF6nestedL_yyF
+
 // CHECK: sil{{.*}} @$s4Test10publicFuncyyF : $@convention(thin) () -> () {
 public func publicFunc() {}
+
+// CHECK: sil{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF : $@convention(thin) () -> () {
+public func publicFuncWithNestedFuncs() {
+  defer { publicFunc() }
+  func nested() {}
+  nested()
+}
+// CHECK: sil private{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF6$deferL_yyF : $@convention(thin) () -> () {
+// CHECK: sil private{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF6nestedL_yyF : $@convention(thin) () -> () {
+
+// CHECK: sil [serialized]{{.*}} @$s4Test13inlinableFuncyyF : $@convention(thin) () -> () {
+@inlinable internal func inlinableFunc() {}
+
+// CHECK: sil [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF : $@convention(thin) () -> () {
+@inlinable internal func inlinableFuncWithNestedFunc() {
+  defer { publicFunc() }
+  func nested() {}
+  nested()
+}
+// CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF6$deferL_yyF : $@convention(thin) () -> () {
+// CHECK: sil shared [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF6nestedL_yyF : $@convention(thin) () -> () {
 
 private class PrivateClass {
   // CHECK-NO-SKIP: sil private{{.*}} @$s4Test12PrivateClass33_E3F0E1C7B46D05C8067CB98677DE566CLLCfd : $@convention(method) (@guaranteed PrivateClass) -> @owned Builtin.NativeObject {

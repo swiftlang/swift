@@ -45,7 +45,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(llvm::None, llvm::None, CleanupLocation(Loc));
+  prepareEpilog(dd, llvm::None, llvm::None, CleanupLocation(Loc));
 
   auto cleanupLoc = CleanupLocation(Loc);
 
@@ -170,7 +170,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   auto *nom = dd->getDeclContext()->getSelfNominalTypeDecl();
   if (isa<ClassDecl>(nom))
     return emitDeallocatingClassDestructor(dd);
-  assert(nom->isMoveOnly());
+  assert(nom->isNoncopyable());
   return emitDeallocatingMoveOnlyDestructor(dd);
 }
 
@@ -248,7 +248,7 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(llvm::None, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dd, llvm::None, llvm::None, CleanupLocation(loc));
 
   auto cleanupLoc = CleanupLocation(loc);
 
@@ -286,7 +286,7 @@ void SILGenFunction::emitIVarDestroyer(SILDeclRef ivarDestroyer) {
   assert(selfValue);
 
   auto cleanupLoc = CleanupLocation(loc);
-  prepareEpilog(llvm::None, llvm::None, cleanupLoc);
+  prepareEpilog(cd, llvm::None, llvm::None, cleanupLoc);
   {
     Scope S(*this, cleanupLoc);
     // Self is effectively guaranteed for the duration of any destructor.  For
@@ -577,7 +577,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Create a basic block to jump to for the implicit destruction behavior
   // of releasing the elements and calling the superclass destructor.
   // We won't actually emit the block until we finish with the destructor body.
-  prepareEpilog(llvm::None, llvm::None, CleanupLocation(loc));
+  prepareEpilog(dd, llvm::None, llvm::None, CleanupLocation(loc));
 
   emitProfilerIncrement(dd->getTypecheckedBody());
   // Emit the destructor body.

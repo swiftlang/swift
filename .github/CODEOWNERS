@@ -142,11 +142,12 @@
 # TODO: /localization
 
 # stdlib
-# TODO: /stdlib/
+/stdlib/                                  @apple/standard-librarians
 /stdlib/public/Backtracing/               @al45tair
 /stdlib/public/Concurrency/               @ktoso @kavon
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan
 /stdlib/public/Distributed/               @ktoso
+/stdlib/public/Observation/               @phausler
 /stdlib/public/Windows/                   @compnerd
 /stdlib/public/libexec/swift-backtrace/   @al45tair
 
@@ -178,7 +179,7 @@
 # FIXME: This file could have a dedicated directory.
 /test/decl/protocol/special/DistributedActor.swift  @ktoso
 /test/expr/                                         @hborla @slavapestov @xedin
-# TODO: /test/stdlib/
+/test/stdlib/                                       @apple/standard-librarians
 /test/stmt/                                         @hborla @xedin
 /test/type/                                         @hborla @slavapestov @xedin
 
@@ -197,7 +198,6 @@
 # TODO: /unittests/SIL/
 /unittests/Sema/                          @hborla @xedin
 /unittests/SourceKit/                     @ahoppen @bnbarham @rintaro @hamishknight
-# TODO: /unittests/stdlib/
 
 # userdocs
 # TODO: /userdocs
@@ -209,7 +209,6 @@
 /utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham
 /utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham
 /utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham
-/utils/swift_build_support/products/swiftevolve.py            @ahoppen @bnbarham
 /utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham
 /utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham
 /utils/update-checkout*                                       @shahmishal
@@ -223,4 +222,4 @@
 # TODO: /validation-test/SILGen/
 # TODO: /validation-test/SILOptimizer/
 /validation-test/Sema/                    @hborla @slavapestov @xedin
-# TODO: /validation-test/stdlib/
+/validation-test/stdlib/                  @apple/standard-librarians

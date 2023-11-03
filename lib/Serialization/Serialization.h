@@ -18,6 +18,7 @@
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
 #include "ModuleFormat.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
@@ -289,7 +290,7 @@ public:
   // constructed, and then converted to a `DerivativeFunctionConfigTableData`.
   using UniquedDerivativeFunctionConfigTable = llvm::MapVector<
       Identifier,
-      llvm::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
+      swift::SmallSetVector<std::pair<Identifier, GenericSignature>, 4>>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of the fingerprint associated with a serialized

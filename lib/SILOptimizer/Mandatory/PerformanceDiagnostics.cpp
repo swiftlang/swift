@@ -157,14 +157,27 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
+  NonErrorHandlingBlocks neBlocks(function);
+
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
       continue;
 
+    // TODO: it's not yet clear how to deal with error existentials.
+    // Ignore them for now. If we have typed throws we could ban error existentials
+    // because typed throws would provide and alternative.
+    if (isa<ThrowInst>(block.getTerminator()))
+      continue;
+
+    if (!neBlocks.isNonErrorHandling(&block))
+      continue;
+
     for (SILInstruction &inst : block) {
-      if (visitInst(&inst, perfConstr, parentLoc))
+      if (visitInst(&inst, perfConstr, parentLoc)) {
+        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         return true;
+      }
 
       if (auto as = FullApplySite::isa(&inst)) {
         if (isEffectFreeArraySemanticCall(&inst))
@@ -346,6 +359,22 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
   return true;
 }
 
+static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
+  // Only diagnose metatype and value_metatype instructions, for now.
+  if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
+    auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
+    if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
+      Type instTy = metaTy->getInstanceType();
+      if (auto selfType = instTy->getAs<DynamicSelfType>())
+        instTy = selfType->getSelfType();
+      // Class metadata are supported in embedded Swift
+      return instTy->getClassOrBoundGenericClass() ? true : false;
+    }
+  }
+
+  return true;
+}
+
 bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
                                           PerformanceConstraints perfConstr,
                                           LocWithParent *parentLoc) {
@@ -353,15 +382,28 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
-  if (module.getOptions().EmbeddedSwift &&
-      impact & RuntimeEffect::Existential) {
-    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
-    if (impactType) {
-      diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
-    } else {
-      diagnose(loc, diag::embedded_swift_existential);
+  if (module.getOptions().EmbeddedSwift) {
+    if (impact & RuntimeEffect::Existential) {
+      PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+      if (impactType) {
+        diagnose(loc, diag::embedded_swift_existential_type, impactType.getASTType());
+      } else {
+        diagnose(loc, diag::embedded_swift_existential);
+      }
+      return true;
     }
-    return true;
+
+    if (impact & RuntimeEffect::MetaData) {
+      if (!allowedMetadataUseInEmbeddedSwift(inst)) {
+        PrettyStackTracePerformanceDiagnostics stackTrace("metatype", inst);
+        if (impactType) {
+          diagnose(loc, diag::embedded_swift_metatype_type, impactType.getASTType());
+        } else {
+          diagnose(loc, diag::embedded_swift_metatype);
+        }
+        return true;
+      }
+    }
   }
 
   if (perfConstr == PerformanceConstraints::None)
@@ -512,7 +554,9 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
     for (SILInstruction &inst : block) {
       if (function->getModule().getOptions().EmbeddedSwift) {
         auto loc = LocWithParent(inst.getLoc().getSourceLoc(), nullptr);
-        visitInst(&inst, PerformanceConstraints::None, &loc);
+        if (visitInst(&inst, PerformanceConstraints::None, &loc)) {
+          LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
+        }
       }
 
       auto as = FullApplySite::isa(&inst);

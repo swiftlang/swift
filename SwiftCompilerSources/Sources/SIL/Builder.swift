@@ -220,6 +220,11 @@ public struct Builder {
     return notifyNew(enumInst.getAs(EnumInst.self))
   }
 
+  public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
+    let tttf = bridged.createThinToThickFunction(thinFunction.bridged, resultType.bridged)
+    return notifyNew(tttf.getAs(ThinToThickFunctionInst.self))
+  }
+
   @discardableResult
   public func createSwitchEnum(enum enumVal: Value,
                                cases: [(Int, BasicBlock)],

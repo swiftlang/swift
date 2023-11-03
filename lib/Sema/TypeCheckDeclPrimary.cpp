@@ -57,6 +57,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/APSInt.h"
@@ -92,7 +93,8 @@ static Type containsParameterizedProtocolType(Type inheritedTy) {
 /// file.
 static void checkInheritanceClause(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> declUnion) {
-  auto inheritedClause = InheritedTypes(declUnion).getEntries();
+  auto inheritedTypes = InheritedTypes(declUnion);
+  auto inheritedClause = inheritedTypes.getEntries();
   const ExtensionDecl *ext = nullptr;
   const TypeDecl *typeDecl = nullptr;
   const Decl *decl;
@@ -122,45 +124,6 @@ static void checkInheritanceClause(
 
   ASTContext &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
-
-  // Retrieve the location of the start of the inheritance clause.
-  auto getStartLocOfInheritanceClause = [&] {
-    if (ext)
-      return ext->getSourceRange().End;
-
-    return typeDecl->getNameLoc();
-  };
-
-  // Compute the source range to be used when removing something from an
-  // inheritance clause.
-  auto getRemovalRange = [&](unsigned i) {
-    // If there is just one entry, remove the entire inheritance clause.
-    if (inheritedClause.size() == 1) {
-      SourceLoc start = getStartLocOfInheritanceClause();
-      SourceLoc end = inheritedClause[i].getSourceRange().End;
-      return SourceRange(Lexer::getLocForEndOfToken(ctx.SourceMgr, start),
-                         Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
-    }
-
-    // If we're at the first entry, remove from the start of this entry to the
-    // start of the next entry.
-    if (i == 0) {
-      return SourceRange(inheritedClause[i].getSourceRange().Start,
-                         inheritedClause[i+1].getSourceRange().Start);
-    }
-
-    // Otherwise, remove from the end of the previous entry to the end of this
-    // entry.
-    SourceLoc afterPriorLoc =
-      Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                 inheritedClause[i-1].getSourceRange().End);
-
-    SourceLoc afterMyEndLoc =
-      Lexer::getLocForEndOfToken(ctx.SourceMgr,
-                                 inheritedClause[i].getSourceRange().End);
-
-    return SourceRange(afterPriorLoc, afterMyEndLoc);
-  };
 
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
@@ -210,7 +173,7 @@ static void checkInheritanceClause(
         // Swift <= 4.
         auto knownIndex = inheritedAnyObject->first;
         auto knownRange = inheritedAnyObject->second;
-        SourceRange removeRange = getRemovalRange(knownIndex);
+        SourceRange removeRange = inheritedTypes.getRemovalRange(knownIndex);
         if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
             isa<ProtocolDecl>(decl) &&
             Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
@@ -264,6 +227,12 @@ static void checkInheritanceClause(
         continue;
       }
 
+      // Classes are always copyable.
+      if (layout.hasInverseCopyable && isa<ClassDecl>(decl)) {
+        decl->diagnose(diag::noncopyable_class);
+        continue;
+      }
+
       // If the existential did not have a class constraint, we're done.
       if (!layout.explicitSuperclass)
         continue;
@@ -278,7 +247,7 @@ static void checkInheritanceClause(
       // Check if we already had a raw type.
       if (superclassTy) {
         if (superclassTy->isEqual(inheritedTy)) {
-          auto removeRange = getRemovalRange(i);
+          auto removeRange = inheritedTypes.getRemovalRange(i);
           diags.diagnose(inherited.getSourceRange().Start,
                          diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
@@ -294,7 +263,7 @@ static void checkInheritanceClause(
       // Noncopyable types cannot have a raw type until there is support for
       // generics, since the raw type here is only useful if we'll generate
       // a conformance to RawRepresentable, which is currently disabled.
-      if (enumDecl->isMoveOnly()) {
+      if (enumDecl->isNoncopyable()) {
         // TODO: getRemovalRange is not yet aware of ~Copyable entries so it
         // will accidentally delete commas or colons that are needed.
         diags.diagnose(inherited.getSourceRange().Start,
@@ -305,7 +274,7 @@ static void checkInheritanceClause(
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        auto removeRange = getRemovalRange(i);
+        auto removeRange = inheritedTypes.getRemovalRange(i);
 
         diags.diagnose(inherited.getSourceRange().Start,
                        diag::raw_type_not_first, inheritedTy)
@@ -330,7 +299,7 @@ static void checkInheritanceClause(
 
         if (superclassTy->isEqual(inheritedTy)) {
           // Duplicate superclass.
-          auto removeRange = getRemovalRange(i);
+          auto removeRange = inheritedTypes.getRemovalRange(i);
           diags.diagnose(inherited.getSourceRange().Start,
                          diag::duplicate_inheritance, inheritedTy)
             .fixItRemoveChars(removeRange.Start, removeRange.End);
@@ -346,7 +315,7 @@ static void checkInheritanceClause(
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
-        auto removeRange = getRemovalRange(i);
+        auto removeRange = inheritedTypes.getRemovalRange(i);
         diags.diagnose(inherited.getSourceRange().Start,
                        diag::superclass_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
@@ -1069,7 +1038,18 @@ static void checkDefaultArguments(ParameterList *params) {
   for (auto *param : *params) {
     auto ifacety = param->getInterfaceType();
     auto *expr = param->getTypeCheckedDefaultExpr();
-    (void)param->getInitializerIsolation();
+
+    // If the default argument has isolation, it must match the
+    // isolation of the decl context.
+    auto defaultArgIsolation = param->getInitializerIsolation();
+    if (defaultArgIsolation.isActorIsolated()) {
+      auto *dc = param->getDeclContext();
+      auto enclosingIsolation = getActorIsolationOfContext(dc);
+      if (enclosingIsolation != defaultArgIsolation) {
+        param->diagnose(diag::isolated_default_argument_context,
+            defaultArgIsolation, enclosingIsolation);
+      }
+    }
 
     if (!ifacety->hasPlaceholder()) {
       continue;
@@ -1569,6 +1549,206 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
+/// Determines if a given TypeLoc is module qualified by checking if it's
+/// of the form `<Module>.<Type>`.
+static bool isModuleQualified(TypeRepr *repr, ModuleDecl *module) {
+  auto memberTy = dyn_cast<MemberTypeRepr>(repr);
+  if (!memberTy) {
+    return false;
+  }
+
+  // FIXME(ModQual): This needs to be updated once we have an explicit
+  //                 module qualification syntax.
+  IdentTypeRepr *baseIdent =
+      dyn_cast<IdentTypeRepr>(memberTy->getBaseComponent());
+  if (!baseIdent) {
+    return false;
+  }
+  return baseIdent->getNameRef().isSimpleName(module->getName());
+}
+
+/// If the provided type is an AttributedTypeRepr, unwraps it and provides both
+/// the casted AttributedTypeRepr and the underlying type.
+/// If the provided type is _not_ an AttributedTypeRepr, returns it unmodified
+/// and returns `nullptr` for the attributed type.
+static TypeRepr *unwrapAttributedRepr(TypeRepr *repr) {
+  if (auto attr = dyn_cast<AttributedTypeRepr>(repr)) {
+    return attr->getTypeRepr();
+  }
+  return repr;
+}
+
+/// Determines if this extension declares a conformance of a type declared
+/// outside this module to a protocol declared outside this module (but only
+/// in library evolution mode)
+///
+/// Since there can only be one conformance of a type to a given protocol,
+/// it's not supported to declare these conformances because any other framework
+/// (including the source framework) can declare this conformance, which would
+/// result in duplicate symbols at runtime.
+static void diagnoseRetroactiveConformances(
+    ExtensionDecl *ext, DiagnosticEngine &diags) {
+  ModuleDecl *module = ext->getParentModule();
+
+  // Disable this for the Foundation module because of the interplay with
+  // _ObjectiveCBridgeable.
+  if (module->isFoundationModule()) {
+    return;
+  }
+
+  // Don't warn for this if we see it in module interfaces.
+  if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+    return;
+  }
+
+  Type extendedType = ext->getExtendedType();
+  NominalTypeDecl *extendedNominalDecl = ext->getExtendedNominal();
+  if (!extendedNominalDecl) {
+    return;
+  }
+
+  ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
+
+  // If the type comes from the __ObjC clang header module, don't warn.
+  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME)) {
+    return;
+  }
+
+  // At this point, we know we're extending a type declared outside this module.
+  // We better only be conforming it to protocols declared within this module.
+  llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
+  for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
+    if (entry.getType().isNull()) {
+      continue;
+    }
+
+    auto proto =
+        dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
+    if (!proto) {  
+      continue;
+    }
+    
+    // As a fallback, to support previous language versions, also allow
+    // this through if the protocol has been explicitly module-qualified.
+    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+    if (isModuleQualified(repr, proto->getParentModule())) {
+      continue;
+    }
+
+    proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
+
+      // Get the original conformance of the extended type to this protocol.
+      auto conformanceRef = TypeChecker::conformsToProtocol(
+          extendedType, decl, ext->getParentModule());
+      if (!conformanceRef.isConcrete()) {
+
+        return TypeWalker::Action::Continue;
+      }
+      auto conformance = conformanceRef.getConcrete();
+
+      // If that conformance came from this extension, then we warn. Otherwise
+      // we will have diagnosed it on the extension that actually declares this
+      // specific conformance.
+      if (conformance->getDeclContext() != ext) {
+        return TypeWalker::Action::Continue;
+      }
+
+      // If this isn't a retroactive conformance, skip it.
+      if (!conformance->isRetroactive()) {
+        // However, if this is the protocol in the inherited type entry,
+        // check to make sure it's not erroneously marked @retroactive when it's
+        // not actually retroactive.
+        if (decl == proto && entry.isRetroactive) {
+          auto loc = entry.getTypeRepr()->findAttrLoc(TAK_retroactive);
+          bool typeIsSameModule =
+              extTypeModule->isSameModuleLookingThroughOverlays(module);
+          auto incorrectTypeName = typeIsSameModule ? 
+              extendedNominalDecl->getName() : proto->getName();
+          diags.diagnose(loc, diag::retroactive_attr_does_not_apply, 
+              incorrectTypeName)
+              .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
+          return TypeWalker::Action::Stop;
+        }
+        return TypeWalker::Action::Continue;
+      }
+
+      // If it's marked @retroactive, no need to warn.
+      if (entry.isRetroactive) {
+        return TypeWalker::Action::Continue;
+      }
+
+      // If we've come this far, we know this extension is the first declaration
+      // of the conformance of the extended type to this protocol.
+      externalProtocols.insert(decl);
+
+      return TypeWalker::Action::Continue;
+    });
+  }
+
+  // If we didn't find any violations, we're done.
+  if (externalProtocols.empty()) {
+    return;
+  }
+
+  // Diagnose the list of protocols we're introducing a conformance to.
+
+  llvm::SmallString<32> protocolList;
+  {
+    llvm::raw_svector_ostream os(protocolList);
+    llvm::interleaveComma(externalProtocols, os, [&os](ProtocolDecl *proto) {
+      os << "'" << proto->getName() << "'";
+    });
+  }
+
+  ext->diagnose(
+      diag::extension_retroactive_conformance,
+      extendedNominalDecl->getName(),
+      externalProtocols.size() == 1,
+      protocolList.str(),
+      extTypeModule->getName());
+
+  // Now build up a set of fix-its to force the user to explicitly specify the
+  // declared conformances.
+
+  auto diag = ext->diagnose(diag::extension_retroactive_conformance_silence);
+
+  // First, find if we can insert `@retroactive ` within this extension
+  // declaration to silence the warning. Each one of these gets removed from the
+  // externalProtocols list, and that might end up being all of them.
+  for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
+    auto protoDecl =
+        dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
+    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+    if (protoDecl && externalProtocols.remove(protoDecl)) {
+      llvm::SmallString<32> qualifiedName;
+      llvm::raw_svector_ostream os(qualifiedName);
+      os << "@retroactive " << protoDecl->getName();
+      diag.fixItReplace(
+        repr->getSourceRange(), qualifiedName.str());
+    }
+  }
+
+  // If we've hit every protocol declared by this extension, we're good to go.
+  if (externalProtocols.empty()) {
+    return;
+  }
+
+  // Otherwise, we've got inherited protocols that are being implicitly declared
+  // by this extension. Create explicit declarations for these with
+  // '@retroactive' conformances.
+
+  {
+    llvm::SmallString<32> additionalExtensions;
+    llvm::raw_svector_ostream os(additionalExtensions);
+    for (ProtocolDecl *proto : externalProtocols) {
+      os << "extension " << extendedNominalDecl->getName() << ": "
+        << "@retroactive " << proto->getName()
+        << " {}\n";
+    }
+    diag.fixItInsert(ext->getStartLoc(), additionalExtensions.str());
+  }
+}
+
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -1811,7 +1991,7 @@ static void diagnoseWrittenPlaceholderTypes(ASTContext &Ctx,
 static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
   auto requiredProtos = proto->getGenericSignature()->getRequiredProtocols(
       proto->getSelfInterfaceType());
-  const bool enabledNoncopyableGenerics =
+  const bool EnabledNoncopyableGenerics =
       proto->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics);
 
   for (auto *otherProto : requiredProtos) {
@@ -1819,13 +1999,15 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
     if (otherProto == proto)
       continue;
 
-    if (enabledNoncopyableGenerics) {
+    if (EnabledNoncopyableGenerics) {
       // For any protocol 'P', there is an implied requirement 'Self: Copyable',
-      // unless it was suppressed via `Self: ~Copyable`; so skip if present.
+      // unless it was suppressed via `Self: ~Copyable`. So if this suppression
+      // annotation exists yet Copyable was implied anyway, emit a diagnostic.
       if (otherProto->isSpecificProtocol(KnownProtocolKind::Copyable))
-        continue;
+        if (!proto->isNoncopyable())
+          continue; // no ~Copyable annotation
 
-      // TODO: report that something implied Copyable despite writing ~Copyable
+      // TODO(kavon): emit tailored error diagnostic to remove the ~Copyable
     }
 
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol
@@ -2266,7 +2448,7 @@ public:
     // completely type checked at that point.
     if (auto attr = VD->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = VD->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           DE.diagnose(attr->getLocation(),
                       diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
@@ -2491,7 +2673,7 @@ public:
       // accessors since this means that we cannot call mutating methods without
       // copying. We do not want to support types that one cannot define a
       // modify operation via a get/set or a modify.
-      if (var->getInterfaceType()->isNoncopyable()) {
+      if (var->getInterfaceType()->isNoncopyable(DC)) {
         if (auto *read = var->getAccessor(AccessorKind::Read)) {
           if (!read->isImplicit()) {
             if (auto *set = var->getAccessor(AccessorKind::Set)) {
@@ -2769,7 +2951,7 @@ public:
     // NonCopyableChecks
     //
 
-    if (ED->isObjC() && ED->isMoveOnly()) {
+    if (ED->isObjC() && ED->isNoncopyable()) {
       ED->diagnose(diag::noncopyable_objc_enum);
     }
     // FIXME(kavon): see if these can be integrated into other parts of Sema
@@ -2784,7 +2966,7 @@ public:
 
     // If our enum is marked as move only, it cannot be indirect or have any
     // indirect cases.
-    if (ED->isMoveOnly()) {
+    if (ED->isNoncopyable()) {
       if (ED->isIndirect())
         ED->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                      ED->getBaseIdentifier());
@@ -2793,12 +2975,6 @@ public:
           elt->diagnose(diag::noncopyable_enums_do_not_support_indirect,
                         ED->getBaseIdentifier());
         }
-      }
-
-      if (!ED->getASTContext().LangOpts.hasFeature(
-              Feature::MoveOnlyResilientTypes) &&
-          ED->isResilient()) {
-        ED->diagnose(diag::noncopyable_types_cannot_be_resilient, ED);
       }
     }
   }
@@ -2840,12 +3016,6 @@ public:
     diagnoseCopyableTypeContainingMoveOnlyType(SD);
 
     diagnoseIncompatibleProtocolsForMoveOnlyType(SD);
-
-    if (!SD->getASTContext().LangOpts.hasFeature(
-            Feature::MoveOnlyResilientTypes) &&
-        SD->isResilient() && SD->isMoveOnly()) {
-      SD->diagnose(diag::noncopyable_types_cannot_be_resilient, SD);
-    }
   }
 
   /// Check whether the given properties can be @NSManaged in this class.
@@ -2953,7 +3123,7 @@ public:
                                                    NominalTypeDecl *moveonlyType,
                                                    Type type) {
     assert(type && "got an empty type?");
-    assert(moveonlyType->isMoveOnly());
+    assert(moveonlyType->isNoncopyable());
 
     // no need to emit a diagnostic if the type itself is already problematic.
     if (type->hasError())
@@ -2975,8 +3145,11 @@ public:
   }
 
   static void diagnoseIncompatibleProtocolsForMoveOnlyType(Decl *decl) {
+    if (decl->getASTContext().LangOpts.hasFeature(Feature::NoncopyableGenerics))
+      return; // taken care of elsewhere.
+
     if (auto *nomDecl = dyn_cast<NominalTypeDecl>(decl)) {
-      if (!nomDecl->isMoveOnly())
+      if (!nomDecl->isNoncopyable())
         return;
 
       // go over the all protocols directly conformed-to by this nominal
@@ -2986,7 +3159,7 @@ public:
 
     } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       if (auto *nomDecl = extension->getExtendedNominal()) {
-        if (!nomDecl->isMoveOnly())
+        if (!nomDecl->isNoncopyable())
           return;
 
         // go over the all types directly conformed-to by the extension
@@ -3250,7 +3423,7 @@ public:
   /// Determine whether the given declaration should not have a definition.
   static bool requiresNoDefinition(Decl *decl) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      // Function with @_extern should not have a body.
+      // Function with @extern should not have a body.
       return func->getAttrs().hasAttribute<ExternAttr>();
     }
     // Everything else can have a definition.
@@ -3655,6 +3828,8 @@ public:
 
     checkInheritanceClause(ED);
 
+    diagnoseRetroactiveConformances(ED, getASTContext().Diags);
+
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
     if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
@@ -3868,7 +4043,7 @@ public:
     // that would require the ability to wrap one inside an optional
     if (CD->isFailable()) {
       if (auto *nom = CD->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           CD->diagnose(diag::noncopyable_failable_init);
         }
       }
@@ -3884,7 +4059,7 @@ public:
     if (!DD->isInvalid()) {
       auto *nom = dyn_cast<NominalTypeDecl>(
                              DD->getDeclContext()->getImplementedObjCContext());
-      if (!nom || (!isa<ClassDecl>(nom) && !nom->isMoveOnly())) {
+      if (!nom || (!isa<ClassDecl>(nom) && !nom->isNoncopyable())) {
         DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 
@@ -3892,7 +4067,7 @@ public:
       // feature flag is set.
       if (!DD->getASTContext().LangOpts.hasFeature(
               Feature::MoveOnlyEnumDeinits) &&
-          nom->isMoveOnly() && isa<EnumDecl>(nom)) {
+          nom->isNoncopyable() && isa<EnumDecl>(nom)) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
       }
 
@@ -4028,7 +4203,7 @@ void TypeChecker::checkParameterList(ParameterList *params,
     // is not move only. It is redundant.
     if (auto attr = param->getAttrs().getAttribute<NoImplicitCopyAttr>()) {
       if (auto *nom = param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
-        if (nom->isMoveOnly()) {
+        if (nom->isNoncopyable()) {
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
         }

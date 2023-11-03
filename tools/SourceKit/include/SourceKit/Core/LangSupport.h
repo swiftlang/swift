@@ -17,6 +17,7 @@
 #include "SourceKit/Support/CancellationToken.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/AST/Type.h"
+#include "swift/IDE/CodeCompletionResult.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -26,6 +27,7 @@
 #include <functional>
 #include <memory>
 #include <unordered_set>
+#include <variant>
 
 namespace llvm {
   class MemoryBuffer;
@@ -329,6 +331,35 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
   DiagnosticSeverityKind Severity = DiagnosticSeverityKind::Error;
   SmallVector<DiagnosticEntryInfoBase, 1> Notes;
 };
+
+struct SwiftSemanticToken {
+  unsigned ByteOffset;
+  unsigned Length : 24;
+  // The code-completion kinds are a good match for the semantic kinds we want.
+  // FIXME: Maybe rename CodeCompletionDeclKind to a more general concept ?
+  swift::ide::CodeCompletionDeclKind Kind : 6;
+  unsigned IsRef : 1;
+  unsigned IsSystem : 1;
+
+  SwiftSemanticToken(swift::ide::CodeCompletionDeclKind Kind,
+                     unsigned ByteOffset, unsigned Length, bool IsRef,
+                     bool IsSystem)
+      : ByteOffset(ByteOffset), Length(Length), Kind(Kind), IsRef(IsRef),
+        IsSystem(IsSystem) {}
+
+  bool getIsRef() const { return static_cast<bool>(IsRef); }
+
+  bool getIsSystem() const { return static_cast<bool>(IsSystem); }
+
+  UIdent getUIdentForKind();
+};
+
+#if !defined(_MSC_VER)
+static_assert(sizeof(SwiftSemanticToken) == 8, "Too big");
+// FIXME: MSVC doesn't pack bitfields with different underlying types.
+// Giving up to check this in MSVC for now, because static_assert is only for
+// keeping low memory usage.
+#endif
 
 struct SourceFileRange {
   /// The byte offset at which the range begins
@@ -708,6 +739,9 @@ struct CursorInfoData {
 
 /// The result type of `LangSupport::getDiagnostics`
 typedef ArrayRef<DiagnosticEntryInfo> DiagnosticsResult;
+
+/// The result of `LangSupport::getSemanticTokens`.
+typedef std::vector<SwiftSemanticToken> SemanticTokensResult;
 
 struct RangeInfo {
   UIdent RangeKind;
@@ -1102,6 +1136,13 @@ public:
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) = 0;
+
+  virtual void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, llvm::Optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)>
+          Receiver) = 0;
 
   virtual void
   getNameInfo(StringRef PrimaryFilePath, StringRef InputBufferName,

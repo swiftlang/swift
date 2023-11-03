@@ -112,6 +112,24 @@ enum class ExposureKind: uint8_t {
 enum : unsigned { NumExposureKindBits =
   countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind)) };
   
+/// This enum represents the possible values of the @extern attribute.
+enum class ExternKind: uint8_t {
+  /// Reference an externally defined C function.
+  /// The imported function has C function pointer representation,
+  /// and is called using the C calling convention.
+  C,
+  /// Reference an externally defined function through WebAssembly's
+  /// import mechanism.
+  /// This does not specify the calling convention and can be used
+  /// with other extern kinds together.
+  /// Effectively, this is no-op on non-WebAssembly targets.
+  Wasm,
+  Last_ExternKind = Wasm
+};
+
+enum : unsigned { NumExternKindBits =
+  countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
+
 enum DeclAttrKind : unsigned {
 #define DECL_ATTR(_, NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"
