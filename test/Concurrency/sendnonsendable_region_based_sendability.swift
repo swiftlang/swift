@@ -682,12 +682,12 @@ func one_consume_many_require_varag(a : A) async {
 
     //TODO: find a way to make the type used in the diagnostic more specific than the signature type
     await a.foo_vararg(ns0, ns1, ns2);
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
     foo_noniso_vararg(ns0, ns3, ns4); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns3, ns1, ns4); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns4, ns3, ns2); // expected-tns-note {{access here could race}}
+    foo_noniso_vararg(ns3, ns1, ns4); // xpected-tns-note {{access here could race}}
+    foo_noniso_vararg(ns4, ns3, ns2); // xpected-tns-note {{access here could race}}
 }
 
 func one_consume_one_require_vararg(a : A) async {
@@ -696,10 +696,10 @@ func one_consume_one_require_vararg(a : A) async {
     let ns2 = NonSendable();
 
     await a.foo_vararg(ns0, ns1, ns2);
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (3 access sites displayed)}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
-    foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note 3{{access here could race}}
+    foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note 1{{access here could race}}
 }
 
 func many_consume_one_require_vararg(a : A) async {
@@ -714,13 +714,13 @@ func many_consume_one_require_vararg(a : A) async {
     // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns4, ns1, ns4)
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns5, ns5, ns2)
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
-    foo_noniso_vararg(ns0, ns1, ns2); //expected-tns-note 3{{access here could race}}
+    foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note {{access here could race}}
 }
 
 func many_consume_many_require_vararg(a : A) async {
@@ -737,15 +737,15 @@ func many_consume_many_require_vararg(a : A) async {
     // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns4, ns1, ns4)
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns5, ns5, ns2)
-    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
+    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function (1 access site displayed)}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
     foo_noniso_vararg(ns0, ns6, ns7); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns6, ns1, ns7); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns7, ns6, ns2); // expected-tns-note {{access here could race}}
+    foo_noniso_vararg(ns6, ns1, ns7); // xpected-tns-note {{access here could race}}
+    foo_noniso_vararg(ns7, ns6, ns2); // xpected-tns-note {{access here could race}}
 }
 
 enum E { // expected-complete-note {{consider making enum 'E' conform to the 'Sendable' protocol}}

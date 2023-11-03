@@ -65,7 +65,8 @@ struct Region {
 
   static Region transferred() { return Region(-1); }
 };
-}
+
+} // namespace PartitionPrimitives
 
 using namespace PartitionPrimitives;
 
@@ -180,23 +181,43 @@ public:
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  void print(llvm::raw_ostream &os) const {
+  void print(llvm::raw_ostream &os, bool extraSpace = false) const {
     switch (OpKind) {
-    case PartitionOpKind::Assign:
-      os << "assign %%" << OpArgs[0] << " = %%" << OpArgs[1];
+    case PartitionOpKind::Assign: {
+      constexpr static char extraSpaceLiteral[10] = "      ";
+      os << "assign ";
+      if (extraSpace)
+        os << extraSpaceLiteral;
+      os << "%%" << OpArgs[0] << " = %%" << OpArgs[1];
       break;
+    }
     case PartitionOpKind::AssignFresh:
       os << "assign_fresh %%" << OpArgs[0];
       break;
-    case PartitionOpKind::Transfer:
-      os << "transfer %%" << OpArgs[0];
+    case PartitionOpKind::Transfer: {
+      constexpr static char extraSpaceLiteral[10] = "    ";
+      os << "transfer ";
+      if (extraSpace)
+        os << extraSpaceLiteral;
+      os << "%%" << OpArgs[0];
       break;
-    case PartitionOpKind::Merge:
-      os << "merge %%" << OpArgs[0] << " with %%" << OpArgs[1];
+    }
+    case PartitionOpKind::Merge: {
+      constexpr static char extraSpaceLiteral[10] = "       ";
+      os << "merge ";
+      if (extraSpace)
+        os << extraSpaceLiteral;
+      os << "%%" << OpArgs[0] << " with %%" << OpArgs[1];
       break;
-    case PartitionOpKind::Require:
-      os << "require %%" << OpArgs[0];
+    }
+    case PartitionOpKind::Require: {
+      constexpr static char extraSpaceLiteral[10] = "     ";
+      os << "require ";
+      if (extraSpace)
+        os << extraSpaceLiteral;
+      os << "%%" << OpArgs[0];
       break;
+    }
     }
     os << ": " << *getSourceInst(true);
   }
@@ -224,6 +245,8 @@ static void horizontalUpdate(std::map<Element, Region> &map, Element key,
       map.insert_or_assign(otherKey, val);
 }
 
+struct PartitionOpEvaluator;
+
 /// A map from Element -> Region that represents the current partition set.
 ///
 ///
@@ -232,6 +255,7 @@ public:
   /// A class defined in PartitionUtils unittest used to grab state from
   /// Partition without exposing it to other users.
   struct PartitionTester;
+  friend PartitionOpEvaluator;
 
 private:
   /// Label each index with a non-negative (unsigned) label if it is associated
@@ -375,125 +399,6 @@ public:
 
     // fst_reduced is now the join
     return fst_reduced;
-  }
-
-  /// Apply the passed PartitionOp to this partition, performing its action.  A
-  /// `handleFailure` closure can optionally be passed in that will be called if
-  /// a transferred region is required. The closure is given the PartitionOp
-  /// that failed, and the index of the SIL value that was required but
-  /// transferred. Additionally, a list of "nontransferrable" indices can be
-  /// passed in along with a handleTransferNonTransferrable closure. In the
-  /// event that a region containing one of the nontransferrable indices is
-  /// transferred, the closure will be called with the offending transfer.
-  void apply(
-      PartitionOp op,
-      llvm::function_ref<void(const PartitionOp &, Element)> handleFailure =
-          [](const PartitionOp &, Element) {},
-      ArrayRef<Element> nontransferrables = {},
-      llvm::function_ref<void(const PartitionOp &, Element)>
-          handleTransferNonTransferrable = [](const PartitionOp &, Element) {},
-      llvm::function_ref<bool(Element)> isActorDerived = nullptr) {
-
-    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
-                                     op.print(llvm::dbgs()));
-    REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
-                                     print(llvm::dbgs()));
-    SWIFT_DEFER {
-      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
-                                       print(llvm::dbgs()));
-    };
-    switch (op.OpKind) {
-    case PartitionOpKind::Assign:
-      assert(op.OpArgs.size() == 2 &&
-             "Assign PartitionOp should be passed 2 arguments");
-      assert(labels.count(op.OpArgs[1]) &&
-             "Assign PartitionOp's source argument should be already tracked");
-      // if assigning to a missing region, handle the failure
-      if (isTransferred(op.OpArgs[1]))
-        handleFailure(op, op.OpArgs[1]);
-
-      labels.insert_or_assign(op.OpArgs[0], labels.at(op.OpArgs[1]));
-
-      // assignment could have invalidated canonicality of either the old region
-      // of op.OpArgs[0] or the region of op.OpArgs[1], or both
-      canonical = false;
-      break;
-    case PartitionOpKind::AssignFresh:
-      assert(op.OpArgs.size() == 1 &&
-             "AssignFresh PartitionOp should be passed 1 argument");
-
-      // map index op.OpArgs[0] to a fresh label
-      labels.insert_or_assign(op.OpArgs[0], fresh_label);
-
-      // increment the fresh label so it remains fresh
-      fresh_label = Region(fresh_label + 1);
-      canonical = false;
-      break;
-    case PartitionOpKind::Transfer: {
-      assert(op.OpArgs.size() == 1 &&
-             "Transfer PartitionOp should be passed 1 argument");
-      assert(labels.count(op.OpArgs[0]) &&
-             "Transfer PartitionOp's argument should already be tracked");
-
-      // check if any nontransferrables are transferred here, and handle the
-      // failure if so
-      for (Element nonTransferrable : nontransferrables) {
-        assert(
-            labels.count(nonTransferrable) &&
-            "nontransferrables should be function args and self, and therefore"
-            "always present in the label map because of initialization at "
-            "entry");
-        if (!isTransferred(nonTransferrable) &&
-            labels.at(nonTransferrable) == labels.at(op.OpArgs[0])) {
-          handleTransferNonTransferrable(op, nonTransferrable);
-          break;
-        }
-      }
-
-      // If this value is actor derived or if any elements in its region are
-      // actor derived, we need to treat as nontransferrable.
-      if (isActorDerived && isActorDerived(op.OpArgs[0]))
-        return handleTransferNonTransferrable(op, op.OpArgs[0]);
-      Region elementRegion = labels.at(op.OpArgs[0]);
-      if (llvm::any_of(labels,
-                       [&](const std::pair<Element, Region> &pair) -> bool {
-                         if (pair.second != elementRegion)
-                           return false;
-                         return isActorDerived && isActorDerived(pair.first);
-                       }))
-        return handleTransferNonTransferrable(op, op.OpArgs[0]);
-
-      // Ensure if the region is transferred...
-      if (!isTransferred(op.OpArgs[0]))
-        // that all elements associated with the region are marked as
-        // transferred.
-        horizontalUpdate(labels, op.OpArgs[0], Region::transferred());
-      break;
-    }
-    case PartitionOpKind::Merge:
-      assert(op.OpArgs.size() == 2 &&
-             "Merge PartitionOp should be passed 2 arguments");
-      assert(labels.count(op.OpArgs[0]) && labels.count(op.OpArgs[1]) &&
-             "Merge PartitionOp's arguments should already be tracked");
-
-      // if attempting to merge a transferred region, handle the failure
-      if (isTransferred(op.OpArgs[0]))
-        handleFailure(op, op.OpArgs[0]);
-      if (isTransferred(op.OpArgs[1]))
-        handleFailure(op, op.OpArgs[1]);
-
-      merge(op.OpArgs[0], op.OpArgs[1]);
-      break;
-    case PartitionOpKind::Require:
-      assert(op.OpArgs.size() == 1 &&
-             "Require PartitionOp should be passed 1 argument");
-      assert(labels.count(op.OpArgs[0]) &&
-             "Require PartitionOp's argument should already be tracked");
-      if (isTransferred(op.OpArgs[0]))
-        handleFailure(op, op.OpArgs[0]);
-    }
-
-    assert(is_canonical_correct());
   }
 
   /// Return a vector of the transferred values in this partition.
@@ -642,6 +547,186 @@ private:
 
     assert(is_canonical_correct());
     assert(labels.at(fst) == labels.at(snd));
+  }
+};
+
+/// A data structure that applies a series of PartitionOps to a single Partition
+/// that it modifies.
+///
+/// Apply the passed PartitionOp to this partition, performing its action.  A
+/// `handleFailure` closure can optionally be passed in that will be called if
+/// a transferred region is required. The closure is given the PartitionOp
+/// that failed, and the index of the SIL value that was required but
+/// transferred. Additionally, a list of "nontransferrable" indices can be
+/// passed in along with a handleTransferNonTransferrable closure. In the
+/// event that a region containing one of the nontransferrable indices is
+/// transferred, the closure will be called with the offending transfer.
+struct PartitionOpEvaluator {
+  Partition &p;
+
+  /// If this PartitionOp evaluator should emit log statements.
+  bool emitLog = true;
+
+  /// If set to a non-null function, then this callback will be called if we
+  /// discover a transferred value was used after it was transferred.
+  std::function<void(const PartitionOp &, Element)> failureCallback = nullptr;
+
+  /// A list of elements that cannot be transferred. Whenever we transfer, we
+  /// check this list to see if we are transferring the element and then call
+  /// transferNonTransferrableCallback. This should consist only of function
+  /// arguments.
+  ArrayRef<Element> nonTransferrableElements = {};
+
+  /// If set to a non-null function_ref, this is called if we detect a never
+  /// transferred element that was passed to a transfer instruction.
+  std::function<void(const PartitionOp &, Element)>
+      transferredNonTransferrableCallback = nullptr;
+
+  /// If set to a non-null function_ref, then this is used to determine if an
+  /// element is actor derived. If we determine that a region containing such an
+  /// element is transferred, we emit an error since actor regions cannot be
+  /// transferred.
+  std::function<bool(Element)> isActorDerivedCallback = nullptr;
+
+  PartitionOpEvaluator(Partition &p) : p(p) {}
+
+  /// A wrapper around the failure callback that checks if it is nullptr.
+  void handleFailure(const PartitionOp &op, Element elt) const {
+    if (!failureCallback)
+      return;
+    failureCallback(op, elt);
+  }
+
+  /// A wrapper around transferNonTransferrableCallback that only calls it if it
+  /// is not null.
+  void handleTransferNonTransferrable(const PartitionOp &op,
+                                      Element elt) const {
+    if (!transferredNonTransferrableCallback)
+      return;
+    transferredNonTransferrableCallback(op, elt);
+  }
+
+  /// A wrapper around isActorDerivedCallback that returns false if
+  /// isActorDerivedCallback is nullptr and otherwise returns
+  /// isActorDerivedCallback().
+  bool isActorDerived(Element elt) const {
+    return bool(isActorDerivedCallback) && isActorDerivedCallback(elt);
+  }
+
+  /// Apply \p op to the partition op.
+  void apply(PartitionOp op) {
+    if (emitLog) {
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
+                                       op.print(llvm::dbgs()));
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
+                                       p.print(llvm::dbgs()));
+    }
+    SWIFT_DEFER {
+      if (emitLog) {
+        REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
+                                         p.print(llvm::dbgs()));
+      }
+    };
+
+    switch (op.getKind()) {
+    case PartitionOpKind::Assign:
+      assert(op.getOpArgs().size() == 2 &&
+             "Assign PartitionOp should be passed 2 arguments");
+      assert(p.labels.count(op.getOpArgs()[1]) &&
+             "Assign PartitionOp's source argument should be already tracked");
+      // if assigning to a missing region, handle the failure
+      if (p.isTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1]);
+
+      p.labels.insert_or_assign(op.getOpArgs()[0],
+                                p.labels.at(op.getOpArgs()[1]));
+
+      // assignment could have invalidated canonicality of either the old region
+      // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
+      p.canonical = false;
+      break;
+    case PartitionOpKind::AssignFresh:
+      assert(op.getOpArgs().size() == 1 &&
+             "AssignFresh PartitionOp should be passed 1 argument");
+
+      // map index op.getOpArgs()[0] to a fresh label
+      p.labels.insert_or_assign(op.getOpArgs()[0], p.fresh_label);
+
+      // increment the fresh label so it remains fresh
+      p.fresh_label = Region(p.fresh_label + 1);
+      p.canonical = false;
+      break;
+    case PartitionOpKind::Transfer: {
+      assert(op.getOpArgs().size() == 1 &&
+             "Transfer PartitionOp should be passed 1 argument");
+      assert(p.labels.count(op.getOpArgs()[0]) &&
+             "Transfer PartitionOp's argument should already be tracked");
+
+      // check if any nontransferrables are transferred here, and handle the
+      // failure if so
+      for (Element nonTransferrable : nonTransferrableElements) {
+        assert(
+            p.labels.count(nonTransferrable) &&
+            "nontransferrables should be function args and self, and therefore"
+            "always present in the label map because of initialization at "
+            "entry");
+        if (!p.isTransferred(nonTransferrable) &&
+            p.labels.at(nonTransferrable) == p.labels.at(op.getOpArgs()[0])) {
+          handleTransferNonTransferrable(op, nonTransferrable);
+          break;
+        }
+      }
+
+      // If this value is actor derived or if any elements in its region are
+      // actor derived, we need to treat as nontransferrable.
+      if (isActorDerived(op.getOpArgs()[0]))
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+      Region elementRegion = p.labels.at(op.getOpArgs()[0]);
+      if (llvm::any_of(p.labels,
+                       [&](const std::pair<Element, Region> &pair) -> bool {
+                         if (pair.second != elementRegion)
+                           return false;
+                         return isActorDerived(pair.first);
+                       }))
+        return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
+
+      // Ensure if the region is transferred...
+      if (!p.isTransferred(op.getOpArgs()[0]))
+        // that all elements associated with the region are marked as
+        // transferred.
+        horizontalUpdate(p.labels, op.getOpArgs()[0], Region::transferred());
+      break;
+    }
+    case PartitionOpKind::Merge:
+      assert(op.getOpArgs().size() == 2 &&
+             "Merge PartitionOp should be passed 2 arguments");
+      assert(p.labels.count(op.getOpArgs()[0]) &&
+             p.labels.count(op.getOpArgs()[1]) &&
+             "Merge PartitionOp's arguments should already be tracked");
+
+      // if attempting to merge a transferred region, handle the failure
+      if (p.isTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0]);
+      if (p.isTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1]);
+
+      p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
+      break;
+    case PartitionOpKind::Require:
+      assert(op.getOpArgs().size() == 1 &&
+             "Require PartitionOp should be passed 1 argument");
+      assert(p.labels.count(op.getOpArgs()[0]) &&
+             "Require PartitionOp's argument should already be tracked");
+      if (p.isTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0]);
+    }
+
+    assert(p.is_canonical_correct());
+  }
+
+  void apply(std::initializer_list<PartitionOp> ops) {
+    for (auto &o : ops)
+      apply(o);
   }
 };
 
