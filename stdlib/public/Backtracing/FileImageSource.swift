@@ -60,12 +60,15 @@ class FileImageSource: ImageSource {
 
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
-    let size = buffer.count * MemoryLayout<T>.stride
-    guard Int(addr) < _mapping.count && _mapping.count - Int(addr) >= size else {
-      throw FileImageSourceError.outOfRangeRead
-    }
-    let slice = _mapping[Int(addr)...]
-    _ = buffer.withMemoryRebound(to: UInt8.self) { byteBuf in
+    let start = Int(addr)
+    _ = try buffer.withMemoryRebound(to: UInt8.self) { byteBuf in
+      guard _mapping.indices.contains(start) else {
+        throw FileImageSourceError.outOfRangeRead
+      }
+      let slice = _mapping[start...]
+      guard slice.count >= byteBuf.count else {
+        throw FileImageSourceError.outOfRangeRead
+      }
       byteBuf.update(from: slice)
     }
   }
