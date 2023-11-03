@@ -8650,7 +8650,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
-  if (M->lookupConformance(resolvedTy, protocol))
+  if (M->lookupConformance(resolvedTy, protocol, /*allowMissing=*/true))
     return SolutionKind::Solved;
 
   // If the type doesn't conform, let's check whether
