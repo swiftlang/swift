@@ -265,13 +265,17 @@ private func encodeString(_ string: String) -> [UInt8] {
 }
 
 private func encodeULEB(_ value: UInt) -> [UInt8] {
+    guard value > 0 else {
+        return [0]
+    }
+
     var bytes: [UInt8] = []
     var buffer = value
     while buffer > 0 {
         var byte = UInt8(buffer & 0b01111111)
         buffer >>= 7
         if buffer > 0 {
-            byte &= 0b1000000
+            byte |= 0b10000000
         }
         bytes.append(byte)
     }
