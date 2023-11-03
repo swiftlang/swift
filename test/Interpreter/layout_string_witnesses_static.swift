@@ -770,6 +770,43 @@ func testSinglePayloadEnumManyXIEmpty() {
 
 testSinglePayloadEnumManyXIEmpty()
 
+func testEnumWithExistential() {
+    // Regression test for rdar://117755666
+    // A missing call to memcpy in `handleSingleRefCountInitWithCopy`
+    // was causing unexpected behavior like wrong enum cases, crashes etc.
+    // Without the fix, this test would not release the references.
+    struct SomeProtocolImpl: SomeProtocol {
+        let x: AnyObject
+    }
+
+    let ptr = UnsafeMutablePointer<SinglePayloadEnumExistential>.allocate(capacity: 1)
+
+    do {
+        let x = SinglePayloadEnumExistential.b
+        testInit(ptr, to: x)
+    }
+
+    do {
+        var z = SinglePayloadEnumExistential.a(SomeProtocolImpl(x: SimpleClass(x: 23)), SimpleClass(x: 43))
+
+        // CHECK-NEXT: Before deinit
+        print("Before deinit")
+
+        testAssignCopy(ptr, from: &z)
+    }
+
+    // CHECK-NEXT: Before deinit
+    print("Before deinit")
+
+    // CHECK-NEXT: SimpleClass deinitialized!
+    // CHECK-NEXT: SimpleClass deinitialized!
+    testDestroy(ptr)
+
+    ptr.deallocate()
+}
+
+testEnumWithExistential()
+
 #if os(macOS)
 func testObjc() {
     let ptr = UnsafeMutablePointer<ObjcWrapper>.allocate(capacity: 1)
