@@ -26,6 +26,8 @@ protocol SyncProtocol {
 
   func syncMethodF(param: String) -> Int // expected-note{{mark the protocol requirement 'syncMethodF(param:)' 'async' to allow actor-isolated conformances}}{{34-34= async}}
 
+  func syncMethodG() throws -> Void // expected-note{{mark the protocol requirement 'syncMethodG()' 'async' to allow actor-isolated conformances}}{{22-22=async }}
+
   subscript (index: Int) -> String { get } // expected-note{{'subscript(_:)' declared here}}
 
   static func staticMethod()
@@ -55,6 +57,10 @@ actor OtherActor: SyncProtocol {
   func syncMethodF(param: String) -> Int { 5 }
   // expected-error@-1{{actor-isolated instance method 'syncMethodF(param:)' cannot be used to satisfy nonisolated protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodF(param:)' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
+
+  func syncMethodG() { }
+  // expected-error@-1{{actor-isolated instance method 'syncMethodG()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-2{{add 'nonisolated' to 'syncMethodG()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 
   subscript (index: Int) -> String { "\(index)" }
   // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy nonisolated protocol requirement}}
