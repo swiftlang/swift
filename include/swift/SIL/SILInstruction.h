@@ -6396,6 +6396,8 @@ public:
     return operand->getOperandNumber() + 1;
   }
 
+  unsigned getNumElements() const { return getTupleType()->getNumElements(); }
+
   TupleType *getTupleType() const {
     return getDest().get()->getType().getRawASTType()->castTo<TupleType>();
   }
