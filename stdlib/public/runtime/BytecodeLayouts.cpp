@@ -281,7 +281,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     if (SWIFT_LIKELY(xiType)) {
       auto tag = xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(addr + addrOffset + xiTagBytesOffset),
-          numEmptyCases);
+          xiType->vw_getNumExtraInhabitants());
       if (SWIFT_LIKELY(tag == 0)) {
         return;
       }
@@ -501,7 +501,7 @@ static void singlePayloadEnumGeneric(const Metadata *metadata,
     if (SWIFT_LIKELY(xiType)) {
       auto tag = xiType->vw_getEnumTagSinglePayload(
           (const OpaqueValue *)(src + addrOffset + xiTagBytesOffset),
-          numEmptyCases);
+          xiType->vw_getNumExtraInhabitants());
       if (SWIFT_LIKELY(tag == 0)) {
         return;
       }
@@ -1317,7 +1317,12 @@ static void handleSingleRefCountInitWithCopy(const Metadata *metadata,
                                         uint8_t *dest,
                                         uint8_t *src) {
   auto tag = reader.readBytes<uint64_t>();
-  addrOffset += (tag & ~(0xFFULL << 56));
+  auto _addrOffset = addrOffset;
+  auto offset = (tag & ~(0xFFULL << 56));
+  if (SWIFT_UNLIKELY(offset)) {
+    memcpy(dest + _addrOffset, src + _addrOffset, offset);
+  }
+  addrOffset = _addrOffset + offset;
   tag >>= 56;
   if (SWIFT_UNLIKELY(tag == 0)) {
     return;
@@ -1490,13 +1495,13 @@ static void singlePayloadEnumGenericAssignWithCopy(const Metadata *metadata,
       if (!srcTag) {
         srcTag = xiType->vw_getEnumTagSinglePayload(
             (const OpaqueValue *)(src + addrOffset + xiTagBytesOffset),
-            numEmptyCases);
+            xiType->vw_getNumExtraInhabitants());
       }
 
       if (!destTag) {
         destTag = xiType->vw_getEnumTagSinglePayload(
             (const OpaqueValue *)(dest + addrOffset + xiTagBytesOffset),
-            numEmptyCases);
+            xiType->vw_getNumExtraInhabitants());
       }
     }
 
@@ -2059,7 +2064,8 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
                           uint8_t numExtraTagBytes) -> unsigned {
     if (xiType) {
       return xiType->vw_getEnumTagSinglePayload(
-          (const OpaqueValue *)(addr + xiTagBytesOffset), numEmptyCases);
+          (const OpaqueValue *)(addr + xiTagBytesOffset),
+          xiType->vw_getNumExtraInhabitants());
     }
 
     return 0;
