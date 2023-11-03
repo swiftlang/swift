@@ -2622,7 +2622,6 @@ extension FixedWidthInteger {
   }
 }
 
-@_unavailableInEmbedded
 extension FixedWidthInteger {
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.
@@ -2695,6 +2694,7 @@ extension FixedWidthInteger {
   ///   `range` must not be empty.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
+  @_unavailableInEmbedded
   public static func random(in range: Range<Self>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
@@ -2767,6 +2767,7 @@ extension FixedWidthInteger {
   /// - Parameter range: The range in which to create a random value.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
+  @_unavailableInEmbedded
   public static func random(in range: ClosedRange<Self>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
@@ -3357,7 +3358,6 @@ extension FixedWidthInteger {
   }
 }
 
-@_unavailableInEmbedded
 extension FixedWidthInteger {
   @inlinable
   public static func _random<R: RandomNumberGenerator>(
