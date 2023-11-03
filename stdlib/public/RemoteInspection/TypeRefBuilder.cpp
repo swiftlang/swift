@@ -471,6 +471,44 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeInfo(
   return nullptr;
 }
 
+/// A builtin type descriptor implementation that wraps a reflection builtin
+/// type descriptor.
+class BuiltinTypeDescriptorImpl : public BuiltinTypeDescriptorBase {
+  RemoteRef<BuiltinTypeDescriptor> BTD;
+  TypeRefBuilder &Builder;
+
+public:
+  BuiltinTypeDescriptorImpl(RemoteRef<BuiltinTypeDescriptor> BTD,
+                            TypeRefBuilder &Builder)
+      : BuiltinTypeDescriptorBase(BTD->Size, BTD->getAlignment(),
+                                       BTD->Stride, BTD->NumExtraInhabitants,
+                                       BTD->isBitwiseTakable()),
+        BTD(BTD), Builder(Builder) {}
+
+  ~BuiltinTypeDescriptorImpl() override {}
+
+  StringRef getMangledTypeName() override {
+    return Builder.getTypeRefString(Builder.readTypeRef(BTD, BTD->TypeName));
+  };
+};
+
+std::unique_ptr<BuiltinTypeDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeDescriptor(
+    const TypeRef *TR) {
+  if (auto BTI = getBuiltinTypeInfo(TR))
+    return std::make_unique<BuiltinTypeDescriptorImpl>(BTI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<BuiltinTypeDescriptorBase>
+TypeRefBuilder::getBuiltinTypeDescriptor(const TypeRef *TR) {
+  for (auto *DF : getDescriptorFinders())
+    if (auto descriptor = DF->getBuiltinTypeDescriptor(TR))
+      return descriptor;
+
+  return nullptr;
+}
+
 RemoteRef<MultiPayloadEnumDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
     const TypeRef *TR) {

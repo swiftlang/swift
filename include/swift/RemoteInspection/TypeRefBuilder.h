@@ -20,6 +20,7 @@
 
 #include "swift/Remote/ExternalTypeRefCache.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/TypeLowering.h"
@@ -409,10 +410,9 @@ private:
 
   TypeConverter TC;
 
-#define TYPEREF(Id, Parent)                                                    \
-  std::unordered_map<TypeRefID, const Id##TypeRef *, TypeRefID::Hash,          \
-                     TypeRefID::Equal>                                         \
-      Id##TypeRefs;
+#define TYPEREF(Id, Parent) \
+  std::unordered_map<TypeRefID, const Id##TypeRef *, \
+                     TypeRefID::Hash, TypeRefID::Equal> Id##TypeRefs;
 #include "swift/RemoteInspection/TypeRefs.def"
 
 public:
@@ -453,7 +453,10 @@ public:
     }
   };
 
-  struct ReflectionTypeDescriptorFinder {
+  /// The default descriptor finder implementation that find descriptors from
+  /// reflection metadata.
+  struct ReflectionTypeDescriptorFinder
+      : public swift::reflection::DescriptorFinder {
     ReflectionTypeDescriptorFinder(TypeRefBuilder &Builder,
                                    remote::ExternalTypeRefCache *externalCache)
         : Builder(Builder), ExternalTypeRefCache(externalCache) {}
@@ -476,8 +479,8 @@ public:
     /// Load unsubstituted field types for a nominal type.
     RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
 
-    /// Get the primitive type lowering for a builtin type.
-    RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+    std::unique_ptr<BuiltinTypeDescriptorBase>
+    getBuiltinTypeDescriptor(const TypeRef *TR) override;
 
     /// Get the raw capture descriptor for a remote capture descriptor
     /// address.
@@ -506,7 +509,11 @@ public:
     llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
 
   private:
+    /// Get the primitive type lowering for a builtin type.
+    RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+
     void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
+
     llvm::Optional<RemoteRef<FieldDescriptor>>
     findFieldDescriptorAtIndex(size_t Index, const std::string &MangledName);
 
@@ -548,6 +555,8 @@ public:
 
     TypeRefBuilder &Builder;
 
+    /// The external typeref cache for looking up field descriptor locators in
+    /// an external file.
     remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
 
   public:
@@ -844,7 +853,6 @@ public:
 
   BuiltTypeDecl createTypeDecl(std::string &&mangledName, bool &typeAlias) {
     return {{(mangledName)}};
-    ;
   }
 
   BuiltProtocolDecl createProtocolDecl(Node *node) {
@@ -1409,7 +1417,20 @@ private:
   using IntVariableReader =
       std::function<llvm::Optional<uint64_t>(std::string, unsigned)>;
 
+  /// The external type descriptor finder injected into this TypeRefBuilder, for
+  /// lookup of descriptors outside of metadata.
+  DescriptorFinder *EDF;
+
+  /// The type descriptor finder that looks up descriptors from metadata.
   ReflectionTypeDescriptorFinder RDF;
+
+  /// Returns the descriptor finders in the order that they should be consulted
+  /// in.
+  llvm::SmallVector<DescriptorFinder *, 2> getDescriptorFinders() {
+    if (EDF)
+      return {EDF, &RDF};
+    return {&RDF};
+  }
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -1428,8 +1449,9 @@ private:
 public:
   template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
-                 remote::ExternalTypeRefCache *externalCache = nullptr)
-      : TC(*this), RDF(*this, externalCache),
+                 remote::ExternalTypeRefCache *externalCache = nullptr,
+                 DescriptorFinder *externalDescriptorFinder = nullptr)
+      : TC(*this), EDF(externalDescriptorFinder), RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)
@@ -1519,10 +1541,11 @@ public:
                         remote::TypeInfoProvider *ExternalTypeInfo,
                         std::vector<FieldTypeInfo> &Fields);
 
-  /// Get the primitive type lowering for a builtin type.
-  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR) {
-    return RDF.getBuiltinTypeInfo(TR);
-  }
+  /// Get the generic interface version of a builtin type descriptor. This
+  /// descriptor may originate from reflection metadata or from an external
+  /// source.
+  std::unique_ptr<BuiltinTypeDescriptorBase>
+  getBuiltinTypeDescriptor(const TypeRef *TR);
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
@@ -1542,6 +1565,9 @@ public:
   }
 
 private:
+  /// Get the primitive type lowering for a builtin type.
+  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+
   llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
 
 public:
