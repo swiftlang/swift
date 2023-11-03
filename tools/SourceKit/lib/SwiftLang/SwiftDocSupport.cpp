@@ -1344,60 +1344,41 @@ void RequestRefactoringEditConsumer::handleDiagnostic(
   Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
-class RequestRenameRangeConsumer::Implementation {
-  CategorizedRenameRangesReceiver Receiver;
-  std::string ErrBuffer;
-  llvm::raw_string_ostream OS;
-  std::vector<CategorizedRenameRanges> CategorizedRanges;
-
-public:
-  PrintingDiagnosticConsumer DiagConsumer;
-
-public:
-  Implementation(CategorizedRenameRangesReceiver Receiver)
-      : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
-
-  ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
-      return;
-    }
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(CategorizedRanges));
-  }
-
-  void accept(SourceManager &SM, RegionType RegionType,
-              ArrayRef<ide::RenameRangeDetail> Ranges) {
-    CategorizedRenameRanges Results;
-    Results.Category = SwiftLangSupport::getUIDForRegionType(RegionType);
-    for (const auto &R : Ranges) {
-      SourceKit::RenameRangeDetail Result;
-      std::tie(Result.StartLine, Result.StartColumn) =
-          SM.getLineAndColumnInBuffer(R.Range.getStart());
-      std::tie(Result.EndLine, Result.EndColumn) =
-          SM.getLineAndColumnInBuffer(R.Range.getEnd());
-      Result.ArgIndex = R.Index;
-      Result.Kind =
-          SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
-      Results.Ranges.push_back(std::move(Result));
-    }
-    CategorizedRanges.push_back(std::move(Results));
-  }
-};
-
 RequestRenameRangeConsumer::RequestRenameRangeConsumer(
     CategorizedRenameRangesReceiver Receiver)
-    : Impl(*new Implementation(Receiver)) {}
-RequestRenameRangeConsumer::~RequestRenameRangeConsumer() { delete &Impl; }
+    : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
+
+RequestRenameRangeConsumer::~RequestRenameRangeConsumer() {
+  if (DiagConsumer.didErrorOccur()) {
+    Receiver(
+        RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
+    return;
+  }
+  Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(
+      CategorizedRanges));
+}
 
 void RequestRenameRangeConsumer::accept(
     SourceManager &SM, RegionType RegionType,
     ArrayRef<ide::RenameRangeDetail> Ranges) {
-  Impl.accept(SM, RegionType, Ranges);
+  CategorizedRenameRanges Results;
+  Results.Category = SwiftLangSupport::getUIDForRegionType(RegionType);
+  for (const auto &R : Ranges) {
+    SourceKit::RenameRangeDetail Result;
+    std::tie(Result.StartLine, Result.StartColumn) =
+        SM.getLineAndColumnInBuffer(R.Range.getStart());
+    std::tie(Result.EndLine, Result.EndColumn) =
+        SM.getLineAndColumnInBuffer(R.Range.getEnd());
+    Result.ArgIndex = R.Index;
+    Result.Kind = SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
+    Results.Ranges.push_back(std::move(Result));
+  }
+  CategorizedRanges.push_back(std::move(Results));
 }
 
 void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
                                                   const DiagnosticInfo &Info) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Info);
+  DiagConsumer.handleDiagnostic(SM, Info);
 }
 
 static NameUsage getNameUsage(RenameType Type) {
