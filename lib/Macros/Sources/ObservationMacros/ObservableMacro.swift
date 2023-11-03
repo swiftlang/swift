@@ -202,7 +202,7 @@ extension ObservableMacro: MemberMacro {
       return []
     }
     
-    let observableType = identified.name
+    let observableType = identified.name.trimmed
     
     if declaration.isEnum {
       // enumerations cannot store properties
