@@ -862,10 +862,6 @@ public:
     return getSILBoxFieldType(fn).isMoveOnly();
   }
 
-  bool isBoxedNonCopyableType(const SILFunction &fn) const {
-    return isBoxedNonCopyableType(&fn);
-  }
-
   bool isBoxedMoveOnlyWrappedType(const SILFunction *fn) const {
     if (!this->is<SILBoxType>())
       return false;

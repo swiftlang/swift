@@ -387,8 +387,9 @@ AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
   sharedUInt8().AllocBoxInst.reflection = reflection;
 
   // If we have a noncopyable type, always set uses mvoeable value debug info.
-  usesMoveableValueDebugInfo |=
-      BoxType->getLayout()->getFields()[0].getObjectType().isMoveOnly();
+  auto fieldTy = getSILBoxFieldType(F.getTypeExpansionContext(), BoxType,
+                                    F.getModule().Types, 0);
+  usesMoveableValueDebugInfo |= fieldTy.isMoveOnly();
 
   sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
       usesMoveableValueDebugInfo;

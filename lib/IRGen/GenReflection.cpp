@@ -396,7 +396,7 @@ getTypeRefImpl(IRGenModule &IGM,
     useFlatUnique = true;
     break;
     
-  case MangledTypeRefRole::FieldMetadata:
+  case MangledTypeRefRole::FieldMetadata: {
     // We want to keep fields of noncopyable type from being exposed to
     // in-process runtime reflection libraries in older Swift runtimes, since
     // they more than likely assume they can copy field values, and the language
@@ -405,11 +405,16 @@ getTypeRefImpl(IRGenModule &IGM,
     // noncopyable, use a function to emit the type ref which will look for a
     // signal from future runtimes whether they support noncopyable types before
     // exposing their metadata to them.
-    if (type->isNoncopyable()) {
+    Type contextualTy = type;
+    if (sig)
+      contextualTy = sig.getGenericEnvironment()->mapTypeIntoContext(type);
+
+    if (contextualTy->isNoncopyable()) {
       IGM.IRGen.noteUseOfTypeMetadata(type);
       return getTypeRefByFunction(IGM, sig, type);
     }
-    LLVM_FALLTHROUGH;
+  }
+  LLVM_FALLTHROUGH;
 
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
