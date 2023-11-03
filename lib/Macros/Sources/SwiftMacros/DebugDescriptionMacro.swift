@@ -4,6 +4,9 @@ import SwiftDiagnostics
 
 public struct DebugDescriptionMacro {}
 
+/// Attached peer macro which converts `debugDescription` (or `description`) implementations into
+/// an LLDB type summary. The type summary record is emitted into a custom section (via a global
+/// constant), where LLDB will load from at debug time.
 extension DebugDescriptionMacro: PeerMacro {
     public static func expansion<Decl, Context>(
         of node: AttributeSyntax,
@@ -114,7 +117,7 @@ extension DebugDescriptionMacro: PeerMacro {
             @unknown default:
                 return []
             }
-}
+        }
 
         let summaryString = summarySegments.joined()
 
@@ -152,7 +155,7 @@ extension DebugDescriptionMacro: PeerMacro {
 
 // MARK: - Diagnostics
 
-struct ErrorMessage: DiagnosticMessage, ExpressibleByStringInterpolation {
+private struct ErrorMessage: DiagnosticMessage, ExpressibleByStringInterpolation {
     init(stringLiteral value: String) {
         self.message = value
     }
@@ -229,8 +232,8 @@ private func isComputedProperty(_ binding: PatternBindingSyntax) -> Bool {
 // Enumerate a MemberAccess expression to produce DeclReferences in left to right order.
 // `a.b.c` will result in callbacks for each DeclReference `a`, `b`, and then `c`.
 private func enumerateMembers(_ memberAccess: MemberAccessExprSyntax, _ action: (DeclReferenceExprSyntax) -> Void) {
-    if let baseMembers = memberAccess.base?.as(MemberAccessExprSyntax.self) {
-        enumerateMembers(baseMembers, action)
+    if let baseMember = memberAccess.base?.as(MemberAccessExprSyntax.self) {
+        enumerateMembers(baseMember, action)
     } else if let baseDecl = memberAccess.base?.as(DeclReferenceExprSyntax.self) {
         action(baseDecl)
     }
@@ -239,6 +242,18 @@ private func enumerateMembers(_ memberAccess: MemberAccessExprSyntax, _ action: 
 
 // MARK: - Encoding
 
+/// Construct an LLDB type summary record.
+///
+/// The record is serializeed as a tuple of `UInt8` bytes.
+///
+/// The record contains the following:
+///   * Version number of the record format
+///   * The size of the record (encoded as ULEB)
+///   * The type identifier, which is either a type name, or for generic types a type regex
+///   * The description string converted to an LLDB summary string
+///
+/// The strings (type identifier and summary) are encoded with both a length prefix (also ULEB)
+/// and with a null terminator.
 private func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: String) -> String {
     let encodedType = encodeString(typeIdentifier)
     let encodedSummary = encodeString(summaryString)
@@ -251,19 +266,23 @@ private func encodeTypeSummaryRecord(_ typeIdentifier: String, _ summaryString: 
     """
 }
 
+/// Generate a _partial_ Swift literal from the given bytes. It is partial in that must be embedded
+/// into some other syntax, specifically as a tuple.
 private func literalBytes(_ bytes: [UInt8]) -> String {
     bytes.map({ "\($0) as UInt8" }).joined(separator: ", ")
 }
 
+/// Encode a string into UTF8 bytes, prefixed by a ULEB length, and suffixed by the null terminator.
 private func encodeString(_ string: String) -> [UInt8] {
     let size = UInt(string.utf8.count) + 1 // including null terminator
     var bytes: [UInt8] = []
     bytes.append(contentsOf: encodeULEB(size))
-    bytes.append(contentsOf: Array(string.utf8))
+    bytes.append(contentsOf: string.utf8)
     bytes.append(0) // null terminator
     return bytes
 }
 
+/// Encode an unsigned integer into ULEB format. See https://en.wikipedia.org/wiki/LEB128
 private func encodeULEB(_ value: UInt) -> [UInt8] {
     guard value > 0 else {
         return [0]
@@ -285,6 +304,8 @@ private func encodeULEB(_ value: UInt) -> [UInt8] {
 // MARK: - Extensions
 
 extension Collection {
+    /// Convert a single element collection to a single value. When a collection consists of
+    /// multiple elements, nil is returned.
     fileprivate var single: Element? {
         count == 1 ? first : nil
     }
