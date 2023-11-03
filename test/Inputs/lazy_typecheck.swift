@@ -131,6 +131,7 @@ public struct PublicStruct {
   @_transparent public var publicTransparentProperty: Int {
     get { return 1 }
   }
+  public dynamic var publicDynamicProperty: Int = 5
 
   public init(x: Int) {
     self.publicProperty = 1
