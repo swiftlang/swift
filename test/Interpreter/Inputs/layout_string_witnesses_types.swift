@@ -534,6 +534,12 @@ public enum PrespecializedMultiPayloadEnum<T> {
     case nonEmpty1(T, Int)
 }
 
+public enum SinglePayloadEnumExistential {
+    case a(SomeProtocol, AnyObject)
+    case b
+    case c
+}
+
 @inline(never)
 public func consume<T>(_ x: T.Type) {
     withExtendedLifetime(x) {}
@@ -564,6 +570,10 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 @inline(never)
 public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
     ptr.assign(from: x, count: 1)
+}
+
+public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
+    ptr.update(from: &x, count: 1)
 }
 
 @inline(never)
