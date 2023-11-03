@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "clang/AST/DeclObjC.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
@@ -29,8 +30,11 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/Module.h"
+#include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 
@@ -558,6 +562,63 @@ static void
                                      getReasonForSuper(Reason), Sig, Visited);
 }
 
+static void lookupVisibleCxxNamespaceMemberDecls(
+    EnumDecl *swiftDecl, const clang::NamespaceDecl *clangNamespace,
+    VisibleDeclConsumer &Consumer, VisitedSet &Visited) {
+  if (!Visited.insert(swiftDecl).second)
+    return;
+  auto &ctx = swiftDecl->getASTContext();
+  auto namespaceDecl = clangNamespace;
+
+  // This is only to keep track of the members we've already seen.
+  llvm::SmallPtrSet<Decl *, 16> addedMembers;
+  for (auto redecl : namespaceDecl->redecls()) {
+    for (auto member : redecl->decls()) {
+      auto lookupAndAddMembers = [&](DeclName name) {
+        auto allResults = evaluateOrDefault(
+            ctx.evaluator, ClangDirectLookupRequest({swiftDecl, redecl, name}),
+            {});
+
+        for (auto found : allResults) {
+          auto clangMember = found.get<clang::NamedDecl *>();
+          if (auto importedDecl =
+                  ctx.getClangModuleLoader()->importDeclDirectly(
+                      cast<clang::NamedDecl>(clangMember))) {
+            if (addedMembers.insert(importedDecl).second) {
+              if (importedDecl->getDeclContext()->getAsDecl() != swiftDecl) {
+                return;
+              }
+              Consumer.foundDecl(cast<ValueDecl>(importedDecl),
+                                 DeclVisibilityKind::MemberOfCurrentNominal);
+            }
+          }
+        }
+      };
+
+      auto namedDecl = dyn_cast<clang::NamedDecl>(member);
+      if (!namedDecl)
+        continue;
+      auto name = ctx.getClangModuleLoader()->importName(namedDecl);
+      if (!name)
+        continue;
+      lookupAndAddMembers(name);
+
+      // Unscoped enums could have their enumerators present
+      // in the parent namespace.
+      if (auto *ed = dyn_cast<clang::EnumDecl>(member)) {
+        if (!ed->isScoped()) {
+          for (const auto *ecd : ed->enumerators()) {
+            auto name = ctx.getClangModuleLoader()->importName(ecd);
+            if (!name)
+              continue;
+            lookupAndAddMembers(name);
+          }
+        }
+      }
+    }
+  }
+}
+
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, GenericSignature Sig,
@@ -645,6 +706,16 @@ static void lookupVisibleMemberDeclsImpl(
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
                                    Reason, Sig, Visited);
     return;
+  }
+
+  // Lookup members of C++ namespace without looking type members, as
+  // C++ namespace uses lazy lookup.
+  if (auto *ET = BaseTy->getAs<EnumType>()) {
+    if (auto *clangNamespace = dyn_cast_or_null<clang::NamespaceDecl>(
+            ET->getDecl()->getClangDecl())) {
+      lookupVisibleCxxNamespaceMemberDecls(ET->getDecl(), clangNamespace,
+                                           Consumer, Visited);
+    }
   }
 
   // If we're looking into a type parameter and we have a GenericSignature,
