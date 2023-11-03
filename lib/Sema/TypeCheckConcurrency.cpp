@@ -517,7 +517,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
     // Static 'let's are initialized upon first access, so they cannot be
     // synchronously accessed across actors.
-    if (var->isStatic())
+    if (var->isGlobalStorage() && var->isLazilyInitializedGlobal())
       return false;
 
     // If it's distributed, generally variable access is not okay...
