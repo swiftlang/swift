@@ -1,5 +1,6 @@
 set(swiftRemoteInspection_SOURCES
   MetadataSource.cpp
+  TypeInfoBuilders.cpp
   TypeLowering.cpp
   TypeRef.cpp
   TypeRefBuilder.cpp)
