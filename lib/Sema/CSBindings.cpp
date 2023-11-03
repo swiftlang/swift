@@ -430,6 +430,41 @@ void BindingSet::inferTransitiveBindings(
         &inferredBindings) {
   using BindingKind = AllowedBindingKind;
 
+  // If the current type variable represents a key path root type
+  // let's try to transitively infer its type through bindings of
+  // a key path type.
+  if (TypeVar->getImpl().isKeyPathRoot()) {
+    auto *locator = TypeVar->getImpl().getLocator();
+    if (auto *keyPathTy =
+            CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
+      auto keyPathBindings = inferredBindings.find(keyPathTy);
+      if (keyPathBindings != inferredBindings.end()) {
+        auto &bindings = keyPathBindings->getSecond();
+
+        for (auto &binding : bindings.Bindings) {
+          auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+
+          Type inferredRootTy;
+          if (isKnownKeyPathType(bindingTy)) {
+            // AnyKeyPath doesn't have a root type.
+            if (bindingTy->isAnyKeyPath())
+              continue;
+
+            auto *BGT = bindingTy->castTo<BoundGenericType>();
+            inferredRootTy = BGT->getGenericArgs()[0];
+          } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+            if (fnType->getNumParams() == 1)
+              inferredRootTy = fnType->getParams()[0].getParameterType();
+          }
+
+          if (inferredRootTy && !inferredRootTy->isTypeVariableOrMember())
+            addBinding(
+                binding.withSameSource(inferredRootTy, BindingKind::Exact));
+        }
+      }
+    }
+  }
+
   for (const auto &entry : Info.SupertypeOf) {
     auto relatedBindings = inferredBindings.find(entry.first);
     if (relatedBindings == inferredBindings.end())
@@ -794,6 +829,12 @@ llvm::Optional<BindingSet> ConstraintSystem::determineBestBindings(
   // attempted next.
   auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
     auto *typeVar = bindings.getTypeVariable();
+
+    // Key path root type variable is always viable because it can be
+    // transitively inferred from key path type during binding set
+    // finalization.
+    if (typeVar->getImpl().isKeyPathRoot())
+      return true;
 
     // Type variable representing a base of unresolved member chain should
     // always be considered viable for ranking since it's allow to infer
