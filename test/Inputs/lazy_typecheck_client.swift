@@ -51,6 +51,7 @@ func testPublicClasses() {
   let _: Int = c.publicMethod()
   let _: Int = c.publicProperty
   let _: String = c.publicPropertyInferredType
+  c.publicFinalWrappedProperty = true
   PublicClass.publicClassMethod()
 
   let d = PublicDerivedClass(x: 3)
