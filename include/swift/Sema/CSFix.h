@@ -1368,6 +1368,10 @@ public:
     return "allow invalid property wrapper type";
   }
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static bool classof(const ConstraintFix *fix) {
