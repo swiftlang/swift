@@ -921,8 +921,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
     }
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Unspecified:
       Out << "nonisolated";
+      if (isolation == ActorIsolation::NonisolatedUnsafe) {
+        Out << "(unsafe)";
+      }
       break;
     }
     break;

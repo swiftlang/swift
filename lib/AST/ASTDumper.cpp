@@ -944,8 +944,9 @@ namespace {
         D->getCaptureInfo().print(OS);
       }
 
-      if (D->getAttrs().hasAttribute<NonisolatedAttr>()) {
-        PrintWithColorRAII(OS, ExprModifierColor) << " nonisolated";
+      if (auto *attr = D->getAttrs().getAttribute<NonisolatedAttr>()) {
+        PrintWithColorRAII(OS, ExprModifierColor)
+            << (attr->isUnsafe() ? " nonisolated(unsafe)" : " nonisolated");
       }
       if (D->isDistributed()) {
         PrintWithColorRAII(OS, ExprModifierColor) << " distributed";
@@ -2595,6 +2596,7 @@ public:
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
       break;
 
     case ActorIsolation::ActorInstance:

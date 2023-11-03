@@ -1046,6 +1046,7 @@ void LifetimeChecker::injectActorHops() {
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::GlobalActor:
     return;

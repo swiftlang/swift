@@ -464,6 +464,7 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(GlobalActorUnsafe)
 #undef CASE
@@ -3834,6 +3835,7 @@ public:
       switch (isoKind) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
         isolation = ActorIsolation::forUnspecified();
         break;
 
@@ -5871,6 +5873,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) ObjCImplementationAttr(categoryName, SourceLoc(),
                                                 SourceRange(), isImplicit,
                                                 isCategoryNameInvalid);
+        break;
+      }
+
+      case decls_block::Nonisolated_DECL_ATTR: {
+        bool isUnsafe{};
+        bool isImplicit{};
+        serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
+            scratch, isUnsafe, isImplicit);
+        Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
         break;
       }
 
