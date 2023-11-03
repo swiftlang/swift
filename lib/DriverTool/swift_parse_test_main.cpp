@@ -141,7 +141,9 @@ static std::pair<Duration, Duration> measure(llvm::function_ref<void()> body) {
   auto tEnd = std::chrono::steady_clock::now();
 
   auto clockMultiply =
-      Duration::period::den / CLOCKS_PER_SEC / Duration::period::num;
+      CLOCKS_PER_SEC > 0
+          ? (Duration::period::den / CLOCKS_PER_SEC / Duration::period::num)
+          : 0;
 
   Duration cDuration((cEnd - cStart) * clockMultiply);
   return {std::chrono::duration_cast<Duration>(tEnd - tStart),
@@ -177,14 +179,16 @@ perform(const SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> &buffers,
       std::chrono::duration_cast<std::chrono::milliseconds>(tDuration).count();
   auto cDisplay =
       std::chrono::duration_cast<std::chrono::milliseconds>(cDuration).count();
-
-  auto byteTPS = totalBytes * duration_t::period::den / cDuration.count();
-  auto lineTPS = totalLines * duration_t::period::den / cDuration.count();
-
   llvm::outs() << llvm::format("wall clock time (ms): %8d\n", tDisplay)
-               << llvm::format("cpu time (ms):        %8d\n", cDisplay)
-               << llvm::format("throughput (byte/s):  %8d\n", byteTPS)
-               << llvm::format("throughput (line/s):  %8d\n", lineTPS);
+               << llvm::format("cpu time (ms):        %8d\n", cDisplay);
+
+  if (cDuration.count() > 0) {
+    auto byteTPS = totalBytes * duration_t::period::den / cDuration.count();
+    auto lineTPS = totalLines * duration_t::period::den / cDuration.count();
+
+    llvm::outs() << llvm::format("throughput (byte/s):  %8d\n", byteTPS)
+                 << llvm::format("throughput (line/s):  %8d\n", lineTPS);
+  }
 }
 
 } // namespace
