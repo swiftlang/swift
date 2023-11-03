@@ -92,6 +92,7 @@ func testMemoryLayout() -> Int {
 }
 
 class MyError : Error {}
+class MyError2 : Error {}
 
 @_noLocks
 func errorExistential(_ b: Bool) throws -> Int {
@@ -99,6 +100,17 @@ func errorExistential(_ b: Bool) throws -> Int {
     return 28
   }
   throw MyError()
+}
+
+@_noLocks
+func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
+  if b1 {
+    throw MyError()
+  }
+  if b2 {
+    throw MyError2()
+  }
+  return 28
 }
 
 @_noLocks
