@@ -2,6 +2,8 @@
 
 // REQUIRES: concurrency
 
+import Distributed
+
 protocol AsyncProtocol {
   func asyncMethod() async -> Int
 }
@@ -96,3 +98,16 @@ actor A2: Initializers {
 
   func withBells() async -> A2 { self }
 }
+
+// https://github.com/apple/swift/issues/69244
+protocol P {
+    func foo() -> Void
+    // expected-note@-1{{mark the protocol requirement 'foo()' 'async throws' to allow actor-isolated conformances}}{{15-15= async throws}}
+}
+
+distributed actor A: P {
+    typealias ActorSystem = LocalTestingDistributedActorSystem
+    distributed func foo() { }
+    // expected-error@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated protocol requirement}}
+}
+// ---
