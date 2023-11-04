@@ -150,6 +150,15 @@ std::string FrontendInputsAndOutputs::getStatsFileMangledInputName() const {
   return isWholeModule() ? "all" : firstPrimaryInput().getFileName();
 }
 
+const InputFile &
+FrontendInputsAndOutputs::getFirstOutputProducingInput() const {
+  // Get the first input file that produces the output file. That is currently
+  // used to compute with input should the cached diagnostics be associated
+  // with. The first output producing input file is the first input if using
+  // whole module, or first primary input if not using whole module.
+  return isWholeModule() ? firstInput() : firstPrimaryInput();
+}
+
 bool FrontendInputsAndOutputs::isInputPrimary(StringRef file) const {
   return primaryInputNamed(file) != nullptr;
 }

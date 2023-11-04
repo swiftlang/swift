@@ -61,28 +61,15 @@ createSwiftCachingOutputBackend(
                                                     InputsAndOutputs, Action);
 }
 
-Expected<bool> cas::CachedResultLoader::replay(CallbackTy Callback) {
-  // Lookup the cache key for the input file.
-  auto OutID = CAS.getID(CacheKey);
-  auto Lookup = Cache.get(OutID);
-  if (!Lookup)
-    return Lookup.takeError();
-
-  if (!*Lookup)
-    return false;
-
-  auto OutputRef = CAS.getReference(**Lookup);
-  if (!OutputRef)
-    return false;
-
-  auto ResultProxy = CAS.getProxy(*OutputRef);
+Error cas::CachedResultLoader::replay(CallbackTy Callback) {
+  auto ResultProxy = CAS.getProxy(OutputRef);
   if (!ResultProxy)
     return ResultProxy.takeError();
 
   {
     swift::cas::CompileJobResultSchema Schema(CAS);
     if (Schema.isRootNode(*ResultProxy)) {
-      auto Result = Schema.load(*OutputRef);
+      auto Result = Schema.load(OutputRef);
       if (!Result)
         return Result.takeError();
 
@@ -90,15 +77,15 @@ Expected<bool> cas::CachedResultLoader::replay(CallbackTy Callback) {
               [&](swift::cas::CompileJobCacheResult::Output Output) -> Error {
                 return Callback(Output.Kind, Output.Object);
               }))
-        return std::move(Err);
+        return Err;
 
-      return true;
+      return Error::success();
     }
   }
   {
     clang::cas::CompileJobResultSchema Schema(CAS);
     if (Schema.isRootNode(*ResultProxy)) {
-      auto Result = Schema.load(*OutputRef);
+      auto Result = Schema.load(OutputRef);
       if (!Result)
         return Result.takeError();
       if (auto Err = Result->forEachOutput(
@@ -120,14 +107,28 @@ Expected<bool> cas::CachedResultLoader::replay(CallbackTy Callback) {
                    "Unexpected output kind in clang cached result");
             return Callback(OutputKind, Output.Object);
           }))
-        return std::move(Err);
+        return Err;
 
-      return true;
+      return Error::success();
     }
   }
 
   return createStringError(inconvertibleErrorCode(),
                            "unexpected output schema for cached result");
+}
+
+static Expected<std::optional<ObjectRef>>
+lookupCacheKey(ObjectStore &CAS, ActionCache &Cache, ObjectRef CacheKey) {
+  // Lookup the cache key for the input file.
+  auto OutID = CAS.getID(CacheKey);
+  auto Lookup = Cache.get(OutID);
+  if (!Lookup)
+    return Lookup.takeError();
+
+  if (!*Lookup)
+    return std::nullopt;
+
+  return CAS.getReference(**Lookup);
 }
 
 bool replayCachedCompilerOutputs(
@@ -154,41 +155,46 @@ bool replayCachedCompilerOutputs(
                     toString(OutputKey.takeError()));
       return lookupFailed();
     }
-    CachedResultLoader Loader(CAS, Cache, *OutputKey);
 
     auto OutID = CAS.getID(*OutputKey);
-    LLVM_DEBUG(llvm::dbgs() << "DEBUG: lookup cache key \'" << OutID.toString()
-                            << "\' for input \'" << InputPath << "\n";);
-
-    auto LookupResult = Loader.replay([&](file_types::ID Kind,
-                                          ObjectRef Ref) -> Error {
-      auto OutputPath = Outputs.find(Kind);
-      if (OutputPath == Outputs.end())
-        return createStringError(inconvertibleErrorCode(),
-                                 "unexpected output kind in the cached output");
-      auto Proxy = CAS.getProxy(Ref);
-      if (!Proxy)
-        return Proxy.takeError();
-
-      if (Kind == file_types::ID::TY_CachedDiagnostics) {
-        assert(!DiagnosticsOutput && "more than 1 diagnotics found");
-        DiagnosticsOutput = OutputEntry{OutputPath->second, OutID, *Proxy};
-      } else
-        OutputProxies.emplace_back(
-            OutputEntry{OutputPath->second, OutID, *Proxy});
-      return Error::success();
-    });
-
-    if (!LookupResult) {
+    auto OutputRef = lookupCacheKey(CAS, Cache, *OutputKey);
+    if (!OutputRef) {
       Diag.diagnose(SourceLoc(), diag::error_cas,
-                    toString(LookupResult.takeError()));
+                    toString(OutputRef.takeError()));
       return lookupFailed();
     }
 
-    if (!*LookupResult) {
+    if (!*OutputRef) {
       if (CacheRemarks)
         Diag.diagnose(SourceLoc(), diag::output_cache_miss, InputPath,
                       OutID.toString());
+      return lookupFailed();
+    }
+
+    CachedResultLoader Loader(CAS, **OutputRef);
+    LLVM_DEBUG(llvm::dbgs() << "DEBUG: lookup cache key \'" << OutID.toString()
+                            << "\' for input \'" << InputPath << "\n";);
+
+    if (auto Err = Loader.replay([&](file_types::ID Kind,
+                                     ObjectRef Ref) -> Error {
+          auto OutputPath = Outputs.find(Kind);
+          if (OutputPath == Outputs.end())
+            return createStringError(
+                inconvertibleErrorCode(),
+                "unexpected output kind in the cached output");
+          auto Proxy = CAS.getProxy(Ref);
+          if (!Proxy)
+            return Proxy.takeError();
+
+          if (Kind == file_types::ID::TY_CachedDiagnostics) {
+            assert(!DiagnosticsOutput && "more than 1 diagnotics found");
+            DiagnosticsOutput = OutputEntry{OutputPath->second, OutID, *Proxy};
+          } else
+            OutputProxies.emplace_back(
+                OutputEntry{OutputPath->second, OutID, *Proxy});
+          return Error::success();
+        })) {
+      Diag.diagnose(SourceLoc(), diag::error_cas, toString(std::move(Err)));
       return lookupFailed();
     }
   };
@@ -209,18 +215,14 @@ bool replayCachedCompilerOutputs(
               Outputs.try_emplace(ID, File);
             });
 
-    // Nothing to replay.
-    if (Outputs.empty())
-      return;
+    // Add cached diagnostic entry for lookup. Output path doesn't matter here.
+    Outputs.try_emplace(file_types::ID::TY_CachedDiagnostics,
+                        "<cached-diagnostics>");
 
     return replayOutputsForInputFile(InputPath, Outputs);
   };
 
   llvm::for_each(InputsAndOutputs.getAllInputs(), replayOutputFromInput);
-
-  replayOutputsForInputFile(
-      "<cached-diagnostics>",
-      {{file_types::ID::TY_CachedDiagnostics, "<cached-diagnostics>"}});
 
   if (!CanReplayAllOutput)
     return false;
@@ -277,25 +279,28 @@ loadCachedCompileResultFromCacheKey(ObjectStore &CAS, ActionCache &Cache,
   if (!Ref)
     return nullptr;
 
-  CachedResultLoader Loader(CAS, Cache, *Ref);
-  std::unique_ptr<llvm::MemoryBuffer> Buffer;
-  auto Result = Loader.replay([&](file_types::ID Type, ObjectRef Ref) -> Error {
-    if (Kind != Type)
-      return Error::success();
+  auto OutputRef = lookupCacheKey(CAS, Cache, *Ref);
+  if (!OutputRef)
+    return failure(OutputRef.takeError());
 
-    auto Proxy = CAS.getProxy(Ref);
-    if (!Proxy)
-      return Proxy.takeError();
-
-    Buffer = Proxy->getMemoryBuffer(Filename);
-    return Error::success();
-  });
-
-  if (!Result)
-    return failure(Result.takeError());
-
-  if (!*Result)
+  if (!*OutputRef)
     return nullptr;
+
+  CachedResultLoader Loader(CAS, **OutputRef);
+  std::unique_ptr<llvm::MemoryBuffer> Buffer;
+  if (auto Err =
+          Loader.replay([&](file_types::ID Type, ObjectRef Ref) -> Error {
+            if (Kind != Type)
+              return Error::success();
+
+            auto Proxy = CAS.getProxy(Ref);
+            if (!Proxy)
+              return Proxy.takeError();
+
+            Buffer = Proxy->getMemoryBuffer(Filename);
+            return Error::success();
+          }))
+    return failure(std::move(Err));
 
   return Buffer;
 }

@@ -10,8 +10,9 @@ output_path = sys.argv[2]
 
 
 with open(input_json, 'r') as file:
-    outputs = json.load(file)
-    for output in outputs:
-        if output['OutputPath'] != output_path:
-            continue
-        print(output['CacheKey'])
+    entries = json.load(file)
+    for entry in entries:
+        for output in entry["Outputs"]:
+            if output['Path'] != output_path:
+                continue
+            print(entry['CacheKey'])
