@@ -46,10 +46,6 @@
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
-        "icu": {
-            "remote": { "id": "unicode-org/icu" },
-            "platforms": [ "Linux" ]
-        },
         "yams": {
             "remote": { "id": "jpsim/Yams" }
         },
@@ -86,7 +82,19 @@
         "swift-llvm-bindings": {
             "remote": { "id": "apple/swift-llvm-bindings" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project" } }
+            "remote": { "id": "apple/llvm-project" } },
+        "curl": {
+          "remote": { "id": "curl/curl" }
+        },
+        "icu": {
+          "remote": { "id": "unicode-org/icu" }
+        },
+        "libxml2": {
+          "remote": { "id": "gnome/libxml2" }
+        },
+        "zlib": {
+          "remote": { "id": "madler/zlib" }
+        }
     },
     "default-branch-scheme": "main",
     "branch-schemes": {
@@ -161,7 +169,6 @@
                 "swift-integration-tests": "release/5.10",
                 "swift-xcode-playground-support": "release/5.10",
                 "ninja": "release",
-                "icu": "release-65-1",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "release/5.10",
@@ -175,7 +182,11 @@
                 "swift-markdown": "release/5.10",
                 "swift-nio": "2.31.2",
                 "swift-nio-ssl": "2.15.0",
-                "swift-experimental-string-processing": "swift/release/5.10"
+                "swift-experimental-string-processing": "swift/release/5.10",
+                "curl": "curl-8_4_0",
+                "icu": "maint/maint-69",
+                "libxml2": "v2.11.5",
+                "zlib": "v1.3"
             }
         },
         "rebranch": {
