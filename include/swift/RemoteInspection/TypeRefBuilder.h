@@ -1362,11 +1362,11 @@ public:
     return subject->subst(*this, Subs);
   }
   uint32_t addReflectionInfo(ReflectionInfo I) {
-    return DF.addReflectionInfo(I);
+    return RDF.addReflectionInfo(I);
   }
 
   const std::vector<ReflectionInfo> &getReflectionInfos() {
-    return DF.getReflectionInfos();
+    return RDF.getReflectionInfos();
   }
 
 public:
@@ -1374,7 +1374,7 @@ public:
 
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this), DF(*this, nullptr) {}
+  explicit TypeRefBuilder(ForTesting_t) : TC(*this), RDF(*this, nullptr) {}
 
 private:
   /// Indexes of Reflection Infos we've already processed.
@@ -1382,11 +1382,11 @@ private:
 
 public:
   RemoteRef<char> readTypeRef(uint64_t remoteAddr) {
-    return DF.readTypeRef(remoteAddr);
+    return RDF.readTypeRef(remoteAddr);
   }
   template <typename Record, typename Field>
   RemoteRef<char> readTypeRef(RemoteRef<Record> record, const Field &field) {
-    return DF.readTypeRef(record, field);
+    return RDF.readTypeRef(record, field);
   }
   StringRef getTypeRefString(RemoteRef<char> record) {
     return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
@@ -1409,7 +1409,7 @@ private:
   using IntVariableReader =
       std::function<llvm::Optional<uint64_t>(std::string, unsigned)>;
 
-  ReflectionTypeDescriptorFinder DF;
+  ReflectionTypeDescriptorFinder RDF;
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -1429,7 +1429,7 @@ public:
   template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr)
-      : TC(*this), DF(*this, externalCache),
+      : TC(*this), RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)
@@ -1506,12 +1506,12 @@ public:
   const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
                                    const std::string &Member,
                                    StringRef Protocol) {
-    return DF.lookupTypeWitness(MangledTypeName, Member, Protocol);
+    return RDF.lookupTypeWitness(MangledTypeName, Member, Protocol);
   }
   const TypeRef *lookupSuperclass(const TypeRef *TR);
 
   RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR) {
-    return DF.getFieldTypeInfo(TR);
+    return RDF.getFieldTypeInfo(TR);
   }
 
   /// Get the parsed and substituted field types for a nominal type.
@@ -1521,24 +1521,24 @@ public:
 
   /// Get the primitive type lowering for a builtin type.
   RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR) {
-    return DF.getBuiltinTypeInfo(TR);
+    return RDF.getBuiltinTypeInfo(TR);
   }
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
   RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress) {
-    return DF.getCaptureDescriptor(RemoteAddress);
+    return RDF.getCaptureDescriptor(RemoteAddress);
   }
 
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
-    return DF.getClosureContextInfo(CD);
+    return RDF.getClosureContextInfo(CD);
   }
 
   /// Get the multipayload enum projection information for a given TR
   RemoteRef<MultiPayloadEnumDescriptor>
   getMultiPayloadEnumInfo(const TypeRef *TR) {
-    return DF.getMultiPayloadEnumInfo(TR);
+    return RDF.getMultiPayloadEnumInfo(TR);
   }
 
 private:
@@ -1573,7 +1573,7 @@ public:
   }
   FieldTypeCollectionResult
   collectFieldTypes(llvm::Optional<std::string> forMangledTypeName) {
-    return DF.collectFieldTypes(forMangledTypeName);
+    return RDF.collectFieldTypes(forMangledTypeName);
   }
 
 public:
@@ -1581,7 +1581,7 @@ public:
             unsigned PointerSize>
   AssociatedTypeCollectionResult
   collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName) {
-    return DF.collectAssociatedTypes<ObjCInteropKind, PointerSize>(
+    return RDF.collectAssociatedTypes<ObjCInteropKind, PointerSize>(
         forMangledTypeName);
   }
   template <template <typename Runtime> class ObjCInteropKind,
@@ -2076,12 +2076,12 @@ private:
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
         std::string demangledParamName =
-            nodeToString(demangleTypeRef(DF.readTypeRef(paramAddress)));
+            nodeToString(demangleTypeRef(RDF.readTypeRef(paramAddress)));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = DF.readTypeRef(typeAddress);
+        auto typeTypeRef = RDF.readTypeRef(typeAddress);
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
@@ -2291,12 +2291,12 @@ public:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   ConformanceCollectionResult collectAllConformances() {
-    return DF.collectAllConformances<ObjCInteropKind, PointerSize>();
+    return RDF.collectAllConformances<ObjCInteropKind, PointerSize>();
   }
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   void dumpAllSections(std::ostream &stream) {
-    DF.dumpAllSections<ObjCInteropKind, PointerSize>(stream);
+    RDF.dumpAllSections<ObjCInteropKind, PointerSize>(stream);
   }
 };
 
