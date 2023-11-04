@@ -417,31 +417,10 @@ private:
   /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
 
-  /// Cache for associated type lookups.
-  std::unordered_map<TypeRefID, const TypeRef *,
-                     TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
-
-  /// Cache for field info lookups.
-  std::unordered_map<std::string, RemoteRef<FieldDescriptor>> FieldTypeInfoCache;
-
-  /// Cache for normalized reflection name lookups.
-  std::unordered_map<uint64_t /* remote address */, llvm::Optional<std::string>>
-      NormalizedReflectionNameCache;
-
-  /// Cache for built-in type descriptor lookups.
-  std::unordered_map<std::string /* normalized name */,
-                     RemoteRef<BuiltinTypeDescriptor>>
-      BuiltInTypeDescriptorCache;
-
-  /// The index of the last ReflectionInfo cached by BuiltInTypeDescriptorCache.
-  uint32_t NormalizedReflectionNameCacheLastReflectionInfoCache = 0;
-
   std::vector<std::unique_ptr<const GenericSignatureRef>> SignatureRefPool;
 
   TypeConverter TC;
-  MetadataSourceBuilder MSB;
 
-  remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
 
 #define TYPEREF(Id, Parent) \
   std::unordered_map<TypeRefID, const Id##TypeRef *, \
@@ -485,6 +464,363 @@ public:
       Builder->popNodeFactoryCheckpoint(Checkpoint);
     }
   };
+
+  struct ReflectionTypeDescriptorFinder {
+    ReflectionTypeDescriptorFinder(TypeRefBuilder &Builder,
+                                   remote::ExternalTypeRefCache *externalCache)
+        : Builder(Builder), ExternalTypeRefCache(externalCache) {}
+
+    /// Add the ReflectionInfo and return a unique ID for the reflection image
+    /// added. Since we only add reflection infos, the ID can be its index.
+    /// We return a uint32_t since it's extremely unlikely we'll run out of
+    /// indexes.
+    uint32_t addReflectionInfo(ReflectionInfo I) {
+      ReflectionInfos.push_back(I);
+      auto InfoID = ReflectionInfos.size() - 1;
+      assert(InfoID <= UINT32_MAX && "ReflectionInfo ID overflow");
+      return InfoID;
+    }
+
+    const std::vector<ReflectionInfo> &getReflectionInfos() {
+      return ReflectionInfos;
+    }
+
+    /// Load unsubstituted field types for a nominal type.
+    RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
+
+    /// Get the primitive type lowering for a builtin type.
+    RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+
+    /// Get the raw capture descriptor for a remote capture descriptor
+    /// address.
+    RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress);
+
+    /// Get the unsubstituted capture types for a closure context.
+    ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
+
+    /// Get the multipayload enum projection information for a given TR
+    RemoteRef<MultiPayloadEnumDescriptor>
+    getMultiPayloadEnumInfo(const TypeRef *TR);
+
+    const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
+                                     const std::string &Member,
+                                     StringRef Protocol);
+
+    RemoteRef<char> readTypeRef(uint64_t remoteAddr);
+
+    template <typename Record, typename Field>
+    RemoteRef<char> readTypeRef(RemoteRef<Record> record, const Field &field) {
+      uint64_t remoteAddr = record.resolveRelativeFieldData(field);
+
+      return readTypeRef(remoteAddr);
+    }
+
+    llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
+
+  private:
+    void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
+    llvm::Optional<RemoteRef<FieldDescriptor>>
+    findFieldDescriptorAtIndex(size_t Index, const std::string &MangledName);
+
+    llvm::Optional<RemoteRef<FieldDescriptor>>
+    getFieldDescriptorFromExternalCache(const std::string &MangledName);
+
+    bool reflectionNameMatches(RemoteRef<char> reflectionName,
+                               StringRef searchName);
+
+    std::vector<ReflectionInfo> ReflectionInfos;
+
+    /// Indexes of Reflection Infos we've already processed.
+    llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
+
+    /// Cache for field info lookups.
+    std::unordered_map<std::string, RemoteRef<FieldDescriptor>>
+        FieldTypeInfoCache;
+
+    /// Cache for normalized reflection name lookups.
+    std::unordered_map<uint64_t /* remote address */,
+                       llvm::Optional<std::string>>
+        NormalizedReflectionNameCache;
+
+    /// Cache for built-in type descriptor lookups.
+    std::unordered_map<std::string /* normalized name */,
+                       RemoteRef<BuiltinTypeDescriptor>>
+        BuiltInTypeDescriptorCache;
+    ///
+    /// Cache for associated type lookups.
+    std::unordered_map<TypeRefID, const TypeRef *, TypeRefID::Hash,
+                       TypeRefID::Equal>
+        AssociatedTypeCache;
+
+    /// The index of the last ReflectionInfo cached by
+    /// BuiltInTypeDescriptorCache.
+    uint32_t NormalizedReflectionNameCacheLastReflectionInfoCache = 0;
+
+    MetadataSourceBuilder MSB;
+
+    TypeRefBuilder &Builder;
+
+    remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
+
+  public:
+    ///
+    /// Dumping typerefs, field declarations, builtin types, captures,
+    /// multi-payload enums
+    ///
+    void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
+                     bool printTypeName = false);
+    FieldTypeCollectionResult
+    collectFieldTypes(llvm::Optional<std::string> forMangledTypeName);
+    void dumpFieldSection(std::ostream &stream);
+    void dumpBuiltinTypeSection(std::ostream &stream);
+    void dumpCaptureSection(std::ostream &stream);
+    void dumpMultiPayloadEnumSection(std::ostream &stream);
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    AssociatedTypeCollectionResult
+    collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName) {
+      AssociatedTypeCollectionResult result;
+      for (const auto &sections : ReflectionInfos) {
+        for (auto descriptor : sections.AssociatedType) {
+          // Read out the relevant info from the associated type descriptor:
+          // The type's name and which protocol conformance it corresponds to
+          llvm::Optional<std::string> optionalMangledTypeName;
+          std::string typeName;
+          std::string protocolName;
+          {
+            TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+            auto typeRef =
+                readTypeRef(descriptor, descriptor->ConformingTypeName);
+            typeName = nodeToString(Builder.demangleTypeRef(typeRef));
+            optionalMangledTypeName = normalizeReflectionName(typeRef);
+            auto protocolNode = Builder.demangleTypeRef(
+                readTypeRef(descriptor, descriptor->ProtocolTypeName));
+            protocolName = nodeToString(protocolNode);
+          }
+          if (optionalMangledTypeName.has_value()) {
+            auto mangledTypeName = optionalMangledTypeName.value();
+            if (forMangledTypeName.has_value()) {
+              if (mangledTypeName != forMangledTypeName.value())
+                continue;
+            }
+
+            // For each associated type, gather its typealias name,
+            // the substituted type info, and if the substituted type is opaque
+            // - gather its protocol conformance requirements
+            std::vector<AssociatedType> associatedTypes;
+            for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
+              auto associatedType = descriptor.getField(associatedTypeRef);
+              std::string typealiasTypeName =
+                  Builder
+                      .getTypeRefString(
+                          readTypeRef(associatedType, associatedType->Name))
+                      .str();
+
+              std::string mangledSubstitutedTypeName =
+                  std::string(associatedType->SubstitutedTypeName);
+              auto substitutedTypeRef = readTypeRef(
+                  associatedType, associatedType->SubstitutedTypeName);
+              auto optionalMangledSubstitutedTypeName =
+                  normalizeReflectionName(substitutedTypeRef);
+              if (optionalMangledSubstitutedTypeName.has_value()) {
+                mangledSubstitutedTypeName =
+                    optionalMangledSubstitutedTypeName.value();
+              }
+
+              // We intentionally do not want to resolve opaque type
+              // references, because if the substituted type is opaque, we
+              // would like to get at its OpaqueTypeDescriptor address, which
+              // is stored on the OpaqueTypeDescriptorSymbolicReference typeRef.
+              auto substitutedDemangleTree = Builder.demangleTypeRef(
+                  substitutedTypeRef,
+                  /* useOpaqueTypeSymbolicReferences */ true);
+
+              // If the substituted type is an opaque type, also gather info
+              // about which protocols it is required to conform to and the
+              // corresponding same-type requirements
+              std::vector<std::string> opaqueTypeConformanceRequirements;
+              std::vector<TypeAliasInfo> sameTypeRequirements;
+              Builder
+                  .gatherOpaqueTypeRequirements<ObjCInteropKind, PointerSize>(
+                      substitutedDemangleTree,
+                      opaqueTypeConformanceRequirements, sameTypeRequirements);
+
+              auto substitutedTypeName = nodeToString(substitutedDemangleTree);
+              std::stringstream OS;
+              dumpTypeRef(substitutedTypeRef, OS);
+              associatedTypes.emplace_back(AssociatedType{
+                  TypeAliasInfo{typealiasTypeName, mangledSubstitutedTypeName,
+                                substitutedTypeName, OS.str()},
+                  opaqueTypeConformanceRequirements, sameTypeRequirements});
+            }
+            result.AssociatedTypeInfos.emplace_back(AssociatedTypeInfo{
+                mangledTypeName, typeName, protocolName, associatedTypes});
+          }
+        }
+      }
+      return result;
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    void dumpAssociatedTypeSection(std::ostream &stream) {
+      auto associatedTypeCollectionResult =
+          collectAssociatedTypes<ObjCInteropKind, PointerSize>(
+              llvm::Optional<std::string>());
+      for (const auto &info :
+           associatedTypeCollectionResult.AssociatedTypeInfos) {
+        stream << "- " << info.FullyQualifiedName << " : "
+               << info.ProtocolFullyQualifiedName << "\n";
+        for (const auto &typeAlias : info.AssociatedTypes) {
+          stream << "typealias " << typeAlias.SubstitutionInfo.TypeAliasName
+                 << " = "
+                 << typeAlias.SubstitutionInfo.SubstitutedTypeFullyQualifiedName
+                 << "\n";
+          stream
+              << typeAlias.SubstitutionInfo.SubstitutedTypeDiagnosticPrintName;
+          if (!typeAlias.OpaqueTypeProtocolConformanceRequirements.empty()) {
+            stream << "-------------------------\n";
+            stream << "conformance requirements: \n";
+            for (const auto &protocolName :
+                 typeAlias.OpaqueTypeProtocolConformanceRequirements) {
+              stream << protocolName << "\n";
+            }
+          }
+          if (!typeAlias.OpaqueTypeSameTypeRequirements.empty()) {
+            stream << "-----------------------\n";
+            stream << "same-type requirements: \n";
+            for (const auto &sameTypeRequirementInfo :
+                 typeAlias.OpaqueTypeSameTypeRequirements) {
+              stream
+                  << sameTypeRequirementInfo.TypeAliasName << " = "
+                  << sameTypeRequirementInfo.SubstitutedTypeMangledName << " ("
+                  << sameTypeRequirementInfo.SubstitutedTypeFullyQualifiedName
+                  << ")\n";
+            }
+          }
+        }
+        stream << "\n";
+      }
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    ConformanceCollectionResult collectAllConformances() {
+      ConformanceCollectionResult result;
+
+      // The Fields section has gathered info on types that includes their
+      // mangled names. Use that to build a dictionary from a type's demangled
+      // name to its mangled name
+      std::unordered_map<std::string, std::string> typeNameToManglingMap;
+      for (const auto &section : ReflectionInfos) {
+        for (auto descriptor : section.Field) {
+          TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+          auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+          auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
+          auto TypeName = nodeToString(Builder.demangleTypeRef(TypeRef));
+          if (OptionalMangledTypeName.has_value()) {
+            typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
+          }
+        }
+      }
+
+      // Collect all conformances and aggregate them per-conforming-type.
+      std::unordered_map<std::string, std::vector<std::string>>
+          typeConformances;
+      TypeRefBuilder::ProtocolConformanceDescriptorReader<ObjCInteropKind,
+                                                          PointerSize>
+          conformanceReader(
+              Builder.OpaqueByteReader, Builder.OpaqueStringReader,
+              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver);
+      for (const auto &section : ReflectionInfos) {
+        auto ConformanceBegin = section.Conformance.startAddress();
+        auto ConformanceEnd = section.Conformance.endAddress();
+        for (auto conformanceAddr = ConformanceBegin;
+             conformanceAddr != ConformanceEnd;
+             conformanceAddr = conformanceAddr.atByteOffset(4)) {
+          auto optionalConformanceInfo =
+              conformanceReader.readConformanceDescriptor(
+                  conformanceAddr, typeNameToManglingMap);
+          if (!optionalConformanceInfo.has_value())
+            result.Errors.push_back(conformanceReader.Error);
+          else
+            result.Conformances.push_back(optionalConformanceInfo.value());
+        }
+      }
+      return result;
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    void dumpConformanceSection(std::ostream &stream) {
+      auto conformanceCollectionResult =
+          collectAllConformances<ObjCInteropKind, PointerSize>();
+
+      // Collect all conformances and aggregate them per-conforming-type.
+      std::unordered_map<std::string, std::vector<std::string>>
+          typeConformances;
+      for (auto &conformanceInfo : conformanceCollectionResult.Conformances) {
+        auto typeConformancesKey = conformanceInfo.MangledTypeName + " (" +
+                                   conformanceInfo.TypeName + ")";
+        if (typeConformances.count(typeConformancesKey) != 0) {
+          typeConformances[typeConformancesKey].push_back(
+              conformanceInfo.ProtocolName);
+        } else {
+          typeConformances.emplace(
+              typeConformancesKey,
+              std::vector<std::string>{conformanceInfo.ProtocolName});
+        }
+      }
+      for (auto &pair : typeConformances) {
+        stream << pair.first << " : ";
+        bool first = true;
+        for (auto &protocol : pair.second) {
+          if (!first) {
+            stream << ", ";
+          }
+          first = false;
+          stream << protocol;
+        }
+        stream << "\n";
+      }
+
+      // Report encountered errors
+      for (auto &error : conformanceCollectionResult.Errors) {
+        stream << "Error reading conformance descriptor: " << error << "\n";
+      }
+    }
+
+    template <template <typename Runtime> class ObjCInteropKind,
+              unsigned PointerSize>
+    void dumpAllSections(std::ostream &stream) {
+      stream << "FIELDS:\n";
+      stream << "=======\n";
+      dumpFieldSection(stream);
+      stream << "\n";
+      stream << "ASSOCIATED TYPES:\n";
+      stream << "=================\n";
+      dumpAssociatedTypeSection<ObjCInteropKind, PointerSize>(stream);
+      stream << "\n";
+      stream << "BUILTIN TYPES:\n";
+      stream << "==============\n";
+      dumpBuiltinTypeSection(stream);
+      stream << "\n";
+      stream << "CAPTURE DESCRIPTORS:\n";
+      stream << "====================\n";
+      dumpCaptureSection(stream);
+      stream << "\n";
+      stream << "CONFORMANCES:\n";
+      stream << "=============\n";
+      dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
+      stream << "\n";
+      stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
+      stream << "===============================\n";
+      dumpMultiPayloadEnumSection(stream);
+      stream << "\n";
+    }
+  };
+  friend struct ReflectionTypeDescriptorFinder;
 
   BuiltType decodeMangledType(Node *node, bool forRequirement = true);
 
@@ -1046,60 +1382,33 @@ public:
   BuiltType subst(BuiltType subject, const BuiltSubstitutionMap &Subs) {
     return subject->subst(*this, Subs);
   }
-
-  ///
-  /// Parsing reflection metadata
-  ///
-
-  /// Add the ReflectionInfo and return a unique ID for the reflection image
-  /// added. Since we only add reflection infos, the ID can be its index.
-  /// We return a uint32_t since it's extremely unlikely we'll run out of
-  /// indexes.
   uint32_t addReflectionInfo(ReflectionInfo I) {
-    ReflectionInfos.push_back(I);
-    auto InfoID = ReflectionInfos.size() - 1;
-    assert(InfoID <= UINT32_MAX && "ReflectionInfo ID overflow");
-    return InfoID;
+    return DF.addReflectionInfo(I);
   }
 
   const std::vector<ReflectionInfo> &getReflectionInfos() {
-    return ReflectionInfos;
+    return DF.getReflectionInfos();
   }
 
 public:
   enum ForTesting_t { ForTesting };
-  
+
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this) {}
+  explicit TypeRefBuilder(ForTesting_t) : TC(*this), DF(*this, nullptr) {}
 
 private:
-  std::vector<ReflectionInfo> ReflectionInfos;
-
   /// Indexes of Reflection Infos we've already processed.
   llvm::DenseSet<size_t> ProcessedReflectionInfoIndexes;
 
-  llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
-  bool reflectionNameMatches(RemoteRef<char> reflectionName,
-                             StringRef searchName);
-  void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
-  llvm::Optional<RemoteRef<FieldDescriptor>>
-  findFieldDescriptorAtIndex(size_t Index, const std::string &MangledName);
-
-  llvm::Optional<RemoteRef<FieldDescriptor>>
-  getFieldDescriptorFromExternalCache(const std::string &MangledName);
-
 public:
-  RemoteRef<char> readTypeRef(uint64_t remoteAddr);
-  
-  template<typename Record, typename Field>
-  RemoteRef<char> readTypeRef(RemoteRef<Record> record,
-                              const Field &field) {
-    uint64_t remoteAddr = record.resolveRelativeFieldData(field);
-    
-    return readTypeRef(remoteAddr);
+  RemoteRef<char> readTypeRef(uint64_t remoteAddr) {
+    return DF.readTypeRef(remoteAddr);
   }
-
+  template <typename Record, typename Field>
+  RemoteRef<char> readTypeRef(RemoteRef<Record> record, const Field &field) {
+    return DF.readTypeRef(record, field);
+  }
   StringRef getTypeRefString(RemoteRef<char> record) {
     return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
   }
@@ -1112,6 +1421,8 @@ private:
   using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
   using DynamicSymbolResolver = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress)>;
   using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
+
+  ReflectionTypeDescriptorFinder DF;
 
   // These fields are captured from the MetadataReader template passed into the
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
@@ -1131,7 +1442,7 @@ public:
   template<typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr)
-      : TC(*this), ExternalTypeRefCache(externalCache),
+      : TC(*this), DF(*this, externalCache),
       PointerSize(sizeof(typename Runtime::StoredPointer)),
       TypeRefDemangler(
       [this, &reader](RemoteRef<char> string, bool useOpaqueTypeSymbolicReferences) -> Demangle::Node * {
@@ -1194,15 +1505,16 @@ public:
 
   TypeConverter &getTypeConverter() { return TC; }
 
-  const TypeRef *
-  lookupTypeWitness(const std::string &MangledTypeName,
-                    const std::string &Member,
-                    StringRef Protocol);
-
+  const TypeRef *lookupTypeWitness(const std::string &MangledTypeName,
+                                   const std::string &Member,
+                                   StringRef Protocol) {
+    return DF.lookupTypeWitness(MangledTypeName, Member, Protocol);
+  }
   const TypeRef *lookupSuperclass(const TypeRef *TR);
 
-  /// Load unsubstituted field types for a nominal type.
-  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
+    RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR) {
+      return DF.getFieldTypeInfo(TR);
+    }
 
   /// Get the parsed and substituted field types for a nominal type.
   bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
@@ -1210,18 +1522,25 @@ public:
                         std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
-  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR) {
+    return DF.getBuiltinTypeInfo(TR);
+  }
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress);
+  RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress) {
+    return DF.getCaptureDescriptor(RemoteAddress);
+  }
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
+  ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
+    return DF.getClosureContextInfo(CD);
+  }
 
   /// Get the multipayload enum projection information for a given TR
-  RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR);
-
+  RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR) {
+    return DF.getMultiPayloadEnumInfo(TR);
+  }
 private:
   llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
 
@@ -1252,106 +1571,17 @@ public:
     }
     return multiPayloadEnumPointerMask.value();
   }
+    FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName) {
+      return DF.collectFieldTypes(forMangledTypeName);
+    }
 
-  ///
-  /// Dumping typerefs, field declarations, builtin types, captures, multi-payload enums
-  ///
-  void dumpTypeRef(RemoteRef<char> MangledName, std::ostream &stream,
-                   bool printTypeName = false);
-  FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName);
-  void dumpFieldSection(std::ostream &stream);
-  void dumpBuiltinTypeSection(std::ostream &stream);
-  void dumpCaptureSection(std::ostream &stream);
-  void dumpMultiPayloadEnumSection(std::ostream &stream);
-
-  ///
-  /// Extraction of associated types
-  ///
-public:
-  template <template <typename Runtime> class ObjCInteropKind,
+public:  
+template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   AssociatedTypeCollectionResult
   collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName) {
-    AssociatedTypeCollectionResult result;
-    for (const auto &sections : ReflectionInfos) {
-      for (auto descriptor : sections.AssociatedType) {
-        // Read out the relevant info from the associated type descriptor:
-        // The type's name and which protocol conformance it corresponds to
-        llvm::Optional<std::string> optionalMangledTypeName;
-        std::string typeName;
-        std::string protocolName;
-        {
-          ScopedNodeFactoryCheckpoint checkpoint(this);
-          auto typeRef =
-              readTypeRef(descriptor, descriptor->ConformingTypeName);
-          typeName = nodeToString(demangleTypeRef(typeRef));
-          optionalMangledTypeName = normalizeReflectionName(typeRef);
-          auto protocolNode = demangleTypeRef(
-              readTypeRef(descriptor, descriptor->ProtocolTypeName));
-          protocolName = nodeToString(protocolNode);
-        }
-        if (optionalMangledTypeName.has_value()) {
-          auto mangledTypeName = optionalMangledTypeName.value();
-          if (forMangledTypeName.has_value()) {
-            if (mangledTypeName != forMangledTypeName.value())
-              continue;
-          }
-
-          // For each associated type, gather its typealias name,
-          // the substituted type info, and if the substituted type is opaque -
-          // gather its protocol conformance requirements
-          std::vector<AssociatedType> associatedTypes;
-          for (const auto &associatedTypeRef : *descriptor.getLocalBuffer()) {
-            auto associatedType = descriptor.getField(associatedTypeRef);
-            std::string typealiasTypeName =
-                getTypeRefString(
-                    readTypeRef(associatedType, associatedType->Name))
-                    .str();
-
-            std::string mangledSubstitutedTypeName =
-                std::string(associatedType->SubstitutedTypeName);
-            auto substitutedTypeRef = readTypeRef(
-                associatedType, associatedType->SubstitutedTypeName);
-            auto optionalMangledSubstitutedTypeName =
-                normalizeReflectionName(substitutedTypeRef);
-            if (optionalMangledSubstitutedTypeName.has_value()) {
-              mangledSubstitutedTypeName =
-                  optionalMangledSubstitutedTypeName.value();
-            }
-
-            // We intentionally do not want to resolve opaque type
-            // references, because if the substituted type is opaque, we
-            // would like to get at its OpaqueTypeDescriptor address, which
-            // is stored on the OpaqueTypeDescriptorSymbolicReference typeRef.
-            auto substitutedDemangleTree =
-                demangleTypeRef(substitutedTypeRef,
-                                /* useOpaqueTypeSymbolicReferences */ true);
-
-            // If the substituted type is an opaque type, also gather info
-            // about which protocols it is required to conform to and the corresponding
-            // same-type requirements
-            std::vector<std::string> opaqueTypeConformanceRequirements;
-            std::vector<TypeAliasInfo> sameTypeRequirements;
-            gatherOpaqueTypeRequirements<ObjCInteropKind, PointerSize>(
-                substitutedDemangleTree, opaqueTypeConformanceRequirements,
-                sameTypeRequirements);
-
-            auto substitutedTypeName = nodeToString(substitutedDemangleTree);
-            std::stringstream OS;
-            dumpTypeRef(substitutedTypeRef, OS);
-            associatedTypes.emplace_back(AssociatedType{
-                TypeAliasInfo{typealiasTypeName, mangledSubstitutedTypeName,
-                              substitutedTypeName, OS.str()},
-                opaqueTypeConformanceRequirements, sameTypeRequirements});
-          }
-          result.AssociatedTypeInfos.emplace_back(AssociatedTypeInfo{
-              mangledTypeName, typeName, protocolName, associatedTypes});
-        }
-      }
-    }
-    return result;
+    return DF.collectAssociatedTypes<ObjCInteropKind, PointerSize>(forMangledTypeName);
   }
-
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   void gatherOpaqueTypeRequirements(
@@ -1782,44 +2012,6 @@ private:
 
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
-  void dumpAssociatedTypeSection(std::ostream &stream) {
-    auto associatedTypeCollectionResult =
-        collectAssociatedTypes<ObjCInteropKind, PointerSize>(
-            llvm::Optional<std::string>());
-    for (const auto &info :
-         associatedTypeCollectionResult.AssociatedTypeInfos) {
-      stream << "- " << info.FullyQualifiedName << " : "
-             << info.ProtocolFullyQualifiedName << "\n";
-      for (const auto &typeAlias : info.AssociatedTypes) {
-        stream << "typealias " << typeAlias.SubstitutionInfo.TypeAliasName << " = "
-               << typeAlias.SubstitutionInfo.SubstitutedTypeFullyQualifiedName << "\n";
-        stream << typeAlias.SubstitutionInfo.SubstitutedTypeDiagnosticPrintName;
-        if (!typeAlias.OpaqueTypeProtocolConformanceRequirements.empty()) {
-          stream << "-------------------------\n";
-          stream << "conformance requirements: \n";
-          for (const auto &protocolName :
-               typeAlias.OpaqueTypeProtocolConformanceRequirements) {
-            stream << protocolName << "\n";
-          }
-        }
-        if (!typeAlias.OpaqueTypeSameTypeRequirements.empty()) {
-          stream << "-----------------------\n";
-          stream << "same-type requirements: \n";
-          for (const auto &sameTypeRequirementInfo :
-               typeAlias.OpaqueTypeSameTypeRequirements) {
-            stream << sameTypeRequirementInfo.TypeAliasName << " = "
-                   << sameTypeRequirementInfo.SubstitutedTypeMangledName << " ("
-                   << sameTypeRequirementInfo.SubstitutedTypeFullyQualifiedName
-                   << ")\n";
-          }
-        }
-      }
-      stream << "\n";
-    }
-  }
-
-  template <template <typename Runtime> class ObjCInteropKind,
-            unsigned PointerSize>
   void extractOpaqueTypeProtocolRequirements(
       uintptr_t opaqueTypeDescriptorAddress,
       std::vector<std::string> &protocolRequirements,
@@ -1888,12 +2080,12 @@ private:
         auto paramAddress = readRequirementTypeRefAddress(req.getParamOffset(),
                                                           (uintptr_t)(&req));
         std::string demangledParamName =
-            nodeToString(demangleTypeRef(readTypeRef(paramAddress)));
+            nodeToString(demangleTypeRef(DF.readTypeRef(paramAddress)));
 
         // Read the substituted Type Name
         auto typeAddress = readRequirementTypeRefAddress(
             req.getSameTypeNameOffset(), (uintptr_t)(&req));
-        auto typeTypeRef = readTypeRef(typeAddress);
+        auto typeTypeRef = DF.readTypeRef(typeAddress);
         std::string demangledTypeName =
             nodeToString(demangleTypeRef(typeTypeRef));
         std::string mangledTypeName;
@@ -2096,113 +2288,12 @@ public:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   ConformanceCollectionResult collectAllConformances() {
-    ConformanceCollectionResult result;
-
-    // The Fields section has gathered info on types that includes their mangled
-    // names. Use that to build a dictionary from a type's demangled name to its
-    // mangled name
-    std::unordered_map<std::string, std::string> typeNameToManglingMap;
-    for (const auto &section : ReflectionInfos) {
-      for (auto descriptor : section.Field) {
-        ScopedNodeFactoryCheckpoint checkpoint(this);
-        auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
-        auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
-        auto TypeName = nodeToString(demangleTypeRef(TypeRef));
-        if (OptionalMangledTypeName.has_value()) {
-          typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
-        }
-      }
-    }
-
-    // Collect all conformances and aggregate them per-conforming-type.
-    std::unordered_map<std::string, std::vector<std::string>> typeConformances;
-    ProtocolConformanceDescriptorReader<ObjCInteropKind, PointerSize>
-        conformanceReader(OpaqueByteReader, OpaqueStringReader,
-                          OpaquePointerReader, OpaqueDynamicSymbolResolver);
-    for (const auto &section : ReflectionInfos) {
-      auto ConformanceBegin = section.Conformance.startAddress();
-      auto ConformanceEnd = section.Conformance.endAddress();
-      for (auto conformanceAddr = ConformanceBegin;
-           conformanceAddr != ConformanceEnd;
-           conformanceAddr = conformanceAddr.atByteOffset(4)) {
-        auto optionalConformanceInfo =
-            conformanceReader.readConformanceDescriptor(conformanceAddr,
-                                                        typeNameToManglingMap);
-        if (!optionalConformanceInfo.has_value())
-          result.Errors.push_back(conformanceReader.Error);
-        else
-          result.Conformances.push_back(optionalConformanceInfo.value());
-      }
-    }
-    return result;
+    return DF.collectAllConformances<ObjCInteropKind, PointerSize>();
   }
-
-  template <template <typename Runtime> class ObjCInteropKind,
-            unsigned PointerSize>
-  void dumpConformanceSection(std::ostream &stream) {
-    auto conformanceCollectionResult = collectAllConformances<ObjCInteropKind, PointerSize>();
-
-    // Collect all conformances and aggregate them per-conforming-type.
-    std::unordered_map<std::string, std::vector<std::string>> typeConformances;
-    for (auto &conformanceInfo : conformanceCollectionResult.Conformances) {
-      auto typeConformancesKey = conformanceInfo.MangledTypeName + " (" +
-                                 conformanceInfo.TypeName + ")";
-      if (typeConformances.count(typeConformancesKey) != 0) {
-        typeConformances[typeConformancesKey].push_back(
-            conformanceInfo.ProtocolName);
-      } else {
-        typeConformances.emplace(
-            typeConformancesKey,
-            std::vector<std::string>{conformanceInfo.ProtocolName});
-      }
-    }
-    for (auto &pair : typeConformances) {
-      stream << pair.first << " : ";
-      bool first = true;
-      for (auto &protocol : pair.second) {
-        if (!first) {
-          stream << ", ";
-        }
-        first = false;
-        stream << protocol;
-      }
-      stream << "\n";
-    }
-
-    // Report encountered errors
-    for (auto &error : conformanceCollectionResult.Errors) {
-      stream << "Error reading conformance descriptor: "
-             << error << "\n";
-    }
-  }
-
-  template <template <typename Runtime> class ObjCInteropKind,
+    template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   void dumpAllSections(std::ostream &stream) {
-    stream << "FIELDS:\n";
-    stream << "=======\n";
-    dumpFieldSection(stream);
-    stream << "\n";
-    stream << "ASSOCIATED TYPES:\n";
-    stream << "=================\n";
-    dumpAssociatedTypeSection<ObjCInteropKind, PointerSize>(stream);
-    stream << "\n";
-    stream << "BUILTIN TYPES:\n";
-    stream << "==============\n";
-    dumpBuiltinTypeSection(stream);
-    stream << "\n";
-    stream << "CAPTURE DESCRIPTORS:\n";
-    stream << "====================\n";
-    dumpCaptureSection(stream);
-    stream << "\n";
-    stream << "CONFORMANCES:\n";
-    stream << "=============\n";
-    dumpConformanceSection<ObjCInteropKind, PointerSize>(stream);
-    stream << "\n";
-    stream << "MULTI-PAYLOAD ENUM DESCRIPTORS:\n";
-    stream << "===============================\n";
-    dumpMultiPayloadEnumSection(stream);
-    stream << "\n";
+    DF.dumpAllSections<ObjCInteropKind, PointerSize>(stream);
   }
 };
 
