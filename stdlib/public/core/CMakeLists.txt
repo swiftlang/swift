@@ -221,7 +221,7 @@ split_embedded_sources(
     NORMAL Diffing.swift
   EMBEDDED Duration.swift
   EMBEDDED DurationProtocol.swift
-    NORMAL FloatingPointRandom.swift
+  EMBEDDED FloatingPointRandom.swift
   EMBEDDED Instant.swift
     NORMAL Mirror.swift
     NORMAL PlaygroundDisplay.swift

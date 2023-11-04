@@ -111,7 +111,6 @@ public struct Bool: Sendable {
   /// - Returns: Either `true` or `false`, randomly chosen with equal
   ///   probability.
   @inlinable
-  @_unavailableInEmbedded
   public static func random<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Bool {
