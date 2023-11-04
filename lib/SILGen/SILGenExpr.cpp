@@ -1148,14 +1148,15 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
 
-  // FIXME: typed throws
-  ASTContext &ctx = SGF.getASTContext();
-  (void) catchBB->createPhiArgument(SILType::getExceptionType(ctx),
-                                    OwnershipKind::Owned);
+  auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
+  if (!errorTL.isAddressOnly()) {
+    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
+                                      OwnershipKind::Owned);
+  }
 
   SGF.ThrowDest = JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
                            CleanupLocation(loc),
-                           ThrownErrorInfo(/*indirectErrorAddr=*/nullptr));
+                           ThrownErrorInfo::forDiscard());
 }
 
 void SILGenFunction::ForceTryEmission::finish() {
@@ -1171,26 +1172,34 @@ void SILGenFunction::ForceTryEmission::finish() {
     // Otherwise, we need to emit it.
     SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
-    // FIXME: typed throws
-    auto error = ManagedValue::forForwardedRValue(SGF, catchBB->getArgument(0));
-
     ASTContext &ctx = SGF.getASTContext();
-    if (auto diagnoseError = ctx.getDiagnoseUnexpectedError()) {
-      auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
 
-      SGF.emitApplyOfLibraryIntrinsic(
-              Loc,
-              diagnoseError,
-              SubstitutionMap(),
-              {
-                error,
-                args.filenameStartPointer,
-                args.filenameLength,
-                args.filenameIsAscii,
-                args.line
-              },
-              SGFContext());
+    // Consume the thrown error.
+    if (catchBB->getNumArguments() == 1) {
+      auto error = ManagedValue::forForwardedRValue(SGF, catchBB->getArgument(0));
+
+      // FIXME: for typed throws, we need a new version of this entry point that
+      // takes a generic rather than an existential.
+      if (error.getType() == SILType::getExceptionType(ctx)) {
+        if (auto diagnoseError = ctx.getDiagnoseUnexpectedError()) {
+          auto args = SGF.emitSourceLocationArgs(Loc->getExclaimLoc(), Loc);
+
+          SGF.emitApplyOfLibraryIntrinsic(
+                  Loc,
+                  diagnoseError,
+                  SubstitutionMap(),
+                  {
+                    error,
+                    args.filenameStartPointer,
+                    args.filenameLength,
+                    args.filenameIsAscii,
+                    args.line
+                  },
+                  SGFContext());
+        }
+      }
     }
+
     SGF.B.createUnreachable(Loc);
   }
 
@@ -1241,19 +1250,22 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   if (isByAddress)
     optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
 
-  FullExpr localCleanups(SGF.Cleanups, E);
-
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
 
-  // FIXME: typed throws
-  auto *errorArg = catchBB->createPhiArgument(
-      SILType::getExceptionType(SGF.getASTContext()), OwnershipKind::Owned);
+  // FIXME: opaque values
+  auto &errorTL = SGF.getTypeLowering(E->getThrownError());
+  if (!errorTL.isAddressOnly()) {
+    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
+                                      OwnershipKind::Owned);
+  }
+
+  FullExpr localCleanups(SGF.Cleanups, E);
 
   llvm::SaveAndRestore<JumpDest> throwDest{
     SGF.ThrowDest,
     JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E,
-             ThrownErrorInfo(/*indirectErrorAddr=*/nullptr))};
+             ThrownErrorInfo::forDiscard())};
 
   SILValue branchArg;
   if (shouldWrapInOptional) {
@@ -1308,11 +1320,14 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   else
     SGF.B.createBranch(E, contBB, branchArg);
 
-  // If control branched to the failure block, inject .None into the
+  // If control branched to the failure block, inject .none into the
   // result type.
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
-  (void) SGF.emitManagedRValueWithCleanup(errorArg);
+
+  // Consume the thrown error.
+  if (!errorTL.isAddressOnly())
+    (void) SGF.emitManagedRValueWithCleanup(catchBB->getArgument(0));
   catchCleanups.pop();
 
   if (isByAddress) {

@@ -1583,6 +1583,10 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
     // A direct error value is passed to the epilog block as a BB argument.
     args.push_back(exn);
+  } else if (ThrowDest.getThrownError().Discard) {
+    assert(!indirectErrorAddr);
+    if (exn)
+      B.createDestroyAddr(loc, exn);
   } else {
     assert(indirectErrorAddr);
 
