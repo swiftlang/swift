@@ -275,7 +275,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
     return true;
   }
 
-  if (isa<ThrowInst>(I))
+  if (isa<ThrowInst>(I) || isa<ThrowAddrInst>(I))
     return false;
 
   // The entire access must be within the loop.

@@ -746,7 +746,7 @@ public:
   bool isIndirectErrorResultOperand(const Operand &op) const {
     return isArgumentOperand(op)
       && (getCalleeArgIndex(op) >= getNumIndirectSILResults())
-      && (getCalleeArgIndex(op) < getNumIndirectSILErrorResults());
+      && (getCalleeArgIndex(op) < getNumIndirectSILResults() + getNumIndirectSILErrorResults());
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
