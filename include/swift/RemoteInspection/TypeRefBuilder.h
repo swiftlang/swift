@@ -38,7 +38,8 @@ namespace reflection {
 
 using remote::RemoteRef;
 
-template <typename Runtime> class ReflectionContext;
+template <typename Runtime>
+class ReflectionContext;
 
 template <typename Iterator>
 class ReflectionSection {
@@ -48,64 +49,54 @@ class ReflectionSection {
 
 public:
   ReflectionSection(RemoteRef<void> Start, uint64_t Size)
-    : Start(Start), Size(Size) {}
+      : Start(Start), Size(Size) {}
 
-  RemoteRef<void> startAddress() const {
-    return Start;
+  RemoteRef<void> startAddress() const { return Start; }
+
+  RemoteRef<void> endAddress() const { return Start.atByteOffset(Size); }
+
+  const_iterator begin() const { return const_iterator(Start, Size); }
+
+  const_iterator end() const { return const_iterator(endAddress(), 0); }
+
+  size_t size() const { return Size; }
+
+  bool containsRemoteAddress(uint64_t remoteAddr, uint64_t size) const {
+    return Start.getAddressData() <= remoteAddr &&
+           remoteAddr + size <= Start.getAddressData() + Size;
   }
 
-  RemoteRef<void> endAddress() const {
-    return Start.atByteOffset(Size);
-  }
-
-  const_iterator begin() const {
-    return const_iterator(Start, Size);
-  }
-
-  const_iterator end() const {
-    return const_iterator(endAddress(), 0);
-  }
-
-  size_t size() const {
-    return Size;
-  }
-  
-  bool containsRemoteAddress(uint64_t remoteAddr,
-                             uint64_t size) const {
-    return Start.getAddressData() <= remoteAddr
-      && remoteAddr + size <= Start.getAddressData() + Size;
-  }
-  
-  template<typename U>
+  template <typename U>
   RemoteRef<U> getRemoteRef(uint64_t remoteAddr) const {
     assert(containsRemoteAddress(remoteAddr, sizeof(U)));
-    auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer()
-      + (remoteAddr - Start.getAddressData());
-    
-    return RemoteRef<U>(remoteAddr, (const U*)localAddr);
+    auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer() +
+                     (remoteAddr - Start.getAddressData());
+
+    return RemoteRef<U>(remoteAddr, (const U *)localAddr);
   }
 };
 
-template<typename Self, typename Descriptor>
+template <typename Self, typename Descriptor>
 class ReflectionSectionIteratorBase {
   uint64_t OriginalSize;
+
 protected:
-  Self &asImpl() {
-    return *static_cast<Self *>(this);
-  }
+  Self &asImpl() { return *static_cast<Self *>(this); }
+
 public:
   using iterator_category = std::forward_iterator_tag;
   using value_type = Descriptor;
   using difference_type = std::ptrdiff_t;
-  using pointer = value_type*;
-  using reference = value_type&;    
+  using pointer = value_type *;
+  using reference = value_type &;
 
   RemoteRef<void> Cur;
   uint64_t Size;
   std::string Name;
-    
-  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size, std::string Name)
-    : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
+
+  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size,
+                                std::string Name)
+      : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
       auto NextRecord = this->operator*();
       if (!NextRecord) {
@@ -116,13 +107,12 @@ public:
       }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
-        std::cerr << "!!! Reflection section too small to contain first record\n" << std::endl;
+        std::cerr
+            << "!!! Reflection section too small to contain first record\n"
+            << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
-        std::cerr << "Section size: "
-                  << Size
-                  << ", size of first record: "
-                  << NextSize
-                  << std::endl;
+        std::cerr << "Section size: " << Size
+                  << ", size of first record: " << NextSize << std::endl;
         // Set this iterator equal to the end. This section is effectively
         // empty.
         this->Size = 0;
@@ -133,7 +123,7 @@ public:
   RemoteRef<Descriptor> operator*() const {
     assert(Size > 0);
     return RemoteRef<Descriptor>(Cur.getAddressData(),
-                                 (const Descriptor*)Cur.getLocalBuffer());
+                                 (const Descriptor *)Cur.getLocalBuffer());
   }
 
   Self &operator++() {
@@ -141,20 +131,21 @@ public:
     auto CurSize = Self::getCurrentRecordSize(CurRecord);
     Cur = Cur.atByteOffset(CurSize);
     Size -= CurSize;
-    
+
     if (Size > 0) {
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
         int offset = (int)(OriginalSize - Size);
-        std::cerr << "!!! Reflection section too small to contain next record\n" << std::endl;
+        std::cerr << "!!! Reflection section too small to contain next record\n"
+                  << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Remaining section size: " << Size
                   << ", total section size: " << OriginalSize
                   << ", offset in section: " << offset
-                  << ", size of next record: " << NextSize
-                  << std::endl;
-        const uint8_t *p = reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
+                  << ", size of next record: " << NextSize << std::endl;
+        const uint8_t *p =
+            reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
         std::cerr << "Last bytes of previous record: ";
         for (int i = std::max(-8, -offset); i < 0; i++) {
           std::cerr << std::hex << std::setw(2) << (int)p[i] << " ";
@@ -180,19 +171,15 @@ public:
     return Cur == other.Cur && Size == other.Size;
   }
 
-  bool operator!=(const Self &other) const {
-    return !(*this == other);
-  }
+  bool operator!=(const Self &other) const { return !(*this == other); }
 };
 
 class FieldDescriptorIterator
-  : public ReflectionSectionIteratorBase<FieldDescriptorIterator,
-                                         FieldDescriptor>
-{
+    : public ReflectionSectionIteratorBase<FieldDescriptorIterator,
+                                           FieldDescriptor> {
 public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor")
-  {}
+      : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor") {}
 
   static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
     return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
@@ -201,64 +188,62 @@ public:
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
 
 class AssociatedTypeIterator
-  : public ReflectionSectionIteratorBase<AssociatedTypeIterator,
-                                         AssociatedTypeDescriptor>
-{
+    : public ReflectionSectionIteratorBase<AssociatedTypeIterator,
+                                           AssociatedTypeDescriptor> {
 public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType")
-  {}
+      : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR){
-    return sizeof(AssociatedTypeDescriptor)
-      + ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+  static uint64_t
+  getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR) {
+    return sizeof(AssociatedTypeDescriptor) +
+           ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
   }
 };
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
 
 class BuiltinTypeDescriptorIterator
-  : public ReflectionSectionIteratorBase<BuiltinTypeDescriptorIterator,
-                                         BuiltinTypeDescriptor> {
+    : public ReflectionSectionIteratorBase<BuiltinTypeDescriptorIterator,
+                                           BuiltinTypeDescriptor> {
 public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor")
-  {}
+      : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR){
+  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
     return sizeof(BuiltinTypeDescriptor);
   }
 };
 using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
 
 class CaptureDescriptorIterator
-  : public ReflectionSectionIteratorBase<CaptureDescriptorIterator,
-                                         CaptureDescriptor> {
+    : public ReflectionSectionIteratorBase<CaptureDescriptorIterator,
+                                           CaptureDescriptor> {
 public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor")
-  {}
+      : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR){
-    return sizeof(CaptureDescriptor)
-      + CR->NumCaptureTypes * sizeof(CaptureTypeRecord)
-      + CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+    return sizeof(CaptureDescriptor) +
+           CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
+           CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 
 class MultiPayloadEnumDescriptorIterator
-  : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
-                                         MultiPayloadEnumDescriptor> {
+    : public ReflectionSectionIteratorBase<MultiPayloadEnumDescriptorIterator,
+                                           MultiPayloadEnumDescriptor> {
 public:
   MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
-    : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum")
-  {}
+      : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
+  static uint64_t
+  getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
   }
 };
-using MultiPayloadEnumSection = ReflectionSection<MultiPayloadEnumDescriptorIterator>;
+using MultiPayloadEnumSection =
+    ReflectionSection<MultiPayloadEnumDescriptorIterator>;
 
 using GenericSection = ReflectionSection<const void *>;
 
@@ -276,7 +261,8 @@ struct ReflectionInfo {
 
 struct ClosureContextInfo {
   std::vector<const TypeRef *> CaptureTypes;
-  std::vector<std::pair<const TypeRef *, const MetadataSource *>> MetadataSources;
+  std::vector<std::pair<const TypeRef *, const MetadataSource *>>
+      MetadataSources;
   unsigned NumBindings = 0;
 
   void dump() const;
@@ -290,15 +276,19 @@ struct FieldTypeInfo {
   bool Indirect;
   bool Generic;
 
-  FieldTypeInfo() : Name(""), Value(0), TR(nullptr), Indirect(false), Generic(false) {}
-  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR, bool Indirect, bool Generic)
-    : Name(Name), Value(Value), TR(TR), Indirect(Indirect), Generic(Generic) {}
+  FieldTypeInfo()
+      : Name(""), Value(0), TR(nullptr), Indirect(false), Generic(false) {}
+  FieldTypeInfo(const std::string &Name, int Value, const TypeRef *TR,
+                bool Indirect, bool Generic)
+      : Name(Name), Value(Value), TR(TR), Indirect(Indirect), Generic(Generic) {
+  }
 
   static FieldTypeInfo forEmptyCase(std::string Name, int Value) {
     return FieldTypeInfo(Name, Value, nullptr, false, false);
   }
 
-  static FieldTypeInfo forField(std::string Name, int Value, const TypeRef *TR) {
+  static FieldTypeInfo forField(std::string Name, int Value,
+                                const TypeRef *TR) {
     return FieldTypeInfo(Name, Value, TR, false, false);
   }
 };
@@ -372,15 +362,13 @@ struct TypeRefDecl {
   // generic params for all the levels are stored as a flat array.
   llvm::Optional<std::vector<size_t>> genericParamsPerLevel;
 
-  TypeRefDecl(std::string mangledName, 
+  TypeRefDecl(std::string mangledName,
               std::vector<size_t> genericParamsPerLevel)
-      : mangledName(mangledName), 
-        genericParamsPerLevel(genericParamsPerLevel) {}
+      : mangledName(mangledName), genericParamsPerLevel(genericParamsPerLevel) {
+  }
 
-  TypeRefDecl(std::string mangledName) 
-      : mangledName(mangledName), 
-        genericParamsPerLevel(llvm::None) {}
-
+  TypeRefDecl(std::string mangledName)
+      : mangledName(mangledName), genericParamsPerLevel(llvm::None) {}
 };
 
 /// An implementation of MetadataReader's BuilderType concept for
@@ -421,10 +409,10 @@ private:
 
   TypeConverter TC;
 
-
-#define TYPEREF(Id, Parent) \
-  std::unordered_map<TypeRefID, const Id##TypeRef *, \
-                     TypeRefID::Hash, TypeRefID::Equal> Id##TypeRefs;
+#define TYPEREF(Id, Parent)                                                    \
+  std::unordered_map<TypeRefID, const Id##TypeRef *, TypeRefID::Hash,          \
+                     TypeRefID::Equal>                                         \
+      Id##TypeRefs;
 #include "swift/RemoteInspection/TypeRefs.def"
 
 public:
@@ -854,13 +842,12 @@ public:
     return {{mangling.result()}};
   }
 
-  BuiltTypeDecl createTypeDecl(std::string &&mangledName,
-                                             bool &typeAlias) {
-    return {{(mangledName)}};;
+  BuiltTypeDecl createTypeDecl(std::string &&mangledName, bool &typeAlias) {
+    return {{(mangledName)}};
+    ;
   }
 
-  BuiltProtocolDecl
-  createProtocolDecl(Node *node) {
+  BuiltProtocolDecl createProtocolDecl(Node *node) {
     auto mangling = Demangle::mangleNode(node);
     if (!mangling.isSuccess()) {
       return llvm::None;
@@ -868,26 +855,21 @@ public:
     return std::make_pair(mangling.result(), false);
   }
 
-  BuiltProtocolDecl
-  createObjCProtocolDecl(std::string &&name) {
+  BuiltProtocolDecl createObjCProtocolDecl(std::string &&name) {
     return std::make_pair(name, true);
   }
 
-
-  const NominalTypeRef *
-  createNominalType(const BuiltTypeDecl &typeRefDecl) {
+  const NominalTypeRef *createNominalType(const BuiltTypeDecl &typeRefDecl) {
     return NominalTypeRef::create(*this, typeRefDecl->mangledName, nullptr);
   }
 
-  const NominalTypeRef *
-  createNominalType(const BuiltTypeDecl &typeRefDecl,
-                    const TypeRef *parent) {
+  const NominalTypeRef *createNominalType(const BuiltTypeDecl &typeRefDecl,
+                                          const TypeRef *parent) {
     return NominalTypeRef::create(*this, typeRefDecl->mangledName, parent);
   }
 
-  const TypeRef *
-  createTypeAliasType(const BuiltTypeDecl &typeRefDecl,
-                      const TypeRef *parent) {
+  const TypeRef *createTypeAliasType(const BuiltTypeDecl &typeRefDecl,
+                                     const TypeRef *parent) {
     // TypeRefs don't contain sugared types
     return nullptr;
   }
@@ -902,7 +884,8 @@ public:
     return nullptr;
   }
 
-  const TypeRef *createDictionaryType(const TypeRef *key, const TypeRef *value) {
+  const TypeRef *createDictionaryType(const TypeRef *key,
+                                      const TypeRef *value) {
     // TypeRefs don't contain sugared types
     return nullptr;
   }
@@ -918,8 +901,7 @@ public:
   const BoundGenericTypeRef *reconstructParentsOfBoundGenericType(
       const NodePointer startNode,
       const std::vector<size_t> &genericParamsPerLevel,
-      const llvm::ArrayRef<const TypeRef *> &args)
-  {
+      const llvm::ArrayRef<const TypeRef *> &args) {
     // Collect the first N parents that potentially have generic args
     // (Ignore the last genericParamPerLevel, which
     // applies to the startNode itself.)
@@ -927,17 +909,17 @@ public:
     NodePointer node = startNode;
     while (nodes.size() < genericParamsPerLevel.size() - 1) {
       if (!node || !node->hasChildren()) {
-	return nullptr;
+        return nullptr;
       }
       node = node->getFirstChild();
       switch (node->getKind()) {
       case Node::Kind::Class:
       case Node::Kind::Structure:
       case Node::Kind::Enum:
-	nodes.push_back(node);
-	break;
+        nodes.push_back(node);
+        break;
       default:
-	break;
+        break;
       }
     }
     assert(nodes.size() == genericParamsPerLevel.size() - 1);
@@ -955,21 +937,22 @@ public:
       // Get the mangling for this node
       auto mangling = Demangle::mangleNode(nodes[i]);
       if (!mangling.isSuccess()) {
-	return nullptr;
+        return nullptr;
       }
 
       // Use the next N params for this node
       auto numGenericArgs = genericParamsPerLevel[i];
       // Skip nodes that don't have any actual type params.
       if (numGenericArgs == 0) {
-	continue;
+        continue;
       }
       auto argEnd = argBegin + numGenericArgs;
       std::vector<const TypeRef *> params(argBegin, argEnd);
       argBegin = argEnd;
-      
+
       // Extend the typeref list towards the innermost type
-      typeref = BoundGenericTypeRef::create(*this, mangling.result(), params, typeref);
+      typeref = BoundGenericTypeRef::create(*this, mangling.result(), params,
+                                            typeref);
     }
     return typeref;
   }
@@ -984,7 +967,8 @@ public:
     // a single BG typeref with all the generic args
     auto maybeGenericParamsPerLevel = builtTypeDecl->genericParamsPerLevel;
     if (!maybeGenericParamsPerLevel) {
-      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName, args, nullptr);
+      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName,
+                                         args, nullptr);
     }
 
     // Otherwise, work from a full demangle tree to produce a
@@ -1009,7 +993,7 @@ public:
     size_t totalParams = 0;
     for (size_t i = 0; i < genericParamsPerLevel.size(); i++) {
       if (genericParamsPerLevel[i] > args.size()) {
-	return nullptr;
+        return nullptr;
       }
       totalParams += genericParamsPerLevel[i];
     }
@@ -1018,7 +1002,8 @@ public:
     }
 
     // Reconstruct all parents that have non-zero generic params
-    auto parents = reconstructParentsOfBoundGenericType(startNode, genericParamsPerLevel, args);
+    auto parents = reconstructParentsOfBoundGenericType(
+        startNode, genericParamsPerLevel, args);
 
     // Collect the final set of generic params for the
     // innermost type.  Note: This will sometimes be empty:
@@ -1026,12 +1011,14 @@ public:
     // which has 2 parents in the parent list
     // (`Foo<Int,String>`, `Baz<Double>`), and the
     // startNode is `Quux` with no params.
-    auto numGenericArgs = genericParamsPerLevel[genericParamsPerLevel.size() - 1];
+    auto numGenericArgs =
+        genericParamsPerLevel[genericParamsPerLevel.size() - 1];
     auto argBegin = args.end() - numGenericArgs;
     std::vector<const TypeRef *> params(argBegin, args.end());
 
     // Build and return the top typeref
-    return BoundGenericTypeRef::create(*this, mangling.result(), params, parents);
+    return BoundGenericTypeRef::create(*this, mangling.result(), params,
+                                       parents);
   }
 
   const BoundGenericTypeRef *
@@ -1042,8 +1029,8 @@ public:
       return nullptr;
 
     if (!builtTypeDecl->genericParamsPerLevel)
-      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName, args,
-                                       parent);
+      return BoundGenericTypeRef::create(*this, builtTypeDecl->mangledName,
+                                         args, parent);
     assert(parent == nullptr &&
            "Parent is not null but we're reconstructing the parent!");
     return createBoundGenericType(builtTypeDecl, args);
@@ -1058,9 +1045,9 @@ public:
 
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
-                            Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
-      auto underlyingTy = OpaqueUnderlyingTypeReader(
-                                         opaqueDescriptor->getIndex(), ordinal);
+        Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
+      auto underlyingTy =
+          OpaqueUnderlyingTypeReader(opaqueDescriptor->getIndex(), ordinal);
 
       if (!underlyingTy)
         return nullptr;
@@ -1072,22 +1059,18 @@ public:
           subs.insert({{d, i}, argsForDepth[i]});
         }
       }
-      
+
       return underlyingTy->subst(*this, subs);
     }
 
-    auto mangling = mangleNode(opaqueDescriptor,
-                               SymbolicResolver(),
-                               Dem);
+    auto mangling = mangleNode(opaqueDescriptor, SymbolicResolver(), Dem);
     if (!mangling.isSuccess())
       return nullptr;
 
     // Otherwise, build a type ref that represents the opaque type.
-    return OpaqueArchetypeTypeRef::create(*this,
-                                          mangling.result(),
+    return OpaqueArchetypeTypeRef::create(*this, mangling.result(),
                                           nodeToString(opaqueDescriptor),
-                                          ordinal,
-                                          genericArgs);
+                                          ordinal, genericArgs);
   }
 
   const TupleTypeRef *createTupleType(llvm::ArrayRef<const TypeRef *> elements,
@@ -1130,8 +1113,8 @@ public:
       const TypeRef *result, FunctionTypeFlags flags,
       FunctionMetadataDifferentiabilityKind diffKind,
       const TypeRef *globalActor, const TypeRef *thrownError) {
-    return FunctionTypeRef::create(
-        *this, params, result, flags, diffKind, globalActor, thrownError);
+    return FunctionTypeRef::create(*this, params, result, flags, diffKind,
+                                   globalActor, thrownError);
   }
 
   const FunctionTypeRef *createImplFunctionType(
@@ -1156,7 +1139,8 @@ public:
       funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Thin);
       break;
     case Demangle::ImplFunctionRepresentation::CFunctionPointer:
-      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+      funcFlags = funcFlags.withConvention(
+          FunctionMetadataConvention::CFunctionPointer);
       break;
     case Demangle::ImplFunctionRepresentation::Block:
       funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Block);
@@ -1187,15 +1171,16 @@ public:
     }
 
     auto result = createTupleType({}, llvm::ArrayRef<llvm::StringRef>());
-    return FunctionTypeRef::create(
-        *this, {}, result, funcFlags, diffKind, nullptr, nullptr);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags, diffKind,
+                                   nullptr, nullptr);
   }
 
   BuiltType createProtocolTypeFromDecl(BuiltProtocolDecl protocol) {
     if (protocol->second) {
       return llvm::cast<TypeRef>(createObjCProtocolType(protocol->first));
     } else {
-      return llvm::cast<TypeRef>(createNominalType(TypeRefDecl(protocol->first)));
+      return llvm::cast<TypeRef>(
+          createNominalType(TypeRefDecl(protocol->first)));
     }
   }
 
@@ -1246,7 +1231,8 @@ public:
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
 
-  void pushGenericParams(llvm::ArrayRef<std::pair<unsigned, unsigned>> parameterPacks) {}
+  void pushGenericParams(
+      llvm::ArrayRef<std::pair<unsigned, unsigned>> parameterPacks) {}
   void popGenericParams() {}
 
   const GenericTypeParameterTypeRef *
@@ -1256,26 +1242,23 @@ public:
   }
 
   const DependentMemberTypeRef *
-  createDependentMemberType(const std::string &member,
-                            const TypeRef *base) {
+  createDependentMemberType(const std::string &member, const TypeRef *base) {
     // Should not have unresolved dependent member types here.
     return nullptr;
   }
 
   const DependentMemberTypeRef *
-  createDependentMemberType(const std::string &member,
-                            const TypeRef *base,
+  createDependentMemberType(const std::string &member, const TypeRef *base,
                             BuiltProtocolDecl protocol) {
     // Objective-C protocols don't have dependent types.
     if (protocol->second)
       return nullptr;
-    return DependentMemberTypeRef::create(*this, member, base,
-                                          protocol->first);
+    return DependentMemberTypeRef::create(*this, member, base, protocol->first);
   }
 
-#define REF_STORAGE(Name, ...) \
+#define REF_STORAGE(Name, ...)                                                 \
   const Name##StorageTypeRef *create##Name##StorageType(const TypeRef *base) { \
-    return Name##StorageTypeRef::create(*this, base); \
+    return Name##StorageTypeRef::create(*this, base);                          \
   }
 #include "swift/AST/ReferenceStorage.def"
 
@@ -1317,8 +1300,7 @@ public:
     return createObjCClassType("");
   }
 
-  const ObjCClassTypeRef *
-  createObjCClassType(const std::string &name) {
+  const ObjCClassTypeRef *createObjCClassType(const std::string &name) {
     return ObjCClassTypeRef::create(*this, name);
   }
 
@@ -1339,14 +1321,11 @@ public:
     return ForeignClassTypeRef::create(*this, mangledName);
   }
 
-  const ForeignClassTypeRef *
-  getUnnamedForeignClassType() {
+  const ForeignClassTypeRef *getUnnamedForeignClassType() {
     return createForeignClassType("");
   }
 
-  const OpaqueTypeRef *getOpaqueType() {
-    return OpaqueTypeRef::get();
-  }
+  const OpaqueTypeRef *getOpaqueType() { return OpaqueTypeRef::get(); }
 
   BuiltGenericSignature
   createGenericSignature(llvm::ArrayRef<BuiltType> builtParams,
@@ -1412,15 +1391,23 @@ public:
   StringRef getTypeRefString(RemoteRef<char> record) {
     return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
   }
-  
+
 private:
-  using RefDemangler = std::function<Demangle::Node * (RemoteRef<char>, bool)>;
-  using UnderlyingTypeReader = std::function<const TypeRef* (uint64_t, unsigned)>;
-  using ByteReader = std::function<remote::MemoryReader::ReadBytesResult (remote::RemoteAddress, unsigned)>;
-  using StringReader = std::function<bool (remote::RemoteAddress, std::string &)>;
-  using PointerReader = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress, unsigned)>;
-  using DynamicSymbolResolver = std::function<llvm::Optional<remote::RemoteAbsolutePointer> (remote::RemoteAddress)>;
-  using IntVariableReader = std::function<llvm::Optional<uint64_t> (std::string, unsigned)>;
+  using RefDemangler = std::function<Demangle::Node *(RemoteRef<char>, bool)>;
+  using UnderlyingTypeReader =
+      std::function<const TypeRef *(uint64_t, unsigned)>;
+  using ByteReader = std::function<remote::MemoryReader::ReadBytesResult(
+      remote::RemoteAddress, unsigned)>;
+  using StringReader =
+      std::function<bool(remote::RemoteAddress, std::string &)>;
+  using PointerReader =
+      std::function<llvm::Optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress, unsigned)>;
+  using DynamicSymbolResolver =
+      std::function<llvm::Optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress)>;
+  using IntVariableReader =
+      std::function<llvm::Optional<uint64_t>(std::string, unsigned)>;
 
   ReflectionTypeDescriptorFinder DF;
 
@@ -1439,36 +1426,46 @@ private:
   IntVariableReader OpaqueIntVariableReader;
 
 public:
-  template<typename Runtime>
+  template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr)
       : TC(*this), DF(*this, externalCache),
-      PointerSize(sizeof(typename Runtime::StoredPointer)),
-      TypeRefDemangler(
-      [this, &reader](RemoteRef<char> string, bool useOpaqueTypeSymbolicReferences) -> Demangle::Node * {
-        return reader.demangle(string,
-                               remote::MangledNameKind::Type,
-                               Dem, useOpaqueTypeSymbolicReferences);
-      }),
-      OpaqueUnderlyingTypeReader(
-      [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(
-          descriptorAddr, ordinal).getType();
-      }),
-      OpaqueByteReader([&reader](remote::RemoteAddress address, unsigned size) -> remote::MemoryReader::ReadBytesResult {
-        return reader.Reader->readBytes(address, size);
-      }),
-      OpaqueStringReader([&reader](remote::RemoteAddress address, std::string &dest) -> bool {
-        return reader.Reader->readString(address, dest);
-      }),
-      OpaquePointerReader([&reader](remote::RemoteAddress address, unsigned size) -> llvm::Optional<remote::RemoteAbsolutePointer> {
-        return reader.Reader->readPointer(address, size);
-      }),
-      OpaqueDynamicSymbolResolver([&reader](remote::RemoteAddress address) -> llvm::Optional<remote::RemoteAbsolutePointer> {
-        return reader.Reader->getDynamicSymbol(address);
-      }),
-      OpaqueIntVariableReader(
-        [&reader](std::string symbol, unsigned size) -> llvm::Optional<uint64_t> {
+        PointerSize(sizeof(typename Runtime::StoredPointer)),
+        TypeRefDemangler([this, &reader](RemoteRef<char> string,
+                                         bool useOpaqueTypeSymbolicReferences)
+                             -> Demangle::Node * {
+          return reader.demangle(string, remote::MangledNameKind::Type, Dem,
+                                 useOpaqueTypeSymbolicReferences);
+        }),
+        OpaqueUnderlyingTypeReader(
+            [&reader](uint64_t descriptorAddr,
+                      unsigned ordinal) -> const TypeRef * {
+              return reader
+                  .readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
+                                                             ordinal)
+                  .getType();
+            }),
+        OpaqueByteReader(
+            [&reader](remote::RemoteAddress address,
+                      unsigned size) -> remote::MemoryReader::ReadBytesResult {
+              return reader.Reader->readBytes(address, size);
+            }),
+        OpaqueStringReader([&reader](remote::RemoteAddress address,
+                                     std::string &dest) -> bool {
+          return reader.Reader->readString(address, dest);
+        }),
+        OpaquePointerReader(
+            [&reader](remote::RemoteAddress address, unsigned size)
+                -> llvm::Optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->readPointer(address, size);
+            }),
+        OpaqueDynamicSymbolResolver(
+            [&reader](remote::RemoteAddress address)
+                -> llvm::Optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->getDynamicSymbol(address);
+            }),
+        OpaqueIntVariableReader([&reader](std::string symbol, unsigned size)
+                                    -> llvm::Optional<uint64_t> {
           llvm::Optional<uint64_t> result;
           if (auto Reader = reader.Reader) {
             auto Addr = Reader->getSymbolAddress(symbol);
@@ -1489,14 +1486,15 @@ public:
                 break;
               }
               default: {
-                assert(false && "Can only read 4- or 8-byte integer variables from image");
+                assert(
+                    false &&
+                    "Can only read 4- or 8-byte integer variables from image");
               }
               }
             }
           }
           return result;
-      })
-  { }
+        }) {}
 
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
@@ -1512,9 +1510,9 @@ public:
   }
   const TypeRef *lookupSuperclass(const TypeRef *TR);
 
-    RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR) {
-      return DF.getFieldTypeInfo(TR);
-    }
+  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR) {
+    return DF.getFieldTypeInfo(TR);
+  }
 
   /// Get the parsed and substituted field types for a nominal type.
   bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
@@ -1538,9 +1536,11 @@ public:
   }
 
   /// Get the multipayload enum projection information for a given TR
-  RemoteRef<MultiPayloadEnumDescriptor> getMultiPayloadEnumInfo(const TypeRef *TR) {
+  RemoteRef<MultiPayloadEnumDescriptor>
+  getMultiPayloadEnumInfo(const TypeRef *TR) {
     return DF.getMultiPayloadEnumInfo(TR);
   }
+
 private:
   llvm::Optional<uint64_t> multiPayloadEnumPointerMask;
 
@@ -1553,8 +1553,8 @@ public:
     unsigned pointerSize = TC.targetPointerSize();
     if (!multiPayloadEnumPointerMask.has_value()) {
       // Ask the target for the spare bits mask
-      multiPayloadEnumPointerMask
-        = OpaqueIntVariableReader("_swift_debug_multiPayloadEnumPointerSpareBitsMask", pointerSize);
+      multiPayloadEnumPointerMask = OpaqueIntVariableReader(
+          "_swift_debug_multiPayloadEnumPointerSpareBitsMask", pointerSize);
     }
     if (!multiPayloadEnumPointerMask.has_value()) {
       if (pointerSize == sizeof(void *)) {
@@ -1571,16 +1571,18 @@ public:
     }
     return multiPayloadEnumPointerMask.value();
   }
-    FieldTypeCollectionResult collectFieldTypes(llvm::Optional<std::string> forMangledTypeName) {
-      return DF.collectFieldTypes(forMangledTypeName);
-    }
+  FieldTypeCollectionResult
+  collectFieldTypes(llvm::Optional<std::string> forMangledTypeName) {
+    return DF.collectFieldTypes(forMangledTypeName);
+  }
 
-public:  
-template <template <typename Runtime> class ObjCInteropKind,
+public:
+  template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   AssociatedTypeCollectionResult
   collectAssociatedTypes(llvm::Optional<std::string> forMangledTypeName) {
-    return DF.collectAssociatedTypes<ObjCInteropKind, PointerSize>(forMangledTypeName);
+    return DF.collectAssociatedTypes<ObjCInteropKind, PointerSize>(
+        forMangledTypeName);
   }
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
@@ -1602,9 +1604,8 @@ template <template <typename Runtime> class ObjCInteropKind,
         if (opaqueTypeChildDemangleTree->getKind() ==
             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
           extractOpaqueTypeProtocolRequirements<ObjCInteropKind, PointerSize>(
-            opaqueTypeChildDemangleTree->getIndex(),
-            opaqueTypeConformanceRequirements,
-            sameTypeRequirements);
+              opaqueTypeChildDemangleTree->getIndex(),
+              opaqueTypeConformanceRequirements, sameTypeRequirements);
         }
       }
     }
@@ -1628,13 +1629,11 @@ private:
     PointerReader OpaquePointerReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
 
-    QualifiedContextNameReader(ByteReader byteReader,
-                               StringReader stringReader,
+    QualifiedContextNameReader(ByteReader byteReader, StringReader stringReader,
                                PointerReader pointerReader,
                                DynamicSymbolResolver dynamicSymbolResolver)
         : Error(""), OpaqueByteReader(byteReader),
-          OpaqueStringReader(stringReader),
-          OpaquePointerReader(pointerReader),
+          OpaqueStringReader(stringReader), OpaquePointerReader(pointerReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver) {}
 
     llvm::Optional<std::string> readProtocolNameFromProtocolDescriptor(
@@ -1753,8 +1752,8 @@ private:
         return llvm::None;
       }
 
-      auto optionalTypeName = readTypeNameFromTypeDescriptor(
-          typeDescriptor, typeDescriptorTarget);
+      auto optionalTypeName =
+          readTypeNameFromTypeDescriptor(typeDescriptor, typeDescriptorTarget);
       if (!optionalTypeName.has_value())
         return llvm::None;
       else
@@ -1769,8 +1768,7 @@ private:
     }
 
     llvm::Optional<std::string>
-    readFullyQualifiedProtocolName(
-        uintptr_t protocolDescriptorTarget) {
+    readFullyQualifiedProtocolName(uintptr_t protocolDescriptorTarget) {
       llvm::Optional<std::string> protocolName;
       // Set low bit indicates that this is an indirect
       // reference
@@ -1791,9 +1789,8 @@ private:
           } else {
             // This is an absolute address of a protocol descriptor
             auto protocolDescriptorAddress = (uintptr_t)symbol->getOffset();
-            protocolName =
-                readFullyQualifiedProtocolNameFromProtocolDescriptor(
-                    protocolDescriptorAddress);
+            protocolName = readFullyQualifiedProtocolNameFromProtocolDescriptor(
+                protocolDescriptorAddress);
           }
         } else {
           Error = "Error reading external protocol address.";
@@ -1802,9 +1799,8 @@ private:
       } else {
         // If this is a direct reference, get symbol name from the protocol
         // descriptor.
-        protocolName =
-            readFullyQualifiedProtocolNameFromProtocolDescriptor(
-                protocolDescriptorTarget);
+        protocolName = readFullyQualifiedProtocolNameFromProtocolDescriptor(
+            protocolDescriptorTarget);
       }
       return protocolName;
     }
@@ -1814,7 +1810,7 @@ private:
     readFullyQualifiedProtocolNameFromProtocolDescriptor(
         uintptr_t protocolDescriptorAddress) {
       llvm::Optional<std::string> protocolName =
-        readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
+          readProtocolNameFromProtocolDescriptor(protocolDescriptorAddress);
 
       // Read the protocol conformance descriptor itself
       auto protocolContextDescriptorBytes = OpaqueByteReader(
@@ -2115,14 +2111,15 @@ private:
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
 
-    ProtocolConformanceDescriptorReader(ByteReader byteReader,
-                                        StringReader stringReader,
-                                        PointerReader pointerReader,
-                                        DynamicSymbolResolver dynamicSymbolResolver)
-        : Error(""),
-          OpaquePointerReader(pointerReader), OpaqueByteReader(byteReader),
+    ProtocolConformanceDescriptorReader(
+        ByteReader byteReader, StringReader stringReader,
+        PointerReader pointerReader,
+        DynamicSymbolResolver dynamicSymbolResolver)
+        : Error(""), OpaquePointerReader(pointerReader),
+          OpaqueByteReader(byteReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
-          NameReader(byteReader, stringReader, pointerReader, dynamicSymbolResolver) {}
+          NameReader(byteReader, stringReader, pointerReader,
+                     dynamicSymbolResolver) {}
 
     /// Extract conforming type's name from a Conformance Descriptor
     /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
@@ -2133,8 +2130,10 @@ private:
       std::string typeName;
       std::string mangledTypeName = "";
 
-      // If this is a conformance added to an ObjC class, detect that here and return class name
-      if (conformanceDescriptor.getTypeKind() == TypeReferenceKind::DirectObjCClassName) {
+      // If this is a conformance added to an ObjC class, detect that here and
+      // return class name
+      if (conformanceDescriptor.getTypeKind() ==
+          TypeReferenceKind::DirectObjCClassName) {
         auto className = conformanceDescriptor.getDirectObjCClassName();
         typeName = MANGLING_MODULE_OBJC.str() + std::string(".") + className;
         return std::make_pair(mangledTypeName, typeName);
@@ -2173,10 +2172,11 @@ private:
         if (!symbol->isResolved()) {
           Demangle::Context Ctx;
           auto demangledRoot =
-            Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
+              Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
           assert(demangledRoot->getKind() == Node::Kind::Global);
           auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
-          assert(nomTypeDescriptorRoot->getKind() == Node::Kind::NominalTypeDescriptor);
+          assert(nomTypeDescriptorRoot->getKind() ==
+                 Node::Kind::NominalTypeDescriptor);
           auto typeRoot = nomTypeDescriptorRoot->getChild(0);
           typeName = nodeToString(typeRoot);
 
@@ -2188,7 +2188,8 @@ private:
 
           return std::make_pair(mangledTypeName, typeName);
         } else if (symbol->getOffset()) {
-          // If symbol is empty and has an offset, this is the resolved remote address
+          // If symbol is empty and has an offset, this is the resolved remote
+          // address
           contextTypeDescriptorAddress = symbol->getOffset();
         }
       }
@@ -2269,7 +2270,8 @@ private:
 
       std::string mangledTypeName;
       if (optionalConformingTypeNamePair.value().first.empty()) {
-        auto it = typeNameToManglingMap.find(optionalConformingTypeNamePair.value().second);
+        auto it = typeNameToManglingMap.find(
+            optionalConformingTypeNamePair.value().second);
         if (it != typeNameToManglingMap.end()) {
           mangledTypeName = it->second;
         } else {
@@ -2279,18 +2281,19 @@ private:
         mangledTypeName = optionalConformingTypeNamePair.value().first;
       }
 
-      return ProtocolConformanceInfo{optionalConformingTypeNamePair.value().second,
-                                     optionalConformanceProtocol.value(),
-                                     mangledTypeName};
+      return ProtocolConformanceInfo{
+          optionalConformingTypeNamePair.value().second,
+          optionalConformanceProtocol.value(), mangledTypeName};
     }
   };
+
 public:
   template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   ConformanceCollectionResult collectAllConformances() {
     return DF.collectAllConformances<ObjCInteropKind, PointerSize>();
   }
-    template <template <typename Runtime> class ObjCInteropKind,
+  template <template <typename Runtime> class ObjCInteropKind,
             unsigned PointerSize>
   void dumpAllSections(std::ostream &stream) {
     DF.dumpAllSections<ObjCInteropKind, PointerSize>(stream);
