@@ -2604,6 +2604,11 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseYieldByReferenceMismatch())
       return true;
 
+    if (isExpr<KeyPathExpr>(anchor)) {
+      diagnostic = diag::expr_keypath_type_covert_to_contextual_type;
+      break;
+    }
+
     if (isExpr<OptionalTryExpr>(anchor) ||
         isExpr<OptionalEvaluationExpr>(anchor)) {
       auto objectType = fromType->getOptionalObjectType();
