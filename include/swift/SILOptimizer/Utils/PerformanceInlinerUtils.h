@@ -456,7 +456,8 @@ public:
 
       if (isa<ReturnInst>(BB.getTerminator()))
         BBInfo->getDistances(0).DistToExit = Length;
-      else if (isa<ThrowInst>(BB.getTerminator()))
+      else if (isa<ThrowInst>(BB.getTerminator()) ||
+               isa<ThrowAddrInst>(BB.getTerminator()))
         BBInfo->getDistances(0).DistToExit = Length + ColdBlockLength;
     }
     // Compute the distances for all loops in the function.

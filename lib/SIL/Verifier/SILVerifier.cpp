@@ -6265,7 +6265,8 @@ public:
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
       return false;
-    else if (isa<ThrowInst>(StartBlock->getTerminator()))
+    else if (isa<ThrowInst>(StartBlock->getTerminator()) ||
+             isa<ThrowAddrInst>(StartBlock->getTerminator()))
       return false;
 
     // Recursively check all successors.

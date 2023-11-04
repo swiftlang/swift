@@ -1406,7 +1406,7 @@ bool SILInstruction::isTriviallyDuplicatable() const {
     if (MI->getMember().isForeign)
       return false;
   }
-  if (isa<ThrowInst>(this))
+  if (isa<ThrowInst>(this) || isa<ThrowAddrInst>(this))
     return false;
 
   // BeginAccess defines the access scope entry point. All associated EndAccess
