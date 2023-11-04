@@ -339,6 +339,12 @@ enum TypeVariableOptions {
   TVO_PackExpansion = 0x40,
 };
 
+enum class KeyPathCapability : uint8_t {
+  ReadOnly,
+  Writable,
+  ReferenceWritable
+};
+
 /// The implementation object for a type variable used within the
 /// constraint-solving type checker.
 ///
@@ -978,6 +984,10 @@ enum ScoreKind: unsigned int {
   SK_ValueToPointerConversion,
   /// A closure/function conversion to an autoclosure parameter.
   SK_FunctionToAutoClosureConversion,
+  /// A type with a missing conformance(s) that has be synthesized
+  /// or diagnosed later, such types are allowed to appear in
+  /// a valid solution.
+  SK_MissingSynthesizableConformance,
   /// An unapplied reference to a function. The purpose of this
   /// score bit is to prune overload choices that are functions
   /// when a solution has already been found using property.
@@ -1153,6 +1163,9 @@ struct Score {
 
     case SK_UnappliedFunction:
       return "use of overloaded unapplied function";
+
+    case SK_MissingSynthesizableConformance:
+      return "type with missing synthesizable conformance";
     }
   }
 
@@ -5512,6 +5525,25 @@ public:
   /// 'Self' or 'Self'-rooted dependent member types in non-covariant position.
   bool isMemberAvailableOnExistential(Type baseTy,
                                       const ValueDecl *member) const;
+
+  /// Attempts to infer a capability of a key path (i.e. whether it
+  /// is read-only, writable, etc.) based on the referenced members.
+  ///
+  /// \param keyPath The key path literal expression.
+  ///
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
+  inferKeyPathLiteralCapability(KeyPathExpr *keyPath);
+
+  /// A convenience overload of \c inferKeyPathLiteralCapability.
+  ///
+  /// \param keyPathType The type variable that represents the key path literal.
+  ///
+  /// \returns `bool` to indicate whether key path is valid or not,
+  /// and capability if it could be determined.
+  std::pair</*isValid=*/bool, llvm::Optional<KeyPathCapability>>
+  inferKeyPathLiteralCapability(TypeVariableType *keyPathType);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

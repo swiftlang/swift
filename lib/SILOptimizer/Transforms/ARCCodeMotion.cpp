@@ -330,8 +330,8 @@ class RetainCodeMotionContext : public CodeMotionContext {
     // end, this function is called many times.
     //
     // These terminator instructions block.
-    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnwindInst>(II) ||
-        isa<UnreachableInst>(II))
+    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<ThrowAddrInst>(II) ||
+        isa<UnwindInst>(II) || isa<UnreachableInst>(II))
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.

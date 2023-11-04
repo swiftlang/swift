@@ -2715,7 +2715,9 @@ bool ModuleDecl::isExternallyConsumed() const {
   // App extensions are special beasts because they build without entrypoints
   // like library targets, but they behave like executable targets because
   // their associated modules are not suitable for distribution.
-  if (getASTContext().LangOpts.EnableAppExtensionRestrictions) {
+  // However, app extension libraries might be consumed externally.
+  if (getASTContext().LangOpts.EnableAppExtensionRestrictions &&
+      !getASTContext().LangOpts.EnableAppExtensionLibraryRestrictions) {
     return false;
   }
 

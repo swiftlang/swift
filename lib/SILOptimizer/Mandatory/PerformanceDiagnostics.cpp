@@ -170,6 +170,12 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
     if (isa<ThrowInst>(block.getTerminator()))
       continue;
 
+    // If a function has multiple throws, all throw-path branch to the single throw-block.
+    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
+      if (isa<ThrowInst>(succ->getTerminator()))
+        continue;
+    }
+
     if (!neBlocks.isNonErrorHandling(&block))
       continue;
 

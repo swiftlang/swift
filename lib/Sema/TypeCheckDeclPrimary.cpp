@@ -1114,6 +1114,12 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
   auto *initExpr = param->getStructuralDefaultExpr();
   assert(initExpr);
 
+  // Prohibit default argument that is a non-built-in macro to avoid confusion.
+  if (isa<MacroExpansionExpr>(initExpr)) {
+    ctx.Diags.diagnose(initExpr->getLoc(), diag::macro_as_default_argument);
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+  }
+
   // If the param has an error type, there's no point type checking the default
   // expression, unless we are type checking for code completion, in which case
   // the default expression might contain the code completion token.
@@ -2330,11 +2336,6 @@ public:
     VD->visitAuxiliaryDecls([&](VarDecl *var) {
       this->visitBoundVariable(var);
     });
-
-    // Add the '@_hasStorage' attribute if this property is stored.
-    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
-      VD->getAttrs().add(new (getASTContext())
-                             HasStorageAttr(/*isImplicit=*/true));
 
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.

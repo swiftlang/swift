@@ -131,6 +131,7 @@ public struct PublicStruct {
   @_transparent public var publicTransparentProperty: Int {
     get { return 1 }
   }
+  public dynamic var publicDynamicProperty: Int = 5
 
   public init(x: Int) {
     self.publicProperty = 1
@@ -167,6 +168,14 @@ public struct PublicGenericStruct<T> {
   }
 }
 
+@frozen public struct FrozenPublicStruct {
+  private(set) var varWithPrivateSetter: Int = 1
+
+  public init(_ varWithPrivateSetter: Int) {
+    self.varWithPrivateSetter = varWithPrivateSetter
+  }
+}
+
 struct InternalStruct: NoTypecheckProto {
   var x: NoTypecheck
 
@@ -176,6 +185,7 @@ struct InternalStruct: NoTypecheckProto {
 public class PublicClass {
   public var publicProperty: Int
   public var publicPropertyInferredType = ""
+  @PublicWrapper public final var publicFinalWrappedProperty: Bool = false
 
   public init(x: Int) {
     self.publicProperty = x

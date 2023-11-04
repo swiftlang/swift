@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -28,7 +29,6 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -218,6 +218,9 @@ namespace swift {
 
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
+
+    /// Enable 'availability' restrictions for App Extension Libraries.
+    bool EnableAppExtensionLibraryRestrictions = false;
 
     /// Diagnostic level to report when a public declarations doesn't declare
     /// an introduction OS version.
@@ -426,7 +429,7 @@ namespace swift {
     bool EnableNewOperatorLookup = false;
 
     /// The set of features that have been enabled.
-    llvm::SmallSet<Feature, 2> Features;
+    FixedBitSet<numFeatures(), Feature> Features;
 
     /// Temporary flag to support LLDB's transition to using \c Features.
     bool EnableBareSlashRegexLiterals = false;

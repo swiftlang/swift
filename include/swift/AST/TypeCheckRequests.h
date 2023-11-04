@@ -1779,10 +1779,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class HasStorageRequest :
-    public SimpleRequest<HasStorageRequest,
-                         bool(AbstractStorageDecl *),
-                         RequestFlags::Cached> {
+class HasStorageRequest
+    : public SimpleRequest<HasStorageRequest, bool(AbstractStorageDecl *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -1793,7 +1792,10 @@ private:
   bool evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  llvm::Optional<bool> getCachedResult() const;
+  void cacheResult(bool hasStorage) const;
 };
 
 class StorageImplInfoRequest :
@@ -2658,7 +2660,8 @@ public:
 
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
-                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool),
+                           bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
+                                bool),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2667,9 +2670,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool evaluate(Evaluator &evaluator, DeclContext *DC,
-                ValueDecl *VD1, ValueDecl *VD2,
-                bool dynamic) const;
+  bool evaluate(Evaluator &evaluator, DeclContext *DC, ValueDecl *VD1,
+                ValueDecl *VD2, bool dynamic,
+                bool allowMissingConformances) const;
 
 public:
   // Caching.

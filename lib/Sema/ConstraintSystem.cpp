@@ -6044,6 +6044,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::WrappedValue:
     case ConstraintLocator::OptionalPayload:
     case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
+    case ConstraintLocator::FallbackType:
       break;
     }
 
@@ -7376,6 +7377,128 @@ ConstraintSystem::lookupConformance(Type type, ProtocolDecl *protocol) {
                                                /*allowMissing=*/true);
   Conformances[cacheKey] = conformance;
   return conformance;
+}
+
+std::pair<bool, llvm::Optional<KeyPathCapability>>
+ConstraintSystem::inferKeyPathLiteralCapability(TypeVariableType *keyPathType) {
+  auto *typeLocator = keyPathType->getImpl().getLocator();
+  assert(typeLocator->isLastElement<LocatorPathElt::KeyPathType>());
+
+  auto *keyPath = castToExpr<KeyPathExpr>(typeLocator->getAnchor());
+  return inferKeyPathLiteralCapability(keyPath);
+}
+
+std::pair<bool, llvm::Optional<KeyPathCapability>>
+ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
+  bool didOptionalChain = false;
+
+  auto fail = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(false, llvm::None);
+  };
+
+  auto delay = []() -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(true, llvm::None);
+  };
+
+  auto success = [](KeyPathCapability capability)
+      -> std::pair<bool, llvm::Optional<KeyPathCapability>> {
+    return std::make_pair(true, capability);
+  };
+
+  auto capability = KeyPathCapability::Writable;
+  for (unsigned i : indices(keyPath->getComponents())) {
+    auto &component = keyPath->getComponents()[i];
+
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
+      break;
+
+    case KeyPathExpr::Component::Kind::CodeCompletion: {
+      capability = KeyPathCapability::ReadOnly;
+      break;
+    }
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+      auto *componentLoc =
+          getConstraintLocator(keyPath, LocatorPathElt::KeyPathComponent(i));
+      auto *calleeLoc = getCalleeLocator(componentLoc);
+      auto overload = findSelectedOverloadFor(calleeLoc);
+      if (!overload) {
+        // If overload cannot be found because member is missing,
+        // that's a failure.
+        if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse))
+          return fail();
+
+        return delay();
+      }
+
+      // tuple elements do not change the capability of the key path
+      auto choice = overload->choice;
+      if (choice.getKind() == OverloadChoiceKind::TupleIndex) {
+        continue;
+      }
+
+      // Discarded unsupported non-decl member lookups.
+      if (!choice.isDecl())
+        return fail();
+
+      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
+
+      if (hasFixFor(componentLoc, FixKind::AllowInvalidRefInKeyPath) ||
+          hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
+          hasFixFor(componentLoc,
+                    FixKind::UnwrapOptionalBaseWithOptionalResult))
+        return fail();
+
+      if (!storage)
+        return fail();
+
+      if (isReadOnlyKeyPathComponent(storage, component.getLoc())) {
+        capability = KeyPathCapability::ReadOnly;
+        continue;
+      }
+
+      // A nonmutating setter indicates a reference-writable base.
+      if (!storage->isSetterMutating()) {
+        capability = KeyPathCapability::ReferenceWritable;
+        continue;
+      }
+
+      // Otherwise, the key path maintains its current capability.
+      break;
+    }
+
+    case KeyPathExpr::Component::Kind::OptionalChain:
+      didOptionalChain = true;
+      break;
+
+    case KeyPathExpr::Component::Kind::OptionalForce:
+      // Forcing an optional preserves its lvalue-ness.
+      break;
+
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      // An optional chain should already have been recorded.
+      assert(didOptionalChain);
+      break;
+
+    case KeyPathExpr::Component::Kind::TupleElement:
+      llvm_unreachable("not implemented");
+      break;
+
+    case KeyPathExpr::Component::Kind::DictionaryKey:
+      llvm_unreachable("DictionaryKey only valid in #keyPath");
+      break;
+    }
+  }
+
+  // Optional chains force the entire key path to be read-only.
+  if (didOptionalChain)
+    capability = KeyPathCapability::ReadOnly;
+
+  return success(capability);
 }
 
 TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)

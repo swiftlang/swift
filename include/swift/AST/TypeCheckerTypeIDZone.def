@@ -47,8 +47,8 @@ SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
 SWIFT_REQUEST(TypeChecker, IDEInspectionFileRequest,
               SourceFile *(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
-              bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
-              NoLocationInfo)
+              bool (DeclContext *, ValueDecl *, ValueDecl *, bool, bool),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConditionalRequirementsRequest,
               ArrayRef<Requirement> (NormalProtocolConformance *),
               Cached, NoLocationInfo)
@@ -311,7 +311,7 @@ SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
               StorageImplInfo(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasStorageRequest,
-              bool(AbstractStorageDecl *), Cached,
+              bool(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
               ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)

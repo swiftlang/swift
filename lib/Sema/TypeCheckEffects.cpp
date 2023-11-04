@@ -3104,6 +3104,8 @@ private:
 
     if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
       E->setThrownError(*thrownError);
+    } else {
+      E->setThrownError(Ctx.getNeverType());
     }
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();
@@ -3123,6 +3125,8 @@ private:
 
     if (auto thrownError = TypeChecker::canThrow(Ctx, E->getSubExpr())) {
       E->setThrownError(*thrownError);
+    } else {
+      E->setThrownError(Ctx.getNeverType());
     }
 
     scope.preserveCoverageFromOptionalOrForcedTryOperand();

@@ -216,20 +216,11 @@ class LLVM(cmake_product.CMakeProduct):
                 # space/time efficient than -g on that platform.
                 llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
-        build_targets = ['all']
-
-        if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
-           self.is_cross_compile_target(host_target):
-            build_targets = (self.args.llvm_ninja_targets_for_cross_compile_hosts)
-        elif self.args.llvm_ninja_targets:
-            build_targets = (self.args.llvm_ninja_targets)
-
-        # indicating we don't want to build LLVM should
-        # override any custom ninja target we specified
         if not self.args._build_llvm:
-            build_targets = ['clean']
-
-        if self.args.skip_build or not self.args.build_llvm:
+            # Indicating we don't want to build LLVM at all should
+            # override everything.
+            build_targets = []
+        elif self.args.skip_build or not self.args.build_llvm:
             # We can't skip the build completely because the standalone
             # build of Swift depends on these.
             build_targets = ['llvm-tblgen', 'clang-resource-headers',
@@ -248,6 +239,14 @@ class LLVM(cmake_product.CMakeProduct):
                     'llvm-nm',
                     'llvm-size'
                 ])
+        else:
+            build_targets = ['all']
+
+            if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
+               self.is_cross_compile_target(host_target):
+                build_targets = (self.args.llvm_ninja_targets_for_cross_compile_hosts)
+            elif self.args.llvm_ninja_targets:
+                build_targets = (self.args.llvm_ninja_targets)
 
         if self.args.host_libtool:
             llvm_cmake_options.define('CMAKE_LIBTOOL', self.args.host_libtool)

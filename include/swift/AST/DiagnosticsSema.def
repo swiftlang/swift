@@ -678,8 +678,11 @@ ERROR(expr_swift_keypath_not_starting_with_type,none,
 ERROR(expr_swift_keypath_not_starting_with_dot,none,
       "a Swift key path with contextual root must begin with a leading dot",
       ())
-ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
+ERROR(expr_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
+      (Type, Type))
+ERROR(expr_keypath_type_covert_to_contextual_type,none,
+      "cannot convert key path type %0 to contextual type %1",
       (Type, Type))
 ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
@@ -7495,6 +7498,9 @@ ERROR(extension_macro_invalid_conformance,none,
 ERROR(macro_attached_to_invalid_decl,none,
       "'%0' macro cannot be attached to %1 (%base2)",
       (StringRef, DescriptiveDeclKind, const Decl *))
+ERROR(macro_as_default_argument, none,
+      "non-built-in macro cannot be used as default argument",
+      ())
 ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())

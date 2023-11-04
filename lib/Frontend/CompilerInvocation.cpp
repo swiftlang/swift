@@ -895,7 +895,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.Features.insert(Feature::LayoutPrespecialization);
 
+  Opts.EnableAppExtensionLibraryRestrictions |= Args.hasArg(OPT_enable_app_extension_library);
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
+  Opts.EnableAppExtensionRestrictions |= Opts.EnableAppExtensionLibraryRestrictions;
 
   Opts.EnableSwift3ObjCInference =
     Args.hasFlag(OPT_enable_swift3_objc_inference,

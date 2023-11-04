@@ -620,10 +620,7 @@ private:
 
   void addLiteralRequirement(Constraint *literal);
 
-  void addDefault(Constraint *constraint) {
-    auto defaultTy = constraint->getSecondType();
-    Defaults.insert({defaultTy->getCanonicalType(), constraint});
-  }
+  void addDefault(Constraint *constraint);
 
   /// Check whether the given binding set covers any of the
   /// literal protocols associated with this type variable.

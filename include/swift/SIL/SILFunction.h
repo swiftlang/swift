@@ -1403,7 +1403,7 @@ public:
     return std::find_if(begin(), end(),
                         [](const SILBasicBlock &BB) -> bool {
                           const TermInst *TI = BB.getTerminator();
-                          return isa<ThrowInst>(TI);
+                          return isa<ThrowInst>(TI) || isa<ThrowAddrInst>(TI);
                         });
   }
   
@@ -1413,7 +1413,7 @@ public:
     return std::find_if(begin(), end(),
                         [](const SILBasicBlock &BB) -> bool {
                           const TermInst *TI = BB.getTerminator();
-                          return isa<ThrowInst>(TI);
+                          return isa<ThrowInst>(TI) || isa<ThrowAddrInst>(TI);
                         });
   }
 

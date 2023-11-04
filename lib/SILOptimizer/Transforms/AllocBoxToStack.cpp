@@ -1062,7 +1062,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
     // boxes, convert them from having escaping to having non-escaping
     // semantics.
     for (unsigned index : PromotedCalleeArgIndices) {
-      if (F->getArgument(index)->getType().isBoxedNonCopyableType(*F)) {
+      if (F->getArgument(index)->getType().isBoxedNonCopyableType(F)) {
         auto boxType = F->getArgument(index)->getType().castTo<SILBoxType>();
         bool isMutable = boxType->getLayout()->getFields()[0].isMutable();
         auto checkKind = isMutable ? MarkUnresolvedNonCopyableValueInst::

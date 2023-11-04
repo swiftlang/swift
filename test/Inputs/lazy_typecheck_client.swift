@@ -32,7 +32,7 @@ func testGobalVars() {
   let _: (Int, Int) = (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY)
 }
 
-func testPublicStruct() {
+func testPublicStructs() {
   let s = PublicStruct(x: 1)
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
@@ -40,8 +40,16 @@ func testPublicStruct() {
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
   let _: Int = s.publicTransparentProperty
+  let _: Int = s.publicDynamicProperty
   PublicStruct.publicStaticMethod()
   PublicStruct.activeMethod()
+
+  let _ = FrozenPublicStruct(1)
+}
+
+extension PublicStruct {
+  @_dynamicReplacement(for: publicDynamicProperty)
+  var replacementVar: Int
 }
 
 func testPublicClasses() {
@@ -49,6 +57,7 @@ func testPublicClasses() {
   let _: Int = c.publicMethod()
   let _: Int = c.publicProperty
   let _: String = c.publicPropertyInferredType
+  c.publicFinalWrappedProperty = true
   PublicClass.publicClassMethod()
 
   let d = PublicDerivedClass(x: 3)

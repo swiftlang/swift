@@ -371,8 +371,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
-OrigDeclAttributes Decl::getOriginalAttrs() const {
-  return OrigDeclAttributes(getAttrs(), this);
+ParsedDeclAttributes Decl::getParsedAttrs() const {
+  return ParsedDeclAttributes(getAttrs(), this);
 }
 
 DeclAttributes Decl::getExpandedAttrs() const {
@@ -777,7 +777,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
 
     // Otherwise, include attributes directly attached to the accessor.
     SourceLoc VarLoc = AD->getStorage()->getStartLoc();
-    for (auto *Attr : getOriginalAttrs()) {
+    for (auto *Attr : getParsedAttrs()) {
       if (!Attr->getRange().isValid())
         continue;
 
@@ -796,13 +796,13 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   if (auto *PBD = dyn_cast<PatternBindingDecl>(this)) {
     for (auto i : range(PBD->getNumPatternEntries()))
       PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
-        for (auto *Attr : VD->getOriginalAttrs())
+        for (auto *Attr : VD->getParsedAttrs())
           if (Attr->getRange().isValid())
             Range.widen(Attr->getRangeWithAt());
       });
   }
 
-  for (auto *Attr : getOriginalAttrs()) {
+  for (auto *Attr : getParsedAttrs()) {
     if (Attr->getRange().isValid())
       Range.widen(Attr->getRangeWithAt());
   }
@@ -6743,13 +6743,11 @@ void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
   cacheImplInfo(implInfo);
 
   if (isImplicit()) {
-    auto &evaluator = getASTContext().evaluator;
-    HasStorageRequest request{this};
-    if (!evaluator.hasCachedResult(request))
-      evaluator.cacheOutput(request, implInfo.hasStorage());
-    else {
-      assert(
-        evaluateOrDefault(evaluator, request, false) == implInfo.hasStorage());
+    if (!LazySemanticInfo.HasStorageComputed) {
+      LazySemanticInfo.HasStorageComputed = true;
+      LazySemanticInfo.HasStorage = implInfo.hasStorage();
+    } else {
+      assert(LazySemanticInfo.HasStorage == implInfo.hasStorage());
     }
   }
 }
@@ -9545,6 +9543,25 @@ GenericTypeParamDecl *OpaqueTypeDecl::getExplicitGenericParam(
 
   auto genericParamType = getOpaqueGenericParams()[ordinal];
   return genericParamType->getDecl();
+}
+
+bool OpaqueTypeDecl::exportUnderlyingType() const {
+  auto mod = getDeclContext()->getParentModule();
+  if (mod->getResilienceStrategy() != ResilienceStrategy::Resilient)
+    return true;
+
+  ValueDecl *namingDecl = getNamingDecl();
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(namingDecl))
+    return AFD->getResilienceExpansion() == ResilienceExpansion::Minimal;
+
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(namingDecl)) {
+    for (auto *accessor : ASD->getAllAccessors())
+      if (accessor->getResilienceExpansion() == ResilienceExpansion::Minimal)
+        return true;
+    return false;
+  }
+
+  llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
 }
 
 llvm::Optional<unsigned>

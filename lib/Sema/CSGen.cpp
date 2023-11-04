@@ -3742,9 +3742,10 @@ namespace {
         // Allow \Derived.property to be inferred as \Base.property to
         // simulate a sort of covariant conversion from
         // KeyPath<Derived, T> to KeyPath<Base, T>.
-        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root, locator);
+        CS.addConstraint(ConstraintKind::Subtype, rootObjectTy, root,
+                         rootLocator);
       }
-      
+
       bool didOptionalChain = false;
       // We start optimistically from an lvalue base.
       Type base = LValueType::get(root);
@@ -3866,6 +3867,12 @@ namespace {
         base = optTy;
       }
 
+      // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
+      // let's record a AllowKeyPathMissingComponent fix.
+      if (E->hasSingleInvalidComponent()) {
+        (void)CS.recordFix(AllowKeyPathWithoutComponents::create(CS, locator));
+      }
+
       auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
@@ -3883,6 +3890,13 @@ namespace {
                                                      TVO_CanBindToHole);
 
       CS.addKeyPathConstraint(kpTy, root, value, componentTypeVars, locator);
+
+      // Add a fallback constraint so we have an anchor to use for
+      // capability inference when there is no context.
+      CS.addUnsolvedConstraint(Constraint::create(
+          CS, ConstraintKind::FallbackType, kpTy,
+          BoundGenericType::get(kpDecl, /*parent=*/Type(), {root, value}),
+          CS.getConstraintLocator(E, ConstraintLocator::FallbackType)));
 
       return kpTy;
     }
