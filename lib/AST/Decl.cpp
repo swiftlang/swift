@@ -985,14 +985,6 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
 
 llvm::Optional<Type> 
 AbstractFunctionDecl::getEffectiveThrownErrorType() const {
-  // FIXME: Only getters can have thrown error types right now, and DidSet
-  // has a cyclic reference if we try to get its interface type here. Find a
-  // better way to express this.
-  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
-    if (accessor->getAccessorKind() != AccessorKind::Get)
-      return llvm::None;
-  }
-
   Type interfaceType = getInterfaceType();
   if (hasImplicitSelfDecl()) {
     if (auto fnType = interfaceType->getAs<AnyFunctionType>())
