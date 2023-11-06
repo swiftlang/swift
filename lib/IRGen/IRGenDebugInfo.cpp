@@ -2328,7 +2328,11 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     // Force the debug info for the function to be emitted, even if it
     // is external or has been inlined.
     llvm::Function *Fn = nullptr;
-    if (!SILFn->getName().empty() && !SILFn->isZombie())
+    // Avoid materializing generic functions in embedded Swift mode.
+    bool genericInEmbedded =
+        IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+        SILFn->isGeneric();
+    if (!SILFn->getName().empty() && !SILFn->isZombie() && !genericInEmbedded)
       Fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
     auto *SP = emitFunction(*SILFn, Fn);
 
