@@ -216,10 +216,7 @@ public:
     return getSILType(funcTy->getErrorResult(), context);
   }
 
-  bool isTypedError() const {
-    return !funcTy->getErrorResult()
-        .getInterfaceType()->isExistentialWithError();
-  }
+  bool isTypedError() const;
 
   /// Returns an array of result info.
   /// Provides convenient access to the underlying SILFunctionType.

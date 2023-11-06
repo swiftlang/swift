@@ -95,3 +95,88 @@ public func genericForceTry<E>(fn: () throws(E) -> ()) {
 // CHECK: dealloc_stack [[ERROR]] : $*E
 // CHECK: destroy_value [[FN]] : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
 // CHECK: unreachable
+
+enum MyError: Error {
+case fail
+}
+
+func passthroughCall<T, E>(_ body: () throws(E) -> T) throws(E) -> T {
+  try body()
+}
+
+func five() -> Int { 5 }
+
+func fiveOrBust() throws -> Int { 5 }
+
+func fiveOrTypedBust() throws(MyError) -> Int { 5 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic23reabstractAsNonthrowingSiyF
+func reabstractAsNonthrowing() -> Int {
+  // CHECK: [[FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PRIOR_FN:%.*]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
+  // CHECK: [[CALLEE:%.*]] = function_ref @$s20typed_throws_generic15passthroughCallyxxyq_YKXEq_YKs5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1)
+  // CHECK: [[ERROR_SLOT:%.*]] = alloc_stack $Never
+  // CHECK: try_apply [[CALLEE]]<Int, Never>(%0, [[ERROR_SLOT]], [[FN]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  passthroughCall(five)
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK: dealloc_stack [[ERROR_SLOT]] : $*Never
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK-NEXT: unreachable
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic20reabstractAsThrowingSiyKF
+func reabstractAsThrowing() throws -> Int {
+  // CHECK: [[FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PRIOR_FN:%.*]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <any Error, Int> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <any Error, Int>
+  // CHECK: [[CALLEE:%.*]] = function_ref @$s20typed_throws_generic15passthroughCallyxxyq_YKXEq_YKs5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1)
+  // CHECK: [[ERROR_SLOT:%.*]] = alloc_stack $any Error
+  // CHECK: try_apply [[CALLEE]]<Int, any Error>(%1, [[ERROR_SLOT]], [[FN]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  try passthroughCall(fiveOrBust)
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK: dealloc_stack [[ERROR_SLOT]] : $*any Error
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK: throw [[ERR:%.*]] : $any Error
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSis5Error_pIgdzo_SisAA_pIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error any Error)) -> (@out Int, @error_indirect any Error)
+// CHECK: bb0([[ARG:%.*]] : $*Int, [[OUTER_ERROR_SLOT:%.*]] : $*any Error, [[INNER_FN:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error any Error)):
+// CHECK: try_apply [[INNER_FN]]() : $@noescape @callee_guaranteed () -> (Int, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK: [[NORMAL_BB]]([[RESULT:%.*]] : $Int):
+// CHECK-NEXT: store [[RESULT]] to [trivial] [[ARG]] : $*Int
+// CHECK-NEXT: [[VOID_RESULT:%.*]] = tuple ()
+// CHECK-NEXT:  return [[VOID_RESULT]] : $()
+
+// CHECK: [[ERROR_BB]]([[INNER_ERROR:%.*]] : @owned $any Error):
+// CHECK-NEXT:  store [[INNER_ERROR]] to [init] [[OUTER_ERROR_SLOT]] : $*any Error
+// CHECK-NEXT:  throw_addr
+
+// CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic28reabstractAsConcreteThrowingSiyKF : $@convention(thin) () -> (Int, @error any Error)
+func reabstractAsConcreteThrowing() throws -> Int {
+  // CHECK: [[FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PRIOR_FN:%.*]] : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <MyError, Int> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <MyError, Int>
+  // CHECK: [[CALLEE:%.*]] = function_ref @$s20typed_throws_generic15passthroughCallyxxyq_YKXEq_YKs5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1)
+  // CHECK: [[ERROR_SLOT:%.*]] = alloc_stack $MyError
+  // CHECK: try_apply [[CALLEE]]<Int, MyError>(%1, [[ERROR_SLOT]], [[FN]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  try passthroughCall(fiveOrTypedBust)
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK-NEXT: dealloc_stack [[ERROR_SLOT]] : $*MyError
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK: alloc_existential_box $any Error, $MyError
+  // CHECK-NEXT: project_existential_box $MyError in
+  // CHECK: throw [[ERR:%.*]] : $any Error
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSi20typed_throws_generic7MyErrorOIgdzo_SiACIegrzr_TR : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (Int, @error MyError)) -> (@out Int, @error_indirect MyError) {
+// CHECK: bb0([[RESULT_ADDR:%.*]] : $*Int, [[OUTER_ERROR:%.*]] : $*MyError, [[FN:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> (Int, @error MyError)):
+// CHECK-NEXT: try_apply [[FN]]() : $@noescape @callee_guaranteed () -> (Int, @error MyError), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+
+// CHECK: [[NORMAL_BB]]([[INNER_RESULT:%.*]] : $Int):
+// CHECK-NEXT: store [[INNER_RESULT]] to [trivial] [[RESULT_ADDR]] : $*Int
+
+// CHECK: [[ERROR_BB]]([[INNER_ERROR:%.*]] : $MyError):
+// CHECK-NEXT: store [[INNER_ERROR]] to [trivial] [[OUTER_ERROR]] : $*MyError
+// CHECK-NEXT: throw_addr

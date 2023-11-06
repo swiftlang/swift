@@ -4943,3 +4943,8 @@ CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext(
   auto funTy = M.Types.getLoweredType(origFunTy , context);
   return cast<SILFunctionType>(funTy.getASTType());
 }
+
+bool SILFunctionConventions::isTypedError() const {
+  return !funcTy->getErrorResult()
+      .getInterfaceType()->isExistentialWithError();
+}

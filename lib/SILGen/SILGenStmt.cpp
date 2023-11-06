@@ -1567,14 +1567,19 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         getModule().getSwiftModule()->conformsToProtocol(
           exn->getType().getASTType(), getASTContext().getErrorDecl())
       };
+
       exnMV = emitExistentialErasure(
           loc,
           exn->getType().getASTType(),
-          getTypeLowering(exn->getType()),
+          getTypeLowering(exn->getType().getObjectType()),
           getTypeLowering(existentialBoxType),
           getASTContext().AllocateCopy(conformances),
           SGFContext(),
           [&](SGFContext C) -> ManagedValue {
+            if (exn->getType().isAddress()) {
+              return emitLoad(loc, exn, getTypeLowering(exn->getType().getObjectType()), C, IsTake);
+            }
+
             return ManagedValue::forForwardedRValue(*this, exn);
           });
 
