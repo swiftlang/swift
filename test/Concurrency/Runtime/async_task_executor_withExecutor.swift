@@ -64,10 +64,10 @@ func nonisolatedAsyncMethod(expect executor: CountEnqueuesSerialExecutor) async 
 }
 
 nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSerialExecutor) async {
-  await withExecutor(countingSerialExecutor) {
+  await withTaskExecutor(countingSerialExecutor) {
     countingSerialExecutor.preconditionIsolated()
     dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-    print("OK: withExecutor body")
+    print("OK: withTaskExecutor body")
   }
 }
 
@@ -82,26 +82,26 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
       await testFromNonisolated(countingSerialExecutor)
 
       MainActor.preconditionIsolated()
-      await withExecutor(countingSerialExecutor) {
+      await withTaskExecutor(countingSerialExecutor) {
         // the block immediately hops to the expected executor
         countingSerialExecutor.preconditionIsolated()
         dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-        print("OK: withExecutor body")
+        print("OK: withTaskExecutor body")
       }
 
       // A nonisolated async func must run on the expected executor,
       // rather than on the default global pool
-      await withExecutor(countingSerialExecutor) {
+      await withTaskExecutor(countingSerialExecutor) {
         await nonisolatedAsyncMethod(expect: countingSerialExecutor)
         print("OK: nonisolated async func")
       }
 
       // TODO: implement handling Executor and not just SerialExecutor
-//      await withExecutor(countingExecutor) {
+//      await withTaskExecutor(countingExecutor) {
 //        // the block immediately hops to the expected executor
 //        countingSerialExecutor.preconditionIsolated()
 //        dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-//        print("OK: withExecutor body")
+//        print("OK: withTaskExecutor body")
 //      }
 
     }

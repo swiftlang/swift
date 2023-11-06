@@ -21,14 +21,18 @@ extension TaskGroup {
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
-  ///   - on:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   will be ignored. In order to inherit the parent task's executor preference
+  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   and it will be inherited automatically.
   ///   - priority: The priority of the operation task.
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
   @_alwaysEmitIntoClient
   public mutating func addTask(
-    on executor: (any Executor)?,
+    on taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -47,20 +51,14 @@ extension TaskGroup {
       isDiscardingTask: false)
     #endif
 
-    if let executor {
+    if let taskExecutor {
       let executorBuiltin: Builtin.Executor =
-      if let serialExecutor = executor as? any SerialExecutor {
-        // We need to go through the asUnowned... for serial executors,
-        // because they encode certain behavior in the reference bits,
-        // so we cannot just cast and assume it'll be correct.
-        serialExecutor.asUnownedSerialExecutor().executor
-      } else {
-        _task_executor_getExecutorRef(executor)
-      }
+        taskExecutor.asUnownedTaskExecutor().executor
 
       // Create the task in this group with an executor preference.
       _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     } else {
+      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
       // Create the task in this group without executor preference.
       _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
     }

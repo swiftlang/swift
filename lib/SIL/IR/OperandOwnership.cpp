@@ -988,8 +988,7 @@ BUILTIN_OPERAND_OWNERSHIP(PointerEscape, AutoDiffProjectTopLevelSubcontext)
 // ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
-BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinaryExecutorRef)
-
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinaryTaskExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinarySerialExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildComplexEqualitySerialExecutorRef)
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)

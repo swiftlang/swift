@@ -4601,12 +4601,12 @@ llvm::Value *irgen::emitTaskCreate(
   // If there is an executor, emit an executor option to contain it.
   if (executor1) {
     assert(executor2 && "second executor field must be present when first was");
-    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::Executor);
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::InitialTaskExecutor);
     llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
         IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
 
     auto optionsRecord = IGF.createAlloca(
-        IGF.IGM.SwiftExecutorTaskOptionRecordTy, Alignment(),
+        IGF.IGM.SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy, Alignment(),
         "executor_options");
     auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
         optionsRecord, 0, Size());

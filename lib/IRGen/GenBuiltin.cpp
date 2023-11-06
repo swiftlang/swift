@@ -431,11 +431,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::BuildOrdinaryExecutorRef) {
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinaryTaskExecutorRef) {
     auto actor = args.claimNext();
     auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
     auto conf = substitutions.getConformances()[0];
-    emitBuildOrdinaryExecutorRef(IGF, actor, type, conf, out);
+    emitBuildOrdinaryTaskExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 

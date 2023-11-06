@@ -145,7 +145,7 @@ SerialExecutorRef _task_serialExecutor_getExecutorRef(
 //
 // We could inline this with effort, though.
 extern "C" SWIFT_CC(swift)
-ExecutorRef _task_executor_getExecutorRef(
+TaskExecutorRef _task_executor_getTaskExecutorRef(
     HeapObject *executor,
     const Metadata *selfType,
     const SerialExecutorWitnessTable *wtable);

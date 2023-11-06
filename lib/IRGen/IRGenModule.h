@@ -780,7 +780,7 @@ public:
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::StructType  *SwiftTaskOptionRecordTy;
   llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
-  llvm::StructType  *SwiftExecutorTaskOptionRecordTy;
+  llvm::StructType  *SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy;
   llvm::StructType  *SwiftResultTypeInfoTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
