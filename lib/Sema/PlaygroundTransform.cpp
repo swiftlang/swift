@@ -904,7 +904,7 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPlaygroundTransform(SourceFile &SF) {
+void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts) {
   class ExpressionFinder : public ASTWalker {
   private:
     ASTContext &ctx;
@@ -913,8 +913,8 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
     unsigned TmpNameIndex = 0;
 
   public:
-    ExpressionFinder(ASTContext &ctx) :
-      ctx(ctx), Options(ctx.LangOpts.PlaygroundOptions) {}
+    ExpressionFinder(ASTContext &ctx, PlaygroundOptionSet Opts) :
+      ctx(ctx), Options(Opts) {}
 
     // FIXME: Remove this
     bool shouldWalkAccessorsTheOldWay() override { return true; }
@@ -954,6 +954,20 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
     }
   };
 
-  ExpressionFinder EF(SF.getASTContext());
+  ExpressionFinder EF(SF.getASTContext(), Opts);
   SF.walk(EF);
+}
+
+/// This function is provided for backward compatibility with the old API, since
+/// LLDB and others call it directly, passing it a boolean to control whether to
+/// only apply "high performance" options. We emulate that here.
+void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
+  PlaygroundOptionSet HighPerfTransformOpts;
+  // Enable any playground options that are marked as being applicable to high
+  // performance mode.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (HighPerfOn) \
+    HighPerfTransformOpts.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
+  swift::performPlaygroundTransform(SF, HighPerfTransformOpts);
 }
