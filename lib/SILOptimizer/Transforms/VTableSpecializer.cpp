@@ -204,7 +204,7 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);

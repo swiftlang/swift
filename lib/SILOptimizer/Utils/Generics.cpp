@@ -649,7 +649,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
 bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
                                          SubstitutionMap ParamSubs) {
-  ReabstractionInfo ReInfo;
+  ReabstractionInfo ReInfo(Callee->getModule());
   return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs);
 }
 
@@ -659,6 +659,7 @@ ReabstractionInfo::ReabstractionInfo(
     bool ConvertIndirectToDirect, bool dropMetatypeArgs, OptRemark::Emitter *ORE)
     : ConvertIndirectToDirect(ConvertIndirectToDirect),
       dropMetatypeArgs(dropMetatypeArgs),
+      M(&Callee->getModule()),
       TargetModule(targetModule), isWholeModule(isWholeModule),
       Serialized(Serialized) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
@@ -772,8 +773,6 @@ bool ReabstractionInfo::isPartialSpecialization() const {
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
-  auto &M = Callee->getModule();
-
   // Find out how the function type looks like after applying the provided
   // substitutions.
   if (!SubstitutedType) {
@@ -792,7 +791,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   TrivialArgs.resize(NumArgs);
   droppedMetatypeArgs.resize(NumArgs);
 
-  SILFunctionConventions substConv(SubstitutedType, M);
+  SILFunctionConventions substConv(SubstitutedType, getModule());
   TypeExpansionContext resilienceExp = getResilienceExpansion();
   TypeExpansionContext minimalExp(ResilienceExpansion::Minimal,
                                   TargetModule, isWholeModule);
@@ -863,26 +862,25 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   // Produce a specialized type, which is the substituted type with
   // the parameters/results passing conventions adjusted according
   // to the conversions selected above.
-  SpecializedType = createSpecializedType(SubstitutedType, M);
+  SpecializedType = createSpecializedType(SubstitutedType, getModule());
 }
 
 ReabstractionInfo::TypeCategory ReabstractionInfo::
 getReturnTypeCategory(const SILResultInfo &RI,
                   const SILFunctionConventions &substConv,
                   TypeExpansionContext typeExpansion) {
-  auto &M = Callee->getModule();
   auto ResultTy = substConv.getSILType(RI, typeExpansion);
   ResultTy = Callee->mapTypeIntoContext(ResultTy);
-  auto &TL = M.Types.getTypeLowering(ResultTy, typeExpansion);
+  auto &TL = getModule().Types.getTypeLowering(ResultTy, typeExpansion);
 
   if (!TL.isLoadable())
     return NotLoadable;
     
-  if (RI.getReturnValueType(M, SubstitutedType, typeExpansion)
+  if (RI.getReturnValueType(getModule(), SubstitutedType, typeExpansion)
         ->isVoid())
     return NotLoadable;
 
-  if (!shouldExpand(M, ResultTy))
+  if (!shouldExpand(getModule(), ResultTy))
     return NotLoadable;
   
   return TL.isTrivial() ? LoadableAndTrivial : Loadable;
@@ -892,10 +890,9 @@ ReabstractionInfo::TypeCategory ReabstractionInfo::
 getParamTypeCategory(const SILParameterInfo &PI,
                   const SILFunctionConventions &substConv,
                   TypeExpansionContext typeExpansion) {
-  auto &M = Callee->getModule();
   auto ParamTy = substConv.getSILType(PI, typeExpansion);
-  ParamTy = Callee->mapTypeIntoContext(ParamTy);
-  auto &TL = M.Types.getTypeLowering(ParamTy, typeExpansion);
+  ParamTy = mapTypeIntoContext(ParamTy);
+  auto &TL = getModule().Types.getTypeLowering(ParamTy, typeExpansion);
 
   if (!TL.isLoadable())
     return NotLoadable;
@@ -908,7 +905,6 @@ CanSILFunctionType
 ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
-  auto &M = OrigF->getModule();
   if ((SpecializedGenericSig &&
        SpecializedGenericSig->areAllParamsConcrete()) ||
       !HasUnboundGenericParams) {
@@ -920,8 +916,8 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
 
   auto lowered = OrigF->getLoweredFunctionType();
   auto genSub =
-      lowered->substGenericArgs(M, SubstMap, getResilienceExpansion());
-  auto unsub = genSub->getUnsubstitutedType(M);
+      lowered->substGenericArgs(getModule(), SubstMap, getResilienceExpansion());
+  auto unsub = genSub->getUnsubstitutedType(getModule());
   auto specialized = CanSpecializedGenericSig.getReducedType(unsub);
 
   // First substitute concrete types into the existing function type.
@@ -935,7 +931,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
       CanSpecializedGenericSig, FnTy->getExtInfo(), FnTy->getCoroutineKind(),
       FnTy->getCalleeConvention(), FnTy->getParameters(), FnTy->getYields(),
       FnTy->getResults(), FnTy->getOptionalErrorResult(),
-      FnTy->getPatternSubstitutions(), SubstitutionMap(), M.getASTContext(),
+      FnTy->getPatternSubstitutions(), SubstitutionMap(), getModule().getASTContext(),
       FnTy->getWitnessMethodConformanceOrInvalid());
 
   // This is an interface type. It should not have any archetypes.
@@ -970,6 +966,16 @@ CanSILFunctionType ReabstractionInfo::createThunkType(PartialApplyInst *forPAI) 
   // This is an interface type. It should not have any archetypes.
   assert(!newFnTy->hasArchetype());
   return newFnTy;
+}
+
+SILType ReabstractionInfo::mapTypeIntoContext(SILType type) const {
+  if (Callee) {
+    return Callee->mapTypeIntoContext(type);
+  }
+  assert(!methodDecl.isNull());
+  if (auto *genericEnv = M->Types.getConstantGenericEnvironment(methodDecl))
+    return genericEnv->mapTypeIntoContext(getModule(), type);
+  return type;
 }
 
 /// Convert the substituted function type into a specialized function type based
@@ -1081,15 +1087,13 @@ void ReabstractionInfo::performFullSpecializationPreparation(
   assert((!EnablePartialSpecialization || !HasUnboundGenericParams) &&
          "Only full specializations are handled here");
 
-  SILModule &M = Callee->getModule();
-
   this->Callee = Callee;
 
   // Get the original substitution map.
   ClonerParamSubMap = ParamSubs;
 
   SubstitutedType = Callee->getLoweredFunctionType()->substGenericArgs(
-      M, ClonerParamSubMap, getResilienceExpansion());
+      getModule(), ClonerParamSubMap, getResilienceExpansion());
   CallerParamSubMap = {};
   createSubstitutedAndSpecializedTypes();
 }
@@ -1889,8 +1893,6 @@ void FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 void ReabstractionInfo::performPartialSpecializationPreparation(
     SILFunction *Caller, SILFunction *Callee,
     SubstitutionMap ParamSubs) {
-  SILModule &M = Callee->getModule();
-
   // Caller is the SILFunction containing the apply instruction.
   CanGenericSignature CallerGenericSig;
   GenericEnvironment *CallerGenericEnv = nullptr;
@@ -1910,7 +1912,7 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
              llvm::dbgs() << "Callee generic signature is:\n";
              CalleeGenericSig->print(llvm::dbgs()));
 
-  FunctionSignaturePartialSpecializer FSPS(M,
+  FunctionSignaturePartialSpecializer FSPS(getModule(),
                                            CallerGenericSig, CallerGenericEnv,
                                            CalleeGenericSig, CalleeGenericEnv,
                                            ParamSubs);
@@ -1968,7 +1970,7 @@ ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
                                      bool isWholeModule, SILFunction *Callee,
                                      GenericSignature SpecializedSig,
                                      bool isPrespecialization)
-    : TargetModule(targetModule), isWholeModule(isWholeModule),
+    : M(&Callee->getModule()), TargetModule(targetModule), isWholeModule(isWholeModule),
       isPrespecialization(isPrespecialization) {
   Serialized =
       this->isPrespecialization ? IsNotSerialized : Callee->isSerialized();
@@ -1979,13 +1981,11 @@ ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
   this->Callee = Callee;
   ConvertIndirectToDirect = true;
 
-  SILModule &M = Callee->getModule();
-
   auto CalleeGenericSig =
       Callee->getLoweredFunctionType()->getInvocationGenericSignature();
   auto *CalleeGenericEnv = Callee->getGenericEnvironment();
 
-  FunctionSignaturePartialSpecializer FSPS(M,
+  FunctionSignaturePartialSpecializer FSPS(getModule(),
                                            CalleeGenericSig, CalleeGenericEnv,
                                            SpecializedSig);
 
@@ -3091,7 +3091,7 @@ void swift::trySpecializeApplyOfGeneric(
 
   // Check if there is a pre-specialization available in a library.
   SpecializedFunction prespecializedF{};
-  ReabstractionInfo prespecializedReInfo;
+  ReabstractionInfo prespecializedReInfo(FuncBuilder.getModule());
   bool replacePartialApplyWithoutReabstraction = false;
 
   if (usePrespecialized(FuncBuilder, Apply, RefF, ReInfo, prespecializedReInfo,
