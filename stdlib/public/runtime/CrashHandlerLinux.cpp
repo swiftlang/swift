@@ -672,7 +672,7 @@ memserver_read(void *to, const void *from, size_t len) {
       memcpy(to, from, len);
       return len;
     } else {
-      return 1;
+      return -1;
     }
   }
 }
