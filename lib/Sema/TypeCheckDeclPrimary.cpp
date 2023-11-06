@@ -1640,7 +1640,7 @@ static void diagnoseRetroactiveConformances(
   // We better only be conforming it to protocols declared within this module.
   llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
-    if (entry.getType().isNull()) {
+    if (entry.getType().isNull() || !entry.getTypeRepr()) {
       continue;
     }
 
@@ -3821,7 +3821,7 @@ public:
       auto *extTypeNominal = extType->getAnyNominal();
       bool firstNominalIsNotMostSpecific =
         extTypeNominal && extTypeNominal != nominal;
-      if (isa<CompositionTypeRepr>(extTypeRepr)
+      if ((extTypeRepr && isa<CompositionTypeRepr>(extTypeRepr))
           || firstNominalIsNotMostSpecific) {
         auto diag = ED->diagnose(diag::composition_in_extended_type,
                                  nominal->getDeclaredType());

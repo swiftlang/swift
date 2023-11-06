@@ -78,7 +78,6 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
   }
     break;
   case InverseMarking::Kind::Explicit:
-    assert(false && "how did it become Copyable?");
     break;
   };
 
@@ -326,11 +325,11 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     ext->setExtendedNominal(nominal);
     nominal->addExtension(ext);
 
-    // Make it accessible to getTopLevelDecls()
-    if (auto file = dyn_cast<FileUnit>(nominal->getModuleScopeContext()))
-      file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
+    // Make it accessible to getTopLevelDecls() so it gets type-checked.
+    auto file = cast<FileUnit>(nominal->getModuleScopeContext());
+    file->getOrCreateSynthesizedFile().addTopLevelDecl(ext);
 
-    // Then reate the conformance using the extension as the conformance's
+    // Then create the conformance using the extension as the conformance's
     // DeclContext, which is how we register these conditional requirements
     // with the conformance.
     return generateConformance(ext);

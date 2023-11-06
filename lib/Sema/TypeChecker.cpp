@@ -290,13 +290,11 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
       }
     }
 
-    // Type-check macro-generated extensions.
+    // Type-check macro-generated or implicitly-synthesized extensions.
     if (auto *synthesizedSF = SF->getSynthesizedFile()) {
       for (auto *decl : synthesizedSF->getTopLevelDecls()) {
-        if (!decl->isImplicit()) {
-          assert(isa<ExtensionDecl>(decl));
-          TypeChecker::typeCheckDecl(decl);
-        }
+        assert(isa<ExtensionDecl>(decl));
+        TypeChecker::typeCheckDecl(decl);
       }
     }
     SF->typeCheckDelayedFunctions();
