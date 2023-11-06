@@ -1276,7 +1276,7 @@ _gatherGenericParameters(const ContextDescriptor *context,
     auto generics = context->getGenericContext();
     assert(generics);
 
-    // If we have a parent, gather it's generic arguments "as written". If our
+    // If we have a parent, gather its generic arguments "as written". If our
     // parent is not generic, there are no generic arguments to add.
     if (parent && parent->getTypeContextDescriptor() &&
         parent->getTypeContextDescriptor()->getGenericContext()) {
@@ -3297,19 +3297,9 @@ bool swift::_gatherWrittenGenericParameters(
       missingWrittenArguments = true;
     }
 
-    switch (param.getKind()) {
-    case GenericParamKind::Type:
-      // Already handled by the above.
-      break;
-
-    case GenericParamKind::TypePack:
-      // Already handled by the above.
-      break;
-
-    default:
-      // We don't know about this kind of parameter.
-      return false;
-    }
+    assert((param.getKind() == GenericParamKind::Type ||
+           param.getKind() == GenericParamKind::TypePack) &&
+           "Unknown generic parameter kind");
   }
 
   // If there is no follow-up work to do, we're done.
@@ -3325,8 +3315,6 @@ bool swift::_gatherWrittenGenericParameters(
 
   SubstGenericParametersFromWrittenArgs substitutions(genericArgs,
                                                       genericParamCounts);
-
-  bool needToCheckAssociatedSameTypes = false;
 
   // Walk through the generic requirements to evaluate same-type
   // constraints that are needed to fill in missing generic arguments.
@@ -3375,10 +3363,10 @@ bool swift::_gatherWrittenGenericParameters(
     auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
 
     // If the rhs parameter is not a generic parameter itself with
-    // (depth, index), it could potentially be some associated type. Check it
-    // again later once we've found all of the other same types.
+    // (depth, index), it could potentially be some associated type. If that's
+    // the case, then we don't need to do anything else for this rhs because it
+    // won't appear in the key arguments list.
     if (!rhsParam) {
-      needToCheckAssociatedSameTypes = true;
       continue;
     }
 
@@ -3392,58 +3380,6 @@ bool swift::_gatherWrittenGenericParameters(
       return false;
 
     genericArgs[*rhsFlatIndex] = genericArgs[*lhsFlatIndex];
-  }
-
-  if (!needToCheckAssociatedSameTypes) {
-    return true;
-  }
-
-  // Once again, loop through our list and look for same type constraints where
-  // the rhs is an associated type of sorts.
-  for (const auto &req : genericContext->getGenericRequirements()) {
-    // We only care about same-type constraints.
-    if (req.Flags.getKind() != GenericRequirementKind::SameType) {
-      continue;
-    }
-
-    auto lhsParam = demangleToGenericParamRef(req.getParam());
-
-    if (!lhsParam) {
-      continue;
-    }
-
-    auto lhsFlatIndex =
-      _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
-                             genericParamCounts);
-    if (!lhsFlatIndex || *lhsFlatIndex >= genericArgs.size())
-      return false;
-
-    auto rhsParam =
-        swift_getTypeByMangledName(MetadataState::Abstract,
-          req.getMangledTypeName(),
-          keyArgs.data(),
-          [&substitutions](unsigned depth, unsigned index) {
-            return substitutions.getMetadata(depth, index).Ptr;
-          },
-          [&substitutions](const Metadata *type, unsigned index) {
-            return substitutions.getWitnessTable(type, index);
-          }).getType().getMetadata();
-
-    if (!rhsParam) {
-      return false;
-    }
-
-    // If we already have an argument for the lhs, then just check that it is
-    // indeed == to the rhs type.
-    if (auto genericArg = genericArgs[*lhsFlatIndex]) {
-      if (genericArg.getMetadata() != rhsParam) {
-        return false;
-      }
-    } else {
-      // If we don't have a lhs yet, then it's just the rhs.
-      genericArgs[*lhsFlatIndex] = MetadataOrPack(rhsParam);
-    }
-
   }
 
   return true;
