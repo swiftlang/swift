@@ -160,6 +160,20 @@ bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          SourceEditConsumer &EditConsumer,
                          DiagnosticConsumer &DiagConsumer);
 
+/// Describes the different ranges that need to be renamed during a rename
+/// operation. For a function these are the base name and the argument labels.
+struct SyntacticRenameRangeDetails {
+  RegionType Type;
+  std::vector<RenameRangeDetail> Ranges;
+};
+
+/// Return the \c SyntacticRenameRangeDetails for the given \c ResolvedLoc and
+/// \c RenameLoc.
+SyntacticRenameRangeDetails
+getSyntacticRenameRangeDetails(const SourceManager &SM, StringRef OldName,
+                               const ResolvedLoc &Resolved,
+                               const RenameLoc &Config);
+
 /// Based on the given \p RenameLocs, finds the ranges (including argument
 /// labels) that need to be renamed and reports those to \p RenameConsumer.
 ///

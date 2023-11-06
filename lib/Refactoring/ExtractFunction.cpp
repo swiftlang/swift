@@ -12,7 +12,6 @@
 
 #include "ExtractExprBase.h"
 #include "RefactoringActions.h"
-#include "RenameRangeDetailCollector.h"
 #include "Utils.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/IDETool/CompilerInvocation.h"
@@ -109,9 +108,9 @@ static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
   RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
                             NameUsage::Definition, /*OldName=*/Name,
                             IsFunctionLike};
-  RenameRangeDetailCollector Renamer(SM, Name);
-  Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
-  auto Ranges = Renamer.getResult();
+  std::vector<RenameRangeDetail> Ranges =
+      getSyntacticRenameRangeDetails(SM, Name, Resolved.back(), RenameConfig)
+          .Ranges;
 
   std::vector<NoteRegion> NoteRegions(Ranges.size());
   llvm::transform(Ranges, NoteRegions.begin(),

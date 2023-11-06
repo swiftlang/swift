@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RenameRangeDetailCollector.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
@@ -19,7 +18,6 @@
 
 using namespace swift;
 using namespace swift::ide;
-using namespace swift::refactoring;
 
 std::vector<ResolvedLoc>
 swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
@@ -93,14 +91,15 @@ int swift::ide::findSyntacticRenameRanges(
   size_t index = 0;
   for (const RenameLoc &Rename : RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
-    RenameRangeDetailCollector Renamer(SM, Rename.OldName);
-    RegionType Type = Renamer.addSyntacticRenameRanges(Resolved, Rename);
-    if (Type == RegionType::Mismatch) {
+
+    SyntacticRenameRangeDetails Details =
+        getSyntacticRenameRangeDetails(SM, Rename.OldName, Resolved, Rename);
+    if (Details.Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
                           NewName);
-      RenameConsumer.accept(SM, Type, llvm::None);
+      RenameConsumer.accept(SM, Details.Type, llvm::None);
     } else {
-      RenameConsumer.accept(SM, Type, Renamer.getResult());
+      RenameConsumer.accept(SM, Details.Type, Details.Ranges);
     }
   }
 
