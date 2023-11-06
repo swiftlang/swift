@@ -279,6 +279,9 @@ struct OverloadSignature {
   /// Whether this is an async function.
   unsigned IsAsyncFunction : 1;
 
+  /// Whether this is an distributed function.
+  unsigned IsDistributed : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -304,8 +307,8 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        InProtocolExtension(false), InExtensionOfGenericType(false),
-        HasOpaqueReturnType(false) { }
+        IsDistributed(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
