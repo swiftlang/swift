@@ -61,14 +61,13 @@ class FileImageSource: ImageSource {
   public func fetch(from addr: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
     let start = Int(addr)
-    _ = try buffer.withMemoryRebound(to: UInt8.self) { byteBuf in
-      guard _mapping.indices.contains(start) else {
-        throw FileImageSourceError.outOfRangeRead
-      }
-      let slice = _mapping[start...]
-      guard slice.count >= byteBuf.count else {
-        throw FileImageSourceError.outOfRangeRead
-      }
+    guard _mapping.indices.contains(start) else {
+      throw FileImageSourceError.outOfRangeRead
     }
+    let slice = _mapping[start...]
+    guard slice.count >= buffer.count else {
+      throw FileImageSourceError.outOfRangeRead
+    }
+    buffer.copyBytes(from: slice[start..<start+buffer.count])
   }
 }
