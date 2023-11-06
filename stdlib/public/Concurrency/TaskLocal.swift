@@ -90,9 +90,6 @@ import Swift
 ///     func call() {
 ///       print("traceID: \(traceID)") // 1234
 ///     }
-///
-/// This type must be a `class` so it has a stable identity, that is used as key
-/// value for lookups in the task local storage.
 @propertyWrapper
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {

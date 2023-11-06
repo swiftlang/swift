@@ -108,7 +108,7 @@ struct SwiftParserExecutor {
     return llvm::Error::success();
 #else
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "SwiftParser is not supported")
+                                   "SwiftParser is not supported");
 #endif
   }
 };

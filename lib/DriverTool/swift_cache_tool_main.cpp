@@ -50,9 +50,8 @@ enum class SwiftCacheToolAction {
 
 struct OutputEntry {
   std::string InputPath;
-  std::string OutputPath;
-  std::string OutputKind;
   std::string CacheKey;
+  std::vector<std::pair<std::string, std::string>> Outputs;
 };
 
 enum ID {
@@ -285,35 +284,30 @@ int SwiftCacheToolInvocation::printOutputKeys() {
 
   std::vector<OutputEntry> OutputKeys;
   bool hasError = false;
-  auto addOutputKey = [&](StringRef InputPath, file_types::ID OutputKind,
-                          StringRef OutputPath) {
+  auto addFromInputFile = [&](const InputFile &Input) {
+    auto InputPath = Input.getFileName();
     auto OutputKey =
         createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputPath);
     if (!OutputKey) {
-      llvm::errs() << "cannot create cache key for " << OutputPath << ": "
+      llvm::errs() << "cannot create cache key for " << InputPath << ": "
                    << toString(OutputKey.takeError()) << "\n";
       hasError = true;
     }
     OutputKeys.emplace_back(
-        OutputEntry{InputPath.str(), OutputPath.str(),
-                    file_types::getTypeName(OutputKind).str(),
-                    CAS.getID(*OutputKey).toString()});
-  };
-  auto addFromInputFile = [&](const InputFile &Input) {
-    auto InputPath = Input.getFileName();
+        OutputEntry{InputPath, CAS.getID(*OutputKey).toString(), {}});
+    auto &Outputs = OutputKeys.back().Outputs;
     if (!Input.outputFilename().empty())
-      addOutputKey(InputPath,
-                   Invocation.getFrontendOptions()
-                       .InputsAndOutputs.getPrincipalOutputType(),
-                   Input.outputFilename());
+      Outputs.emplace_back(file_types::getTypeName(
+                               Invocation.getFrontendOptions()
+                                   .InputsAndOutputs.getPrincipalOutputType()),
+                           Input.outputFilename());
     Input.getPrimarySpecificPaths()
         .SupplementaryOutputs.forEachSetOutputAndType(
             [&](const std::string &File, file_types::ID ID) {
               // Dont print serialized diagnostics.
               if (file_types::isProducedFromDiagnostics(ID))
                 return;
-
-              addOutputKey(InputPath, ID, File);
+              Outputs.emplace_back(file_types::getTypeName(ID), File);
             });
   };
   llvm::for_each(
@@ -321,8 +315,10 @@ int SwiftCacheToolInvocation::printOutputKeys() {
       addFromInputFile);
 
   // Add diagnostics file.
-  addOutputKey("<cached-diagnostics>", file_types::ID::TY_CachedDiagnostics,
-               "<cached-diagnostics>");
+  if (!OutputKeys.empty())
+    OutputKeys.front().Outputs.emplace_back(
+        file_types::getTypeName(file_types::ID::TY_CachedDiagnostics),
+        "<cached-diagnostics>");
 
   if (hasError)
     return 1;
@@ -331,10 +327,16 @@ int SwiftCacheToolInvocation::printOutputKeys() {
   Out.array([&] {
     for (const auto &E : OutputKeys) {
       Out.object([&] {
-        Out.attribute("OutputPath", E.OutputPath);
-        Out.attribute("OutputKind", E.OutputKind);
         Out.attribute("Input", E.InputPath);
         Out.attribute("CacheKey", E.CacheKey);
+        Out.attributeArray("Outputs", [&] {
+          for (const auto &OutEntry : E.Outputs) {
+            Out.object([&] {
+              Out.attribute("Kind", OutEntry.first);
+              Out.attribute("Path", OutEntry.second);
+            });
+          }
+        });
       });
     }
   });
@@ -367,9 +369,20 @@ int SwiftCacheToolInvocation::validateOutputs() {
     report_fatal_error(DB.takeError());
 
   auto &CAS = *DB->first;
+  auto &Cache = *DB->second;
 
   PrintingDiagnosticConsumer PDC;
   Instance.getDiags().addConsumer(PDC);
+
+  auto lookupFailed = [&](StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << "\n";
+    return true;
+  };
+  auto lookupError = [&](llvm::Error Err, StringRef Key) {
+    llvm::errs() << "failed to find output for cache key " << Key << ": "
+                 << toString(std::move(Err)) << "\n";
+    return true;
+  };
 
   auto validateCacheKeysFromFile = [&](const std::string &Path) {
     auto Keys = readOutputEntriesFromFile(Path);
@@ -389,28 +402,30 @@ int SwiftCacheToolInvocation::validateOutputs() {
             return true;
           }
           auto Ref = CAS.getReference(*ID);
-          if (!Ref) {
-            llvm::errs() << "failed to find output for cache key " << Key
-                         << "\n";
-            return true;
-          }
-          cas::CachedResultLoader Loader(*DB->first, *DB->second, *Ref);
-          auto Result = Loader.replay(
+          if (!Ref)
+            return lookupFailed(*Key);
+          auto KeyID = CAS.getID(*Ref);
+          auto Lookup = Cache.get(KeyID);
+          if (!Lookup)
+            return lookupError(Lookup.takeError(), *Key);
+
+          if (!*Lookup)
+            return lookupFailed(*Key);
+
+          auto OutputRef = CAS.getReference(**Lookup);
+          if (!OutputRef)
+            return lookupFailed(*Key);
+
+          cas::CachedResultLoader Loader(CAS, *OutputRef);
+          if (auto Err = Loader.replay(
                   [&](file_types::ID Kind, ObjectRef Ref) -> llvm::Error {
                     auto Proxy = CAS.getProxy(Ref);
                     if (!Proxy)
                       return Proxy.takeError();
                     return llvm::Error::success();
-                  });
-
-          if (!Result) {
+                  })) {
             llvm::errs() << "failed to find output for cache key " << *Key
-                         << ": " << toString(Result.takeError()) << "\n";
-            return true;
-          }
-          if (!*Result) {
-            llvm::errs() << "failed to load output for cache key " << *Key
-                         << "\n";
+                         << ": " << toString(std::move(Err)) << "\n";
             return true;
           }
           continue;

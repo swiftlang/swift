@@ -42,11 +42,11 @@ An array of architectures for which the Swift SDK should be built.
 The product version to be used when building the installer.
 Supports semantic version strings.
 
-.PARAMETER PinnedBranch
-The branch for the snapshot to build the early components with.
-
-.PARAMETER PinnedToolchain
+.PARAMETER PinnedBuild
 The toolchain snapshot to build the early components with.
+
+.PARAMETER PinnedSHA256
+The SHA256 for the pinned toolchain.
 
 .PARAMETER WinSDKVersion
 The version number of the Windows SDK to be used.
@@ -93,8 +93,8 @@ param(
   [string] $SwiftDebugFormat = "dwarf",
   [string[]] $SDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
-  [string] $PinnedBranch = "swift-5.9-release",
-  [string] $PinnedToolchain = "swift-5.9-RELEASE",
+  [string] $PinnedBuild = "https://download.swift.org/swift-5.9-release/windows10/swift-5.9-RELEASE/swift-5.9-RELEASE-windows10.exe",
+  [string] $PinnedSHA256 = "EAB668ABFF903B4B8111FD27F49BAD470044B6403C6FA9CCD357AE831909856D",
   [string] $WinSDKVersion = "",
   [switch] $SkipBuild = $false,
   [switch] $SkipRedistInstall = $false,
@@ -217,6 +217,7 @@ function Get-InstallDir($Arch) {
 }
 
 $NugetRoot = "$BinaryCache\nuget"
+$PinnedToolchain = [IO.Path]::GetFileNameWithoutExtension($PinnedBuild)
 
 $LibraryRoot = "$ImageRoot\Library"
 $ToolchainInstallRoot = "$(Get-InstallDir $HostArch)\Toolchains\$ProductVersion+Asserts"
@@ -422,25 +423,38 @@ function Ensure-WindowsSDK {
 }
 
 function Ensure-SwiftToolchain($Arch) {
-  if (Test-Path "$BinaryCache\toolchains\$PinnedToolchain\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin\swiftc.exe") {
-    return
-  }
-
   if (-not (Test-Path $BinaryCache\wix-4.0.1.zip)) {
+    Write-Output "WiX not found. Downloading from nuget.org..."
     Invoke-Program curl.exe -sL https://www.nuget.org/api/v2/package/wix/4.0.1 --output $BinaryCache\wix-4.0.1.zip --create-dirs
   }
-  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\wix-4.0.1 | Out-Null
-  Expand-Archive -Path $BinaryCache\wix-4.0.1.zip -Destination $BinaryCache\wix-4.0.1 -Force
 
-  Write-Output "Swift toolchain not found. Downloading from swift.org..."
-  $SwiftToolchainURL = "https://swift.org/builds/${PinnedBranch}/windows10/${PinnedToolchain}/${PinnedToolchain}-windows10.exe"
-  New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
-  if (-not (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}.exe")) {
-    (New-Object Net.WebClient).DownloadFile($SwiftToolchainURL, "$BinaryCache\toolchains\${PinnedToolchain}.exe")
+  if (-not $ToBatch) {
+    $SHA256 = Get-FileHash -Path "$BinaryCache\wix-4.0.1.zip" -Algorithm SHA256
+    if ($SHA256.Hash -ne "756AD3115F0CE808313266F4E401C0F520D319211DE0B9D8D7E7697020E0C461") {
+      throw "WiX SHA256 mismatch ($($SHA256.Hash) vs 756AD3115F0CE808313266F4E401C0F520D319211DE0B9D8D7E7697020E0C461)"
+    }
   }
 
-  Write-Output "Installing Swift toolchain..."
-  Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\toolchains\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
+  New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\wix-4.0.1 | Out-Null
+  Write-Output "Extracting WiX..."
+  Expand-Archive -Path $BinaryCache\wix-4.0.1.zip -Destination $BinaryCache\wix-4.0.1 -Force
+
+  if (-not (Test-Path "$BinaryCache\${PinnedToolchain}.exe")) {
+    Write-Output "Swift toolchain not found. Downloading from swift.org..."
+    (New-Object Net.WebClient).DownloadFile($PinnedBuild, "$BinaryCache\${PinnedToolchain}.exe")
+    # Invoke-Program curl.exe -sL $PinnedBuild --output $BinaryCache\${PinnedToolchain}.exe --create-dirs
+  }
+
+  if (-not $ToBatch) {
+    $SHA256 = Get-FileHash -Path "$BinaryCache\${PinnedToolchain}.exe" -Algorithm SHA256
+    if ($SHA256.Hash -ne $PinnedSHA256) {
+      throw "SHA256 mismatch ($($SHA256.Hash) vs ${PinnedSHA256})"
+    }
+  }
+
+  New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
+  Write-Output "Extracting Swift toolchain..."
+  Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
   Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a0" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
   Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a1" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
   Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a2" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
@@ -1467,30 +1481,17 @@ function Build-IndexStoreDB($Arch) {
     }
 }
 
-function Build-Syntax($Arch) {
-  Build-CMakeProject `
-    -Src $SourceCache\swift-syntax `
-    -Bin $BinaryCache\14 `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
-    -Arch $Arch `
-    -UseBuiltCompilers Swift `
-    -SwiftSDK $SDKInstallRoot `
-    -BuildTargets default `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-    }
-}
-
 function Build-SourceKitLSP($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\sourcekit-lsp `
-    -Bin $BinaryCache\15 `
+    -Bin $BinaryCache\14 `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -UseBuiltCompilers C,Swift `
     -SwiftSDK $SDKInstallRoot `
     -BuildTargets default `
     -Defines @{
+      SwiftSyntax_DIR = "$BinaryCache\1\cmake\modules";
       SwiftSystem_DIR = "$BinaryCache\2\cmake\modules";
       TSC_DIR = "$BinaryCache\3\cmake\modules";
       LLBuild_DIR = "$BinaryCache\4\cmake\modules";
@@ -1499,7 +1500,6 @@ function Build-SourceKitLSP($Arch) {
       SwiftCollections_DIR = "$BinaryCache\9\cmake\modules";
       SwiftPM_DIR = "$BinaryCache\12\cmake\modules";
       IndexStoreDB_DIR = "$BinaryCache\13\cmake\modules";
-      SwiftSyntax_DIR = "$BinaryCache\14\cmake\modules";
     }
 }
 
@@ -1654,7 +1654,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Certificates $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
-  Invoke-BuildStep Build-Syntax $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
 

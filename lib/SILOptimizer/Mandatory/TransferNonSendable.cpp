@@ -1392,7 +1392,11 @@ public:
   void print(llvm::raw_ostream &os) const {
     os << SEP_STR << "BlockPartitionState[reached=" << reached
        << ", needsUpdate=" << needsUpdate << "]\nid: ";
+#ifndef NDEBUG
     basicBlock->printID(os);
+#else
+    os << "NOASSERTS. ";
+#endif
     os << "entry partition: ";
     entryPartition.print(os);
     os << "exit partition: ";

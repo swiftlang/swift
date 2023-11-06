@@ -7,6 +7,7 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 add_swift_host_library(libSwiftScan SHARED
   libSwiftScan.cpp
   c-include-check.c
+  SwiftCaching.cpp
   HAS_SWIFT_MODULES)
 
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)

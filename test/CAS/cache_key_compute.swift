@@ -50,32 +50,34 @@
 // RUN:   %target-swift-frontend -cache-compile-job %s -emit-module -c -emit-dependencies \
 // RUN:   -emit-tbd -emit-tbd-path %t/test.tbd -o %t/test.o -allow-unstable-cache-key-for-testing | %FileCheck %s --check-prefix=CHECK --check-prefix=PLUGIN
 
-// CHECK: test.o
-// CHECK-NEXT: "OutputKind": "object"
-// CHECK-NEXT: "Input"
+// CHECK: "Input": "{{.*}}{{/|\\}}cache_key_compute.swift"
 // CHECK-NEXT: "CacheKey"
 // PLUGIN-SAME: myfirst-llvmcas://
 
-// CHECK: test.swiftmodule
-// CHECK-NEXT: "OutputKind": "swiftmodule"
-// CHECK-NEXT: "Input"
-// CHECK-NEXT: "CacheKey"
-// PLUGIN-SAME: myfirst-llvmcas://
+// CHECK-NEXT: "Outputs": [
+// CHECK-NEXT: {
+// CHECK-NEXT: "Kind": "object",
+// CHECK-NEXT: "Path":
+// CHECK-SAME: test.o
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT: "Kind": "swiftmodule",
+// CHECK-NEXT: "Path":
+// CHECK-SAME: test.swiftmodule
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT: "Kind": "dependencies",
+// CHECK-NEXT: "Path":
+// CHECK-SAME: test.d
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT: "Kind": "tbd",
+// CHECK-NEXT: "Path":
+// CHECK-SAME: test.tbd
+// CHECK-NEXT: },
+// CHECK-NEXT: {
+// CHECK-NEXT: "Kind": "cached-diagnostics",
+// CHECK-NEXT: "Path": "<cached-diagnostics>"
+// CHECK-NEXT: }
+// CHECK-NEXT: ]
 
-// CHECK: test.d
-// CHECK-NEXT: "OutputKind": "dependencies"
-// CHECK-NEXT: "Input"
-// CHECK-NEXT: "CacheKey"
-// PLUGIN-SAME: myfirst-llvmcas://
-
-// CHECK: test.tbd
-// CHECK-NEXT: "OutputKind": "tbd"
-// CHECK-NEXT: "Input"
-// CHECK-NEXT: "CacheKey"
-// PLUGIN-SAME: myfirst-llvmcas://
-
-// CHECK: <cached-diagnostics>
-// CHECK-NEXT: "OutputKind": "cached-diagnostics"
-// CHECK-NEXT: "Input": "<cached-diagnostics>"
-// CHECK-NEXT: "CacheKey"
-// PLUGIN-SAME: myfirst-llvmcas://

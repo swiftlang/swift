@@ -3288,12 +3288,6 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
       } else if (requirementAbstractFunc->getThrowsLoc().isValid()) {
         // Insert before the "throws" (we only have async)".
         insertLoc = requirementAbstractFunc->getThrowsLoc();
-      } else if (auto requirementFunc =
-                     dyn_cast<FuncDecl>(requirementAbstractFunc)) {
-        // Insert before the result type, if there is one.
-        if (auto resultTypeRepr = requirementFunc->getResultTypeRepr()) {
-          insertLoc = resultTypeRepr->getStartLoc();
-        }
       }
 
       // Insert after the parentheses.
