@@ -38,6 +38,9 @@
     },
     {
       "name": "ld-path-driver-option"
+    },
+    {
+      "name": "cache-compile-job"
     }
   ]
 }
