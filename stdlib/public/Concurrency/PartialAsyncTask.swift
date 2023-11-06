@@ -24,7 +24,7 @@ internal func _swiftJobRun(_ job: UnownedJob,
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
 
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -116,7 +116,7 @@ extension UnownedJob: CustomStringConvertible {
 
 /// Deprecated equivalent of ``ExecutorJob``.
 ///
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -172,7 +172,7 @@ extension Job {
   /// The passed in executor reference is used to establish the executor context for the job,
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
-  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
   /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
   /// as a job can only ever be run once, and must not be accessed after it has been run.
@@ -185,7 +185,7 @@ extension Job {
   }
 }
 
-/// A unit of scheduleable work.
+/// A unit of schedulable work.
 ///
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with jobs directly.
@@ -240,7 +240,7 @@ extension ExecutorJob {
   /// The passed in executor reference is used to establish the executor context for the job,
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
-  /// This operation consumes the job, preventing it accidental use after it has ben run.
+  /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
   /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
   /// as a job can only ever be run once, and must not be accessed after it has been run.
@@ -287,7 +287,7 @@ extension TaskPriority {
   @available(SwiftStdlib 5.9, *)
   public init?(_ p: JobPriority) {
     guard p.rawValue != 0 else {
-      /// 0 is "undefined"
+      // 0 is "undefined"
       return nil
     }
     self = TaskPriority(rawValue: p.rawValue)
@@ -325,7 +325,7 @@ extension JobPriority: Comparable {
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: UncheckedContinuation
+// MARK: UnsafeContinuation
 
 /// A mechanism to interface
 /// between synchronous and asynchronous code,
