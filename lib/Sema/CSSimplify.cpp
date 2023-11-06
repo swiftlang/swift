@@ -4471,13 +4471,6 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
-  if (typeVar->getImpl().isKeyPathType()) {
-    if (flags.contains(TMF_BindingTypeVariable))
-      return resolveKeyPath(typeVar, type, locator)
-                 ? getTypeMatchSuccess()
-                 : getTypeMatchFailure(locator);
-  }
-
   assignFixedType(typeVar, type, /*updateState=*/true,
                   /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 

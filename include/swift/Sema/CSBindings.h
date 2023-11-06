@@ -71,6 +71,8 @@ enum class LiteralBindingKind : uint8_t {
 /// along with information that can be used to construct related
 /// bindings, e.g., the supertypes of a given type.
 struct PotentialBinding {
+  friend class BindingSet;
+
   /// The type to which the type variable can be bound.
   Type BindingType;
 
