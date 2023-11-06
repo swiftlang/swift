@@ -20,51 +20,56 @@ import Swift
 
 enum FileImageSourceError: Error {
   case posixError(Int32)
-  case truncatedRead
+  case outOfRangeRead
 }
 
 class FileImageSource: ImageSource {
-  private var fd: Int32
+  private var _mapping: UnsafeRawBufferPointer
 
   public var isMappedImage: Bool { return false }
 
   private var _path: String
   public var path: String? { return _path }
 
-  public lazy var bounds: Bounds? = {
-    let size = lseek(fd, 0, SEEK_END)
-    if size < 0 {
-      return nil
-    }
-    return Bounds(base: 0, size: Size(size))
-  }()
+  public var bounds: Bounds? {
+    return Bounds(base: 0, size: Size(_mapping.count))
+  }
 
   public init(path: String) throws {
     _path = path
-    fd = _swift_open(path, O_RDONLY, 0)
+    let fd = _swift_open(path, O_RDONLY, 0)
     if fd < 0 {
       throw FileImageSourceError.posixError(_swift_get_errno())
     }
+    defer { close(fd) }
+    let size = lseek(fd, 0, SEEK_END)
+    if size < 0 {
+      throw FileImageSourceError.posixError(_swift_get_errno())
+    }
+    let base = mmap(nil, Int(size), PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0)
+    if base == nil || base! == UnsafeRawPointer(bitPattern: -1)! {
+      throw FileImageSourceError.posixError(_swift_get_errno())
+    }
+    _mapping = UnsafeRawBufferPointer(start: base, count: Int(size))
   }
 
   deinit {
-    close(fd)
+    munmap(UnsafeMutableRawPointer(mutating: _mapping.baseAddress),
+           _mapping.count)
   }
 
   public func fetch<T>(from addr: Address,
                        into buffer: UnsafeMutableBufferPointer<T>) throws {
-    while true {
-      let size = MemoryLayout<T>.stride * buffer.count
-      let result = pread(fd, buffer.baseAddress, size, off_t(addr))
-
-      if result < 0 {
-        throw FileImageSourceError.posixError(_swift_get_errno())
+    let start = Int(addr)
+    _ = try buffer.withMemoryRebound(to: UInt8.self) { byteBuf in
+      guard _mapping.indices.contains(start) else {
+        throw FileImageSourceError.outOfRangeRead
       }
-
-      if result != size {
-        throw FileImageSourceError.truncatedRead
+      let slice = _mapping[start...]
+      guard slice.count >= byteBuf.count else {
+        throw FileImageSourceError.outOfRangeRead
       }
-      break
+      byteBuf.update(from: slice)
     }
   }
 }
