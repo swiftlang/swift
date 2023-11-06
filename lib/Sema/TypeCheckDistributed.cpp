@@ -696,19 +696,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // If applicable, this will create the default 'init(transport:)' initializer
   (void)nominal->getDefaultInitializer();
 
-  // We check decls for ambiguity more strictly than normal nominal types,
-  // because we want to record distributed accessors the same if function they
-  // point at (in a remote process) is async or not, as that has no effect on
-  // a caller from a different process, so we want to make the remoteCall target
-  // identifiers, less fragile against such refactorings.
-  //
-  // To achieve this, we ban overloads on just "effects" of functions,
-  // which are useful in local settings, but really should not be relied
-  // on as differenciators in remote calls - the call will always be "async"
-  // since it will go through a thunk, and then be asynchronously transferred
-  // to the called process.
-//  llvm::SmallDenseSet<DeclName, 2> diagnosedAmbiguity;
-
   for (auto member : nominal->getMembers()) {
     // --- Ensure 'distributed func' all thunks
     if (auto *var = dyn_cast<VarDecl>(member)) {
