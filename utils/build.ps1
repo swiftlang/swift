@@ -1481,30 +1481,17 @@ function Build-IndexStoreDB($Arch) {
     }
 }
 
-function Build-Syntax($Arch) {
-  Build-CMakeProject `
-    -Src $SourceCache\swift-syntax `
-    -Bin $BinaryCache\14 `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
-    -Arch $Arch `
-    -UseBuiltCompilers Swift `
-    -SwiftSDK $SDKInstallRoot `
-    -BuildTargets default `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-    }
-}
-
 function Build-SourceKitLSP($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\sourcekit-lsp `
-    -Bin $BinaryCache\15 `
+    -Bin $BinaryCache\14 `
     -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -UseBuiltCompilers C,Swift `
     -SwiftSDK $SDKInstallRoot `
     -BuildTargets default `
     -Defines @{
+      SwiftSyntax_DIR = "$BinaryCache\1\cmake\modules";
       SwiftSystem_DIR = "$BinaryCache\2\cmake\modules";
       TSC_DIR = "$BinaryCache\3\cmake\modules";
       LLBuild_DIR = "$BinaryCache\4\cmake\modules";
@@ -1513,7 +1500,6 @@ function Build-SourceKitLSP($Arch) {
       SwiftCollections_DIR = "$BinaryCache\9\cmake\modules";
       SwiftPM_DIR = "$BinaryCache\12\cmake\modules";
       IndexStoreDB_DIR = "$BinaryCache\13\cmake\modules";
-      SwiftSyntax_DIR = "$BinaryCache\14\cmake\modules";
     }
 }
 
@@ -1668,7 +1654,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Certificates $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
-  Invoke-BuildStep Build-Syntax $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
 }
 
