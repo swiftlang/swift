@@ -81,6 +81,8 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
 ///
 /// \sa SIL_INDEX_BLOCK_ID
 namespace sil_index_block {
+// clang-format off
+
   // These IDs must \em not be renumbered or reordered without incrementing
   // the module version.
   enum RecordKind {
@@ -111,12 +113,16 @@ namespace sil_index_block {
     BCFixed<4>,  // record ID
     BCArray<BitOffsetField>
   >;
+
+// clang-format on
 }
 
 /// The record types within the "sil" block.
 ///
 /// \sa SIL_BLOCK_ID
 namespace sil_block {
+// clang-format off
+
   // These IDs must \em not be renumbered or reordered without incrementing
   // the module version.
   enum RecordKind : uint8_t {
@@ -566,6 +572,8 @@ namespace sil_block {
     ValueIDField,               // decl
     BCArray<IdentifierIDField>  // referenced functions
   >;
+
+// clang-format on
 }
 
 } // end namespace serialization
