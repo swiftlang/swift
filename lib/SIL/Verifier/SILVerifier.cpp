@@ -2112,7 +2112,7 @@ public:
       return;
     }
 
-    if (builtinKind == BuiltinValueKind::BuildOrdinaryExecutorRef ||
+    if (builtinKind == BuiltinValueKind::BuildOrdinaryTaskExecutorRef ||
         builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildComplexEqualitySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {

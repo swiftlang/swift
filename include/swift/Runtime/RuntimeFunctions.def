@@ -2392,7 +2392,7 @@ FUNCTION(TaskGetMainExecutor,
          EFFECT(Concurrency),
          MEMEFFECTS(ArgMemOnly))
 
-// ExecutorRef swift_task_getPreferredTaskExecutor();
+// TaskExecutorRef swift_task_getPreferredTaskExecutor();
 FUNCTION(TaskGetPreferredTaskExecutor,
          swift_task_getPreferredTaskExecutor, SwiftCC,
          TaskExecutorAvailability,

@@ -530,8 +530,8 @@ public:
   ///
   /// This means that during task tear down the record should be deallocated
   /// because it was not set with a
-  bool hasInitialExecutorPreferenceRecord() const {
-    return Flags.task_hasInitialExecutorPreferenceRecord();
+  bool hasInitialTaskExecutorPreferenceRecord() const {
+    return Flags.task_hasInitialTaskExecutorPreferenceRecord();
   }
 
   // ==== Future ---------------------------------------------------------------

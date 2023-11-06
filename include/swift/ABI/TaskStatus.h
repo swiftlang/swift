@@ -276,6 +276,9 @@ public:
   }
 };
 
+/// This record signifies that the task has an executor preference.
+/// This preference may be added or removed at runtime, e.g. when multiple `withTaskExecutor { ... }`
+/// blocks are nested, they add more executor preferences.
 class TaskExecutorPreferenceStatusRecord : public TaskStatusRecord {
 private:
   const TaskExecutorRef Preferred;

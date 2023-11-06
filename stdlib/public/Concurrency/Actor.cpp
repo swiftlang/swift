@@ -1968,6 +1968,10 @@ extern "C" SWIFT_CC(swift)
 void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
                                    const Metadata *selfType,
                                    const SerialExecutorWitnessTable *wtable);
+extern "C" SWIFT_CC(swift)
+void _swift_task_enqueueOnTaskExecutor(Job *job, HeapObject *executor,
+                                       const Metadata *selfType,
+                                       const TaskExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
@@ -1978,8 +1982,21 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
 
   _swift_tsan_release(job);
 
-  if (executor.isGeneric())
+  if (executor.isGeneric()) {
+    // TODO: check the task for a flag if we need to look for task executor
+    if (auto task = dyn_cast<AsyncTask>(job)) {
+      fprintf(stderr, "[%s:%d](%s) checking task...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      auto taskExecutor = task->getPreferredTaskExecutor();
+      if (taskExecutor.isDefined()) {
+      fprintf(stderr, "[%s:%d](%s) FOUND TASK EXECUTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+        auto wtable = taskExecutor.getTaskExecutorWitnessTable();
+        auto taskExecutorObject = taskExecutor.getIdentity();
+        auto taskExecutorType = swift_getObjectType(taskExecutorObject);
+        return _swift_task_enqueueOnTaskExecutor(job, taskExecutorObject, taskExecutorType, wtable);
+      } // else, fall-through to the default global enqueue
+    }
     return swift_task_enqueueGlobal(job);
+  }
 
   if (executor.isDefaultActor()) {
     return swift_defaultActor_enqueue(job, executor.getDefaultActor());

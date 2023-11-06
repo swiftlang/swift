@@ -1800,11 +1800,11 @@ static ManagedValue emitBuildExecutorRef(SILGenFunction &SGF, SILLocation loc,
       subs, argValues);
   return ManagedValue::forObjectRValueWithoutOwnership(builtinApply);
 }
-static ManagedValue emitBuiltinBuildOrdinaryExecutorRef(
+static ManagedValue emitBuiltinBuildOrdinaryTaskExecutorRef(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
   return emitBuildExecutorRef(SGF, loc, subs, args,
-                            BuiltinValueKind::BuildOrdinaryExecutorRef);
+                            BuiltinValueKind::BuildOrdinaryTaskExecutorRef);
 }
 static ManagedValue emitBuiltinBuildOrdinarySerialExecutorRef(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,

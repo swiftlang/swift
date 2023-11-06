@@ -157,7 +157,7 @@ void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
   out.add(impl);
 }
 
-void irgen::emitBuildOrdinaryExecutorRef(IRGenFunction &IGF,
+void irgen::emitBuildOrdinaryTaskExecutorRef(IRGenFunction &IGF,
                                          llvm::Value *executor,
                                          CanType executorType,
                                          ProtocolConformanceRef executorConf,

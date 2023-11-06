@@ -37,14 +37,6 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
-@available(SwiftStdlib 9999, *)
-extension Executor {
-
-  public func asUnownedExecutor() -> UnownedExecutor {
-    return UnownedExecutor(ordinary: self)
-  }
-}
-
 /// A service that executes jobs.
 @available(SwiftStdlib 5.1, *)
 public protocol SerialExecutor: Executor {
@@ -139,7 +131,7 @@ public protocol TaskExecutor: Executor {
   func enqueue(_ job: consuming ExecutorJob)
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  // TODO: Implement: func asUnownedTaskExecutor() -> UnownedTaskExecutor
+  func asUnownedTaskExecutor() -> UnownedTaskExecutor
 }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -254,7 +246,7 @@ public struct UnownedSerialExecutor: Sendable {
 
 @available(SwiftStdlib 9999, *)
 @frozen
-public struct UnownedExecutor: Sendable {
+public struct UnownedTaskExecutor: Sendable {
   // #if compiler(>=5.9) && $BuiltinExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
   @usableFromInline
   internal var executor: Builtin.Executor
@@ -275,11 +267,11 @@ public struct UnownedExecutor: Sendable {
   }
 
   @inlinable
-  public init<E: Executor>(ordinary executor: __shared E) {
+  public init<E: TaskExecutor>(ordinary executor: __shared E) {
     // #if compiler(>=9999) && $BuiltinBuildExecutor // FIXME: THIS MUST BE DIFFERENT FOR THE NEW ONE?
-    self.executor = Builtin.buildOrdinaryExecutorRef(executor)
+    self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
     // #else
-    fatalError("Swift compiler is incompatible with this SDK version")
+    // fatalError("Swift compiler is incompatible with this SDK version")
     // #endif
   }
 }
@@ -343,13 +335,13 @@ internal func _task_serialExecutor_getExecutorRef<E>(_ executor: E) -> Builtin.E
   return executor.asUnownedSerialExecutor().executor
 }
 
-/// Obtain the executor ref by calling the executor's `asUnownedSerialExecutor()`.
+/// Obtain the executor ref by calling the executor's `asUnownedTaskExecutor()`.
 /// The obtained executor ref will have all the user-defined flags set on the executor.
 @available(SwiftStdlib 9999, *)
-@_silgen_name("_task_executor_getExecutorRef")
-public func _task_executor_getExecutorRef<E>(_ executor: E) -> Builtin.Executor
-    where E: Executor {
-  executor.asUnownedExecutor().executor
+@_silgen_name("_task_executor_getTaskExecutorRef")
+internal func _task_executor_getTaskExecutorRef<E>(_ executor: E) -> Builtin.Executor
+    where E: TaskExecutor {
+  return executor.asUnownedTaskExecutor().executor
 }
 
 // Used by the concurrency runtime
@@ -359,6 +351,22 @@ internal func _enqueueOnExecutor<E>(job unownedJob: UnownedJob, executor: E)
 where E: SerialExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(SwiftStdlib 5.9, *) {
+    executor.enqueue(ExecutorJob(context: unownedJob._context))
+  } else {
+    executor.enqueue(unownedJob)
+  }
+  #else // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  executor.enqueue(unownedJob)
+  #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+}
+
+// Used by the concurrency runtime
+@available(SwiftStdlib 9999, *)
+@_silgen_name("_swift_task_enqueueOnTaskExecutor")
+internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E)
+where E: TaskExecutor {
+  #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  if #available(SwiftStdlib 9999, *) {
     executor.enqueue(ExecutorJob(context: unownedJob._context))
   } else {
     executor.enqueue(unownedJob)

@@ -522,12 +522,14 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-ExecutorRef AsyncTask::getPreferredTaskExecutor() {
-  fprintf(stderr, "[%s:%d](%s) get task executor from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
+TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
+  fprintf(stderr, "[%s:%d](%s) get task executor from task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
 
-  ExecutorRef preference = ExecutorRef::generic();
+  TaskExecutorRef preference = TaskExecutorRef::undefined();
+  // TODO: check in flags before we have to take the lock to scan for the task executor...?
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto record: status.records()) {
+      fprintf(stderr, "[%s:%d](%s) record kind: %d (looking for %d)\n", __FILE_NAME__, __LINE__, __FUNCTION__, record->getKind(), TaskStatusRecordKind::TaskExecutorPreference);
       if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
         preference = executorPreferenceRecord->getPreferredExecutor();
@@ -536,14 +538,21 @@ ExecutorRef AsyncTask::getPreferredTaskExecutor() {
     }
   });
 
+  if (preference.isDefined()) {
+    fprintf(stderr, "[%s:%d](%s) FOUND EXEC PREFERENCE: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            preference.getIdentity());
+  } else {
+    fprintf(stderr, "[%s:%d](%s) !!! NO EXEC PREFERENCE: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            preference.getIdentity());
+  }
   return preference;
 }
 
-ExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   if (auto task = swift_task_getCurrent()) {
     return task->getPreferredTaskExecutor();
   } else {
-    return ExecutorRef::generic(); // the default executor, meaning no preference
+    return TaskExecutorRef::undefined(); // "no executor preference"
   }
 }
 
@@ -584,7 +593,7 @@ void swift::swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRec
 }
 
 void AsyncTask::dropTaskExecutorPreferenceRecord() {
-  assert(this->hasInitialExecutorPreferenceRecord());
+  assert(this->hasInitialTaskExecutorPreferenceRecord());
   fprintf(stderr, "[%s:%d](%s) DROP task executor preference as we destroy [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
           this);
 

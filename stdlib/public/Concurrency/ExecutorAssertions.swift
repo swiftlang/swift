@@ -18,9 +18,8 @@ import SwiftShims
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
-// FIXME: remove this, we need a similar thing on TaskExecutor instead
 @available(SwiftStdlib 9999, *)
-extension Executor {
+extension TaskExecutor {
   /// Unconditionally if the current task is executing on the expected serial executor,
   /// and if not crash the program offering information about the executor mismatch.
   ///
@@ -46,13 +45,14 @@ extension Executor {
       return
     }
 
-    let expectationCheck = _taskIsCurrentExecutor(Builtin.buildOrdinaryExecutorRef(self))
-
-    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
-    precondition(expectationCheck,
-      // TODO: offer information which executor we actually got
-      "Incorrect executor assumption; Expected '\(self)' executor. \(message())",
-      file: file, line: line) // short-cut so we get the exact same failure reporting semantics
+    fatalError("FIXME CANT IMPLEMENT YET")
+//    let expectationCheck = _taskIsCurrentExecutor(Builtin.buildOrdinaryExecutorRef(self))
+//
+//    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
+//    precondition(expectationCheck,
+//      // TODO: offer information which executor we actually got
+//      "Incorrect executor assumption; Expected '\(self)' executor. \(message())",
+//      file: file, line: line) // short-cut so we get the exact same failure reporting semantics
   }
 }
 

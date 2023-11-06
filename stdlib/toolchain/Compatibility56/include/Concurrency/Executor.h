@@ -28,7 +28,6 @@ class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
-class ExecutorWitnessTable;
 class SerialExecutorWitnessTable;
 
 /// An unmanaged reference to an executor.

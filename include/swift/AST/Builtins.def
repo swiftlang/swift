@@ -1009,6 +1009,11 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
     "createAsyncTaskInGroupWithExecutor", "", Special)
 
+/// Build a Builtin.Executor value from an "ordinary" task executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
+    "buildOrdinaryTaskExecutorRef", "n", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it
@@ -1024,10 +1029,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffP
 
 // autoDiffAllocateSubcontextWithType: (Builtin.NativeObject, T.Type) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiffAllocateSubcontextWithType", "", Special)
-
-/// Build a Builtin.Executor value from an "ordinary" serial executor reference.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryExecutorRef,
-                                   "buildOrdinaryExecutorRef", "n", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" serial executor
 /// reference.

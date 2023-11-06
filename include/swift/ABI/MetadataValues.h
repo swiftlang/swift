@@ -2487,8 +2487,8 @@ public:
                                 task_isAsyncLetTask,
                                 task_setIsAsyncLetTask)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInheritedExecutorPreference,
-                                task_hasInitialExecutorPreferenceRecord,
-                                task_setHasInitialExecutorPreferenceRecord)
+                                task_hasInitialTaskExecutorPreferenceRecord,
+                                task_setHasInitialTaskExecutorPreferenceRecord)
 };
 
 /// Kinds of task status record.
@@ -2525,7 +2525,7 @@ enum class TaskStatusRecordKind : uint8_t {
 /// Kinds of option records that can be passed to creating asynchronous tasks.
 enum class TaskOptionRecordKind : uint8_t {
   /// Request a task to be kicked off, or resumed, on a specific executor.
-  Executor  = 0,
+  InitialTaskExecutor  = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
   /// DEPRECATED. AsyncLetWithBuffer is used instead.

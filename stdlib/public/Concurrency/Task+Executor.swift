@@ -17,8 +17,8 @@ import Swift
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
-@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
-public func withExecutor<T: Sendable>(
+@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+public func withTaskExecutor<T: Sendable>(
   _ executor: (any SerialExecutor)?, // FIXME: any Executor
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
@@ -37,7 +37,7 @@ public func withExecutor<T: Sendable>(
       _popTaskExecutorPreference(record: record)
     }
 
-    #if compiler(>=5.5) && $BuiltinHopToExecutor
+    #if compiler(>=9999) && $BuiltinHopToExecutor
     await Builtin.hopToExecutor(executorBuiltin)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
@@ -51,8 +51,8 @@ public func withExecutor<T: Sendable>(
 
 //// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 //@available(SwiftStdlib 9999, *)
-//@_unsafeInheritExecutor // calling withExecutor MUST NOT perform the "usual" hop to global
-//public func withExecutor<T: Sendable>(
+//@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+//public func withTaskExecutor<T: Sendable>(
 //  _ executor: any Executor, // FIXME: any Executor
 //  operation: @Sendable () async throws -> T
 //  ) async rethrows -> T {
@@ -78,11 +78,11 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    on executor: any Executor,
+    on executor: any TaskExecutor,
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskWithExecutor
+    #if compiler(>=9999) && $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -108,139 +108,6 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
     #endif
   }
-
-  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init<A>(
-    on actor: A,
-    priority: TaskPriority? = nil,
-    operation _operation: __owned @Sendable @escaping (isolated A) async -> Success
-  ) where A: Actor {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-        priority: priority, isChildTask: false, copyTaskLocals: true,
-        inheritContext: true, enqueueJob: true,
-        addPendingGroupTaskUnconditionally: false,
-        isDiscardingTask: false)
-
-    typealias IsolatedSignature = (isolated A) async -> Success
-
-    let operation: (@Sendable () async -> Success) = {
-      await _operation(actor)
-    }
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, actor.unownedExecutor.executor, operation)
-
-    self._task = task
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-}
-
-@available(SwiftStdlib 9999, *)
-extension GlobalActor {
-
-  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func task<Success>(
-    priority: TaskPriority? = nil,
-    operation _operation: __owned @Sendable @escaping (isolated Self.ActorType) async -> Success
-  ) -> Task<Success, Never> {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    typealias IsolatedSignature = (isolated Self) async -> Success
-
-    let operation: (@Sendable () async -> Success) = {
-      await _operation(Self.shared)
-    }
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, Self.sharedUnownedExecutor.executor, operation)
-
-    return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-
-  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func task<Success>(
-    priority: TaskPriority? = nil,
-    operation _operation: __owned @MainActor @Sendable @escaping () async -> Success
-  ) -> Task<Success, Never> where Self == MainActor {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    typealias IsolatedSignature = (isolated Self) async -> Success
-
-    let operation: (@Sendable () async -> Success) = {
-      await _operation()
-    }
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, Self.sharedUnownedExecutor.executor, operation)
-
-    return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-}
-
-/// Task on MainActor specializations -----------------------------------------
-
-@available(SwiftStdlib 9999, *)
-extension Task where Failure == Never {
-
-  // TODO: rdar://116049628 Would like to express <GA>(@GA () -> Success) where GA: GlobalActor but can't today
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(on globalActorType: MainActor.Type,
-              priority: TaskPriority? = nil,
-              operation _operation: __owned @MainActor @Sendable @escaping () async -> Success) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskWithExecutor
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    let operation: (@Sendable () async -> Success) = {
-      await _operation()
-    }
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, MainActor.sharedUnownedExecutor.executor, operation)
-
-    self._task = task
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
-  }
-
 }
 
 // ==== Runtime ---------------------------------------------------------------

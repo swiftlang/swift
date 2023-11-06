@@ -699,7 +699,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
   });
-  SwiftExecutorTaskOptionRecordTy = createStructType(
+  SwiftInitialTaskExecutorPreferenceTaskOptionRecordTy = createStructType(
       *this, "swift.task_executor_task_option", {
     SwiftTaskOptionRecordTy,    // Base option record
     SwiftExecutorTy,            // Executor

@@ -413,6 +413,9 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// whether or not it is running.
     IsRunning = 0x800,
 #endif
+    // FIXME: should we use this to know that we have such record set? This way we can avoid scanning the task to look for a record if we know there isn't one.
+    HasTaskExecutorPreference = 0x1600, // FIXME what bits to use
+
     /// Task is intrusively enqueued somewhere - either in the default executor
     /// pool, or in an actor. Currently, due to lack of task stealers, this bit
     /// is cleared when a task starts running on a thread, suspends or is
@@ -738,7 +741,7 @@ struct AsyncTask::PrivateStorage {
     // so we must do so specifically here, before the task-local storage
     // elements are destroyed; in order to respect stack-discipline of
     // the task-local allocator.
-    if (task->hasInitialExecutorPreferenceRecord()) {
+    if (task->hasInitialTaskExecutorPreferenceRecord()) {
       task->dropTaskExecutorPreferenceRecord();
     }
 
@@ -984,6 +987,7 @@ inline void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor)
     // dependency record (Eg. newly created)
     assert(_private().dependencyRecord == nullptr);
 
+    // TODO: do we need to do tracking for task executors...? I guess no since they can't escalate.
     void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
     TaskDependencyStatusRecord *dependencyRecord = _private().dependencyRecord = ::new (allocation) TaskDependencyStatusRecord(this, newExecutor);
     SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsAndEnqueueOnExecutor() with dependencyRecord %p", this,

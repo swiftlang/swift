@@ -22,15 +22,18 @@ final class NaiveQueueExecutor: TaskExecutor {
     print("\(self): enqueue")
     let job = UnownedJob(_job)
     queue.async {
+      fatalError("NEIN")
       print("\(self): run job on queue")
       job.runSynchronously(on: self.asUnownedSerialExecutor())
     }
   }
 }
 
-nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
-  dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-  expectedExecutor.preconditionIsolated()
+actor ThreaddyTheDefaultActor {
+  func actorIsolated(expectedExecutor: NaiveQueueExecutor) async {
+    dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
+    expectedExecutor.preconditionIsolated()
+  }
 }
 
 @main struct Main {
@@ -40,9 +43,15 @@ nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
       let queue = DispatchQueue(label: "example-queue")
       let executor = NaiveQueueExecutor(queue)
 
+      let defaultActor = ThreaddyTheDefaultActor()
+
       await Task(on: executor) {
-        await nonisolatedFunc(expectedExecutor: executor)
+        await defaultActor.actorIsolated(expectedExecutor: executor)
       }.value
+
+//      await withTaskExecutor(executor) {
+//        await defaultActor.actorIsolated(expectedExecutor: executor)
+//      }
     }
   }
 }
