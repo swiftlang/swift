@@ -417,7 +417,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
           if (elt->getType().isAddress())
             killBits(state, elt);
         }
-        genBits(state, taci->getDestValue());
+        genBits(state, taci->getDest());
         break;
       }
       case SILInstructionKind::DestroyAddrInst:

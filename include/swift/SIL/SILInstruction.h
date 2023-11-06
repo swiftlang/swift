@@ -6372,10 +6372,10 @@ public:
     Dest = 0,
   };
 
-  Operand &getDest() { return getAllOperands().front(); }
-  const Operand &getDest() const { return getAllOperands().front(); }
+  Operand &getDestOperand() { return getAllOperands().front(); }
+  const Operand &getDestOperand() const { return getAllOperands().front(); }
 
-  SILValue getDestValue() const { return getDest().get(); }
+  SILValue getDest() const { return getDestOperand().get(); }
 
   /// The elements referenced by this TupleInst.
   MutableArrayRef<Operand> getElementOperands() {
@@ -6392,14 +6392,16 @@ public:
 
   unsigned getElementIndex(Operand *operand) {
     assert(operand->getUser() == this);
-    assert(operand != &getDest() && "Cannot pass in the destination");
+    assert(operand != &getDestOperand() && "Cannot pass in the destination");
     return operand->getOperandNumber() + 1;
   }
 
   unsigned getNumElements() const { return getTupleType()->getNumElements(); }
 
   TupleType *getTupleType() const {
-    return getDest().get()->getType().getRawASTType()->castTo<TupleType>();
+    // We use getASTType() since we want to look through a wrapped noncopyable
+    // type to get to the underlying tuple type.
+    return getDest()->getType().getASTType()->castTo<TupleType>();
   }
 
   IsInitialization_t isInitializationOfDest() const {

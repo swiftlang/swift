@@ -750,7 +750,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   }
   case SILInstructionKind::TupleAddrConstructorInst: {
     auto *ca = cast<TupleAddrConstructorInst>(inst);
-    impactType = ca->getDestValue()->getType();
+    impactType = ca->getDest()->getType();
     if (!ca->isInitializationOfDest())
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     return RuntimeEffect::MetaData;

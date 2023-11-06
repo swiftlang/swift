@@ -2223,7 +2223,7 @@ public:
     } else {
       *this << "[assign] ";
     }
-    *this << getIDAndType(TI->getDestValue());
+    *this << getIDAndType(TI->getDest());
 
     *this << " with (";
 

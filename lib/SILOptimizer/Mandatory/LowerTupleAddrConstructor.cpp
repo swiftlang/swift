@@ -40,7 +40,7 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
 
         unsigned count = 0;
         visitExplodedTupleValue(
-            inst->getDestValue(),
+            inst->getDest(),
             [&](SILValue value, std::optional<unsigned> index) -> SILValue {
               if (!index) {
                 SILValue elt = inst->getElement(count);

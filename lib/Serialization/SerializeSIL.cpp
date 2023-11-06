@@ -2345,7 +2345,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       result |= value->getType().isObject() ? 0 : 0x80000000;
       return result;
     };
-    ListOfValues.push_back(getValue(TI->getDestValue()));
+    ListOfValues.push_back(getValue(TI->getDest()));
     for (auto Elt : TI->getElements()) {
       ListOfValues.push_back(getValue(Elt));
     }
@@ -2354,7 +2354,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     options |= bool(TI->isInitializationOfDest());
     SILOneTypeValuesCategoriesLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(),
-        S.addTypeRef(TI->getDestValue()->getType().getRawASTType()),
+        S.addTypeRef(TI->getDest()->getType().getRawASTType()),
         (unsigned)SILValueCategory::Address, options, ListOfValues);
     break;
   }

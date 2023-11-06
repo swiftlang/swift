@@ -2184,11 +2184,29 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitTupleAddrConstructorInst(
     TupleAddrConstructorInst *Inst) {
-  auto Elements = getOpValueArray<8>(Inst->getElements());
+  SmallVector<SILValue, 8> Elements;
+  for (auto e : Inst->getElements()) {
+    SILValue mappedValue = getOpValue(e);
+
+    // Check if mappedValue only consists of empty tuple elements. If it does,
+    // then we do not add it to our result. This is because we know that the
+    // corresponding elements in getOpValue(Inst->getDest()) will also change
+    // into an empty exploded tuple. Since we only have leaf non-empty non-tuple
+    // elements as operands, these are not represented.
+    bool FoundNonTuple = false;
+    mappedValue->getType().getASTType().visit(
+        [&](CanType ty) { FoundNonTuple |= !ty->is<TupleType>(); });
+    if (FoundNonTuple)
+      Elements.push_back(mappedValue);
+  }
+
+  if (Elements.empty())
+    return;
+
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createTupleAddrConstructor(
                                     getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getDestValue()), Elements,
+                                    getOpValue(Inst->getDest()), Elements,
                                     Inst->isInitializationOfDest()));
 }
 

@@ -1483,3 +1483,131 @@ bb0(%0 : @guaranteed $GenericKlass<Int>):
   return %3 : $()
 }
 
+// Specialize tuple_addr_constructor
+
+// In this case we specialized using all non-tuple types
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCBoADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned Builtin.NativeObject, @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, Builtin.NativeObject, Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Builtin.NativeObject, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCBoADTg5'
+
+// In this case, we specialized where a single parameter was an empty
+// tuple... make sure that we eliminated it as a parameter to tuple_addr_constructor
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCytADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned (), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, (), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCytADTg5'
+
+// Make sure we handle this with multiple level tuples
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_yt_ytttADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned ((), ((), ())), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, ((), ((), ())), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_yt_ytttADTg5'
+
+// Make sure we keep in the parameter if we have one leaf node.
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_Bo_ytttADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned ((), (Builtin.NativeObject, ())), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, ((), (Builtin.NativeObject, ())), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $((), (Builtin.NativeObject, ())), {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_Bo_ytttADTg5'
+
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeyt_ytyt_yt_ytttytTg5 : $@convention(thin) ((), (), @owned ((), ((), ())), @owned ()) -> () {
+// CHECK-NOT: tuple_addr_constructor
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeyt_ytyt_yt_ytttytTg5'
+
+sil [ossa] @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> () {
+bb0(%arg0 : $*T1, %arg1 : $*T2, %arg2 : @owned $T3, %arg3 : @owned $T4):
+  %tup = alloc_stack $(T1, T2, T3, T4)
+  tuple_addr_constructor [init] %tup : $*(T1, T2, T3, T4) with (%arg0 : $*T1, %arg1 : $*T2, %arg2 : $T3, %arg3 : $T4)
+  destroy_addr %tup : $*(T1, T2, T3, T4)
+  dealloc_stack %tup : $*(T1, T2, T3, T4)
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorSimple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  apply %2<Builtin.NativeObject, Base, Builtin.NativeObject, Base>(%3, %4, %0a, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateTuple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = tuple ()
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  apply %2<Builtin.NativeObject, Base, (), Base>(%3, %4, %0a, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateMultiLevelTuple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  %tup = tuple ()
+  %tup2 = tuple (%tup : $(), %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $((), ()))
+  apply %2<Builtin.NativeObject, Base, ((), ((), ())), Base>(%3, %4, %tup3, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateNoEliminateIfOneElt : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  %tup = tuple ()
+  %tup2 = tuple (%0a : $Builtin.NativeObject, %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $(Builtin.NativeObject, ()))
+  apply %2<Builtin.NativeObject, Base, ((), (Builtin.NativeObject, ())), Base>(%3, %4, %tup3, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorNoEmitIfAllTuple : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*()
+  %4 = alloc_stack $*()
+  %tup = tuple ()
+  %tup2 = tuple (%tup : $(), %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $((), ()))
+  apply %2<(), (), ((), ((), ())), ()>(%3, %4, %tup3, %tup) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*()
+  dealloc_stack %3 : $*()
+  %9999 = tuple ()
+  return %9999 : $()
+}
