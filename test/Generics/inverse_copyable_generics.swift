@@ -47,6 +47,7 @@ protocol RemovedAgain where Self: ~Copyable {
 
 struct StructContainment<T: ~Copyable> : Copyable {
     // expected-note@-1 {{consider adding '~Copyable' to generic struct 'StructContainment'}}{{50-50=, ~Copyable}}
+    // expected-note@-2 {{generic struct 'StructContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 
     var storage: Maybe<T>
     // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has noncopyable type 'Maybe<T>'}}
@@ -55,6 +56,7 @@ struct StructContainment<T: ~Copyable> : Copyable {
 enum EnumContainment<T: ~Copyable> : Copyable {
     // expected-note@-1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
     // expected-note@-2{{consider adding '~Copyable' to generic enum 'EnumContainment'}}{{46-46=, ~Copyable}}
+    // expected-note@-3{{generic enum 'EnumContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 
     case some(T) // expected-error {{associated value 'some' of 'Copyable'-conforming generic enum 'EnumContainment' has noncopyable type 'T'}}
     case other(Int)
@@ -69,6 +71,7 @@ class ClassContainment<T: ~Copyable> {
     }
 }
 
+// expected-note@+2 {{generic struct 'ConditionalContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 // expected-note@+1 {{consider adding '~Copyable' to generic struct 'ConditionalContainment'}}{{45-45=: ~Copyable}}
 struct ConditionalContainment<T: ~Copyable> {
   var x: T
@@ -116,6 +119,7 @@ extension Maybe where Self: Copyable {
   func check2(_ t: RequireCopyable<Self>) {}
 }
 
+// expected-note@+2 {{generic struct 'CornerCase' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 // expected-note@+1 {{consider adding '~Copyable' to generic struct 'CornerCase'}}{{33-33=: ~Copyable}}
 struct CornerCase<T: ~Copyable> {
   let t: T

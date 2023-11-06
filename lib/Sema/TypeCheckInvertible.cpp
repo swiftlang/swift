@@ -58,13 +58,29 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
   auto *module = enclosingNom->getParentModule();
   auto &ctx = enclosingNom->getASTContext();
 
-  // First and most universal suggestion, add the inverse to the enclosing type.
-  {
+  // Check the enclosing type's markings to see what to suggest.
+  assert(kp == KnownProtocolKind::Copyable);
+  auto enclosingMarking = enclosingNom->getNoncopyableMarking();
+
+  switch (enclosingMarking.getInverse().getKind()) {
+  case InverseMarking::Kind::Inferred:
+    // Note that the enclosing type is conditionally conforming to KP first.
+    ctx.Diags.diagnose(enclosingMarking.getInverse().getLoc(),
+                       diag::note_inverse_preventing_conformance_implicit,
+                       enclosingNom, getProtocolName(kp));
+    LLVM_FALLTHROUGH;
+  case InverseMarking::Kind::None: {
+    // Suggest adding ~KP to make it non-KP.
     auto diag = enclosingNom->diagnose(diag::add_inverse,
                                        enclosingNom,
                                        getProtocolName(kp));
     addConformanceFixIt(enclosingNom, diag, kp, /*inverse=*/true);
   }
+    break;
+  case InverseMarking::Kind::Explicit:
+    assert(false && "how did it become Copyable?");
+    break;
+  };
 
   // If it's a generic parameter defined in the same module, point to the
   // parameter that must have had the inverse applied to it somewhere.
@@ -83,31 +99,29 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
     return;
   }
 
-  if (kp == KnownProtocolKind::Copyable) {
-    // If the offending type is a nominal with a SourceLoc, explain why it's
-    // not Copyable.
-    if (auto nominal = nonConformingTy->getAnyNominal()) {
-      if (nominal->getLoc(/*SerializedOK=*/false)) {
-        auto inverse = nominal->getNoncopyableMarking().getInverse();
-        auto loc = inverse.getLoc();
+  // If the offending type is a nominal with a SourceLoc, explain why it's
+  // not Copyable.
+  if (auto nominal = nonConformingTy->getAnyNominal()) {
+    if (nominal->getLoc(/*SerializedOK=*/false)) {
+      auto inverse = nominal->getNoncopyableMarking().getInverse();
+      auto loc = inverse.getLoc();
 
-        switch (inverse.getKind()) {
-        case InverseMarking::Kind::None:
-          assert(false && "how did it become noncopyable then?");
-          break;
-        case InverseMarking::Kind::Inferred:
-          assert(loc);
-          ctx.Diags.diagnose(loc,
-                             diag::note_inverse_preventing_conformance_implicit,
-                             nominal, getProtocolName(kp));
-          break;
-        case InverseMarking::Kind::Explicit:
-          assert(loc);
-          ctx.Diags.diagnose(loc,
-                             diag::note_inverse_preventing_conformance_explicit,
-                             nominal, getProtocolName(kp));
-          break;
-        }
+      switch (inverse.getKind()) {
+      case InverseMarking::Kind::None:
+        assert(false && "how did it become noncopyable then?");
+        break;
+      case InverseMarking::Kind::Inferred:
+        assert(loc);
+        ctx.Diags.diagnose(loc,
+                           diag::note_inverse_preventing_conformance_implicit,
+                           nominal, getProtocolName(kp));
+        break;
+      case InverseMarking::Kind::Explicit:
+        assert(loc);
+        ctx.Diags.diagnose(loc,
+                           diag::note_inverse_preventing_conformance_explicit,
+                           nominal, getProtocolName(kp));
+        break;
       }
     }
   }
@@ -321,8 +335,6 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
     // with the conformance.
     return generateConformance(ext);
   };
-
-  DeclContext *conformanceDC = nominal;
 
   switch (*ip) {
   case InvertibleProtocolKind::Copyable: {
