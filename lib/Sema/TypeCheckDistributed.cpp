@@ -707,7 +707,7 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
   // on as differenciators in remote calls - the call will always be "async"
   // since it will go through a thunk, and then be asynchronously transferred
   // to the called process.
-  llvm::SmallDenseSet<DeclName, 2> diagnosedAmbiguity;
+//  llvm::SmallDenseSet<DeclName, 2> diagnosedAmbiguity;
 
   for (auto member : nominal->getMembers()) {
     // --- Ensure 'distributed func' all thunks
@@ -733,63 +733,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
               diag::distributed_actor_conformance_missing_system_type,
               nominal->getName());
           return;
-        }
-
-        // Check there's no async/no-async overloads, since those are more
-        // fragile in distribution than we'd want distributed calls to be.
-        // A remote call is always 'async throws', and we can always record
-        // an async throws "accessor" (see AccessibleFunction.cpp) as such.
-        // This means, if we allowed async/no-async overloads of functions,
-        // we'd have to store the precise "it was not throwing" information,
-        // but we'll _never_ make use of such because all remote calls are
-        // necessarily going to async to the actor in the recipient process,
-        // and for the remote caller, they are always as-if-async.
-        //
-        // By banning such overloads, which may be useful in local APIs,
-        // but too fragile in distributed APIs, we allow a remote 'v2' version
-        // of an implementation to add or remove `async` to their implementation
-        // without breaking calls which were made on previous 'v1' versions of
-        // the same interface; Callers are never broken this way, and rollouts
-        // are simpler.
-        //
-        // The restriction on overloads is not a problem for distributed calls,
-        // as we don't have a vast swab of APIs which must compatibly get async
-        // versions, as that is what the async overloading aimed to address.
-        //
-        // Note also, that overloading on throws is already illegal anyway.
-        if (!diagnosedAmbiguity.contains(func->getName())) {
-          auto candidates = nominal->lookupDirect(func->getName());
-          if (candidates.size() > 1) {
-            auto firstDecl = dyn_cast<AbstractFunctionDecl>(candidates.back());
-            for (auto candidate: candidates) {
-              if (auto candidateFunc = dyn_cast<AbstractFunctionDecl>(candidate)) {
-                assert(candidateFunc->getParameters()->size() ==
-                       firstDecl->getParameters()->size());
-                bool allSame = true;
-                for (size_t i = 0; i < candidateFunc->getParameters()->size(); ++i) {
-                  auto lhs = firstDecl->getParameters()->get(i);
-                  auto rhs = candidateFunc->getParameters()->get(i);
-                  if (!lhs->getInterfaceType()->isEqual(rhs->getInterfaceType())) {
-                    allSame = false;
-                    break;
-                  }
-                }
-
-                if (candidate != firstDecl && // can't be ambiguous with itself
-                    allSame && // diagnose if ambiguous
-                    !diagnosedAmbiguity.contains(func->getName())) {
-                  candidate->diagnose(
-                      diag::distributed_func_cannot_overload_on_async_only,
-                      candidate->getName());
-                  diagnosedAmbiguity.insert(func->getName());
-                } else if (diagnosedAmbiguity.contains(func->getName())) {
-                  candidate->diagnose(
-                      diag::distributed_func_other_ambiguous_overload_here,
-                      candidate->getName());
-                }
-              }
-            }
-          }
         }
       }
 
