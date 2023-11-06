@@ -259,12 +259,12 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     }
 
     if (!RootID.empty()) {
+      swiftArgs.push_back("-no-clang-include-tree");
       swiftArgs.push_back("-cas-fs");
       swiftArgs.push_back(RootID);
     }
 
     if (!IncludeTree.empty()) {
-      swiftArgs.push_back("-clang-include-tree");
       swiftArgs.push_back("-clang-include-tree-root");
       swiftArgs.push_back(IncludeTree);
     }
@@ -368,11 +368,11 @@ void ClangImporter::recordBridgingHeaderOptions(
   }
 
   if (auto Tree = deps.IncludeTreeID) {
-    swiftArgs.push_back("-clang-include-tree");
     swiftArgs.push_back("-clang-include-tree-root");
     swiftArgs.push_back(*Tree);
   }
   if (auto CASFS = deps.CASFileSystemRootID) {
+    swiftArgs.push_back("-no-clang-include-tree");
     swiftArgs.push_back("-cas-fs");
     swiftArgs.push_back(*CASFS);
   }

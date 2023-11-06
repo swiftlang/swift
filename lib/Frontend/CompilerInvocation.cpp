@@ -1605,7 +1605,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.ExtraArgsOnly |= Args.hasArg(OPT_extra_clang_options_only);
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
-  Opts.UseClangIncludeTree |= Args.hasArg(OPT_clang_include_tree);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();
@@ -1632,8 +1631,12 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   // Forward the FrontendOptions to clang importer option so it can be
   // accessed when creating clang module compilation invocation.
-  if (FrontendOpts.EnableCaching)
+  if (FrontendOpts.EnableCaching) {
     Opts.CASOpts = FrontendOpts.CASOpts;
+    // Only set UseClangIncludeTree when caching is enabled since it is not
+    // useful in non-caching context.
+    Opts.UseClangIncludeTree = !Args.hasArg(OPT_no_clang_include_tree);
+  }
 
   return false;
 }

@@ -1274,8 +1274,8 @@ def input_file_key : Separate<["-"], "input-file-key">,
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
 
-def clang_include_tree: Flag<["-"], "clang-include-tree">,
-  HelpText<"Use clang include tree">;
+def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
+  HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
 def cas_fs: Separate<["-"], "cas-fs">,
   HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
