@@ -2,8 +2,6 @@
 
 // REQUIRES: concurrency
 
-import Distributed
-
 protocol AsyncProtocol {
   func asyncMethod() async -> Int
 }
