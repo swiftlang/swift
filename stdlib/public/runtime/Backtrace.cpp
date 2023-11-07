@@ -58,6 +58,8 @@
 #include <cxxabi.h>
 #endif
 
+#include "BacktracePrivate.h"
+
 #define DEBUG_BACKTRACING_SETTINGS 0
 
 #ifndef lengthof
@@ -984,6 +986,57 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
   return false;
 
   // ###TODO: Windows
+#endif
+}
+
+// N.B. THIS FUNCTION MUST BE SAFE TO USE FROM A CRASH HANDLER.  On Linux
+// and macOS, that means it must be async-signal-safe.  On Windows, there
+// isn't an equivalent notion but a similar restriction applies.
+SWIFT_RUNTIME_STDLIB_INTERNAL void
+_swift_displayCrashMessage(int signum, const void *pc)
+{
+#if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+  return;
+#else
+  int fd = STDOUT_FILENO;
+
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+    fd = STDERR_FILENO;
+
+  const char *intro;
+  if (_swift_backtraceSettings.color == OnOffTty::On) {
+    intro = "\n💣 \033[91mProgram crashed: ";
+  } else {
+    intro = "\n*** Program crashed: ";
+  }
+  write(fd, intro, strlen(intro));
+
+  char sigbuf[30];
+  strcpy(sigbuf, "Signal ");
+  _swift_formatUnsigned((unsigned)signum, sigbuf + 7);
+  write(fd, sigbuf, strlen(sigbuf));
+
+  const char *message;
+  if (!pc) {
+    message = ": Backtracing";
+  } else {
+    message = ": Backtracing from 0x";
+  }
+  write(fd, message, strlen(message));
+
+  if (pc) {
+    char pcbuf[18];
+    _swift_formatAddress(pc, pcbuf);
+    write(fd, pcbuf, strlen(pcbuf));
+  }
+
+  const char *outro;
+  if (_swift_backtraceSettings.color == OnOffTty::On) {
+    outro = "...\033[0m";
+  } else {
+    outro = "...";
+  }
+  write(fd, outro, strlen(outro));
 #endif
 }
 
