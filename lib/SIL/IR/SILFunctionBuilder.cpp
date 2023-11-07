@@ -181,7 +181,7 @@ void SILFunctionBuilder::addFunctionAttributes(
   }
 
   if (auto *EA = ExternAttr::find(Attrs, ExternKind::Wasm)) {
-    // @extern(wasm) always has explicit names
+    // @_extern(wasm) always has explicit names
     F->setWasmImportModuleAndField(*EA->ModuleName, *EA->Name);
   }
 

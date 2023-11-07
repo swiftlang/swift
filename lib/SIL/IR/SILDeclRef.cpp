@@ -1149,7 +1149,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
       }
 
     if (auto *ExternA = ExternAttr::find(getDecl()->getAttrs(), ExternKind::C)) {
-      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @extern should be rejected by typechecker");
+      assert(isa<FuncDecl>(getDecl()) && "non-FuncDecl with @_extern should be rejected by typechecker");
       return ExternA->getCName(cast<FuncDecl>(getDecl())).str();
     }
 

@@ -437,19 +437,19 @@ the export name.
 
 It's the equivalent of clang's `__attribute__((export_name))`.
 
-## `@extern(<language>)`
+## `@_extern(<language>)`
 
 Indicates that a particular declaration should be imported
 from the external environment.
 
-### `@extern(wasm, module: <"moduleName">, name: <"fieldName">)`
+### `@_extern(wasm, module: <"moduleName">, name: <"fieldName">)`
 
 Indicates that a particular declaration should be imported
 through WebAssembly's import interface.
 
 It's the equivalent of clang's `__attribute__((import_module("module"), import_name("field")))`.
 
-### `@extern(c, [, <"cName">])`
+### `@_extern(c, [, <"cName">])`
 
 Indicates that a particular declaration should refer to a
 C declaration with the given name. If the optional "cName"
@@ -462,7 +462,7 @@ C declarations from Swift, while `@_cdecl` is used to define
 Swift functions that can be referenced from C.
 
 Also similar to `@_silgen_name`, but a function declared with
-`@extern(c)` is assumed to use the C ABI, while `@_silgen_name`
+`@_extern(c)` is assumed to use the C ABI, while `@_silgen_name`
 assumes the Swift ABI.
 
 ## `@_fixed_layout`

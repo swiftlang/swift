@@ -1900,17 +1900,17 @@ ERROR(section_not_at_top_level,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
-// @extern
+// @_extern
 ERROR(attr_extern_experimental,none,
-      "@extern requires '-enable-experimental-feature Extern'", ())
+      "@_extern requires '-enable-experimental-feature Extern'", ())
 ERROR(extern_not_at_top_level_func,none,
-      "@extern attribute can only be applied to global functions", ())
+      "@_extern attribute can only be applied to global functions", ())
 ERROR(extern_empty_c_name,none,
-      "expected non-empty C name in @extern attribute", ())
+      "expected non-empty C name in @_extern attribute", ())
 ERROR(extern_only_non_other_attr,none,
-      "@extern attribute cannot be applied to an '@%0' declaration", (StringRef))
+      "@_extern attribute cannot be applied to an '@%0' declaration", (StringRef))
 WARNING(extern_c_maybe_invalid_name, none,
-        "C name '%0' may be invalid; explicitly specify the name in @extern(c) to suppress this warning",
+        "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
         (StringRef))
 
 ERROR(c_func_variadic, none,
