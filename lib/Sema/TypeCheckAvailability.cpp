@@ -388,9 +388,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
   /// contexts. TRCs in this stack should be pushed onto \p ContextStack when
   /// \p BodyStmt is encountered.
   struct DeclBodyContextInfo {
-    TypeRefinementContext *TRC;
     Decl *Decl;
-    Stmt *BodyStmt;
+    llvm::DenseMap<ASTNode, TypeRefinementContext *> BodyTRCs;
   };
   std::vector<DeclBodyContextInfo> DeclBodyContextStack;
 
@@ -419,11 +418,10 @@ class TypeRefinementContextBuilder : private ASTWalker {
     ContextStack.push_back(Info);
   }
 
-  void pushDeclBodyContext(TypeRefinementContext *TRC, Decl *D, Stmt *S) {
+  void pushDeclBodyContext(TypeRefinementContext *TRC, Decl *D, ASTNode Body) {
     DeclBodyContextInfo Info;
-    Info.TRC = TRC;
     Info.Decl = D;
-    Info.BodyStmt = S;
+    Info.BodyTRCs.insert({Body, TRC});
 
     DeclBodyContextStack.push_back(Info);
   }
@@ -491,6 +489,8 @@ private:
 
     while (!DeclBodyContextStack.empty() &&
            DeclBodyContextStack.back().Decl == D) {
+      // All pending body TRCs should have been consumed.
+      assert(DeclBodyContextStack.back().BodyTRCs.empty());
       DeclBodyContextStack.pop_back();
     }
 
@@ -771,19 +771,20 @@ private:
     return Action::Continue(S);
   }
 
-  /// Consumes the top TRC from \p DeclBodyContextStack and pushes it onto the
-  /// \p Context stack if the given \p Stmt is the matching body statement.
-  /// Returns \p true if a context was pushed.
-  bool consumeDeclBodyContextIfNecessary(Stmt *S) {
+  /// Attempts to consume a TRC from the `BodyTRCs` of the top of
+  /// `DeclBodyContextStack`. Returns \p true if a context was pushed.
+  template <typename T>
+  bool consumeDeclBodyContextIfNecessary(T Body) {
     if (DeclBodyContextStack.empty())
       return false;
 
-    auto Info = DeclBodyContextStack.back();
-    if (S != Info.BodyStmt)
+    auto &Info = DeclBodyContextStack.back();
+    auto Iter = Info.BodyTRCs.find(Body);
+    if (Iter == Info.BodyTRCs.end())
       return false;
 
-    pushContext(Info.TRC, Info.BodyStmt);
-    DeclBodyContextStack.pop_back();
+    pushContext(Iter->getSecond(), Body);
+    Info.BodyTRCs.erase(Iter);
     return true;
   }
 
