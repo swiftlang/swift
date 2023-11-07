@@ -1,7 +1,6 @@
 target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
-  AlwaysEmitConformanceMetadataPreservation.cpp
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
