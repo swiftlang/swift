@@ -21,7 +21,7 @@ extension CountingExecutor {
   }
 }
 
-final class CountEnqueuesSerialExecutor: SerialExecutor, CountingExecutor, @unchecked Sendable {
+final class CountEnqueuesTaskExecutor: TaskExecutor, CountingExecutor, @unchecked Sendable {
   var enqueueCount = 0
   let queue: DispatchQueue
 
@@ -33,15 +33,15 @@ final class CountEnqueuesSerialExecutor: SerialExecutor, CountingExecutor, @unch
     enqueueCount += 1
     let job = UnownedJob(job)
     queue.async {
-      job.runSynchronously(on: self.asUnownedSerialExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 }
 
-nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSerialExecutor) async {
-  await withTaskExecutor(countingSerialExecutor) {
-    countingSerialExecutor.preconditionIsolated()
-    dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+nonisolated func testFromNonisolated(_ countingTaskExecutor: CountEnqueuesTaskExecutor) async {
+  await withTaskExecutor(countingTaskExecutor) {
+    // countingTaskExecutor.preconditionIsolated()
+    dispatchPrecondition(condition: .onQueue(countingTaskExecutor.queue))
     print("OK: withTaskExecutor body")
   }
 }
@@ -51,25 +51,25 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
   static func main() async {
     if #available(SwiftStdlib 5.9, *) {
       let queue = DispatchQueue(label: "sample")
-      let countingSerialExecutor = CountEnqueuesSerialExecutor(queue: queue)
+      let countingTaskExecutor = CountEnqueuesTaskExecutor(queue: queue)
 
       print("==== TaskGroup - respects task executor")
       MainActor.preconditionIsolated()
-      await withTaskExecutor(countingSerialExecutor) {
+      await withTaskExecutor(countingTaskExecutor) {
         // the block immediately hops to the expected executor
-//        countingSerialExecutor.preconditionIsolated()
-//        dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+//        countingTaskExecutor.preconditionIsolated()
+//        dispatchPrecondition(condition: .onQueue(countingTaskExecutor.queue))
 
         await withTaskGroup(of: Int.self) { group in
           group.addTask {
-            countingSerialExecutor.preconditionIsolated()
-            dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+            // countingTaskExecutor.preconditionIsolated()
+            dispatchPrecondition(condition: .onQueue(countingTaskExecutor.queue))
 
             return 42
           }
 
           group.addTask(on: nil) {
-            dispatchPrecondition(condition: .notOnQueue(countingSerialExecutor.queue))
+            dispatchPrecondition(condition: .notOnQueue(countingTaskExecutor.queue))
             return 42
           }
 
@@ -81,10 +81,10 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
       MainActor.preconditionIsolated()
 //
       print("==== async let - respects task executor")
-      await withTaskExecutor(countingSerialExecutor) {
+      await withTaskExecutor(countingTaskExecutor) {
         async let compute: Int = {
-          countingSerialExecutor.preconditionIsolated()
-          dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
+          // countingTaskExecutor.preconditionIsolated()
+          dispatchPrecondition(condition: .onQueue(countingTaskExecutor.queue))
           return 42
         }()
 
@@ -94,9 +94,9 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
       MainActor.preconditionIsolated()
 
 //      print("==== Task{} - drops task executor")
-//      await withTaskExecutor(countingSerialExecutor) {
+//      await withTaskExecutor(countingTaskExecutor) {
 //        let t = Task {
-//          dispatchPrecondition(condition: .notOnQueue(countingSerialExecutor.queue))
+//          dispatchPrecondition(condition: .notOnQueue(countingTaskExecutor.queue))
 //          return 42
 //        }
 //        let v = await t.value
@@ -104,16 +104,16 @@ nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSeri
 //      }
 //
 //      print("==== Task.detached{} - drops task executor")
-//      await withTaskExecutor(countingSerialExecutor) {
+//      await withTaskExecutor(countingTaskExecutor) {
 //        let t = Task.detached {
-//          dispatchPrecondition(condition: .notOnQueue(countingSerialExecutor.queue))
+//          dispatchPrecondition(condition: .notOnQueue(countingTaskExecutor.queue))
 //          return 42
 //        }
 //        let v = await t.value
 //        precondition(v == 42)
 //      }
 
-      // TODO: implement handling Executor and not just SerialExecutor
+      // TODO: implement handling Executor and not just TaskExecutor
     }
   }
 }

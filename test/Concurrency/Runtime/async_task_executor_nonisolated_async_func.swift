@@ -23,14 +23,14 @@ final class NaiveQueueExecutor: TaskExecutor {
     let job = UnownedJob(_job)
     queue.async {
       print("\(self): run job on queue")
-      job.runSynchronously(on: self.asUnownedSerialExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 }
 
 nonisolated func nonisolatedFunc(expectedExecutor: NaiveQueueExecutor) async {
   dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-  expectedExecutor.preconditionIsolated()
+  // expectedExecutor.preconditionIsolated()
 }
 
 @main struct Main {

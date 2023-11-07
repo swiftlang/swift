@@ -18,43 +18,42 @@ import SwiftShims
 // ==== -----------------------------------------------------------------------
 // MARK: Precondition executors
 
-@available(SwiftStdlib 9999, *)
-extension TaskExecutor {
-  /// Unconditionally if the current task is executing on the expected serial executor,
-  /// and if not crash the program offering information about the executor mismatch.
-  ///
-  /// This function's effect varies depending on the build flag used:
-  ///
-  /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
-  ///   configuration), stops program execution in a debuggable state after
-  ///   printing `message`.
-  ///
-  /// * In `-O` builds (the default for Xcode's Release configuration), stops
-  ///   program execution.
-  ///
-  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
-  ///   never called. Failure to satisfy that assumption is a serious
-  ///   programming error.
-  @available(SwiftStdlib 9999, *)
-  @_unavailableInEmbedded
-  public func preconditionIsolated(
-    _ message: @autoclosure () -> String = String(),
-    file: StaticString = #fileID, line: UInt = #line
-  ) {
-    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
-      return
-    }
-
-    fatalError("FIXME CANT IMPLEMENT YET")
-//    let expectationCheck = _taskIsCurrentExecutor(Builtin.buildOrdinaryExecutorRef(self))
+//@available(SwiftStdlib 9999, *)
+//extension TaskExecutor {
+//  /// Unconditionally if the current task is executing on the expected serial executor,
+//  /// and if not crash the program offering information about the executor mismatch.
+//  ///
+//  /// This function's effect varies depending on the build flag used:
+//  ///
+//  /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
+//  ///   configuration), stops program execution in a debuggable state after
+//  ///   printing `message`.
+//  ///
+//  /// * In `-O` builds (the default for Xcode's Release configuration), stops
+//  ///   program execution.
+//  ///
+//  /// * In `-Ounchecked` builds, the optimizer may assume that this function is
+//  ///   never called. Failure to satisfy that assumption is a serious
+//  ///   programming error.
+//  @available(SwiftStdlib 9999, *)
+//  @_unavailableInEmbedded
+//  public func precondition(
+//    _ message: @autoclosure () -> String = String(),
+//    file: StaticString = #fileID, line: UInt = #line
+//  ) {
+//    guard _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() else {
+//      return
+//    }
 //
-//    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
-//    precondition(expectationCheck,
-//      // TODO: offer information which executor we actually got
-//      "Incorrect executor assumption; Expected '\(self)' executor. \(message())",
-//      file: file, line: line) // short-cut so we get the exact same failure reporting semantics
-  }
-}
+////    let expectationCheck = _taskIsCurrentExecutor(Builtin.buildOrdinaryExecutorRef(self))
+////
+////    /// TODO: implement the logic in-place perhaps rather than delegating to precondition()?
+////    precondition(expectationCheck,
+////      // TODO: offer information which executor we actually got
+////      "Incorrect executor assumption; Expected '\(self)' executor. \(message())",
+////      file: file, line: line) // short-cut so we get the exact same failure reporting semantics
+//  }
+//}
 
 @available(SwiftStdlib 5.9, *)
 extension SerialExecutor {
