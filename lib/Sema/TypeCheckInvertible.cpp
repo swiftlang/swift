@@ -47,12 +47,53 @@ static void addConformanceFixIt(const NominalTypeDecl *nominal,
   }
 }
 
+// If there is not already an inverse ~KP applied to this type, suggest it.
+// The goal here is that we want to tell users how they can suppress or remove
+// a conformance to KP.
+static void emitAdviceToApplyInverseAfter(InFlightDiagnostic &&diag,
+                                          KnownProtocolKind kp,
+                                          InverseMarking marking,
+                                          NominalTypeDecl *nominal) {
+  // Immediately flush, then emit notes, so they're associated.
+  diag.flush();
+
+  auto &ctx = nominal->getASTContext();
+  // Not expecting the positive KP constraint to be classified as "Inferred".
+  assert(marking.getPositive().getKind() != InverseMarking::Kind::Inferred);
+
+  // Have no advice for situations where the KP conformance is explicit.
+  if (marking.getPositive().isPresent())
+    return;
+
+  switch (marking.getInverse().getKind()) {
+  case InverseMarking::Kind::Inferred:
+    // Note that the enclosing type is conditionally conforming to KP first.
+    ctx.Diags.diagnose(marking.getInverse().getLoc(),
+                       diag::note_inverse_preventing_conformance_implicit,
+                       nominal, getProtocolName(kp));
+    LLVM_FALLTHROUGH;
+  case InverseMarking::Kind::None: {
+    // Suggest adding ~KP to make it non-KP.
+    auto diag = nominal->diagnose(diag::add_inverse,
+                                       nominal,
+                                       getProtocolName(kp));
+    addConformanceFixIt(nominal, diag, kp, /*inverse=*/true);
+  }
+    break;
+  case InverseMarking::Kind::Explicit:
+    // FIXME: we can probably do better here. Look for the extension where the
+    // inverse came from.
+    break;
+  };
+}
+
 /// Emit fix-it's to help the user resolve a containment issue where the
 /// \c nonConformingTy needs to be made to conform to \c kp to resolve a
 /// containment issue.
 /// \param enclosingNom is the nominal type containing a nonconforming value
 /// \param nonConformingTy is the type of the nonconforming value
-static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
+static void tryEmitContainmentFixits(InFlightDiagnostic &&diag,
+                                     NominalTypeDecl *enclosingNom,
                                      Type nonConformingTy,
                                      KnownProtocolKind kp) {
   auto *module = enclosingNom->getParentModule();
@@ -62,24 +103,9 @@ static void tryEmitContainmentFixits(NominalTypeDecl *enclosingNom,
   assert(kp == KnownProtocolKind::Copyable);
   auto enclosingMarking = enclosingNom->getNoncopyableMarking();
 
-  switch (enclosingMarking.getInverse().getKind()) {
-  case InverseMarking::Kind::Inferred:
-    // Note that the enclosing type is conditionally conforming to KP first.
-    ctx.Diags.diagnose(enclosingMarking.getInverse().getLoc(),
-                       diag::note_inverse_preventing_conformance_implicit,
-                       enclosingNom, getProtocolName(kp));
-    LLVM_FALLTHROUGH;
-  case InverseMarking::Kind::None: {
-    // Suggest adding ~KP to make it non-KP.
-    auto diag = enclosingNom->diagnose(diag::add_inverse,
-                                       enclosingNom,
-                                       getProtocolName(kp));
-    addConformanceFixIt(enclosingNom, diag, kp, /*inverse=*/true);
-  }
-    break;
-  case InverseMarking::Kind::Explicit:
-    break;
-  };
+  // First, the generic advice.
+  emitAdviceToApplyInverseAfter(std::move(diag), kp,
+                                enclosingMarking, enclosingNom);
 
   // If it's a generic parameter defined in the same module, point to the
   // parameter that must have had the inverse applied to it somewhere.
@@ -174,8 +200,16 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
   if (isa<BuiltinTupleDecl>(nom))
     llvm_unreachable("TODO: BuiltinTupleDecl");
 
-  // NOTE: A deinit prevents a struct or enum from conforming to Copyable, but
-  // we will emit an error for that elsewhere already.
+  // A deinit prevents a struct or enum from conforming to Copyable.
+  if (auto *deinit = nom->getValueTypeDestructor()) {
+    auto diag = deinit->diagnose(diag::copyable_illegal_deinit, nom);
+    emitAdviceToApplyInverseAfter(std::move(diag),
+                                  KnownProtocolKind::Copyable,
+                                  nom->getNoncopyableMarking(),
+                                  nom);
+    return false;
+  }
+
 
   // Otherwise, we have to check its storage to ensure it is all Copyable.
 
@@ -200,10 +234,11 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
       if (!Diagnosing)
         return true; // it's noncopyable
 
-      storage->diagnose(diag::noncopyable_type_member_in_copyable, type,
-                        isEnum, storage->getName(), Nominal);
+      auto diag = storage->diagnose(diag::noncopyable_type_member_in_copyable,
+                                    type, isEnum, storage->getName(), Nominal);
 
-      tryEmitContainmentFixits(Nominal, type, KnownProtocolKind::Copyable);
+      tryEmitContainmentFixits(std::move(diag),
+                               Nominal, type, KnownProtocolKind::Copyable);
       return true;
     }
 

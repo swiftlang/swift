@@ -46,17 +46,12 @@ protocol RemovedAgain where Self: ~Copyable {
 }
 
 struct StructContainment<T: ~Copyable> : Copyable {
-    // expected-note@-1 {{consider adding '~Copyable' to generic struct 'StructContainment'}}{{50-50=, ~Copyable}}
-    // expected-note@-2 {{generic struct 'StructContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
-
     var storage: Maybe<T>
     // expected-error@-1 {{stored property 'storage' of 'Copyable'-conforming generic struct 'StructContainment' has noncopyable type 'Maybe<T>'}}
 }
 
 enum EnumContainment<T: ~Copyable> : Copyable {
     // expected-note@-1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
-    // expected-note@-2{{consider adding '~Copyable' to generic enum 'EnumContainment'}}{{46-46=, ~Copyable}}
-    // expected-note@-3{{generic enum 'EnumContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 
     case some(T) // expected-error {{associated value 'some' of 'Copyable'-conforming generic enum 'EnumContainment' has noncopyable type 'T'}}
     case other(Int)
@@ -69,6 +64,8 @@ class ClassContainment<T: ~Copyable> {
         storage = t
         checkCopyable(t) // expected-error {{noncopyable type 'T' cannot be substituted for copyable generic parameter 'T' in 'checkCopyable'}}
     }
+
+    deinit {}
 }
 
 // expected-note@+2 {{generic struct 'ConditionalContainment' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
@@ -83,20 +80,44 @@ func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 
 /// ----------------
 
-// expected-note@+1 {{generic enum 'Maybe' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
+struct AlwaysCopyableDeinit<T: ~Copyable> : Copyable {
+  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'AlwaysCopyableDeinit' that conforms to 'Copyable'}}
+}
+
+struct SometimesCopyableDeinit<T: ~Copyable> : ~Copyable {
+  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'SometimesCopyableDeinit' that conforms to 'Copyable'}}
+}
+extension SometimesCopyableDeinit: Copyable where T: Copyable {}
+
+struct NeverCopyableDeinit<T: ~Copyable>: ~Copyable {
+  deinit {}
+}
+
+/// ---------------
+
+// expected-note@+2 {{consider adding '~Copyable' to generic enum 'Maybe'}}
+// expected-note@+1 2{{generic enum 'Maybe' has '~Copyable' constraint on a generic parameter, making its 'Copyable' conformance conditional}}
 enum Maybe<Wrapped: ~Copyable> {
   case just(Wrapped)
   case none
+
+  deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
+  // expected-error@-1 {{deinitializers are not yet supported on noncopyable enums}}
 }
 
-struct RequireCopyable<T> {}
-// expected-note@-1{{requirement specified as 'NC' : 'Copyable'}}
-// expected-note@-2{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
-// expected-note@-3{{requirement specified as 'Wrapped' : 'Copyable'}}
-// expected-note@-4{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
+// expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}
+// expected-note@+3{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
+// expected-note@+2{{requirement specified as 'Wrapped' : 'Copyable'}}
+// expected-note@+1{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
+struct RequireCopyable<T> {
+  // expected-note@-1 {{consider adding '~Copyable' to generic struct 'RequireCopyable'}}{{27-27=: ~Copyable}}
+  deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'RequireCopyable' that conforms to 'Copyable'}}
+}
 
-struct NC: ~Copyable {}
+struct NC: ~Copyable {
 // expected-note@-1 2{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
+  deinit {}
+}
 
 typealias ok1 = RequireCopyable<Int>
 typealias ok2 = RequireCopyable<Maybe<Int>>
