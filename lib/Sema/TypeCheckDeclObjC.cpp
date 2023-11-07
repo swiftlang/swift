@@ -3011,59 +3011,74 @@ private:
     diagnose(afd, diag::objc_implementation_member_requires_vtable, afd);
   }
 
+  void addRequirement(Decl *D) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return;
+
+    ASTContext &ctx = VD->getASTContext();
+
+    // Also skip overrides, unless they override an unavailable decl, which
+    // makes them not formally overrides anymore.
+    if (VD->getOverriddenDecl() &&
+          !VD->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
+      return;
+
+    // Skip alternate Swift names for other language modes.
+    if (VD->getAttrs().isUnavailable(ctx))
+      return;
+
+    // Skip async versions of members. We'll match against the completion
+    // handler versions, hopping over to `getAsyncAlternative()` if needed.
+    if (hasAsync(VD))
+      return;
+
+    auto inserted = unmatchedRequirements.insert(VD);
+    assert(inserted && "objc interface member added twice?");
+  }
+
+  void addCandidate(Decl *D) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD || isa<DestructorDecl>(VD))
+      return;
+
+    // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
+    // in `matchRequirementsAtThreshold()`, so just precompute it.
+    auto inserted =
+        unmatchedCandidates.insert({ VD, getExplicitObjCName(VD) });
+    assert(inserted.second && "member implementation added twice?");
+  }
+
   void addRequirements(IterableDeclContext *idc) {
     assert(idc->getDecl()->hasClangNode());
-    for (Decl *_member : idc->getMembers()) {
+    for (Decl *member : idc->getMembers()) {
       // Skip accessors; we'll match their storage instead.
-      auto member = dyn_cast<ValueDecl>(_member);
-      if (!member || isa<AccessorDecl>(member))
+      if (isa<AccessorDecl>(member))
         continue;
 
-      ASTContext &ctx = member->getASTContext();
-
-      // Also skip overrides, unless they override an unavailable decl, which
-      // makes them not formally overrides anymore.
-      if (member->getOverriddenDecl() &&
-          !member->getOverriddenDecl()->getAttrs().isUnavailable(ctx))
-        continue;
-
-      // Skip alternate Swift names for other language modes.
-      if (member->getAttrs().isUnavailable(ctx))
-        continue;
-
-      // Skip async versions of members. We'll match against the completion
-      // handler versions, hopping over to `getAsyncAlternative()` if needed.
-      if (hasAsync(member))
-        continue;
-
-      auto inserted = unmatchedRequirements.insert(member);
-      assert(inserted && "objc interface member added twice?");
+      addRequirement(member);
     }
   }
 
   void addCandidates(ExtensionDecl *ext) {
     assert(ext->isObjCImplementation());
-    for (Decl *_member : ext->getMembers()) {
+    for (Decl *member : ext->getMembers()) {
       // Skip accessors; we'll match their storage instead.
-      auto member = dyn_cast<ValueDecl>(_member);
-      if (!member || isa<AccessorDecl>(member) || isa<DestructorDecl>(member))
+      if (isa<AccessorDecl>(member))
         continue;
 
-      // Skip non-member implementations.
-      // FIXME: Should we consider them if they were only rejected for privacy?
-      if (!member->isObjCMemberImplementation()) {
-        // No member of an `@_objcImplementation` extension should need a vtable
-        // entry.
-        diagnoseVTableUse(member);
-        continue;
+      if (auto VD = dyn_cast<ValueDecl>(member)) {
+        // Skip non-member implementations.
+        // FIXME: Should we consider them if only rejected for access level?
+        if (!VD->isObjCMemberImplementation()) {
+          // No member of an `@_objcImplementation` extension should need a
+          // vtable entry.
+          diagnoseVTableUse(VD);
+          continue;
+        }
       }
 
-      // `getExplicitObjCName()` is O(N) and would otherwise be used repeatedly
-      // in `matchRequirementsAtThreshold()`, so just precompute it.
-      auto inserted =
-          unmatchedCandidates.insert({ member, getExplicitObjCName(member) });
-      assert(inserted.second && "member implementation added twice?");
-
+      addCandidate(member);
     }
   }
 
