@@ -935,7 +935,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, from parent: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
           task, parent);
   fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, task executor identity: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          taskExecutor.getIdentity());
+          task, taskExecutor.getIdentity());
 
   // Initialize the child fragment if applicable.
   if (parent) {

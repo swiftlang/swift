@@ -903,6 +903,9 @@ void swift_task_asyncMainDrainQueue [[noreturn]]();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_job_run(Job *job, SerialExecutorRef executor);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_run_on_task_executor(Job *job, TaskExecutorRef executor);
+
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTask *swift_task_getCurrent(void);

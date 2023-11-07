@@ -549,7 +549,9 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
 }
 
 TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
+  fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   if (auto task = swift_task_getCurrent()) {
+    fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     return task->getPreferredTaskExecutor();
   } else {
     return TaskExecutorRef::undefined(); // "no executor preference"
