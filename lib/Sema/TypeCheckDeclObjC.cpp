@@ -3068,9 +3068,13 @@ private:
   }
 
   static ObjCSelector getExplicitObjCName(ValueDecl *VD) {
-    if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
-      return attr->getName().value_or(ObjCSelector());
+    if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
+      return objcAttr->getName().value_or(ObjCSelector());
     return ObjCSelector();
+  }
+
+  static llvm::Optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+    return VD->getObjCRuntimeName();
   }
 
 public:
@@ -3215,12 +3219,11 @@ private:
       for (auto req : matchedRequirements.matches) {
         auto diag =
             diagnose(cand, diag::objc_implementation_one_matched_requirement,
-                           req, *req->getObjCRuntimeName(), shouldOfferFix,
-                           req->getObjCRuntimeName()->getString(scratch));
+                           req, *getObjCName(req), shouldOfferFix,
+                           getObjCName(req)->getString(scratch));
         if (shouldOfferFix) {
-          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                                 req->getObjCRuntimeName(),
-                                 /*ignoreImpliedName=*/true);
+          fixDeclarationObjCName(diag, cand, getObjCName(cand),
+                                 getObjCName(req), /*ignoreImpliedName=*/true);
         }
       }
 
@@ -3257,19 +3260,18 @@ private:
       auto ext =
           cast<ExtensionDecl>(reqIDC->getImplementationContext());
       diagnose(ext, diag::objc_implementation_multiple_matching_candidates,
-                    req, *req->getObjCRuntimeName());
+                    req, *getObjCName(req));
 
       for (auto cand : cands.matches) {
         bool shouldOfferFix = !unmatchedCandidates[cand];
         auto diag =
             diagnose(cand, diag::objc_implementation_candidate_impl_here,
                            cand, shouldOfferFix,
-                           req->getObjCRuntimeName()->getString(scratch));
+                           getObjCName(req)->getString(scratch));
 
         if (shouldOfferFix) {
-          fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                                 req->getObjCRuntimeName(),
-                                 /*ignoreImpliedName=*/true);
+          fixDeclarationObjCName(diag, cand, getObjCName(cand),
+                                 getObjCName(req), /*ignoreImpliedName=*/true);
         }
       }
 
@@ -3362,8 +3364,7 @@ private:
 
   MatchOutcome matchesImpl(ValueDecl *req, ValueDecl *cand,
                            ObjCSelector explicitObjCName) const {
-    bool hasObjCNameMatch =
-        req->getObjCRuntimeName() == cand->getObjCRuntimeName();
+    bool hasObjCNameMatch = getObjCName(req) == getObjCName(cand);
     bool hasSwiftNameMatch = areSwiftNamesEqual(req->getName(), cand->getName());
 
     // If neither the ObjC nor Swift names match, there's absolutely no reason
@@ -3373,8 +3374,7 @@ private:
 
     // There's at least some reason to treat these as matches.
 
-    if (explicitObjCName
-          && req->getObjCRuntimeName() != explicitObjCName)
+    if (explicitObjCName && getObjCName(req) != explicitObjCName)
       return MatchOutcome::WrongExplicitObjCName;
 
     if (!hasSwiftNameMatch)
@@ -3430,7 +3430,7 @@ private:
 
   void diagnoseOutcome(MatchOutcome outcome, ValueDecl *req, ValueDecl *cand,
                        ObjCSelector explicitObjCName) {
-    auto reqObjCName = *req->getObjCRuntimeName();
+    auto reqObjCName = *getObjCName(req);
 
     switch (outcome) {
     case MatchOutcome::NoRelationship:
@@ -3447,7 +3447,7 @@ private:
     case MatchOutcome::WrongImplicitObjCName:
     case MatchOutcome::WrongExplicitObjCName: {
       auto diag = diagnose(cand, diag::objc_implementation_wrong_objc_name,
-                           *cand->getObjCRuntimeName(), cand, reqObjCName);
+                           *getObjCName(cand), cand, reqObjCName);
       fixDeclarationObjCName(diag, cand, explicitObjCName, reqObjCName);
       return;
     }
@@ -3459,8 +3459,8 @@ private:
       if (!explicitObjCName) {
         // Changing the Swift name will probably change the implicitly-computed
         // ObjC name, so let's make that explicit.
-        fixDeclarationObjCName(diag, cand, cand->getObjCRuntimeName(),
-                               reqObjCName, /*ignoreImpliedName=*/true);
+        fixDeclarationObjCName(diag, cand, getObjCName(cand), reqObjCName,
+                               /*ignoreImpliedName=*/true);
       }
       return;
     }
