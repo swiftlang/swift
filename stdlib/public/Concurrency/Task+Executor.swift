@@ -19,7 +19,7 @@ import Swift
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
 public func withTaskExecutor<T: Sendable>(
-  _ executor: (any SerialExecutor)?, // FIXME: any Executor
+  _ executor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
     let executorBuiltin: Builtin.Executor =
@@ -27,9 +27,9 @@ public func withTaskExecutor<T: Sendable>(
           // We need to go through the asUnowned... for serial executors,
           // because they encode certain behavior in the reference bits,
           // so we cannot just cast and assume it'll be correct.
-          executor.asUnownedSerialExecutor().executor
+          executor.asUnownedTaskExecutor().executor
         } else {
-          _getGenericExecutor()
+          _getGenericExecutor() // FIXME: "get the no preference executor (0,0)"
         }
 
     let record = _pushTaskExecutorPreference(executorBuiltin)
@@ -37,38 +37,14 @@ public func withTaskExecutor<T: Sendable>(
       _popTaskExecutorPreference(record: record)
     }
 
-    #if compiler(>=9999) && $BuiltinHopToExecutor
+//    #if compiler(>=9999) && $BuiltinHopToExecutor
     await Builtin.hopToExecutor(executorBuiltin)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
-    if let executor {
-      executor.preconditionIsolated() // TODO: remove this once confident
-    }
+//    #else
+//    fatalError("Swift compiler is incompatible with this SDK version")
+//    #endif
 
     return try await operation()
 }
-
-//// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-//@available(SwiftStdlib 9999, *)
-//@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
-//public func withTaskExecutor<T: Sendable>(
-//  _ executor: any Executor, // FIXME: any Executor
-//  operation: @Sendable () async throws -> T
-//  ) async rethrows -> T {
-//  let executorBuiltin = Builtin.buildOrdinaryExecutorRef(executor)
-//  let record = _pushTaskExecutorPreference(executorBuiltin)
-//  defer { _popTaskExecutorPreference(record: record) }
-//
-//#if compiler(>=5.5) && $BuiltinHopToExecutor
-//  await Builtin.hopToExecutor(executorBuiltin)
-//#else
-//  fatalError("Swift compiler is incompatible with this SDK version")
-//#endif
-//  // executor.preconditionIsolated() // TODO: remove this once confident
-//
-//  return try await operation()
-//}
 
 /// Task with specified executor ----------------------------------------------
 
@@ -82,6 +58,35 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
+    // #if compiler(>=9999) && $BuiltinCreateAsyncTaskWithExecutor // FIXME
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
+
+    // Create the asynchronous task.
+    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, taskExecutorRef.executor, operation)
+    self._task = task
+//    #else
+//    fatalError("Unsupported Swift compiler")
+//    #endif
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension Task where Failure == Error {
+  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @discardableResult
+  @_alwaysEmitIntoClient
+  public init(
+    on executor: any TaskExecutor,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Success
+  ) {
     #if compiler(>=9999) && $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
@@ -91,19 +96,10 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-    if let serialExecutor = executor as? any SerialExecutor {
-      // We need to go through the asUnowned... for serial executors,
-      // because they encode certain behavior in the reference bits,
-      // so we cannot just cast and assume it'll be correct.
-      let executorBuiltin = serialExecutor.asUnownedSerialExecutor().executor
-      let (task, _) = Builtin.createAsyncTaskWithExecutor(
-        flags, executorBuiltin, operation)
-      self._task = task
-    } else {
-      let (task, _) = Builtin.createAsyncTaskWithExecutor(
-        flags, unsafeBitCast(executor, to: Builtin.Executor.self), operation)
-      self._task = task
-    }
+    let taskExecutorRef = executor.asUnownedTaskExecutor()
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+      flags, taskExecutorRef, operation)
+    self._task = task
     #else
     fatalError("Unsupported Swift compiler")
     #endif

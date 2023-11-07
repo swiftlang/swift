@@ -401,6 +401,7 @@ public:
   /// Flag that the task is to be enqueued on the provided executor and actually
   /// enqueue it
   void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
+  void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor, TaskExecutorRef taskExecutor);
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.

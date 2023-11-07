@@ -19,20 +19,17 @@ final class NaiveQueueExecutor: TaskExecutor {
   }
 
   public func enqueue(_ _job: consuming ExecutorJob) {
-    print("\(self): enqueue")
     let job = UnownedJob(_job)
     queue.async {
-      fatalError("NEIN")
-      print("\(self): run job on queue")
-      job.runSynchronously(on: self.asUnownedSerialExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
+
 }
 
 actor ThreaddyTheDefaultActor {
   func actorIsolated(expectedExecutor: NaiveQueueExecutor) async {
     dispatchPrecondition(condition: .onQueue(expectedExecutor.queue))
-    expectedExecutor.preconditionIsolated()
   }
 }
 
@@ -46,12 +43,13 @@ actor ThreaddyTheDefaultActor {
       let defaultActor = ThreaddyTheDefaultActor()
 
       await Task(on: executor) {
+        dispatchPrecondition(condition: .onQueue(executor.queue))
         await defaultActor.actorIsolated(expectedExecutor: executor)
       }.value
 
-//      await withTaskExecutor(executor) {
-//        await defaultActor.actorIsolated(expectedExecutor: executor)
-//      }
+      await withTaskExecutor(executor) {
+        await defaultActor.actorIsolated(expectedExecutor: executor)
+      }
     }
   }
 }

@@ -134,6 +134,13 @@ public protocol TaskExecutor: Executor {
   func asUnownedTaskExecutor() -> UnownedTaskExecutor
 }
 
+@available(SwiftStdlib 9999, *)
+extension TaskExecutor {
+  public func asUnownedTaskExecutor() -> UnownedTaskExecutor {
+    UnownedTaskExecutor(ordinary: self)
+  }
+}
+
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.9, *)
 extension Executor {
