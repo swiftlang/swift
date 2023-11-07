@@ -60,7 +60,7 @@ class SwiftPassInvocation;
 class GenericSpecializationInformation;
 }
 
-extern bool nodeMetatypesInitialized;
+bool swiftModulesInitialized();
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
 struct BridgedType {

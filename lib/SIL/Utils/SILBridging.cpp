@@ -31,13 +31,17 @@
 
 using namespace swift;
 
-bool nodeMetatypesInitialized = false;
-
 namespace {
+
+bool nodeMetatypesInitialized = false;
 
 // Filled in by class registration in initializeSwiftModules().
 SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
+}
+
+bool swiftModulesInitialized() {
+  return nodeMetatypesInitialized;
 }
 
 // Does return null if initializeSwiftModules() is never called.
