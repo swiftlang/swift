@@ -26,54 +26,71 @@ func findPointerEscapingUse(of value: Value) -> Bool {
   value.bridged.findPointerEscape()
 }
 
-// Visit the introducers of a forwarded lifetime (Value -> LifetimeIntroducer).
-//
-// A lifetime introducer produces an initial OSSA lifetime which may be extended by forwarding instructions. The introducer is never itself the result of a ForwardingInstruction. Example:
-//
-//   # lifetime introducer
-//   %1 = apply               -+                  -+
-//   ...                       | OSSA lifetime     |
-//   # forwarding instruction  |                   |
-//   %2 = struct $S (%1)      -+ -+                | forward-extended lifetime
-//                                | OSSA lifetime  |
-//   # non-forwarding consumer    |                |
-//   destroy_value %2            -+               -+
-//
-// The lifetime of a single owned value ends when it is forwarded, but certain lifetime properties are relevant for the entire forward-extended lifetime. For example, if an owned lifetime has a pointer-escaping use, then all values in the forward-extended lifetime are also considered pointer-escaping. Certain propeties, like lexical lifetimes, only exist on the forward introducer and apply to all forwarded values.
-//
-// Note: Although move_value conceptually forwards an owned value, it also summarizes lifetime attributes; therefore, it is not formally a ForwardingInstruction.
-//
-// The lifetime introducer of a guaranteed value is the borrow introducer:
-//
-//   # lifetime introducer / borrow introducer
-//   %1 = begin_borrow        -+
-//   ...                       | OSSA lifetime == forwarded lifetime
-//   # forwarding instruction  |
-//   %2 = struct $S (%1)       | - forwarded uses are within the OSSA lifetime
-//                             |
-//   end_borrow %1            -+
-//
-// TODO: When a begin_borrow has no lifetime flags, it can be ignored as a lifetime introducer. In that case, an owned value may introduce guaranteed OSSA lifetimes.
-//
-// Forwarded lifetimes also extend through phis. In this case, however, there is no ForwardingInstruction.
-//
-//   # lifetime introducer
-//   %1 = apply             -+               -+
-//   ...                     | OSSA lifetime  |
-//   # phi operand           |                |
-//   br bbContinue(%1: $S)  -+                | forward-extended lifetime
-//                                            |
-//   bbContinue(%phi : $S): -+ OSSA lifetime  |
-//   ...                     |                |
-//   destroy_value %phi     -+               -+
-//
-// TODO: when phi lifetime flags are implemented, phis will introduce a lifetime in the same way as move_value.
-//
-// This walker is used to query basic lifetime attributes on values, such as "escaping" or "lexical". It must be precise for correctness and is performance critical.
+/// Visit the introducers of a forwarded lifetime (Value -> LifetimeIntroducer).
+///
+/// A lifetime introducer produces an initial OSSA lifetime which may
+/// be extended by forwarding instructions. The introducer is never
+/// itself the result of a ForwardingInstruction. Example:
+///
+///   # lifetime introducer
+///   %1 = apply               -+                  -+
+///   ...                       | OSSA lifetime     |
+///   # forwarding instruction  |                   |
+///   %2 = struct $S (%1)      -+ -+                | forward-extended lifetime
+///                                | OSSA lifetime  |
+///   # non-forwarding consumer    |                |
+///   destroy_value %2            -+               -+
+///
+/// The lifetime of a single owned value ends when it is forwarded,
+/// but certain lifetime properties are relevant for the entire
+/// forward-extended lifetime. For example, if an owned lifetime has a
+/// pointer-escaping use, then all values in the forward-extended
+/// lifetime are also considered pointer-escaping. Certain properties,
+/// like lexical lifetimes, only exist on the forward introducer and
+/// apply to all forwarded values.
+///
+/// Note: Although move_value conceptually forwards an owned value, it
+/// also summarizes lifetime attributes; therefore, it is not formally
+/// a ForwardingInstruction.
+///
+/// The lifetime introducer of a guaranteed value is the borrow introducer:
+///
+///   # lifetime introducer / borrow introducer
+///   %1 = begin_borrow        -+
+///   ...                       | OSSA lifetime == forwarded lifetime
+///   # forwarding instruction  |
+///   %2 = struct $S (%1)       | - forwarded uses are within the OSSA lifetime
+///                             |
+///   end_borrow %1            -+
+///
+/// TODO: When a begin_borrow has no lifetime flags, it can be ignored
+/// as a lifetime introducer. In that case, an owned value may
+/// introduce guaranteed OSSA lifetimes.
+///
+/// Forwarded lifetimes also extend through phis. In this case,
+/// however, there is no ForwardingInstruction.
+///
+///   # lifetime introducer
+///   %1 = apply             -+               -+
+///   ...                     | OSSA lifetime  |
+///   # phi operand           |                |
+///   br bbContinue(%1: $S)  -+                | forward-extended lifetime
+///                                            |
+///   bbContinue(%phi : $S): -+ OSSA lifetime  |
+///   ...                     |                |
+///   destroy_value %phi     -+               -+
+///
+/// TODO: when phi lifetime flags are implemented, phis will introduce
+/// a lifetime in the same way as move_value.
+///
+/// This walker is used to query basic lifetime attributes on values,
+/// such as "escaping" or "lexical". It must be precise for
+/// correctness and is performance critical.
 protocol ForwardingUseDefWalker {
   mutating func introducer(_ value: Value) -> WalkResult
 
-  // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring along with phis.
+  // Minimally, check a ValueSet. This walker may traverse chains of
+  // aggregation and destructuring along with phis.
   mutating func needWalk(for value: Value) -> Bool
 
   mutating func walkUp(value: Value) -> WalkResult
@@ -114,7 +131,8 @@ extension ForwardingUseDefWalker {
   }
 }
 
-// This conveniently gathers all forward introducers and deinitializes visitedValues before the caller has a chance to recurse.
+// This conveniently gathers all forward introducers and deinitializes
+// visitedValues before the caller has a chance to recurse.
 func gatherLifetimeIntroducers(for value: Value, _ context: Context) -> [Value] {
   var gather = GatherLifetimeIntroducers(context)
   defer { gather.visitedValues.deinitialize() }
@@ -159,14 +177,16 @@ enum ForwardingUseResult: CustomStringConvertible {
   }
 }
 
-// Visit all the uses in a forward-extended lifetime (LifetimeIntroducer -> Operand).
+/// Visit all the uses in a forward-extended lifetime (LifetimeIntroducer -> Operand).
 protocol ForwardingDefUseWalker {
-  // Minimally, check a ValueSet. This walker may traverse chains of aggregation and destructuring by default. Implementations may handle phis.
+  // Minimally, check a ValueSet. This walker may traverse chains of
+  // aggregation and destructuring by default. Implementations may
+  // handle phis.
   mutating func needWalk(for value: Value) -> Bool
 
   mutating func leafUse(_ operand: Operand) -> WalkResult
 
-  // Report any initial or forwarded  with no uses. Only relevant for
+  // Report any initial or forwarded value with no uses. Only relevant for
   // guaranteed values or incomplete OSSA. This could be a dead
   // instruction, a terminator in which the result is dead on one
   // path, or a dead phi.
@@ -233,9 +253,9 @@ extension ForwardingDefUseWalker {
   }
 }
 
-// This conveniently allows a closure to be called for each leaf use of a forward-extended lifetime. It should be called on a forward introducer provided by ForwardingDefUseWalker.introducer() or gatherLifetimeIntroducers().
-//
-// TODO: make the visitor non-escaping once Swift supports stored non-escaping closues.
+/// This conveniently allows a closure to be called for each leaf use of a forward-extended lifetime. It should be called on a forward introducer provided by ForwardingDefUseWalker.introducer() or gatherLifetimeIntroducers().
+///
+/// TODO: make the visitor non-escaping once Swift supports stored non-escaping closues.
 func visitForwardedUses(introducer: Value, _ context: Context,
   visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {
