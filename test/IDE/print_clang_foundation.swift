@@ -17,7 +17,7 @@
 // CHECK_NSARRAY: class NSMutableArray : NSArray
 // CHECK_NSARRAY:   func setArray(_ otherArray: [Any])
 
-// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false -print-regular-comments > %t/Foundation.NSKeyValueCoding.printed.txt
+// RUN: %target-swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSKeyValueCoding -function-definitions=false > %t/Foundation.NSKeyValueCoding.printed.txt
 // RUN: %FileCheck -input-file %t/Foundation.NSKeyValueCoding.printed.txt -check-prefix=CHECK2 %s
 
 // CHECK2: extension NSObject
