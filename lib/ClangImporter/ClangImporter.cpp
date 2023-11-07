@@ -5827,21 +5827,6 @@ findImplsGivenInterface(ClassDecl *classDecl, Identifier categoryName) {
       impls.push_back(ext);
   }
 
-  if (impls.size() > 1) {
-    llvm::sort(impls, OrderDecls());
-
-    auto &diags = classDecl->getASTContext().Diags;
-    for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
-      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
-      attr->setCategoryNameInvalid();
-
-      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
-                     categoryName, classDecl)
-        .fixItRemove(attr->getRangeWithAt());
-      diags.diagnose(impls.front(), diag::previous_objc_implementation);
-    }
-  }
-
   return impls;
 }
 
@@ -5872,9 +5857,25 @@ findInterfaceGivenImpl(ClassDecl *classDecl, ExtensionDecl *ext) {
 }
 
 static ObjCInterfaceAndImplementation
-constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> impls) {
-  if (impls.empty())
+constructResult(Decl *interface, llvm::TinyPtrVector<Decl *> &impls,
+                Decl *diagnoseOn, Identifier categoryName) {
+  if (!interface || impls.empty())
     return ObjCInterfaceAndImplementation();
+
+  if (impls.size() > 1) {
+    llvm::sort(impls, OrderDecls());
+
+    auto &diags = interface->getASTContext().Diags;
+    for (auto extraImpl : llvm::ArrayRef<Decl *>(impls).drop_front()) {
+      auto attr = extraImpl->getAttrs().getAttribute<ObjCImplementationAttr>();
+      attr->setCategoryNameInvalid();
+
+      diags.diagnose(attr->getLocation(), diag::objc_implementation_two_impls,
+                     categoryName, diagnoseOn)
+        .fixItRemove(attr->getRangeWithAt());
+      diags.diagnose(impls.front(), diag::previous_objc_implementation);
+    }
+  }
 
   return ObjCInterfaceAndImplementation(interface, impls.front());
 }
@@ -5924,7 +5925,7 @@ findContextInterfaceAndImplementation(DeclContext *dc) {
   // look for extensions implementing it.
 
   auto implDecls = findImplsGivenInterface(classDecl, categoryName);
-  return constructResult(interfaceDecl, implDecls);
+  return constructResult(interfaceDecl, implDecls, classDecl, categoryName);
 }
 
 ObjCInterfaceAndImplementation ObjCInterfaceAndImplementationRequest::
