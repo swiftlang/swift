@@ -5379,16 +5379,23 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
         return;
       SmallVector<KeyPathExpr *, 1> keyPathArgs;
       auto *args = expr->getArgs();
+
+      auto isKeyPathLiteral = [&](Expr *argExpr) -> KeyPathExpr * {
+        if (auto *DTBE = getAsExpr<DerivedToBaseExpr>(argExpr))
+          argExpr = DTBE->getSubExpr();
+        return getAsExpr<KeyPathExpr>(argExpr);
+      };
+
       if (fn->getModuleContext()->getName() == C.Id_Foundation &&
           fn->getName().isCompoundName("observe",
                                        {"", "options", "changeHandler"})) {
-        if (auto keyPathArg = dyn_cast<KeyPathExpr>(args->getExpr(0))) {
+        if (auto keyPathArg = isKeyPathLiteral(args->getExpr(0))) {
           keyPathArgs.push_back(keyPathArg);
         }
       } else if (fn->getAttrs()
                  .hasSemanticsAttr(semantics::KEYPATH_MUST_BE_VALID_FOR_KVO)) {
-        for (const auto& arg: *args) {
-          if (auto keyPathArg = dyn_cast<KeyPathExpr>(arg.getExpr())) {
+        for (auto *argExpr : args->getArgExprs()) {
+          if (auto keyPathArg = isKeyPathLiteral(argExpr)) {
             keyPathArgs.push_back(keyPathArg);
           }
         }
