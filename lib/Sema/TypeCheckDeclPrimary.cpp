@@ -205,6 +205,10 @@ static void checkInheritanceClause(
     if (inheritedTy->isConstraintType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
+      // An inverse on an extension is an error.
+      if (isa<ExtensionDecl>(decl) && inheritedTy->is<InverseType>())
+        decl->diagnose(diag::inverse_extension, inheritedTy);
+
       // Subclass existentials are not allowed except on classes and
       // non-@objc protocols.
       if (layout.explicitSuperclass &&
@@ -224,12 +228,6 @@ static void checkInheritanceClause(
       // AnyObject is not allowed except on protocols.
       if (layout.hasExplicitAnyObject) {
         decl->diagnose(diag::inheritance_from_anyobject);
-        continue;
-      }
-
-      // Classes are always copyable.
-      if (layout.hasInverseCopyable && isa<ClassDecl>(decl)) {
-        decl->diagnose(diag::noncopyable_class);
         continue;
       }
 

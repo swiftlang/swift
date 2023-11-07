@@ -59,7 +59,7 @@ protocol Rope<Element>: Hashable, ~ Copyable {
   associatedtype Element: ~Copyable
 }
 
-extension S: ~Copyable {}
+extension S: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
 
 struct S: ~U, // expected-error {{type 'U' is not invertible}}
           ~Copyable {}

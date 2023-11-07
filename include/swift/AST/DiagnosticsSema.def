@@ -7539,6 +7539,9 @@ ERROR(noncopyable_but_copyable, none,
 ERROR(noncopyable_class, none,
       "classes cannot be noncopyable",
       ())
+ERROR(inverse_extension, none,
+      "cannot apply inverse %0 to extension",
+      (Type))
 ERROR(copyable_illegal_deinit, none,
       "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
       (const ValueDecl *))

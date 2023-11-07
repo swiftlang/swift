@@ -81,6 +81,7 @@ func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 /// ----------------
 
 struct AlwaysCopyableDeinit<T: ~Copyable> : Copyable {
+  let nc: NC // expected-error {{stored property 'nc' of 'Copyable'-conforming generic struct 'AlwaysCopyableDeinit' has noncopyable type 'NC'}}
   deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'AlwaysCopyableDeinit' that conforms to 'Copyable'}}
 }
 
@@ -115,7 +116,7 @@ struct RequireCopyable<T> {
 }
 
 struct NC: ~Copyable {
-// expected-note@-1 2{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
+// expected-note@-1 3{{struct 'NC' has '~Copyable' constraint preventing 'Copyable' conformance}}
   deinit {}
 }
 
@@ -150,3 +151,29 @@ struct CornerCase<T: ~Copyable> {
 func chk(_ t: CornerCase<NC>) {}
 // expected-error@-1 {{parameter of noncopyable type 'CornerCase<NC>' must specify ownership}}
 // expected-note@-2 3{{add}}
+
+
+/// MARK: tests that we diagnose ~Copyable that became invalid because it's required to be copyable
+
+protocol NeedsCopyable {}
+
+struct Silly: ~Copyable, Copyable {} // expected-error {{struct 'Silly' required to be 'Copyable' but is marked with '~Copyable'}}
+enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sally' required to be 'Copyable' but is marked with '~Copyable'}}
+class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be noncopyable}}
+
+struct OopsConformance1: ~Copyable, NeedsCopyable {}
+// expected-error@-1 {{type 'OopsConformance1' does not conform to protocol 'NeedsCopyable'}}
+// expected-error@-2 {{type 'OopsConformance1' does not conform to protocol 'Copyable'}}
+
+protocol Nothing: ~Copyable, NeedsCopyable {}
+// expected-warning@-1 {{protocol 'Nothing' should be declared to refine 'Copyable' due to a same-type constraint on 'Self'}}
+
+
+struct Extendo: ~Copyable {}
+extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
+
+enum EnumExtendo {}
+extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~Copyable' to extension}}
+
+extension NeedsCopyable where Self: ~Copyable {}
+// expected-error@-1 {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}

@@ -189,16 +189,36 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
   if (!nom)
     return false;
 
+  auto &ctx = nom->getASTContext();
+  bool conforms = true;
+
+  // An explicit `~Copyable` prevents conformance if any of these are true:
+  //
+  // 1. It appears on a class.
+  // 2. Appears on the same declaration that also declares the conformance.
+  //    So, if the nominal has `~Copyable` but this conformance is
+  //    written in an extension, then we do not raise an error.
+  auto marking = nom->getNoncopyableMarking();
+  if (marking.getInverse().getKind() == InverseMarking::Kind::Explicit) {
+    if (isa<ClassDecl>(nom)) {
+      ctx.Diags.diagnose(marking.getInverse().getLoc(),
+                         diag::noncopyable_class);
+      conforms &= false;
+    } else if (conformance->getDeclContext() == nom) {
+      ctx.Diags.diagnose(marking.getInverse().getLoc(),
+                         diag::noncopyable_but_copyable,
+                         nom);
+      conforms &= false;
+    }
+  }
+
   // All classes can store noncopyable values.
   if (isa<ClassDecl>(nom))
-    return true;
+    return conforms;
 
   // Protocols do not directly define any storage.
-  if (isa<ProtocolDecl>(nom))
-    return true;
-
-  if (isa<BuiltinTupleDecl>(nom))
-    llvm_unreachable("TODO: BuiltinTupleDecl");
+  if (isa<ProtocolDecl, BuiltinTupleDecl>(nom))
+    llvm_unreachable("unexpected nominal to check Copyable conformance");
 
   // A deinit prevents a struct or enum from conforming to Copyable.
   if (auto *deinit = nom->getValueTypeDestructor()) {
@@ -207,7 +227,7 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
                                   KnownProtocolKind::Copyable,
                                   nom->getNoncopyableMarking(),
                                   nom);
-    return false;
+    conforms &= false;
   }
 
 
@@ -256,8 +276,12 @@ bool checkCopyableConformance(ProtocolConformance *conformance) {
   };
 
   // This nominal cannot be Copyable if it contains noncopyable storage.
-  return !HasNoncopyable(nom, conformance->getDeclContext(),
+  bool haveNoncopyableStorage =
+      HasNoncopyable(nom, conformance->getDeclContext(),
                          /*diagnose=*/true).visit();
+  conforms &= !haveNoncopyableStorage;
+
+  return conforms;
 }
 
 /// Visit the instance storage of the given nominal type as seen through
@@ -372,23 +396,14 @@ ProtocolConformance *deriveConformanceForInvertible(Evaluator &evaluator,
 
   switch (*ip) {
   case InvertibleProtocolKind::Copyable: {
+    // Always derive unconditional Copyable conformance for classes
+    if (isa<ClassDecl>(nominal))
+      return generateConformance(nominal);
+
     auto marking = nominal->getNoncopyableMarking();
 
-    // An explicit Copyable takes precedece over any ~Copyable marking.
-    if (marking.getPositive().getKind() == InverseMarking::Kind::Explicit) {
-      // If they also explicitly wrote ~Copyable, then diagnose that.
-      auto inverse = marking.getInverse();
-      if (inverse.getKind() == InverseMarking::Kind::Explicit) {
-        ctx.Diags.diagnose(inverse.getLoc(),
-                           diag::noncopyable_but_copyable,
-                           nominal);
-      }
-
-      return generateConformance(nominal);
-    }
-
-    // Unexpected to have Kind::Inferred marking for Copyable; it's assumed.
-    assert(marking.getPositive().getKind() == InverseMarking::Kind::None);
+    // Unexpected to have any marking for Copyable if we're deriving it.
+    assert(!marking.getPositive().isPresent());
 
     // Check what kind of inverse we have to determine whether to generate a
     // conformance for Copyable.

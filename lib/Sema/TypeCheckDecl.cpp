@@ -963,7 +963,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
     return false;
   };
 
-  auto isInverseTarget = [](Type t) -> bool {
+  auto isInverseTarget = [&](Type t) -> bool {
     if (auto inverse = t->getAs<InverseType>())
       return inverse->getInverseKind() == TARGET;
     else if (auto pct = t->getAs<ProtocolCompositionType>())
@@ -1038,7 +1038,7 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
         // Try to find a good location.
         SourceLoc loc;
         if (repr && !repr->isInvalid())
-          if (auto *constraintRepr = repr->getSecondTypeRepr())
+          if (auto *constraintRepr = repr->getConstraintRepr())
             if (!repr->isInvalid())
               loc = constraintRepr->getLoc();
 
@@ -1056,10 +1056,6 @@ NoncopyableAnnotationRequest::evaluate(Evaluator &evaluator,
 
   auto nominal = cast<NominalTypeDecl>(decl);
   assert(!isa<BuiltinTupleDecl>(nominal));
-
-  // Classes can't be noncopyable; it's diagnosed elsewhere.
-  if (isa<ClassDecl>(nominal))
-    return InverseMarking::forInverse(Kind::None);
 
   /// Protocols are handled specially since they do not infer an inverse based
   /// on their associated types.
