@@ -124,8 +124,13 @@ class ReabstractionInfo {
   // callee.
   SubstitutionMap ClonerParamSubMap;
 
-  // Reference to the original generic non-specialized callee function.
+  // Reference to the original generic non-specialized callee function, if available
   SILFunction *Callee = nullptr;
+
+  // The method to specialize. This must be not null if Callee is null.
+  SILDeclRef methodDecl;
+
+  SILModule *M = nullptr;
 
   // The module the specialization is created in.
   ModuleDecl *TargetModule = nullptr;
@@ -186,7 +191,7 @@ private:
       FunctionSignaturePartialSpecializer &FSPS);
 
 public:
-  ReabstractionInfo() {}
+  ReabstractionInfo(SILModule &M) : M(&M) {}
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// substitutions \p ParamSubs.
@@ -208,9 +213,11 @@ public:
                     bool isPrespecialization = false);
 
   ReabstractionInfo(CanSILFunctionType substitutedType,
+                    SILDeclRef methodDecl,
                     SILModule &M) :
     SubstitutedType(substitutedType),
-    isWholeModule(M.isWholeModule()) {}
+    methodDecl(methodDecl),
+    M(&M), isWholeModule(M.isWholeModule()) {}
 
 
   bool isPrespecialized() const { return isPrespecialization; }
@@ -326,13 +333,10 @@ public:
 
   SILFunction *getNonSpecializedFunction() const { return Callee; }
 
-  /// Map type into a context of the specialized function.
-  Type mapTypeIntoContext(Type type) const;
-
   /// Map SIL type into a context of the specialized function.
   SILType mapTypeIntoContext(SILType type) const;
 
-  SILModule &getModule() const { return Callee->getModule(); }
+  SILModule &getModule() const { return *M; }
 
   /// Returns true if generic specialization is possible.
   bool canBeSpecialized() const;
