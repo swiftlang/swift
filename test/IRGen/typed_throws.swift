@@ -2,6 +2,8 @@
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows -disable-availability-checking -runtime-compatibility-version 5.8 -disable-concrete-type-metadata-mangled-name-accessors | %FileCheck %s --check-prefix=CHECK-NOMANGLE
 
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows  | %FileCheck %s --check-prefix=CHECK
+
 // XFAIL: CPU=arm64e
 
 enum MyBigError: Error {
@@ -35,3 +37,31 @@ func buildMetatype() -> Any.Type {
 protocol P {
   associatedtype A
 }
+
+// The following ensures that we lower
+func passthroughCall<T, E>(_ body: () throws(E) -> T) throws(E) -> T {
+  try body()
+}
+
+func five() -> Int { 5 }
+
+func fiveOrBust() throws -> Int { 5 }
+
+func fiveOrTypedBust() throws(MyBigError) -> Int { 5 }
+
+func reabstractAsNonthrowing() -> Int {
+  passthroughCall(five)
+}
+
+func reabstractAsThrowing() throws -> Int {
+  try passthroughCall(fiveOrBust)
+}
+
+
+func reabstractAsConcreteThrowing() throws -> Int {
+  try passthroughCall(fiveOrTypedBust)
+}
+
+// CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias nocapture sret(%TSi) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable(8) %4, ptr %5)
+// CHECK: call swiftcc i64 %1
+// CHECK: br i1 %8, label %typed.error.load, label %10

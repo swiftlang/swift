@@ -4946,5 +4946,7 @@ CanSILFunctionType SILFunction::getLoweredFunctionTypeInContext(
 
 bool SILFunctionConventions::isTypedError() const {
   return !funcTy->getErrorResult()
-      .getInterfaceType()->isExistentialWithError();
+        .getInterfaceType()->isEqual(
+            funcTy->getASTContext().getErrorExistentialType()) ||
+    getNumIndirectSILResults() > 0;
 }
