@@ -257,7 +257,7 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
 
-/// Enable the `@extern` attribute.
+/// Enable the `@_extern` attribute.
 EXPERIMENTAL_FEATURE(Extern, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE

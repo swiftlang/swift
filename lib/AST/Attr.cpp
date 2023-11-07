@@ -1144,7 +1144,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_Extern: {
     auto *Attr = cast<ExternAttr>(this);
-    Printer.printAttrName("@extern");
+    Printer.printAttrName("@_extern");
     Printer << "(";
     switch (Attr->getExternKind()) {
     case ExternKind::C:
@@ -1155,7 +1155,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       break;
     case ExternKind::Wasm:
       Printer << "wasm";
-      // @extern(wasm) always has names.
+      // @_extern(wasm) always has names.
       Printer << ", module: \"" << *Attr->ModuleName << "\"";
       Printer << ", name: \"" << *Attr->Name << "\"";
       break;
@@ -1749,7 +1749,7 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_RawLayout:
     return "_rawLayout";
   case DAK_Extern:
-    return "extern";
+    return "_extern";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

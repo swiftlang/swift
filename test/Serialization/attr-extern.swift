@@ -5,6 +5,6 @@
 
 // BC-CHECK: <Extern_DECL_ATTR
 
-// MODULE-CHECK: @extern(wasm, module: "m0", name: "import1") func import1()
-@extern(wasm, module: "m0", name: "import1")
+// MODULE-CHECK: @_extern(wasm, module: "m0", name: "import1") func import1()
+@_extern(wasm, module: "m0", name: "import1")
 func import1()
