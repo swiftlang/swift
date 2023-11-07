@@ -275,8 +275,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   SourceLoc BeginLoc = Tok.getLoc();
   State->setIDEInspectionDelayedDeclState(
       SourceMgr, L->getBufferID(),
-      IDEInspectionDelayedDeclKind::TopLevelCodeDecl,
-      PD_Default, TLCD, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
+      IDEInspectionDelayedDeclKind::TopLevelCodeDecl, TLCD, {BeginLoc, EndLoc},
+      BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
@@ -376,7 +376,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                           IsFollowingGuard);
         });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
-        consumeDecl(BeginParserPosition, llvm::None, IsTopLevel);
+        consumeDecl(BeginParserPosition, IsTopLevel);
         return IfConfigResult;
       }
       BraceItemsStatus |= IfConfigResult;
@@ -407,11 +407,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       NeedParseErrorRecovery = Status.isErrorOrHasCompletion();
     } else if (isStartOfSwiftDecl()) {
       SmallVector<Decl*, 8> TmpDecls;
-      ParserResult<Decl> DeclResult = 
-          parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
-                    IsAtStartOfLineOrPreviousHadSemi,
-                    /*IfConfigsAreDeclAttrs=*/true,
-                    [&](Decl *D) {
+      ParserResult<Decl> DeclResult =
+          parseDecl(IsAtStartOfLineOrPreviousHadSemi,
+                    /*IfConfigsAreDeclAttrs=*/true, [&](Decl *D) {
                       TmpDecls.push_back(D);
 
                       // Any function after a 'guard' statement is marked as
@@ -428,7 +426,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         NeedParseErrorRecovery = true;
         if (DeclResult.hasCodeCompletion() && IsTopLevel &&
             isIDEInspectionFirstPass()) {
-          consumeDecl(BeginParserPosition, llvm::None, IsTopLevel);
+          consumeDecl(BeginParserPosition, IsTopLevel);
           return DeclResult;
         }
       }
