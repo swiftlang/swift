@@ -502,9 +502,6 @@ struct PrintOptions {
   /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
 
-  /// Whether to print regular comments from clang module headers.
-  bool PrintRegularClangComments = false;
-
   /// When true, printing interface from a source file will print the original
   /// source text for applicable declarations, in order to preserve the
   /// formatting.
@@ -645,7 +642,6 @@ struct PrintOptions {
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDocumentationComments = true;
-    result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
     return result;
