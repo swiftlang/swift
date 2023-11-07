@@ -36,20 +36,18 @@ actor ThreaddyTheDefaultActor {
 @main struct Main {
 
   static func main() async {
-    if #available(SwiftStdlib 5.9, *) {
-      let queue = DispatchQueue(label: "example-queue")
-      let executor = NaiveQueueExecutor(queue)
+    let queue = DispatchQueue(label: "example-queue")
+    let executor = NaiveQueueExecutor(queue)
 
-      let defaultActor = ThreaddyTheDefaultActor()
+    let defaultActor = ThreaddyTheDefaultActor()
 
-      await Task(on: executor) {
-        dispatchPrecondition(condition: .onQueue(executor.queue))
-        await defaultActor.actorIsolated(expectedExecutor: executor)
-      }.value
+    await Task(on: executor) {
+      dispatchPrecondition(condition: .onQueue(executor.queue))
+      await defaultActor.actorIsolated(expectedExecutor: executor)
+    }.value
 
-      await withTaskExecutor(executor) {
-        await defaultActor.actorIsolated(expectedExecutor: executor)
-      }
+    await withTaskExecutor(executor) {
+      await defaultActor.actorIsolated(expectedExecutor: executor)
     }
   }
 }
