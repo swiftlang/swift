@@ -508,6 +508,17 @@ public:
                                           unsigned depth, unsigned index,
                                           llvm::ArrayRef<unsigned> paramCounts);
 
+  /// Gathers all of the written generic parameters needed for
+  /// '_gatherGenericParameters'. This takes a list of key arguments and fills
+  /// in the generic arguments with all generic arguments.
+  ///
+  /// \returns true if the operation succeeded.
+  bool _gatherWrittenGenericParameters(
+      const TypeContextDescriptor *descriptor,
+      llvm::ArrayRef<const void *> keyArgs,
+      llvm::SmallVectorImpl<MetadataOrPack> &genericArgs,
+      Demangle::Demangler &Dem);
+
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for
   /// the caller.
