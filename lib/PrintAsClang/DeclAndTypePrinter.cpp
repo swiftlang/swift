@@ -1414,8 +1414,7 @@ private:
 
     assert(FD->getAttrs().hasAttribute<CDeclAttr>() && "not a cdecl function");
     os << "SWIFT_EXTERN ";
-    printFunctionDeclAsCFunctionDecl(
-        FD, FD->getAttrs().getAttribute<CDeclAttr>()->Name, resultTy);
+    printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     printFunctionClangAttributes(FD, funcTy);
     printAvailability(FD);
     os << ";\n";
@@ -1425,12 +1424,12 @@ private:
     FunctionSwiftABIInformation(AbstractFunctionDecl *FD,
                                 LoweredFunctionSignature signature)
         : signature(signature) {
-      isCDecl = FD->getAttrs().hasAttribute<CDeclAttr>();
+      isCDecl = !FD->getCDeclName().empty();
       if (!isCDecl) {
         auto mangledName = SILDeclRef(FD).mangle();
         symbolName = FD->getASTContext().AllocateCopy(mangledName);
       } else {
-        symbolName = FD->getAttrs().getAttribute<CDeclAttr>()->Name;
+        symbolName = FD->getCDeclName();
       }
     }
 

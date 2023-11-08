@@ -2118,7 +2118,7 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
   case ExposureKind::Cxx: {
     auto *VD = cast<ValueDecl>(D);
     // Expose cannot be mixed with '@_cdecl' declarations.
-    if (VD->getAttrs().hasAttribute<CDeclAttr>())
+    if (!VD->getCDeclName().empty())
       diagnose(attr->getLocation(), diag::expose_only_non_other_attr, "@_cdecl");
 
     // Nested exposed declarations are expected to be inside

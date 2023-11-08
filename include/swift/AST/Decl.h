@@ -2778,6 +2778,10 @@ public:
     return DeclNameRef(Name);
   }
 
+  /// Retrieve the C declaration name that names this function, or empty
+  /// string if it has none.
+  StringRef getCDeclName() const;
+
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
   ///

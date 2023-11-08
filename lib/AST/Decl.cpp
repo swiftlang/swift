@@ -3869,6 +3869,21 @@ void ValueDecl::setInterfaceType(Type type) {
                                         std::move(type));
 }
 
+StringRef ValueDecl::getCDeclName() const {
+  // Treat imported C functions as implicitly @_cdecl.
+  if (auto clangDecl = dyn_cast_or_null<clang::FunctionDecl>(getClangDecl())) {
+    if (clangDecl->getLanguageLinkage() == clang::CLanguageLinkage
+          && clangDecl->getIdentifier())
+      return clangDecl->getName();
+  }
+
+  // Handle explicit cdecl attributes.
+  if (auto *cdecl = getAttrs().getAttribute<CDeclAttr>())
+    return cdecl->Name;
+
+  return "";
+}
+
 llvm::Optional<ObjCSelector>
 ValueDecl::getObjCRuntimeName(bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
