@@ -10,23 +10,9 @@
 import Dispatch
 import StdlibUnittest
 
-protocol CountingExecutor: Executor, Sendable {
-  var enqueueCount: Int { get }
-
-  func expectEnqueues(_ expected: Int)
-}
-
-extension CountingExecutor {
-  func expectEnqueues(_ expected: Int) {
-    precondition(self.enqueueCount == expected, "Expected [\(expected)] enqueues but had [\(enqueueCount)] (difference: \(enqueueCount - expected))")
-  }
-}
-
-final class CountEnqueuesTaskExecutor: TaskExecutor, CountingExecutor, @unchecked Sendable {
-  var enqueueCount = 0
+final class CountEnqueuesTaskExecutor: TaskExecutor, @unchecked Sendable {
 
   func enqueue(_ job: consuming ExecutorJob) {
-    enqueueCount += 1
     print("enqueue job")
   }
 }
