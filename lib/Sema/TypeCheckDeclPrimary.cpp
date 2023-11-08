@@ -2481,6 +2481,15 @@ public:
         }
       }
     }
+
+    // @_staticExclusiveOnly types cannot be put into 'var's, only 'let'.
+    if (auto SD = VD->getInterfaceType()->getStructOrBoundGenericStruct()) {
+      if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+          !VD->isLet()) {
+        VD->diagnose(diag::attr_static_exclusive_only_let_only,
+                     VD->getInterfaceType());
+      }
+    }
   }
 
   bool checkBoundInOutVarDecl(PatternBindingDecl *pbd, unsigned patternIndex,
@@ -4221,6 +4230,16 @@ void TypeChecker::checkParameterList(ParameterList *params,
           param->diagnose(diag::noimplicitcopy_attr_not_allowed_on_moveonlytype)
             .fixItRemove(attr->getRange());
         }
+      }
+    }
+
+    // @_staticExclusiveOnly types cannot be passed as 'inout', only as either
+    // a borrow or as consuming.
+    if (auto SD = param->getInterfaceType()->getStructOrBoundGenericStruct()) {
+      if (SD->getAttrs().hasAttribute<StaticExclusiveOnlyAttr>() &&
+          param->isInOut()) {
+        param->diagnose(diag::attr_static_exclusive_only_let_only_param,
+                        param->getInterfaceType());
       }
     }
   }
