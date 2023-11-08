@@ -95,11 +95,11 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
-  StringRef getFieldName() const {
+  llvm::StringRef getFieldName() const {
     return FieldName.get();
   }
 
@@ -230,7 +230,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -238,7 +238,7 @@ public:
     return Superclass;
   }
 
-  StringRef getSuperclass() const {
+  llvm::StringRef getSuperclass() const {
     return Demangle::makeSymbolicMangledNameStringRef(Superclass.get());
   }
 };
@@ -250,11 +250,11 @@ public:
   const RelativeDirectPointer<const char> Name;
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
-  StringRef getName() const {
+  llvm::StringRef getName() const {
     return Name.get();
   }
 
-  StringRef getMangledSubstitutedTypeName() const {
+  llvm::StringRef getMangledSubstitutedTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                     SubstitutedTypeName.get());
   }
@@ -332,11 +332,11 @@ public:
     return const_iterator { End, End };
   }
 
-  StringRef getMangledProtocolTypeName() const {
+  llvm::StringRef getMangledProtocolTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ProtocolTypeName.get());
   }
 
-  StringRef getMangledConformingTypeName() const {
+  llvm::StringRef getMangledConformingTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(ConformingTypeName.get());
   }
 };
@@ -369,7 +369,7 @@ public:
     return TypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
   }
 };
@@ -489,7 +489,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 };
@@ -535,7 +535,7 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName() const {
+  llvm::StringRef getMangledTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
@@ -543,7 +543,7 @@ public:
     return MangledMetadataSource;
   }
 
-  StringRef getMangledMetadataSource() const {
+  llvm::StringRef getMangledMetadataSource() const {
     return Demangle::makeSymbolicMangledNameStringRef(
                                                    MangledMetadataSource.get());
   }
