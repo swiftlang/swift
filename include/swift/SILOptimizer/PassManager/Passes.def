@@ -369,6 +369,8 @@ PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 PASS(TransferNonSendable, "transfer-non-sendable",
      "Checks calls that send non-sendable values between isolation domains")
+PASS(LowerTupleAddrConstructor, "lower-tuple-addr-constructor",
+     "Lower tuple addr constructor to tuple_element_addr+copy_addr")
 PASS(SILGenCleanup, "silgen-cleanup",
      "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",

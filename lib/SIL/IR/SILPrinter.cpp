@@ -2215,7 +2215,25 @@ public:
       *this << ')';
     }
   }
-  
+
+  void visitTupleAddrConstructorInst(TupleAddrConstructorInst *TI) {
+    // First print out our dest.
+    if (TI->isInitializationOfDest()) {
+      *this << "[init] ";
+    } else {
+      *this << "[assign] ";
+    }
+    *this << getIDAndType(TI->getDest());
+
+    *this << " with (";
+
+    llvm::interleave(
+        TI->getElements(), [&](const SILValue &V) { *this << getIDAndType(V); },
+        [&] { *this << ", "; });
+
+    *this << ')';
+  }
+
   void visitEnumInst(EnumInst *UI) {
     *this << UI->getType() << ", "
           << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);

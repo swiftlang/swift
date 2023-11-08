@@ -2529,6 +2529,30 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return;
   }
 
+  if (auto *TACI = dyn_cast<TupleAddrConstructorInst>(Inst)) {
+    assert(!TACI->isInitializationOfDest() &&
+           "should not modify copy_addr that already knows it is initialized");
+    TACI->setIsInitializationOfDest(InitKind);
+    if (InitKind == IsInitialization)
+      setStaticInitAccess(TACI->getDest());
+
+    // If we had an initialization and had an assignable_but_not_consumable
+    // noncopyable type, convert it to be an initable_but_not_consumable so that
+    // we do not consume an uninitialized value.
+    if (InitKind == IsInitialization) {
+      if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
+              stripAccessMarkers(TACI->getDest()))) {
+        if (mmci->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
+                                        CheckKind::AssignableButNotConsumable) {
+          mmci->setCheckKind(MarkUnresolvedNonCopyableValueInst::CheckKind::
+                                 InitableButNotConsumable);
+        }
+      }
+    }
+
+    return;
+  }
+
   // Ignore non-stores for SelfInits.
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }

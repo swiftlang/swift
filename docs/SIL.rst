@@ -4799,6 +4799,71 @@ eliminated. However, a memory location ``%a`` must not be accessed
 after ``destroy_addr %a`` (which has not yet been eliminated)
 regardless of its type.
 
+tuple_addr_constructor
+``````````````````````
+
+::
+
+   sil-instruction ::= 'tuple_addr_constructor' sil-tuple-addr-constructor-init sil-operand 'with' sil-tuple-addr-constructor-elements
+   sil-tuple-addr-constructor-init ::= init|assign
+   sil-tuple-addr-constructor-elements ::= '(' (sil-operand (',' sil-operand)*)? ')'
+
+   // %destAddr has the type $*(Type1, Type2, Type3). Note how we convert all of the types
+   // to their address form.
+   %1 = tuple_addr_constructor [init] %destAddr : $*(Type1, Type2, Type3) with (%a : $Type1, %b : $*Type2, %c : $Type3)
+
+Creates a new tuple in memory from an exploded list of object and address
+values. The SSA values form the leaf elements of the exploded tuple. So for a
+simple tuple that only has top level tuple elements, then the instruction lowers
+as follows::
+
+  %1 = tuple_addr_constructor [init] %destAddr : $*(Type1, Type2, Type3) with (%a : $Type1, %b : $*Type2, %c : $Type3)
+  
+  -->
+  
+  %0 = tuple_element_addr %destAddr : $*(Type1, Type2, Type3), 0
+  store %a to [init] %0 : $*Type1
+  %1 = tuple_element_addr %destAddr : $*(Type1, Type2, Type3), 1
+  copy_addr %b to [init] %1 : $*Type2
+  %2 = tuple_element_addr %destAddr : $*(Type1, Type2, Type3), 2
+  store %2 to [init] %2 : $*Type3
+
+A ``tuple_addr_constructor`` is lowered similarly with each store/copy_addr
+being changed to their dest assign form.
+
+In contrast, if we have a more complicated form of tuple with sub-tuples, then
+we read one element from the list as we process the tuple recursively from left
+to right. So for instance we would lower as follows a more complicated tuple::
+
+  %1 = tuple_addr_constructor [init] %destAddr : $*((), (Type1, ((), Type2)), Type3) with (%a : $Type1, %b : $*Type2, %c : $Type3)
+
+  ->
+
+  %0 = tuple_element_addr %destAddr : $*((), (Type1, ((), Type2)), Type3), 1
+  %1 = tuple_element_addr %0 : $*(Type1, ((), Type2)), 0
+  store %a to [init] %1 : $*Type1
+  %2 = tuple_element_addr %0 : $*(Type1, ((), Type2)), 1
+  %3 = tuple_element_addr %2 : $*((), Type2), 1
+  copy_addr %b to [init] %3 : $*Type2
+  %4 = tuple_element_addr %destAddr : $*((), (Type1, ((), Type2)), Type3), 2
+  store %c to [init] %4 : $*Type3
+
+This instruction exists to enable for SILGen to init and assign RValues into
+tuples with a single instruction. Since an RValue is a potentially exploded
+tuple, we are forced to use our representation here. If SILGen instead just uses
+separate address projections and stores when it sees such an aggregate,
+diagnostic SIL passes can not tell the difference semantically in between
+initializing a tuple in parts or at once::
+
+  var arg = (Type1(), Type2())
+  
+  // This looks the same at the SIL level...
+  arg = (a, b)
+  
+  // to assigning in pieces even though we have formed a new tuple.
+  arg.0 = a
+  arg.1 = a
+
 index_addr
 ``````````
 ::

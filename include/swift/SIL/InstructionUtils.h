@@ -205,6 +205,23 @@ private:
 /// polymorphic builtin or does not have any available overload for these types,
 /// return SILValue().
 SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
+
+/// Visit the exploded leaf elements of a tuple type that contains potentially
+/// a tree of tuples.
+///
+/// If visitor returns false, we stop processing early. We return true if we
+/// visited all of the tuple elements without the visitor returing false.
+bool visitExplodedTupleType(SILType type,
+                            llvm::function_ref<bool(SILType)> callback);
+
+/// Visit the exploded leaf elements of a tuple type that contains potentially
+/// a tree of tuples.
+///
+/// If visitor returns false, we stop processing early. We return true if we
+/// visited all of the tuple elements without the visitor returing false.
+bool visitExplodedTupleValue(SILValue value,
+                             llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
 } // end namespace swift
 
 #endif

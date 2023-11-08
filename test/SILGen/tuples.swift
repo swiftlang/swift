@@ -57,10 +57,7 @@ func testShuffleOpaque() {
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples7make_xySi1x_AA1P_p1ytyF
   // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[TMP]])
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: any P, x: Int)
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 0
-  // CHECK-NEXT: copy_addr [take] [[TMP]] to [[PAIR_0]]
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 1
-  // CHECK-NEXT: assign [[T1]] to [[PAIR_1]]
+  // CHECK-NEXT: tuple_addr_constructor [assign] [[WRITE]] : $*(y: any P, x: Int) with ([[TMP]] : $*any P, [[T1]] : $Int)
   // CHECK-NEXT: end_access [[WRITE]] : $*(y: any P, x: Int)
   // CHECK-NEXT: dealloc_stack [[TMP]]
   pair = make_xy()
@@ -110,10 +107,7 @@ func testShuffleTuple() {
   // CHECK-NEXT: [[T0:%.*]] = function_ref @$s6tuples6make_pAA1P_pyF 
   // CHECK-NEXT: apply [[T0]]([[TEMP]])
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBPAIR]] : $*(y: any P, x: Int)
-  // CHECK-NEXT: [[PAIR_0:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 0
-  // CHECK-NEXT: copy_addr [take] [[TEMP]] to [[PAIR_0]]
-  // CHECK-NEXT: [[PAIR_1:%.*]] = tuple_element_addr [[WRITE]] : $*(y: any P, x: Int), 1
-  // CHECK-NEXT: assign [[INT]] to [[PAIR_1]]
+  // CHECK-NEXT: tuple_addr_constructor [assign] [[WRITE]] : $*(y: any P, x: Int) with ([[TEMP]] : $*any P, [[INT]] : $Int)
   // CHECK-NEXT: end_access [[WRITE]] : $*(y: any P, x: Int)
   // CHECK-NEXT: dealloc_stack [[TEMP]]
   pair = (x: make_int(), y: make_p())

@@ -558,36 +558,33 @@ void RValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, SGF);
 }
 
-static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
-                            CanType type, ArrayRef<ManagedValue> &srcValues,
-                            SILValue destAddr) {
-  // Recurse into tuples.
-  auto srcTupleType = dyn_cast<TupleType>(type);
-  if (srcTupleType && !srcTupleType.containsPackExpansionType()) {
-    assert(destAddr->getType().castTo<TupleType>()->getNumElements()
-             == srcTupleType->getNumElements());
-    for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
-      auto eltDestAddr = SGF.B.createTupleElementAddr(loc, destAddr, eltIndex);
-      assignRecursive(SGF, loc, srcTupleType.getElementType(eltIndex),
-                      srcValues, eltDestAddr);
-    }
-    return;
-  }
-
-  // Otherwise, pull the front value off the list.
-  auto srcValue = srcValues.front();
-  srcValues = srcValues.slice(1);
-
-  srcValue.assignInto(SGF, loc, destAddr);
-}
-
 void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         SILValue destAddr) && {
   assert(isComplete() && "rvalue is not complete");
   assert(isPlusOneOrTrivial(SGF) && "Can not assign borrowed RValues");
-  ArrayRef<ManagedValue> srcValues = values;
-  assignRecursive(SGF, loc, type, srcValues, destAddr);
-  assert(srcValues.empty() && "didn't claim all elements!");
+  ArrayRef<ManagedValue> srcMvValues = values;
+
+  SWIFT_DEFER { assert(srcMvValues.empty() && "didn't claim all elements!"); };
+
+  // If we do not have a tuple, just bail early.
+  auto srcTupleType = dyn_cast<TupleType>(type);
+  if (!srcTupleType || srcTupleType.containsPackExpansionType()) {
+    // Otherwise, pull the front value off the list.
+    auto srcValue = srcMvValues.front();
+    srcMvValues = srcMvValues.slice(1);
+    srcValue.assignInto(SGF, loc, destAddr);
+    return;
+  }
+
+  assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
+         srcTupleType->getNumElements());
+
+  // If we do have any srcMvValues, then emit a TupleAddrConstructor. If we do
+  // not have any, then our tuple must consist only of empty tuples.
+  if (srcMvValues.size())
+    SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+                                     IsNotInitialization);
+  srcMvValues = ArrayRef<ManagedValue>();
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {

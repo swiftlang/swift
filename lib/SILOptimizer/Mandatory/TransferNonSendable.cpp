@@ -21,6 +21,7 @@
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -859,9 +860,14 @@ public:
            "srcID and dstID are different?!");
   }
 
-  void translateSILAssign(SILValue dest, SILValue src) {
-    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest),
-                                   TinyPtrVector<SILValue>(src));
+  template <typename Collection>
+  void translateSILAssign(SILValue dest, Collection collection) {
+    return translateSILMultiAssign(TinyPtrVector<SILValue>(dest), collection);
+  }
+
+  template <>
+  void translateSILAssign<SILValue>(SILValue dest, SILValue src) {
+    return translateSILAssign(dest, TinyPtrVector<SILValue>(src));
   }
 
   void translateSILAssign(SILInstruction *inst) {
@@ -876,13 +882,22 @@ public:
                                    TinyPtrVector<SILValue>());
   }
 
-  void translateSILMerge(SILValue dest, SILValue src) {
+  template <typename Collection>
+  void translateSILMerge(SILValue dest, Collection collection) {
     auto trackableDest = tryToTrackValue(dest);
-    auto trackableSrc = tryToTrackValue(src);
-    if (!trackableDest || !trackableSrc)
+    if (!trackableDest)
       return;
-    builder.addMerge(trackableDest->getRepresentative(),
-                     trackableSrc->getRepresentative());
+    for (SILValue elt : collection) {
+      if (auto trackableSrc = tryToTrackValue(elt)) {
+        builder.addMerge(trackableDest->getRepresentative(),
+                         trackableSrc->getRepresentative());
+      }
+    }
+  }
+
+  template <>
+  void translateSILMerge<SILValue>(SILValue dest, SILValue src) {
+    return translateSILMerge(dest, TinyPtrVector<SILValue>(src));
   }
 
   /// If tgt is known to be unaliased (computed thropugh a combination of
@@ -908,6 +923,30 @@ public:
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(dest, src);
+    }
+
+    // Stores to storage of non-Sendable type can be ignored.
+  }
+
+  void translateSILTupleAddrConstructor(TupleAddrConstructorInst *inst) {
+    SILValue dest = inst->getDest();
+    if (auto nonSendableTgt = tryToTrackValue(dest)) {
+      // In the following situations, we can perform an assign:
+      //
+      // 1. A store to unaliased storage.
+      // 2. A store that is to an entire value.
+      //
+      // DISCUSSION: If we have case 2, we need to merge the regions since we
+      // are not overwriting the entire region of the value. This does mean that
+      // we artificially include the previous region that was stored
+      // specifically in this projection... but that is better than
+      // miscompiling. For memory like this, we probably need to track it on a
+      // per field basis to allow for us to assign.
+      if (nonSendableTgt.value().isNoAlias() && !isProjectedFromAggregate(dest))
+        return translateSILAssign(dest, inst->getElements());
+
+      // Stores to possibly aliased storage must be treated as merges.
+      return translateSILMerge(dest, inst->getElements());
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -1088,6 +1127,10 @@ public:
     case SILInstructionKind::StoreBorrowInst:
     case SILInstructionKind::StoreWeakInst:
       return translateSILStore(inst->getOperand(1), inst->getOperand(0));
+
+    case SILInstructionKind::TupleAddrConstructorInst:
+      return translateSILTupleAddrConstructor(
+          cast<TupleAddrConstructorInst>(inst));
 
     // Applies are handled specially since we need to merge their results.
     case SILInstructionKind::ApplyInst:
