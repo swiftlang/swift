@@ -936,6 +936,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
           task, parent);
   fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, task executor identity: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
           task, taskExecutor.getIdentity());
+  fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, is async let == %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          task, asyncLet);
 
   // Initialize the child fragment if applicable.
   if (parent) {
@@ -1010,6 +1012,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   initialContext->Parent = nullptr;
 
   // FIXME: add discarding flag
+  // FIXME: add task executor
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
@@ -1058,6 +1061,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
+    fprintf(stderr, "[%s:%d](%s) DONE TASK INIT; ENQUEUE JOB %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
     assert(false && "Should not be enqueuing tasks in task-to-thread model");
 #endif
@@ -1065,6 +1069,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     task->flagAsAndEnqueueOnExecutor(serialExecutor); // FIXME: pass the task executor explicitly?
   }
 
+  fprintf(stderr, "[%s:%d](%s) DONE TASK INIT; RETURN %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
   return {task, initialContext};
 }
 
