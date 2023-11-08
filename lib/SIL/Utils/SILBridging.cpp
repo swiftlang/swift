@@ -40,6 +40,10 @@ SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 }
 
+bool swiftModulesInitialized() {
+  return nodeMetatypesInitialized;
+}
+
 // Does return null if initializeSwiftModules() is never called.
 SwiftMetatype SILNode::getSILNodeMetatype(SILNodeKind kind) {
   SwiftMetatype metatype = nodeMetatypes[(unsigned)kind];

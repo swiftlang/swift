@@ -31,6 +31,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -3226,14 +3227,12 @@ bool swift::conflicting(const OverloadSignature& sig1,
   // versions, as that is what the async overloading aimed to address.
   //
   // Note also, that overloading on throws is already illegal anyway.
-  if (sig1.IsDistributed || sig2.IsDistributed) {
-    if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
-      return true;
-  } else {
-    // Otherwise one is an async function and the other is not, they don't conflict.
+  if (!sig1.IsDistributed && !sig2.IsDistributed) {
+    // For non-distributed functions,
+    // if one is an async function and the other is not, they don't conflict.
     if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
       return false;
-  }
+  } // else, if any of the methods was distributed, continue checking
 
   // If one is a macro and the other is not, they can't conflict.
   if (sig1.IsMacro != sig2.IsMacro)
@@ -4876,12 +4875,16 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
-bool TypeDecl::isNoncopyable() const {
-  // NOTE: must answer true iff it is unconditionally noncopyable.
-  return evaluateOrDefault(getASTContext().evaluator,
-                           HasNoncopyableAnnotationRequest{
-                               const_cast<TypeDecl *>(this)},
-                           true); // default to true for safety
+InverseMarking TypeDecl::getNoncopyableMarking() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      NoncopyableAnnotationRequest{const_cast<TypeDecl *>(this)},
+      InverseMarking::forInverse(InverseMarking::Kind::None)
+  );
+}
+
+bool TypeDecl::canBeNoncopyable() const {
+  return getNoncopyableMarking().getInverse().isPresent();
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {

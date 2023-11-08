@@ -1952,7 +1952,6 @@ bool swift::diagnoseApplyArgSendability(ApplyExpr *apply, const DeclContext *dec
             isolationCrossing.value().getDiagnoseIsolation()))
       return true;
   }
-
   auto fnType = fnExprType->getAs<FunctionType>();
   if (!fnType)
     return false;
@@ -5527,6 +5526,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
   // Apply unsafe concurrency features to the given function type.
   bool strictChecking = contextRequiresStrictConcurrencyChecking(
       dc, getType, isolatedByPreconcurrency);
+
   fnType = applyUnsafeConcurrencyToFunctionType(
       fnType, decl, strictChecking, numApplies, isMainDispatchQueue);
 

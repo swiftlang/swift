@@ -242,6 +242,12 @@ class CG2<T, U> {
   }
 }
 
+struct ReallyLongGeneric<T, U, V, W> {}
+
+extension ReallyLongGeneric where T == U, U == V.Element, V == W, W: Collection {
+  struct Nested {}
+}
+
 DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(EG<Int, String>.NestedSG<Double>.self,
     _typeByName("4main2EGO8NestedSGVySiSS_SdG")!)
@@ -252,6 +258,10 @@ DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(
     CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
     _typeByName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
+  expectEqual(
+    ReallyLongGeneric<Int, Int, [Int], [Int]>.Nested.self,
+    _typeByName("4main17ReallyLongGenericVAAE6NestedVyS2iSaySiGAF_G")!
+  )
 }
 
 DemangleToMetadataTests.test("demangle built-in types") {

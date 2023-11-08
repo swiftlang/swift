@@ -1612,7 +1612,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
 void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
                                           DestructorDecl *dd) {
-  assert(cd->isNoncopyable());
+  assert(cd->canBeNoncopyable());
 
   emitAbstractFuncDecl(dd);
 

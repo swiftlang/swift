@@ -116,3 +116,72 @@ bb0:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_assign : $@convention(thin) (@in Builtin.NativeObject, @in (Builtin.NativeObject, Builtin.NativeObject)) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*Builtin.NativeObject,
+// CHECK: [[RHS:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [assign] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $*Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_assign'
+sil [ossa] @tuple_addr_constructor_assign : $@convention(thin) (@in Builtin.NativeObject, @in (Builtin.NativeObject, Builtin.NativeObject)) -> () {
+bb0(%0 : $*Builtin.NativeObject, %0a : $*(Builtin.NativeObject, Builtin.NativeObject)):
+  %1 = alloc_stack $Builtin.NativeObject
+  copy_addr %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  copy_addr [take] %0a to [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [assign] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_differing_category : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*Builtin.NativeObject, [[RHS:%.*]] : @owned $Builtin.NativeObject)
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [init] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_differing_category'
+sil [ossa] @tuple_addr_constructor_differing_category : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_init : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[LHS:%.*]] : $*
+// CHECK: [[RHS:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: [[DEST:%.*]] = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+// CHECK: tuple_addr_constructor [init] [[DEST]] : $*(Builtin.NativeObject, Builtin.NativeObject) with ([[LHS]] : $*Builtin.NativeObject, [[RHS]] : $*Builtin.NativeObject)
+// CHECK: } // end sil function 'tuple_addr_constructor_init'
+sil [ossa] @tuple_addr_constructor_init : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  copy_addr %0 to [init] %1 : $*Builtin.NativeObject
+  %2 = alloc_stack $(Builtin.NativeObject, Builtin.NativeObject)
+  tuple_addr_constructor [init] %2 : $*(Builtin.NativeObject, Builtin.NativeObject) with (%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject)
+  destroy_addr %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %2 : $*(Builtin.NativeObject, Builtin.NativeObject)
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_unfriendly_tuple : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*((), (Builtin.NativeObject, Builtin.NativeObject)) with
+sil [ossa] @tuple_addr_constructor_unfriendly_tuple : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = alloc_stack $((), (Builtin.NativeObject, Builtin.NativeObject))
+  tuple_addr_constructor [init] %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject)) with (%0 : $*Builtin.NativeObject, %1 : $Builtin.NativeObject)
+  destroy_addr %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject))
+  dealloc_stack %2 : $*((), (Builtin.NativeObject, Builtin.NativeObject))
+  %9999 = tuple ()
+  return %9999 : $()
+}

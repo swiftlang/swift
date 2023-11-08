@@ -227,7 +227,7 @@ bool swift::rewriting::diagnoseRequirementErrors(
       case RequirementKind::Conformance:
         ctx.Diags.diagnose(loc, diag::redundant_conformance_constraint,
                            requirement.getFirstType(),
-                           requirement.getProtocolDecl());
+                           requirement.getSecondType());
         break;
       case RequirementKind::Superclass:
         ctx.Diags.diagnose(loc, diag::redundant_superclass_constraint,

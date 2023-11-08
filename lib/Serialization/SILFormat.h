@@ -134,6 +134,7 @@ namespace sil_block {
     SIL_ONE_TYPE_ONE_OPERAND,
     SIL_ONE_TYPE_VALUES,
     SIL_ONE_TYPE_OWNERSHIP_VALUES,
+    SIL_ONE_TYPE_VALUES_CATEGORIES,
     SIL_TWO_OPERANDS,
     SIL_TAIL_ADDR,
     SIL_INST_APPLY,
@@ -382,10 +383,10 @@ namespace sil_block {
   // SIL instructions with one type and a list of values.
   using SILOneTypeValuesLayout = BCRecordLayout<
     SIL_ONE_TYPE_VALUES,
-    SILInstOpCodeField,
-    TypeIDField,
-    SILTypeCategoryField,
-    BCArray<ValueIDField>
+    SILInstOpCodeField,      // opcode
+    TypeIDField,             // destType
+    SILTypeCategoryField,    // destCategory
+    BCArray<ValueIDField>    // operand ids
   >;
 
   // SIL instructions with one type, forwarding ownership, and a list of values.
@@ -397,6 +398,15 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     BCArray<ValueIDField>>;
+
+  using SILOneTypeValuesCategoriesLayout = BCRecordLayout<
+    SIL_ONE_TYPE_VALUES_CATEGORIES,
+    SILInstOpCodeField,           // opcode
+    TypeIDField,                  // destType
+    SILTypeCategoryField,         // destCategory
+    BCFixed<1>,                   // options
+    BCArray<BCFixed<32>>          // operand id and categories.
+  >;
 
   enum ApplyKind : unsigned {
     SIL_APPLY = 0,

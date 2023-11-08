@@ -907,12 +907,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       assert(OpType.isObject());
       Args.push_back(S.addTypeRef(OpType.getRawASTType()));
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       (unsigned)SI.getKind(),
-                                       S.addTypeRef(
-                                         OI->getType().getRawASTType()),
-                                       (unsigned)OI->getType().getCategory(),
-                                       Args);
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(),
+        S.addTypeRef(OI->getType().getRawASTType()),
+        (unsigned)OI->getType().getCategory(), Args);
     break;
   }
 
@@ -1081,12 +1079,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       assert(OpType.isObject());
       Args.push_back(S.addTypeRef(OpType.getRawASTType()));
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                       (unsigned)SI.getKind(),
-                                       S.addTypeRef(
-                                         ARI->getType().getRawASTType()),
-                                       (unsigned)ARI->getType().getCategory(),
-                                       Args);
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(),
+        S.addTypeRef(ARI->getType().getRawASTType()),
+        (unsigned)ARI->getType().getCategory(), Args);
     break;
   }
   case SILInstructionKind::AllocStackInst: {
@@ -1283,10 +1279,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(addValueRef(Elt));
     }
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
-        (unsigned)SI.getKind(),
-        BasicBlockMap[BrI->getDestBB()], 0, ListOfValues);
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), BasicBlockMap[BrI->getDestBB()], 0,
+        ListOfValues);
     break;
   }
   case SILInstructionKind::CondBranchInst: {
@@ -1312,12 +1308,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(addValueRef(Elt));
     }
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
         S.addTypeRef(CBI->getCondition()->getType().getRawASTType()),
-        (unsigned)CBI->getCondition()->getType().getCategory(),
-        ListOfValues);
+        (unsigned)CBI->getCondition()->getType().getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::AwaitAsyncContinuationInst: {
@@ -1332,12 +1327,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (auto errorBB = AACI->getErrorBB()) {
       ListOfValues.push_back(BasicBlockMap[errorBB]);
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-       SILAbbrCodes[SILOneTypeValuesLayout::Code],
-       (unsigned)SI.getKind(),
-       S.addTypeRef(AACI->getOperand()->getType().getRawASTType()),
-       (unsigned)AACI->getOperand()->getType().getCategory(),
-       ListOfValues);
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(AACI->getOperand()->getType().getRawASTType()),
+        (unsigned)AACI->getOperand()->getType().getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::SwitchEnumInst:
@@ -1435,12 +1429,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(addValueRef(value));
       ListOfValues.push_back(BasicBlockMap[dest]);
     }
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
         S.addTypeRef(SII->getOperand()->getType().getRawASTType()),
-        (unsigned)SII->getOperand()->getType().getCategory(),
-        ListOfValues);
+        (unsigned)SII->getOperand()->getType().getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::UnownedCopyValueInst:
@@ -1574,8 +1567,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     args.push_back(BasicBlockMap[YI->getResumeBB()]);
     args.push_back(BasicBlockMap[YI->getUnwindBB()]);
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)YI->getKind(), 0, 0, args);
     break;
   }
@@ -1823,8 +1816,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(addValueRef(Elt));
     }
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(), 0, 0, ListOfValues);
     break;
   }
@@ -1983,11 +1976,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       S.addTypeRef(CI->getTargetFormalType())
     };
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
-             (unsigned)CI->getTargetLoweredType().getCategory(),
-             llvm::makeArrayRef(listOfValues));
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
+        (unsigned)CI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
@@ -2000,11 +1994,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
-             (unsigned)CI->getTargetLoweredType().getCategory(),
-             llvm::makeArrayRef(listOfValues));
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
+        (unsigned)CI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
@@ -2017,11 +2012,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
-             (unsigned)CI->getTargetLoweredType().getCategory(),
-             llvm::makeArrayRef(listOfValues));
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(CI->getTargetLoweredType().getRawASTType()),
+        (unsigned)CI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
 
@@ -2200,13 +2196,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(addValueRef(indexOperand));
 
     SILOneTypeValuesLayout::emitRecord(
-      Out,
-      ScratchRecord,
-      SILAbbrCodes[SILOneTypeValuesLayout::Code],
-      (unsigned)SI.getKind(),
-      S.addTypeRef(boundType.getRawASTType()),
-      (unsigned)boundType.getCategory(),
-      ListOfValues);
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(boundType.getRawASTType()),
+        (unsigned)boundType.getCategory(), ListOfValues);
     break;
   }
   case SILInstructionKind::RebindMemoryInst: {
@@ -2294,10 +2286,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(addValueRef(Elt));
     }
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code],
-        (unsigned)SI.getKind(),
-        S.addTypeRef(StrI->getType().getRawASTType()),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(StrI->getType().getRawASTType()),
         (unsigned)StrI->getType().getCategory(), ListOfValues);
     break;
   }
@@ -2337,11 +2328,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
 
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
-        (unsigned)SI.getKind(),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(),
         S.addTypeRef(TI->getType().getRawASTType()),
-        (unsigned)TI->getType().getCategory(),
-        ListOfValues);
+        (unsigned)TI->getType().getCategory(), ListOfValues);
+    break;
+  }
+  case SILInstructionKind::TupleAddrConstructorInst: {
+    // Format: a type followed by a list of values. A value is expressed by
+    // 2 IDs: ValueID, ValueResultNumber.
+    const auto *TI = cast<TupleAddrConstructorInst>(&SI);
+    SmallVector<uint64_t, 4> ListOfValues;
+    auto getValue = [&](SILValue value) -> uint64_t {
+      uint32_t result = addValueRef(value);
+      // Set the top bit if we are an address.
+      result |= value->getType().isObject() ? 0 : 0x80000000;
+      return result;
+    };
+    ListOfValues.push_back(getValue(TI->getDest()));
+    for (auto Elt : TI->getElements()) {
+      ListOfValues.push_back(getValue(Elt));
+    }
+    unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesCategoriesLayout::Code];
+    unsigned options = 0;
+    options |= bool(TI->isInitializationOfDest());
+    SILOneTypeValuesCategoriesLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(),
+        S.addTypeRef(TI->getDest()->getType().getRawASTType()),
+        (unsigned)SILValueCategory::Address, options, ListOfValues);
     break;
   }
   case SILInstructionKind::EnumInst: {
@@ -2396,9 +2410,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SmallVector<uint64_t, 9> ListOfValues;
     handleMethodInst(CMI, CMI->getOperand(), ListOfValues);
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getRawASTType()),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
@@ -2411,9 +2425,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SmallVector<uint64_t, 9> ListOfValues;
     handleMethodInst(SMI, SMI->getOperand(), ListOfValues);
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getRawASTType()),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
@@ -2426,9 +2440,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SmallVector<uint64_t, 9> ListOfValues;
     handleMethodInst(OMI, OMI->getOperand(), ListOfValues);
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getRawASTType()),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
@@ -2441,9 +2455,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SmallVector<uint64_t, 9> ListOfValues;
     handleMethodInst(SMI, SMI->getOperand(), ListOfValues);
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-        S.addTypeRef(Ty.getRawASTType()),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(Ty.getRawASTType()),
         (unsigned)Ty.getCategory(), ListOfValues);
     break;
   }
@@ -2457,8 +2471,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(BasicBlockMap[DMB->getHasMethodBB()]);
     ListOfValues.push_back(BasicBlockMap[DMB->getNoMethodBB()]);
 
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
         S.addTypeRef(DMB->getOperand()->getType().getRawASTType()),
         (unsigned)DMB->getOperand()->getType().getCategory(), ListOfValues);
     break;
@@ -2498,11 +2513,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       BasicBlockMap[CBI->getSuccessBB()],
       BasicBlockMap[CBI->getFailureBB()]
     };
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
-             (unsigned)CBI->getTargetLoweredType().getCategory(),
-             llvm::makeArrayRef(listOfValues));
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(),
+        S.addTypeRef(CBI->getTargetLoweredType().getRawASTType()),
+        (unsigned)CBI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::InitBlockStorageHeaderInst: {
@@ -2518,12 +2534,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getRawASTType()));
     // Always a value, don't need to save category
     ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions()));
-    
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(IBSHI->getType().getRawASTType()),
-             (unsigned)IBSHI->getType().getCategory(),
-             ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(IBSHI->getType().getRawASTType()),
+        (unsigned)IBSHI->getType().getCategory(), ListOfValues);
 
     break;
   }
@@ -2561,12 +2576,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back(S.addTypeRef(value->getType().getRawASTType()));
       ListOfValues.push_back((unsigned)value->getType().getCategory());
     }
-    
-    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
-         SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-         S.addTypeRef(KPI->getType().getRawASTType()),
-         (unsigned)KPI->getType().getCategory(),
-         ListOfValues);
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(KPI->getType().getRawASTType()),
+        (unsigned)KPI->getType().getCategory(), ListOfValues);
 
     break;
   }
@@ -3100,6 +3114,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILOneTypeOwnershipValuesLayout>();
+  registerSILAbbr<SILOneTypeValuesCategoriesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
   registerSILAbbr<SILTwoOperandsExtraAttributeLayout>();
   registerSILAbbr<SILTailAddrLayout>();

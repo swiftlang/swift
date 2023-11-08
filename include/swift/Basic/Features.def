@@ -243,7 +243,6 @@ EXPERIMENTAL_FEATURE(RawLayout, true)
 /// Enables the "embedded" swift mode (no runtime).
 EXPERIMENTAL_FEATURE(Embedded, true)
 
-
 /// Enables noncopyable generics
 EXPERIMENTAL_FEATURE(NoncopyableGenerics, false)
 
@@ -257,8 +256,12 @@ EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 /// lifetime-dependent results.
 EXPERIMENTAL_FEATURE(NonEscapableTypes, false)
 
-/// Enable the `@extern` attribute.
+/// Enable the `@_extern` attribute.
 EXPERIMENTAL_FEATURE(Extern, true)
+
+// Infer Sendability of unapplied and partial applied methods,
+// global functions and key paths.
+EXPERIMENTAL_FEATURE(InferSendableFromCaptures, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

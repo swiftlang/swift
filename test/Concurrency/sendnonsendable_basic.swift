@@ -596,24 +596,24 @@ func multipleFieldTupleMergeTest2() async {
   var box = (NonSendableKlass(), NonSendableKlass())
 
   // This transfers the entire region.
-  await transferToMain(box.0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
+  await transferToMain(box.0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   let box2 = (NonSendableKlass(), NonSendableKlass())
   // But if we assign over box completely, we can use it again.
-  box = box2 // expected-tns-note {{access here could race}}
+  box = box2
 
-  useValue(box.0) // expected-tns-note {{access here could race}}
-  useValue(box.1) // expected-tns-note {{access here could race}}
-  useValue(box) // expected-tns-note {{access here could race}}
+  useValue(box.0)
+  useValue(box.1)
+  useValue(box)
 
-  await transferToMain(box.1) // expected-tns-note {{access here could race}}
+  await transferToMain(box.1)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   // But if we assign over box completely, we can use it again.
-  box = (NonSendableKlass(), NonSendableKlass()) // expected-tns-note {{access here could race}}
+  box = (NonSendableKlass(), NonSendableKlass())
 
-  useValue(box.0) // expected-tns-note {{access here could race}}
-  useValue(box.1) // expected-tns-note {{access here could race}}
-  useValue(box) // expected-tns-note {{access here could race}}
+  useValue(box.0)
+  useValue(box.1)
+  useValue(box)
 }

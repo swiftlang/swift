@@ -823,8 +823,19 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
       return true;
     }
 
+    auto currentDefaults = defaults[subject];
+    auto inverseKind = inverse->getInverseKind();
+
+    // Check if this inverse is redundant.
+    if (!currentDefaults.contains(inverseKind)) {
+      errors.push_back(
+          RequirementError::forRedundantRequirement(req, structReq.loc));
+      return true;
+    }
+
     // Apply the inverse to the subject's defaults.
-    defaults[subject].remove(inverse->getInverseKind());
+    currentDefaults.remove(inverseKind);
+    defaults[subject] = currentDefaults;
 
     // Remove this inverse conformance requirement.
     return true;

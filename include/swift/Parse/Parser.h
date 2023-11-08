@@ -953,13 +953,11 @@ public:
   /// Options that control the parsing of declarations.
   using ParseDeclOptions = OptionSet<ParseDeclFlags>;
 
-  void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
-                   bool IsTopLevel);
+  void consumeDecl(ParserPosition BeginParserPosition, bool IsTopLevel);
 
-  ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
-                               bool IsAtStartOfLineOrPreviousHadSemi,
+  ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl*)> Handler);
+                               llvm::function_ref<void(Decl *)> Handler);
 
   std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1095,7 +1093,7 @@ public:
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
 
-  /// Parse the @extern attribute.
+  /// Parse the @_extern attribute.
   bool parseExternAttribute(DeclAttributes &Attributes, bool &DiscardAttribute,
                             StringRef AttrName, SourceLoc AtLoc, SourceLoc Loc);
 
@@ -1235,11 +1233,9 @@ public:
                                 bool allowAnyObject,
                                 SourceLoc *parseTildeCopyable = nullptr);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
-                             ParseDeclOptions Options,
-                             llvm::function_ref<void(Decl*)> handler);
+                             llvm::function_ref<void(Decl *)> handler);
   std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
   parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
-                ParseDeclOptions Options, IterableDeclContext *IDC,
                 bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);

@@ -857,7 +857,7 @@ void EagerSpecializerTransform::run() {
       // That means we are loading it from another module. In this case, we
       // don't want to create a pre-specialization.
       SpecializedFuncs.push_back(nullptr);
-      ReInfoVec.emplace_back(ReabstractionInfo());
+      ReInfoVec.emplace_back(ReabstractionInfo(F.getModule()));
       continue;
     }
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),

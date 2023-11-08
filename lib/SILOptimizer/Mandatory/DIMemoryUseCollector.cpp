@@ -908,6 +908,27 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (auto *TACI = dyn_cast<TupleAddrConstructorInst>(User)) {
+      // If this is the source of the copy_addr, then this is a load.  If it is
+      // the destination, then this is an unknown assignment.  Note that we'll
+      // revisit this instruction and add it to Uses twice if it is both a load
+      // and store to the same aggregate.
+      DIUseKind Kind;
+      if (TACI->getDest() == Op->get()) {
+        if (InStructSubElement)
+          Kind = DIUseKind::PartialStore;
+        else if (TACI->isInitializationOfDest())
+          Kind = DIUseKind::Initialization;
+        else
+          Kind = DIUseKind::InitOrAssign;
+      } else {
+        Kind = DIUseKind::Load;
+      }
+
+      addElementUses(BaseEltNo, PointeeType, User, Kind);
+      continue;
+    }
+
     if (auto *MAI = dyn_cast<MarkUnresolvedMoveAddrInst>(User)) {
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is an unknown assignment.  Note that we'll

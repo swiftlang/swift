@@ -161,7 +161,7 @@ bool TypeBase::isMarkerExistential() {
 /// that does not rely on conformances.
 static bool alwaysNoncopyable(Type ty) {
   if (auto *nominal = ty->getNominalOrBoundGenericNominal())
-    return nominal->isNoncopyable();
+    return nominal->canBeNoncopyable();
 
   if (auto *expansion = ty->getAs<PackExpansionType>()) {
     return alwaysNoncopyable(expansion->getPatternType());

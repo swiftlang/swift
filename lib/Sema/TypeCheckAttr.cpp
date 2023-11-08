@@ -2173,7 +2173,7 @@ void AttributeChecker::visitExternAttr(ExternAttr *attr) {
   }
 
   for (auto *otherAttr : D->getAttrs()) {
-    // @_cdecl cannot be mixed with @extern since @_cdecl is for definitions
+    // @_cdecl cannot be mixed with @_extern since @_cdecl is for definitions
     // @_silgen_name cannot be mixed to avoid SIL-level name ambiguity
     if (isa<CDeclAttr>(otherAttr) || isa<SILGenNameAttr>(otherAttr)) {
       diagnose(attr->getLocation(), diag::extern_only_non_other_attr,
@@ -7169,7 +7169,7 @@ void AttributeChecker::visitRawLayoutAttr(RawLayoutAttr *attr) {
     return;
   }
   
-  if (!sd->isNoncopyable()) {
+  if (!sd->canBeNoncopyable()) {
     diagnoseAndRemoveAttr(attr, diag::attr_rawlayout_cannot_be_copyable);
   }
   

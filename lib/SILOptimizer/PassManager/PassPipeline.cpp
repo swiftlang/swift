@@ -134,6 +134,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addFlowIsolation();
   P.addTransferNonSendable();
+  // Lower tuple addr constructor. Eventually this can be merged into later
+  // passes. This ensures we do not need to update later passes for something
+  // that is only needed by TransferNonSendable().
+  P.addLowerTupleAddrConstructor();
 
   // Automatic differentiation: canonicalize all differentiability witnesses
   // and `differentiable_function` instructions.

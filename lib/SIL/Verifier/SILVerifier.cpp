@@ -3290,6 +3290,22 @@ public:
     }
   }
 
+  void checkTupleAddrConstructorInst(TupleAddrConstructorInst *taci) {
+    require(taci->getNumElements() > 0,
+            "Cannot be applied to tuples that do not contain any real "
+            "elements. E.x.: ((), ())");
+    for (auto elt : taci->getElements()) {
+      // We cannot have any elements that contain only tuple elements. This is
+      // due to our exploded representation. This means when specializing,
+      // cloners must eliminate these parameters.
+      bool hasNonTuple = false;
+      elt->getType().getASTType().visit([&](CanType ty) {
+        hasNonTuple |= !ty->is<TupleType>();
+      });
+      require(hasNonTuple, "Element only consists of tuples");
+    }
+  }
+
   // Is a SIL type a potential lowering of a formal type?
   bool isLoweringOf(SILType loweredType, CanType formalType) {
     return loweredType.isLoweringOf(F.getTypeExpansionContext(), F.getModule(),
@@ -3857,7 +3873,11 @@ public:
     auto member = CMI->getMember();
     auto overrideTy =
         TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
-    if (CMI->getModule().getStage() != SILStage::Lowered) {
+
+    SILModule &mod = CMI->getModule();
+    bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+    if (mod.getStage() != SILStage::Lowered && !embedded) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of class_method must match abstracted type of method");

@@ -411,6 +411,15 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::TupleAddrConstructorInst: {
+        auto *taci = cast<TupleAddrConstructorInst>(&I);
+        for (SILValue elt : taci->getElements()) {
+          if (elt->getType().isAddress())
+            killBits(state, elt);
+        }
+        genBits(state, taci->getDest());
+        break;
+      }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));

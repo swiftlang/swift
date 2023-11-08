@@ -199,7 +199,8 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) && {
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
-        isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user)) {
+        isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
+        isa<TupleAddrConstructorInst>(user)) {
       callVisitUse(op);
       continue;
     }

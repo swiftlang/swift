@@ -848,6 +848,8 @@ NON_VALUE_INST(CopyAddrInst, copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(ExplicitCopyAddrInst, explicit_copy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
+NON_VALUE_INST(TupleAddrConstructorInst, tuple_addr_constructor,
+               SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(DestroyAddrInst, destroy_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(EndLifetimeInst, end_lifetime,

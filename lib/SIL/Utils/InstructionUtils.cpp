@@ -748,6 +748,13 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::MetaData | RuntimeEffect::RefCounting;
     return RuntimeEffect::MetaData;
   }
+  case SILInstructionKind::TupleAddrConstructorInst: {
+    auto *ca = cast<TupleAddrConstructorInst>(inst);
+    impactType = ca->getDest()->getType();
+    if (!ca->isInitializationOfDest())
+      return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
+    return RuntimeEffect::MetaData;
+  }
   case SILInstructionKind::ExplicitCopyAddrInst: {
     auto *ca = cast<ExplicitCopyAddrInst>(inst);
     impactType = ca->getSrc()->getType();
@@ -1289,4 +1296,43 @@ swift::getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi) {
   }
 
   return newBI;
+}
+
+//===----------------------------------------------------------------------===//
+//                          Exploded Tuple Visitors
+//===----------------------------------------------------------------------===//
+
+bool swift::visitExplodedTupleType(SILType inputType,
+                                   llvm::function_ref<bool(SILType)> callback) {
+  auto tupType = inputType.getAs<TupleType>();
+  if (!tupType || tupType.containsPackExpansionType()) {
+    return callback(inputType);
+  }
+
+  for (auto elt : tupType->getElementTypes()) {
+    auto eltSILTy = SILType::getPrimitiveType(elt->getCanonicalType(),
+                                              inputType.getCategory());
+    if (!visitExplodedTupleType(eltSILTy, callback))
+      return false;
+  }
+
+  return true;
+}
+
+bool swift::visitExplodedTupleValue(
+    SILValue inputValue,
+    llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback) {
+  SILType inputType = inputValue->getType();
+  auto tupType = inputType.getAs<TupleType>();
+  if (!tupType || tupType.containsPackExpansionType()) {
+    return callback(inputValue, {});
+  }
+
+  for (auto eltIndex : range(tupType->getNumElements())) {
+    auto elt = callback(inputValue, eltIndex);
+    if (!visitExplodedTupleValue(elt, callback))
+      return false;
+  }
+
+  return true;
 }

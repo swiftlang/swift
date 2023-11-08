@@ -234,7 +234,7 @@ swift::cxx_translation::getDeclRepresentation(const ValueDecl *VD) {
     if (isa<ProtocolDecl>(typeDecl))
       return {Unsupported, UnrepresentableProtocol};
     // Swift's consume semantics are not yet supported in C++.
-    if (typeDecl->isNoncopyable())
+    if (typeDecl->canBeNoncopyable())
       return {Unsupported, UnrepresentableMoveOnly};
     if (typeDecl->isGeneric()) {
       if (isa<ClassDecl>(VD))

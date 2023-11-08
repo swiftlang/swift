@@ -28,10 +28,7 @@ struct TestInit {
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*Int
     //
     // CHECK-NEXT: [[FULL_ACCESS:%.*]] = begin_access [modify] [static] [[FULL_REF]] : $*(Int, Int)
-    // CHECK-NEXT: [[FULL_ELT_0:%.*]] = tuple_element_addr [[FULL_ACCESS]] : $*(Int, Int), 0
-    // CHECK-NEXT: store [[X_VAL]] to [trivial] [[FULL_ELT_0]] : $*Int
-    // CHECK-NEXT: [[FULL_ELT_1:%.*]] = tuple_element_addr [[FULL_ACCESS]] : $*(Int, Int), 1
-    // CHECK-NEXT: store [[Y_VAL]] to [trivial] [[FULL_ELT_1]] : $*Int
+    // CHECK-NEXT: tuple_addr_constructor [init] [[FULL_ACCESS]] : $*(Int, Int) with ([[X_VAL]] : $Int, [[Y_VAL]] : $Int)
     // CHECK-NEXT: end_access [[FULL_ACCESS]] : $*(Int, Int)
     @storageRestrictions(initializes: y, full, accesses: x)
     init(initialValue) {
@@ -237,10 +234,7 @@ class TestClass {
     // CHECK: ([[X_VAL:%.*]], [[Y_VAL:%.*]]) = destructure_tuple {{.*}} : $(Int, (Int, Array<String>))
     // CHECK: ([[Y_VAL_0:%.*]], [[Y_VAL_1:%.*]]) = destructure_tuple {{.*}} : $(Int, Array<String>)
     // CHECK: [[Y_ACCESS:%.*]] = begin_access [modify] [static] [[Y_REF]] : $*(Int, Array<String>)
-    // CHECK-NEXT: [[Y_ELT_0:%.*]] = tuple_element_addr [[Y_ACCESS]] : $*(Int, Array<String>), 0
-    // CHECK-NEXT: store [[Y_VAL_0]] to [trivial] [[Y_ELT_0]] : $*Int
-    // CHECK-NEXT: [[Y_ELT_1:%.*]] = tuple_element_addr [[Y_ACCESS]] : $*(Int, Array<String>), 1
-    // CHECK-NEXT: store [[Y_VAL_1]] to [init] [[Y_ELT_1]] : $*Array<String>
+    // CHECK-NEXT: tuple_addr_constructor [init] [[Y_ACCESS]] : $*(Int, Array<String>) with ([[Y_VAL_0]] : $Int, [[Y_VAL_1]] :
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*(Int, Array<String>)
     @storageRestrictions(initializes: x, y)
     init(initialValue) {
@@ -316,6 +310,43 @@ struct TestGeneric<T, U> {
     self.c = c
     self.data = (a, b)
     self.data = (b, a)
+  }
+}
+
+struct TestGenericTuple<T, U> {
+  var a: T
+  var b: (T, U)
+
+  // CHECK-LABEL: sil private [ossa] @$s14init_accessors16TestGenericTupleV4datax_x_q_ttvi : $@convention(thin) <T, U> (@in T, @in T, @in U) -> (@out T, @out (T, U)) {
+  //
+  // CHECK: bb0([[A_REF:%.*]] : $*T, [[B_REF:%.*]] : $*(T, U), [[A_VALUE:%.*]] : $*T, [[B_VALUE:%.*]] : $*T, [[C_VALUE:%.*]] : $*U):
+  //
+  // CHECK: [[INIT_VALUE_1:%.*]] = alloc_stack $(T, U), let, name "initialValue"
+  // CHECK-NEXT: [[INIT_VALUE_1_0:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 0
+  // CHECK-NEXT: copy_addr [take] [[B_VALUE]] to [init] [[INIT_VALUE_1_0]]
+  // CHECK-NEXT: [[INIT_VALUE_1_1:%.*]] = tuple_element_addr [[INIT_VALUE_1]] : $*(T, U), 1
+  // CHECK-NEXT: copy_addr [take] [[C_VALUE]] to [init] [[INIT_VALUE_1_1]]
+
+  // CHECK-NEXT: [[INIT_VALUE_2:%.*]] = alloc_stack [lexical] $(T, (T, U))
+  // CHECK-NEXT: [[INIT_VALUE_2_0:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 0
+  // CHECK-NEXT: copy_addr [take] [[A_VALUE]] to [init] [[INIT_VALUE_2_0]]
+  // CHECK-NEXT: [[INIT_VALUE_2_1:%.*]] = tuple_element_addr [[INIT_VALUE_2]] : $*(T, (T, U)), 1
+  // CHECK-NEXT: copy_addr [take] [[INIT_VALUE_1]] to [init] [[INIT_VALUE_2_1]]
+
+  var data: (T, (T, U)) {
+    @storageRestrictions(initializes: a, b)
+    init(initialValue) {
+      a = initialValue.0
+      b = initialValue.1
+    }
+
+    get { (a, b) }
+    set { }
+  }
+
+  init(a: T, b: T, c: U) {
+    self.data = (a, (b, c))
+    self.data = (b, (a, c))
   }
 }
 

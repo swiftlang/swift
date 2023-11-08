@@ -5433,6 +5433,8 @@ public:
     return range.isValid() ? range : llvm::Optional<SourceRange>();
   }
 
+  bool isPartialApplication(ConstraintLocator *locator);
+
   bool isTooComplex(size_t solutionMemory) {
     if (isAlreadyTooComplex.first)
       return true;

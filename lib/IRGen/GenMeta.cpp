@@ -3903,6 +3903,16 @@ namespace {
       llvm_unreachable("covered switch");
     }
 
+    void addEmbeddedSuperclass(CanType classTy) {
+      CanType superclass = asImpl().getSuperclassTypeForMetadata();
+      if (!superclass) {
+        B.addNullPointer(IGM.TypeMetadataPtrTy);
+        return;
+      }
+      CanType superTy = classTy->getSuperclass()->getCanonicalType();
+      B.add(IGM.getAddrOfTypeMetadata(superTy));
+    }
+
     void addSuperclass() {
       if (asImpl().shouldAddNullSuperclass()) {
         B.addNullPointer(IGM.TypeMetadataPtrTy);
@@ -5025,7 +5035,7 @@ static void emitEmbeddedVTable(IRGenModule &IGM, CanType classTy,
 
   FixedClassMetadataBuilder builder(IGM, classDecl, init, fragileLayout,
                                     vtable);
-  builder.layout();
+  builder.layoutEmbedded(classTy);
   bool canBeConstant = builder.canBeConstant();
 
   StringRef section{};

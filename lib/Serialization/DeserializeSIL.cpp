@@ -1150,6 +1150,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   SourceLoc SLoc;
   ApplyOptions ApplyOpts;
   ArrayRef<uint64_t> ListOfValues;
+
   SILLocation Loc = RegularLocation(SLoc);
   ValueOwnershipKind forwardingOwnership(OwnershipKind::Any);
   auto decodeValueOwnership = [](unsigned field){
@@ -1206,6 +1207,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                                 ownershipField, TyID,
                                                 TyCategory, ListOfValues);
     forwardingOwnership = decodeValueOwnership(ownershipField);
+    break;
+  }
+  case SIL_ONE_TYPE_VALUES_CATEGORIES: {
+    // NOTE: This is the same as Values except we smuggle in the category in the
+    // top bit.
+    SILOneTypeValuesCategoriesLayout::readRecord(
+        scratch, RawOpCode, TyID, TyCategory, Attr, ListOfValues);
     break;
   }
   case SIL_TWO_OPERANDS:
@@ -2561,6 +2569,44 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     }
     ResultInst = Builder.createTuple(
         Loc, getSILType(Ty, (SILValueCategory)TyCategory, Fn), OpList);
+    break;
+  }
+  case SILInstructionKind::TupleAddrConstructorInst: {
+    assert(RecordKind == SIL_ONE_TYPE_VALUES_CATEGORIES);
+
+    // Format: A type followed by a list of values. A value is expressed by 2
+    // IDs: ValueID, ValueResultNumber. The type is the type of the first
+    // element (which is our dest).
+    auto Ty = MF->getType(TyID);
+    TupleType *TT = Ty->castTo<TupleType>();
+    assert(
+        TT &&
+        "Type of the DestAddr of a TupleAddrConstructor should be TupleType");
+    assert(ListOfValues.size() >= 2 &&
+           "Should have at least a dest and one element");
+
+    auto getValue = [&](Type type, uint64_t value) -> SILValue {
+      assert((value & 0xFFFFFFFF00000000) == 0 &&
+             "High bits should never be set");
+      uint32_t count = value & 0x7FFFFFFF;
+      SILValueCategory category = value & 0x80000000 ? SILValueCategory::Address
+                                                     : SILValueCategory::Object;
+      return getLocalValue(count, getSILType(type, category, Fn));
+    };
+
+    SILValue DestAddr = getValue(TT, ListOfValues[0]);
+
+    SmallVector<SILValue, 4> OpList;
+    unsigned Count = 1;
+
+    visitExplodedTupleType(DestAddr->getType(), [&](SILType eltType) {
+      OpList.push_back(getValue(eltType.getRawASTType(), ListOfValues[Count]));
+      ++Count;
+      return true;
+    });
+    auto IsInitOfDest = IsInitialization_t(Attr & 0x1);
+    ResultInst =
+        Builder.createTupleAddrConstructor(Loc, DestAddr, OpList, IsInitOfDest);
     break;
   }
   case SILInstructionKind::ObjectInst: {

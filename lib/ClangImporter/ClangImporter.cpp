@@ -894,9 +894,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
   invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
   invocation->getLangOpts().CacheGeneratedPCH = true;
-  // If the underlying invocation is allowing PCH errors, then it "can be read",
-  // even if it has its error bit set. Thus, don't override
-  // `AllowPCHWithCompilerErrors`.
 
   // ClangImporter::create adds a remapped MemoryBuffer that we don't need
   // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
@@ -933,6 +930,14 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     clang::ASTReader::ARR_Missing |
     clang::ASTReader::ARR_OutOfDate |
     clang::ASTReader::ARR_VersionMismatch;
+
+  // If a PCH was output with errors, it may not have serialized all its
+  // inputs. If there was a change to the search path or a headermap now
+  // exists where it didn't previously, it's possible those inputs will now be
+  // found. Ideally we would only rebuild in this particular case rather than
+  // any error in general, but explicit module builds are the real solution
+  // there. For now, just treat PCH with errors as out of date.
+  failureCapabilities |= clang::ASTReader::ARR_TreatModuleWithErrorsAsOutOfDate;
 
   auto result = Reader.ReadAST(PCHFilename, clang::serialization::MK_PCH,
                                clang::SourceLocation(), failureCapabilities);

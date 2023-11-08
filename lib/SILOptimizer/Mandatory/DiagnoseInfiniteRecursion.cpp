@@ -90,7 +90,7 @@ static bool isRecursiveCall(FullApplySite applySite) {
     if (classDecl && classDecl->getModuleContext() != module.getSwiftModule())
       return false;
 
-    SILFunction *method = getTargetClassMethod(module, classDecl, CMI);
+    SILFunction *method = getTargetClassMethod(module, classDecl, classType, CMI);
     if (method != parentFunc)
       return false;
 

@@ -210,8 +210,9 @@ SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, HasNoncopyableAnnotationRequest, bool(TypeDecl *), SeparatelyCached,
-              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, NoncopyableAnnotationRequest,
+              InverseMarking(TypeDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsNoncopyableRequest,
               bool (CanType),
               Cached, NoLocationInfo)

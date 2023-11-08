@@ -20,6 +20,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Parse/ParseVersion.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/Strings.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/STLExtras.h"
@@ -521,12 +522,12 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
   diags.diagnose(SourceLoc(), diag::valid_cxx_interop_modes, versStr);
 }
 
-static llvm::Optional<StrictConcurrency>
+static llvm::Optional<swift::StrictConcurrency>
 parseStrictConcurrency(StringRef value) {
-  return llvm::StringSwitch<llvm::Optional<StrictConcurrency>>(value)
-      .Case("minimal", StrictConcurrency::Minimal)
-      .Case("targeted", StrictConcurrency::Targeted)
-      .Case("complete", StrictConcurrency::Complete)
+  return llvm::StringSwitch<llvm::Optional<swift::StrictConcurrency>>(value)
+      .Case("minimal", swift::StrictConcurrency::Minimal)
+      .Case("targeted", swift::StrictConcurrency::Targeted)
+      .Case("complete", swift::StrictConcurrency::Complete)
       .Default(llvm::None);
 }
 
@@ -1334,6 +1335,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
+    assert(swiftModulesInitialized() && "no SwiftCompilerSources");
+
     Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
     Opts.DisableImplicitStringProcessingModuleImport = true;
     Opts.DisableImplicitConcurrencyModuleImport = true;

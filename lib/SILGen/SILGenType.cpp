@@ -1113,7 +1113,7 @@ public:
 
     // If this is a nominal type that is move only, emit a deinit table for it.
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isNoncopyable()) {
+      if (nom->canBeNoncopyable()) {
         SGM.emitNonCopyableTypeDeinitTable(nom);
       }
     }
@@ -1178,7 +1178,7 @@ public:
     if (auto *cd = dyn_cast<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
-      if (nom->isNoncopyable()) {
+      if (nom->canBeNoncopyable()) {
         return SGM.emitMoveOnlyDestructor(nom, dd);
       }
     }

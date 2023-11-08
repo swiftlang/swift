@@ -179,10 +179,8 @@ void Parser::performIDEInspectionSecondPassImpl(
            "Delayed decl must be a type member or a top-level decl");
     ContextChange CC(*this, DC);
 
-    parseDecl(ParseDeclOptions(info.Flags),
-              /*IsAtStartOfLineOrPreviousHadSemi=*/true,
-              /*IfConfigsAreDeclAttrs=*/false,
-              [&](Decl *D) {
+    parseDecl(/*IsAtStartOfLineOrPreviousHadSemi=*/true,
+              /*IfConfigsAreDeclAttrs=*/false, [&](Decl *D) {
                 if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
                   NTD->addMemberPreservingSourceOrder(D);
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {

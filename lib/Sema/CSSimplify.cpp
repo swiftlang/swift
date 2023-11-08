@@ -29,7 +29,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/CSFix.h"
@@ -9511,6 +9513,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   Type baseObjTy = baseTy->getRValueType();
   Type instanceTy = baseObjTy;
 
+  auto &ctx = getASTContext();
   auto memberNode = simplifyLocatorToAnchor(memberLocator);
   auto memberLoc = memberNode ? memberNode.getStartLoc() : SourceLoc();
 
@@ -9518,9 +9521,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     instanceTy = baseObjMeta->getInstanceType();
   }
 
+  MemberLookupResult result;
+
   if (instanceTy->isTypeVariableOrMember() ||
       instanceTy->is<UnresolvedType>()) {
-    MemberLookupResult result;
     result.OverallResult = MemberLookupResult::Unsolved;
     return result;
   }
@@ -9530,14 +9534,40 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   if (isSingleUnlabeledPackExpansionTuple(instanceTy)) {
     auto elementTy = instanceTy->castTo<TupleType>()->getElementType(0);
     if (elementTy->is<TypeVariableType>()) {
-      MemberLookupResult result;
       result.OverallResult = MemberLookupResult::Unsolved;
       return result;
     }
   }
 
+  // Delay solving member constraint for unapplied methods
+  // where the base type has a conditional Sendable conformance
+  if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+    if (isPartialApplication(memberLocator)) {
+      auto sendableProtocol =
+          Context.getProtocol(
+              KnownProtocolKind::Sendable);
+      auto baseConformance = DC->getParentModule()->lookupConformance(
+          instanceTy, sendableProtocol);
+
+      if (llvm::any_of(
+              baseConformance.getConditionalRequirements(),
+              [&](const auto &req) {
+                if (req.getKind() != RequirementKind::Conformance)
+                  return false;
+
+                if (auto protocolTy = req.getSecondType()->template getAs<ProtocolType>()) {
+                  return req.getFirstType()->hasTypeVariable() &&
+                         protocolTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable);
+                }
+                return false;
+              })) {
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
+    }
+  }
+
   // Okay, start building up the result list.
-  MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
   // Add key path result.
@@ -9559,7 +9589,6 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
-  auto &ctx = getASTContext();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     if (!memberName.isSpecial()) {
       StringRef nameStr = memberName.getBaseIdentifier().str();

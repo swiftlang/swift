@@ -303,7 +303,7 @@ private:
   /// empty.
   StringRef WasmExportName;
 
-  /// Name of a Wasm import module and field if @extern(wasm) attribute
+  /// Name of a Wasm import module and field if @_extern(wasm) attribute
   llvm::Optional<std::pair<StringRef, StringRef>> WasmImportModuleAndField;
 
   /// Has value if there's a profile for this function
@@ -1288,14 +1288,14 @@ public:
   StringRef wasmExportName() const { return WasmExportName; }
   void setWasmExportName(StringRef value) { WasmExportName = value; }
 
-  /// Return Wasm import module name if @extern(wasm) was used otherwise empty
+  /// Return Wasm import module name if @_extern(wasm) was used otherwise empty
   StringRef wasmImportModuleName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->first;
     return StringRef();
   }
 
-  /// Return Wasm import field name if @extern(wasm) was used otherwise empty
+  /// Return Wasm import field name if @_extern(wasm) was used otherwise empty
   StringRef wasmImportFieldName() const {
     if (WasmImportModuleAndField)
       return WasmImportModuleAndField->second;

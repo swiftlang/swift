@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-ir -parse-stdlib %s -enable-experimental-feature Embedded -verify -wmo
 
+// REQUIRES: swift_in_compiler
+
 public enum Never {}
 
 @_silgen_name("abort")

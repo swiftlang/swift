@@ -3324,12 +3324,12 @@ static bool usesFeatureFlowSensitiveConcurrencyCaptures(Decl *decl) {
 static bool usesFeatureMoveOnly(Decl *decl) {
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
-      if (nominal->isNoncopyable())
+      if (nominal->canBeNoncopyable())
         return true;
   }
 
   if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-    if (typeDecl->isNoncopyable())
+    if (typeDecl->canBeNoncopyable())
       return true;
   }
 
@@ -3559,9 +3559,15 @@ static bool usesFeatureParameterPacks(Decl *decl) {
 
 static bool usesFeatureRegionBasedIsolation(Decl *decl) { return false; }
 
-static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
+static bool usesFeatureGlobalConcurrency(Decl *decl) {
+  return false;
+}
 
 static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureInferSendableFromCaptures(Decl *decl) {
   return false;
 }
 

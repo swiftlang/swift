@@ -266,25 +266,6 @@ _buildDemanglingForMetadataPack(MetadataPackPointer pack, size_t count,
   return node;
 }
 
-/// Demangle the given type name to a generic parameter reference, which
-/// will be returned as (depth, index).
-static llvm::Optional<std::pair<unsigned, unsigned>>
-demangleToGenericParamRef(StringRef typeName) {
-  StackAllocatedDemangler<1024> demangler;
-  NodePointer node = demangler.demangleType(typeName);
-  if (!node)
-    return llvm::None;
-
-  // Find the flat index that the right-hand side refers to.
-  if (node->getKind() == Demangle::Node::Kind::Type)
-    node = node->getChild(0);
-  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return llvm::None;
-
-  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
-                                       node->getChild(1)->getIndex());
-}
-
 /// Build an array of demangling trees for each generic argument of the given
 /// type metadata.
 ///
@@ -314,144 +295,77 @@ static bool _buildDemanglingForGenericArgs(
     return true;
 
   auto genericArgs = description->getGenericArguments(type);
-
   auto packHeader = generics->getGenericPackShapeHeader();
   auto packDescriptors = generics->getGenericPackShapeDescriptors();
 
-  unsigned packIndex = 0;
-  unsigned argIndex = packHeader.NumShapeClasses;
+  llvm::SmallVector<MetadataOrPack> allGenericArgs;
 
-  bool missingWrittenArguments = false;
+  auto numKeyArgs = 0;
+  for (auto param : generics->getGenericParams()) {
+    if (param.hasKeyArgument()) {
+      numKeyArgs += 1;
+    }
+  }
+
+  // _gatherWrittenGenericParameters expects to immediately read key generic
+  // arguments, so skip past the shape classes if we have any.
+  auto nonShapeClassGenericArgs = genericArgs + packHeader.NumShapeClasses;
+
+  llvm::ArrayRef<const void *> genericArgsRef(
+      reinterpret_cast<const void * const *>(nonShapeClassGenericArgs), numKeyArgs);
+
+  if (!_gatherWrittenGenericParameters(description, genericArgsRef,
+                                       allGenericArgs, Dem)) {
+    return false;
+  }
+
+  auto argIndex = 0;
+  auto packIndex = 0;
 
   for (auto param : generics->getGenericParams()) {
+    auto genericArg = allGenericArgs[argIndex];
+
     switch (param.getKind()) {
-    case GenericParamKind::Type:
-      // The type should have a key argument unless it's been same-typed to
-      // another type.
-      if (param.hasKeyArgument()) {
-        auto genericArg = reinterpret_cast<const Metadata *>(genericArgs[argIndex]);
+    case GenericParamKind::Type: {
+      auto metadata = genericArg.getMetadata();
+      auto genericArgDemangling =
+        _swift_buildDemanglingForMetadata(metadata, Dem);
 
-        auto genericArgDemangling =
-          _swift_buildDemanglingForMetadata(genericArg, Dem);
-        if (!genericArgDemangling)
-          return false;
-        demangledGenerics.push_back(genericArgDemangling);
-
-        ++argIndex;
-      } else {
-        // Leave a gap for us to fill in by looking at same-type requirements.
-        demangledGenerics.push_back(nullptr);
-        missingWrittenArguments = true;
+      if (!genericArgDemangling) {
+        return false;
       }
 
+      demangledGenerics.push_back(genericArgDemangling);
       break;
+    }
 
-    case GenericParamKind::TypePack:
-      if (param.hasKeyArgument()) {
-        auto packDescriptor = packDescriptors[packIndex];
-        assert(packDescriptor.Kind == GenericPackKind::Metadata);
-        assert(packDescriptor.ShapeClass < packHeader.NumShapeClasses);
-        assert(packDescriptor.Index == argIndex);
+    case GenericParamKind::TypePack: {
+      auto packDescriptor = packDescriptors[packIndex];
+      assert(packDescriptor.Kind == GenericPackKind::Metadata);
+      assert(packDescriptor.ShapeClass < packHeader.NumShapeClasses);
 
-        MetadataPackPointer pack(genericArgs[argIndex]);
-        size_t count = reinterpret_cast<size_t>(genericArgs[packDescriptor.ShapeClass]);
+      // Arg index is not interested in the shape classes, but the pack
+      // descriptor's index is in terms of the shape classes.
+      assert(packDescriptor.Index == argIndex + packHeader.NumShapeClasses);
 
-        auto genericArgDemangling = _buildDemanglingForMetadataPack(pack, count, Dem);
-        if (genericArgDemangling == nullptr)
-          return false;
+      MetadataPackPointer pack(genericArg.getMetadataPack());
+      size_t count = reinterpret_cast<size_t>(genericArgs[packDescriptor.ShapeClass]);
 
-        demangledGenerics.push_back(genericArgDemangling);
+      auto genericArgDemangling = _buildDemanglingForMetadataPack(pack, count, Dem);
+      if (genericArgDemangling == nullptr)
+        return false;
 
-        ++packIndex;
-        ++argIndex;
-      } else {
-        // Leave a gap for us to fill in by looking at same-type requirements.
-        demangledGenerics.push_back(nullptr);
-        missingWrittenArguments = true;
-      }
-
+      demangledGenerics.push_back(genericArgDemangling);
+      packIndex += 1;
       break;
+    }
 
     default:
       // We don't know about this kind of parameter.
       return false;
     }
-  }
 
-  // If there is no follow-up work to do, we're done.
-  if (!missingWrittenArguments)
-    return true;
-
-  // We have generic arguments that would be written, but have been
-  // canonicalized away. Use same-type requirements to reconstitute them.
-  SubstGenericParametersFromMetadata substitutions(
-        description, reinterpret_cast<const void * const *>(genericArgs));
-
-  // Retrieve the mapping information needed for depth/index -> flat index.
-  llvm::SmallVector<unsigned, 8> genericParamCounts;
-  (void)_gatherGenericParameterCounts(description, genericParamCounts, Dem);
-
-  // Walk through the generic requirements to evaluate same-type
-  // constraints that are needed to fill in missing generic arguments.
-  for (const auto &req : generics->getGenericRequirements()) {
-    // We only care about same-type constraints.
-    if (req.Flags.getKind() != GenericRequirementKind::SameType)
-      continue;
-
-    auto lhsParam = demangleToGenericParamRef(req.getParam());
-    if (!lhsParam)
-      continue;
-
-    assert(!req.Flags.isPackRequirement() &&
-           "Pack requirements not supported here yet");
-
-    // If we don't yet have an argument for this parameter, it's a
-    // same-type-to-concrete constraint.
-    auto lhsFlatIndex =
-      _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
-                             genericParamCounts);
-    if (!lhsFlatIndex || *lhsFlatIndex >= demangledGenerics.size())
-      return false;
-
-    if (!demangledGenerics[*lhsFlatIndex]) {
-      // Substitute into the right-hand side.
-      auto *genericArg =
-          swift_getTypeByMangledName(MetadataState::Abstract,
-            req.getMangledTypeName(),
-            reinterpret_cast<const void * const *>(genericArgs),
-            [&substitutions](unsigned depth, unsigned index) {
-              // FIXME: Variadic generics
-              return substitutions.getMetadata(depth, index).getMetadata();
-            },
-            [&substitutions](const Metadata *type, unsigned index) {
-              return substitutions.getWitnessTable(type, index);
-            }).getType().getMetadata();
-      if (!genericArg)
-        return false;
-
-      demangledGenerics[*lhsFlatIndex] =
-          _swift_buildDemanglingForMetadata(genericArg, Dem);
-
-      continue;
-    }
-
-    // If we do have an argument for this parameter, it might be that
-    // the right-hand side is itself a generic parameter, which means
-    // we have a same-type constraint A == B where A is already filled in.
-    auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
-    if (!rhsParam)
-      return false;
-
-    auto rhsFlatIndex =
-      _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
-                             genericParamCounts);
-    if (!rhsFlatIndex || *rhsFlatIndex >= demangledGenerics.size())
-      return false;
-
-    if (demangledGenerics[*rhsFlatIndex] || !demangledGenerics[*lhsFlatIndex])
-      return false;
-
-    demangledGenerics[*rhsFlatIndex] = demangledGenerics[*lhsFlatIndex];
+    argIndex += 1;
   }
 
   return true;
@@ -468,9 +382,14 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   switch (type->getKind()) {
   case MetadataKind::Class: {
     auto classType = static_cast<const ClassMetadata *>(type);
+
+    if (!classType->isTypeMetadata()) {
+      return nullptr;
+    }
+
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
-    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
+    while (classType->isArtificialSubclass())
       classType = classType->Superclass;
 #endif
     description = classType->getDescription();

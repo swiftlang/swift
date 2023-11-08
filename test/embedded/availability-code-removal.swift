@@ -10,6 +10,8 @@
 // RUN: %target-swift-frontend -emit-ir %s -parse-stdlib  -wmo | %FileCheck %s --check-prefix CHECK-A
 // RUN: %target-swift-frontend -emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s --check-prefix CHECK-B
 
+// REQUIRES: swift_in_compiler
+
 public protocol Player {}
 struct Concrete: Player {}
 

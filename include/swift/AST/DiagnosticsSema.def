@@ -1900,17 +1900,17 @@ ERROR(section_not_at_top_level,none,
 ERROR(section_empty_name,none,
       "@_section section name cannot be empty", ())
 
-// @extern
+// @_extern
 ERROR(attr_extern_experimental,none,
-      "@extern requires '-enable-experimental-feature Extern'", ())
+      "@_extern requires '-enable-experimental-feature Extern'", ())
 ERROR(extern_not_at_top_level_func,none,
-      "@extern attribute can only be applied to global functions", ())
+      "@_extern attribute can only be applied to global functions", ())
 ERROR(extern_empty_c_name,none,
-      "expected non-empty C name in @extern attribute", ())
+      "expected non-empty C name in @_extern attribute", ())
 ERROR(extern_only_non_other_attr,none,
-      "@extern attribute cannot be applied to an '@%0' declaration", (StringRef))
+      "@_extern attribute cannot be applied to an '@%0' declaration", (StringRef))
 WARNING(extern_c_maybe_invalid_name, none,
-        "C name '%0' may be invalid; explicitly specify the name in @extern(c) to suppress this warning",
+        "C name '%0' may be invalid; explicitly specify the name in @_extern(c) to suppress this warning",
         (StringRef))
 
 ERROR(c_func_variadic, none,
@@ -3170,7 +3170,7 @@ ERROR(recursive_superclass_constraint,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0 : %1", (Type, ProtocolDecl *))
+        "redundant conformance constraint %0 : %1", (Type, Type))
 
 WARNING(missing_protocol_refinement, none,
         "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
@@ -7533,22 +7533,34 @@ ERROR(accessor_macro_not_single_var, none,
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------
-
+ERROR(noncopyable_but_copyable, none,
+      "%kind0 required to be 'Copyable' but is marked with '~Copyable'",
+      (const ValueDecl *))
 ERROR(noncopyable_class, none,
       "classes cannot be noncopyable",
       ())
+ERROR(inverse_extension, none,
+      "cannot apply inverse %0 to extension",
+      (Type))
+ERROR(copyable_illegal_deinit, none,
+      "deinitializer cannot be declared in %kind0 that conforms to 'Copyable'",
+      (const ValueDecl *))
 ERROR(noncopyable_type_member_in_copyable,none,
       "%select{stored property %2|associated value %2}1 of "
       "'Copyable'-conforming %kind3 has noncopyable type %0",
       (Type, bool, DeclName, const ValueDecl *))
-NOTE(add_inverse_for_containment,none,
-     "consider removing implicit '%1' conformance from %kind0",
+NOTE(add_inverse,none,
+     "consider adding '~%1' to %kind0",
      (const ValueDecl *, StringRef))
-NOTE(remove_inverse_on_generic_parameter_for_conformance,none,
-     "consider removing '~%1' from generic parameter %0 so it conforms to the '%1' protocol",
+NOTE(note_inverse_preventing_conformance,none,
+     "%0 has '~%1' constraint preventing implicit '%1' conformance",
      (Type, StringRef))
-NOTE(remove_inverse_on_nominal_for_conformance,none,
-     "consider removing '~%1' from %kind0 so it conforms to the '%1' protocol",
+NOTE(note_inverse_preventing_conformance_implicit,none,
+     "%kind0 has '~%1' constraint on a generic parameter, "
+     "making its '%1' conformance conditional",
+     (const ValueDecl *, StringRef))
+NOTE(note_inverse_preventing_conformance_explicit,none,
+     "%kind0 has '~%1' constraint preventing '%1' conformance",
      (const ValueDecl *, StringRef))
 NOTE(add_explicit_protocol_for_conformance,none,
      "consider making %kind0 explicitly conform to the '%1' protocol",

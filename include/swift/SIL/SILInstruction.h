@@ -6339,6 +6339,80 @@ public:
   }
 };
 
+/// TupleAddrConstructorInst - a constructor for address tuples. Can take
+/// objects and addresses. Intended only to be used with diagnostics and be
+/// lowered after diagnostics run. Once we have opaque values this will not be
+/// necessary.
+///
+/// tuple_addr_constructor [init] dest with (operands)
+///
+/// This always consumes its operands but will either init or assign into dest.
+class TupleAddrConstructorInst final
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::TupleAddrConstructorInst,
+          TupleAddrConstructorInst, NonValueInstruction> {
+  friend SILBuilder;
+  USE_SHARED_UINT8;
+
+  TupleAddrConstructorInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elts,
+                           IsInitialization_t IsInitOfDest)
+      : InstructionBaseWithTrailingOperands(Elts, DebugLoc) {
+    sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest =
+        bool(IsInitOfDest);
+  }
+
+  static TupleAddrConstructorInst *create(SILDebugLocation DebugLoc,
+                                          SILValue DestAddr,
+                                          ArrayRef<SILValue> Elements,
+                                          IsInitialization_t IsInitOfDest,
+                                          SILModule &Mod);
+
+public:
+  enum {
+    Dest = 0,
+  };
+
+  Operand &getDestOperand() { return getAllOperands().front(); }
+  const Operand &getDestOperand() const { return getAllOperands().front(); }
+
+  SILValue getDest() const { return getDestOperand().get(); }
+
+  /// The elements referenced by this TupleInst.
+  MutableArrayRef<Operand> getElementOperands() {
+    return getAllOperands().drop_front();
+  }
+
+  /// The elements referenced by this TupleInst.
+  OperandValueArrayRef getElements() const {
+    return OperandValueArrayRef(getAllOperands().drop_front());
+  }
+
+  /// Return the i'th value referenced by this TupleInst.
+  SILValue getElement(unsigned i) const { return getElements()[i]; }
+
+  unsigned getElementIndex(Operand *operand) {
+    assert(operand->getUser() == this);
+    assert(operand != &getDestOperand() && "Cannot pass in the destination");
+    return operand->getOperandNumber() + 1;
+  }
+
+  unsigned getNumElements() const { return getTupleType()->getNumElements(); }
+
+  TupleType *getTupleType() const {
+    // We use getASTType() since we want to look through a wrapped noncopyable
+    // type to get to the underlying tuple type.
+    return getDest()->getType().getASTType()->castTo<TupleType>();
+  }
+
+  IsInitialization_t isInitializationOfDest() const {
+    return IsInitialization_t(
+        sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest);
+  }
+  void setIsInitializationOfDest(IsInitialization_t I) {
+    sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest = (bool)I;
+  }
+};
+
 /// Represents a loadable enum constructed from one of its
 /// elements.
 class EnumInst

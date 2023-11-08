@@ -255,8 +255,13 @@ function Copy-File($Src, $Dst) {
   # Create the directory tree first so Copy-Item succeeds
   # If $Dst is the target directory, make sure it ends with "\"
   $DstDir = [IO.Path]::GetDirectoryName($Dst)
-  New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
-  Copy-Item -Force $Src $Dst
+  if ($ToBatch) {
+    Write-Output "md `"$DstDir`""
+    Write-Output "copy /Y `"$Src`" `"$Dst`""
+  } else {
+    New-Item -ItemType Directory -ErrorAction Ignore $DstDir | Out-Null
+    Copy-Item -Force $Src $Dst
+  }
 }
 
 function Copy-Directory($Src, $Dst) {
@@ -1558,46 +1563,56 @@ function Build-DocC() {
   }
 }
 
-function Build-Installer() {
+function Build-Installer($Arch) {
   $Properties = @{
     BundleFlavor = "offline";
-    DEVTOOLS_ROOT = "$($HostArch.ToolchainInstallRoot)\";
-    TOOLCHAIN_ROOT = "$($HostArch.ToolchainInstallRoot)\";
+    DEVTOOLS_ROOT = "$($Arch.ToolchainInstallRoot)\";
+    TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
     INCLUDE_SWIFT_FORMAT = "true";
-    SWIFT_FORMAT_BUILD = "$($HostArch.BinaryCache)\swift-format\release";
+    SWIFT_FORMAT_BUILD = "$($Arch.BinaryCache)\swift-format\release";
     INCLUDE_SWIFT_INSPECT = "true";
-    SWIFT_INSPECT_BUILD = "$($HostArch.BinaryCache)\swift-inspect\release";
+    SWIFT_INSPECT_BUILD = "$($Arch.BinaryCache)\swift-inspect\release";
     INCLUDE_SWIFT_DOCC = "true";
-    SWIFT_DOCC_BUILD = "$($HostArch.BinaryCache)\swift-docc\release";
+    SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
   }
 
   Isolate-EnvVars {
-    Invoke-VsDevShell $HostArch
-    $VCRedistInstallerPath = "${env:VCToolsRedistDir}\vc_redist.$($HostArch.ShortName).exe"
+    Invoke-VsDevShell $Arch
+    $VCRedistInstallerPath = "${env:VCToolsRedistDir}\vc_redist.$($Arch.ShortName).exe"
     if (Test-Path $VCRedistInstallerPath) {
       $Properties["VCRedistInstaller"] = $VCRedistInstallerPath
       $Properties["VSVersion"] = $env:VSCMD_VER
     }
   }
 
-  foreach ($Arch in $SDKArchs) {
-    $Properties["INCLUDE_$($Arch.VSName.ToUpperInvariant())_SDK"] = "true"
-    $Properties["PLATFORM_ROOT_$($Arch.VSName.ToUpperInvariant())"] = "$($Arch.PlatformInstallRoot)\"
-    $Properties["SDK_ROOT_$($Arch.VSName.ToUpperInvariant())"] = "$($Arch.SDKInstallRoot)\"
+  foreach ($SDK in $SDKArchs) {
+    $Properties["INCLUDE_$($SDK.VSName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["PLATFORM_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
+    $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
 
-  Build-WiXProject bundle\installer.wixproj -Arch $HostArch -Properties $Properties
+  Build-WiXProject bundle\installer.wixproj -Arch $Arch -Properties $Properties
+}
 
-  if ($Stage -and (-not $ToBatch)) {
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.cab" "$Stage\"
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msi" "$Stage\"
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\*.msm" "$Stage\"
-    Copy-File "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" "$Stage\"
-    # Extract installer engine to ease code-signing on swift.org CI
-    New-Item -Type Directory -Path "$($HostArch.BinaryCache)\installer\$($HostArch.VSName)\" -ErrorAction Ignore | Out-Null
-    Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn detach "$($HostArch.BinaryCache)\installer\Release\$($HostArch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($HostArch.BinaryCache)\installer\$($HostArch.VSName)\"
+function Stage-BuildArtifacts($Arch) {
+  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.cab" "$Stage\"
+  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\*.msi" "$Stage\"
+  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.cab" "$Stage\"
+  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\rtl.msi" "$Stage\"
+  foreach ($SDK in $SDKArchs) {
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).cab" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\sdk.$($SDK.VSName).msi" "$Stage\"
+    Copy-File "$($Arch.BinaryCache)\installer\Release\$($SDK.VSName)\rtl.$($SDK.VSName).msm" "$Stage\"
   }
+  Copy-File "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" "$Stage\"
+  # Extract installer engine to ease code-signing on swift.org CI
+  if ($ToBatch) {
+    Write-Output "md `"$($Arch.BinaryCache)\installer\$($Arch.VSName)\`""
+  } else {
+    New-Item -Type Directory -Path "$($Arch.BinaryCache)\installer\$($Arch.VSName)\" -ErrorAction Ignore | Out-Null
+  }
+  Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn detach "$($Arch.BinaryCache)\installer\Release\$($Arch.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$($Arch.BinaryCache)\installer\$($Arch.VSName)\"
 }
 
 #-------------------------------------------------------------------
@@ -1666,7 +1681,11 @@ if (-not $SkipBuild) {
 }
 
 if (-not $SkipPackaging) {
-  Invoke-BuildStep Build-Installer
+  Invoke-BuildStep Build-Installer $HostArch
+}
+
+if ($Stage) {
+  Stage-BuildArtifacts $HostArch
 }
 
 if ($Test -contains "swift") { Build-Compilers $HostArch -Test }

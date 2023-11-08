@@ -1196,11 +1196,6 @@ public:
 
 }  // end anonymous namespace
 
-static void _gatherWrittenGenericArgs(
-    const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
-    Demangler &BorrowFrom);
-
 static llvm::Optional<TypeLookupError>
 _gatherGenericParameters(const ContextDescriptor *context,
                          llvm::ArrayRef<MetadataOrPack> genericArgs,
@@ -1278,10 +1273,41 @@ _gatherGenericParameters(const ContextDescriptor *context,
     // Compute the set of generic arguments "as written".
     llvm::SmallVector<MetadataOrPack, 8> allGenericArgs;
 
-    // If we have a parent, gather it's generic arguments "as written".
-    if (parent) {
-      _gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
-                                allGenericArgs, demangler);
+    auto generics = context->getGenericContext();
+    assert(generics);
+
+    // If we have a parent, gather its generic arguments "as written". If our
+    // parent is not generic, there are no generic arguments to add.
+    if (parent && parent->getTypeContextDescriptor() &&
+        parent->getTypeContextDescriptor()->getGenericContext()) {
+      auto parentDescriptor = parent->getTypeContextDescriptor();
+      auto parentGenerics = parentDescriptor->getGenericContext();
+      auto packHeader = parentGenerics->getGenericPackShapeHeader();
+
+      // _gatherWrittenGenericParameters expects to immediately read key generic
+      // arguments, so skip past the shape classes if we have any.
+      auto nonShapeClassGenericArgs = parent->getGenericArgs() + packHeader.NumShapeClasses;
+
+      auto numKeyArgs = 0;
+      for (auto param : parentGenerics->getGenericParams()) {
+        if (param.hasKeyArgument()) {
+          numKeyArgs += 1;
+        }
+      }
+
+      llvm::ArrayRef<const void *> genericArgsRef(
+          reinterpret_cast<const void * const *>(nonShapeClassGenericArgs),
+          numKeyArgs);
+
+      if (!_gatherWrittenGenericParameters(parentDescriptor,
+                                           genericArgsRef,
+                                           allGenericArgs, demangler)) {
+        auto commonString = makeCommonErrorStringGetter();
+        return TypeLookupError([=] {
+          return commonString() + "failed to get parent context's written" +
+                 " generic arguments";
+        });
+      }
     }
     
     // Add the generic arguments we were given.
@@ -1290,8 +1316,6 @@ _gatherGenericParameters(const ContextDescriptor *context,
     
     // Copy the generic arguments needed for metadata from the generic
     // arguments "as written".
-    auto generics = context->getGenericContext();
-    assert(generics);
     {
       // Add a placeholder length for each shape class.
       auto packShapeHeader = generics->getGenericPackShapeHeader();
@@ -2876,12 +2900,21 @@ const Metadata *swift::_swift_instantiateCheckedGenericMetadata(
 
   DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
 
-  llvm::ArrayRef<MetadataOrPack> genericArgsRef(
-      reinterpret_cast<const MetadataOrPack *>(genericArgs), genericArgsSize);
+  // _instantiateCheckedGenericMetadata expects generic args to NOT begin with
+  // shape classes.
+  llvm::ArrayRef<const void *> genericArgsRef(genericArgs, genericArgsSize);
+  llvm::SmallVector<MetadataOrPack, 8> writtenGenericArgs;
+
+  // If we fail to fill in all of the generic parameters, just fail.
+  if (!_gatherWrittenGenericParameters(context, genericArgsRef,
+                                       writtenGenericArgs, demangler)) {
+    return nullptr;
+  }
+
   llvm::SmallVector<unsigned, 8> genericParamCounts;
   llvm::SmallVector<const void *, 8> allGenericArgs;
 
-  auto result = _gatherGenericParameters(context, genericArgsRef,
+  auto result = _gatherGenericParameters(context, writtenGenericArgs,
                                          /* parent */ nullptr,
                                          genericParamCounts, allGenericArgs,
                                          demangler);
@@ -3230,76 +3263,60 @@ demangleToGenericParamRef(StringRef typeName) {
                                        node->getChild(1)->getIndex());
 }
 
-static void _gatherWrittenGenericArgs(
-    const Metadata *metadata, const TypeContextDescriptor *description,
-    llvm::SmallVectorImpl<MetadataOrPack> &allGenericArgs,
-    Demangler &BorrowFrom) {
-  if (!description)
-    return;
-  auto generics = description->getGenericContext();
-  if (!generics)
-    return;
+bool swift::_gatherWrittenGenericParameters(
+    const TypeContextDescriptor *descriptor,
+    llvm::ArrayRef<const void *> keyArgs,
+    llvm::SmallVectorImpl<MetadataOrPack> &genericArgs,
+    Demangle::Demangler &Dem) {
+  if (!descriptor) {
+    return false;
+  }
 
+  auto genericContext = descriptor->getGenericContext();
+
+  // If the type itself is not generic, then we're done.
+  if (!genericContext) {
+    return true;
+  }
+
+  unsigned argIndex = 0;
   bool missingWrittenArguments = false;
-  auto genericArgs = description->getGenericArguments(metadata);
-  for (auto param : generics->getGenericParams()) {
-    switch (param.getKind()) {
-    case GenericParamKind::Type:
-      // The type should have a key argument unless it's been same-typed to
-      // another type.
-      if (param.hasKeyArgument()) {
-        auto genericArg = *genericArgs++;
-        allGenericArgs.push_back(MetadataOrPack(genericArg));
-      } else {
-        // Leave a gap for us to fill in by looking at same type info.
-        allGenericArgs.push_back(MetadataOrPack());
-        missingWrittenArguments = true;
-      }
 
-      break;
+  for (auto param : genericContext->getGenericParams()) {
+    // The type should have a key argument unless it's been same-typed to
+    // another type.
+    if (param.hasKeyArgument()) {
+      genericArgs.push_back(MetadataOrPack(keyArgs[argIndex]));
 
-    case GenericParamKind::TypePack:
-      // The type should have a key argument unless it's been same-typed to
-      // another type.
-      if (param.hasKeyArgument()) {
-        auto genericArg = reinterpret_cast<const Metadata * const *>(*genericArgs++);
-        MetadataPackPointer pack(genericArg);
-        allGenericArgs.push_back(MetadataOrPack(pack));
-      } else {
-        // Leave a gap for us to fill in by looking at same type info.
-        allGenericArgs.push_back(MetadataOrPack());
-        missingWrittenArguments = true;
-      }
-
-      break;
-
-    default:
-      // We don't know about this kind of parameter. Create placeholders where
-      // needed.
-      if (param.hasKeyArgument()) {
-        allGenericArgs.push_back(MetadataOrPack());
-        ++genericArgs;
-      }
-
-      break;
+      argIndex += 1;
+    } else {
+      // Leave a gap for us to fill in by looking at same-type requirements.
+      genericArgs.push_back(MetadataOrPack());
+      missingWrittenArguments = true;
     }
+
+    assert((param.getKind() == GenericParamKind::Type ||
+           param.getKind() == GenericParamKind::TypePack) &&
+           "Unknown generic parameter kind");
   }
 
   // If there is no follow-up work to do, we're done.
   if (!missingWrittenArguments)
-    return;
+    return true;
 
   // We have generic arguments that would be written, but have been
   // canonicalized away. Use same-type requirements to reconstitute them.
 
   // Retrieve the mapping information needed for depth/index -> flat index.
   llvm::SmallVector<unsigned, 8> genericParamCounts;
-  (void)_gatherGenericParameterCounts(description, genericParamCounts,
-                                      BorrowFrom);
+  (void)_gatherGenericParameterCounts(descriptor, genericParamCounts, Dem);
+
+  SubstGenericParametersFromWrittenArgs substitutions(genericArgs,
+                                                      genericParamCounts);
 
   // Walk through the generic requirements to evaluate same-type
   // constraints that are needed to fill in missing generic arguments.
-  for (const auto &req : generics->getGenericRequirements()) {
+  for (const auto &req : genericContext->getGenericRequirements()) {
     // We only care about same-type constraints.
     if (req.Flags.getKind() != GenericRequirementKind::SameType)
       continue;
@@ -3316,23 +3333,25 @@ static void _gatherWrittenGenericArgs(
     auto lhsFlatIndex =
       _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
                              genericParamCounts);
-    if (!lhsFlatIndex || *lhsFlatIndex >= allGenericArgs.size())
-      continue;
+    if (!lhsFlatIndex || *lhsFlatIndex >= genericArgs.size())
+      return false;
 
-    if (!allGenericArgs[*lhsFlatIndex]) {
+    if (!genericArgs[*lhsFlatIndex]) {
       // Substitute into the right-hand side.
-      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
-                                                          genericParamCounts);
-      allGenericArgs[*lhsFlatIndex] =
-          MetadataOrPack(swift_getTypeByMangledName(MetadataState::Abstract,
+      auto *genericArg =
+          swift_getTypeByMangledName(MetadataState::Abstract,
             req.getMangledTypeName(),
-            (const void * const *)allGenericArgs.data(),
+            keyArgs.data(),
             [&substitutions](unsigned depth, unsigned index) {
               return substitutions.getMetadata(depth, index).Ptr;
             },
             [&substitutions](const Metadata *type, unsigned index) {
               return substitutions.getWitnessTable(type, index);
-            }).getType().getMetadata());
+            }).getType().getMetadata();
+      if (!genericArg)
+        return false;
+
+      genericArgs[*lhsFlatIndex] = MetadataOrPack(genericArg);
       continue;
     }
 
@@ -3340,20 +3359,28 @@ static void _gatherWrittenGenericArgs(
     // the right-hand side is itself a generic parameter, which means
     // we have a same-type constraint A == B where A is already filled in.
     auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
-    if (!rhsParam)
+
+    // If the rhs parameter is not a generic parameter itself with
+    // (depth, index), it could potentially be some associated type. If that's
+    // the case, then we don't need to do anything else for this rhs because it
+    // won't appear in the key arguments list.
+    if (!rhsParam) {
       continue;
+    }
 
     auto rhsFlatIndex =
       _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
                              genericParamCounts);
-    if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
-      continue;
+    if (!rhsFlatIndex || *rhsFlatIndex >= genericArgs.size())
+      return false;
 
-    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[*lhsFlatIndex])
-      continue;
+    if (genericArgs[*rhsFlatIndex] || !genericArgs[*lhsFlatIndex])
+      return false;
 
-    allGenericArgs[*rhsFlatIndex] = allGenericArgs[*lhsFlatIndex];
+    genericArgs[*rhsFlatIndex] = genericArgs[*lhsFlatIndex];
   }
+
+  return true;
 }
 
 struct InitializeDynamicReplacementLookup {
