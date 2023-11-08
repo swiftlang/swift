@@ -1369,16 +1369,13 @@ class BlockPartitionState {
   /// The basic block that this state belongs to.
   SILBasicBlock *basicBlock;
 
-  /// The translator that we use to initialize our PartitionOps.
-  PartitionOpTranslator &translator;
-
   /// The vector of PartitionOps that are used to perform the dataflow in this
   /// block.
   std::vector<PartitionOp> blockPartitionOps = {};
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator)
-      : basicBlock(basicBlock), translator(translator) {
+      : basicBlock(basicBlock) {
     translator.translateSILBasicBlock(basicBlock, blockPartitionOps);
   }
 
@@ -1400,30 +1397,6 @@ class BlockPartitionState {
     return exitUpdated;
   }
 
-  /// Once the dataflow has converged, rerun the dataflow from the
-  /// entryPartition this time diagnosing errors as we apply the dataflow.
-  void diagnoseFailures(
-      llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
-          failureCallback,
-      llvm::function_ref<void(const PartitionOp &, TrackableValueID)>
-          transferredNonTransferrableCallback) {
-    Partition workingPartition = entryPartition;
-    PartitionOpEvaluator eval(workingPartition);
-    eval.failureCallback = failureCallback;
-    eval.transferredNonTransferrableCallback =
-        transferredNonTransferrableCallback;
-    eval.nonTransferrableElements = translator.getNeverTransferredValues();
-    eval.isActorDerivedCallback = [&](Element element) -> bool {
-      auto iter = translator.getValueForId(element);
-      if (!iter)
-        return false;
-      return iter->isActorDerived();
-    };
-    for (auto &partitionOp : blockPartitionOps) {
-      eval.apply(partitionOp);
-    }
-  }
-
 public:
   /// Run the passed action on each partitionOp in this block. Action should
   /// return true iff iteration should continue.
@@ -1433,6 +1406,8 @@ public:
       if (!action(partitionOp))
         break;
   }
+
+  ArrayRef<PartitionOp> getPartitionOps() const { return blockPartitionOps; }
 
   const Partition &getEntryPartition() const { return entryPartition; }
 
@@ -2126,13 +2101,15 @@ class PartitionAnalysis {
                             << function->getName() << "\n");
     RaceTracer tracer(function, blockStates);
 
+    // Then for each block...
     for (auto [block, blockState] : blockStates) {
       LLVM_DEBUG(llvm::dbgs() << "|--> Block bb" << block.getDebugID() << "\n");
 
-      // populate the raceTracer with all requires of transferred valued found
-      // throughout the CFG
-      blockState.diagnoseFailures(
-          /*handleFailure=*/
+      // Grab its entry partition and setup an evaluator for the partition that
+      // has callbacks that emit diagnsotics...
+      Partition workingPartition = blockState.getEntryPartition();
+      PartitionOpEvaluator eval(workingPartition);
+      eval.failureCallback = /*handleFailure=*/
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             auto expr = getExprForPartitionOp(partitionOp);
 
@@ -2149,9 +2126,8 @@ class PartitionAnalysis {
                                ->getRepresentative());
 
             raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
-          },
-
-          /*handleTransferNonTransferrable=*/
+          };
+      eval.transferredNonTransferrableCallback =
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             LLVM_DEBUG(llvm::dbgs()
                        << "Emitting TransferNonTransferrable Error!\n"
@@ -2162,14 +2138,26 @@ class PartitionAnalysis {
             auto expr = getExprForPartitionOp(partitionOp);
             function->getASTContext().Diags.diagnose(
                 expr->getLoc(), diag::arg_region_transferred);
-          });
+          };
+      eval.nonTransferrableElements = translator.getNeverTransferredValues();
+      eval.isActorDerivedCallback = [&](Element element) -> bool {
+        auto iter = translator.getValueForId(element);
+        if (!iter)
+          return false;
+        return iter->isActorDerived();
+      };
+
+      // And then evaluate all of our partition ops on the entry partition.
+      for (auto &partitionOp : blockState.getPartitionOps()) {
+        eval.apply(partitionOp);
+      }
     }
 
+    // Once we have run over all backs, dump the accumulator and ask the
+    // raceTracer to report diagnostics at the transfer sites for all the racy
+    // requirement sites entered into it above.
     LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
                raceTracer.getAccumulator().print(llvm::dbgs()););
-
-    // Ask the raceTracer to report diagnostics at the transfer sites for all
-    // the racy requirement sites entered into it above.
     raceTracer.getAccumulator().emitErrorsForTransferRequire(
         NUM_REQUIREMENTS_TO_DIAGNOSE);
   }
