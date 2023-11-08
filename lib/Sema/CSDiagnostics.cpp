@@ -7295,6 +7295,18 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 
   auto argType = getFromType();
 
+  // Unresolved key path argument requires a tailored diagnostic
+  // that doesn't mention a fallback type - `KeyPath<_, _>`.
+  if (argType->isKeyPath() && !isKnownKeyPathType(paramType)) {
+    auto keyPathTy = argType->castTo<BoundGenericType>();
+    auto rootTy = keyPathTy->getGenericArgs()[0];
+    if (rootTy->is<UnresolvedType>()) {
+      emitDiagnostic(diag::cannot_convert_unresolved_key_path_argument_value,
+                     paramType);
+      return true;
+    }
+  }
+
   if (paramType->isAnyObject()) {
     emitDiagnostic(diag::cannot_convert_argument_value_anyobject, argType,
                    paramType);
