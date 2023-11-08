@@ -239,8 +239,8 @@ class ASTContext final {
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -257,8 +257,8 @@ public:
       ClangImporterOptions &ClangImporterOpts,
       symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr,
-      std::function<bool(llvm::StringRef, bool)> PreModuleImportCallback = {});
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutBackend = nullptr
+      );
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -293,6 +293,8 @@ public:
 
   /// OutputBackend for writing outputs.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
+
+  void SetPreModuleImportCallback(std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)> callback);
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
