@@ -354,7 +354,7 @@ void swift::swift_reportError(uint32_t flags,
                               const char *message) {
 #if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
-#else
+#elif SWIFT_ENABLE_BACKTRACING
   // Disable fatalError backtraces if the backtracer is enabled
   if (runtime::backtrace::_swift_backtrace_isEnabled()) {
     flags &= ~FatalErrorFlags::ReportBacktrace;
