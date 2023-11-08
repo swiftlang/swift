@@ -1827,7 +1827,8 @@ uint16_t SILGenFunction::emitBasicProlog(
                                        (*errorType)->getCanonicalType());
   }
 
-  if (origErrorType && errorType) {
+  if (origErrorType && errorType &&
+      F.getConventions().hasIndirectSILErrorResults()) {
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
 

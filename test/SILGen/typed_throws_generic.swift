@@ -237,3 +237,20 @@ func reabstractClosureAsTypedThrowing(b: Bool) throws(MyError) -> Int {
   // CHECK: dealloc_stack [[INT_BOX]] : $*Int
   // CHECK-NEXT: throw [[ERROR]] : $MyError
 }
+
+
+extension Collection {
+  func typedMap<T, E>(body: (Element) throws(E) -> T) throws(E) -> [T] {
+    var result: [T] = []
+    for element in self {
+      result.append(try body(element))
+    }
+    return result
+  }
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic9forcedMapySayq_GSayxGr0_lFq_xXEfU_ : $@convention(thin) <T, U> (@in_guaranteed T) -> (@out U, @error Never)
+func forcedMap<T, U>(_ source: [T]) -> [U] {
+  // CHECK: bb0(%0 : $*U, %1 : $*T)
+  return source.typedMap { $0 as! U }
+}
