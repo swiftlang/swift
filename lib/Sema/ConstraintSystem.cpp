@@ -1160,7 +1160,6 @@ FunctionType *ConstraintSystem::openFunctionType(
        DeclContext *outerDC) {
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
     auto signature = genericFn->getGenericSignature();
-
     openGenericParameters(outerDC, signature, replacements, locator);
 
     openGenericRequirements(outerDC, signature,
@@ -1612,6 +1611,7 @@ AnyFunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     AnyFunctionType *fnType, ValueDecl *decl, DeclContext *dc,
     unsigned numApplies, bool isMainDispatchQueue, OpenedTypeMap &replacements,
     ConstraintLocatorBuilder locator) {
+
   return swift::adjustFunctionTypeForConcurrency(
       fnType, decl, dc, numApplies, isMainDispatchQueue,
       GetClosureType{*this}, ClosureIsolatedByPreconcurrency{*this},
@@ -1665,6 +1665,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
+  auto &ctx = getASTContext();
+
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -1710,6 +1712,14 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
+
+    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+      // All global functions should be @Sendable
+      if (!funcDecl->getDeclContext()->isTypeContext() && !funcDecl->getDeclContext()->isLocalContext() ) {
+        funcType =
+            funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
+      }
+    }
 
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
@@ -2416,6 +2426,36 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
+bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
+  // If this is a compiler synthesized implicit conversion, let's skip
+  // the check because the base of `UDE` is not the base of the injected
+  // initializer.
+  if (locator->isLastElement<LocatorPathElt::ConstructorMember>() &&
+      locator->findFirst<LocatorPathElt::ImplicitConversion>())
+    return false;
+
+  auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor());
+  if (UDE == nullptr)
+    return false;
+
+  auto baseTy =
+      simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
+
+  // If base is a metatype it would be ignored (unless this is an initializer
+  // call), but if it is some other type it means that we have a single
+  // application level already.
+  unsigned level = 0;
+  if (!baseTy->is<MetatypeType>())
+    ++level;
+
+  if (auto *call = dyn_cast_or_null<CallExpr>(getParentExpr(UDE))) {
+    if (UDE == call->getFn()->getSemanticsProvidingExpr())
+      level += 1;
+  }
+
+  return level < 2;
+}
+
 DeclReferenceType
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -2626,6 +2666,17 @@ ConstraintSystem::getTypeOfMemberReference(
                                                        functionType, locator);
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
+
+    if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
+      if (isPartialApplication(locator) &&
+          isSendableType(DC->getParentModule(), baseOpenedTy)) {
+        // Add @Sendable to functions without conditional conformances
+        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+      }
+      // Unapplied values should always be Sendable
+      info = info.withConcurrent();
+    }
+
     openedType =
         FunctionType::get(fullFunctionType->getParams(), functionType, info);
   }

@@ -3559,9 +3559,15 @@ static bool usesFeatureParameterPacks(Decl *decl) {
 
 static bool usesFeatureRegionBasedIsolation(Decl *decl) { return false; }
 
-static bool usesFeatureGlobalConcurrency(Decl *decl) { return false; }
+static bool usesFeatureGlobalConcurrency(Decl *decl) {
+  return false;
+}
 
 static bool usesFeatureIsolatedDefaultValues(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureInferSendableFromCaptures(Decl *decl) {
   return false;
 }
 
