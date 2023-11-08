@@ -928,7 +928,7 @@ public:
     // Stores to storage of non-Sendable type can be ignored.
   }
 
-  void translateSILTupleAddrConstructor(TupleAddrConstructorInst *inst) {
+  void translateSILInitTupleAddr(InitTupleAddrInst *inst) {
     SILValue dest = inst->getDest();
     if (auto nonSendableTgt = tryToTrackValue(dest)) {
       // In the following situations, we can perform an assign:
@@ -1128,9 +1128,9 @@ public:
     case SILInstructionKind::StoreWeakInst:
       return translateSILStore(inst->getOperand(1), inst->getOperand(0));
 
-    case SILInstructionKind::TupleAddrConstructorInst:
-      return translateSILTupleAddrConstructor(
-          cast<TupleAddrConstructorInst>(inst));
+    case SILInstructionKind::InitTupleAddrInst:
+      return translateSILInitTupleAddr(
+          cast<InitTupleAddrInst>(inst));
 
     // Applies are handled specially since we need to merge their results.
     case SILInstructionKind::ApplyInst:

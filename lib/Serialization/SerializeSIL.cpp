@@ -2334,10 +2334,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)TI->getType().getCategory(), ListOfValues);
     break;
   }
-  case SILInstructionKind::TupleAddrConstructorInst: {
+  case SILInstructionKind::InitTupleAddrInst: {
     // Format: a type followed by a list of values. A value is expressed by
     // 2 IDs: ValueID, ValueResultNumber.
-    const auto *TI = cast<TupleAddrConstructorInst>(&SI);
+    const auto *TI = cast<InitTupleAddrInst>(&SI);
     SmallVector<uint64_t, 4> ListOfValues;
     auto getValue = [&](SILValue value) -> uint64_t {
       uint32_t result = addValueRef(value);

@@ -71,7 +71,8 @@
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
                     "mark_uninitialized_behavior"
                     "mark_function_escape" "copy_addr" "destroy_addr"
-                    "index_addr" "index_raw_pointer" "bind_memory" "to")
+                    "index_addr" "index_raw_pointer" "bind_memory" "to"
+                    "init_tuple_addr")
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing

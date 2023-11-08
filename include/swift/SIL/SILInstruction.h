@@ -6339,29 +6339,29 @@ public:
   }
 };
 
-/// TupleAddrConstructorInst - a constructor for address tuples. Can take
+/// InitTupleAddrInst - a constructor for address tuples. Can take
 /// objects and addresses. Intended only to be used with diagnostics and be
 /// lowered after diagnostics run. Once we have opaque values this will not be
 /// necessary.
 ///
-/// tuple_addr_constructor [init] dest with (operands)
+/// init_tuple_addr [init] dest with (operands)
 ///
 /// This always consumes its operands but will either init or assign into dest.
-class TupleAddrConstructorInst final
+class InitTupleAddrInst final
     : public InstructionBaseWithTrailingOperands<
-          SILInstructionKind::TupleAddrConstructorInst,
-          TupleAddrConstructorInst, NonValueInstruction> {
+          SILInstructionKind::InitTupleAddrInst,
+          InitTupleAddrInst, NonValueInstruction> {
   friend SILBuilder;
   USE_SHARED_UINT8;
 
-  TupleAddrConstructorInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elts,
+  InitTupleAddrInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Elts,
                            IsInitialization_t IsInitOfDest)
       : InstructionBaseWithTrailingOperands(Elts, DebugLoc) {
-    sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest =
+    sharedUInt8().InitTupleAddrInst.isInitializationOfDest =
         bool(IsInitOfDest);
   }
 
-  static TupleAddrConstructorInst *create(SILDebugLocation DebugLoc,
+  static InitTupleAddrInst *create(SILDebugLocation DebugLoc,
                                           SILValue DestAddr,
                                           ArrayRef<SILValue> Elements,
                                           IsInitialization_t IsInitOfDest,
@@ -6406,10 +6406,10 @@ public:
 
   IsInitialization_t isInitializationOfDest() const {
     return IsInitialization_t(
-        sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest);
+        sharedUInt8().InitTupleAddrInst.isInitializationOfDest);
   }
   void setIsInitializationOfDest(IsInitialization_t I) {
-    sharedUInt8().TupleAddrConstructorInst.isInitializationOfDest = (bool)I;
+    sharedUInt8().InitTupleAddrInst.isInitializationOfDest = (bool)I;
   }
 };
 

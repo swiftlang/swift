@@ -43,7 +43,7 @@ target_sources(swiftSILOptimizer PRIVATE
   RawSILInstLowering.cpp
   ReferenceBindingTransform.cpp
   TransferNonSendable.cpp
-  LowerTupleAddrConstructor.cpp
+  LowerInitTupleAddr.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
   OSLogOptimization.cpp

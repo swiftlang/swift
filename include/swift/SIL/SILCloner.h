@@ -2182,8 +2182,8 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitTupleAddrConstructorInst(
-    TupleAddrConstructorInst *Inst) {
+void SILCloner<ImplClass>::visitInitTupleAddrInst(
+    InitTupleAddrInst *Inst) {
   SmallVector<SILValue, 8> Elements;
   for (auto e : Inst->getElements()) {
     SILValue mappedValue = getOpValue(e);
@@ -2204,7 +2204,7 @@ void SILCloner<ImplClass>::visitTupleAddrConstructorInst(
     return;
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createTupleAddrConstructor(
+  recordClonedInstruction(Inst, getBuilder().createInitTupleAddr(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getDest()), Elements,
                                     Inst->isInitializationOfDest()));

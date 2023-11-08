@@ -2529,7 +2529,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     return;
   }
 
-  if (auto *TACI = dyn_cast<TupleAddrConstructorInst>(Inst)) {
+  if (auto *TACI = dyn_cast<InitTupleAddrInst>(Inst)) {
     assert(!TACI->isInitializationOfDest() &&
            "should not modify copy_addr that already knows it is initialized");
     TACI->setIsInitializationOfDest(InitKind);

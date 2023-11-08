@@ -34,7 +34,7 @@ struct MyText<V> {
   // expected-note @-2 {{'self.value.1' not initialized}} 
 }
 
-sil [ossa] @tuple_addr_constructor_1 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+sil [ossa] @init_tuple_addr_1 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
@@ -45,7 +45,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   end_access %8 : $*MyText<(Int, Int)>
   %12 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
   %13 = struct_element_addr %12 : $*MyText<(Int, Int)>, #MyText.value
-  tuple_addr_constructor [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
+  init_tuple_addr [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
   end_access %12 : $*MyText<(Int, Int)>
   %16 = load [copy] %4 : $*MyText<(Int, Int)>
   destroy_value %0 : $String
@@ -54,7 +54,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   return %16 : $MyText<(Int, Int)>
 }
 
-sil [ossa] @tuple_addr_constructor_2 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+sil [ossa] @init_tuple_addr_2 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>
@@ -65,7 +65,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   end_access %8 : $*MyText<(Int, Int)>
   %12 = begin_access [modify] [static] %4 : $*MyText<(Int, Int)>
   %13 = struct_element_addr %12 : $*MyText<(Int, Int)>, #MyText.value
-  tuple_addr_constructor [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
+  init_tuple_addr [assign] %13 : $*(Int, Int) with (%1 : $Int, %1 : $Int)
   end_access %12 : $*MyText<(Int, Int)>
   %16 = load [copy] %4 : $*MyText<(Int, Int)> // expected-error {{return from initializer without initializing all stored properties}}
   destroy_value %0 : $String
@@ -74,7 +74,7 @@ bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   return %16 : $MyText<(Int, Int)>
 }
 
-sil [ossa] @tuple_addr_constructor_3 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
+sil [ossa] @init_tuple_addr_3 : $@convention(method) (@owned String, Int, @thin MyText<(Int, Int)>.Type) -> @owned MyText<(Int, Int)> {
 bb0(%0 : @owned $String, %1 : $Int, %2 : $@thin MyText<(Int, Int)>.Type):
   %3 = alloc_stack $MyText<(Int, Int)>, var, name "self", implicit
   %4 = mark_uninitialized [rootself] %3 : $*MyText<(Int, Int)>

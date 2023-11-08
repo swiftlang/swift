@@ -5328,7 +5328,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       ResultVal = B.createTuple(InstLoc, Ty, OpList);
       break;
     }
-    case SILInstructionKind::TupleAddrConstructorInst: {
+    case SILInstructionKind::InitTupleAddrInst: {
       // First parse [init] or [assign].
       StringRef InitOrAssign;
       SILValue DestValue;
@@ -5383,7 +5383,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       ResultVal =
-          B.createTupleAddrConstructor(InstLoc, DestValue, OpList, *IsInit);
+          B.createInitTupleAddr(InstLoc, DestValue, OpList, *IsInit);
       break;
     }
     case SILInstructionKind::EnumInst: {

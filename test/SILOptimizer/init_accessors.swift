@@ -28,7 +28,7 @@ struct TestInit {
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*Int
     //
     // CHECK-NEXT: [[FULL_ACCESS:%.*]] = begin_access [modify] [static] [[FULL_REF]] : $*(Int, Int)
-    // CHECK-NEXT: tuple_addr_constructor [init] [[FULL_ACCESS]] : $*(Int, Int) with ([[X_VAL]] : $Int, [[Y_VAL]] : $Int)
+    // CHECK-NEXT: init_tuple_addr [init] [[FULL_ACCESS]] : $*(Int, Int) with ([[X_VAL]] : $Int, [[Y_VAL]] : $Int)
     // CHECK-NEXT: end_access [[FULL_ACCESS]] : $*(Int, Int)
     @storageRestrictions(initializes: y, full, accesses: x)
     init(initialValue) {
@@ -234,7 +234,7 @@ class TestClass {
     // CHECK: ([[X_VAL:%.*]], [[Y_VAL:%.*]]) = destructure_tuple {{.*}} : $(Int, (Int, Array<String>))
     // CHECK: ([[Y_VAL_0:%.*]], [[Y_VAL_1:%.*]]) = destructure_tuple {{.*}} : $(Int, Array<String>)
     // CHECK: [[Y_ACCESS:%.*]] = begin_access [modify] [static] [[Y_REF]] : $*(Int, Array<String>)
-    // CHECK-NEXT: tuple_addr_constructor [init] [[Y_ACCESS]] : $*(Int, Array<String>) with ([[Y_VAL_0]] : $Int, [[Y_VAL_1]] :
+    // CHECK-NEXT: init_tuple_addr [init] [[Y_ACCESS]] : $*(Int, Array<String>) with ([[Y_VAL_0]] : $Int, [[Y_VAL_1]] :
     // CHECK-NEXT: end_access [[Y_ACCESS]] : $*(Int, Array<String>)
     @storageRestrictions(initializes: x, y)
     init(initialValue) {
