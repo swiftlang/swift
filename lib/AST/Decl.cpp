@@ -3227,14 +3227,12 @@ bool swift::conflicting(const OverloadSignature& sig1,
   // versions, as that is what the async overloading aimed to address.
   //
   // Note also, that overloading on throws is already illegal anyway.
-  if (sig1.IsDistributed || sig2.IsDistributed) {
-    if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
-      return true;
-  } else {
-    // Otherwise one is an async function and the other is not, they don't conflict.
+  if (!sig1.IsDistributed && !sig2.IsDistributed) {
+    // For non-distributed functions,
+    // if one is an async function and the other is not, they don't conflict.
     if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
       return false;
-  }
+  } // else, if any of the methods was distributed, continue checking
 
   // If one is a macro and the other is not, they can't conflict.
   if (sig1.IsMacro != sig2.IsMacro)
