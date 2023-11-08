@@ -9,20 +9,7 @@
 
 import Dispatch
 
-protocol CountingExecutor: Executor, Sendable {
-  var enqueueCount: Int { get }
-
-  func expectEnqueues(_ expected: Int)
-}
-
-extension CountingExecutor {
-  func expectEnqueues(_ expected: Int) {
-    precondition(self.enqueueCount == expected, "Expected [\(expected)] enqueues but had [\(enqueueCount)] (difference: \(enqueueCount - expected))")
-  }
-}
-
-final class CountEnqueuesSerialExecutor: SerialExecutor, CountingExecutor, @unchecked Sendable {
-  var enqueueCount = 0
+final class MyTaskExecutor: TaskExecutor, @unchecked Sendable {
   let queue: DispatchQueue
 
   init(queue: DispatchQueue) {
@@ -30,80 +17,91 @@ final class CountEnqueuesSerialExecutor: SerialExecutor, CountingExecutor, @unch
   }
 
   func enqueue(_ job: consuming ExecutorJob) {
-    enqueueCount += 1
     let job = UnownedJob(job)
     queue.async {
-      job.runSynchronously(on: self.asUnownedSerialExecutor())
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
   }
 }
 
-final class CountEnqueuesExecutor: CountingExecutor, @unchecked Sendable {
-  var enqueueCount = 0
-  let queue: DispatchQueue
-
-  init(queue: DispatchQueue) {
-    self.queue = queue
-  }
-
-  func enqueue(_ job: consuming ExecutorJob) {
-    enqueueCount += 1
-    let job = UnownedJob(job)
-//    queue.async {
-//     job.runSynchronously(on: self.asUnownedSerialExecutor())
-//    }
-  }
-}
-
-
-func nonisolatedAsyncMethod(expect executor: CountEnqueuesSerialExecutor) async {
-  executor.preconditionIsolated()
+nonisolated func nonisolatedAsyncMethod(expectedOn executor: MyTaskExecutor) async {
   dispatchPrecondition(condition: .onQueue(executor.queue))
-
-  print("Hello there")
 }
 
-nonisolated func testFromNonisolated(_ countingSerialExecutor: CountEnqueuesSerialExecutor) async {
-  await withTaskExecutor(countingSerialExecutor) {
-    countingSerialExecutor.preconditionIsolated()
-    dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-    print("OK: withTaskExecutor body")
+@MainActor
+func testNestingWithExecutor(_ firstExecutor: MyTaskExecutor,
+                             _ secondExecutor: MyTaskExecutor) async {
+//  MainActor.preconditionIsolated()
+//  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+//
+//  await withTaskExecutor(firstExecutor) {
+//    // the block immediately hops to the expected executor
+//    dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
+//    print("OK: withTaskExecutor body")
+//    await nonisolatedAsyncMethod(expectedOn: firstExecutor)
+//  }
+//  MainActor.preconditionIsolated()
+//
+//  await withTaskExecutor(firstExecutor) {
+//    await withTaskExecutor(secondExecutor) {
+//      // the block immediately hops to the expected executor
+//      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+//      dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
+//      print("OK: withTaskExecutor { withTaskExecutor { ... } }")
+//      await nonisolatedAsyncMethod(expectedOn: secondExecutor)
+//    }
+//  }
+//  MainActor.preconditionIsolated()
+
+  await withTaskExecutor(firstExecutor) {
+    await withTaskExecutor(secondExecutor) {
+      await withTaskExecutor(firstExecutor) {
+        // the block immediately hops to the expected executor
+        dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
+        dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
+        print("OK: withTaskExecutor { withTaskExecutor withTaskExecutor { { ... } } }")
+        await nonisolatedAsyncMethod(expectedOn: firstExecutor)
+      }
+    }
+  }
+
+  MainActor.preconditionIsolated()
+  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+}
+
+func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
+                                         _ secondExecutor: MyTaskExecutor) async {
+  dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+  dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
+
+  await withTaskExecutor(firstExecutor) {
+    dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
+    dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
+    await withTaskExecutor(nil) {
+      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+      dispatchPrecondition(condition: .notOnQueue(secondExecutor.queue))
+      print("OK: withTaskExecutor(nil) { ... }")
+    }
   }
 }
 
 @main struct Main {
 
   static func main() async {
-    if #available(SwiftStdlib 5.9, *) {
-      let queue = DispatchQueue(label: "sample")
-      let countingSerialExecutor = CountEnqueuesSerialExecutor(queue: queue)
-      let countingExecutor = CountEnqueuesExecutor(queue: queue)
+    let firstExecutor = MyTaskExecutor(queue: DispatchQueue(label: "first"))
+    let secondExecutor = MyTaskExecutor(queue: DispatchQueue(label: "second"))
 
-      await testFromNonisolated(countingSerialExecutor)
+    // === nonisolated func
+//    await Task(on: firstExecutor) {
+//      await nonisolatedAsyncMethod(expectedOn: firstExecutor)
+//    }.value
 
-      MainActor.preconditionIsolated()
-      await withTaskExecutor(countingSerialExecutor) {
-        // the block immediately hops to the expected executor
-        countingSerialExecutor.preconditionIsolated()
-        dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-        print("OK: withTaskExecutor body")
-      }
+    // We properly hop back to the main executor from the nonisolated func which used a a task executor
+    MainActor.preconditionIsolated()
+    dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
 
-      // A nonisolated async func must run on the expected executor,
-      // rather than on the default global pool
-      await withTaskExecutor(countingSerialExecutor) {
-        await nonisolatedAsyncMethod(expect: countingSerialExecutor)
-        print("OK: nonisolated async func")
-      }
+    await testNestingWithExecutor(firstExecutor, secondExecutor)
 
-      // TODO: implement handling Executor and not just SerialExecutor
-//      await withTaskExecutor(countingExecutor) {
-//        // the block immediately hops to the expected executor
-//        countingSerialExecutor.preconditionIsolated()
-//        dispatchPrecondition(condition: .onQueue(countingSerialExecutor.queue))
-//        print("OK: withTaskExecutor body")
-//      }
-
-    }
+//    await testDisablingTaskExecutorPreference(firstExecutor, secondExecutor)
   }
 }

@@ -549,9 +549,7 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
 }
 
 TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
-  fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   if (auto task = swift_task_getCurrent()) {
-    fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     return task->getPreferredTaskExecutor();
   } else {
     return TaskExecutorRef::undefined(); // "no executor preference"
@@ -578,7 +576,7 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) 
 void AsyncTask::pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
-  fprintf(stderr, "[%s:%d](%s) create task preference record [%p] for task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+  fprintf(stderr, "[%s:%d](%s) push task preference record [%p] for task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
           allocation, this);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p", allocation, this);
 
