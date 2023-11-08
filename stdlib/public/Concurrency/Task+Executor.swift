@@ -29,7 +29,11 @@ public func withTaskExecutor<T: Sendable>(
           // so we cannot just cast and assume it'll be correct.
           executor.asUnownedTaskExecutor().executor
         } else {
-          _getGenericExecutor() // FIXME: "get the no preference executor (0,0)"
+          // we must push a "no preference" record onto the task
+          // because there may be other records issuing a preference already,
+          // so by pushing this "no preference" (undefined task executor),
+          // we turn off the task executor preference for the scope of `operation`.
+          _getUndefinedTaskExecutor()
         }
 
     let record = _pushTaskExecutorPreference(executorBuiltin)
@@ -125,3 +129,8 @@ internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
 internal func _popTaskExecutorPreference(
   record: UnsafeRawPointer /*TaskExecutorPreferenceStatusRecord*/
 )
+
+@available(SwiftStdlib 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_getUndefinedTaskExecutor")
+internal func _getUndefinedTaskExecutor() -> Builtin.Executor

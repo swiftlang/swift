@@ -31,27 +31,27 @@ nonisolated func nonisolatedAsyncMethod(expectedOn executor: MyTaskExecutor) asy
 @MainActor
 func testNestingWithExecutor(_ firstExecutor: MyTaskExecutor,
                              _ secondExecutor: MyTaskExecutor) async {
-//  MainActor.preconditionIsolated()
-//  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
-//
-//  await withTaskExecutor(firstExecutor) {
-//    // the block immediately hops to the expected executor
-//    dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
-//    print("OK: withTaskExecutor body")
-//    await nonisolatedAsyncMethod(expectedOn: firstExecutor)
-//  }
-//  MainActor.preconditionIsolated()
-//
-//  await withTaskExecutor(firstExecutor) {
-//    await withTaskExecutor(secondExecutor) {
-//      // the block immediately hops to the expected executor
-//      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
-//      dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
-//      print("OK: withTaskExecutor { withTaskExecutor { ... } }")
-//      await nonisolatedAsyncMethod(expectedOn: secondExecutor)
-//    }
-//  }
-//  MainActor.preconditionIsolated()
+  MainActor.preconditionIsolated()
+  dispatchPrecondition(condition: .onQueue(DispatchQueue.main))
+
+  await withTaskExecutor(firstExecutor) {
+    // the block immediately hops to the expected executor
+    dispatchPrecondition(condition: .onQueue(firstExecutor.queue))
+    print("OK: withTaskExecutor body")
+    await nonisolatedAsyncMethod(expectedOn: firstExecutor)
+  }
+  MainActor.preconditionIsolated()
+
+  await withTaskExecutor(firstExecutor) {
+    await withTaskExecutor(secondExecutor) {
+      // the block immediately hops to the expected executor
+      dispatchPrecondition(condition: .notOnQueue(firstExecutor.queue))
+      dispatchPrecondition(condition: .onQueue(secondExecutor.queue))
+      print("OK: withTaskExecutor { withTaskExecutor { ... } }")
+      await nonisolatedAsyncMethod(expectedOn: secondExecutor)
+    }
+  }
+  MainActor.preconditionIsolated()
 
   await withTaskExecutor(firstExecutor) {
     await withTaskExecutor(secondExecutor) {
@@ -92,9 +92,9 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
     let secondExecutor = MyTaskExecutor(queue: DispatchQueue(label: "second"))
 
     // === nonisolated func
-//    await Task(on: firstExecutor) {
-//      await nonisolatedAsyncMethod(expectedOn: firstExecutor)
-//    }.value
+    await Task(on: firstExecutor) {
+      await nonisolatedAsyncMethod(expectedOn: firstExecutor)
+    }.value
 
     // We properly hop back to the main executor from the nonisolated func which used a a task executor
     MainActor.preconditionIsolated()
