@@ -5435,10 +5435,30 @@ static void skipAttribute(Parser &P) {
 
 bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
                                 bool hadAttrsOrModifiers) {
+  const bool isTopLevelLibrary = (SF.Kind == SourceFileKind::Library) ||
+                                 (SF.Kind == SourceFileKind::Interface) ||
+                                 (SF.Kind == SourceFileKind::SIL);
   if (Tok.is(tok::at_sign) && peekToken().is(tok::kw_rethrows)) {
     // @rethrows does not follow the general rule of @<identifier> so
     // it is needed to short circuit this else there will be an infinite
     // loop on invalid attributes of just rethrows
+  } else if (Context.LangOpts.hasFeature(Feature::GlobalConcurrency) &&
+             (Tok.getKind() == tok::identifier) &&
+             Tok.getText().equals("nonisolated") && isTopLevelLibrary &&
+             !CurDeclContext->isLocalContext()) {
+    // TODO: hack to unblock proposal review by treating top-level nonisolated
+    // contextual keyword like an attribute; more robust implementation pending
+    BacktrackingScope backtrack(*this);
+    skipAttribute(*this);
+
+    // If this attribute is the last element in the block,
+    // consider it is a start of incomplete decl.
+    if (Tok.isAny(tok::r_brace, tok::eof) ||
+        (Tok.is(tok::pound_endif) && !allowPoundIfAttributes))
+      return true;
+
+    return isStartOfSwiftDecl(allowPoundIfAttributes,
+                              /*hadAttrsOrModifiers=*/true);
   } else if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok)) {
     // If this is obviously not the start of a decl, then we're done.
     return false;
