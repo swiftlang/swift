@@ -184,7 +184,7 @@ static bool isProjectedFromAggregate(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
-//                           MARK: Main Computation
+//                       MARK: Instruction Level Model
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -1342,6 +1342,14 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
 #endif
 }
 
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                          MARK: Block Level Model
+//===----------------------------------------------------------------------===//
+
+namespace {
+
 /// Dataflow State associated with a specific SILBasicBlock.
 class BlockPartitionState {
   friend class PartitionAnalysis;
@@ -1462,6 +1470,14 @@ public:
     os << SEP_STR;
   }
 };
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//       MARK: Inferring Transferred Instruction from violating Require
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 /// Classified kind for a LocalTransferredReason.
 enum class LocalTransferredReasonKind {
@@ -1948,6 +1964,14 @@ public:
 
   const TransferRequireAccumulator &getAccumulator() { return accumulator; }
 };
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+//                               MARK: Dataflow
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 /// The top level datastructure that we use to perform our dataflow. It
 /// contains:
