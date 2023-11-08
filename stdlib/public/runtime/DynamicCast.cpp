@@ -126,8 +126,8 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
 
   std::string srcTypeName = nameForMetadata(srcType);
   std::string destTypeName = nameForMetadata(destType);
-  const char * const msg = "Non-Optional value of type '%s' (%p)"
-                    " holds a null pointer?!"
+  const char * const msg = "Found a null pointer in a value of type '%s' (%p)."
+                    " Non-Optional values are not allowed to hold null pointers."
                     " (Detected while casting to '%s' (%p))%s\n";
   if (runtime::bincompat::useLegacyPermissiveObjCNullSemanticsInCasting()) {
     // In backwards compatibility mode, this code will warn and return the null
