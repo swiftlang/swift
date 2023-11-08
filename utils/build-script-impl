@@ -2783,6 +2783,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 FILTER_SWIFT_OPTION="--filter=[sS]wift"
+                FILTER_SWIFT_API_OPTION="--filter=lang/swift"
                 LLVM_LIT_FILTER_ARG=""
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_FILTER_ARG="${FILTER_SWIFT_OPTION}"
@@ -2798,11 +2799,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
                          ${LLVM_LIT_ARGS} ${LLVM_LIT_FILTER_ARG}
-                echo "--- Rerun LLDB Swift tests (using only DWARFImporter) ---"
+                echo "--- Rerun LLDB Swift API tests (using only DWARFImporter) ---"
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/test" \
-                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_OPTION} \
+                         ${LLVM_LIT_ARGS} ${FILTER_SWIFT_API_OPTION} \
                          --param dotest-args="--setting symbols.use-swift-clangimporter=false"
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
