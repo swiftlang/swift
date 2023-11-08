@@ -4948,5 +4948,5 @@ bool SILFunctionConventions::isTypedError() const {
   return !funcTy->getErrorResult()
         .getInterfaceType()->isEqual(
             funcTy->getASTContext().getErrorExistentialType()) ||
-    getNumIndirectSILResults() > 0;
+    hasIndirectSILErrorResults();
 }

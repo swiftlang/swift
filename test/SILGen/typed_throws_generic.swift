@@ -180,3 +180,60 @@ func reabstractAsConcreteThrowing() throws -> Int {
 // CHECK: [[ERROR_BB]]([[INNER_ERROR:%.*]] : $MyError):
 // CHECK-NEXT: store [[INNER_ERROR]] to [trivial] [[OUTER_ERROR]] : $*MyError
 // CHECK-NEXT: throw_addr
+
+
+// CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic30reabstractClosureAsNonthrowingSiyF : $@convention(thin) () -> Int
+func reabstractClosureAsNonthrowing() -> Int {
+  // CHECK: [[INT_BOX:%.*]] = alloc_stack $Int
+  // CHECK: [[CLOSURE:%.*]] = function_ref @$s20typed_throws_generic30reabstractClosureAsNonthrowingSiyFSiyXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
+  // CHECK-NEXT: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int> to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
+  // CHECK: [[CALLEE:%.*]] = function_ref @$s20typed_throws_generic15passthroughCallyxxyq_YKXEq_YKs5ErrorR_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1)
+  // CHECK-NEXT: [[NEVER_BOX:%.*]] = alloc_stack $Never
+  // CHECK-NEXT: try_apply [[CALLEE]]<Int, Never>([[INT_BOX]], [[NEVER_BOX]], [[THICK_CLOSURE]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  passthroughCall { 5 }
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK-NEXT: dealloc_stack [[NEVER_BOX]] : $*Never
+  // CHECK-NEXT: [[RESULT:%.*]] = load [trivial] [[INT_BOX]] : $*Int
+  // CHECK-NEXT: dealloc_stack [[INT_BOX]] : $*Int
+  // CHECK-NEXT: return [[RESULT]] : $Int
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK-NEXT: unreachable
+
+  // CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic30reabstractClosureAsNonthrowingSiyFSiyXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
+}
+
+func reabstractClosureAsThrowing(b: Bool) throws -> Int {
+  try passthroughCall {
+    if b {
+      throw MyError.fail
+    }
+
+    return 5
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic32reabstractClosureAsTypedThrowing1bSiSb_tAA7MyErrorOYKF : $@convention(thin) (Bool) -> (Int, @error MyError)
+func reabstractClosureAsTypedThrowing(b: Bool) throws(MyError) -> Int {
+  // CHECK: try_apply [[CALLEE:%.*]]<Int, MyError>([[INT_BOX:%.*]], [[ERROR_BOX:%.*]], [[THICK_CLOSURE:%.*]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <τ_0_1, τ_0_0>) -> (@out τ_0_0, @error_indirect τ_0_1), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  try passthroughCall { () throws(MyError) -> Int in
+    if b {
+      throw MyError.fail
+    }
+
+    return 5
+  }
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK-NEXT: dealloc_stack [[ERROR_BOX]] : $*MyError
+  // CHECK: [[RESULT:%.*]] = load [trivial] [[INT_BOX]] : $*Int
+  // CHECK-NEXT: dealloc_stack [[INT_BOX]] : $*Int
+  // CHECK-NEXT: return [[RESULT]] : $Int
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK-NEXT: [[ERROR:%.*]] = load [trivial] [[ERROR_BOX]] : $*MyError
+  // CHECK-NEXT: dealloc_stack [[ERROR_BOX]] : $*MyError
+  // CHECK: dealloc_stack [[INT_BOX]] : $*Int
+  // CHECK-NEXT: throw [[ERROR]] : $MyError
+}
