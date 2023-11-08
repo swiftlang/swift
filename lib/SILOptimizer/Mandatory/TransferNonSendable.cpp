@@ -1398,15 +1398,6 @@ class BlockPartitionState {
   }
 
 public:
-  /// Run the passed action on each partitionOp in this block. Action should
-  /// return true iff iteration should continue.
-  void forEachPartitionOp(
-      llvm::function_ref<bool(const PartitionOp &)> action) const {
-    for (const PartitionOp &partitionOp : blockPartitionOps)
-      if (!action(partitionOp))
-        break;
-  }
-
   ArrayRef<PartitionOp> getPartitionOps() const { return blockPartitionOps; }
 
   const Partition &getEntryPartition() const { return entryPartition; }
@@ -1831,15 +1822,15 @@ class RaceTracer {
     if (!targetOp && transferredAtExitReasons.count({SILBlock, transferredVal}))
       return transferredAtExitReasons.at({SILBlock, transferredVal});
 
-    const BlockPartitionState &block = blockStates[SILBlock];
+    const BlockPartitionState &blockState = blockStates[SILBlock];
 
     // If targetOp is null, we're checking why the value is transferred at exit,
     // so assert that it's actually transferred at exit
-    assert(targetOp || block.getExitPartition().isTransferred(transferredVal));
+    assert(targetOp || blockState.getExitPartition().isTransferred(transferredVal));
 
     std::optional<LocalTransferredReason> transferredReason;
 
-    Partition workingPartition = block.getEntryPartition();
+    Partition workingPartition = blockState.getEntryPartition();
 
     // We are looking for a local reason, so if the value is transferred at
     // entry, revive it for the sake of this search.
@@ -1849,10 +1840,10 @@ class RaceTracer {
       eval.apply(PartitionOp::AssignFresh(transferredVal));
     }
 
-    int i = 0;
-    block.forEachPartitionOp([&](const PartitionOp &partitionOp) {
+    for (const auto &partitionOp : blockState.getPartitionOps()) {
       if (targetOp == partitionOp)
-        return false; // break
+        break;
+
       PartitionOpEvaluator eval(workingPartition);
       eval.emitLog = false;
       eval.apply(partitionOp);
@@ -1869,16 +1860,12 @@ class RaceTracer {
       if (!workingPartition.isTransferred(transferredVal) && transferredReason)
         // Value is no longer transferred - e.g. reassigned or assigned fresh.
         transferredReason = llvm::None;
-
-      // continue walking block
-      i++;
-      return true;
-    });
+    }
 
     // If we failed to find a local transfer reason, but the value was
     // transferred at entry to the block, then the reason is "NonLocal".
     if (!transferredReason &&
-        block.getEntryPartition().isTransferred(transferredVal))
+        blockState.getEntryPartition().isTransferred(transferredVal))
       transferredReason = LocalTransferredReason::NonLocal();
 
     // If transferredReason is none, then transferredVal was not actually
@@ -1902,13 +1889,14 @@ class RaceTracer {
 
   bool printBlockSearch(raw_ostream &os, SILBasicBlock *SILBlock,
                         TrackableValueID transferredVal) const {
-    unsigned i = 0;
-    const BlockPartitionState &block = blockStates[SILBlock];
-    Partition working = block.getEntryPartition();
+    const BlockPartitionState &blockState = blockStates[SILBlock];
+    Partition working = blockState.getEntryPartition();
     PartitionOpEvaluator eval(working);
     os << "┌──────────╼\n│ ";
     working.print(os);
-    block.forEachPartitionOp([&](const PartitionOp &op) {
+
+    unsigned i = 0;
+    for (const auto &op : blockState.getPartitionOps()) {
       os << "├[" << i++ << "] ";
       op.print(os);
       eval.apply(op);
@@ -1917,8 +1905,7 @@ class RaceTracer {
         os << "(" << transferredVal << " TRANSFERRED) ";
       }
       working.print(os);
-      return true;
-    });
+    }
     os << "└──────────╼\n";
     return false;
   }
