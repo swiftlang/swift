@@ -143,14 +143,13 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
 
 bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                              bool ForTargetVariant) {
-  llvm::Triple TT = LangOpts.Target;
-
   if (ForTargetVariant) {
     assert(LangOpts.TargetVariant && "Must have target variant triple");
-    TT = *LangOpts.TargetVariant;
+    return isPlatformActiveForTarget(Platform, *LangOpts.TargetVariant,
+                                     LangOpts.EnableAppExtensionRestrictions);
   }
 
-  return isPlatformActiveForTarget(Platform, TT,
+  return isPlatformActiveForTarget(Platform, LangOpts.Target,
                                    LangOpts.EnableAppExtensionRestrictions);
 }
 
