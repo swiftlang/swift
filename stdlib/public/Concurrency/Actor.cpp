@@ -1978,12 +1978,14 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
     (trackingInfo ? trackingInfo->getActiveExecutor()
                   : SerialExecutorRef::generic());
   auto taskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch from executor %p to %p %s", task,
+  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch from executor %p to %p%s, task executor: %p%s", task,
                        currentExecutor.getIdentity(),
                        newExecutor.getIdentity(),
                        newExecutor.isMainExecutor() ? " (MainActorExecutor)" :
-                       newExecutor.isGeneric() ? " (GenericExecutor)" : "");
-  fprintf(stderr, "[%s:%d](%s) Task %p trying to switch from executor %p to %p %s [task executor: %p%s]\n",
+                       newExecutor.isGeneric() ? " (GenericExecutor)" : "",
+                       taskExecutor.getIdentity(),
+                       taskExecutor.isDefined() ? "" : " (undefined)");
+  fprintf(stderr, "[%s:%d](%s) Task %p trying to switch from executor %p to %p%s, task executor: %p%s\n",
       __FILE_NAME__, __LINE__, __FUNCTION__, task,
                        currentExecutor.getIdentity(),
                        newExecutor.getIdentity(),
