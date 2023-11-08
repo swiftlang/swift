@@ -472,6 +472,17 @@ private:
   PreWalkAction walkToDeclPre(Decl *D) override {
     PrettyStackTraceDecl trace(stackTraceAction(), D);
 
+    // Implicit decls don't have source locations so they cannot have a TRC.
+    if (D->isImplicit())
+      return Action::Continue();
+
+    // The AST of this decl may not be ready to traverse yet if it hasn't been
+    // full typechecked. If that's the case, we leave a placeholder node in the
+    // tree to indicate that the subtree should be expanded lazily when it
+    // needs to be traversed.
+    if (buildLazyContextForDecl(D))
+      return Action::SkipChildren();
+
     // Adds in a TRC that covers the entire declaration.
     if (auto DeclTRC = getNewContextForSignatureOfDecl(D)) {
       pushContext(DeclTRC, D);
@@ -497,6 +508,44 @@ private:
     return Action::Continue();
   }
 
+  /// Constructs a placeholder TRC node that should be expanded later if the AST
+  /// associated with the given declaration is not ready to be traversed yet.
+  /// Returns true if a node was created.
+  bool buildLazyContextForDecl(Decl *D) {
+    if (!isa<PatternBindingDecl>(D))
+      return false;
+
+    // Check whether the current TRC is already a lazy placeholder. If it is,
+    // we should try to expand it rather than creating a new placeholder.
+    auto currentTRC = getCurrentTRC();
+    if (currentTRC->getNeedsExpansion() && currentTRC->getDeclOrNull() == D)
+      return false;
+
+    // Pattern binding declarations may have attached property wrappers that
+    // get expanded from macros attached to the parent declaration. We must
+    // not eagerly expand the attached property wrappers to avoid a request
+    // cycle.
+    if (auto *pattern = dyn_cast<PatternBindingDecl>(D)) {
+      if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
+        // If there's no initial value, or the init is exposed to clients, then
+        // we don't need to create any implicit TRCs for the init bodies.
+        if (!firstVar->hasInitialValue() || firstVar->isInitExposedToClients())
+          return false;
+
+        // FIXME: We could narrow this further by detecting whether there are
+        // any macro expansions required to visit the CustomAttrs of the var.
+      }
+    }
+
+    // If we've made it this far then we've identified a declaration that
+    // requires lazy expansion later.
+    auto lazyTRC = TypeRefinementContext::createForDeclImplicit(
+        Context, D, currentTRC, currentTRC->getAvailabilityInfo(),
+        refinementSourceRangeForDecl(D));
+    lazyTRC->setNeedsExpansion(true);
+    return true;
+  }
+
   /// Returns a new context to be introduced for the declaration, or nullptr
   /// if no new context should be introduced.
   TypeRefinementContext *getNewContextForSignatureOfDecl(Decl *D) {
@@ -519,10 +568,6 @@ private:
         return nullptr;
     }
 
-    // Ignore implicit declarations (mainly skips over `DeferStmt` functions).
-    if (D->isImplicit())
-      return nullptr;
-
     // Declarations with an explicit availability attribute always get a TRC.
     if (hasActiveAvailableAttribute(D, Context)) {
       AvailabilityContext DeclaredAvailability =
@@ -539,17 +584,11 @@ private:
     // internal property in a public struct can be effectively less available
     // than the containing struct decl because the internal property will only
     // be accessed by code running at the deployment target or later.
-    //
-    // For declarations that have their child construction delayed, always
-    // create this implicit declaration context. It will be used to trigger
-    // lazy creation of the child TRCs.
     AvailabilityContext CurrentAvailability =
         getCurrentTRC()->getAvailabilityInfo();
     AvailabilityContext EffectiveAvailability =
         getEffectiveAvailabilityForDeclSignature(D, CurrentAvailability);
-    if ((isa<PatternBindingDecl>(D) &&
-         refinementSourceRangeForDecl(D).isValid()) ||
-        CurrentAvailability.isSupersetOf(EffectiveAvailability))
+    if (CurrentAvailability.isSupersetOf(EffectiveAvailability))
       return TypeRefinementContext::createForDeclImplicit(
           Context, D, getCurrentTRC(), EffectiveAvailability,
           refinementSourceRangeForDecl(D));
@@ -730,6 +769,11 @@ private:
               afd, body);
         }
       }
+      return;
+    }
+
+    if (auto pattern = dyn_cast<PatternBindingDecl>(D)) {
+      buildContextsForPatternBindingDecl(pattern);
       return;
     }
   }
@@ -1208,7 +1252,7 @@ void TypeChecker::buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, Abs
 
   // Build the refinement context for the function body.
   ASTContext &Context = SF.getASTContext();
-  auto LocalTRC = RootTRC->findMostRefinedSubContext(AFD->getLoc(), Context.SourceMgr);
+  auto LocalTRC = RootTRC->findMostRefinedSubContext(AFD->getLoc(), Context);
   TypeRefinementContextBuilder Builder(LocalTRC, Context);
   Builder.build(AFD);
 }
@@ -1224,23 +1268,16 @@ TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
   return TRC;
 }
 
-bool ExpandChildTypeRefinementContextsRequest::evaluate(
-    Evaluator &evaluator, Decl *decl, TypeRefinementContext *parentTRC
-) const {
-  // If the parent TRC is already contained by the deployment target, there's
-  // nothing more to do.
-  ASTContext &ctx = decl->getASTContext();
-  if (computeContainedByDeploymentTarget(parentTRC, ctx))
-    return false;
-
-  // Pattern binding declarations can have children corresponding to property
-  // wrappers and the initial values provided in each pattern binding entry.
-  if (auto *binding = dyn_cast<PatternBindingDecl>(decl)) {
+std::vector<TypeRefinementContext *>
+ExpandChildTypeRefinementContextsRequest::evaluate(
+    Evaluator &evaluator, TypeRefinementContext *parentTRC) const {
+  assert(parentTRC->getNeedsExpansion());
+  if (auto decl = parentTRC->getDeclOrNull()) {
+    ASTContext &ctx = decl->getASTContext();
     TypeRefinementContextBuilder builder(parentTRC, ctx);
-    builder.buildContextsForPatternBindingDecl(binding);
+    builder.build(decl);
   }
-
-  return false;
+  return parentTRC->Children;
 }
 
 AvailabilityContext
@@ -1293,7 +1330,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   if (SF && loc.isValid()) {
     TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
     TypeRefinementContext *TRC =
-        rootTRC->findMostRefinedSubContext(loc, Context.SourceMgr);
+        rootTRC->findMostRefinedSubContext(loc, Context);
     OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
     if (MostRefined) {
       *MostRefined = TRC;
