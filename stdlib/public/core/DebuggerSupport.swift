@@ -268,10 +268,38 @@ public func _stringForPrintObject(_ value: Any) -> String {
 
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
+@_alwaysEmitIntoClient @_transparent
+internal func _withHeapObject<R>(
+  of object: AnyObject,
+  _ body: (UnsafeMutableRawPointer) -> R
+) -> R {
+  defer { _fixLifetime(object) }
+  let unmanaged = Unmanaged.passUnretained(object)
+  return body(unmanaged.toOpaque())
+}
+
+@_extern(c, "swift_retainCount") @usableFromInline
+internal func _swift_retainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_unownedRetainCount") @usableFromInline
+internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_weakRetainCount") @usableFromInline
+internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
+
 // Utilities to get refcount(s) of class objects.
-@_silgen_name("swift_retainCount")
-public func _getRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value: AnyObject) -> UInt
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_retainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@backDeployed(before: SwiftStdlib 5.11)
+public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
+  let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
+  return UInt(bitPattern: count)
+}
