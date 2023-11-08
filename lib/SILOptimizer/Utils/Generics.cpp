@@ -517,6 +517,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
 
+  // FIXME: Specialization with typed throws.
+  if (Callee->getConventions().hasIndirectSILErrorResults())
+    return false;
+
   SpecializedGenericEnv = nullptr;
   SpecializedGenericSig = nullptr;
   auto CalleeGenericSig = Callee->getLoweredFunctionType()

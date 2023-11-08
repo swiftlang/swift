@@ -114,6 +114,10 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->getConventions().hasIndirectSILResults())
     return false;
 
+  // For now ignore functions with indirect error results.
+  if (F->getConventions().hasIndirectSILErrorResults())
+    return false;
+
   // For now ignore coroutines.
   if (F->getLoweredFunctionType()->isCoroutine())
     return false;
