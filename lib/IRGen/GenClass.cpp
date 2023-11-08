@@ -3024,8 +3024,6 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
-  assert(!method.getOverridden() && "must always be base method");
-
   auto entity = LinkEntity::forMethodDescriptor(method);
   auto mangled = entity.mangleAsString();
   auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
@@ -3061,10 +3059,9 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
   return IGF.emitInvariantLoad(slot);
 }
 
-FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                                              llvm::Value *metadata,
-                                              SILDeclRef method,
-                                              CanSILFunctionType methodType) {
+FunctionPointer irgen::emitVirtualMethodValue(
+    IRGenFunction &IGF, llvm::Value *metadata, SILDeclRef method,
+    SILDeclRef staticallyKnownDerivedMethod, CanSILFunctionType methodType) {
   Signature signature = IGF.IGM.getSignature(methodType);
 
   auto classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
@@ -3079,7 +3076,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     auto slot = IGF.emitAddressAtOffset(metadata, offset,
                                         signature.getType()->getPointerTo(),
                                         IGF.IGM.getPointerAlignment());
-    auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
+    auto fnPtr =
+        emitVTableSlotLoad(IGF, slot, staticallyKnownDerivedMethod, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
@@ -3105,14 +3103,10 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   llvm_unreachable("covered switch");
 }
 
-FunctionPointer
-irgen::emitVirtualMethodValue(IRGenFunction &IGF,
-                              llvm::Value *base,
-                              SILType baseType,
-                              SILDeclRef method,
-                              CanSILFunctionType methodType,
-                              GenericSignature fnSig,
-                              bool useSuperVTable) {
+FunctionPointer irgen::emitVirtualMethodValue(
+    IRGenFunction &IGF, llvm::Value *base, SILType baseType, SILDeclRef method,
+    SILDeclRef staticallyKnownDerivedMethod, CanSILFunctionType methodType,
+    GenericSignature fnSig, bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
@@ -3135,5 +3129,6 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     }
   }
 
-  return emitVirtualMethodValue(IGF, metadata, method, methodType);
+  return emitVirtualMethodValue(IGF, metadata, method,
+                                staticallyKnownDerivedMethod, methodType);
 }
