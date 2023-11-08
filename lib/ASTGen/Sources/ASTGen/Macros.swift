@@ -636,12 +636,11 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   var currentSyntax = Syntax(token)
   var resultSyntax: Node? = nil
   while let parentSyntax = currentSyntax.parent {
-    if let typedParent = parentSyntax.as(type) {
+    currentSyntax = parentSyntax
+    if let typedParent = currentSyntax.as(type) {
       resultSyntax = typedParent
       break
     }
-
-    currentSyntax = parentSyntax
   }
 
   // If we didn't find anything, complain and fail.
@@ -651,26 +650,16 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
   }
 
   // If we want the outermost node, keep looking.
-  // FIXME: This is VERY SPECIFIC to handling of types. We must be able to
-  // do better.
+  // E.g. for 'foo.bar' we want the member ref expression instead of the
+  // identifier expression.
   if wantOutermost {
-    while let parentSyntax = resultSyntax.parent {
-      // Look through type compositions.
-      if let compositionElement = parentSyntax.as(CompositionTypeElementSyntax.self),
-        let compositionList = compositionElement.parent?.as(CompositionTypeElementListSyntax.self),
-        let typedParent = compositionList.parent?.as(type)
-      {
+    while
+      let parentSyntax = currentSyntax.parent,
+      parentSyntax.position == resultSyntax.position {
+      currentSyntax = parentSyntax
+      if let typedParent = currentSyntax.as(type) {
         resultSyntax = typedParent
-        continue
       }
-
-      guard let typedParent = parentSyntax.as(type),
-        typedParent.position == resultSyntax.position
-      else {
-        break
-      }
-
-      resultSyntax = typedParent
     }
   }
 
