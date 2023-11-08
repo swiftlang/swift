@@ -1047,7 +1047,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
       return;
 
     // No synthesized conformances for move-only nominals.
-    if (isNoncopyable()) {
+    if (canBeNoncopyable()) {
       // assumption is Sendable gets synthesized elsewhere.
       assert(!proto->isSpecificProtocol(KnownProtocolKind::Sendable));
       return;

@@ -31,6 +31,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/InverseMarking.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
@@ -4876,12 +4877,16 @@ GenericParameterReferenceInfo ValueDecl::findExistentialSelfReferences(
                                         llvm::None);
 }
 
-bool TypeDecl::isNoncopyable() const {
-  // NOTE: must answer true iff it is unconditionally noncopyable.
-  return evaluateOrDefault(getASTContext().evaluator,
-                           HasNoncopyableAnnotationRequest{
-                               const_cast<TypeDecl *>(this)},
-                           true); // default to true for safety
+InverseMarking TypeDecl::getNoncopyableMarking() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      NoncopyableAnnotationRequest{const_cast<TypeDecl *>(this)},
+      InverseMarking::forInverse(InverseMarking::Kind::None)
+  );
+}
+
+bool TypeDecl::canBeNoncopyable() const {
+  return getNoncopyableMarking().getInverse().isPresent();
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
