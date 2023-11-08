@@ -1,3 +1,10 @@
+//
+// Unlike its counterparts in the other *_resilience.swift files, the goal is
+// for the package's component modules to all be considered within the same
+// resilience domain. This file ensures that we use direct access as much as
+// possible.
+//
+
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/package_resilience.swift
 // RUN: %target-swift-frontend -package-name MyPkg -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/Inputs/package_types/resilient_struct.swift
@@ -7,6 +14,7 @@
 // RUN: %target-swift-frontend -package-name MyPkg -disable-objc-interop -I %t -emit-ir -enable-library-evolution %t/package_resilience.swift | %FileCheck %t/package_resilience.swift --check-prefixes=CHECK,CHECK-native,CHECK-native%target-ptrsize,CHECK-%target-ptrsize,CHECK-%target-cpu,CHECK-native-STABLE-ABI-%target-mandates-stable-abi,CHECK-%target-sdk-name -DINT=i%target-ptrsize -D#MDWORDS=4 -D#MDSIZE32=40 -D#MDSIZE64=56 -D#WORDSIZE=%target-alignment
 // RUN: %target-swift-frontend -package-name MyPkg -I %t -emit-ir -enable-library-evolution -O %t/package_resilience.swift -package-name MyPkg
 // REQUIRES: objc_codegen
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1p16resilient_struct5PointVvpWvd" = constant [[INT]] {{8|16}}, align [[#WORDSIZE]]
 // CHECK: @"$s18package_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd" = constant [[INT]] {{32|16}}, align [[#WORDSIZE]]
