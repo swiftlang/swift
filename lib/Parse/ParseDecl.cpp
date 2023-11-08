@@ -5128,22 +5128,21 @@ ParserStatus Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-ParserStatus
-Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                      SourceLoc &SpecifierLoc,
-                                      SourceLoc &IsolatedLoc,
-                                      SourceLoc &ConstLoc,
-                                      TypeAttributes &Attributes) {
+ParserStatus Parser::parseTypeAttributeListPresent(
+    ParamDecl::Specifier &Specifier, SourceLoc &SpecifierLoc,
+    SourceLoc &IsolatedLoc, SourceLoc &ConstLoc, SourceLoc &ResultDependsOnLoc,
+    TypeAttributes &Attributes) {
   PatternBindingInitializer *initContext = nullptr;
   Specifier = ParamDecl::Specifier::Default;
-  while (Tok.is(tok::kw_inout)
-         || (canHaveParameterSpecifierContextualKeyword()
-             && (Tok.isContextualKeyword("__shared")
-                 || Tok.isContextualKeyword("__owned")
-                 || Tok.isContextualKeyword("isolated")
-                 || Tok.isContextualKeyword("consuming")
-                 || Tok.isContextualKeyword("borrowing")
-                 || Tok.isContextualKeyword("_const")))) {
+  while (Tok.is(tok::kw_inout) ||
+         (canHaveParameterSpecifierContextualKeyword() &&
+          (Tok.isContextualKeyword("__shared") ||
+           Tok.isContextualKeyword("__owned") ||
+           Tok.isContextualKeyword("isolated") ||
+           Tok.isContextualKeyword("consuming") ||
+           Tok.isContextualKeyword("borrowing") ||
+           Tok.isContextualKeyword("_const") ||
+           Tok.isContextualKeyword("_resultDependsOn")))) {
 
     if (Tok.isContextualKeyword("isolated")) {
       if (IsolatedLoc.isValid()) {
@@ -5157,6 +5156,15 @@ Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
     if (Tok.isContextualKeyword("_const")) {
       Tok.setKind(tok::contextual_keyword);
       ConstLoc = consumeToken();
+      continue;
+    }
+
+    if (Tok.isContextualKeyword("_resultDependsOn")) {
+      if (!Context.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+        diagnose(Tok, diag::requires_non_escapable_types, "resultDependsOn",
+                 false);
+      }
+      ResultDependsOnLoc = consumeToken();
       continue;
     }
 

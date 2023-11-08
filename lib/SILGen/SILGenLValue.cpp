@@ -2979,7 +2979,9 @@ public:
         case ParamSpecifier::LegacyOwned:
           return false;
         }
-        llvm_unreachable("unhandled switch case");
+        if (pd->hasResultDependsOn()) {
+          return true;
+        }
       }
     }
     return false;

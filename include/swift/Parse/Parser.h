@@ -1197,6 +1197,7 @@ public:
                                       SourceLoc &SpecifierLoc,
                                       SourceLoc &IsolatedLoc,
                                       SourceLoc &ConstLoc,
+                                      SourceLoc &ResultDependsOnLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (canHaveParameterSpecifierContextualKeyword() &&
@@ -1205,9 +1206,11 @@ public:
           Tok.getRawText().equals("consuming") ||
           Tok.getRawText().equals("borrowing") ||
           Tok.isContextualKeyword("isolated") ||
-          Tok.isContextualKeyword("_const"))))
-      return parseTypeAttributeListPresent(
-          Specifier, SpecifierLoc, IsolatedLoc, ConstLoc, Attributes);
+          Tok.isContextualKeyword("_const") ||
+          Tok.getRawText().equals("_resultDependsOn"))))
+      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, IsolatedLoc,
+                                           ConstLoc, ResultDependsOnLoc,
+                                           Attributes);
     return makeParserSuccess();
   }
 
@@ -1215,6 +1218,7 @@ public:
                                              SourceLoc &SpecifierLoc,
                                              SourceLoc &IsolatedLoc,
                                              SourceLoc &ConstLoc,
+                                             SourceLoc &ResultDependsOnLoc,
                                              TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
@@ -1509,6 +1513,9 @@ public:
 
     /// The location of the '_const' keyword, if present.
     SourceLoc CompileConstLoc;
+
+    /// The location of the '_resultDependsOn' keyword, if present.
+    SourceLoc ResultDependsOnLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;

@@ -1163,6 +1163,21 @@ public:
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
 };
 
+/// A lifetime dependent type.
+/// \code
+///   x : _resultDependsOn Int
+/// \endcode
+class ResultDependsOnTypeRepr : public SpecifierTypeRepr {
+public:
+  ResultDependsOnTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+      : SpecifierTypeRepr(TypeReprKind::ResultDependsOn, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ResultDependsOn;
+  }
+  static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
+};
+
 /// A TypeRepr for a known, fixed type.
 ///
 /// Fixed type representations should be used sparingly, in places
@@ -1522,6 +1537,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::ResultDependsOn:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

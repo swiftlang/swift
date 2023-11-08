@@ -6424,6 +6424,9 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is 'isolated'.
     IsIsolated = 1 << 2,
+
+    /// Whether or not this paramater is '_resultDependsOn'
+    IsResultDependsOn = 1 << 3,
   };
 
   /// The default value, if any, along with flags.
@@ -6635,6 +6638,16 @@ public:
     flags = value ? flags | ArgumentNameFlags::IsCompileTimeConst
                   : flags - ArgumentNameFlags::IsCompileTimeConst;
     ArgumentNameAndFlags.setInt(flags);
+  }
+
+  bool hasResultDependsOn() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsResultDependsOn);
+  }
+
+  void setResultDependsOn(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsResultDependsOn
+                                      : flags - Flags::IsResultDependsOn);
   }
 
   /// Does this parameter reject temporary pointer conversions?

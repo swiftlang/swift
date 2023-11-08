@@ -329,6 +329,7 @@ extension BridgedAttributedTypeSpecifier {
     case .keyword(.__owned): self = .legacyOwned
     case .keyword(._const): self = .const
     case .keyword(.isolated): self = .isolated
+    case .keyword(._resultDependsOn): self = .resultDependsOn
     default: return nil
     }
   }

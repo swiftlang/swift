@@ -7671,7 +7671,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
   VarDecl::Introducer introducer;
   switch (specifier) {
   // Unannotated or `borrowing` parameters are locally immutable.
-  // So are parameters using the legacy `__shared` or `__owned` modifiers.
+  // So are parameters using the legacy `__shared` or  `__owned` modifiers.
   case ParamSpecifier::Default:
   case ParamSpecifier::Borrowing:
   case ParamSpecifier::LegacyShared:

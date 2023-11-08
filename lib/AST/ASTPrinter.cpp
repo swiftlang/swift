@@ -3605,6 +3605,10 @@ static bool usesFeatureNonEscapableTypes(Decl *decl) {
   if (fd && fd->getAttrs().getAttribute(DAK_ResultDependsOnSelf)) {
     return true;
   }
+  auto *pd = dyn_cast<ParamDecl>(decl);
+  if (pd && pd->hasResultDependsOn()) {
+    return true;
+  }
   return false;
 }
 
@@ -4359,6 +4363,9 @@ static void printParameterFlags(ASTPrinter &printer,
   
   if (flags.isIsolated())
     printer.printKeyword("isolated", options, " ");
+
+  if (flags.hasResultDependsOn())
+    printer.printKeyword("resultDependsOn", options, " ");
 
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");

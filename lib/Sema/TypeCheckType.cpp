@@ -2146,6 +2146,8 @@ namespace {
                                           TypeResolutionOptions options);
     NeverNullType resolveCompileTimeConstTypeRepr(CompileTimeConstTypeRepr *repr,
                                                   TypeResolutionOptions options);
+    NeverNullType resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                                 TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2631,6 +2633,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Self:
     return cast<SelfTypeRepr>(repr)->getType();
+
+  case TypeReprKind::ResultDependsOn:
+    return resolveResultDependsOnTypeRepr(cast<ResultDependsOnTypeRepr>(repr),
+                                          options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -4462,7 +4468,6 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
     }
     break;
   }
-
   return result;
 }
 
@@ -4522,6 +4527,31 @@ NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
   }
 
   return ArraySliceType::get(baseTy);
+}
+
+NeverNullType
+TypeResolver::resolveResultDependsOnTypeRepr(ResultDependsOnTypeRepr *repr,
+                                             TypeResolutionOptions options) {
+  // _resultDependsOn is only valid for (non-Subscript and non-EnumCaseDecl)
+  // function parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::SubscriptDecl) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+
+    decltype(diag::attr_only_on_parameters) diagID;
+    if (options.hasBase(TypeResolverContext::SubscriptDecl) ||
+        options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagID = diag::attr_only_valid_on_func_or_init_params;
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput)) {
+      diagID = diag::attr_not_on_variadic_parameters;
+    } else {
+      diagID = diag::attr_only_on_parameters;
+    }
+
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, "_resultDependsOn");
+    return ErrorType::get(getASTContext());
+  }
+  return resolveType(repr->getBase(), options);
 }
 
 NeverNullType
@@ -5400,6 +5430,7 @@ public:
     case TypeReprKind::Pack:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
+    case TypeReprKind::ResultDependsOn:
       return false;
     }
   }

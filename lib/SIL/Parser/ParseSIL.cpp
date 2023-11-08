@@ -1507,8 +1507,10 @@ bool SILParser::parseSILType(SILType &Result,
   SourceLoc specifierLoc;
   SourceLoc isolatedLoc;
   SourceLoc constLoc;
+  SourceLoc resultDependsOnLoc;
   TypeAttributes attrs;
-  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc, attrs);
+  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, constLoc,
+                           resultDependsOnLoc, attrs);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
