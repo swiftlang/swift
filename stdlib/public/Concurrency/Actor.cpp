@@ -1783,7 +1783,9 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
 
 SWIFT_CC(swift)
 static void swift_job_run_on_task_executorImpl(Job *job, TaskExecutorRef taskExecutor) {
-  fprintf(stderr, "[%s:%d](%s) execute on executor: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, taskExecutor.getIdentity());
+  fprintf(stderr, "[%s:%d](%s) execute [%p] on executor: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+          job,
+          taskExecutor.getIdentity());
   ExecutorTrackingInfo trackingInfo;
 
   // TODO: we don't allow switching
@@ -2033,13 +2035,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        newExecutor.getIdentity(),
                        taskExecutor.getIdentity());
 
-  if (taskExecutor.isDefined()) {
-    fprintf(stderr, "[%s:%d](%s) SWITCH FAILED, USE TASK EXECUTOR [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
-    task->flagAsAndEnqueueOnTaskExecutor(newExecutor, taskExecutor);
-  } else {
-    fprintf(stderr, "[%s:%d](%s) SWITCH FAILED, USE SERIAL EXECUTOR [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
-    task->flagAsAndEnqueueOnExecutor(newExecutor);
-  }
+  task->flagAsAndEnqueueOnExecutor(newExecutor);
   _swift_task_clearCurrent();
 }
 
@@ -2061,8 +2057,8 @@ void _swift_task_enqueueOnTaskExecutor(Job *job, HeapObject *executor,
 
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
-  fprintf(stderr, "[%s:%d](%s) enqueue job %p...\n", __FILE_NAME__, __LINE__, __FUNCTION__, job);
-  SWIFT_TASK_DEBUG_LOG("enqueue job %p on executor %p", job,
+  fprintf(stderr, "[%s:%d](%s) enqueue job %p on serial executor %p...\n", __FILE_NAME__, __LINE__, __FUNCTION__, job, executor.getIdentity());
+  SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial executor %p", job,
                        executor.getIdentity());
 
   assert(job && "no job provided");
@@ -2074,13 +2070,17 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
     if (auto task = dyn_cast<AsyncTask>(job)) {
       fprintf(stderr, "[%s:%d](%s) checking task...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       auto taskExecutor = task->getPreferredTaskExecutor();
+      fprintf(stderr, "[%s:%d](%s) checked task %p...", __FILE_NAME__, __LINE__, __FUNCTION__, task);
       if (taskExecutor.isDefined()) {
-      fprintf(stderr, "[%s:%d](%s) FOUND TASK EXECUTOR\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      fprintf(stderr, " FOUND TASK EXECUTOR\n");
         auto wtable = taskExecutor.getTaskExecutorWitnessTable();
         auto taskExecutorObject = taskExecutor.getIdentity();
         auto taskExecutorType = swift_getObjectType(taskExecutorObject);
         return _swift_task_enqueueOnTaskExecutor(job, taskExecutorObject, taskExecutorType, wtable);
       } // else, fall-through to the default global enqueue
+      else {
+        fprintf(stderr, " NO TASK EXECUTOR!!!!\n");
+      }
     }
     return swift_task_enqueueGlobal(job);
   }
