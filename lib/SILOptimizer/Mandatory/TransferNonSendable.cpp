@@ -1393,10 +1393,15 @@ public:
     os << SEP_STR << "BlockPartitionState[reached=" << reached
        << ", needsUpdate=" << needsUpdate << "]\nid: ";
 #ifndef NDEBUG
-    basicBlock->printID(os);
+    auto printID = [&](SILBasicBlock *block) {
+      block->printID(os);
+    };
 #else
-    os << "NOASSERTS. ";
+    auto printID = [&](SILBasicBlock *) {
+      os << "NOASSERTS. ";
+    };
 #endif
+    printID(basicBlock);
     os << "entry partition: ";
     entryPartition.print(os);
     os << "exit partition: ";
@@ -1409,12 +1414,12 @@ public:
     os << "└──────────╼\nSuccs:\n";
     for (auto succ : basicBlock->getSuccessorBlocks()) {
       os << "→";
-      succ->printID(os);
+      printID(succ);
     }
     os << "Preds:\n";
     for (auto pred : basicBlock->getPredecessorBlocks()) {
       os << "←";
-      pred->printID(os);
+      printID(pred);
     }
     os << SEP_STR;
   }
