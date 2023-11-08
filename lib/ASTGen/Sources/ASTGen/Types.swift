@@ -217,7 +217,7 @@ extension ASTGenVisitor {
   }
 }
 
-// MARK: - SpecifierTypeRepr/AttrubutedTypeRepr
+// MARK: - SpecifierTypeRepr/AttributedTypeRepr
 
 extension BridgedAttributedTypeSpecifier {
   fileprivate init?(from tokenKind: TokenKind) {

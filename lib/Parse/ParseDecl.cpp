@@ -2900,6 +2900,12 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
   }
 
+  if (DK == DAK_ResultDependsOnSelf &&
+      !Context.LangOpts.hasFeature(Feature::NonEscapableTypes)) {
+    diagnose(Loc, diag::requires_non_escapable_types, AttrName, true);
+    DiscardAttribute = true;
+  }
+
   // Filled in during parsing.  If there is a duplicate
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;

@@ -2334,6 +2334,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
     return serialization::SelfAccessKind::Consuming;
   case swift::SelfAccessKind::Borrowing:
     return serialization::SelfAccessKind::Borrowing;
+  case swift::SelfAccessKind::ResultDependsOnSelf:
+    return serialization::SelfAccessKind::ResultDependsOnSelf;
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");

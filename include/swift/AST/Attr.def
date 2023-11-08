@@ -527,6 +527,9 @@ DECL_ATTR(storageRestrictions, StorageRestrictions,
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   102)
+CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOnSelf, ResultDependsOnSelf,
+  OnFunc | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  150)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
