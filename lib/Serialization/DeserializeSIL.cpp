@@ -2571,7 +2571,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Loc, getSILType(Ty, (SILValueCategory)TyCategory, Fn), OpList);
     break;
   }
-  case SILInstructionKind::TupleAddrConstructorInst: {
+  case SILInstructionKind::InitTupleAddrInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES_CATEGORIES);
 
     // Format: A type followed by a list of values. A value is expressed by 2
@@ -2581,7 +2581,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     TupleType *TT = Ty->castTo<TupleType>();
     assert(
         TT &&
-        "Type of the DestAddr of a TupleAddrConstructor should be TupleType");
+        "Type of the DestAddr of a InitTupleAddr should be TupleType");
     assert(ListOfValues.size() >= 2 &&
            "Should have at least a dest and one element");
 
@@ -2606,7 +2606,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     });
     auto IsInitOfDest = IsInitialization_t(Attr & 0x1);
     ResultInst =
-        Builder.createTupleAddrConstructor(Loc, DestAddr, OpList, IsInitOfDest);
+        Builder.createInitTupleAddr(Loc, DestAddr, OpList, IsInitOfDest);
     break;
   }
   case SILInstructionKind::ObjectInst: {

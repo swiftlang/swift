@@ -1644,11 +1644,11 @@ public:
 
   TupleInst *createTuple(SILLocation loc, ArrayRef<SILValue> elts);
 
-  TupleAddrConstructorInst *
-  createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
+  InitTupleAddrInst *
+  createInitTupleAddr(SILLocation Loc, SILValue DestAddr,
                              ArrayRef<SILValue> Elements,
                              IsInitialization_t IsInitOfDest) {
-    return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
+    return insert(InitTupleAddrInst::create(getSILDebugLocation(Loc),
                                                    DestAddr, Elements,
                                                    IsInitOfDest, getModule()));
   }

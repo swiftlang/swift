@@ -506,9 +506,9 @@ public:
     createEndLifetime(loc, selfValue.forward(SGF));
   }
 
-  using SILBuilder::createTupleAddrConstructor;
+  using SILBuilder::createInitTupleAddr;
 
-  void createTupleAddrConstructor(SILLocation loc, SILValue destAddr,
+  void createInitTupleAddr(SILLocation loc, SILValue destAddr,
                                   ArrayRef<ManagedValue> elements,
                                   IsInitialization_t isInitOfDest) {
     SmallVector<SILValue, 8> values;
@@ -516,7 +516,7 @@ public:
       values.push_back(mv.forward(SGF));
     }
 
-    createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
+    createInitTupleAddr(loc, destAddr, values, isInitOfDest);
   }
 };
 

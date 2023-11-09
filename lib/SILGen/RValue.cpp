@@ -579,10 +579,10 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
   assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
          srcTupleType->getNumElements());
 
-  // If we do have any srcMvValues, then emit a TupleAddrConstructor. If we do
+  // If we do have any srcMvValues, then emit a InitTupleAddr. If we do
   // not have any, then our tuple must consist only of empty tuples.
   if (srcMvValues.size())
-    SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+    SGF.B.createInitTupleAddr(loc, destAddr, srcMvValues,
                                      IsNotInitialization);
   srcMvValues = ArrayRef<ManagedValue>();
 }

@@ -3290,7 +3290,7 @@ public:
     }
   }
 
-  void checkTupleAddrConstructorInst(TupleAddrConstructorInst *taci) {
+  void checkInitTupleAddrInst(InitTupleAddrInst *taci) {
     require(taci->getNumElements() > 0,
             "Cannot be applied to tuples that do not contain any real "
             "elements. E.x.: ((), ())");

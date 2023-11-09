@@ -411,8 +411,8 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
-      case SILInstructionKind::TupleAddrConstructorInst: {
-        auto *taci = cast<TupleAddrConstructorInst>(&I);
+      case SILInstructionKind::InitTupleAddrInst: {
+        auto *taci = cast<InitTupleAddrInst>(&I);
         for (SILValue elt : taci->getElements()) {
           if (elt->getType().isAddress())
             killBits(state, elt);

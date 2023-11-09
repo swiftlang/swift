@@ -2216,7 +2216,7 @@ public:
     }
   }
 
-  void visitTupleAddrConstructorInst(TupleAddrConstructorInst *TI) {
+  void visitInitTupleAddrInst(InitTupleAddrInst *TI) {
     // First print out our dest.
     if (TI->isInitializationOfDest()) {
       *this << "[init] ";

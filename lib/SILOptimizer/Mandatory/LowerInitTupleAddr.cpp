@@ -1,4 +1,4 @@
-//===--- LowerTupleAddrConstructor.cpp ------------------------------------===//
+//===--- LowerInitTupleAddr.cpp -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -22,15 +22,15 @@ using namespace swift;
 
 namespace {
 
-class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
+class LowerInitTupleAddrTransform : public SILFunctionTransform {
   void run() override {
     SILFunction *function = getFunction();
 
-    // Once we have finished, lower all tuple_addr_constructor that we see.
+    // Once we have finished, lower all init_tuple_addr that we see.
     bool deletedInst = false;
     for (auto &block : *function) {
       for (auto ii = block.begin(), ie = block.end(); ii != ie;) {
-        auto *inst = dyn_cast<TupleAddrConstructorInst>(&*ii);
+        auto *inst = dyn_cast<InitTupleAddrInst>(&*ii);
         ++ii;
 
         if (!inst)
@@ -73,6 +73,6 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createLowerTupleAddrConstructor() {
-  return new LowerTupleAddrConstructorTransform();
+SILTransform *swift::createLowerInitTupleAddr() {
+  return new LowerInitTupleAddrTransform();
 }

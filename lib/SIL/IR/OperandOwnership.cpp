@@ -676,8 +676,8 @@ OperandOwnership OperandOwnershipClassifier::visitKeyPathInst(KeyPathInst *I) {
   return OperandOwnership::ForwardingConsume;
 }
 
-OperandOwnership OperandOwnershipClassifier::visitTupleAddrConstructorInst(
-    TupleAddrConstructorInst *inst) {
+OperandOwnership OperandOwnershipClassifier::visitInitTupleAddrInst(
+    InitTupleAddrInst *inst) {
   // If we have an object, then we have an instantaneous use...
   if (getValue()->getType().isObject())
     return OperandOwnership::DestroyingConsume;
