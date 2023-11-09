@@ -270,3 +270,8 @@ public func swift_once(predicate: UnsafeMutablePointer<Int>, fn: (@convention(c)
 public func swift_deletedMethodError() -> Never {
   Builtin.int_trap()
 }
+
+@_silgen_name("swift_willThrow")
+public func swift_willThrow() throws {
+}
+

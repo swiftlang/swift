@@ -10,4 +10,4 @@ public func test() {
   }
 }
 
-// CHECK-NOT: swift_willThrow
+// CHECK: swift_willThrow
