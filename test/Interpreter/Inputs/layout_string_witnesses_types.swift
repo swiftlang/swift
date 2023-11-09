@@ -380,6 +380,12 @@ public struct MultiPayloadEnumWrapper {
     }
 }
 
+public enum MultiPayloadEnumMultiLarge {
+    case empty
+    case nonEmpty(Int, SimpleClass, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+    case nonEmpty2(SimpleClass, Int, Int, SimpleClass, Int, Bool, SimpleClass, Bool, SimpleClass, Bool)
+}
+
 public struct MixedEnumWrapper {
     let x: SinglePayloadSimpleClassEnum
     let y: MultiPayloadEnum
@@ -577,10 +583,6 @@ public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: T) {
 }
 
 @inline(never)
-public func testAssign<T>(_ ptr: UnsafeMutablePointer<T>, from x: UnsafeMutablePointer<T>) {
-    ptr.assign(from: x, count: 1)
-}
-
 public func testAssignCopy<T>(_ ptr: UnsafeMutablePointer<T>, from x: inout T) {
     ptr.update(from: &x, count: 1)
 }
@@ -628,10 +630,10 @@ public func testGenericArrayDestroy<T>(_ buffer: UnsafeMutableBufferPointer<T>) 
 
 @inline(never)
 public func testGenericArrayInitWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.initialize(fromContentsOf: src)
+    _ = dest.initialize(fromContentsOf: src)
 }
 
 @inline(never)
 public func testGenericArrayAssignWithCopy<T>(dest: UnsafeMutableBufferPointer<T>, src: UnsafeMutableBufferPointer<T>) {
-    dest.update(fromContentsOf: src)
+    _ = dest.update(fromContentsOf: src)
 }
