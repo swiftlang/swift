@@ -34,6 +34,7 @@
 
 #include "ImageInspection.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/Backtrace.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Runtime/Win32.h"
@@ -353,7 +354,13 @@ void swift::swift_reportError(uint32_t flags,
                               const char *message) {
 #if defined(__APPLE__) && NDEBUG
   flags &= ~FatalErrorFlags::ReportBacktrace;
+#elif SWIFT_ENABLE_BACKTRACING
+  // Disable fatalError backtraces if the backtracer is enabled
+  if (runtime::backtrace::_swift_backtrace_isEnabled()) {
+    flags &= ~FatalErrorFlags::ReportBacktrace;
+  }
 #endif
+
   reportNow(flags, message);
   reportOnCrash(flags, message);
 }
@@ -388,9 +395,9 @@ swift::warningv(uint32_t flags, const char *format, va_list args)
 #pragma GCC diagnostic ignored "-Wuninitialized"
   swift_vasprintf(&log, format, args);
 #pragma GCC diagnostic pop
-  
+
   reportNow(flags, log);
-  
+
   free(log);
 }
 

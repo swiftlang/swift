@@ -37,6 +37,8 @@ struct FatalError {
   }
 }
 
+// CHECK-NOT: Current stack trace:
+
 // CHECK: *** Program crashed: {{Illegal instruction|System trap}} at 0x{{[0-9a-f]+}} ***
 
 // CHECK: Thread 0 {{(".*" )?}}crashed:
