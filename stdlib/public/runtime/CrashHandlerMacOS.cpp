@@ -248,7 +248,8 @@ handle_fatal_signal(int signum,
   /* Start the backtracer; this will suspend the process, so there's no need
      to try to suspend other threads from here. */
   if (!run_backtracer()) {
-    const char *message = "\n\nBacktracing failed\n";
+    const char *message = _swift_backtraceSettings.color == OnOffTty::On
+      ? " failed\n\n" : " failed ***\n\n";
     if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
       write(STDERR_FILENO, message, strlen(message));
     else

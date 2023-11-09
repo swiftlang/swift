@@ -250,7 +250,8 @@ handle_fatal_signal(int signum,
 
   // Actually start the backtracer
   if (!run_backtracer(fd)) {
-    const char *message = "\n\nBacktracing failed\n";
+    const char *message = _swift_backtraceSettings.color == OnOffTty::On
+      ? " failed\n\n" : " failed ***\n\n";
     if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
       write(STDERR_FILENO, message, strlen(message));
     else

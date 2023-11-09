@@ -76,13 +76,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   UnwindAlgorithm::Auto,
 
   // enabled
-#if TARGET_OS_OSX
-  OnOffTty::TTY,
-#elif defined(__linux__) // || defined(_WIN32)
-  OnOffTty::On,
-#else
-  OnOffTty::Off,
-#endif
+  OnOffTty::Default,
 
   // demangle
   true,
@@ -232,6 +226,7 @@ const char *algorithmToString(UnwindAlgorithm algorithm) {
 
 const char *onOffTtyToString(OnOffTty oot) {
   switch (oot) {
+  case OnOffTty::Default: return "Default";
   case OnOffTty::On: return "On";
   case OnOffTty::Off: return "Off";
   case OnOffTty::TTY: return "TTY";
@@ -278,6 +273,32 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (backtracing)
     _swift_parseBacktracingSettings(backtracing);
+
+#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
+  if (!_swift_backtraceSettings.swiftBacktracePath) {
+    _swift_backtraceSettings.swiftBacktracePath
+      = swift_copyAuxiliaryExecutablePath("swift-backtrace");
+
+    if (!_swift_backtraceSettings.swiftBacktracePath) {
+      if (_swift_backtraceSettings.enabled == OnOffTty::On) {
+        swift::warning(0,
+                       "swift runtime: unable to locate swift-backtrace; "
+                       "disabling backtracing.\n");
+      }
+      _swift_backtraceSettings.enabled = OnOffTty::Off;
+    }
+  }
+#endif
+
+  if (_swift_backtraceSettings.enabled == OnOffTty::Default) {
+#if TARGET_OS_OSX
+    _swift_backtraceSettings.enabled = OnOffTty::TTY;
+#elif defined(__linux__) // || defined(_WIN32)
+    _swift_backtraceSettings.enabled = OnOffTty::On;
+#else
+    _swift_backtraceSettings.enabled = OnOffTty::Off;
+#endif
+  }
 
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
   if (_swift_backtraceSettings.enabled != OnOffTty::Off) {
@@ -330,22 +351,6 @@ BacktraceInitializer::BacktraceInitializer() {
     else
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
   }
-
-#if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
-  if (_swift_backtraceSettings.enabled == OnOffTty::On
-      && !_swift_backtraceSettings.swiftBacktracePath) {
-    _swift_backtraceSettings.swiftBacktracePath
-      = swift_copyAuxiliaryExecutablePath("swift-backtrace");
-
-    if (!_swift_backtraceSettings.swiftBacktracePath) {
-      // Disabled warning for now - rdar://106813646
-      /* swift::warning(0,
-                     "swift runtime: unable to locate swift-backtrace; "
-                     "disabling backtracing.\n"); */
-      _swift_backtraceSettings.enabled = OnOffTty::Off;
-    }
-  }
-#endif
 
   if (_swift_backtraceSettings.enabled == OnOffTty::On) {
     // Copy the path to swift-backtrace into swiftBacktracePath, then write
@@ -1007,7 +1012,7 @@ _swift_displayCrashMessage(int signum, const void *pc)
   if (_swift_backtraceSettings.color == OnOffTty::On) {
     intro = "\n💣 \033[91mProgram crashed: ";
   } else {
-    intro = "\n*** Program crashed: ";
+    intro = "\n*** ";
   }
   write(fd, intro, strlen(intro));
 

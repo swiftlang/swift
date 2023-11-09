@@ -652,11 +652,11 @@ Generate a backtrace for the parent process.
       description = "Program crashed: \(target.signalDescription) at \(hex(target.faultAddress))"
     }
 
-    // Clear the message written by the crash handler
+    // Clear (or complete) the message written by the crash handler
     if args.color {
       write("\r\u{1b}[0K")
     } else {
-      write("\r" + String(repeating:" ", count: 80) + "\r")
+      write(" done ***\n\n")
     }
 
     writeln(theme.crashReason(description))
