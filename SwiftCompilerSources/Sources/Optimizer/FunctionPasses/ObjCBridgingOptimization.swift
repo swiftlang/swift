@@ -84,7 +84,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
   }
 
   // Check for the first ObjC -> swift bridging operation.
-  let swiftValue = lookThroughOwnershipInsts(swiftValueSwitch.enumOp)
+  let swiftValue = swiftValueSwitch.enumOp.lookThoughOwnershipInstructions
   guard let originalObjCValueSwitch = isOptionalBridging(of: swiftValue, isBridging: isBridgeToSwiftCall) else {
     return true
   }
@@ -126,7 +126,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     return true
   }
 
-  let swiftValue = lookThroughOwnershipInsts(bridgeToObjcCall.arguments[0])
+  let swiftValue = bridgeToObjcCall.arguments[0].lookThoughOwnershipInstructions
 
   // Handle the first case: the ObjC -> swift bridging operation is optional and the swift -> ObjC
   // bridging is within a test for Optional.some, e.g.
@@ -243,18 +243,6 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
       context.erase(instruction: bridgingCall as! ApplyInst)
     }
   }
-}
-
-private func lookThroughOwnershipInsts(_ value: Value) -> Value {
-  // Looks like it's sufficient to support begin_borrow and copy_value for now.
-  // TODO: add move_value if needed.
-  if let bbi = value as? BeginBorrowInst {
-    return bbi.borrowedValue
-  }
-  if let cvi = value as? CopyValueInst {
-    return cvi.fromValue
-  }
-  return value
 }
 
 /// Checks for an optional bridging `switch_enum` diamond.
