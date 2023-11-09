@@ -1638,6 +1638,11 @@ OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRe
   return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
 }
 
+OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal)  const {
+  swift::SILModule *mod = invocation->getPassManager()->getModule();
+  return {mod->lookUpMoveOnlyDeinitFunction(nominal.unbridged())};
+}
+
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
   // Fast-path check.
   if (SimplifyInstructionTest.empty() && SILDisablePass.empty())

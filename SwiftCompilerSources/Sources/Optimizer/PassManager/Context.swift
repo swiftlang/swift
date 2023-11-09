@@ -42,6 +42,10 @@ extension Context {
       default:         fatalError("unhandled SILStage case")
     }
   }
+
+  func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
+    _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
+  }
 }
 
 /// A context which allows mutation of a function's SIL.

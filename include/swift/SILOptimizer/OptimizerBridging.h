@@ -268,6 +268,7 @@ struct BridgedPassContext {
                                                                           bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE void loadFunction(BridgedFunction function, bool loadCalleesRecursively) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookupStdlibFunction(BridgedStringRef name) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedFunction lookUpNominalDeinitFunction(BridgedNominalTypeDecl nominal) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap getContextSubstitutionMap(BridgedType type) const;
 
   // Passmanager housekeeping
