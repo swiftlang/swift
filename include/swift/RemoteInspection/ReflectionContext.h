@@ -30,6 +30,7 @@
 #include "swift/Concurrency/Actor.h"
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/RuntimeInternals.h"
@@ -214,8 +215,9 @@ public:
 
   explicit ReflectionContext(
       std::shared_ptr<MemoryReader> reader,
-      remote::ExternalTypeRefCache *externalCache = nullptr)
-      : super(std::move(reader), *this, externalCache) {}
+      remote::ExternalTypeRefCache *externalCache = nullptr,
+      reflection::DescriptorFinder *descriptorFinder = nullptr)
+      : super(std::move(reader), *this, externalCache, descriptorFinder) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;

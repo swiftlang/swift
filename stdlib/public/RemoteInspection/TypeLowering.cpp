@@ -230,16 +230,12 @@ void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
-                                 RemoteRef<BuiltinTypeDescriptor> descriptor)
-    : TypeInfo(TypeInfoKind::Builtin,
-               descriptor->Size,
-               descriptor->getAlignment(),
-               descriptor->Stride,
-               descriptor->NumExtraInhabitants,
-               descriptor->isBitwiseTakable()),
-      Name(builder.getTypeRefString(
-              builder.readTypeRef(descriptor, descriptor->TypeName)))
-{}
+                                 BuiltinTypeDescriptorBase &descriptor)
+    : TypeInfo(TypeInfoKind::Builtin, descriptor.Size,
+               descriptor.Alignment, descriptor.Stride,
+               descriptor.NumExtraInhabitants,
+               descriptor.IsBitwiseTakable),
+      Name(descriptor.getMangledTypeName()) {}
 
 bool BuiltinTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -1641,9 +1637,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
       Kind, Fields);
 }
 
-const ReferenceTypeInfo *
-TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
-                                    ReferenceCounting Refcounting) {
+const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
+    ReferenceKind Kind, ReferenceCounting Refcounting) {
   auto key = std::make_pair(unsigned(Kind), unsigned(Refcounting));
   auto found = ReferenceCache.find(key);
   if (found != ReferenceCache.end())
@@ -1664,7 +1659,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   //
   // Weak references do not have any extra inhabitants.
 
-  auto BuiltinTI = Builder.getBuiltinTypeInfo(TR);
+  auto BuiltinTI = Builder.getBuiltinTypeDescriptor(TR);
   if (BuiltinTI == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for reference type: "); TR->dump());
     return nullptr;
@@ -1689,7 +1684,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   }
 
   auto *TI = makeTypeInfo<ReferenceTypeInfo>(BuiltinTI->Size,
-                                             BuiltinTI->getAlignment(),
+                                             BuiltinTI->Alignment,
                                              BuiltinTI->Stride,
                                              numExtraInhabitants,
                                              bitwiseTakable,
@@ -1705,13 +1700,14 @@ TypeConverter::getThinFunctionTypeInfo() {
   if (ThinFunctionTI != nullptr)
     return ThinFunctionTI;
 
-  auto descriptor = getBuilder().getBuiltinTypeInfo(getThinFunctionTypeRef());
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for function type\n"));
     return nullptr;
   }
 
-  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
+  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
 
   return ThinFunctionTI;
 }
@@ -1739,13 +1735,14 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   if (AnyMetatypeTI != nullptr)
     return AnyMetatypeTI;
 
-  auto descriptor = getBuilder().getBuiltinTypeInfo(getAnyMetatypeTypeRef());
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(fprintf(stderr, "No TypeInfo for metatype type\n"));
     return nullptr;
   }
 
-  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
+  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
 
   return AnyMetatypeTI;
 }
@@ -2245,7 +2242,7 @@ public:
 
     // Do we have a fixed layout?
     // TODO: Test whether a missing FixedDescriptor is actually relevant.
-    auto FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+    auto FixedDescriptor = TC.getBuilder().getBuiltinTypeDescriptor(TR);
     if (!FixedDescriptor || GenericPayloadCases > 0) {
       // This is a "dynamic multi-payload enum".  For example,
       // this occurs with:
@@ -2283,9 +2280,9 @@ public:
     //  * Has at least two cases with non-zero payload size
     //  * Has a descriptor stored as BuiltinTypeInfo
     Size = FixedDescriptor->Size;
-    Alignment = FixedDescriptor->getAlignment();
+    Alignment = FixedDescriptor->Alignment;
     NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
-    BitwiseTakable = FixedDescriptor->isBitwiseTakable();
+    BitwiseTakable = FixedDescriptor->IsBitwiseTakable;
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
@@ -2395,12 +2392,12 @@ public:
 
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
-    auto descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
+    auto descriptor = TC.getBuilder().getBuiltinTypeDescriptor(B);
     if (descriptor == nullptr) {
       DEBUG_LOG(fprintf(stderr, "No TypeInfo for builtin type: "); B->dump());
       return nullptr;
     }
-    return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), descriptor);
+    return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), *descriptor.get());
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
@@ -2424,7 +2421,7 @@ public:
       // descriptor to see if we at least know its size
       // and alignment.
       if (auto ImportedTypeDescriptor =
-              TC.getBuilder().getBuiltinTypeInfo(TR)) {
+              TC.getBuilder().getBuiltinTypeDescriptor(TR)) {
         // This might be an external type we treat as opaque (like C structs),
         // the external type info provider might have better type information,
         // so ask it first.
@@ -2432,7 +2429,7 @@ public:
           return External;
 
         return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(),
-                                                ImportedTypeDescriptor);
+                                                *ImportedTypeDescriptor.get());
       }
 
       if (FD == nullptr) {
