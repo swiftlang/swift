@@ -146,3 +146,11 @@ extension Either: Error where First: Error, Second: Error { }
 func f<E1, E2>(_ error: Either<E1, E2>) throws(Either<E1, E2>) {
   throw error
 }
+
+// Ensure that calls to 'rethrows' functions are always treated as throwing `any
+// Error`.
+func rethrowingFunc(body: () throws -> Void) rethrows { }
+
+func typedCallsRethrowingFunc<E>(body: () throws(E) -> Void) throws(E) {
+  try rethrowingFunc(body: body) // expected-error{{thrown expression type 'any Error' cannot be converted to error type 'E'}}
+}
