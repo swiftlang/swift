@@ -25,8 +25,6 @@
 public macro externalMacro<T>(module: String, type: String) -> T =
   Builtin.ExternalMacro
 
-#if false
-
 // File and path-related information
 
 /// Produces a unique identifier for the given source file, comprised of
@@ -72,7 +70,5 @@ public macro warning(_ message: String) = Builtin.WarningMacro
 /// Produce the given error message during compilation.
 @freestanding(declaration)
 public macro error(_ message: String) = Builtin.ErrorMacro
-
-#endif // false
 
 #endif // $Macros && hasAttribute(attached)
