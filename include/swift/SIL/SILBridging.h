@@ -996,8 +996,6 @@ void registerFunctionTestThunk(SwiftNativeFunctionTestThunk);
 void registerFunctionTest(BridgedStringRef,
                           void *_Nonnull nativeSwiftInvocation);
 
-void writeCharToStderr(int c);
-
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #ifndef PURE_BRIDGING_MODE

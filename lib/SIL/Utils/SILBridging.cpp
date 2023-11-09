@@ -444,6 +444,3 @@ bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
   return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
 }
 
-void writeCharToStderr(int c) {
-  putc(c, stderr);
-}
