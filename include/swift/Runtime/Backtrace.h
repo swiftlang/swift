@@ -135,6 +135,10 @@ struct BacktraceSettings {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
 
+inline bool _swift_backtrace_isEnabled() {
+  return _swift_backtraceSettings.enabled == OnOffTty::On;
+}
+
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_backtrace_isThunkFunction(const char *mangledName);
 
