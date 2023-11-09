@@ -5348,6 +5348,7 @@ bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
   case SelfAccessKind::LegacyConsuming:
   case SelfAccessKind::Consuming:
   case SelfAccessKind::Borrowing:
+  case SelfAccessKind::ResultDependsOnSelf:
     return true;
   }
   llvm_unreachable("bad self-access kind");

@@ -1559,6 +1559,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     case SelfAccessKind::Borrowing:
       FuncSelfKind = "Borrowing";
       break;
+    case SelfAccessKind::ResultDependsOnSelf:
+      FuncSelfKind = "ResultDependsOnSelf";
+      break;
     }
   }
 

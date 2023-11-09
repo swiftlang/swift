@@ -2119,6 +2119,10 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
     if (!Options.excludeAttrKind(DAK_Borrowing))
       Printer.printKeyword("borrowing", Options, " ");
     break;
+  case SelfAccessKind::ResultDependsOnSelf:
+    if (!Options.excludeAttrKind(DAK_ResultDependsOnSelf))
+      Printer.printKeyword("_resultDependsOnSelf", Options, " ");
+    break;
   }
 }
 
@@ -3516,8 +3520,15 @@ static bool usesFeatureStructLetDestructuring(Decl *decl) {
 }
 
 static bool usesFeatureNonEscapableTypes(Decl *decl) {
-  return decl->getAttrs().hasAttribute<NonEscapableAttr>()
-    || decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>();
+  if (decl->getAttrs().hasAttribute<NonEscapableAttr>() ||
+      decl->getAttrs().hasAttribute<UnsafeNonEscapableResultAttr>()) {
+    return true;
+  }
+  auto *fd = dyn_cast<FuncDecl>(decl);
+  if (fd && fd->getAttrs().getAttribute(DAK_ResultDependsOnSelf)) {
+    return true;
+  }
+  return false;
 }
 
 static bool hasParameterPacks(Decl *decl) {

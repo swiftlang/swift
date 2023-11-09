@@ -2392,6 +2392,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
       case SelfAccessKind::Mutating:
         return ParamSpecifier::InOut;
       case SelfAccessKind::NonMutating:
+      case SelfAccessKind::ResultDependsOnSelf:
         return ParamSpecifier::Default;
       }
       llvm_unreachable("nonexhaustive switch");
