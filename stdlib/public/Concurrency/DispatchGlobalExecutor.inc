@@ -193,23 +193,6 @@ static dispatch_queue_t getTimerQueue(JobPriority priority) {
 SWIFT_CC(swift)
 static void swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
-
-//  fprintf(stderr, "[%s:%d](%s) get preferred [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, swift_task_getCurrent());
-//  auto preferred = swift_task_getPreferredTaskExecutor();
-//  fprintf(stderr, "[%s:%d](%s) preferred = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//          preferred.getIdentity());
-//  fprintf(stderr, "[%s:%d](%s)      impl = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//          preferred.getRawImplementation());
-
-//  if (preferred.isDefined()) {
-//    fprintf(stderr, "[%s:%d](%s) enqueue on preferred\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    swift_task_enqueue(job, preferred);
-//    return;
-//  } else {
-//    fprintf(stderr, "[%s:%d](%s) is generic executor preference from [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//            swift_task_getCurrent());
-//  }
-
   // We really want four things from the global execution service:
   //  - Enqueuing work should have minimal runtime and memory overhead.
   //  - Adding work should never result in an "explosion" where many

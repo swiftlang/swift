@@ -283,6 +283,14 @@ public struct UnownedTaskExecutor: Sendable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
+extension UnownedTaskExecutor: Equatable {
+  @inlinable
+  public static func == (_ lhs: UnownedTaskExecutor, _ rhs: UnownedTaskExecutor) -> Bool {
+    unsafeBitCast(lhs.executor, to: (Int, Int).self) == unsafeBitCast(rhs.executor, to: (Int, Int).self)
+  }
+}
+
 /// Checks if the current task is running on the expected executor.
 ///
 /// Generally, Swift programs should be constructed such that it is statically
@@ -370,8 +378,7 @@ where E: SerialExecutor {
 // Used by the concurrency runtime
 @available(SwiftStdlib 9999, *)
 @_silgen_name("_swift_task_enqueueOnTaskExecutor")
-internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E)
-where E: TaskExecutor {
+internal func _enqueueOnTaskExecutor<E>(job unownedJob: UnownedJob, executor: E) where E: TaskExecutor {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(SwiftStdlib 9999, *) {
     executor.enqueue(ExecutorJob(context: unownedJob._context))

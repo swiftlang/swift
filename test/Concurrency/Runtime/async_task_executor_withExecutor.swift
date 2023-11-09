@@ -8,8 +8,9 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
+@_spi(ConcurrencyExecutors) import _Concurrency
 
-final class MyTaskExecutor: TaskExecutor, @unchecked Sendable {
+final class MyTaskExecutor: TaskExecutor, @unchecked Sendable, CustomStringConvertible {
   let queue: DispatchQueue
 
   init(queue: DispatchQueue) {
@@ -17,11 +18,15 @@ final class MyTaskExecutor: TaskExecutor, @unchecked Sendable {
   }
 
   func enqueue(_ job: consuming ExecutorJob) {
-    let job = UnownedJob(job)
-    queue.async {
-      job.runSynchronously(on: self.asUnownedTaskExecutor())
-    }
-  }
+  let job = UnownedJob(job)
+  queue.async {
+  job.runSynchronously(on: self.asUnownedTaskExecutor())
+}
+}
+
+var description: String {
+  "\(Self.self)(\(ObjectIdentifier(self))"
+}
 }
 
 nonisolated func nonisolatedAsyncMethod(expectedOn executor: MyTaskExecutor) async {
@@ -85,6 +90,28 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
   }
 }
 
+func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
+                                _ secondExecutor: MyTaskExecutor) async {
+
+  _ = await Task {
+    withUnsafeCurrentTask { task in
+      precondition(nil == task!.unownedTaskExecutor, "unexpected task executor value, should be nil")
+    }
+  }.value
+
+  await withTaskExecutor(firstExecutor) {
+    await withUnsafeCurrentTask { task in
+      guard let task else {
+        fatalError("Missing task?")
+      }
+      guard let currentTaskExecutor = task.unownedTaskExecutor else {
+        fatalError("Expected to have task executor")
+      }
+      precondition(currentTaskExecutor == firstExecutor.asUnownedTaskExecutor())
+    }
+  }
+}
+
 @main struct Main {
 
   static func main() async {
@@ -102,6 +129,8 @@ func testDisablingTaskExecutorPreference(_ firstExecutor: MyTaskExecutor,
 
     await testNestingWithExecutor(firstExecutor, secondExecutor)
 
-//    await testDisablingTaskExecutorPreference(firstExecutor, secondExecutor)
+    // FIXME: await testDisablingTaskExecutorPreference(firstExecutor, secondExecutor)
+
+    await testGetCurrentTaskExecutor(firstExecutor, secondExecutor)
   }
 }

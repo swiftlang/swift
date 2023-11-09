@@ -2035,7 +2035,7 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                        newExecutor.getIdentity(),
                        taskExecutor.getIdentity());
 
-  task->flagAsAndEnqueueOnExecutor(newExecutor);
+  task->flagAsAndEnqueueOnTaskExecutor(newExecutor, taskExecutor);
   _swift_task_clearCurrent();
 }
 
@@ -2054,6 +2054,11 @@ extern "C" SWIFT_CC(swift)
 void _swift_task_enqueueOnTaskExecutor(Job *job, HeapObject *executor,
                                        const Metadata *selfType,
                                        const TaskExecutorWitnessTable *wtable);
+
+extern "C" SWIFT_CC(swift)
+void _swift_task_makeAnyTaskExecutor(HeapObject *executor,
+                                     const Metadata *selfType,
+                                     const TaskExecutorWitnessTable *wtable);
 
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {

@@ -20,6 +20,7 @@
 #include "TaskPrivate.h"
 #include "swift/Runtime/AtomicWaitQueue.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Thread.h"
 #include <atomic>
@@ -554,6 +555,16 @@ TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   } else {
     return TaskExecutorRef::undefined(); // "no executor preference"
   }
+}
+
+TaskExecutorRef swift::swift_task_getAnyPreferredTaskExecutor() {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return TaskExecutorRef::undefined();
+
+  auto executorRef = task->getPreferredTaskExecutor();
+  fprintf(stderr, "[%s:%d](%s) executor ref == %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, executorRef);
+  return executorRef;
 }
 
 SWIFT_CC(swift)

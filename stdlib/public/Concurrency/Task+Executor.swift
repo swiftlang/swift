@@ -42,7 +42,11 @@ public func withTaskExecutor<T: Sendable>(
     }
 
 //    #if compiler(>=9999) && $BuiltinHopToExecutor
+//  if let executor {
     await Builtin.hopToExecutor(executorBuiltin)
+//  } else {
+//    await Builtin.hopToExecutor(_getGenericExecutor())
+//  }
 //    #else
 //    fatalError("Swift compiler is incompatible with this SDK version")
 //    #endif
@@ -110,12 +114,27 @@ extension Task where Failure == Error {
   }
 }
 
+@available(SwiftStdlib 9999, *)
+extension UnsafeCurrentTask {
+
+//  public var withunownedTaskExecutor: (any TaskExecutor)? {
+  public var unownedTaskExecutor: UnownedTaskExecutor? {
+    let ref = _getPreferredTaskExecutor()
+//    assert(ref is TaskExecutor)
+    return UnownedTaskExecutor(ref)
+  }
+}
+
 // ==== Runtime ---------------------------------------------------------------
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
 public func _getPreferredTaskExecutor() -> Builtin.Executor
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_getAnyPreferredTaskExecutor")
+public func _getAnyPreferredTaskExecutor() -> (any TaskExecutor)?
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
