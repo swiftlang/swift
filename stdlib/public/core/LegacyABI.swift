@@ -13,13 +13,13 @@
 // This file contains non-API (or underscored) declarations that are needed to
 // be kept around for ABI compatibility
 
-extension Unicode.UTF16 {
-  @available(*, unavailable, renamed: "Unicode.UTF16.isASCII")
-  @inlinable
-  public static func _isASCII(_ x: CodeUnit) -> Bool  {
-    return Unicode.UTF16.isASCII(x)
-  }
-}
+// extension Unicode.UTF16 {
+//   @available(*, unavailable, renamed: "Unicode.UTF16.isASCII")
+//   @inlinable
+//   public static func _isASCII(_ x: CodeUnit) -> Bool  {
+//     return Unicode.UTF16.isASCII(x)
+//   }
+// }
 
 @available(*, unavailable, renamed: "Unicode.UTF8.isASCII")
 @inlinable

@@ -1,0 +1,50 @@
+// RUN: %empty-directory(%t)
+// RUN: nm -g --defined-only -f just-symbols %stdlib_dir/arm64/libswiftCore.dylib > %t/symbols
+// RUN: { grep -Ev "^/|^$" %s || true; } > %t/changes
+// RUN: cat %t/changes | while read line; do if [[ $line =~ ^Added:\ (.*)$ ]]; then sed -i "" "/${BASH_REMATCH[1]}/d" %t/symbols; fi done
+// RUN: cat %t/changes | while read line; do if [[ $line =~ ^Removed:\ (.*)$ ]]; then echo "${BASH_REMATCH[1]}" >> %t/symbols; fi done
+// RUN: sort %t/symbols -o %t/symbols
+// RUN: diff -u %S/../../Inputs/macOS/arm64/stdlib/baseline %t/symbols
+
+// REQUIRES: swift_stdlib_no_asserts
+// REQUIRES: OS=macosx
+
+// FIXME: This isn't technically required. We really want a STDLIB_ARCH=arm64
+// feature that tells us we've built an arm64 version of the standard library.
+// REQUIRES: CPU=arm64
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
+// Welcome, Build Wrangler!
+//
+// This file lists APIs that have recently changed in a way that potentially
+// indicates an ABI- or source-breaking problem.
+//
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
+//
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
+//
+// Instead of disabling this test, you'll need to extend the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
+
+// Standard Library Symbols
+
+Added: _$ss15_getRetainCountySuyXlF
+Added: _$ss19_getWeakRetainCountySuyXlF
+Added: _$ss22_getUnownedRetainCountySuyXlF
+
+// Runtime Symbols
