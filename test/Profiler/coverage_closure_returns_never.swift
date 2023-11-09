@@ -6,7 +6,6 @@
 // CHECK-NOT:  increment_profiler_counter
 // CHECK:      [[LOAD:%.*]] = load {{.*}} : $*Never
 // CHECK-NEXT: debug_value [[LOAD]] : $Never
-// CHECK-NEXT: debug_value undef : $any Error, var, name "$error", argno
 // CHECK-NEXT: unreachable
 
 func closure_with_fatal_error(_ arr: [Never]) {

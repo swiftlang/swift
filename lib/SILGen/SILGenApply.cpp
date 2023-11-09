@@ -5727,6 +5727,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   {
     B.emitBlock(errorBB);
 
+    Scope scope(Cleanups, CleanupLocation(loc));
+
     // Grab the inner error.
     SILValue innerError;
     bool hasInnerIndirectError = fnConv.hasIndirectSILErrorResults();
