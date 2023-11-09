@@ -56,7 +56,7 @@ struct ModuleInterfaceOptions {
   std::string IgnorablePrivateFlags;
 
   /// Prints package, SPIs, or public/inlinable decls depending on the mode.
-  PrintInterfaceContentMode InterfaceContentMode = PrintInterfaceContentMode::Public;
+  InterfaceMode InterfaceContentMode = InterfaceMode::Public;
 
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.

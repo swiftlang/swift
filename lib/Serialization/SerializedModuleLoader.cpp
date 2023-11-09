@@ -596,7 +596,11 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   return std::string(result.str());
 }
 
-llvm::Optional<std::string> SerializedModuleLoaderBase::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs, ASTContext &ctx) {
+llvm::Optional<std::string> SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
+
+  if (!ctx.LangOpts.EnablePackageInterfaceLoad)
+    return {};
+
   std::string packagePath{
     getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
 
@@ -612,8 +616,9 @@ llvm::Optional<std::string> SerializedModuleLoaderBase::getPackageInterfacePathI
       for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
         StringRef current(args[I]), next(args[I + 1]);
         if (current == "-package-name") {
+          // Instead of `break` here, continue to get the last value in case of dupes,
+          // to be consistent with the default parsing logic.
           result = next;
-          break;
         }
       }
     }
@@ -628,17 +633,18 @@ llvm::Optional<std::string> SerializedModuleLoaderBase::getPackageInterfacePathI
 llvm::Optional<std::string>
 SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
   std::string interfacePath{getName(file_types::TY_SwiftModuleInterfaceFile)};
-  // Ensure the public swiftinterface already exists, otherwise bail early.
+  // Ensure the public swiftinterface already exists, otherwise bail early
+  // as it's considered the module doesn't exist.
   if (!fs.exists(interfacePath))
     return {};
 
   // Check if a package interface exists and if the package name applies to
   // the importer module.
-  auto packagePath = getPackageInterfacePathIfInSamePackage(fs, ctx);
-  if (fs.exists(packagePath))
-    return packagePath;
+  auto pkgPath = getPackageInterfacePathIfInSamePackage(fs, ctx).value_or("");
+  if (fs.exists(pkgPath))
+    return pkgPath;
 
-  // If above fails, use the existing logic.
+  // If above fails, use the existing logic as fallback.
   // If present, use the private interface instead of the public one.
   std::string privatePath{
       getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};

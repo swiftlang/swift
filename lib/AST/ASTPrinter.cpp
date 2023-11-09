@@ -174,7 +174,7 @@ static bool shouldTypeCheck(const PrintOptions &options) {
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
                                                    bool printFullConvention,
-                                                   PrintInterfaceContentMode interfaceContentMode,
+                                                   InterfaceMode interfaceContentMode,
                                                    bool useExportedModuleNames,
                                                    bool aliasModuleNames,
                                                    llvm::SmallSet<StringRef, 4>
@@ -238,7 +238,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         return false;
 
       // Skip SPI decls if `PrintSPIs`.
-      if (options.InterfaceContentMode == PrintInterfaceContentMode::Public && D->isSPI())
+      if (options.InterfaceContentMode == InterfaceMode::Public && D->isSPI())
         return false;
 
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -252,7 +252,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
             if (contributesToParentTypeStorage(ASD))
               return true;
 
-          if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(VD))
+          if (options.InterfaceContentMode != InterfaceMode::Package || !isPackage(VD))
             return false;
         }
 
@@ -288,7 +288,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
         for (const Requirement &req : ED->getGenericRequirements()) {
           if (!isPublicOrUsableFromInline(req.getFirstType())) {
-            if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(req.getSecondType()))
+            if (options.InterfaceContentMode != InterfaceMode::Package || !isPackage(req.getSecondType()))
               return false;
           }
 
@@ -297,7 +297,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
           case RequirementKind::Superclass:
           case RequirementKind::SameType:
             if (!isPublicOrUsableFromInline(req.getSecondType())) {
-              if (options.InterfaceContentMode != PrintInterfaceContentMode::Package || !isPackage(req.getSecondType()))
+              if (options.InterfaceContentMode != InterfaceMode::Package || !isPackage(req.getSecondType()))
                 return false;
             }
             break;
@@ -1205,7 +1205,7 @@ void PrintAST::printAttributes(const Decl *D) {
     }
 
     // Add SPIs to both private and package interfaces
-    if (Options.InterfaceContentMode != PrintInterfaceContentMode::Public &&
+    if (Options.InterfaceContentMode != InterfaceMode::Public &&
         DeclAttribute::canAttributeAppearOnDeclKind(
           DAK_SPIAccessControl, D->getKind())) {
       interleave(D->getSPIGroups(),
@@ -1294,7 +1294,7 @@ static bool mustPrintPropertyName(VarDecl *decl, const PrintOptions &opts) {
   if (contributesToParentTypeStorage(decl)) return true;
 
   // Print a package decl if in print package mode (for .package.swiftinterface),
-  if (opts.InterfaceContentMode == PrintInterfaceContentMode::Package && isPackage(decl))
+  if (opts.InterfaceContentMode == InterfaceMode::Package && isPackage(decl))
     return true;
 
   // If it's public or @usableFromInline, we must print the name because it's a
@@ -6007,8 +6007,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Filter |= ModuleDecl::ImportFilterKind::Default;
 
     // For private or package swiftinterfaces, also look through @_spiOnly imports.
-    if (Options.InterfaceContentMode != PrintInterfaceContentMode::Public)
+    if (Options.InterfaceContentMode != InterfaceMode::Public)
       Filter |= ModuleDecl::ImportFilterKind::SPIOnly;
+    // Consider package import for package interface
+    if (Options.InterfaceContentMode == InterfaceMode::Package)
+      Filter |= ModuleDecl::ImportFilterKind::PackageOnly;
 
     SmallVector<ImportedModule, 4> Imports;
     Options.CurrentModule->getImportedModules(Imports, Filter);

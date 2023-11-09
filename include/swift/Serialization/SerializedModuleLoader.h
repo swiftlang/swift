@@ -67,11 +67,12 @@ struct SerializedModuleBaseName {
   /// private interface if there is one, else public). Return an empty optional otherwise.
   llvm::Optional<std::string>
   findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const;
-
+  
   /// Returns the .package.swiftinterface path if its package-name also applies to
   /// the the importing module. Returns an empty optional otherwise.
   llvm::Optional<std::string>
-  getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs, ASTContext &ctx) const;
+  getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
+                                         ASTContext &ctx) const;
 };
 
 /// Common functionality shared between \c ImplicitSerializedModuleLoader,
@@ -183,6 +184,7 @@ protected:
   /// Load the module file into a buffer and also collect its module name.
   static std::unique_ptr<llvm::MemoryBuffer>
   getModuleName(ASTContext &Ctx, StringRef modulePath, std::string &Name);
+  
 public:
   virtual ~SerializedModuleLoaderBase();
   SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;

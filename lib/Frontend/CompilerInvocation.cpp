@@ -417,7 +417,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
     if (contents == "spi") {
-      Opts.InterfaceContentMode = PrintInterfaceContentMode::Private;
+      Opts.InterfaceContentMode = InterfaceMode::Private;
     }
   }
   for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
@@ -622,6 +622,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableAccessControl
       = A->getOption().matches(OPT_enable_access_control);
   }
+  if (auto A = Args.getLastArg(OPT_experimental_package_interface_load,
+                               OPT_experimental_package_interface_load)) {
+    Opts.EnablePackageInterfaceLoad
+      = A->getOption().matches(OPT_experimental_package_interface_load);
+  }
+
   Opts.ForceWorkaroundBrokenModules
     |= Args.hasArg(OPT_force_workaround_broken_modules);
 

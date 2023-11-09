@@ -69,13 +69,11 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
 
   // Use package.swiftinterface if it exists and its package-name applies to
   // the importer module.
-  auto PkgInPath = getPackageInterfacePathIfInSamePackage(fs, Ctx);
+  auto PkgInPath = BaseName.getPackageInterfacePathIfInSamePackage(fs, Ctx).value_or("");
   if (fs.exists(PkgInPath)) {
     InPath = PkgInPath;
-  }
-
-  // If not in package, use the private interface file if exits.
-  if (fs.exists(InPath)) {
+  } else {
+    // If not in package, use the private interface file if exits.
     auto PrivateInPath =
     BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
     if (fs.exists(PrivateInPath)) {

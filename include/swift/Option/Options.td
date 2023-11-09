@@ -758,6 +758,11 @@ def experimental_hermetic_seal_at_link:
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
 
+def experimental_package_interface_load:
+  Flag<["-"], "experimental-package-interface-load">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enables loading a package interface if in the same package specified with package-name">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

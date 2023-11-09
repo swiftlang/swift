@@ -216,6 +216,10 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Enable loading a package interface if both client and depdency module are in the
+    /// same package determined by `package-name` flag.
+    bool EnablePackageInterfaceLoad = false;
+
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
