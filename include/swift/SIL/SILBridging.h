@@ -78,6 +78,22 @@ struct BridgedType {
     Is
   };
 
+  struct EnumElementIterator {
+    uint64_t storage[4];
+
+#ifdef USED_IN_CPP_SOURCE
+    EnumElementIterator(swift::EnumDecl::ElementRange::iterator i) {
+      static_assert(sizeof(EnumElementIterator) >= sizeof(swift::EnumDecl::ElementRange::iterator));
+      *reinterpret_cast<swift::EnumDecl::ElementRange::iterator *>(&storage) = i;
+    }
+    swift::EnumDecl::ElementRange::iterator unbridged() const {
+      return *reinterpret_cast<const swift::EnumDecl::ElementRange::iterator *>(&storage);
+    }
+#endif
+
+    SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getNext() const;
+  };
+
 #ifdef USED_IN_CPP_SOURCE
   BridgedType(swift::SILType t) : opaqueValue(t.getOpaqueValue()) {}
 
@@ -128,6 +144,9 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFieldType(SwiftInt idx, BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getFieldIdxOfNominalType(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getFieldName(SwiftInt idx) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE EnumElementIterator getFirstEnumCaseIterator() const;
+  BRIDGED_INLINE bool isEndCaseIterator(EnumElementIterator i) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getEnumCasePayload(EnumElementIterator i, BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getNumTupleElements() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getTupleElementType(SwiftInt idx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFunctionTypeWithNoEscape(bool withNoEscape) const;
@@ -898,11 +917,16 @@ struct BridgedBuilder{
                                           BridgedSubstitutionMap subMap,
                                           BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
                                           BridgedGenericSpecializationInformation specInfo) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createSwitchEnumInst(BridgedValue enumVal,
+  SWIFT_IMPORT_UNSAFE BridgedInstruction createSwitchEnumInst(BridgedValue enumVal,
+                                          OptionalBridgedBasicBlock defaultBlock,
+                                          const void * _Nullable enumCases, SwiftInt numEnumCases) const;
+  SWIFT_IMPORT_UNSAFE BridgedInstruction createSwitchEnumAddrInst(BridgedValue enumAddr,
                                           OptionalBridgedBasicBlock defaultBlock,
                                           const void * _Nullable enumCases, SwiftInt numEnumCases) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedEnumData(BridgedValue enumVal,
                                           SwiftInt caseIdx, BridgedType resultType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTakeEnumDataAddr(BridgedValue enumAddr,
+                                                                                        SwiftInt caseIdx) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,
                                           BridgedType resultType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThinToThickFunction(BridgedValue fn,

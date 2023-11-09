@@ -100,6 +100,16 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return NominalFieldsArray(type: self, function: function)
   }
 
+  /// Can only be used if the type is in fact an enum type.
+  /// Returns nil if the enum is a resilient type because in this case the complete list
+  /// of cases is not known.
+  public func getEnumCases(in function: Function) -> EnumCases? {
+    if nominal.isResilient(in: function) {
+      return nil
+    }
+    return EnumCases(enumType: self, function: function)
+  }
+
   public typealias MetatypeRepresentation = BridgedType.MetatypeRepresentation
 
   public func instanceTypeOfMetatype(in function: Function) -> Type {
@@ -196,6 +206,36 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 
   public func getNameOfField(withIndex idx: Int) -> StringRef {
     StringRef(bridged: type.bridged.getFieldName(idx))
+  }
+}
+
+public struct EnumCase {
+  public let payload: Type?
+  public let index: Int
+}
+
+public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
+  fileprivate let enumType: Type
+  fileprivate let function: Function
+  private var caseIterator: BridgedType.EnumElementIterator
+  private var caseIndex = 0
+
+  fileprivate init(enumType: Type, function: Function) {
+    self.enumType = enumType
+    self.function = function
+    self.caseIterator = enumType.bridged.getFirstEnumCaseIterator()
+  }
+
+  public mutating func next() -> EnumCase? {
+    if !enumType.bridged.isEndCaseIterator(caseIterator) {
+      defer {
+        caseIterator = caseIterator.getNext()
+        caseIndex += 1
+      }
+      return EnumCase(payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+                      index: caseIndex)
+    }
+    return nil
   }
 }
 

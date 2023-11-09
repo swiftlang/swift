@@ -215,6 +215,12 @@ public struct Builder {
     return notifyNew(ued.getAs(UncheckedEnumDataInst.self))
   }
 
+  public func createUncheckedTakeEnumDataAddr(enumAddress: Value,
+                                              caseIndex: Int) -> UncheckedTakeEnumDataAddrInst {
+    let uteda = bridged.createUncheckedTakeEnumDataAddr(enumAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedTakeEnumDataAddrInst.self))
+  }
+
   public func createEnum(caseIndex: Int, payload: Value?, enumType: Type) -> EnumInst {
     let enumInst = bridged.createEnum(caseIndex, payload.bridged, enumType.bridged)
     return notifyNew(enumInst.getAs(EnumInst.self))
@@ -236,6 +242,17 @@ public struct Builder {
     return notifyNew(se.getAs(SwitchEnumInst.self))
   }
   
+  @discardableResult
+  public func createSwitchEnumAddr(enumAddress: Value,
+                                   cases: [(Int, BasicBlock)],
+                                   defaultBlock: BasicBlock? = nil) -> SwitchEnumAddrInst {
+    let se = cases.withUnsafeBufferPointer { caseBuffer in
+      bridged.createSwitchEnumAddrInst(enumAddress.bridged, defaultBlock.bridged,
+                                       caseBuffer.baseAddress, caseBuffer.count)
+    }
+    return notifyNew(se.getAs(SwitchEnumAddrInst.self))
+  }
+
   @discardableResult
   public func createBranch(to destBlock: BasicBlock, arguments: [Value] = []) -> BranchInst {
     return arguments.withBridgedValues { valuesRef in
