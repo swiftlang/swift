@@ -96,6 +96,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isValueTypeWithDeinit() const;
   BRIDGED_INLINE bool isLoadable(BridgedFunction f) const;
   BRIDGED_INLINE bool isReferenceCounted(BridgedFunction f) const;
+  BRIDGED_INLINE bool selfOrAnyFieldHasValueDeinit(BridgedFunction f) const;
   BRIDGED_INLINE bool isUnownedStorageType() const;
   BRIDGED_INLINE bool hasArchetype() const;
   BRIDGED_INLINE bool isNominalOrBoundGenericNominal() const;

@@ -43,6 +43,10 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     return bridged.isReferenceCounted(function.bridged)
   }
 
+  public func selfOrAnyFieldHasValueDeinit(in function: Function) -> Bool {
+    return bridged.selfOrAnyFieldHasValueDeinit(function.bridged)
+  }
+
   public var isUnownedStorageType: Bool {
     return bridged.isUnownedStorageType()
   }
@@ -207,7 +211,7 @@ extension BridgedType {
 
 // TODO: use an AST type for this once we have it
 public struct NominalTypeDecl : Equatable, Hashable {
-  private let bridged: BridgedNominalTypeDecl
+  public let bridged: BridgedNominalTypeDecl
 
   public init(_bridged: BridgedNominalTypeDecl) {
     self.bridged = _bridged
@@ -229,5 +233,9 @@ public struct NominalTypeDecl : Equatable, Hashable {
 
   public var isGlobalActor: Bool {
     return bridged.isGlobalActor()
+  }
+
+  public var hasValueDeinit: Bool {
+    return bridged.hasValueDeinit()
   }
 }
