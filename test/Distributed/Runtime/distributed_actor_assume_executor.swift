@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN:  %target-run %t/a.out
 
@@ -18,8 +18,10 @@ import StdlibUnittest
 import Distributed
 import FakeDistributedActorSystems
 
+@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
+@available(SwiftStdlib 5.9, *)
 func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchronous! */ -> String {
   actor.assumeIsolated { dist in
     print("gained access to: \(dist.isolatedProperty)")
@@ -27,12 +29,14 @@ func checkAssumeLocalDistributedActor(actor: MainDistributedFriend) /* synchrono
   }
 }
 
+@available(SwiftStdlib 5.9, *)
 func checkAssumeMainActor(actor: MainDistributedFriend) /* synchronous! */ {
   MainActor.assumeIsolated {
     print("yay")
   }
 }
 
+@available(SwiftStdlib 5.9, *)
 @MainActor
 func check(actor: MainDistributedFriend) {
   _ = checkAssumeLocalDistributedActor(actor: actor)
@@ -58,6 +62,7 @@ distributed actor MainDistributedFriend {
 
 }
 
+@available(SwiftStdlib 5.9, *)
 actor OtherMain {
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     return MainActor.sharedUnownedExecutor
@@ -71,14 +76,14 @@ actor OtherMain {
   }
 }
 
+@available(SwiftStdlib 5.7, *)
 @main struct Main {
   static func main() async {
-    let tests = TestSuite("AssumeLocalDistributedActorExecutor")
-
-    let system = FakeRoundtripActorSystem()
-    let distLocal = MainDistributedFriend(actorSystem: system)
-
     if #available(SwiftStdlib 5.9, *) {
+      let tests = TestSuite("AssumeLocalDistributedActorExecutor")
+
+      let system = FakeRoundtripActorSystem()
+      let distLocal = MainDistributedFriend(actorSystem: system)
 
       tests.test("assumeOnLocalDistributedActorExecutor: assume the main executor, inside the DistributedMainDistributedFriend local actor") {
         _ = checkAssumeLocalDistributedActor(actor: distLocal)
@@ -100,9 +105,7 @@ actor OtherMain {
         await OtherMain().checkAssumeLocalDistributedActor(actor: remoteRef)
       }
 
-
+      await runAllTestsAsync()
     }
-
-    await runAllTestsAsync()
   }
 }
