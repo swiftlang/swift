@@ -205,7 +205,8 @@ bool TypeBase::isNoncopyable(const DeclContext *dc) {
 
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable() {
-  auto canType = getCanonicalType();
+  // Strip @lvalue and canonicalize.
+  auto canType = getRValueType()->getCanonicalType();
   auto &ctx = canType->getASTContext();
 
   // for legacy-mode queries that are not dependent on conformances to Copyable
