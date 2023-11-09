@@ -24,6 +24,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -32,6 +33,7 @@
 #define DEBUG_TYPE "transfer-non-sendable"
 
 using namespace swift;
+using namespace swift::PartitionPrimitives;
 
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
@@ -351,7 +353,7 @@ struct PartitionOpBuilder {
         lookupValueID(tgt), lookupValueID(src), currentInst));
   }
 
-  void addTransfer(SILValue value, Expr *sourceExpr = nullptr) {
+  void addTransfer(SILValue value, Expr *sourceExpr) {
     assert(valueHasID(value) &&
            "transferred value should already have been encountered");
 
@@ -2097,23 +2099,24 @@ class PartitionAnalysis {
       Partition workingPartition = blockState.getEntryPartition();
       PartitionOpEvaluator eval(workingPartition);
       eval.failureCallback = /*handleFailure=*/
-          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
-            auto expr = getExprForPartitionOp(partitionOp);
+        [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
+            SILInstruction *transferringInst) {
+          auto expr = getExprForPartitionOp(partitionOp);
 
-            // ensure that multiple transfers at the same AST node are only
-            // entered once into the race tracer
-            if (hasBeenEmitted(expr))
-              return;
+          // Ensure that multiple transfers at the same AST node are only
+          // entered once into the race tracer
+          if (hasBeenEmitted(expr))
+            return;
 
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Emitting Use After Transfer Error!\n"
-                       << "    ID:  %%" << transferredVal << "\n"
-                       << "    Rep: "
-                       << *translator.getValueForId(transferredVal)
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Emitting Use After Transfer Error!\n"
+                     << "    ID:  %%" << transferredVal << "\n"
+                     << "    Rep: "
+                     << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
 
             raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
-          };
+        };
       eval.transferredNonTransferrableCallback =
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             LLVM_DEBUG(llvm::dbgs()
