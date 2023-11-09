@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import sys
 
 from . import product
 from .. import shell
@@ -42,11 +41,6 @@ class EarlySwiftDriver(product.Product):
         return True
 
     def should_build(self, host_target):
-        # Temporarily disable for non-darwin since this build never works
-        # outside of that case currently.
-        if sys.platform != 'darwin':
-            return False
-
         if self.is_cross_compile_target(host_target):
             return False
 
