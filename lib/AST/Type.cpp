@@ -181,20 +181,6 @@ static bool alwaysNoncopyable(Type ty) {
 /// context to substitute unbound types.
 bool TypeBase::isNoncopyable(const DeclContext *dc) {
   assert(dc);
-  auto &ctx = dc->getASTContext();
-
-  // Fast-path for type parameters; ask the generic signature directly.
-  if (isTypeParameter() &&
-      ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-    auto canType = getCanonicalType();
-
-    auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
-    if (!copyable)
-      llvm_unreachable("missing Copyable protocol!");
-
-    auto sig = dc->getGenericSignatureOfContext();
-    return !sig->requiresProtocol(canType, copyable);
-  }
 
   if (!hasArchetype() || hasOpenedExistential())
     if (auto env = dc->getGenericEnvironmentOfContext())
