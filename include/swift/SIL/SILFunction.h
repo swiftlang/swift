@@ -1455,7 +1455,8 @@ public:
   ArrayRef<SILArgument *> getArgumentsWithoutIndirectResults() const {
     assert(!empty() && "Cannot get arguments of a function without a body");
     return begin()->getArguments().slice(
-        getConventions().getNumIndirectSILResults());
+        getConventions().getNumIndirectSILResults() +
+          getConventions().getNumIndirectSILErrorResults());
   }
 
   const SILArgument *getSelfArgument() const {

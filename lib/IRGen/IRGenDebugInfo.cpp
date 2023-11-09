@@ -2480,6 +2480,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   llvm::DITypeArray Error = nullptr;
   if (FnTy && (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables))
     if (auto ErrorInfo = FnTy->getOptionalErrorResult()) {
+      GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
       SILType SILTy = IGM.silConv.getSILType(
           *ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext());
       auto DTI = DebugTypeInfo::getFromTypeInfo(

@@ -626,6 +626,29 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
       return;
     }
   }
+
+  // Modify throw_addr terminators to branch to the error-return BB, rather than
+  // trying to clone the ThrowAddrInst.
+  if (auto *TAI = dyn_cast<ThrowAddrInst>(Terminator)) {
+    SILLocation Loc = getOpLocation(TAI->getLoc());
+    switch (Apply.getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      assert(cast<ApplyInst>(Apply)->isNonThrowing()
+             && "apply of a function with error result must be non-throwing");
+      getBuilder().createUnreachable(Loc);
+      return;
+    case FullApplySiteKind::BeginApplyInst:
+      assert(cast<BeginApplyInst>(Apply)->isNonThrowing()
+             && "apply of a function with error result must be non-throwing");
+      getBuilder().createUnreachable(Loc);
+      return;
+    case FullApplySiteKind::TryApplyInst:
+      auto tryAI = cast<TryApplyInst>(Apply);
+      getBuilder().createBranch(Loc, tryAI->getErrorBB());
+      return;
+    }
+  }
+
   // Otherwise use normal visitor, which clones the existing instruction
   // but remaps basic blocks and values.
   visit(Terminator);
