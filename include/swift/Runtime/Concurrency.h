@@ -933,6 +933,9 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskExecutorRef swift_task_getPreferredTaskExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskExecutorRef swift_task_getAnyPreferredTaskExecutor(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(SerialExecutorRef executor);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
