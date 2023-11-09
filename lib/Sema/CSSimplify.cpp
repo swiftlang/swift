@@ -3789,8 +3789,15 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       getConstraintLocator(locator, {LocatorPathElt::GenericType(bound1),
           LocatorPathElt::GenericType(bound2)});
 
-    auto argMatchingFlags =
-      subflags | TMF_ApplyingFix | TMF_MatchingGenericArguments;
+    auto argMatchingFlags = subflags;
+    // Allow the solver to produce separate fixes while matching
+    // key path's root/value to a contextual type instead of the
+    // standard one fix for all mismatched generic arguments
+    // because at least one side of such a relation would be resolved.
+    if (!isExpr<KeyPathExpr>(locator.trySimplifyToExpr())) {
+      argMatchingFlags |= TMF_ApplyingFix;
+      argMatchingFlags |= TMF_MatchingGenericArguments;
+    }
 
     // Optionals have a lot of special diagnostics and only one
     // generic argument so if we' re dealing with one, don't produce generic
