@@ -1056,10 +1056,6 @@ AvailabilityContext overApproximateAvailabilityAtLocation(
 /// Walk the AST to build the hierarchy of TypeRefinementContexts
 void buildTypeRefinementContextHierarchy(SourceFile &SF);
 
-/// Walk the AST to complete the hierarchy of TypeRefinementContexts for
-/// the delayed function body of \p AFD.
-void buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, AbstractFunctionDecl *AFD);
-
 /// Build the hierarchy of TypeRefinementContexts for the entire
 /// source file, if it has not already been built. Returns the root
 /// TypeRefinementContext for the source file.

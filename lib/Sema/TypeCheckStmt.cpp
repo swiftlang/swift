@@ -2729,10 +2729,6 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   if (tyOpts.DebugTimeFunctionBodies || tyOpts.WarnLongFunctionBodies)
     timer.emplace(AFD);
 
-  auto SF = AFD->getParentSourceFile();
-  if (SF)
-    TypeChecker::buildTypeRefinementContextHierarchyDelayed(*SF, AFD);
-
   BraceStmt *body = AFD->getBody();
   assert(body && "Expected body to type-check");
 

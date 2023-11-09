@@ -512,34 +512,54 @@ private:
     return Action::Continue();
   }
 
-  /// Constructs a placeholder TRC node that should be expanded later if the AST
-  /// associated with the given declaration is not ready to be traversed yet.
-  /// Returns true if a node was created.
-  bool buildLazyContextForDecl(Decl *D) {
-    if (!isa<PatternBindingDecl>(D))
-      return false;
+  bool shouldBuildLazyContextForDecl(Decl *D) {
+    // Skip functions that have unparsed bodies on an initial descent to avoid
+    // eagerly parsing bodies unnecessarily.
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      if (afd->hasBody() && !afd->isBodySkipped() &&
+          !afd->getBody(/*canSynthesize=*/false))
+        return true;
+    }
 
+    // Pattern binding declarations may have attached property wrappers that
+    // get expanded from macros attached to the parent declaration. We must
+    // not eagerly expand the attached property wrappers to avoid request
+    // cycles.
+    if (auto *pattern = dyn_cast<PatternBindingDecl>(D)) {
+      if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
+        // FIXME: We could narrow this further by detecting whether there are
+        // any macro expansions required to visit the CustomAttrs of the var.
+        if (firstVar->hasInitialValue() && !firstVar->isInitExposedToClients())
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// For declarations that were previously skipped prepare the AST before
+  /// building out TRCs.
+  void prepareDeclForLazyExpansion(Decl *D) {
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      (void)AFD->getBody(/*canSynthesize*/ true);
+    }
+  }
+
+  /// Constructs a placeholder TRC node that should be expanded later. This is
+  /// useful for postponing unnecessary work (and request triggers) when
+  /// initally building out the TRC subtree under a declaration. Lazy nodes
+  /// constructed here will be expanded by
+  /// ExpandChildTypeRefinementContextsRequest. Returns true if a node was
+  /// created.
+  bool buildLazyContextForDecl(Decl *D) {
     // Check whether the current TRC is already a lazy placeholder. If it is,
     // we should try to expand it rather than creating a new placeholder.
     auto currentTRC = getCurrentTRC();
     if (currentTRC->getNeedsExpansion() && currentTRC->getDeclOrNull() == D)
       return false;
 
-    // Pattern binding declarations may have attached property wrappers that
-    // get expanded from macros attached to the parent declaration. We must
-    // not eagerly expand the attached property wrappers to avoid a request
-    // cycle.
-    if (auto *pattern = dyn_cast<PatternBindingDecl>(D)) {
-      if (auto firstVar = pattern->getAnchoringVarDecl(0)) {
-        // If there's no initial value, or the init is exposed to clients, then
-        // we don't need to create any implicit TRCs for the init bodies.
-        if (!firstVar->hasInitialValue() || firstVar->isInitExposedToClients())
-          return false;
-
-        // FIXME: We could narrow this further by detecting whether there are
-        // any macro expansions required to visit the CustomAttrs of the var.
-      }
-    }
+    if (!shouldBuildLazyContextForDecl(D))
+      return false;
 
     // If we've made it this far then we've identified a declaration that
     // requires lazy expansion later.
@@ -1223,6 +1243,7 @@ private:
 void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
   ASTContext &Context = SF.getASTContext();
+  assert(!Context.LangOpts.DisableAvailabilityChecking);
 
   if (!RootTRC) {
     // The root type refinement context reflects the fact that all parts of
@@ -1246,28 +1267,11 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF) {
   }
 }
 
-void TypeChecker::buildTypeRefinementContextHierarchyDelayed(SourceFile &SF, AbstractFunctionDecl *AFD) {
-  // If there's no TRC for the file, we likely don't want this one either.
-  // RootTRC is not set when availability checking is disabled.
-  TypeRefinementContext *RootTRC = SF.getTypeRefinementContext();
-  if(!RootTRC)
-    return;
-
-  if (AFD->getBodyKind() != AbstractFunctionDecl::BodyKind::Unparsed)
-    return;
-
-  // Parse the function body.
-  AFD->getBody(/*canSynthesize=*/true);
-
-  // Build the refinement context for the function body.
-  ASTContext &Context = SF.getASTContext();
-  auto LocalTRC = RootTRC->findMostRefinedSubContext(AFD->getLoc(), Context);
-  TypeRefinementContextBuilder Builder(LocalTRC, Context);
-  Builder.build(AFD);
-}
-
 TypeRefinementContext *
 TypeChecker::getOrBuildTypeRefinementContext(SourceFile *SF) {
+  if (SF->getASTContext().LangOpts.DisableAvailabilityChecking)
+    return nullptr;
+
   TypeRefinementContext *TRC = SF->getTypeRefinementContext();
   if (!TRC) {
     buildTypeRefinementContextHierarchy(*SF);
@@ -1284,6 +1288,7 @@ ExpandChildTypeRefinementContextsRequest::evaluate(
   if (auto decl = parentTRC->getDeclOrNull()) {
     ASTContext &ctx = decl->getASTContext();
     TypeRefinementContextBuilder builder(parentTRC, ctx);
+    builder.prepareDeclForLazyExpansion(decl);
     builder.build(decl);
   }
   return parentTRC->Children;
@@ -1338,11 +1343,13 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 
   if (SF && loc.isValid()) {
     TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
-    TypeRefinementContext *TRC =
-        rootTRC->findMostRefinedSubContext(loc, Context);
-    OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
-    if (MostRefined) {
-      *MostRefined = TRC;
+    if (rootTRC) {
+      TypeRefinementContext *TRC =
+          rootTRC->findMostRefinedSubContext(loc, Context);
+      OverApproximateContext.constrainWith(TRC->getAvailabilityInfo());
+      if (MostRefined) {
+        *MostRefined = TRC;
+      }
     }
   }
 
