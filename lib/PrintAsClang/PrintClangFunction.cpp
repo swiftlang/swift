@@ -1131,7 +1131,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
   llvm::Optional<StringRef> indirectFunctionVar;
   using DispatchKindTy = IRABIDetailsProvider::MethodDispatchInfo::Kind;
-  if (dispatchInfo) {
+  if (dispatchInfo && !isStaticMethod) {
+    // Always dispatch class methods directly to the concrete class instance.
     switch (dispatchInfo->getKind()) {
     case DispatchKindTy::Direct:
       break;
