@@ -268,6 +268,10 @@ option(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS
        "Install a parent module map for Swift shims."
        ${SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default})
 
+option(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+       "Allow retain/release functions to be overridden by indirecting through function pointers."
+       TRUE)
+
 set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
   "If set, provides a fixed path to the swift-backtrace binary.  This
    will disable dynamic determination of the path and will also disable

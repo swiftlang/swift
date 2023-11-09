@@ -246,6 +246,7 @@ KNOWN_SETTINGS=(
     swift-earlyswiftsyntax                        "0"               "use the early SwiftSyntax"
     swift-enable-backtracing                      "1"               "whether to build the backtracing support"
     swift-runtime-fixed-backtracer-path           ""                "if set, use a fixed path for the backtracer"
+    swift-stdlib-overridable-retain-release       "1"               "whether to allow retain/release functions to be overridden by indirecting through function pointers"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-flavor                     ""                "when building the FREESTANDING stdlib, which build style to use (options: apple, linux)"
@@ -1878,6 +1879,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH="${SWIFT_SYNTAX_SOURCE_DIR}"
                     -DSWIFT_ENABLE_BACKTRACING:BOOL=$(true_false "${SWIFT_ENABLE_BACKTRACING}")
+                    -DSWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE:BOOL=$(true_false "${SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE}")
                     "${swift_cmake_options[@]}"
                 )
 
