@@ -51,6 +51,7 @@ enum class UnwindAlgorithm {
 };
 
 enum class OnOffTty {
+  Default = -1,
   Off = 0,
   On = 1,
   TTY = 2
