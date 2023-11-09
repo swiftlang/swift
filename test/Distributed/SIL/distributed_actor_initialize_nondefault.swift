@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -disable-availability-checking -I %t | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -module-name default_deinit -primary-file %s -emit-sil -verify -I %t | %FileCheck %s --enable-var-scope
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -9,6 +9,7 @@
 import Distributed
 import FakeDistributedActorSystems
 
+@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 // ==== ----------------------------------------------------------------------------------------------------------------
