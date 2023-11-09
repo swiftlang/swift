@@ -1530,12 +1530,14 @@ function Install-HostToolchain() {
 function Build-Inspect() {
   $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-inspect
 
-  Build-SPMProject `
-    -Src $SourceCache\swift\tools\swift-inspect `
-    -Bin $OutDir `
-    -Arch $HostArch `
-    -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib" `
-    -Xcc -Xclang -Xcc -fno-split-cold-code # Workaround https://github.com/llvm/llvm-project/issues/40056
+  Isolate-EnvVars {
+    $env:SWIFTCI_USE_LOCAL_DEPS=1
+    Build-SPMProject `
+      -Src $SourceCache\swift\tools\swift-inspect `
+      -Bin $OutDir `
+      -Arch $HostArch `
+      -Xcc "-I$SDKInstallRoot\usr\include\swift\SwiftRemoteMirror" -Xlinker "$SDKInstallRoot\usr\lib\swift\windows\$($HostArch.LLVMName)\swiftRemoteMirror.lib"
+  }
 }
 
 function Build-Format() {
