@@ -1243,10 +1243,9 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     if (SWIFT_UNLIKELY(offset)) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
-    _addrOffset += offset;
+    addrOffset += offset;
     tag >>= 56;
     if (SWIFT_UNLIKELY(tag == 0)) {
-      addrOffset = _addrOffset;
       return;
     }
 
