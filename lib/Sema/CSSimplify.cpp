@@ -6675,6 +6675,10 @@ bool ConstraintSystem::repairFailures(
     if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
       break;
 
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) ||
+        hasConversionOrRestriction(ConversionRestrictionKind::ValueToOptional))
+      return false;
+
     auto kpExpr = castToExpr<KeyPathExpr>(anchor);
     auto i = kpExpr->getComponents().size() - 1;
     auto lastCompLoc =
