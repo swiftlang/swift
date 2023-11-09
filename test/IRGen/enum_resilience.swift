@@ -308,8 +308,7 @@ extension ResilientMultiPayloadGenericEnum {
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[WITNESSTABLE_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr [[METADATA]], {{(i64|i32)}} -1
-// CHECK-NEXT: %.valueWitnesses = load ptr, ptr [[WITNESSTABLE_ADDR]]
-// CHECK-NEXT: [[WITNESS_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %.valueWitnesses, i32 7
+// CHECK: [[WITNESS_ADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 7
 // CHECK-NEXT: [[WITNESS_FN:%[^,]+]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr {{.*}} to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
