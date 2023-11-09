@@ -331,7 +331,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[NOOP:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 1
+  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 1
   // CHECK:        [[DESTROY:%[^,]+]] = load ptr, ptr [[DESTROYADDR]]
   // CHECK:        call void [[DESTROY]](ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[NOOP]]
@@ -343,7 +343,7 @@ entry(%a : $*EitherOr<T, Builtin.Int64>, %b : $*EitherOr<T, Builtin.Int64>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 4
+  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 4
   // CHECK:        [[INITWITHTAKE:%[^,]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHTAKE]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
@@ -370,7 +370,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 1
+  // CHECK:        [[DESTROYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 1
   // CHECK:        [[DESTROY:%[^,]+]] = load ptr, ptr [[DESTROYADDR]]
   // CHECK:        call void [[DESTROY]](ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[NOOP]]
@@ -384,7 +384,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK:        [[COND:%.*]] = icmp ne i32 [[TAG]], 0
   // CHECK-NEXT:   br i1 [[COND]], label %[[TRIVIAL:[0-9]+]], label %[[LEFT:[0-9]+]]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 4
+  // CHECK:        [[INITWITHTAKEADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 4
   // CHECK:        [[INITWITHTAKE:%[^,]+]] = load ptr, ptr [[INITWITHTAKEADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHTAKE]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
@@ -401,7 +401,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   // CHECK-NEXT:     i32 1, label %[[RIGHT:[0-9]+]]
   // CHECK-NEXT:   ]
   // CHECK:      [[LEFT]]:
-  // CHECK:        [[INITWITHCOPYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr %T.valueWitnesses, i32 2
+  // CHECK:        [[INITWITHCOPYADDR:%[0-9]+]] = getelementptr inbounds ptr, ptr {{.*}}, i32 2
   // CHECK:        [[INITWITHCOPY:%[^,]+]] = load ptr, ptr [[INITWITHCOPYADDR]]
   // CHECK:        {{%[0-9]+}} = call ptr [[INITWITHCOPY]](ptr noalias {{%[0-9]+}}, ptr noalias {{%[0-9]+}}, ptr %T)
   // CHECK:        br label %[[DONE:[0-9]+]]
