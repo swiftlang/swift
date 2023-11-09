@@ -4544,7 +4544,7 @@ public:
 /// This is done on all of a class's implementations at once to improve diagnostics.
 class TypeCheckObjCImplementationRequest
     : public SimpleRequest<TypeCheckObjCImplementationRequest,
-                           evaluator::SideEffect(ExtensionDecl *),
+                           evaluator::SideEffect(Decl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4554,7 +4554,7 @@ private:
 
   // Evaluation.
   evaluator::SideEffect
-  evaluate(Evaluator &evaluator, ExtensionDecl *ED) const;
+  evaluate(Evaluator &evaluator, Decl *D) const;
 
 public:
   // Separate caching.

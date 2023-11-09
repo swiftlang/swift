@@ -3567,6 +3567,8 @@ public:
         reason.setAttrInvalid();
       }
     }
+
+    TypeChecker::checkObjCImplementation(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -4006,6 +4008,8 @@ public:
 
     checkDefaultArguments(CD->getParameters());
     checkVariadicParameters(CD->getParameters(), CD);
+
+    TypeChecker::checkObjCImplementation(CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {

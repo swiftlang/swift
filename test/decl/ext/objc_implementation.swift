@@ -476,7 +476,7 @@ func CImplFunc2(_: Int32) {
 
 @_objcImplementation @_cdecl("CImplFuncMissing")
 func CImplFuncMissing(_: Int32) {
-  // FIXME: expected-DISABLED-error@-1 {{fnord}}
+  // expected-error@-2 {{could not find imported function 'CImplFuncMissing' matching global function 'CImplFuncMissing'; make sure your umbrella or bridging header imports the header that declares it}}
 }
 
 func usesAreNotAmbiguous(obj: ObjCClass) {

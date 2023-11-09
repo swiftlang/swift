@@ -1590,6 +1590,14 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
       attr->setCategoryNameInvalid();
     }
+
+    // FIXME: if (AFD->getCDeclName().empty())
+
+    if (!AFD->getImplementedObjCDecl()) {
+      diagnose(attr->getLocation(),
+               diag::attr_objc_implementation_func_not_found,
+               AFD->getCDeclName(), AFD);
+    }
   }
 }
 

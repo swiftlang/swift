@@ -2775,12 +2775,12 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   return anyDiagnosed;
 }
 
-void TypeChecker::checkObjCImplementation(ExtensionDecl *ED) {
-  if (!ED->getImplementedObjCDecl())
+void TypeChecker::checkObjCImplementation(Decl *D) {
+  if (!D->getImplementedObjCDecl())
     return;
 
-  evaluateOrDefault(ED->getASTContext().evaluator,
-                    TypeCheckObjCImplementationRequest{ED},
+  evaluateOrDefault(D->getASTContext().evaluator,
+                    TypeCheckObjCImplementationRequest{D},
                     evaluator::SideEffect());
 }
 
@@ -2901,10 +2901,20 @@ class ObjCImplementationChecker {
   llvm::SmallDenseMap<ValueDecl *, ObjCSelector, 16> unmatchedCandidates;
 
 public:
-  ObjCImplementationChecker(ExtensionDecl *ext)
-      : diags(ext->getASTContext().Diags)
+  ObjCImplementationChecker(Decl *D)
+      : diags(D->getASTContext().Diags)
   {
-    assert(!ext->hasClangNode() && "passed interface, not impl, to checker");
+    assert(!D->hasClangNode() && "passed interface, not impl, to checker");
+
+    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+      addCandidate(D);
+      addRequirement(D->getImplementedObjCDecl());
+
+      return;
+    }
+
+    // Otherwise this must be an extension.
+    auto ext = cast<ExtensionDecl>(D);
 
     // Conformances are declared exclusively in the interface, so diagnose any
     // in the implementation right away.
@@ -3083,12 +3093,20 @@ private:
   }
 
   static ObjCSelector getExplicitObjCName(ValueDecl *VD) {
+    if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>()) {
+      auto ident = VD->getASTContext().getIdentifier(cdeclAttr->Name);
+      return ObjCSelector(VD->getASTContext(), 0, { ident });
+    }
     if (auto objcAttr = VD->getAttrs().getAttribute<ObjCAttr>())
       return objcAttr->getName().value_or(ObjCSelector());
     return ObjCSelector();
   }
 
   static llvm::Optional<ObjCSelector> getObjCName(ValueDecl *VD) {
+    if (!VD->getCDeclName().empty()) {
+      auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
+      return ObjCSelector(VD->getASTContext(), 0, { ident });
+    }
     return VD->getObjCRuntimeName();
   }
 
@@ -3401,8 +3419,11 @@ private:
     if (req->isInstanceMember() != cand->isInstanceMember())
       return MatchOutcome::WrongStaticness;
 
-    if (cand->getDeclContext()->getImplementedObjCContext()
-          != req->getDeclContext())
+    // Check only applies to members of implementations, not implementations in
+    // their own right.
+    if (!cand->isObjCImplementation()
+          && cand->getDeclContext()->getImplementedObjCContext()
+                 != req->getDeclContext())
       return MatchOutcome::WrongCategory;
 
     if (cand->getKind() != req->getKind())
@@ -3648,8 +3669,8 @@ public:
 }
 
 evaluator::SideEffect TypeCheckObjCImplementationRequest::
-evaluate(Evaluator &evaluator, ExtensionDecl *ED) const {
-  PrettyStackTraceDecl trace("checking member implementations of", ED);
+evaluate(Evaluator &evaluator, Decl *D) const {
+  PrettyStackTraceDecl trace("checking member implementations of", D);
 
   // FIXME: Because we check extension-by-extension, candidates and requirements
   // from different extensions are never compared, so we never get an
@@ -3658,7 +3679,7 @@ evaluate(Evaluator &evaluator, ExtensionDecl *ED) const {
   // candidates we considered to all unmatched requirements in the module, and
   // vice versa. The tricky bit is making sure we only diagnose for candidates
   // and requirements in our primary files!
-  ObjCImplementationChecker checker(ED);
+  ObjCImplementationChecker checker(D);
 
   checker.matchRequirements();
   checker.diagnoseUnmatchedCandidates();
