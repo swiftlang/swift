@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-copy-propagation=false -Xllvm -sil-print-all -module-name=main %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-lexical-lifetimes=false -Xllvm -sil-print-all -module-name=main %s 2>&1 | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 @inline(never)
 func takeGuaranteed(_ a: AnyObject) -> AnyObject {
   return a
@@ -35,7 +37,7 @@ func getOwned() -> AnyObject
 // The first round of SemanticARCOpts must eliminate the borrow scope
 // that was only needed for a lexical lifetime.
 
-// CHECK-LABEL: *** SIL function after {{.*}} (semantic-arc-opts)
+// CHECK-LABEL: *** SIL function after {{.*}} (onone-simplification)
 // CHECK-LABEL: // testLexical()
 // CHECK: [[A:%.*]] = apply %{{.*}}()
 // CHECK: apply %{{.*}}([[A]])
