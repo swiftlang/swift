@@ -104,6 +104,7 @@ extension ProjectedValue {
                                          _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, complexityBudget: complexityBudget, context)
     if walker.walkUp(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -119,6 +120,7 @@ extension ProjectedValue {
                                                       _ context: some Context) -> V.Result? {
     var walker = EscapeWalker(visitor: visitor, context)
     if walker.walkDown(addressOrValue: value, path: path.escapePath) == .abortWalk {
+      walker.visitor.cleanupOnAbort()
       return nil
     }
     return walker.visitor.result
@@ -182,6 +184,12 @@ extension EscapeVisitor {
 protocol EscapeVisitorWithResult : EscapeVisitor {
   associatedtype Result
   var result: Result { get }
+
+  mutating func cleanupOnAbort()
+}
+
+extension EscapeVisitorWithResult {
+  mutating func cleanupOnAbort() {}
 }
 
 // FIXME: This ought to be marked private, but that triggers a compiler bug
@@ -482,7 +490,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // 1. the closure (with the captured values) itself can escape
       // 2. something can escape in a destructor when the context is destroyed
       return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
+    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path.projectionPath) {
         return .continueWalk
       }
@@ -693,7 +701,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     case let ap as ApplyInst:
       return walkUpApplyResult(apply: ap, path: path.with(knownType: nil))
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst:
+    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path.projectionPath) {
         // When walking up we shouldn't end up at a load where followLoads is false,
         // because going from a (non-followLoads) address to a load always involves a class indirection.
