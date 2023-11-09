@@ -1813,17 +1813,22 @@ uint16_t SILGenFunction::emitBasicProlog(
   emitIndirectResultParameters(*this, resultType, origResultType, DC);
 
   llvm::Optional<AbstractionPattern> origErrorType;
-  if (errorType) {
-    if (origClosureType &&
-        !origClosureType->isTypeParameterOrOpaqueArchetype()) {
-      origErrorType =
-          origClosureType->getFunctionThrownErrorType();
-    } else {
-      origErrorType =
-          AbstractionPattern(genericSig.getCanonicalSignature(),
-                             (*errorType)->getCanonicalType());
+  if (origClosureType && !origClosureType->isTypeParameterOrOpaqueArchetype()) {
+    CanType substClosureType = origClosureType->getType()
+        .subst(origClosureType->getGenericSubstitutions())->getCanonicalType();
+    CanAnyFunctionType substClosureFnType =
+        cast<AnyFunctionType>(substClosureType);
+    if (auto optPair = origClosureType->getFunctionThrownErrorType(substClosureFnType)) {
+      origErrorType = optPair->first;
+      errorType = optPair->second;
     }
+  } else if (errorType) {
+    origErrorType = AbstractionPattern(genericSig.getCanonicalSignature(),
+                                       (*errorType)->getCanonicalType());
+  }
 
+  if (origErrorType && errorType &&
+      F.getConventions().hasIndirectSILErrorResults()) {
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
 

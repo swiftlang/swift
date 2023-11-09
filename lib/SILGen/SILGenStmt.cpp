@@ -1547,58 +1547,65 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     }
   }
 
+  bool shouldDiscard = ThrowDest.getThrownError().Discard;
+  SILType exnType = exn->getType().getObjectType();
   SILBasicBlock &throwBB = *ThrowDest.getBlock();
-  if (!throwBB.getArguments().empty()) {
-    assert(exn);
-    assert(!indirectErrorAddr);
+  SILType destErrorType =  indirectErrorAddr
+      ? indirectErrorAddr->getType().getObjectType()
+      : !throwBB.getArguments().empty() 
+        ? throwBB.getArguments()[0]->getType().getObjectType()
+        : exnType;
 
-    auto errorArg = throwBB.getArguments()[0];
+  // If the thrown error type differs from what the throw destination expects,
+  // perform the conversion.
+  // FIXME: Can the AST tell us what to do here?
+  if (exnType != destErrorType && !shouldDiscard) {
+    assert(destErrorType == SILType::getExceptionType(getASTContext()));
 
-    // If we don't have an existential box, create one to jump to the throw
-    // destination.
-    SILType errorArgType = errorArg->getType();
-    if (exn->getType() != errorArgType) {
-      SILType existentialBoxType = SILType::getExceptionType(getASTContext());
-      assert(errorArgType == existentialBoxType);
+    ProtocolConformanceRef conformances[1] = {
+      getModule().getSwiftModule()->conformsToProtocol(
+        exn->getType().getASTType(), getASTContext().getErrorDecl())
+    };
 
-      // FIXME: Callers should provide this conformance from places recorded in
-      // the AST.
-      ProtocolConformanceRef conformances[1] = {
-        getModule().getSwiftModule()->conformsToProtocol(
-          exn->getType().getASTType(), getASTContext().getErrorDecl())
-      };
-      exnMV = emitExistentialErasure(
-          loc,
-          exn->getType().getASTType(),
-          getTypeLowering(exn->getType()),
-          getTypeLowering(existentialBoxType),
-          getASTContext().AllocateCopy(conformances),
-          SGFContext(),
-          [&](SGFContext C) -> ManagedValue {
-            return ManagedValue::forForwardedRValue(*this, exn);
-          });
+    exn = emitExistentialErasure(
+        loc,
+        exnType.getASTType(),
+        getTypeLowering(exnType),
+        getTypeLowering(destErrorType),
+        getASTContext().AllocateCopy(conformances),
+        SGFContext(),
+        [&](SGFContext C) -> ManagedValue {
+          if (exn->getType().isAddress()) {
+            return emitLoad(loc, exn, getTypeLowering(exnType), SGFContext(),
+                            IsTake);
+          }
 
-      exn = exnMV.forward(*this);
+          return ManagedValue::forForwardedRValue(*this, exn);
+        }).forward(*this);
+  }
+  assert(exn->getType().getObjectType() == destErrorType);
+
+  if (indirectErrorAddr) {
+    if (exn->getType().isAddress()) {
+      B.createCopyAddr(loc, exn, indirectErrorAddr,
+                       IsTake, IsInitialization);
+    } else {
+      // An indirect error is written into the destination error address.
+      emitSemanticStore(loc, exn, indirectErrorAddr,
+                        getTypeLowering(destErrorType), IsInitialization);
+    }
+  } else if (!throwBB.getArguments().empty()) {
+    // Load if we need to.
+    if (exn->getType().isAddress()) {
+      exn = emitLoad(loc, exn, getTypeLowering(exnType), SGFContext(), IsTake)
+         .forward(*this);
     }
 
     // A direct error value is passed to the epilog block as a BB argument.
     args.push_back(exn);
-  } else if (ThrowDest.getThrownError().Discard) {
-    assert(!indirectErrorAddr);
-    if (exn)
+  } else if (shouldDiscard) {
+    if (exn && exn->getType().isAddress())
       B.createDestroyAddr(loc, exn);
-  } else {
-    assert(indirectErrorAddr);
-
-    // FIXME: opaque values
-
-    // If an error value was provided by the caller, copy it into the
-    // indirect error result. Otherwise we assume the indirect error
-    // result has been initialized.
-    if (exn) {
-      B.createCopyAddr(loc, exn, indirectErrorAddr,
-                       IsTake, IsInitialization);
-    }
   }
 
   // Branch to the cleanup destination.

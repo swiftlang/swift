@@ -6087,7 +6087,6 @@ public:
     }
 
     if (fnConv.hasIndirectSILErrorResults()) {
-      assert(fnConv.isTypedError());
       auto errorResult = fnConv.getSILErrorType(F.getTypeExpansionContext());
       check("indirect error result", errorResult);
     }

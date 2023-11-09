@@ -850,7 +850,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
-    SmallVectorImpl<ManagedValue> *indirectResults) {
+    SmallVectorImpl<ManagedValue> *indirectResults,
+    SmallVectorImpl<ManagedValue> *indirectErrors) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes(
            getTypeExpansionContext())) {
@@ -862,6 +863,19 @@ void SILGenFunction::collectThunkParams(
     SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
     if (indirectResults)
       indirectResults->push_back(ManagedValue::forLValue(arg));
+  }
+
+  if (F.getConventions().hasIndirectSILErrorResults()) {
+    assert(F.getConventions().getNumIndirectSILErrorResults() == 1);
+    auto paramTy = F.mapTypeIntoContext(
+                       F.getConventions().getSILErrorType(getTypeExpansionContext()));
+    auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
+                                .getCategoryType(paramTy.getCategory());
+    SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
+    if (indirectErrors)
+      indirectErrors->push_back(ManagedValue::forLValue(arg));
+
+    IndirectErrorResult = arg;
   }
 
   // Add the parameters.
@@ -4830,6 +4844,31 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                      outputOrigType.getFunctionResultType(),
                      outputSubstType.getResult(),
                      fnType, thunkType);
+
+  // If the function we're calling has as indirect error result, create an
+  // argument for it.
+  SILValue innerIndirectErrorAddr;
+  if (auto innerError = fnType->getOptionalErrorResult()) {
+    if (innerError->getConvention() == ResultConvention::Indirect) {
+      auto loweredErrorResultType = SGF.getSILType(*innerError, fnType);
+      if (SGF.IndirectErrorResult &&
+          SGF.IndirectErrorResult->getType().getObjectType()
+              == loweredErrorResultType) {
+        // The type of the indirect error is the same for both the inner
+        // function and the thunk, so we can re-use the indirect error slot.
+        innerIndirectErrorAddr = SGF.IndirectErrorResult;
+      } else {
+        // The type of the indirect error in the inner function differs from
+        // that of the thunk, or the thunk has a direct error, so allocate a
+        // stack location for the inner indirect error.
+        innerIndirectErrorAddr =
+            SGF.B.createAllocStack(loc, loweredErrorResultType);
+        SGF.enterDeallocStackCleanup(innerIndirectErrorAddr);
+      }
+
+      argValues.push_back(innerIndirectErrorAddr);
+    }
+  }
 
   // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, args, argValues);

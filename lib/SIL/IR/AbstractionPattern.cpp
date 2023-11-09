@@ -1279,8 +1279,15 @@ AbstractionPattern::getFunctionThrownErrorType(
                           (*optErrorType)->getCanonicalType());
   }
 
-  if (!optErrorType)
-    optErrorType = ctx.getErrorExistentialType();
+  if (!optErrorType) {
+    Type origErrorSubstType =
+        optOrigErrorType->getType()
+          .subst(optOrigErrorType->getGenericSubstitutions());
+    if (origErrorSubstType->isNever())
+      optErrorType = ctx.getNeverType();
+    else
+      optErrorType = ctx.getErrorExistentialType();
+  }
 
   return std::make_pair(*optOrigErrorType,
                         (*optErrorType)->getCanonicalType());

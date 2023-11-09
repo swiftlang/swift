@@ -5716,7 +5716,6 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
   SILType resultType = fnConv.getSILResultType(getTypeExpansionContext());
-
   if (!silFnType->hasErrorResult()) {
     return B.createApply(loc, fn, subs, args);
   }
@@ -5729,19 +5728,64 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   {
     B.emitBlock(errorBB);
 
-    SILValue error;
-    bool indirectError = fnConv.hasIndirectSILErrorResults();
-
-    if (!indirectError) {
-      error = errorBB->createPhiArgument(
+    // Grab the inner error.
+    SILValue innerError;
+    bool hasInnerIndirectError = fnConv.hasIndirectSILErrorResults();
+    if (!hasInnerIndirectError) {
+      innerError = errorBB->createPhiArgument(
           fnConv.getSILErrorType(getTypeExpansionContext()),
           OwnershipKind::Owned);
+    } else {
+      // FIXME: This probably belongs on SILFunctionConventions.
+      innerError = args[fnConv.getNumIndirectSILResults()];
+    }
+
+    // Convert to the outer error, if we need to.
+    SILValue outerError;
+    SILType innerErrorType = innerError->getType().getObjectType();
+    SILType outerErrorType = F.mapTypeIntoContext(
+        F.getConventions().getSILErrorType(getTypeExpansionContext()));
+    if (IndirectErrorResult && IndirectErrorResult == innerError) {
+      // Fast path: we aliased the indirect error result slot because both are
+      // indirect and the types matched, so we are done.
+    } else if (!IndirectErrorResult && !hasInnerIndirectError &&
+               innerErrorType == outerErrorType) {
+      // Fast path: both have a direct error result and the types line up, so
+      // rethrow the inner error.
+      outerError = innerError;
+    } else {
+      // The error requires some kind of translation.
+
+      // Load the inner error, if it was returned indirectly.
+      if (innerError->getType().isAddress()) {
+        innerError = emitLoad(loc, innerError, getTypeLowering(innerErrorType),
+                              SGFContext(), IsTake).forward(*this);
+      }
+
+      // If we need to convert the error type, do so now.
+      if (innerErrorType != outerErrorType) {
+        auto conversion = Conversion::getOrigToSubst(
+            AbstractionPattern(innerErrorType.getASTType()),
+            outerErrorType.getASTType(),
+            outerErrorType);
+        outerError = emitConvertedRValue(loc, conversion, SGFContext(),
+            [innerError](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+              return ManagedValue::forForwardedRValue(SGF, innerError);
+            }).forward(*this);
+      }
+
+      // If the outer error is returned indirectly, copy from the converted
+      // inner error to the outer error slot.
+      if (IndirectErrorResult) {
+        emitSemanticStore(loc, outerError, IndirectErrorResult, 
+                          getTypeLowering(outerErrorType), IsInitialization);
+      }
     }
 
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
-    if (!indirectError)
-      B.createThrow(loc, error);
+    if (!IndirectErrorResult)
+      B.createThrow(loc, outerError);
     else
       B.createThrowAddr(loc);
   }
