@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -206,6 +206,82 @@ extension BidirectionalCollection where Element: Equatable {
       return result
     }
     return lastIndex(where: { $0 == element })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// indices(where:) / indices(of:)
+//===----------------------------------------------------------------------===//
+
+extension Collection {
+  /// Returns the indices of all the elements that match the given predicate.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// vowel occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let allTheVowels = str.indices(where: { vowels.contains($0) })
+  ///     // str[allTheVowels].count == 9
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: A set of the indices of the elements for which `predicate`
+  ///   returns `true`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 5.11, *)
+  public func indices(where predicate: (Element) throws -> Bool) rethrows
+    -> RangeSet<Index>
+  {
+    if isEmpty { return RangeSet() }
+
+    var result: [Range<Index>] = []
+    var i = startIndex
+    var start: Index? = nil
+    while i < endIndex {
+      if try predicate(self[i]) {
+        if start == nil {
+          start = i
+        }
+      } else {
+        if let oldStart = start {
+          result.append(oldStart ..< i)
+          start = nil
+        }
+      }
+      formIndex(after: &i)
+    }
+
+    if let start {
+      result.append(start ..< endIndex)
+    }
+
+    return RangeSet(_orderedRanges: result)
+  }
+}
+
+extension Collection where Element: Equatable {
+  /// Returns the indices of all the elements that are equal to the given
+  /// element.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// particular letter occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let allTheEs = str.indices(of: "e")
+  ///     // str[allTheEs].count == 7
+  ///
+  /// - Parameter element: An element to look for in the collection.
+  /// - Returns: A set of the indices of the elements that are equal to
+  ///   `element`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 5.11, *)
+  @inlinable
+  public func indices(of element: Element) -> RangeSet<Index> {
+    indices(where: { $0 == element })
   }
 }
 

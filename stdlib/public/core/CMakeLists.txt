@@ -71,6 +71,7 @@ split_embedded_sources(
     NORMAL DictionaryCasting.swift
     NORMAL DictionaryStorage.swift
     NORMAL DictionaryVariant.swift
+    NORMAL DiscontiguousSlice.swift
     NORMAL DropWhile.swift
     NORMAL Dump.swift
   EMBEDDED EmptyCollection.swift
@@ -129,6 +130,8 @@ split_embedded_sources(
   EMBEDDED RandomAccessCollection.swift
   EMBEDDED Range.swift
   EMBEDDED RangeReplaceableCollection.swift
+    NORMAL RangeSet.swift
+    NORMAL RangeSetRanges.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift
