@@ -30,6 +30,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/Parser.h"
@@ -171,32 +172,6 @@ static void appendToVector(void *declPtr, void *vecPtr) {
   vec->push_back(decl);
 }
 #endif
-
-/// Parse a source file.
-extern "C" void *swift_ASTGen_parseSourceFile(const char *buffer,
-                                              size_t bufferLength,
-                                              const char *moduleName,
-                                              const char *filename,
-                                              void *_Nullable ctx);
-
-/// Destroy a source file parsed with swift_ASTGen_parseSourceFile.
-extern "C" void swift_ASTGen_destroySourceFile(void *sourceFile);
-
-/// Check whether the given source file round-trips correctly. Returns 0 if
-/// round-trip succeeded, non-zero otherwise.
-extern "C" int swift_ASTGen_roundTripCheck(void *sourceFile);
-
-/// Emit parser diagnostics for given source file.. Returns non-zero if any
-/// diagnostics were emitted.
-extern "C" int
-swift_ASTGen_emitParserDiagnostics(void *diagEngine, void *sourceFile,
-                                   int emitOnlyErrors,
-                                   int downgradePlaceholderErrorsToWarnings);
-
-// Build AST nodes for the top-level entities in the syntax.
-extern "C" void swift_ASTGen_buildTopLevelASTNodes(
-    void *diagEngine, void *sourceFile, void *declContext, void *astContext,
-    void *outputContext, void (*)(void *, void *));
 
 /// Main entrypoint for the parser.
 ///
@@ -380,8 +355,9 @@ void Parser::parseSourceFileViaASTGen(
 
   // If we want to do ASTGen, do so now.
   if (langOpts.hasFeature(Feature::ParserASTGen)) {
+    this->IsForASTGen = true;
     swift_ASTGen_buildTopLevelASTNodes(&Diags, exportedSourceFile,
-                                       CurDeclContext, &Context, &items,
+                                       CurDeclContext, Context, *this, &items,
                                        appendToVector);
 
     // Spin the C++ parser to the end; we won't be using it.
@@ -5818,9 +5794,17 @@ static Parser::ParseDeclOptions getParseDeclOptions(DeclContext *DC) {
 ///     decl-import
 ///     decl-operator
 /// \endverbatim
+///
+/// \param fromASTGen If true , this function in called from ASTGen as the
+/// fallback, so do not attempt a callback to ASTGen.
 ParserResult<Decl> Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                      bool IfConfigsAreDeclAttrs,
-                                     llvm::function_ref<void(Decl *)> Handler) {
+                                     llvm::function_ref<void(Decl *)> Handler,
+                                     bool fromASTGen) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (IsForASTGen && !fromASTGen)
+    return parseDeclFromSyntaxTree();
+#endif
   ParseDeclOptions Flags = getParseDeclOptions(CurDeclContext);
   ParserPosition BeginParserPosition;
   if (isIDEInspectionFirstPass())

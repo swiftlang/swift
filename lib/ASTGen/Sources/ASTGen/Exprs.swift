@@ -12,7 +12,75 @@
 
 import ASTBridging
 import SwiftDiagnostics
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+
+/// Check if an `ExprSyntax` can be generated using ASTGen.
+///
+/// If all the expression nodes that shares the first token are migrated,
+/// returns true. For example, given
+///   ```
+///   foo.bar({ $0 + 1 }) + 2
+///   ```
+/// `foo` token is the first token of all `SequenceExpr`, `FunctionCallExpr`,
+/// `MemberAccessExpr`, and `DeclReferenceExpr`. All these expression kinds must
+/// be migrated to handle it in ASTGen. Because the fallback
+/// `generateWithLegacy(_:)` only receives the parser position, it eagerly
+/// parses the outer expressions.
+func isExprMigrated(_ node: ExprSyntax) -> Bool {
+  var current: Syntax = Syntax(node)
+  if let firstToken = node.firstToken(viewMode: .sourceAccurate) {
+    current = firstToken.parent!
+  }
+  while true {
+    switch current.kind {
+    case // Known implemented kinds.
+        .closureExpr, .functionCallExpr, .declReferenceExpr, .memberAccessExpr,
+        .tupleExpr, .ifExpr, .booleanLiteralExpr, .integerLiteralExpr,
+        .arrayExpr, .nilLiteralExpr, .stringLiteralExpr:
+
+      // `generate(_: StringLiteralExprSyntax)` doesn't support interpolations.
+      if let str = current.as(StringLiteralExprSyntax.self) {
+        if str.segments.count != 1 {
+          return false
+        }
+        assert(str.segments.first!.is(StringSegmentSyntax.self))
+      }
+
+      // NOTE: When SequenceExpr is implemented, we need some special handling.
+      // E.g.
+      //   <implemented> + <unimplemented> + <implemented>
+      // If we delegate `<unimplemented>` part to the legacy parser, it would
+      // eagerly parse the rest of the expression, instead of just the
+      // <unimplemented> part.
+      // Maybe call 'Parser::parseExprSequenceElement' directly.
+      break
+    case // Known unimplemented kinds.
+        .arrowExpr, .asExpr, .assignmentExpr, .awaitExpr, .binaryOperatorExpr,
+        .borrowExpr, .canImportExpr, .canImportVersionInfo, .dictionaryExpr,
+        .discardAssignmentExpr, .doExpr, .editorPlaceholderExpr,
+        .floatLiteralExpr, .forceUnwrapExpr, .inOutExpr, .infixOperatorExpr,
+        .isExpr, .keyPathExpr, .macroExpansionExpr, .consumeExpr, .copyExpr,
+        .optionalChainingExpr, .packElementExpr, .packExpansionExpr,
+        .postfixIfConfigExpr, .postfixOperatorExpr, .prefixOperatorExpr,
+        .regexLiteralExpr, .sequenceExpr, .genericSpecializationExpr,
+        .simpleStringLiteralExpr, .subscriptCallExpr, .superExpr, .switchExpr,
+        .ternaryExpr, .tryExpr, .typeExpr, .unresolvedAsExpr, .unresolvedIsExpr,
+        .patternExpr, .unresolvedTernaryExpr:
+      return false
+    case // Unknown expr kinds.
+      _ where current.is(ExprSyntax.self):
+      return false
+    default:
+      break
+    }
+    if current.id == node.id {
+      return true
+    }
+    // This is walking up the parents from the first token of `node`. `.parent`
+    // must exist if `current` is not `node`
+    current = current.parent!
+  }
+}
 
 extension ASTGenVisitor {
   public func generate(_ node: ClosureExprSyntax) -> BridgedClosureExpr {
@@ -99,8 +167,10 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: TupleExprSyntax) -> BridgedTupleExpr {
-    self.generate(node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
+    return self.generate(node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
   }
+
+  // NOTE: When implementing new `generate(_:)`, please update `isExprMigrated(_:)`.
 }
 
 extension ASTGenVisitor {

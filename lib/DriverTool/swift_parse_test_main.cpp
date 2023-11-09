@@ -19,6 +19,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Subsystems.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 
@@ -32,11 +33,14 @@ namespace {
 enum class Executor {
   SwiftParser,
   LibParse,
+  ASTGen,
 };
 
 enum class ExecuteOptionFlag {
   /// Enable body skipping
   SkipBodies = 1 << 0,
+  /// Dump result
+  Dump = 1 << 1,
 };
 using ExecuteOptions = OptionSet<ExecuteOptionFlag>;
 
@@ -45,6 +49,7 @@ struct SwiftParseTestOptions {
       llvm::cl::desc("Available parsers"),
       llvm::cl::values(
           clEnumValN(Executor::SwiftParser, "swift-parser", "SwiftParser"),
+          clEnumValN(Executor::ASTGen, "ast-gen", "ASTGen with SwiftParser"),
           clEnumValN(Executor::LibParse, "lib-parse", "libParse")));
 
   llvm::cl::opt<unsigned int> Iterations = llvm::cl::opt<unsigned int>(
@@ -53,6 +58,9 @@ struct SwiftParseTestOptions {
   llvm::cl::opt<bool> SkipBodies = llvm::cl::opt<bool>(
       "skip-bodies",
       llvm::cl::desc("skip function bodies and type members if possible"));
+
+  llvm::cl::opt<bool> Dump = llvm::cl::opt<bool>(
+      "dump", llvm::cl::desc("dump result for each iteration"));
 
   llvm::cl::list<std::string> InputPaths = llvm::cl::list<std::string>(
       llvm::cl::Positional, llvm::cl::desc("input paths"));
@@ -90,6 +98,14 @@ struct LibParseExecutor {
     SmallVector<ASTNode> items;
     parser.parseTopLevelItems(items);
 
+    if (opts.contains(ExecuteOptionFlag::Dump)) {
+      registerParseRequestFunctions(ctx->evaluator);
+      registerTypeCheckerRequestFunctions(ctx->evaluator);
+      for (auto &item : items) {
+        item.dump(llvm::outs());
+      }
+    }
+
     return llvm::Error::success();
   }
 };
@@ -105,10 +121,76 @@ struct SwiftParserExecutor {
         buffer.getBufferStart(), buffer.getBufferSize(), /*moduleName=*/"",
         buffer.getBufferIdentifier().data(), /*ASTContext=*/nullptr);
     swift_ASTGen_destroySourceFile(sourceFile);
+
+    if (opts.contains(ExecuteOptionFlag::Dump)) {
+      // TODO: Implement.
+    }
+
     return llvm::Error::success();
 #else
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "SwiftParser is not supported");
+#endif
+  }
+};
+
+static void appendToVector(void *declPtr, void *vecPtr) {
+  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
+  auto decl = static_cast<Decl *>(declPtr);
+
+  vec->push_back(decl);
+}
+
+struct ASTGenExecutor {
+  constexpr static StringRef name = "ASTGen with SwiftParser";
+
+  static llvm::Error performParse(llvm::MemoryBufferRef buffer,
+                                  ExecuteOptions opts) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+
+    SourceManager SM;
+    unsigned bufferID =
+        SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(buffer));
+    DiagnosticEngine diagEngine(SM);
+    LangOptions langOpts;
+    TypeCheckerOptions typeckOpts;
+    SILOptions silOpts;
+    SearchPathOptions searchPathOpts;
+    ClangImporterOptions clangOpts;
+    symbolgraphgen::SymbolGraphOptions symbolOpts;
+
+    // Enable ASTGen.
+    langOpts.Features.insert(Feature::ParserASTGen);
+
+    std::unique_ptr<ASTContext> ctx(
+        ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
+                        clangOpts, symbolOpts, SM, diagEngine));
+    registerParseRequestFunctions(ctx->evaluator);
+    registerTypeCheckerRequestFunctions(ctx->evaluator);
+
+    SourceFile::ParsingOptions parseOpts;
+    parseOpts |= SourceFile::ParsingFlags::DisablePoundIfEvaluation;
+    if (!opts.contains(ExecuteOptionFlag::SkipBodies))
+      parseOpts |= SourceFile::ParsingFlags::DisableDelayedBodies;
+
+    ModuleDecl *M = ModuleDecl::create(Identifier(), *ctx);
+    SourceFile *SF =
+        new (*ctx) SourceFile(*M, SourceFileKind::Library, bufferID, parseOpts);
+
+    Parser P(bufferID, *SF, nullptr);
+    SmallVector<ASTNode> items;
+    P.parseTopLevelItems(items);
+
+    if (opts.contains(ExecuteOptionFlag::Dump)) {
+      for (auto &item : items) {
+        item.dump(llvm::outs());
+      }
+    }
+
+    return llvm::Error::success();
+#else
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "ASTGen/SwiftParser is not supported");
 #endif
   }
 };
@@ -224,6 +306,8 @@ int swift_parse_test_main(ArrayRef<const char *> args, const char *argv0,
   ExecuteOptions execOptions;
   if (options.SkipBodies)
     execOptions |= ExecuteOptionFlag::SkipBodies;
+  if (options.Dump)
+    execOptions |= ExecuteOptionFlag::Dump;
 
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>> buffers;
   loadSources(options.InputPaths, buffers);
@@ -244,14 +328,14 @@ int swift_parse_test_main(ArrayRef<const char *> args, const char *argv0,
 
   for (auto mode : options.Executors) {
     switch (mode) {
-    case Executor::SwiftParser:
-      err = perform<SwiftParserExecutor>(buffers, execOptions, iterations,
-                                         byteCount, lineCount);
-      break;
-    case Executor::LibParse:
-      err = perform<LibParseExecutor>(buffers, execOptions, iterations,
-                                      byteCount, lineCount);
-      break;
+#define CASE(NAME, EXECUTOR)                                                   \
+  case Executor::NAME:                                                         \
+    err = perform<EXECUTOR>(buffers, execOptions, iterations, byteCount,       \
+                            lineCount);                                        \
+    break;
+      CASE(LibParse, LibParseExecutor)
+      CASE(SwiftParser, SwiftParserExecutor)
+      CASE(ASTGen, ASTGenExecutor)
     }
     if (err)
       break;

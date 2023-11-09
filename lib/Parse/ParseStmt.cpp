@@ -539,8 +539,16 @@ static ParserResult<Stmt> recoverFromInvalidCase(Parser &P) {
   return nullptr;
 }
 
-ParserResult<Stmt> Parser::parseStmt() {
+/// parseStmt
+///
+/// \param fromASTGen If true , this function in called from ASTGen as the
+/// fallback, so do not attempt a callback to ASTGen.
+ParserResult<Stmt> Parser::parseStmt(bool fromASTGen) {
   AssertParserMadeProgressBeforeLeavingScopeRAII apmp(*this);
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (IsForASTGen && !fromASTGen)
+    return parseStmtFromSyntaxTree();
+#endif
 
   // If this is a label on a loop/switch statement, consume it and pass it into
   // parsing logic below.

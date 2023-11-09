@@ -15,6 +15,42 @@ import BasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
+/// Check if an `TypeSyntax` can be generated using ASTGen.
+///
+/// If all the type nodes that shares the first token are migrated,
+/// returns true.
+func isTypeMigrated(_ node: TypeSyntax) -> Bool {
+  var current: Syntax = Syntax(node)
+  if let firstToken = node.firstToken(viewMode: .sourceAccurate) {
+    current = firstToken.parent!
+  }
+  while true {
+    switch current.kind {
+    case // Known implemented kinds.
+        .arrayType, .attributedType, .compositionType, .someOrAnyType,
+        .dictionaryType, .functionType, .implicitlyUnwrappedOptionalType,
+        .memberType, .metatypeType, .namedOpaqueReturnType, .optionalType,
+        .packExpansionType, .identifierType, .tupleType:
+      break
+    case // Known unimplemented kinds.
+        .suppressedType, .packElementType, .missingType:
+      return false;
+    case // Unknown type kinds
+      _ where current.is(TypeSyntax.self):
+      return false
+    default:
+      break
+    }
+    if current.id == node.id {
+      return true
+    }
+    // This is walking up the parents from the first token of `node`. `.parent`
+    // must exist if `current` is not `node`
+    current = current.parent!
+  }
+}
+
+
 extension ASTGenVisitor {
   public func generate(_ node: IdentifierTypeSyntax) -> BridgedTypeRepr {
     let loc = node.bridgedSourceLoc(in: self)
@@ -227,6 +263,8 @@ extension ASTGenVisitor {
       )
     }
   }
+
+  // NOTE: When implementing new `generate(_:)`, please update  `isTypeMigrated(_:)`.
 }
 
 // MARK: - SpecifierTypeRepr/AttributedTypeRepr
@@ -351,42 +389,3 @@ extension ASTGenVisitor {
   }
 }
 
-@_cdecl("swift_ASTGen_buildTypeRepr")
-@usableFromInline
-func buildTypeRepr(
-  diagEnginePtr: UnsafeMutableRawPointer,
-  sourceFilePtr: UnsafeRawPointer,
-  typeLocPtr: UnsafePointer<UInt8>,
-  dc: UnsafeMutableRawPointer,
-  ctx: UnsafeMutableRawPointer,
-  endTypeLocPtr: UnsafeMutablePointer<UnsafePointer<UInt8>?>
-) -> UnsafeMutableRawPointer? {
-  let sourceFile = sourceFilePtr.bindMemory(
-    to: ExportedSourceFile.self,
-    capacity: 1
-  )
-
-  // Find the type syntax node.
-  guard
-    let typeSyntax = findSyntaxNodeInSourceFile(
-      sourceFilePtr: sourceFilePtr,
-      sourceLocationPtr: typeLocPtr,
-      type: TypeSyntax.self,
-      wantOutermost: true
-    )
-  else {
-    // FIXME: Produce an error
-    return nil
-  }
-
-  // Fill in the end location.
-  endTypeLocPtr.pointee = sourceFile.pointee.buffer.baseAddress!.advanced(by: typeSyntax.endPosition.utf8Offset)
-
-  // Convert the type syntax node.
-  return ASTGenVisitor(
-    diagnosticEngine: .init(raw: diagEnginePtr),
-    sourceBuffer: sourceFile.pointee.buffer,
-    declContext: BridgedDeclContext(raw: dc),
-    astContext: BridgedASTContext(raw: ctx)
-  ).generate(typeSyntax).raw
-}

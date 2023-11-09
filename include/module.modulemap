@@ -10,6 +10,12 @@ module ASTBridging {
   export *
 }
 
+module ParseBridging {
+  header "swift/Parse/ParseBridging.h"
+  requires cplusplus
+  export *
+}
+
 module SILBridging {
   header "swift/SIL/SILBridging.h"
   requires cplusplus

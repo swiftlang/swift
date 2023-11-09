@@ -20,28 +20,6 @@ import SwiftSyntaxBuilder
 import SwiftSyntaxMacroExpansion
 import SwiftSyntaxMacros
 
-extension SyntaxProtocol {
-  func token(at position: AbsolutePosition) -> TokenSyntax? {
-    // If the position isn't within this node at all, return early.
-    guard position >= self.position && position < self.endPosition else {
-      return nil
-    }
-
-    // If we are a token syntax, that's it!
-    if let token = Syntax(self).as(TokenSyntax.self) {
-      return token
-    }
-
-    // Otherwise, it must be one of our children.
-    for child in children(viewMode: .sourceAccurate) {
-      if let token = child.token(at: position) {
-        return token
-      }
-    }
-    fatalError("Children of syntax node do not cover all positions in it")
-  }
-}
-
 /// Describes a macro that has been "exported" to the C++ part of the
 /// compiler, with enough information to interface with the C++ layer.
 struct ExportedMacro {
@@ -627,10 +605,7 @@ func findSyntaxNodeInSourceFile<Node: SyntaxProtocol>(
     return nil
   }
 
-  let sourceFilePtr = sourceFilePtr.bindMemory(
-    to: ExportedSourceFile.self,
-    capacity: 1
-  )
+  let sourceFilePtr = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
 
   // Find the offset.
   let buffer = sourceFilePtr.pointee.buffer
