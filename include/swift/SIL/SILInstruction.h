@@ -2902,7 +2902,9 @@ public:
     return getSubstCalleeConv().hasIndirectSILResults();
   }
   unsigned getNumIndirectResults() const {
-    return getSubstCalleeConv().getNumIndirectSILResults();
+    auto fnConv = getSubstCalleeConv();
+    return fnConv.getNumIndirectSILResults() +
+        fnConv.getNumIndirectSILErrorResults();
   }
 
   bool hasSelfArgument() const {
