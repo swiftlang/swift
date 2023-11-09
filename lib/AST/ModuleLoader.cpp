@@ -49,7 +49,6 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
   // dimension, which we accept and pass along to the clang DependencyCollector.
   clangCollector->maybeAddDependency(File, /*FromModule=*/false,
                                      IsSystem, /*IsModuleFile=*/false,
-                                     /* FileManager=*/ nullptr,
                                      /*IsMissing=*/false);
 }
 

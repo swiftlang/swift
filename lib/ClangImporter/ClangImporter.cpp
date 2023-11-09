@@ -377,12 +377,11 @@ public:
   }
 
   void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
-                          bool IsModuleFile, clang::FileManager *fileManager,
-                          bool IsMissing) override {
+                          bool IsModuleFile, bool IsMissing) override {
     if (FileCollector)
       FileCollector->addFile(Filename);
     clang::DependencyCollector::maybeAddDependency(
-        Filename, FromModule, IsSystem, IsModuleFile, fileManager, IsMissing);
+        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
   }
 };
 } // end anonymous namespace
