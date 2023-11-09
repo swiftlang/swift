@@ -99,6 +99,13 @@ option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
         "Emit api descriptors for the standard library"
         FALSE)
 
+option(SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES
+       "Build only the core subset of the standard library,
+       ignoring additional libraries such as Concurrency, Distributed and StringProcessing.
+       This is an option meant for internal configurations inside Apple
+       that need to build the standard libraries in chunks when constructing an SDK"
+       FALSE)
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
