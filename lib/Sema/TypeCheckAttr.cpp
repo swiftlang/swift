@@ -7044,7 +7044,7 @@ void AttributeChecker::visitEagerMoveAttr(EagerMoveAttr *attr) {
   if (visitLifetimeAttr(attr))
     return;
   if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    if (nominal->getDeclaredInterfaceType()->isNoncopyable()) {
+    if (nominal->getSelfTypeInContext()->isNoncopyable()) {
       diagnoseAndRemoveAttr(attr, diag::eagermove_and_noncopyable_combined);
       return;
     }
