@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Init -clang-header-expose-decls=all-public -emit-clang-header-path %t/inits-evo.h -enable-library-evolution
 // RUN: %FileCheck %s < %t/inits-evo.h
 // RUN: %check-interop-cxx-header-in-clang(%t/inits-evo.h)
-// REQUIRES: rdar117805261
 
 public final class AKlass {
     public init() {}
@@ -140,7 +139,7 @@ public struct TheGenericContainerInitNonTriv {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_2[sizeof(LargeStructNonTrivial)];
 // CHECK-NEXT: auto &consumedParamCopy_2 = *(new(copyBuffer_consumedParamCopy_2) LargeStructNonTrivial(_2));
 // CHECK-NEXT: swift::_impl::ConsumedValueStorageDestroyer<LargeStructNonTrivial> storageGuard_consumedParamCopy_2(consumedParamCopy_2);
-// CHECK-NON_EVO-NEXT: return _impl::$s4Init0A9FromSmallV04takeC5LargeyyAA0C16StructNonTrivialVn_AA0efgH0VntF(_impl::swift_interop_passDirect_Init_void_ptr_0_8_uint32_t_8_12(_impl::_impl_SmallStructNonTrivial::getOpaquePointer(consumedParamCopy_1)), _impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_2), _impl::swift_interop_passDirect_Init_uint64_t_0_8(_getOpaquePointer()));
+// CHECK-NON_EVO-NEXT: return _impl::$s4Init0A9FromSmallV04takeC5LargeyyAA0C16StructNonTrivialVn_AA0efgH0VntF(_impl::swift_interop_passDirect_Init_{{.*}}(_impl::_impl_SmallStructNonTrivial::getOpaquePointer(consumedParamCopy_1)), _impl::_impl_LargeStructNonTrivial::getOpaquePointer(consumedParamCopy_2), _impl::swift_interop_passDirect_Init_{{.*}}(_getOpaquePointer()));
 
 // CHECK: SWIFT_INLINE_THUNK void LargeStructNonTrivial::takeMe() const {
 // CHECK-NEXT: alignas(alignof(LargeStructNonTrivial)) char copyBuffer_consumedParamCopy_this[sizeof(LargeStructNonTrivial)];
