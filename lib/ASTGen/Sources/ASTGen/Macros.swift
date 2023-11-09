@@ -255,6 +255,20 @@ func checkMacroDefinition(
         case "ExternalMacro":
           return Int(BridgedMacroDefinitionKind.builtinExternalMacro.rawValue)
 
+        // These builtins don't exist, but are put into the standard library at
+        // least for documentation purposes right now. Don't emit a warning for
+        // them, but do fail operation.
+        case "FileIDMacro",
+             "FilePathMacro",
+             "FileMacro",
+             "FunctionMacro",
+             "LineMacro",
+             "ColumnMacro",
+             "DSOHandleMacro",
+             "WarningMacro",
+             "ErrorMacro":
+          return -1
+
         default:
           // Warn about the unknown builtin.
           let srcMgr = SourceManager(cxxDiagnosticEngine: diagEnginePtr)

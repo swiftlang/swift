@@ -2030,6 +2030,17 @@ static void checkProtocolRefinementRequirements(ProtocolDecl *proto) {
       // TODO(kavon): emit tailored error diagnostic to remove the ~Copyable
     }
 
+    // SIMDScalar in the standard library currently emits this warning for:
+    // 'Hashable', 'Encodable', and 'Decodable'. This is unfortunate, but we
+    // cannot fix it as it would alter the ABI of the protocol. Silence these
+    // warnings specifically for those cases.
+    if (proto->isSpecificProtocol(KnownProtocolKind::SIMDScalar) &&
+        (otherProto->isSpecificProtocol(KnownProtocolKind::Hashable) ||
+        otherProto->isSpecificProtocol(KnownProtocolKind::Encodable) ||
+        otherProto->isSpecificProtocol(KnownProtocolKind::Decodable))) {
+      continue;
+    }
+
     // GenericSignature::getRequiredProtocols() canonicalizes the protocol
     // list by dropping protocols that are inherited by other protocols in
     // the list. Any protocols that remain in the list other than 'proto'
