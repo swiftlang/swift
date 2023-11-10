@@ -5728,6 +5728,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   {
     B.emitBlock(errorBB);
 
+    Scope scope(Cleanups, CleanupLocation(loc));
+
     // Grab the inner error.
     SILValue innerError;
     bool hasInnerIndirectError = fnConv.hasIndirectSILErrorResults();
@@ -5755,24 +5757,42 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
       outerError = innerError;
     } else {
       // The error requires some kind of translation.
-
-      // Load the inner error, if it was returned indirectly.
-      if (innerError->getType().isAddress()) {
-        innerError = emitLoad(loc, innerError, getTypeLowering(innerErrorType),
-                              SGFContext(), IsTake).forward(*this);
-      }
+      outerErrorType = outerErrorType.getObjectType();
 
       // If we need to convert the error type, do so now.
       if (innerErrorType != outerErrorType) {
-        auto conversion = Conversion::getOrigToSubst(
-            AbstractionPattern(innerErrorType.getASTType()),
-            outerErrorType.getASTType(),
-            outerErrorType);
-        outerError = emitConvertedRValue(loc, conversion, SGFContext(),
-            [innerError](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
-              return ManagedValue::forForwardedRValue(SGF, innerError);
+        assert(outerErrorType == SILType::getExceptionType(getASTContext()));
+
+        ProtocolConformanceRef conformances[1] = {
+          getModule().getSwiftModule()->conformsToProtocol(
+            innerError->getType().getASTType(),
+            getASTContext().getErrorDecl())
+        };
+
+        outerError = emitExistentialErasure(
+            loc,
+            innerErrorType.getASTType(),
+            getTypeLowering(innerErrorType),
+            getTypeLowering(outerErrorType),
+            getASTContext().AllocateCopy(conformances),
+            SGFContext(),
+            [&](SGFContext C) -> ManagedValue {
+              if (innerError->getType().isAddress()) {
+                return emitLoad(loc, innerError,
+                                getTypeLowering(innerErrorType), SGFContext(),
+                                IsTake);
+              }
+
+              return ManagedValue::forForwardedRValue(*this, innerError);
             }).forward(*this);
+      } else if (innerError->getType().isAddress()) {
+        // Load the inner error, if it was returned indirectly.
+        outerError = emitLoad(loc, innerError, getTypeLowering(innerErrorType),
+                              SGFContext(), IsTake).forward(*this);
+      } else {
+        outerError = innerError;
       }
+
 
       // If the outer error is returned indirectly, copy from the converted
       // inner error to the outer error slot.
