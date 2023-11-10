@@ -5045,8 +5045,7 @@ case TypeKind::Id:
     // Transform the thrown error.
     Type thrownError;
     if (Type origThrownError = function->getThrownError()) {
-      thrownError = origThrownError.transformWithPosition(
-          TypePosition::Invariant, fn);
+      thrownError = origThrownError.transformWithPosition(pos, fn);
       if (!thrownError)
         return Type();
 
