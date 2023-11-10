@@ -670,9 +670,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
@@ -688,6 +689,20 @@ extension Sequence {
       result.append(try transform(element))
     }
     return Array(result)
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
+    _ transform: (Element) throws -> T
+  ) rethrows -> [T] {
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   /// Returns an array containing, in order, the elements of the sequence

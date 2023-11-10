@@ -1190,9 +1190,10 @@ extension Collection {
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     // TODO: swift-3-indexing-model - review the following
     let n = self.count
     if n == 0 {
@@ -1211,6 +1212,20 @@ extension Collection {
 
     _expectEnd(of: self, is: i)
     return Array(result)
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
+    _ transform: (Element) throws -> T
+  ) rethrows -> [T] {
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   /// Returns a subsequence containing all but the given number of initial
