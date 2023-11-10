@@ -1807,7 +1807,14 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         }
 
         auto *argPack = PackType::get(cs.getASTContext(), argTypes);
-        auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
+        auto argPackExpansion = [&]() {
+          if (argPack->getNumElements() == 1 &&
+              argPack->getElementType(0)->is<PackExpansionType>()) {
+            return argPack->getElementType(0)->castTo<PackExpansionType>();
+          }
+
+          return PackExpansionType::get(argPack, argPack);
+        }();
 
         auto firstArgIdx =
             argTypes.empty() ? paramIdx : parameterBindings[paramIdx].front();
