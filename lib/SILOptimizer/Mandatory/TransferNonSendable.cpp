@@ -1389,7 +1389,7 @@ class BlockPartitionState {
   bool recomputeExitFromEntry() {
     Partition workingPartition = entryPartition;
     PartitionOpEvaluator eval(workingPartition);
-    for (auto partitionOp : blockPartitionOps) {
+    for (const auto &partitionOp : blockPartitionOps) {
       // By calling apply without providing a `handleFailure` closure, errors
       // will be suppressed
       eval.apply(partitionOp);
@@ -1421,7 +1421,7 @@ public:
     os << "exit partition: ";
     exitPartition.print(os);
     os << "instructions:\n┌──────────╼\n";
-    for (PartitionOp op : blockPartitionOps) {
+    for (const auto &op : blockPartitionOps) {
       os << "│ ";
       op.print(os, true /*extra space*/);
     }

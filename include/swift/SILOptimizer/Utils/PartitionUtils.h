@@ -748,7 +748,7 @@ struct PartitionOpEvaluator {
   }
 
   /// Apply \p op to the partition op.
-  void apply(PartitionOp op) {
+  void apply(const PartitionOp &op) const {
     if (emitLog) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
