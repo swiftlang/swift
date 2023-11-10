@@ -2306,10 +2306,13 @@ static CanSILFunctionType getSILFunctionType(
     auto &errorTLConv = TC.getTypeLowering(origErrorType, errorType,
                                            TypeExpansionContext::minimal());
 
+    bool isFormallyIndirectError =
+        origErrorType.isTypeParameter() || errorTLConv.isAddressOnly();
+
     errorResult = SILResultInfo(errorTLConv.getLoweredType().getASTType(),
-                                errorTLConv.isAddressOnly()
-                                ? ResultConvention::Indirect
-                                : ResultConvention::Owned);
+                                isFormallyIndirectError
+                                  ? ResultConvention::Indirect
+                                  : ResultConvention::Owned);
   }
 
   // Lower the result type.
