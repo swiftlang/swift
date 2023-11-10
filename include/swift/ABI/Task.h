@@ -38,6 +38,7 @@ struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
 class TaskDependencyStatusRecord;
+class TaskExecutorPreferenceStatusRecord;
 class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;

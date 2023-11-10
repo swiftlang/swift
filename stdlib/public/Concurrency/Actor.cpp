@@ -1480,11 +1480,8 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
 
     // TODO: maybe use some flag to detect if we need to do this?
     if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-      fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       auto taskExecutor = task->getPreferredTaskExecutor();
       trackingInfo.setTaskExecutor(taskExecutor);
-      fprintf(stderr, "[%s:%d](%s) tracking info: serial executor: %p, task executor: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              job, trackingInfo.getActiveExecutor(), trackingInfo.getTaskExecutor());
     }
 
     // This thread is now going to follow the task on this actor. It may hop off
@@ -1783,9 +1780,6 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
 
 SWIFT_CC(swift)
 static void swift_job_run_on_task_executorImpl(Job *job, TaskExecutorRef taskExecutor) {
-  fprintf(stderr, "[%s:%d](%s) execute [%p] on executor: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          job,
-          taskExecutor.getIdentity());
   ExecutorTrackingInfo trackingInfo;
 
   // TODO: we don't allow switching
@@ -1907,15 +1901,32 @@ static void giveUpThreadForSwitch(SerialExecutorRef currentExecutor) {
 ///
 /// Note that we don't update DefaultActorProcessingFrame here; we'll
 /// do that in runOnAssumedThread.
-static bool tryAssumeThreadForSwitch(SerialExecutorRef newExecutor) {
+static bool tryAssumeThreadForSwitch(SerialExecutorRef newExecutor, TaskExecutorRef newTaskExecutor) {
   // If the new executor is generic, we don't need to do anything.
-  if (newExecutor.isGeneric()) {
+  if (newExecutor.isGeneric() && newTaskExecutor.isUndefined()) {
     return true;
   }
 
   // If the new executor is a default actor, ask it to assume the thread.
   if (newExecutor.isDefaultActor()) {
     return asImpl(newExecutor.getDefaultActor())->tryLock(false);
+  }
+
+  return false;
+}
+
+static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
+                            SerialExecutorRef newSerialExecutor,
+                            TaskExecutorRef currentTaskExecutor,
+                            TaskExecutorRef newTaskExecutor) {
+  if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
+    return true; // must switch, new isolation context
+  }
+
+  // else, we may have to switch if the preferred task executor is different
+  auto differentTaskExecutor = currentTaskExecutor.getIdentity() != newTaskExecutor.getIdentity();
+  if (differentTaskExecutor) {
+    return true;
   }
 
   return false;
@@ -1933,8 +1944,6 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
-    fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
     oldTracking->setActiveExecutor(executor);
     oldTracking->setTaskExecutor(task->getPreferredTaskExecutor());
 
@@ -1943,7 +1952,6 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
 
   // Otherwise, set up tracking info.
   ExecutorTrackingInfo trackingInfo;
-  fprintf(stderr, "[%s:%d](%s) here\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   trackingInfo.enterAndShadow(executor, task->getPreferredTaskExecutor());
 
   // Run the new task.
@@ -1973,39 +1981,32 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
                                   SerialExecutorRef newExecutor) SWIFT_OPTNONE {
   auto task = swift_task_getCurrent();
   assert(task && "no current task!");
-  fprintf(stderr, "[%s:%d](%s) TRY SWITCH TASK %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 
   auto trackingInfo = ExecutorTrackingInfo::current();
   auto currentExecutor =
     (trackingInfo ? trackingInfo->getActiveExecutor()
                   : SerialExecutorRef::generic());
-  auto taskExecutor = task->getPreferredTaskExecutor();
-  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch from executor %p to %p%s, task executor: %p%s", task,
+  auto currentTaskExecutor =
+    (trackingInfo ? trackingInfo->getTaskExecutor()
+                  : TaskExecutorRef::undefined());
+  auto newTaskExecutor = task->getPreferredTaskExecutor();
+  SWIFT_TASK_DEBUG_LOG("Task %p trying to switch executors: executor %p to %p%s; task executor: from %p%s to %p%s", task,
                        currentExecutor.getIdentity(),
+                       currentExecutor.isMainExecutor() ? " (MainActorExecutor)" :
+                          currentExecutor.isGeneric() ? " (GenericExecutor)" : "",
                        newExecutor.getIdentity(),
                        newExecutor.isMainExecutor() ? " (MainActorExecutor)" :
-                       newExecutor.isGeneric() ? " (GenericExecutor)" : "",
-                       taskExecutor.getIdentity(),
-                       taskExecutor.isDefined() ? "" : " (undefined)");
-  fprintf(stderr, "[%s:%d](%s) Task %p trying to switch from executor %p to %p%s, task executor: %p%s\n",
-      __FILE_NAME__, __LINE__, __FUNCTION__, task,
-                       currentExecutor.getIdentity(),
-                       newExecutor.getIdentity(),
-                       newExecutor.isMainExecutor() ? " (MainActorExecutor)" : newExecutor.isGeneric() ? " (GenericExecutor)" : "",
-                       taskExecutor.getIdentity(),
-                       taskExecutor.isDefined() ? "" : " (undefined)"
-                       );
+                          newExecutor.isGeneric() ? " (GenericExecutor)" : "",
+                       currentTaskExecutor.getIdentity(),
+                       currentTaskExecutor.isDefined() ? "" : " (undefined)",
+                       newTaskExecutor.getIdentity(),
+                       newTaskExecutor.isDefined() ? "" : " (undefined)");
 
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function
   // we were passed in.
-  if (taskExecutor.isUndefined()) {
-      fprintf(stderr, "[%s:%d](%s) cannot SWITCH, has preferred executor [te:%p] [task: %p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              task->getPreferredTaskExecutor(), task);
-    if (!currentExecutor.mustSwitchToRun(newExecutor)) {
-      fprintf(stderr, "[%s:%d](%s) MUST SWITCH, return [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
-      return resumeFunction(resumeContext); // 'return' forces tail call
-    }
+  if (!mustSwitchToRun(currentExecutor, newExecutor, currentTaskExecutor, newTaskExecutor)) {
+    return resumeFunction(resumeContext); // 'return' forces tail call
   }
 
   // Park the task for simplicity instead of trying to thread the
@@ -2016,11 +2017,10 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // If the current executor can give up its thread, and the new executor
   // can take over a thread, try to do so; but don't do this if we've
   // been asked to yield the thread.
-  if (taskExecutor.isUndefined() &&
+  if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
       !shouldYieldThread() &&
-      tryAssumeThreadForSwitch(newExecutor)) {
-    fprintf(stderr, "[%s:%d](%s) CAN SWITCH, return [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
+      tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
     SWIFT_TASK_DEBUG_LOG(
         "switch succeeded, task %p assumed thread for executor %p", task,
         newExecutor.getIdentity());
@@ -2033,9 +2033,9 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // executor.
   SWIFT_TASK_DEBUG_LOG("switch failed, task %p enqueued on executor %p (task executor: %p)", task,
                        newExecutor.getIdentity(),
-                       taskExecutor.getIdentity());
+                       currentTaskExecutor.getIdentity());
 
-  task->flagAsAndEnqueueOnTaskExecutor(newExecutor, taskExecutor);
+  task->flagAsAndEnqueueOnTaskExecutor(newExecutor, currentTaskExecutor);
   _swift_task_clearCurrent();
 }
 
@@ -2062,7 +2062,6 @@ void _swift_task_makeAnyTaskExecutor(HeapObject *executor,
 
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
-  fprintf(stderr, "[%s:%d](%s) enqueue job %p on serial executor %p...\n", __FILE_NAME__, __LINE__, __FUNCTION__, job, executor.getIdentity());
   SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial executor %p", job,
                        executor.getIdentity());
 
@@ -2073,19 +2072,13 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
   if (executor.isGeneric()) {
     // TODO: check the task for a flag if we need to look for task executor
     if (auto task = dyn_cast<AsyncTask>(job)) {
-      fprintf(stderr, "[%s:%d](%s) checking task...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       auto taskExecutor = task->getPreferredTaskExecutor();
-      fprintf(stderr, "[%s:%d](%s) checked task %p...", __FILE_NAME__, __LINE__, __FUNCTION__, task);
       if (taskExecutor.isDefined()) {
-      fprintf(stderr, " FOUND TASK EXECUTOR\n");
         auto wtable = taskExecutor.getTaskExecutorWitnessTable();
         auto taskExecutorObject = taskExecutor.getIdentity();
         auto taskExecutorType = swift_getObjectType(taskExecutorObject);
         return _swift_task_enqueueOnTaskExecutor(job, taskExecutorObject, taskExecutorType, wtable);
       } // else, fall-through to the default global enqueue
-      else {
-        fprintf(stderr, " NO TASK EXECUTOR!!!!\n");
-      }
     }
     return swift_task_enqueueGlobal(job);
   }
@@ -2097,14 +2090,11 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef executor) {
     }
 
     if (taskExecutor.isDefined()) {
-      fprintf(stderr, "[%s:%d](%s) default actor AND TASK EXECUTOR!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
       auto wtable = taskExecutor.getTaskExecutorWitnessTable();
       auto executorObject = taskExecutor.getIdentity();
       auto executorType = swift_getObjectType(executorObject);
       return _swift_task_enqueueOnTaskExecutor(job, executorObject, executorType, wtable);
     } else {
-      fprintf(stderr, "[%s:%d](%s) default actor!\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       return swift_defaultActor_enqueue(job, executor.getDefaultActor());
     }
   }
