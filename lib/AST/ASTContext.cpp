@@ -714,8 +714,8 @@ ASTContext::~ASTContext() {
   getImpl().~Implementation();
 }
 
-void ASTContext::SetPreModuleImportCallback(std::function<bool(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
-  ASTContext::PreModuleImportCallback = callback;
+void ASTContext::SetPreModuleImportCallback(std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
+  PreModuleImportCallback = callback;
 }
 
 llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
