@@ -326,7 +326,42 @@ BridgedParamDecl BridgedParamDecl_createParsed(
   auto *paramDecl = new (cContext.unbridged())
       ParamDecl(cSpecifierLoc.unbridged(), firstNameLoc, firstName,
                 secondNameLoc, secondName, declContext);
-  paramDecl->setTypeRepr(opaqueType.unbridged());
+
+  if (auto type = opaqueType.unbridged()) {
+    paramDecl->setTypeRepr(type);
+
+    // FIXME: Copied from 'Parser::parsePattern()'. This should be in Sema.
+    // Dig through the type to find any attributes or modifiers that are
+    // associated with the type but should also be reflected on the
+    // declaration.
+    auto unwrappedType = type;
+    while (true) {
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+        auto &attrs = ATR->getAttrs();
+        // At this point we actually don't know if that's valid to mark
+        // this parameter declaration as `autoclosure` because type has
+        // not been resolved yet - it should either be a function type
+        // or typealias with underlying function type.
+        paramDecl->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+
+        unwrappedType = ATR->getTypeRepr();
+        continue;
+      }
+
+      if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+        if (isa<IsolatedTypeRepr>(STR))
+          paramDecl->setIsolated(true);
+        else if (isa<CompileTimeConstTypeRepr>(STR))
+          paramDecl->setCompileTimeConst(true);
+
+        unwrappedType = STR->getBase();
+        continue;
+      }
+
+      break;
+    }
+  }
+
   paramDecl->setDefaultExpr(defaultValue, /*isTypeChecked*/ false);
   paramDecl->setDefaultArgumentKind(defaultArgumentKind);
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ASTGenTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts

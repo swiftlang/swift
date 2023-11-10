@@ -3422,10 +3422,6 @@ static bool usesFeatureParserASTGen(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureASTGenTypes(Decl *decl) {
-  return false;
-}
-
 static bool usesFeatureBuiltinMacros(Decl *decl) {
   return false;
 }

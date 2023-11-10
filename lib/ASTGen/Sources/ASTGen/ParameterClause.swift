@@ -31,6 +31,8 @@ fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
   // FIXME: Rename once we support covariant witnesses.
   var optionalType: TypeSyntax? { get }
 
+  var ellipsis: TokenSyntax? { get }
+
   var defaultValue: InitializerClauseSyntax? { get }
 }
 
@@ -51,6 +53,10 @@ extension EnumCaseParameterSyntax: ValueParameterSyntax {
 
   fileprivate var optionalType: TypeSyntax? {
     type
+  }
+
+  fileprivate var ellipsis: TokenSyntax? {
+    nil
   }
 }
 
@@ -77,6 +83,15 @@ extension ASTGenVisitor {
 
     let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
+    var type = self.generate(node.optionalType)
+    if let ellipsis = node.ellipsis, let base = type {
+      type = BridgedVarargTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        ellipsisLoc: ellipsis.bridgedSourceLoc(in: self)
+      )
+    }
+
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -85,7 +100,7 @@ extension ASTGenVisitor {
       firstNameLoc: node.optionalFirstName.bridgedSourceLoc(in: self),
       secondName: secondName,
       secondNameLoc: secondNameLoc,
-      type: self.generate(node.optionalType).asNullable,
+      type: type.asNullable,
       defaultValue: self.generate(node.defaultValue?.value).asNullable
     )
   }
