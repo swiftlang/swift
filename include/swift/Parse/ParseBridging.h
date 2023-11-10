@@ -35,18 +35,28 @@ public:
 
   swift::Parser &unbridged() const { return *handle; }
 #endif
-
-  BridgedASTContext getASTContext() const;
-  BridgedDiagnosticEngine getDiagnosticEngine() const;
-  BridgedStringRef getSourceBuffer() const;
-  BridgedDeclContext getCurrDeclContext() const;
-
-  BridgedExpr parseExpr(BridgedSourceLoc loc, BridgedDeclContext DC,
-                        bool isExprBasic) const;
-  BridgedDecl parseDecl(BridgedSourceLoc loc, BridgedDeclContext DC) const;
-  BridgedStmt parseStmt(BridgedSourceLoc loc, BridgedDeclContext DC) const;
-  BridgedTypeRepr parseType(BridgedSourceLoc loc, BridgedDeclContext DC) const;
 };
+
+SWIFT_NAME("BridgedLegacyParser.parseExpr(self:_:_:_:)")
+BridgedExpr BridgedLegacyParser_parseExpr(BridgedLegacyParser,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC,
+                                          bool isExprBasic);
+
+SWIFT_NAME("BridgedLegacyParser.parseDecl(self:_:_:)")
+BridgedDecl BridgedLegacyParser_parseDecl(BridgedLegacyParser,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC);
+
+SWIFT_NAME("BridgedLegacyParser.parseStmt(self:_:_:)")
+BridgedStmt BridgedLegacyParser_parseStmt(BridgedLegacyParser,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC);
+
+SWIFT_NAME("BridgedLegacyParser.parseType(self:_:_:)")
+BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser,
+                                              BridgedSourceLoc loc,
+                                              BridgedDeclContext DC);
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

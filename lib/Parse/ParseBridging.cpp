@@ -16,31 +16,13 @@
 
 using namespace swift;
 
-BridgedASTContext BridgedLegacyParser::getASTContext() const {
-  return unbridged().Context;
-}
-
-BridgedDiagnosticEngine BridgedLegacyParser::getDiagnosticEngine() const {
-  return &unbridged().Diags;
-}
-
-BridgedDeclContext BridgedLegacyParser::getCurrDeclContext() const {
-  return unbridged().CurDeclContext;
-}
-
-BridgedStringRef BridgedLegacyParser::getSourceBuffer() const {
-  // FIXME: Should we consider partial parsing?
-  StringRef text =
-      handle->SourceMgr.getEntireTextForBuffer(*handle->SF.getBufferID());
-  return {text.data(), text.size()};
-}
-
 // MARK: Functions called from SwiftParser.
 
-BridgedExpr BridgedLegacyParser::parseExpr(BridgedSourceLoc loc,
-                                           BridgedDeclContext DC,
-                                           bool isExprBasic) const {
-  auto &P = unbridged();
+BridgedExpr BridgedLegacyParser_parseExpr(BridgedLegacyParser p,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC,
+                                          bool isExprBasic) {
+  auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
@@ -50,9 +32,10 @@ BridgedExpr BridgedLegacyParser::parseExpr(BridgedSourceLoc loc,
   return result.getPtrOrNull();
 }
 
-BridgedDecl BridgedLegacyParser::parseDecl(BridgedSourceLoc loc,
-                                           BridgedDeclContext DC) const {
-  auto &P = unbridged();
+BridgedDecl BridgedLegacyParser_parseDecl(BridgedLegacyParser p,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC) {
+  auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
@@ -68,9 +51,10 @@ BridgedDecl BridgedLegacyParser::parseDecl(BridgedSourceLoc loc,
   return result.getPtrOrNull();
 }
 
-BridgedStmt BridgedLegacyParser::parseStmt(BridgedSourceLoc loc,
-                                           BridgedDeclContext DC) const {
-  auto &P = unbridged();
+BridgedStmt BridgedLegacyParser_parseStmt(BridgedLegacyParser p,
+                                          BridgedSourceLoc loc,
+                                          BridgedDeclContext DC) {
+  auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
@@ -80,9 +64,10 @@ BridgedStmt BridgedLegacyParser::parseStmt(BridgedSourceLoc loc,
   return result.getPtrOrNull();
 }
 
-BridgedTypeRepr BridgedLegacyParser::parseType(BridgedSourceLoc loc,
-                                               BridgedDeclContext DC) const {
-  auto &P = unbridged();
+BridgedTypeRepr BridgedLegacyParser_parseType(BridgedLegacyParser p,
+                                              BridgedSourceLoc loc,
+                                              BridgedDeclContext DC) {
+  auto &P = p.unbridged();
   auto PP =
       P.getParserPosition(loc.unbridged(), /*PreviousLoc=*/loc.unbridged());
   P.CurDeclContext = DC.unbridged();
