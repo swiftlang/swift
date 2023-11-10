@@ -691,18 +691,15 @@ extension Sequence {
     return Array(result)
   }
 
-  // ABI-only entrypoint
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
   @usableFromInline
-  @_disfavoredOverload
-  func map<T>(
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    do {
-      return try map(transform)
-    } catch {
-      try _rethrowsViaClosure { throw error }
-      Builtin.unreachable()
-    }
+  ) throws -> [T] {
+    try map(transform)
   }
 
   /// Returns an array containing, in order, the elements of the sequence
