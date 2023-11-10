@@ -249,8 +249,8 @@ extension Collection {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic9forcedMapySayq_GSayxGr0_lFq_xXEfU_ : $@convention(thin) <T, U> (@in_guaranteed T) -> (@out U, @error Never)
+// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic9forcedMapySayq_GSayxGr0_lFq_xXEfU_ : $@convention(thin) <T, U> (@in_guaranteed T) -> (@out U, @error_indirect Never)
 func forcedMap<T, U>(_ source: [T]) -> [U] {
-  // CHECK: bb0(%0 : $*U, %1 : $*T)
+  // CHECK: bb0(%0 : $*U, %1 : $*Never, %2 : $*T)
   return source.typedMap { $0 as! U }
 }
