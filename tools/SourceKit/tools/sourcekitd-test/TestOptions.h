@@ -56,7 +56,6 @@ enum class SourceKitRequest {
   PrintDiags,
   ExtractComment,
   ModuleGroups,
-  SyntacticRename,
   FindRenameRanges,
   FindLocalRenameRanges,
   NameTranslation,

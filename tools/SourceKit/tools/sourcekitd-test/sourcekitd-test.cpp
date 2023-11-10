@@ -1102,13 +1102,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     break;
 
-  case SourceKitRequest::SyntacticRename:
   case SourceKitRequest::FindRenameRanges: {
-    if (Opts.Request == SourceKitRequest::SyntacticRename) {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSyntacticRename);
-    } else {
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestFindRenameRanges);
-    }
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestFindRenameRanges);
     if (Opts.RenameSpecPath.empty()) {
       llvm::errs() << "Missing '-rename-spec <file path>'\n";
       return 1;
@@ -1586,7 +1582,6 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         break;
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:
 #include "swift/Refactoring/RefactoringKinds.def"
-      case SourceKitRequest::SyntacticRename:
       case SourceKitRequest::SyntacticMacroExpansion:
         printSyntacticRenameEdits(Info, llvm::outs());
         break;

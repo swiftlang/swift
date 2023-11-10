@@ -319,11 +319,6 @@ createCategorizedEditsResponse(
     const RequestResult<ArrayRef<CategorizedEdits>> &Result);
 
 static sourcekitd_response_t
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args);
-
-static sourcekitd_response_t
 createCategorizedRenameRangesResponse(
     const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result);
 
@@ -1057,28 +1052,6 @@ handleRequestModuleGroups(const RequestDict &Req,
     if (!ModuleName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.modulename'"));
     return Rec(editorFindModuleGroups(*ModuleName, Args));
-  }
-}
-
-static void
-handleRequestSyntacticRename(const RequestDict &Req,
-                             SourceKitCancellationToken CancellationToken,
-                             ResponseReceiver Rec) {
-  {
-    SmallVector<const char *, 8> Args;
-    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
-      return;
-    Optional<VFSOptions> vfsOptions = getVFSOptions(Req);
-    std::unique_ptr<llvm::MemoryBuffer> InputBuf =
-        getInputBufForRequestOrEmitError(Req, vfsOptions, Rec);
-    if (!InputBuf)
-      return;
-
-    SmallString<64> ErrBuf;
-    std::vector<RenameLocations> RenameLocations;
-    if (buildRenameLocationsFromDict(Req, true, RenameLocations, ErrBuf))
-      return Rec(createErrorRequestFailed(ErrBuf.c_str()));
-    return Rec(syntacticRename(InputBuf.get(), RenameLocations, Args));
   }
 }
 
@@ -2094,7 +2067,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                  handleRequestEditorFindInterfaceDoc)
   HANDLE_REQUEST(RequestModuleGroups, handleRequestModuleGroups)
 
-  HANDLE_REQUEST(RequestSyntacticRename, handleRequestSyntacticRename)
   HANDLE_REQUEST(RequestFindRenameRanges, handleRequestFindRenameRanges)
 
   HANDLE_REQUEST(RequestCodeCompleteClose, handleRequestCodeCompleteClose)
@@ -4164,19 +4136,6 @@ createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &
     }
   }
   return RespBuilder.createResponse();
-}
-
-static sourcekitd_response_t
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args) {
-  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  sourcekitd_response_t Result;
-  Lang.syntacticRename(InputBuf, RenameLocations, Args,
-    [&](const RequestResult<ArrayRef<CategorizedEdits>> &ReqResult) {
-      Result = createCategorizedEditsResponse(ReqResult);
-  });
-  return Result;
 }
 
 static sourcekitd_response_t

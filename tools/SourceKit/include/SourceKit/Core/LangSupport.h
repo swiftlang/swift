@@ -1189,11 +1189,6 @@ public:
                                 ArrayRef<const char *> Args,
                                 std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
-  virtual void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                               ArrayRef<RenameLocations> RenameLocations,
-                               ArrayRef<const char*> Args,
-                               CategorizedEditsReceiver Receiver) = 0;
-
   virtual void findRenameRanges(llvm::MemoryBuffer *InputBuf,
                                 ArrayRef<RenameLocations> RenameLocations,
                                 ArrayRef<const char *> Args,
