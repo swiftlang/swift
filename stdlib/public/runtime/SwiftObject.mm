@@ -36,11 +36,13 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
+#include "swift/Threading/Mutex.h"
 #include "swift/shims/RuntimeShims.h"
 #include "swift/shims/AssertionReporting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "Private.h"
+#include "SwiftEquatableSupport.h"
 #include "SwiftObject.h"
 #include "SwiftValue.h"
 #include "WeakReference.h"
@@ -51,6 +53,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
+#include <unordered_set>
 #if SWIFT_OBJC_INTEROP
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # import <Foundation/Foundation.h>
@@ -373,11 +376,86 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 }
 
 - (NSUInteger)hash {
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+
+  // If it's Hashable, use that
+  auto hashableConformance =
+    reinterpret_cast<const hashable_support::HashableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &hashable_support::HashableProtocolDescriptor));
+  if (hashableConformance != NULL) {
+    return _swift_stdlib_Hashable_hashValue_indirect(
+      &self, selfMetadata, hashableConformance);
+  }
+
+  // If a type is Equatable (but not Hashable), we
+  // have to return something here that is compatible
+  // with the `isEqual:` below.
+  auto equatableConformance =
+    reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &equatable_support::EquatableProtocolDescriptor));
+  if (equatableConformance != nullptr) {
+    // Warn once per class about this
+    auto selfClass = [self class];
+    static Lazy<std::unordered_set<Class>> warned;
+    static LazyMutex warnedLock;
+    LazyMutex::ScopedLock guard(warnedLock);
+    auto result = warned.get().insert(selfClass);
+    auto inserted = std::get<1>(result);
+    if (inserted) {
+      const char *clsName = class_getName([self class]);
+      warning(0,
+	      "Obj-C `-hash` method was invoked on a Swift object of type `%s` "
+	      "that is Equatable but not Hashable; "
+	      "this can lead to severe performance problems.\n",
+	      clsName);
+    }
+    // Constant value (yuck!) is the only choice here
+    return (NSUInteger)1;
+  }
+
+  // Legacy default for types that are neither Hashable nor Equatable.
   return (NSUInteger)self;
 }
 
-- (BOOL)isEqual:(id)object {
-  return self == object;
+- (BOOL)isEqual:(id)other {
+  if (self == other) {
+    return YES;
+  }
+
+  // Get Swift type for self and other
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+
+  // We use Equatable conformance, which will also work for types that implement
+  // Hashable.  If the type implements Equatable but not Hashable, there is a
+  // risk that `-hash` and `-isEqual:` might be incompatible.  See notes above
+  // for `-hash`
+  auto equatableConformance =
+    swift_conformsToProtocolCommon(
+      selfMetadata, &equatable_support::EquatableProtocolDescriptor);
+  if (equatableConformance == NULL) {
+    return NO;
+  }
+
+  // Is the other object a subclass of the parent that
+  // actually defined this conformance?
+  auto conformingParent =
+    findConformingSuperclass(selfMetadata, equatableConformance->getDescription());
+  auto otherMetadata = _swift_getClassOfAllocated(other);
+  if (_swift_class_isSubclass(otherMetadata, conformingParent)) {
+    // We now have an equatable conformance of a common parent
+    // of both object types:
+    return _swift_stdlib_Equatable_isEqual_indirect(
+      &self,
+      &other,
+      conformingParent,
+      reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+	equatableConformance)
+    );
+  }
+
+  return NO;
 }
 
 - (id)performSelector:(SEL)aSelector {
