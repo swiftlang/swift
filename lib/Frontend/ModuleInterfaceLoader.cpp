@@ -1655,10 +1655,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     }
   }
 
-  if (clangImporterOpts.UseClangIncludeTree) {
-    genericSubInvocation.getClangImporterOptions().UseClangIncludeTree =
-        clangImporterOpts.UseClangIncludeTree;
-    GenericArgs.push_back("-clang-include-tree");
+  if (!clangImporterOpts.UseClangIncludeTree) {
+    genericSubInvocation.getClangImporterOptions().UseClangIncludeTree = false;
+    GenericArgs.push_back("-no-clang-include-tree");
   }
 }
 
