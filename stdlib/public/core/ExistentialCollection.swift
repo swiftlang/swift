@@ -175,7 +175,7 @@ internal class _AnySequenceBox<Element> {
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  ) throws -> [T] {
     _abstract()
   }
 
@@ -525,13 +525,8 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    do {
-      return try _base.map(transform)
-    } catch {
-      try _rethrowsViaClosure { throw error }
-      Builtin.unreachable()
-    }
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -623,13 +618,8 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    do {
-      return try _base.map(transform)
-    } catch {
-      try _rethrowsViaClosure { throw error }
-      Builtin.unreachable()
-    }
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -823,13 +813,8 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    do {
-      return try _base.map(transform)
-    } catch {
-      try _rethrowsViaClosure { throw error }
-      Builtin.unreachable()
-    }
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -1041,13 +1026,8 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    do {
-      return try _base.map(transform)
-    } catch {
-      try _rethrowsViaClosure { throw error }
-      Builtin.unreachable()
-    }
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
