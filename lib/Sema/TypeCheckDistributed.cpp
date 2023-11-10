@@ -507,8 +507,8 @@ bool CheckDistributedFunctionRequest::evaluate(
   } else if (isa<ProtocolDecl>(DC)) {
     if (auto seqReqTy =
         getConcreteReplacementForMemberSerializationRequirement(func)) {
-      auto seqReqTyDes = seqReqTy->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-      for (auto req : flattenDistributedSerializationTypeToRequiredProtocols(seqReqTyDes)) {
+      auto layout = seqReqTy->getExistentialLayout();
+      for (auto req : layout.getProtocols()) {
         serializationRequirements.insert(req);
       }
     }
@@ -759,11 +759,13 @@ swift::getDistributedSerializationRequirementProtocols(
     return {};
   }
 
-  auto serialReqType =
-      ty->castTo<ExistentialType>()->getConstraintType()->getDesugaredType();
-
   // TODO(distributed): check what happens with Any
-  return flattenDistributedSerializationTypeToRequiredProtocols(serialReqType);
+  auto layout = ty->getExistentialLayout();
+  llvm::SmallPtrSet<ProtocolDecl *, 2> result;
+  for (auto p : layout.getProtocols()) {
+    result.insert(p);
+  }
+  return result;
 }
 
 ConstructorDecl*
@@ -887,8 +889,7 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
       continue;
 
     auto paramTy = genericParamList->getParams()[0]
-                       ->getInterfaceType()
-                       ->getMetatypeInstanceType();
+                       ->getDeclaredInterfaceType();
 
     // `decodeNextArgument` should return its generic parameter value
     if (!FD->getResultInterfaceType()->isEqual(paramTy))
@@ -896,20 +897,16 @@ GetDistributedActorArgumentDecodingMethodRequest::evaluate(Evaluator &evaluator,
 
     // Let's find out how many serialization requirements does this method cover
     // e.g. `Codable` is two requirements - `Encodable` and `Decodable`.
-    unsigned numSerializationReqsCovered = llvm::count_if(
-        FD->getGenericRequirements(), [&](const Requirement &requirement) {
-          if (!(requirement.getFirstType()->isEqual(paramTy) &&
-                requirement.getKind() == RequirementKind::Conformance))
-            return 0;
-
-          return serializationReqs.count(requirement.getProtocolDecl()) ? 1 : 0;
-        });
+    bool okay = llvm::all_of(serializationReqs,
+                            [&](ProtocolDecl *p) -> bool {
+                              return FD->getGenericSignature()->requiresProtocol(paramTy, p);
+                            });
 
     // If the current method covers all of the serialization requirements,
     // it's a match. Note that it might also have other requirements, but
     // we let that go as long as there are no two candidates that differ
     // only in generic requirements.
-    if (numSerializationReqsCovered == serializationReqs.size())
+    if (okay)
       candidates.push_back(FD);
   }
 

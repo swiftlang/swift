@@ -91,12 +91,6 @@ llvm::SmallPtrSet<ProtocolDecl *, 2>
 getDistributedSerializationRequirementProtocols(
     NominalTypeDecl *decl, ProtocolDecl* protocol);
 
-/// Desugar and flatten the `SerializationRequirement` type into a set of
-/// specific protocol declarations.
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-flattenDistributedSerializationTypeToRequiredProtocols(
-    TypeBase *serializationRequirement);
-
 /// Check if the `allRequirements` represent *exactly* the
 /// `Encodable & Decodable` (also known as `Codable`) requirement.
 ///
