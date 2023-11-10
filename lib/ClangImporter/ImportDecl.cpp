@@ -3569,6 +3569,13 @@ namespace {
           if (parameter->isInOut())
             // Subscripts with inout parameters are not allowed in Swift.
             return nullptr;
+          // Subscript setter is marked as mutating in Swift even if the
+          // C++ `operator []` is `const`.
+          if (importedName.getAccessorKind() ==
+                  ImportedAccessorKind::SubscriptSetter &&
+              !dc->isModuleScopeContext() &&
+              !typeDecl->getDeclaredType()->isForeignReferenceType())
+            func->setSelfAccessKind(SelfAccessKind::Mutating);
 
           auto &getterAndSetter = Impl.cxxSubscripts[{ typeDecl,
                                                        parameterType }];
