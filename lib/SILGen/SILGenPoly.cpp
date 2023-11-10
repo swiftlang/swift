@@ -891,6 +891,37 @@ void SILGenFunction::collectThunkParams(
   }
 }
 
+/// If the inner function we are calling (with type \c fnType) from the thunk
+/// created by \c SGF requires an indirect error argument, returns that
+/// argument.
+static llvm::Optional<SILValue>
+emitThunkIndirectErrorArgument(SILGenFunction &SGF, SILLocation loc,
+                               CanSILFunctionType fnType) {
+  // If the function we're calling has as indirect error result, create an
+  // argument for it.
+  auto innerError = fnType->getOptionalErrorResult();
+  if (!innerError || innerError->getConvention() != ResultConvention::Indirect)
+    return llvm::None;
+
+  // If the type of the indirect error is the same for both the inner
+  // function and the thunk, so we can re-use the indirect error slot.
+  auto loweredErrorResultType = SGF.getSILType(*innerError, fnType);
+  if (SGF.IndirectErrorResult &&
+      SGF.IndirectErrorResult->getType().getObjectType()
+          == loweredErrorResultType) {
+    return SGF.IndirectErrorResult;
+  }
+
+  // The type of the indirect error in the inner function differs from
+  // that of the thunk, or the thunk has a direct error, so allocate a
+  // stack location for the inner indirect error.
+  SILValue innerIndirectErrorAddr =
+      SGF.B.createAllocStack(loc, loweredErrorResultType);
+  SGF.enterDeallocStackCleanup(innerIndirectErrorAddr);
+
+  return innerIndirectErrorAddr;
+}
+
 namespace {
 
 class TranslateIndirect : public Cleanup {
@@ -4847,27 +4878,9 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // If the function we're calling has as indirect error result, create an
   // argument for it.
-  SILValue innerIndirectErrorAddr;
-  if (auto innerError = fnType->getOptionalErrorResult()) {
-    if (innerError->getConvention() == ResultConvention::Indirect) {
-      auto loweredErrorResultType = SGF.getSILType(*innerError, fnType);
-      if (SGF.IndirectErrorResult &&
-          SGF.IndirectErrorResult->getType().getObjectType()
-              == loweredErrorResultType) {
-        // The type of the indirect error is the same for both the inner
-        // function and the thunk, so we can re-use the indirect error slot.
-        innerIndirectErrorAddr = SGF.IndirectErrorResult;
-      } else {
-        // The type of the indirect error in the inner function differs from
-        // that of the thunk, or the thunk has a direct error, so allocate a
-        // stack location for the inner indirect error.
-        innerIndirectErrorAddr =
-            SGF.B.createAllocStack(loc, loweredErrorResultType);
-        SGF.enterDeallocStackCleanup(innerIndirectErrorAddr);
-      }
-
-      argValues.push_back(innerIndirectErrorAddr);
-    }
+  if (auto innerIndirectErrorAddr =
+          emitThunkIndirectErrorArgument(SGF, loc, fnType)) {
+    argValues.push_back(*innerIndirectErrorAddr);
   }
 
   // Add the rest of the arguments.
@@ -6571,6 +6584,13 @@ void SILGenFunction::emitProtocolWitness(
                         reqtOrigTy.getFunctionResultType(),
                         reqtSubstTy.getResult(),
                         witnessFTy, thunkTy);
+  }
+
+  // If the function we're calling has as indirect error result, create an
+  // argument for it.
+  if (auto innerIndirectErrorAddr =
+          emitThunkIndirectErrorArgument(*this, loc, witnessFTy)) {
+    args.push_back(*innerIndirectErrorAddr);
   }
 
   //   - the rest of the arguments
