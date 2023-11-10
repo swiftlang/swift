@@ -3765,9 +3765,11 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                        genericParamType, protocol->getName().str());
         break;
       case UnviableReason::Inaccessible:
-        diags.diagnose(init->getLoc(), diag::type_eraser_init_not_accessible,
-                       init->getEffectiveAccess(), protocolType,
-                       protocol->getEffectiveAccess());
+        diags.diagnose(
+            init->getLoc(), diag::type_eraser_init_not_accessible,
+            init->getFormalAccessScope().requiredAccessForDiagnostics(),
+            protocolType,
+            protocol->getFormalAccessScope().requiredAccessForDiagnostics());
         break;
       case UnviableReason::SPI:
         diags.diagnose(init->getLoc(), diag::type_eraser_init_spi,

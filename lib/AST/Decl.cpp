@@ -4121,6 +4121,15 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   case AccessLevel::Open:
     break;
   case AccessLevel::Package:
+    if (getModuleContext()->isTestingEnabled() ||
+        getModuleContext()->arePrivateImportsEnabled()) {
+        effectiveAccess = getMaximallyOpenAccessFor(this);
+    } else {
+        // Package declarations are effectively public within their
+        // package unit.
+        effectiveAccess = AccessLevel::Public;
+    }
+    break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
     if (getModuleContext()->isTestingEnabled() ||
