@@ -633,8 +633,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     const Metadata *futureResultTypeMetadata,
     TaskContinuationFunction *function, void *closureContext,
     size_t initialContextSize) {
-  fprintf(stderr, "[%s:%d](%s) swift_task_create_commonImpl\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
   JobFlags jobFlags(JobKind::Task, JobPriority::Unspecified);
 
@@ -656,11 +654,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::InitialTaskExecutor:
-      fprintf(stderr, "[%s:%d](%s) SET TASK EXECUTOR OPTION...\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       taskExecutor = cast<InitialTaskExecutorPreferenceTaskOptionRecord>(option)->getExecutorRef();
       jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
-      fprintf(stderr, "[%s:%d](%s) SET TASK EXECUTOR OPTION executor: ident %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              taskExecutor.getIdentity());
       break;
 
     case TaskOptionRecordKind::TaskGroup:
@@ -859,10 +854,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
                        parent, initialSlabSize);
 
-
-  fprintf(stderr, "[%s:%d](%s) created allocation for task: [%p] from parent [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          allocation, parent);
-
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
       reinterpret_cast<char*>(allocation) + headerSize);
@@ -907,8 +898,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   if (taskExecutor.isUndefined() && parent) {
     auto parentTaskExecutor = parent->getPreferredTaskExecutor();
     if (parentTaskExecutor.isDefined()) {
-      fprintf(stderr, "[%s:%d](%s) parent task [%p] has executor preference: [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              parent, parentTaskExecutor.getIdentity());
       shouldPushTaskExecutorPreferenceRecord = true;
       jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
       taskExecutor = parentTaskExecutor;
@@ -931,13 +920,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
                                     function, initialContext,
                                     captureCurrentVoucher);
   }
-
-  fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, from parent: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          task, parent);
-  fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, task executor identity: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          task, taskExecutor.getIdentity());
-  fprintf(stderr, "[%s:%d](%s) TASK ALLOCATED: %p, is async let == %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          task, asyncLet);
 
   // Initialize the child fragment if applicable.
   if (parent) {
@@ -988,7 +970,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // Perform additional linking between parent and child task.
-  fprintf(stderr, "[%s:%d](%s) task %p, has parent = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task, parent);
   if (parent) {
     // If the parent was already cancelled, we carry this flag forward to the child.
     //
@@ -1047,21 +1028,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If the task does not have a specific executor set already via create options,
   // and there is a task executor preference set in the parent,
   // we inherit it by deep-copying the preference record.
-  fprintf(stderr, "[%s:%d](%s) shouldPushTaskExecutorPreferenceRecord = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          shouldPushTaskExecutorPreferenceRecord);
-  fprintf(stderr, "[%s:%d](%s) taskExecutor.isDefined() = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          taskExecutor.isDefined());
   if (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
     assert(jobFlags.task_hasInitialTaskExecutorPreferenceRecord());
-    fprintf(stderr, "[%s:%d](%s) PUSH THE RECORD in task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
     task->pushTaskExecutorPreference(taskExecutor);
   }
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
-    fprintf(stderr, "[%s:%d](%s) DONE TASK INIT; ENQUEUE JOB %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
     assert(false && "Should not be enqueuing tasks in task-to-thread model");
 #endif
@@ -1069,7 +1044,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     task->flagAsAndEnqueueOnExecutor(serialExecutor); // FIXME: pass the task executor explicitly?
   }
 
-  fprintf(stderr, "[%s:%d](%s) DONE TASK INIT; RETURN %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, task);
   return {task, initialContext};
 }
 

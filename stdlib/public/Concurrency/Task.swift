@@ -973,6 +973,20 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try body(UnsafeCurrentTask(_task))
 }
 
+@available(SwiftStdlib 9999, *)
+public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
+  guard let _task = _getCurrentAsyncTask() else {
+    return try await body(nil)
+  }
+
+  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+  //        with "destroying a task that never completed" in the task's destroy.
+  //        How do we solve this properly?
+  Builtin.retain(_task)
+
+  return try await body(UnsafeCurrentTask(_task))
+}
+
 /// An unsafe reference to the current task.
 ///
 /// To get an instance of `UnsafeCurrentTask` for the current task,

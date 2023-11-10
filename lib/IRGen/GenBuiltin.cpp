@@ -323,23 +323,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor) {
 
-    if (Builtin.ID == BuiltinValueKind::CreateAsyncTask)
-      fprintf(stderr, "[%s:%d](%s) MAKE CreateAsyncTask\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
-      fprintf(stderr, "[%s:%d](%s) MAKE CreateAsyncTaskInGroup\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskWithExecutor)
-      fprintf(stderr, "[%s:%d](%s) MAKE CreateAsyncTaskWithExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
-      fprintf(stderr, "[%s:%d](%s) MAKE CreateAsyncTaskInGroupWithExecutor\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-
     auto flags = args.claimNext();
-    fprintf(stderr, "[%s:%d](%s) ==== flags::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup ||
          Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
         ? args.claimNext()
         : nullptr;
-    fprintf(stderr, "[%s:%d](%s) ==== taskGroup::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
 
     // ExecutorRef is two pointers: {Identity, Implementation}
     std::pair<llvm::Value*, llvm::Value*> executorRef =
@@ -347,12 +336,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
          Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroupWithExecutor)
         ? std::pair(args.claimNext(), args.claimNext())
         : std::pair(nullptr, nullptr);
-    if (executorRef.first) {
-      fprintf(stderr, "[%s:%d](%s) ==== executorRef-ident::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      executorRef.first->dump();
-      fprintf(stderr, "[%s:%d](%s) ==== executorRef-impl::\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-      executorRef.second->dump();
-    }
 
     // In embedded Swift, futureResultType is a thin metatype, not backed by any
     // actual value.
@@ -361,14 +344,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     if (!IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
       futureResultType = args.claimNext();
     }
-    fprintf(stderr, "[%s:%d](%s) ==== future result type:: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    futureResultType->dump();
     auto taskFunction = args.claimNext();
-    fprintf(stderr, "[%s:%d](%s) ==== task func:: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    taskFunction->dump();
     auto taskContext = args.claimNext();
-    fprintf(stderr, "[%s:%d](%s) ==== task context:: \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-    taskContext->dump();
 
     auto newTaskAndContext = emitTaskCreate(
         IGF,

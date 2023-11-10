@@ -524,13 +524,9 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///**************************************************************************/
 
 TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
-  fprintf(stderr, "[%s:%d](%s) get task executor from task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, this);
-
   TaskExecutorRef preference = TaskExecutorRef::undefined();
-  // TODO: check in flags before we have to take the lock to scan for the task executor...?
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto record: status.records()) {
-      fprintf(stderr, "[%s:%d](%s) record kind: %d (looking for %d)\n", __FILE_NAME__, __LINE__, __FUNCTION__, record->getKind(), TaskStatusRecordKind::TaskExecutorPreference);
       if (record->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto executorPreferenceRecord = cast<TaskExecutorPreferenceStatusRecord>(record);
         preference = executorPreferenceRecord->getPreferredExecutor();
@@ -539,13 +535,6 @@ TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
     }
   });
 
-  if (preference.isDefined()) {
-    fprintf(stderr, "[%s:%d](%s) FOUND EXEC PREFERENCE: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            preference.getIdentity());
-  } else {
-    fprintf(stderr, "[%s:%d](%s) !!! NO EXEC PREFERENCE: %p\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-            preference.getIdentity());
-  }
   return preference;
 }
 
@@ -557,27 +546,19 @@ TaskExecutorRef swift::swift_task_getPreferredTaskExecutor() {
   }
 }
 
-TaskExecutorRef swift::swift_task_getAnyPreferredTaskExecutor() {
-  auto task = swift_task_getCurrent();
-  if (!task)
-    return TaskExecutorRef::undefined();
-
-  auto executorRef = task->getPreferredTaskExecutor();
-  fprintf(stderr, "[%s:%d](%s) executor ref == %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, executorRef);
-  return executorRef;
-}
-
 SWIFT_CC(swift)
 TaskExecutorPreferenceStatusRecord*
-swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
+swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
   auto task = swift_task_getCurrent();
   assert(task && "Executor preference can only be called from async contexts.");
 
+  // return task->pushTaskExecutorPreference(taskExecutor);
+
   void *allocation = _swift_task_alloc_specific(task, sizeof(class TaskExecutorPreferenceStatusRecord));
-  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+  auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p", allocation, task);
 
-  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+  addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
   });
 
@@ -587,9 +568,8 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) 
 void AsyncTask::pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
-  fprintf(stderr, "[%s:%d](%s) push task preference record [%p] for task [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          allocation, this);
-  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p", allocation, this);
+  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p",
+                       record, this);
 
   addStatusRecord(this, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
@@ -603,18 +583,15 @@ void swift::swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRec
   swift_task_dealloc(record);
 }
 
+// ONLY use this method while destroying task and removing the "initial" preference.
+// In all other situations prefer a balanced "push / pop" pair of calls.
 void AsyncTask::dropTaskExecutorPreferenceRecord() {
   assert(this->hasInitialTaskExecutorPreferenceRecord());
-  fprintf(stderr, "[%s:%d](%s) DROP task executor preference as we destroy [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          this);
 
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto r : status.records()) {
-      fprintf(stderr, "[%s:%d](%s) record kind = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              r->getKind());
       if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
-        fprintf(stderr, "[%s:%d](%s) removing the record [%p]\n", __FILE_NAME__, __LINE__, __FUNCTION__, record);
         removeStatusRecordLocked(status, record);
         _swift_task_dealloc_specific(this, record);
         return;

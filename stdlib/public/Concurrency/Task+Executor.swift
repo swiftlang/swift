@@ -22,7 +22,7 @@ public func withTaskExecutor<T: Sendable>(
   _ executor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
   ) async rethrows -> T {
-    let executorBuiltin: Builtin.Executor =
+    let taskExecutorBuiltin: Builtin.Executor =
         if let executor {
           // We need to go through the asUnowned... for serial executors,
           // because they encode certain behavior in the reference bits,
@@ -36,17 +36,18 @@ public func withTaskExecutor<T: Sendable>(
           _getUndefinedTaskExecutor()
         }
 
-    let record = _pushTaskExecutorPreference(executorBuiltin)
+    let record = _pushTaskExecutorPreference(taskExecutorBuiltin)
     defer {
       _popTaskExecutorPreference(record: record)
     }
 
 //    #if compiler(>=9999) && $BuiltinHopToExecutor
-//  if let executor {
-    await Builtin.hopToExecutor(executorBuiltin)
-//  } else {
-//    await Builtin.hopToExecutor(_getGenericExecutor())
-//  }
+  if executor == nil {
+    let defaultGenericExecutor = _getGenericExecutor()
+    await Builtin.hopToExecutor(defaultGenericExecutor)
+  } else {
+    await Builtin.hopToExecutor(taskExecutorBuiltin)
+  }
 //    #else
 //    fatalError("Swift compiler is incompatible with this SDK version")
 //    #endif
@@ -117,10 +118,8 @@ extension Task where Failure == Error {
 @available(SwiftStdlib 9999, *)
 extension UnsafeCurrentTask {
 
-//  public var withunownedTaskExecutor: (any TaskExecutor)? {
   public var unownedTaskExecutor: UnownedTaskExecutor? {
     let ref = _getPreferredTaskExecutor()
-//    assert(ref is TaskExecutor)
     return UnownedTaskExecutor(ref)
   }
 }
@@ -131,10 +130,6 @@ extension UnsafeCurrentTask {
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
 public func _getPreferredTaskExecutor() -> Builtin.Executor
-
-@available(SwiftStdlib 9999, *)
-@_silgen_name("swift_task_getAnyPreferredTaskExecutor")
-public func _getAnyPreferredTaskExecutor() -> (any TaskExecutor)?
 
 // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
