@@ -16,6 +16,8 @@ var StdUniquePtrTestSuite = TestSuite("StdUniquePtr")
 StdUniquePtrTestSuite.test("int") {
   let u = makeInt()
   expectEqual(u.pointee, 42)
+  u.pointee = -11
+  expectEqual(u.pointee, -11)
 }
 
 StdUniquePtrTestSuite.test("array") {
