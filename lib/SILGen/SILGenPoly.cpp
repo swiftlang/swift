@@ -5188,7 +5188,8 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
 
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
-  SGF.collectThunkParams(loc, params, &indirectResults);
+  SmallVector<ManagedValue, 1> indirectErrorResults;
+  SGF.collectThunkParams(loc, params, &indirectResults, &indirectErrorResults);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5198,13 +5199,16 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   ManagedValue fnValue = params.pop_back_val();
   auto fnType = fnValue.getType().castTo<SILFunctionType>();
 
+  // Forward indirect result arguments.
   SmallVector<SILValue, 8> argValues;
   if (!indirectResults.empty()) {
     for (auto result : indirectResults)
       argValues.push_back(result.getLValueAddress());
   }
 
-  // Forward indirect result arguments.
+  // Forward indirect error arguments.
+  for (auto indirectError : indirectErrorResults)
+    argValues.push_back(indirectError.getLValueAddress());
 
    // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, params, argValues);
@@ -5389,7 +5393,9 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> thunkIndirectResults;
-  thunkSGF.collectThunkParams(loc, params, &thunkIndirectResults);
+  SmallVector<ManagedValue, 4> thunkIndirectErrorResults;
+  thunkSGF.collectThunkParams(
+      loc, params, &thunkIndirectResults, &thunkIndirectErrorResults);
 
   SILFunctionConventions fromConv(fromType, getModule());
   SILFunctionConventions toConv(toType, getModule());
@@ -5397,6 +5403,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     SmallVector<ManagedValue, 4> thunkArguments;
     for (auto indRes : thunkIndirectResults)
       thunkArguments.push_back(indRes);
+    for (auto indErrRes : thunkIndirectErrorResults)
+      thunkArguments.push_back(indErrRes);
     thunkArguments.append(params.begin(), params.end());
     SmallVector<SILParameterInfo, 4> toParameters(
         toConv.getParameters().begin(), toConv.getParameters().end());
@@ -5405,7 +5413,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     // Handle self reordering.
     // - For pullbacks: reorder result infos.
     // - For differentials: reorder parameter infos and arguments.
-    auto numIndirectResults = thunkIndirectResults.size();
+    auto numIndirectResults =
+        thunkIndirectResults.size() + thunkIndirectErrorResults.size();
     if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback &&
         toResults.size() > 1) {
       std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
@@ -5477,6 +5486,8 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   SmallVector<ManagedValue, 4> thunkArguments;
   thunkArguments.append(thunkIndirectResults.begin(),
                         thunkIndirectResults.end());
+  thunkArguments.append(thunkIndirectErrorResults.begin(),
+                        thunkIndirectErrorResults.end());
   thunkArguments.append(params.begin(), params.end());
   SmallVector<SILParameterInfo, 4> toParameters(toConv.getParameters().begin(),
                                                 toConv.getParameters().end());
@@ -5723,7 +5734,9 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectResults;
-  thunkSGF.collectThunkParams(loc, params, &indirectResults);
+  SmallVector<ManagedValue, 1> indirectErrorResults;
+  thunkSGF.collectThunkParams(
+      loc, params, &indirectResults, &indirectErrorResults);
 
   auto *fnRef = thunkSGF.B.createFunctionRef(loc, customDerivativeFn);
   auto fnRefType =
@@ -5767,6 +5780,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   SmallVector<SILValue, 8> arguments;
   for (auto indRes : indirectResults)
     arguments.push_back(indRes.getLValueAddress());
+  for (auto indErrorRes : indirectErrorResults)
+    arguments.push_back(indErrorRes.getLValueAddress());
   forwardFunctionArguments(thunkSGF, loc, fnRefType, params, arguments);
 
   // Apply function argument.
@@ -6200,6 +6215,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
                         inputOrigType.getFunctionResultType(),
                         inputSubstType.getResult(),
                         derivedFTy, thunkTy);
+
+    // If the function we're calling has as indirect error result, create an
+    // argument for it.
+    if (auto innerIndirectErrorAddr =
+            emitThunkIndirectErrorArgument(*this, loc, derivedFTy)) {
+      args.push_back(*innerIndirectErrorAddr);
+    }
   }
 
   // Then, the arguments.
@@ -6584,13 +6606,13 @@ void SILGenFunction::emitProtocolWitness(
                         reqtOrigTy.getFunctionResultType(),
                         reqtSubstTy.getResult(),
                         witnessFTy, thunkTy);
-  }
 
-  // If the function we're calling has as indirect error result, create an
-  // argument for it.
-  if (auto innerIndirectErrorAddr =
-          emitThunkIndirectErrorArgument(*this, loc, witnessFTy)) {
-    args.push_back(*innerIndirectErrorAddr);
+    // If the function we're calling has as indirect error result, create an
+    // argument for it.
+    if (auto innerIndirectErrorAddr =
+            emitThunkIndirectErrorArgument(*this, loc, witnessFTy)) {
+      args.push_back(*innerIndirectErrorAddr);
+    }
   }
 
   //   - the rest of the arguments
