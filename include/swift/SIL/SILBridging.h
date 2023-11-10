@@ -593,6 +593,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StructExtractInst_fieldIndex() const;
   BRIDGED_INLINE OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue() const;
   BRIDGED_INLINE SwiftInt StructElementAddrInst_fieldIndex() const;
+  BRIDGED_INLINE bool BeginBorrow_isLexical() const;
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;

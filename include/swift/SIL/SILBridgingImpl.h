@@ -780,6 +780,10 @@ SwiftInt BridgedInstruction::StructElementAddrInst_fieldIndex() const {
   return getAs<swift::StructElementAddrInst>()->getFieldIndex();
 }
 
+bool BridgedInstruction::BeginBorrow_isLexical() const {
+  return getAs<swift::BeginBorrowInst>()->isLexical();
+}
+
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
   return getAs<swift::ProjectBoxInst>()->getFieldIndex();
 }
