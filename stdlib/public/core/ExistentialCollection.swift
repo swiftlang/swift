@@ -526,7 +526,12 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _base.map(transform)
+    do {
+      return try _base.map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
   @inlinable
   internal override func _filter(
@@ -619,7 +624,12 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _base.map(transform)
+    do {
+      return try _base.map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
   @inlinable
   internal override func _filter(
@@ -814,7 +824,12 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _base.map(transform)
+    do {
+      return try _base.map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
   @inlinable
   internal override func _filter(
@@ -1027,7 +1042,12 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func _map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _base.map(transform)
+    do {
+      return try _base.map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
   @inlinable
   internal override func _filter(
@@ -1303,10 +1323,29 @@ extension AnySequence {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _box._map(transform)
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   @inlinable
@@ -1390,10 +1429,29 @@ extension AnyCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _box._map(transform)
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   @inlinable
@@ -1483,10 +1541,29 @@ extension AnyBidirectionalCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _box._map(transform)
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   @inlinable
@@ -1578,10 +1655,29 @@ extension AnyRandomAccessCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint
+  @usableFromInline
+  @_disfavoredOverload
+  func map<T>(
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
-    return try _box._map(transform)
+    do {
+      return try map(transform)
+    } catch {
+      try _rethrowsViaClosure { throw error }
+      Builtin.unreachable()
+    }
   }
 
   @inlinable
