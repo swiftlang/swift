@@ -1,0 +1,34 @@
+add_compiler_swift_library(swiftASTGen
+  ASTGen.swift
+  Bridge.swift
+  Decls.swift
+  Diagnostics.swift
+  DiagnosticsBridge.swift
+  Exprs.swift
+  Generics.swift
+  Literals.swift
+  Macros.swift
+  ParameterClause.swift
+  PluginHost.swift
+  SourceFile.swift
+  SourceManager.swift
+  SourceManager+MacroExpansionContext.swift
+  Stmts.swift
+  Types.swift
+
+  DEPENDENCIES
+    swiftAST
+  SWIFT_DEPENDENCIES
+    SwiftBasicFormat
+    SwiftCompilerPluginMessageHandling
+    SwiftDiagnostics
+    SwiftOperators
+    SwiftIDEUtils
+    SwiftParser
+    SwiftParserDiagnostics
+    SwiftSyntax
+    SwiftSyntaxBuilder
+    SwiftSyntaxMacros
+    SwiftSyntaxMacroExpansion
+    swiftLLVMJSON
+)
