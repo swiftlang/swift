@@ -9608,6 +9608,12 @@ bool OpaqueTypeDecl::exportUnderlyingType() const {
   llvm_unreachable("The naming decl is expected to be either an AFD or ASD");
 }
 
+llvm::Optional<SubstitutionMap>
+OpaqueTypeDecl::getUniqueUnderlyingTypeSubstitutions() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           UniqueUnderlyingTypeSubstitutionsRequest{this}, {});
+}
+
 llvm::Optional<unsigned>
 OpaqueTypeDecl::getAnonymousOpaqueParamOrdinal(TypeRepr *repr) const {
   assert(NamingDeclAndHasOpaqueReturnTypeRepr.getInt() &&

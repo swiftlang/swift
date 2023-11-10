@@ -3214,6 +3214,7 @@ class OpaqueTypeDecl final :
     public GenericTypeDecl,
     private llvm::TrailingObjects<OpaqueTypeDecl, TypeRepr *> {
   friend TrailingObjects;
+  friend class UniqueUnderlyingTypeSubstitutionsRequest;
 
 public:
   /// A set of substitutions that represents a possible underlying type iff
@@ -3252,6 +3253,10 @@ private:
       ConditionallyAvailableTypes = llvm::None;
 
   mutable Identifier OpaqueReturnTypeIdentifier;
+
+  struct {
+    unsigned UniqueUnderlyingTypeComputed : 1;
+  } LazySemanticInfo = { };
 
   OpaqueTypeDecl(ValueDecl *NamingDecl, GenericParamList *GenericParams,
                  DeclContext *DC,
@@ -3329,9 +3334,7 @@ public:
 
   /// The substitutions that map the generic parameters of the opaque type to
   /// the unique underlying types, when that information is known.
-  llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const {
-    return UniqueUnderlyingType;
-  }
+  llvm::Optional<SubstitutionMap> getUniqueUnderlyingTypeSubstitutions() const;
 
   void setUniqueUnderlyingTypeSubstitutions(SubstitutionMap subs) {
     assert(!UniqueUnderlyingType.has_value() && "resetting underlying type?!");
