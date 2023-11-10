@@ -18,6 +18,33 @@ extension Value {
     uses.lazy.filter { !($0.instruction is DebugValueInst) }
   }
 
+  var lookThroughBorrow: Value {
+    if let beginBorrow = self as? BeginBorrowInst {
+      return beginBorrow.borrowedValue.lookThroughBorrow
+    }
+    return self
+  }
+
+  var lookThroughCopy: Value {
+    if let copy = self as? CopyValueInst {
+      return copy.fromValue.lookThroughCopy
+    }
+    return self
+  }
+
+  var lookThoughOwnershipInstructions: Value {
+    switch self {
+    case let beginBorrow as BeginBorrowInst:
+      return beginBorrow.borrowedValue.lookThoughOwnershipInstructions
+    case let copy as CopyValueInst:
+      return copy.fromValue.lookThoughOwnershipInstructions
+    case let move as MoveValueInst:
+      return move.fromValue.lookThoughOwnershipInstructions
+    default:
+      return self
+    }
+  }
+
   /// Walks over all fields of an aggregate and checks if a reference count
   /// operation for this value is required. This differs from a simple `Type.isTrivial`
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
