@@ -169,15 +169,6 @@ struct TermArgSources {
 
 } // namespace
 
-/// Used for generating informative diagnostics.
-static Expr *getExprForPartitionOp(const PartitionOp &op) {
-  SILInstruction *sourceInstr = op.getSourceInst(/*assertNonNull=*/true);
-  Expr *expr = sourceInstr->getLoc().getAsASTNode<Expr>();
-  assert(expr && "PartitionOp's source location should correspond to"
-                 "an AST node");
-  return expr;
-}
-
 static bool isProjectedFromAggregate(SILValue value) {
   assert(value->getType().isAddress());
   UseDefChainVisitor visitor;
@@ -1611,9 +1602,9 @@ public:
         assert(false && "no transfers besides callsites implemented yet");
 
         // Default to a more generic diagnostic if we can't find the callsite.
-        auto expr = getExprForPartitionOp(transferOp);
+        auto loc = transferOp.getSourceLoc();
         auto diag = fn->getASTContext().Diags.diagnose(
-            expr->getLoc(), diag::transfer_yields_race, numDisplayed,
+            loc.getSourceLoc(), diag::transfer_yields_race, numDisplayed,
             numDisplayed != 1, numHidden > 0, numHidden);
         if (auto sourceExpr = transferOp.getSourceExpr())
           diag.highlight(sourceExpr->getSourceRange());
@@ -1626,10 +1617,10 @@ public:
         // transfer...
         if (numRequiresToProcess-- == 0)
           break;
-        auto expr = getExprForPartitionOp(requireOp);
+        auto loc = requireOp.getSourceLoc();
         fn->getASTContext()
-            .Diags.diagnose(expr->getLoc(), diag::possible_racy_access_site)
-            .highlight(expr->getSourceRange());
+            .Diags.diagnose(loc.getSourceLoc(), diag::possible_racy_access_site)
+            .highlight(loc.getSourceRange());
       }
     }
   }
@@ -2065,18 +2056,15 @@ class PartitionAnalysis {
     translator.sortUniqueNeverTransferredValues();
   }
 
-  /// Track the AST exprs that have already had diagnostics emitted about.
-  llvm::DenseSet<Expr *> emittedExprs;
+  /// Track the transfer insts that have already had diagnostics emitted about.
+  llvm::DenseSet<SILInstruction *> emittedTransferInsts;
 
-  /// Check if a diagnostic has already been emitted for \p expr.
-  bool hasBeenEmitted(Expr *expr) {
-    if (auto castExpr = dyn_cast<ImplicitConversionExpr>(expr))
-      return hasBeenEmitted(castExpr->getSubExpr());
-
-    if (emittedExprs.contains(expr))
-      return true;
-    emittedExprs.insert(expr);
-    return false;
+  /// Returns true if a diagnostic has already been emitted for the transferred
+  /// instruction \p transferredInst.
+  ///
+  /// If we return false, we insert \p transferredInst into emittedTransferInst.
+  bool hasBeenEmitted(SILInstruction *transferredInst) {
+    return !emittedTransferInsts.insert(transferredInst).second;
   }
 
   /// Once we have reached a fixpoint, this routine runs over all blocks again
@@ -2098,24 +2086,22 @@ class PartitionAnalysis {
       Partition workingPartition = blockState.getEntryPartition();
       PartitionOpEvaluator eval(workingPartition);
       eval.failureCallback = /*handleFailure=*/
-        [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
-            SILInstruction *transferringInst) {
-          auto expr = getExprForPartitionOp(partitionOp);
+          [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
+              SILInstruction *transferringInst) {
+            // Ensure that multiple transfers at the same AST node are only
+            // entered once into the race tracer
+            if (hasBeenEmitted(partitionOp.getSourceInst(true)))
+              return;
 
-          // Ensure that multiple transfers at the same AST node are only
-          // entered once into the race tracer
-          if (hasBeenEmitted(expr))
-            return;
-
-          LLVM_DEBUG(llvm::dbgs()
-                     << "    Emitting Use After Transfer Error!\n"
-                     << "    ID:  %%" << transferredVal << "\n"
-                     << "    Rep: "
-                     << *translator.getValueForId(transferredVal)
+            LLVM_DEBUG(llvm::dbgs()
+                       << "    Emitting Use After Transfer Error!\n"
+                       << "    ID:  %%" << transferredVal << "\n"
+                       << "    Rep: "
+                       << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
 
             raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
-        };
+          };
       eval.transferredNonTransferrableCallback =
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             LLVM_DEBUG(llvm::dbgs()
@@ -2124,9 +2110,9 @@ class PartitionAnalysis {
                        << "Rep: "
                        << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
-            auto expr = getExprForPartitionOp(partitionOp);
             function->getASTContext().Diags.diagnose(
-                expr->getLoc(), diag::arg_region_transferred);
+                partitionOp.getSourceLoc().getSourceLoc(),
+                diag::arg_region_transferred);
           };
       eval.nonTransferrableElements = translator.getNeverTransferredValues();
       eval.isActorDerivedCallback = [&](Element element) -> bool {

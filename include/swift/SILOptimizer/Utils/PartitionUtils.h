@@ -200,6 +200,8 @@ public:
     return sourceInst;
   }
 
+  SILLocation getSourceLoc() const { return getSourceInst(true)->getLoc(); }
+
   Expr *getSourceExpr() const {
     return sourceExpr;
   }
