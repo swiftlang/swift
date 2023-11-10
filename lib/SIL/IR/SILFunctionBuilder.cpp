@@ -110,14 +110,15 @@ void SILFunctionBuilder::addFunctionAttributes(
       auto *effectsAttr = cast<EffectsAttr>(attr);
       if (effectsAttr->getKind() == EffectsKind::Custom) {
         customEffects.push_back(effectsAttr);
+        continue;
+      }
+      if (F->getEffectsKind() != EffectsKind::Unspecified) {
+        // If multiple known effects are specified, the most restrictive one
+        // is used.
+        F->setEffectsKind(
+            std::min(effectsAttr->getKind(), F->getEffectsKind()));
       } else {
-        if (F->getEffectsKind() != EffectsKind::Unspecified &&
-            F->getEffectsKind() != effectsAttr->getKind()) {
-          mod.getASTContext().Diags.diagnose(effectsAttr->getLocation(),
-              diag::warning_in_effects_attribute, "mismatching function effects");
-        } else {
-          F->setEffectsKind(effectsAttr->getKind());
-        }
+        F->setEffectsKind(effectsAttr->getKind());
       }
     }
   }
