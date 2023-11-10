@@ -118,9 +118,11 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-LABEL: ClassDecl name=Sub
 // CHECK-NEXT: (inherited_conformance type="Sub" protocol="P2"
 // CHECK-NEXT:   (specialized_conformance type="Super<NonRecur, Recur>" protocol="P2"
-// CHECK-NEXT:      (substitution_map generic_signature="<T, U where T : P2, U : P2>"
-// CHECK-NEXT:         (substitution "T -> NonRecur")
-// CHECK-NEXT:         (substitution "U -> Recur")
+// CHECK-NEXT:      (substitution_map generic_signature=<T, U where T : P2, U : P2>
+// CHECK-NEXT:        (substitution T -> 
+// CHECK-NEXT:          (struct_type decl="{{.*}}"))
+// CHECK-NEXT:        (substitution U -> 
+// CHECK-NEXT:          (struct_type decl="{{.*}}"))
 // CHECK-NEXT:         (conformance type="T"
 // CHECK-NEXT:            (normal_conformance type="NonRecur" protocol="P2"
 // CHECK-NEXT:              (assoc_type req="A" type="Recur")
@@ -166,8 +168,9 @@ struct RecurGeneric<T: P3>: P3 {
 // CHECK-NEXT:   (assoc_type req="A" type="RecurGeneric<Specialize>")
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P3"
 // CHECK-NEXT:     (specialized_conformance type="Specialize.A" protocol="P3"
-// CHECK-NEXT:       (substitution_map generic_signature="<T where T : P3>"
-// CHECK-NEXT:         (substitution "T -> Specialize")
+// CHECK-NEXT:       (substitution_map generic_signature=<T where T : P3>
+// CHECK-NEXT:         (substitution T ->
+// CHECK-NEXT:           (struct_type decl="{{.*}}"))
 // CHECK-NEXT:         (conformance type="T"
 // CHECK-NEXT:           (normal_conformance type="Specialize" protocol="P3" <details printed above>)))
 // CHECK-NEXT:       (normal_conformance type="RecurGeneric<T>" protocol="P3"
