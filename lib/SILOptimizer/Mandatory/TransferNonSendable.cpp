@@ -1594,13 +1594,13 @@ public:
 
   void accumulateTransferredReason(PartitionOp requireOp,
                                    const TransferredReason &transferredReason) {
-    for (auto [distance, transferOp] : transferredReason.transferOps)
+    for (auto &[distance, transferOp] : transferredReason.transferOps)
       requirementsForTransfers[transferOp].insert({requireOp, distance});
   }
 
   void emitErrorsForTransferRequire(
       unsigned numRequiresPerTransfer = UINT_MAX) const {
-    for (auto [transferOp, requireOps] : requirementsForTransfers) {
+    for (auto &[transferOp, requireOps] : requirementsForTransfers) {
       unsigned numProcessed = std::min(
           {(unsigned)requireOps.size(), (unsigned)numRequiresPerTransfer});
 
@@ -1637,7 +1637,7 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    for (auto [transferOp, requireOps] : requirementsForTransfers) {
+    for (auto &[transferOp, requireOps] : requirementsForTransfers) {
       os << " ┌──╼ TRANSFER: ";
       transferOp.print(os);
 
@@ -1675,8 +1675,7 @@ private:
         .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
                   argExpr->findOriginalType(),
                   isolationCrossing.value().getCallerIsolation(),
-                  isolationCrossing.value().getCalleeIsolation(), numDisplayed,
-                  numDisplayed != 1, numHidden > 0, numHidden)
+                  isolationCrossing.value().getCalleeIsolation())
         .highlight(argExpr->getSourceRange());
     return true;
   }
@@ -2178,8 +2177,7 @@ class PartitionAnalysis {
         .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
                   argExpr->findOriginalType(),
                   isolationCrossing.value().getCallerIsolation(),
-                  isolationCrossing.value().getCalleeIsolation(), numDisplayed,
-                  numDisplayed != 1, numHidden > 0, numHidden)
+                  isolationCrossing.value().getCalleeIsolation())
         .highlight(argExpr->getSourceRange());
     return true;
   }

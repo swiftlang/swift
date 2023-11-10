@@ -883,8 +883,8 @@ WARNING(transfer_yields_race, none,
         "non-sendable value sent across isolation domains that could be concurrently accessed later in this function (%0 access site%select{|s}1 displayed%select{|, %3 more hidden}2)",
         (unsigned, bool, bool, unsigned))
 WARNING(call_site_transfer_yields_race, none,
-        "passing argument of non-sendable type %0 from %1 context to %2 context at this call site could yield a race with accesses later in this function (%3 access site%select{|s}4 displayed%select{|, %6 more hidden}5)",
-        (Type, ActorIsolation, ActorIsolation, unsigned, bool, bool, unsigned))
+        "passing argument of non-sendable type %0 from %1 context to %2 context at this call site could yield a race with accesses later in this function",
+        (Type, ActorIsolation, ActorIsolation))
 NOTE(possible_racy_access_site, none,
      "access here could race", ())
 
