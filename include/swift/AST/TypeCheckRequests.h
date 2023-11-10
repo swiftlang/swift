@@ -4541,23 +4541,26 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Expand the children of the type refinement context for the given
-/// declaration.
+/// Expand the children of the given type refinement context.
 class ExpandChildTypeRefinementContextsRequest
     : public SimpleRequest<ExpandChildTypeRefinementContextsRequest,
-                           bool(Decl *, TypeRefinementContext *),
-                           RequestFlags::Cached> {
+                           std::vector<TypeRefinementContext *>(
+                               TypeRefinementContext *),
+                           RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, Decl *decl,
-                TypeRefinementContext *parentTRC) const;
+  std::vector<TypeRefinementContext *>
+  evaluate(Evaluator &evaluator, TypeRefinementContext *parentTRC) const;
 
 public:
+  // Separate caching.
   bool isCached() const { return true; }
+  llvm::Optional<std::vector<TypeRefinementContext *>> getCachedResult() const;
+  void cacheResult(std::vector<TypeRefinementContext *> children) const;
 };
 
 class SerializeAttrGenericSignatureRequest

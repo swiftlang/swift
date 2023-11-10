@@ -42,36 +42,43 @@
 /// inlining target.
 public struct NoAvailable {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS 10.9, *)
 public struct BeforeInliningTarget {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS 10.10, *)
 public struct AtInliningTarget {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS 10.14.5, *)
 public struct BetweenTargets { // expected-note {{enclosing scope requires availability of macOS 10.14.5 or newer}}
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS 10.15, *)
 public struct AtDeploymentTarget {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS 11, *)
 public struct AfterDeploymentTarget {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 @available(macOS, unavailable)
 public struct Unavailable {
   @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
 }
 
 // MARK: - Protocol definitions
@@ -880,7 +887,7 @@ public struct PropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
-public struct PublicStruct { // expected-note 15 {{add @available attribute}}
+public struct PublicStruct { // expected-note 21 {{add @available attribute}}
   // Public property declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
@@ -958,7 +965,51 @@ public struct PublicStruct { // expected-note 15 {{add @available attribute}}
              dPublicInit: Any = BetweenTargets(),
              ePublicInit: Any = AtDeploymentTarget(),
              fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  
+
+  @available(macOS 10.14.5, *)
+  public var  aPublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return NoAvailable(AfterDeploymentTarget())
+                } else {
+                  return NoAvailable(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }(),
+              bPublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return BeforeInliningTarget(AfterDeploymentTarget())
+                } else {
+                  return BeforeInliningTarget(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }(),
+              cPublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return AtInliningTarget(AfterDeploymentTarget())
+                } else {
+                  return AtInliningTarget(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }(),
+              dPublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return BetweenTargets(AfterDeploymentTarget())
+                } else {
+                  return BetweenTargets(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }(),
+              ePublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return AtDeploymentTarget(AfterDeploymentTarget())
+                } else {
+                  return AtDeploymentTarget(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }(),
+              fPublicInitAvailBetween: Any = {
+                if #available(macOS 11, *) {
+                  return AfterDeploymentTarget()
+                } else {
+                  return AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
+                }
+              }()
+
   // Internal declarations are not exposed.
   var aInternal: NoAvailable = .init(),
       bInternal: BeforeInliningTarget = .init(),

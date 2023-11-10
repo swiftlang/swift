@@ -513,8 +513,8 @@ SWIFT_REQUEST(TypeChecker, InitAccessorReferencedVariablesRequest,
                                   ArrayRef<Identifier>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ExpandChildTypeRefinementContextsRequest,
-              bool(Decl *, TypeRefinementContext *),
-              Cached, NoLocationInfo)
+              std::vector<TypeRefinementContext *>(TypeRefinementContext *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
               GenericSignature(Decl *, SpecializeAttr *),
               SeparatelyCached, NoLocationInfo)

@@ -10,7 +10,12 @@
 // CHECK-NEXT: {{^}}      (decl versions=[10.53,+Inf) decl=someInnerFunc()
 // CHECK-NEXT: {{^}}      (decl versions=[10.53,+Inf) decl=InnerClass
 // CHECK-NEXT: {{^}}        (decl versions=[10.54,+Inf) decl=innerClassMethod
-// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someStaticProperty
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticProperty
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticProperty
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyInferredType
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyInferredType
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=multiPatternStaticPropertyA
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=multiPatternStaticPropertyA
 // CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someComputedProperty
 // CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someOtherMethod()
 @available(OSX 10.51, *)
@@ -32,6 +37,13 @@ class SomeClass {
 
   @available(OSX 10.52, *)
   static var someStaticProperty: Int = 7
+
+  @available(OSX 10.52, *)
+  static var someStaticPropertyInferredType = 7
+
+  @available(OSX 10.52, *)
+  static var multiPatternStaticPropertyA = 7,
+             multiPatternStaticPropertyB = 8
 
   @available(OSX 10.52, *)
   var someComputedProperty: Int {
@@ -191,4 +203,67 @@ func functionWithWhile() {
     @available(OSX 10.54, *)
     func funcInWhileBody() { }
   }
+}
+
+// CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=extension.SomeClass
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInit
+// CHECK-NEXT: {{^}}        (condition_following_availability versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}        (if_then versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}      (decl versions=[10.52,+Inf) decl=someStaticPropertyWithClosureInitInferred
+// CHECK-NEXT: {{^}}        (condition_following_availability versions=[10.54,+Inf)
+// CHECK-NEXT: {{^}}        (if_then versions=[10.54,+Inf)
+@available(OSX 10.51, *)
+extension SomeClass {
+  @available(OSX 10.52, *)
+  static var someStaticPropertyWithClosureInit: Int = {
+    if #available(OSX 10.54, *) {
+      return 54
+    }
+    return 53
+  }()
+
+  @available(OSX 10.52, *)
+  static var someStaticPropertyWithClosureInitInferred = {
+    if #available(OSX 10.54, *) {
+      return 54
+    }
+    return 53
+  }()
+}
+
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+}
+
+// CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=SomeStruct
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someLazyVar
+// CHECK-NEXT: {{^}}      (condition_following_availability versions=[10.52,+Inf)
+// CHECK-NEXT: {{^}}      (guard_fallthrough versions=[10.52,+Inf)
+// CHECK-NEXT: {{^}}    (decl_implicit versions=[10.51,+Inf) decl=someWrappedVar
+// CHECK-NEXT: {{^}}      (condition_following_availability versions=[10.52,+Inf)
+// CHECK-NEXT: {{^}}      (guard_fallthrough versions=[10.52,+Inf)
+// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=someMethodAvailable52()
+@available(OSX 10.51, *)
+struct SomeStruct {
+  lazy var someLazyVar = {
+    guard #available(OSX 10.52, *) else {
+      return someMethod()
+    }
+    return someMethodAvailable52()
+  }()
+
+  @Wrapper var someWrappedVar = {
+    guard #available(OSX 10.52, *) else {
+      return 51
+    }
+    return 52
+  }()
+
+  func someMethod() -> Int { return 51 }
+
+  @available(OSX 10.52, *)
+  func someMethodAvailable52() -> Int { return 52 }
 }
