@@ -80,6 +80,10 @@ class SWIFT_CONFORMS_TO_PROTOCOL(SwiftMod.Proto) ConformsTo {
 public:
 };
 
+class SWIFT_UNCHECKED_SENDABLE UnsafeSendable {
+public:
+};
+
 
 // CHECK: struct SelfContained {
 
@@ -101,3 +105,4 @@ public:
 
 // CHECK: struct ConformsTo : Proto {
 
+// CHECK: struct UnsafeSendable : @unchecked Sendable {
