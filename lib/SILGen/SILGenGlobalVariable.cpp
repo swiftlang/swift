@@ -205,6 +205,12 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
 /// Emit a global initialization.
 void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                                             unsigned pbdEntry) {
+  // The SIL emitted for global initialization is never needed clients of
+  // resilient modules, so skip it if -experimental-skip-non-exportable-decls
+  // is specified.
+  if (M.getOptions().SkipNonExportableDecls)
+    return;
+
   // Generic and dynamic static properties require lazy initialization, which
   // isn't implemented yet.
   if (pd->isStatic()) {

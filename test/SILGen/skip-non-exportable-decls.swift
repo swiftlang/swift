@@ -4,6 +4,17 @@
 
 import Swift
 
+// CHECK-NO-SKIP: sil_global private @$s4Test17internalGlobalVar_Wz : $Builtin.Word
+// CHECK-SKIP-NOT: s4Test17internalGlobalVar_Wz
+
+// CHECK-NO-SKIP: sil_global hidden @$s4Test17internalGlobalVarSivp : $Int
+// CHECK-SKIP-NOT: s4Test17internalGlobalVarSivp
+
+// CHECK-NO-SKIP: sil_global private @$s4Test15publicGlobalVar_Wz : $Builtin.Word
+// CHECK-SKIP-NOT: s4Test15publicGlobalVar_Wz
+
+// CHECK: sil_global @$s4Test15publicGlobalVarSivp : $Int
+
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test11privateFunc33_E3F0E1C7B46D05C8067CB98677DE566CLLyyF
 private func privateFunc() {}
@@ -35,6 +46,20 @@ public func publicFuncWithNestedFuncs() {
 
 // CHECK: sil [serialized]{{.*}} @$s4Test13inlinableFuncyyF : $@convention(thin) () -> () {
 @inlinable internal func inlinableFunc() {}
+
+// CHECK-NO-SKIP: sil private [global_init_once_fn]{{.*}} @$s4Test17internalGlobalVar_WZ : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK-SKIP-NOT: s4Test17internalGlobalVar_WZ
+
+// CHECK-NO-SKIP: sil hidden [global_init]{{.*}} @$s4Test17internalGlobalVarSivau : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-SKIP-NOT: s4Test17internalGlobalVarSivau
+internal var internalGlobalVar = 1
+
+// CHECK-NO-SKIP: sil private [global_init_once_fn]{{.*}} @$s4Test15publicGlobalVar_WZ : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK-SKIP-NOT: s4Test15publicGlobalVar_WZ
+
+// CHECK-NO-SKIP: sil [global_init]{{.*}} @$s4Test15publicGlobalVarSivau : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-SKIP-NOT: s4Test15publicGlobalVarSivau
+public var publicGlobalVar = 1
 
 // CHECK: sil [serialized]{{.*}} @$s4Test023inlinableFuncWithNestedC0yyF : $@convention(thin) () -> () {
 @inlinable internal func inlinableFuncWithNestedFunc() {
