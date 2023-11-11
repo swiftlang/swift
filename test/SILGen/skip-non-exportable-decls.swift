@@ -85,6 +85,23 @@ private class PrivateClass {
 }
 
 public class PublicClass {
+  // CHECK-NO-SKIP: sil [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivpfi : $@convention(thin) () -> Int {
+  // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivpfi
+  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
+  // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivg
+  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
+  // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivs
+  // CHECK-NO-SKIP: sil hidden [transparent]{{.*}} @$s4Test11PublicClassC11internalVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
+  // CHECK-SKIP-NOT: s4Test11PublicClassC11internalVarSivM
+  var internalVar = 1
+
+  // CHECK-NO-SKIP: sil [transparent]{{.*}} @$s4Test11PublicClassC9publicVarSivpfi : $@convention(thin) () -> Int {
+  // CHECK-SKIP-NOT: s4Test11PublicClassC9publicVarSivpfi
+  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivg : $@convention(method) (@guaranteed PublicClass) -> Int {
+  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivs : $@convention(method) (Int, @guaranteed PublicClass) -> () {
+  // CHECK: sil [transparent] [serialized]{{.*}} @$s4Test11PublicClassC9publicVarSivM : $@yield_once @convention(method) (@guaranteed PublicClass) -> @yields @inout Int {
+  public var publicVar = 1
+
   // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test11PublicClassC14internalMethodyyF : $@convention(method) (@guaranteed PublicClass) -> () {
   // CHECK-SKIP-NOT: s4Test11PublicClassC14internalMethodyyF
   internal func internalMethod() {}
@@ -106,6 +123,11 @@ extension PublicClass {
   internal func internalMethodInExtension() {}
 }
 
+@frozen public struct FrozenPublicStruct {
+  // CHECK: sil non_abi [transparent] [serialized]{{.*}} @$s4Test18FrozenPublicStructV11internalVarSivpfi : $@convention(thin) () -> Int {
+  var internalVar = 1
+}
+
 // CHECK-NO-SKIP-LABEL: sil_vtable PrivateClass {
 // CHECK-NO-SKIP-NEXT:    #PrivateClass.init!allocator
 // CHECK-NO-SKIP-NEXT:    #PrivateClass.deinit!deallocator
@@ -113,9 +135,20 @@ extension PublicClass {
 // CHECK-SKIP-NOT:      sil_vtable PrivateClass
 
 // CHECK-LABEL:         sil_vtable [serialized] PublicClass {
+// CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!getter
+// CHECK-SKIP-NOT:        #PublicClass.internalVar!getter
+// CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!setter
+// CHECK-SKIP-NOT:        #PublicClass.internalVar!setter
+// CHECK-NO-SKIP-NEXT:    #PublicClass.internalVar!modify
+// CHECK-SKIP-NOT:        #PublicClass.internalVar!modify
+// CHECK-NEXT:            #PublicClass.publicVar!getter
+// CHECK-NEXT:            #PublicClass.publicVar!setter
+// CHECK-NEXT:            #PublicClass.publicVar!modify
 // CHECK-NO-SKIP-NEXT:    #PublicClass.internalMethod
 // CHECK-SKIP-NOT:        #PublicClass.internalMethod
 // CHECK-NO-SKIP-NEXT:    #PublicClass.init!allocator
 // CHECK-SKIP-NOT:        #PublicClass.init!allocator
 // CHECK-NEXT:            #PublicClass.deinit!deallocator
 // CHECK-NEXT:          }
+
+// CHECK:               sil_property #PublicClass.publicVar ()
