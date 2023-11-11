@@ -2075,3 +2075,84 @@ void SemanticDeclAttrsRequest::cacheResult(DeclAttributes attrs) const {
   auto decl = std::get<0>(getStorage());
   const_cast<Decl *>(decl)->setSemanticAttrsComputed(true);
 }
+
+//----------------------------------------------------------------------------//
+// UniqueUnderlyingTypeSubstitutionsRequest computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<SubstitutionMap>
+UniqueUnderlyingTypeSubstitutionsRequest::evaluate(
+    Evaluator &evaluator, const OpaqueTypeDecl *decl) const {
+  // Typechecking the body of a function that is associated with the naming
+  // declaration of an opaque type declaration will have the side-effect of
+  // setting UniqueUnderlyingType on the opaque type declaration.
+  auto typecheckBodyIfNeeded = [](AbstractFunctionDecl *afd) {
+    auto shouldTypecheckFunctionBody = [](AbstractFunctionDecl *afd) -> bool {
+      auto mod = afd->getModuleContext();
+      if (!mod->isMainModule())
+        return true;
+
+      // If the main module has no primary source files then the compilation is
+      // a whole module build and all source files can be typechecked.
+      if (mod->getPrimarySourceFiles().size() == 0)
+        return true;
+
+      auto sf = afd->getParentSourceFile();
+      if (!sf)
+        return true;
+
+      if (sf->isPrimary())
+        return true;
+
+      switch (sf->Kind) {
+      case SourceFileKind::Interface:
+      case SourceFileKind::MacroExpansion:
+      case SourceFileKind::SIL:
+        return true;
+      case SourceFileKind::Main:
+      case SourceFileKind::Library:
+        // Don't typecheck bodies in auxiliary source files.
+        return false;
+      }
+
+      llvm_unreachable("bad SourceFileKind");
+    };
+
+    if (shouldTypecheckFunctionBody(afd))
+      (void)afd->getTypecheckedBody();
+  };
+
+  auto namingDecl = decl->getNamingDecl();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(namingDecl)) {
+    typecheckBodyIfNeeded(afd);
+
+    return decl->UniqueUnderlyingType;
+  }
+
+  if (auto asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
+    asd->visitParsedAccessors([&](AccessorDecl *accessor) {
+      typecheckBodyIfNeeded(accessor);
+    });
+
+    return decl->UniqueUnderlyingType;
+  }
+
+  assert(false && "Unexpected kind of naming decl");
+  return llvm::None;
+}
+
+llvm::Optional<llvm::Optional<SubstitutionMap>>
+UniqueUnderlyingTypeSubstitutionsRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.UniqueUnderlyingTypeComputed)
+    return decl->UniqueUnderlyingType;
+  return llvm::None;
+}
+
+void UniqueUnderlyingTypeSubstitutionsRequest::cacheResult(
+    llvm::Optional<SubstitutionMap> subs) const {
+  auto decl = std::get<0>(getStorage());
+  assert(subs == decl->UniqueUnderlyingType);
+  const_cast<OpaqueTypeDecl *>(decl)
+      ->LazySemanticInfo.UniqueUnderlyingTypeComputed = true;
+}
