@@ -254,3 +254,66 @@ func forcedMap<T, U>(_ source: [T]) -> [U] {
   // CHECK: bb0(%0 : $*U, %1 : $*Never, %2 : $*T)
   return source.typedMap { $0 as! U }
 }
+
+// Witness thunks
+protocol P {
+  associatedtype E: Error
+  func f() throws(E)
+}
+
+struct Res<Success, Failure: Error>: P {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic3ResVyxq_GAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0, τ_0_1 where τ_0_1 : Error> (@in_guaranteed Res<τ_0_0, τ_0_1>) -> @error_indirect τ_0_1
+  // CHECK: bb0(%0 : $*τ_0_1, %1 : $*Res<τ_0_0, τ_0_1>):
+  // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*Res<τ_0_0, τ_0_1>
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic3ResV1fyyq_YKF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_1 : Error> (Res<τ_0_0, τ_0_1>) -> @error_indirect τ_0_1
+  // CHECK-NEXT: [[INNER_ERROR_BOX:%.*]] = alloc_stack $τ_0_1
+  // CHECK-NEXT: try_apply [[WITNESS]]<τ_0_0, τ_0_1>([[INNER_ERROR_BOX]], [[SELF]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_1 : Error> (Res<τ_0_0, τ_0_1>) -> @error_indirect τ_0_1, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK: dealloc_stack [[INNER_ERROR_BOX]] : $*τ_0_1
+
+  // CHECK: [[ERROR_BB]]:
+  // CHECK: throw_addr
+  func f() throws(Failure) { }
+}
+
+struct TypedRes<Success>: P {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic8TypedResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed TypedRes<τ_0_0>) -> @error_indirect MyError
+  // CHECK: bb0(%0 : $*MyError, %1 : $*TypedRes<τ_0_0>)
+  // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*TypedRes<τ_0_0>
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic8TypedResV1fyyAA7MyErrorOYKF : $@convention(method) <τ_0_0> (TypedRes<τ_0_0>) -> @error MyError
+  // CHECK: try_apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (TypedRes<τ_0_0>) -> @error MyError, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK: return
+
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : $MyError):
+  // CHECK-NEXT: store [[ERROR]] to [trivial] %0 : $*MyError
+  // CHECK-NEXT: throw_addr
+  func f() throws(MyError) { }
+}
+
+struct UntypedRes<Success>: P {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic10UntypedResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed UntypedRes<τ_0_0>) -> @error_indirect any Error
+  // CHECK: bb0(%0 : $*any Error, %1 : $*UntypedRes<τ_0_0>):
+  // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*UntypedRes<τ_0_0>
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic10UntypedResV1fyyKF : $@convention(method) <τ_0_0> (UntypedRes<τ_0_0>) -> @error any Error
+  // CHECK: try_apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (UntypedRes<τ_0_0>) -> @error any Error, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+
+  // CHECK: [[NORMAL_BB]]
+  // CHECK: return
+
+  // CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+  // CHECK-NEXT: store [[ERROR]] to [init] %0 : $*any Error
+  // CHECK-NEXT: throw_addr
+  func f() throws { }
+}
+
+struct InfallibleRes<Success>: P {
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s20typed_throws_generic13InfallibleResVyxGAA1PA2aEP1fyy1EQzYKFTW : $@convention(witness_method: P) <τ_0_0> (@in_guaranteed InfallibleRes<τ_0_0>) -> @error_indirect any Error
+  // CHECK: bb0(%0 : $*any Error, %1 : $*InfallibleRes<τ_0_0>):
+  // CHECK: [[SELF:%.*]] = load [trivial] %1 : $*InfallibleRes<τ_0_0>
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s20typed_throws_generic13InfallibleResV1fyyF : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>) -> ()
+  // CHECK: = apply [[WITNESS]]<τ_0_0>([[SELF]]) : $@convention(method) <τ_0_0> (InfallibleRes<τ_0_0>)
+  func f() { }
+}

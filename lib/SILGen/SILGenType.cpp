@@ -758,7 +758,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
     CanAnyFunctionType::get(genericSig,
                             reqtSubstTy->getParams(),
                             reqtSubstTy.getResult(),
-                            reqtOrigTy->getExtInfo());
+                            reqtSubstTy->getExtInfo());
 
   // Coroutine lowering requires us to provide these substitutions
   // in order to recreate the appropriate yield types for the accessor
