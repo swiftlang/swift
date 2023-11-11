@@ -47,6 +47,7 @@ extension Parser.ExperimentalFeatures {
     mapFeature(.TypedThrows, to: .typedThrows)
     mapFeature(.DoExpressions, to: .doExpressions)
     mapFeature(.NonEscapableTypes, to: .nonEscapableTypes)
+    mapFeature(.GlobalConcurrency, to: .globalConcurrency)
   }
 }
 
