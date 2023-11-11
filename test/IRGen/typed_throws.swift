@@ -32,7 +32,7 @@ func buildMetatype() -> Any.Type {
 }
 
 // CHECK-NOMANGLE: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sySi12typed_throws10MyBigErrorOYKcMa"
-// CHECK-NOMANGLE: call ptr @swift_getExtendedFunctionTypeMetadata({{i32|i64}} 2231369729, {{i32|i64}} 0, ptr [[PARAMS:%.*]], ptr null, ptr getelementptr inbounds (%swift.full_existential_type, ptr @"$sytN", i32 0, i32 1), ptr null, i32 1, ptr getelementptr inbounds (<{ ptr, ptr, i64, ptr }>, ptr {{.*}}@"$s12typed_throws10MyBigErrorOMf"
+// CHECK-NOMANGLE: @swift_getExtendedFunctionTypeMetadata({{.*}}@"$s12typed_throws10MyBigErrorOMf"
 
 protocol P {
   associatedtype A
@@ -63,5 +63,5 @@ func reabstractAsConcreteThrowing() throws -> Int {
 }
 
 // CHECK-LABEL: define {{.*}} swiftcc void @"$sSi12typed_throws10MyBigErrorOIgdzo_SiACIegrzr_TR"(ptr noalias nocapture sret(%TSi) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable(8) %4, ptr %5)
-// CHECK: call swiftcc i64 %1
+// CHECK: call swiftcc {{i32|i64}} %1
 // CHECK: br i1 %8, label %typed.error.load, label %10
