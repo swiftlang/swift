@@ -2050,7 +2050,8 @@ DeclAttributes SemanticDeclAttrsRequest::evaluate(Evaluator &evaluator,
                           {});
 
   // Trigger requests that cause additional semantic attributes to be added.
-  if (auto vd = dyn_cast<ValueDecl>(decl)) {
+  if (auto vd = dyn_cast<ValueDecl>(mutableDecl)) {
+    (void)getActorIsolation(vd);
     (void)vd->isDynamic();
     (void)vd->isFinal();
   }
