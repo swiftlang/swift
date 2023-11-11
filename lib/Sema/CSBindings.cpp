@@ -602,17 +602,45 @@ void BindingSet::finalize(
 
       std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
 
-      if (!isValid) {
-        // If key path is invalid we have to drop all the contextual
-        // bindings, none of the could be used unless capability is
-        // known.
-        Bindings.clear();
+      // Key path literal is not yet sufficiently resolved.
+      if (isValid && !capability)
+        return;
 
-        // If one of the references in a key path is invalid let's add
-        // a placeholder binding in diagnostic mode to indicate that
-        // the key path cannot be properly resolved.
-        if (CS.shouldAttemptFixes()) {
-          auto rootTy = CS.getKeyPathRootType(keyPath);
+      // If the key path is sufficiently resolved we can add inferred binding
+      // to the set.
+      SmallSetVector<PotentialBinding, 4> updatedBindings;
+      for (const auto &binding : Bindings) {
+        auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+
+        assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
+
+        // Functions don't have capability so we can simply add them.
+        if (bindingTy->is<FunctionType>())
+          updatedBindings.insert(binding);
+      }
+
+      // Note that even though key path literal maybe be invalid it's
+      // still the best course of action to use contextual function type
+      // bindings because they allow to propagate type information from
+      // the key path into the context, so key path bindings are addded
+      // only if there is absolutely no other choice.
+      if (updatedBindings.empty()) {
+        auto rootTy = CS.getKeyPathRootType(keyPath);
+
+        // A valid key path literal.
+        if (capability) {
+          // Note that the binding is formed using root & value
+          // type variables produced during constraint generation
+          // because at this point root is already known (otherwise
+          // inference wouldn't been able to determine key path's
+          // capability) and we always want to infer value from
+          // the key path and match it to a contextual type to produce
+          // better diagnostics.
+          auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
+                                          CS.getKeyPathValueType(keyPath));
+          updatedBindings.insert(
+              {keyPathTy, AllowedBindingKind::Exact, keyPathLoc});
+        } else if (CS.shouldAttemptFixes()) {
           // If key path is structurally correct and has a resolved root
           // type, let's promote the fallback type into a binding because
           // root would have been inferred from explicit type already and
@@ -625,52 +653,18 @@ void BindingSet::finalize(
               return entry.second->getKind() == ConstraintKind::FallbackType;
             });
             assert(fallback != Defaults.end());
-            addBinding(
+            updatedBindings.insert(
                 {fallback->first, AllowedBindingKind::Exact, fallback->second});
           } else {
-            addBinding(PotentialBinding::forHole(
+            updatedBindings.insert(PotentialBinding::forHole(
                 TypeVar, CS.getConstraintLocator(
                              keyPath, ConstraintLocator::FallbackType)));
           }
         }
-
-        // No need for fallback if key path is invalid.
-        Defaults.clear();
-        return;
       }
 
-      // If the key path is sufficiently resolved we can add inferred binding
-      // to the set.
-      if (capability) {
-        SmallSetVector<PotentialBinding, 4> updatedBindings;
-        for (const auto &binding : Bindings) {
-          auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
-
-          assert(isKnownKeyPathType(bindingTy) ||
-                 bindingTy->is<FunctionType>());
-
-          // Functions don't have capability so we can simply add them.
-          if (bindingTy->is<FunctionType>())
-            updatedBindings.insert(binding);
-        }
-
-        // Note that the binding is formed using root & value
-        // type variables produced during constraint generation
-        // because at this point root is already known (otherwise
-        // inference wouldn't been able to determine key path's
-        // capability) and we always want to infer value from
-        // the key path and match it to a contextual type to produce
-        // better diagnostics.
-        auto keyPathTy =
-            getKeyPathType(ctx, *capability, CS.getKeyPathRootType(keyPath),
-                           CS.getKeyPathValueType(keyPath));
-
-        updatedBindings.insert(
-            {keyPathTy, AllowedBindingKind::Exact, keyPathLoc});
-
-        Bindings = std::move(updatedBindings);
-        Defaults.clear();
-      }
+      Bindings = std::move(updatedBindings);
+      Defaults.clear();
 
       return;
     }
