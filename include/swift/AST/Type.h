@@ -541,6 +541,7 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
+  TypeDecl *getAnyTypeDecl() const;
 
   bool isForeignReferenceType(); // in Types.h
 
