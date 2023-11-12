@@ -115,6 +115,12 @@ public protocol PublicProtoWithAssociatedType {
   func req() throws -> Int
 }
 
+extension MainActorProtocol {
+  public func req() throws -> Int {
+    return 1
+  }
+}
+
 protocol InternalProtoWithAssociatedType {
   associatedtype A
   func internalReq() -> A

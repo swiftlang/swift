@@ -146,7 +146,7 @@ static bool isInObjCImpl(const ValueDecl *VD) {
 /// be complete (for example, when printing a .swiftinterface). In other
 /// contexts, though, triggering type checking could cause re-entrancy and
 /// should be avoided.
-static bool shouldTypeCheck(const PrintOptions &options) {
+static bool shouldPrintAllSemanticDetails(const PrintOptions &options) {
   if (options.IsForSwiftInterface)
     return true;
 
@@ -1150,7 +1150,11 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
 
-  auto attrs = D->getSemanticAttrs();
+  // Force semantic attrs to be computed if appropriate.
+  if (shouldPrintAllSemanticDetails(Options))
+    (void)D->getSemanticAttrs();
+
+  auto attrs = D->getAttrs();
 
   // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
@@ -2259,7 +2263,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   }
 
   // Force implicit accessors to be created if they haven't been already.
-  if (shouldTypeCheck(Options)) {
+  if (shouldPrintAllSemanticDetails(Options)) {
     ASD->visitEmittedAccessors([](AccessorDecl *accessor) {
       (void)accessor;
     });
@@ -3900,7 +3904,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     auto *pattern = decl->getPattern(idx);
 
     // Force the entry to be typechecked before attempting to print.
-    if (shouldTypeCheck(Options) && !pattern->hasType())
+    if (shouldPrintAllSemanticDetails(Options) && !pattern->hasType())
       (void)decl->getCheckedPatternBindingEntry(idx);
 
     if (!shouldPrintPattern(pattern))
