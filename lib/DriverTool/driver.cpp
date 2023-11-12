@@ -122,11 +122,9 @@ extern int swift_parse_test_main(ArrayRef<const char *> Args, const char *Argv0,
 /// and 'swift-test', respectively.
 ///
 /// \param ExecName The name of the argv[0] we were invoked as.
-/// \param SubcommandName On success, the full name of the subcommand to invoke.
 /// \param Args On return, the adjusted program arguments to use.
 /// \returns True if running as a subcommand.
 static bool shouldRunAsSubcommand(StringRef ExecName,
-                                  SmallString<256> &SubcommandName,
                                   const ArrayRef<const char *> Args) {
   assert(!Args.empty());
 
@@ -147,19 +145,11 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
       FirstArg.contains('/'))
     return false;
 
-  // Otherwise, we should have some sort of subcommand. Get the subcommand name
-  // and remove it from the program arguments.
-  StringRef Subcommand = Args[1];
-
   // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
-  if (Subcommand == "repl") {
+  if (StringRef(Args[1]) == "repl") {
     return false;
   }
-
-  // Form the subcommand name.
-  SubcommandName.assign("swift-");
-  SubcommandName.append(Subcommand);
 
   return true;
 }
@@ -461,46 +451,37 @@ int swift::mainEntry(int argc_, const char **argv_) {
   const char **ThrowawayExpandedArgv = ExpandedArgs.data();
   PROGRAM_START(ThrowawayExpandedArgc, ThrowawayExpandedArgv);
   ArrayRef<const char *> argv(ExpandedArgs);
+  ArrayRef<const char *> originalArgv(argv_, &argv_[argc_]);
 
   PrettyStackTraceSwiftVersion versionStackTrace;
 
-  // Check if this invocation should execute a subcommand.
+  // Always forward subcommand invocations to the new driver.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);
-  SmallString<256> SubcommandName;
-  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv)) {
-    // Preserve argv for the stack trace.
-    SmallVector<const char *, 256> subCommandArgs(argv.begin(), argv.end());
-    subCommandArgs.erase(&subCommandArgs[1]);
-    // We are running as a subcommand, try to find the subcommand adjacent to
-    // the executable we are running as.
-    SmallString<256> SubcommandPath(SubcommandName);
-    auto result = llvm::sys::findProgramByName(SubcommandName,
-      { llvm::sys::path::parent_path(getExecutablePath(argv[0])) });
-    if (!result.getError()) {
-      SubcommandPath = *result;
-    } else {
-      // If we didn't find the tool there, let the OS search for it.
-      result = llvm::sys::findProgramByName(SubcommandName);
-      // Search for the program and use the path if found. If there was an
-      // error, ignore it and just let the exec fail.
-      if (!result.getError())
-        SubcommandPath = *result;
+  if (shouldRunAsSubcommand(ExecName, argv)) {
+    std::string ExecPath = getExecutablePath(argv[0]);
+    SmallString<256> NewDriverPath(llvm::sys::path::parent_path(ExecPath));
+    if (appendSwiftDriverName(NewDriverPath) &&
+        llvm::sys::fs::exists(NewDriverPath)) {
+      std::vector<const char *> subCommandArgs;
+      SmallString<256> NewArgv0(llvm::sys::path::parent_path(ExecPath));
+      llvm::sys::path::append(NewArgv0, "swift");
+      subCommandArgs.push_back(NewArgv0.c_str());
+      subCommandArgs.insert(subCommandArgs.end(),
+                              originalArgv.begin() + 1, originalArgv.end());
+
+      // Execute the subcommand.
+      subCommandArgs.push_back(nullptr);
+      ExecuteInPlace(NewDriverPath.c_str(), subCommandArgs.data());
+
+      // If we reach here then an error occurred (typically a missing path).
+      std::string ErrorString = llvm::sys::StrError();
+      llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
+                   << " (" << ErrorString << ")\n";
+      return 2;
     }
-
-    // Rewrite the program argument.
-    subCommandArgs[0] = SubcommandPath.c_str();
-
-    // Execute the subcommand.
-    subCommandArgs.push_back(nullptr);
-    ExecuteInPlace(SubcommandPath.c_str(), subCommandArgs.data());
-
-    // If we reach here then an error occurred (typically a missing path).
-    std::string ErrorString = llvm::sys::StrError();
-    llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
-                 << " (" << ErrorString << ")\n";
+    llvm::errs() << "error: unable to find swift-driver to invoke subcommand\n";
     return 2;
   }
 
-  ArrayRef<const char *> originalArgv(argv_, &argv_[argc_]);
   return run_driver(ExecName, argv, originalArgv);
 }
