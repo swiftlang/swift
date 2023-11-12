@@ -897,7 +897,7 @@ void SILGenFunction::collectThunkParams(
 static llvm::Optional<SILValue>
 emitThunkIndirectErrorArgument(SILGenFunction &SGF, SILLocation loc,
                                CanSILFunctionType fnType) {
-  // If the function we're calling has as indirect error result, create an
+  // If the function we're calling has an indirect error result, create an
   // argument for it.
   auto innerError = fnType->getOptionalErrorResult();
   if (!innerError || innerError->getConvention() != ResultConvention::Indirect)
@@ -4876,7 +4876,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                      outputSubstType.getResult(),
                      fnType, thunkType);
 
-  // If the function we're calling has as indirect error result, create an
+  // If the function we're calling has an indirect error result, create an
   // argument for it.
   if (auto innerIndirectErrorAddr =
           emitThunkIndirectErrorArgument(SGF, loc, fnType)) {
@@ -6216,7 +6216,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
                         inputSubstType.getResult(),
                         derivedFTy, thunkTy);
 
-    // If the function we're calling has as indirect error result, create an
+    // If the function we're calling has an indirect error result, create an
     // argument for it.
     if (auto innerIndirectErrorAddr =
             emitThunkIndirectErrorArgument(*this, loc, derivedFTy)) {
@@ -6607,7 +6607,7 @@ void SILGenFunction::emitProtocolWitness(
                         reqtSubstTy.getResult(),
                         witnessFTy, thunkTy);
 
-    // If the function we're calling has as indirect error result, create an
+    // If the function we're calling has an indirect error result, create an
     // argument for it.
     if (auto innerIndirectErrorAddr =
             emitThunkIndirectErrorArgument(*this, loc, witnessFTy)) {

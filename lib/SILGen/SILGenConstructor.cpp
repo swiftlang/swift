@@ -936,6 +936,22 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Forward the constructor arguments.
   // FIXME: Handle 'self' along with the other body patterns.
   SmallVector<SILValue, 8> args;
+
+  // If the function we're calling has an indirect error result, create an
+  // argument for it.
+  if (F.getConventions().hasIndirectSILErrorResults()) {
+    assert(F.getConventions().getNumIndirectSILErrorResults() == 1);
+    auto paramTy = F.mapTypeIntoContext(
+                       F.getConventions().getSILErrorType(getTypeExpansionContext()));
+    auto inContextParamTy = F.getLoweredType(paramTy.getASTType())
+                                .getCategoryType(paramTy.getCategory());
+    SILArgument *arg = F.begin()->createFunctionArgument(inContextParamTy);
+
+    IndirectErrorResult = arg;
+
+    args.push_back(arg);
+  }
+
   bindParametersForForwarding(ctor->getParameters(), args);
 
   if (ctor->requiresUnavailableDeclABICompatibilityStubs())
