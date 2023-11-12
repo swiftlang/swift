@@ -115,3 +115,15 @@ func throwsConcreteWithDoCatchTypedRethrow() throws(MyError) {
   // CHECK: [[DEFAULT_BB]]:
   // CHECK-NEXT: throw [[ERROR]] : $MyError
 }
+
+open class MyClass {
+  // CHECK-LABEL: sil [serialized] [exact_self_class] [ossa] @$s12typed_throws7MyClassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC : $@convention(method) <E where E : Error> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, @thick MyClass.Type) -> (@owned MyClass, @error_indirect E)
+  // CHECK: bb0(%0 : $*E, %1 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>, %2 : $@thick MyClass.Type):
+  // CHECK: try_apply{{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+  // CHECK: [[NORMAL_BB]]([[SELF:%.*]] : @owned $MyClass):
+  // CHECK-NEXT: return [[SELF]] : $MyClass
+  // CHECK: [[ERROR_BB]]:
+  // CHECK-NEXT: throw_addr
+  public init<E>(body: () throws(E) -> Void) throws(E) {
+  }
+}
