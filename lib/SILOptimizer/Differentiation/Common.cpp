@@ -37,16 +37,28 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v) {
     ptai = dyn_cast<PointerToAddressInst>(iai->getOperand(0));
   if (!ptai)
     return nullptr;
-  auto *mdi = dyn_cast<MarkDependenceInst>(
-      ptai->getOperand()->getDefiningInstruction());
-  if (!mdi)
-    return nullptr;
   // Return the `array.uninitialized_intrinsic` application, if it exists.
   if (auto *dti = dyn_cast<DestructureTupleInst>(
-          mdi->getValue()->getDefiningInstruction()))
+          ptai->getOperand()->getDefiningInstruction()))
     return ArraySemanticsCall(dti->getOperand(),
                               semantics::ARRAY_UNINITIALIZED_INTRINSIC);
   return nullptr;
+}
+
+DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
+  bool foundDestructureTupleUser = false;
+  if (!value->getType().is<TupleType>())
+    return nullptr;
+  DestructureTupleInst *result = nullptr;
+  for (auto *use : value->getUses()) {
+    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+      assert(!foundDestructureTupleUser &&
+             "There should only be one `destructure_tuple` user of a tuple");
+      foundDestructureTupleUser = true;
+      result = dti;
+    }
+  }
+  return result;
 }
 
 bool isSemanticMemberAccessor(SILFunction *original) {
@@ -97,7 +109,7 @@ void forEachApplyDirectResult(
       resultCallback(ai);
       return;
     }
-    if (auto *dti = ai->getSingleUserOfType<DestructureTupleInst>())
+    if (auto *dti = getSingleDestructureTupleUser(ai))
       for (auto directResult : dti->getResults())
         resultCallback(directResult);
     break;

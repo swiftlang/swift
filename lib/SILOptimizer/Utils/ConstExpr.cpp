@@ -528,9 +528,6 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *convertEscapeInst = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return getConstantValue(convertEscapeInst->getOperand());
 
-  if (auto *mdi = dyn_cast<MarkDependenceInst>(value))
-    return getConstantValue(mdi->getValue());
-
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
