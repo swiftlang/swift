@@ -138,3 +138,11 @@ func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
     throw .forgot
   }
 }
+
+// "Rethrow-like" functions are only allowed to be called from rethrows
+// functions as a compatibility hack, which is removed under FullTypedThrows.
+func rethrowsLike<E>(_ body: () throws(E) -> Void) throws(E) { }
+
+func fromRethrows(body: () throws -> Void) rethrows {
+  try rethrowsLike(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}

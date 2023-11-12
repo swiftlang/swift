@@ -637,6 +637,59 @@ static Expr *removeErasureToExistentialError(Expr *expr) {
   return expr;
 }
 
+/// Determine whether the given function uses typed throws in a manner
+/// than is structurally similar to 'rethrows', e.g.,
+///
+/// \code
+/// func map<T, E>(_ body: (Element) throws(E) -> T) throws(E) -> [T]
+/// \endcode
+static bool isRethrowLikeTypedThrows(AbstractFunctionDecl *func) {
+  // This notion is only for compatibility in Swift 5 and is disabled
+  // when FullTypedThrows is enabled.
+  ASTContext &ctx = func->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::FullTypedThrows))
+    return false;
+
+  // It must have a thrown error type...
+  auto thrownError = func->getThrownInterfaceType();
+  if (!thrownError)
+    return false;
+
+  /// ... that is a generic parameter type (call it E)
+  auto thrownErrorGP = thrownError->getAs<GenericTypeParamType>();
+  if (!thrownErrorGP)
+    return false;
+
+  /// ... of the generic function.
+  auto genericParams = func->getGenericParams();
+  if (!genericParams ||
+      thrownErrorGP->getDepth() !=
+          genericParams->getParams().front()->getDepth())
+    return false;
+
+  // E: Error must be the only conformance requirement on the generic parameter.
+  auto genericSig = func->getGenericSignature();
+  if (!genericSig)
+    return false;
+
+  auto requiredProtocols = genericSig->getRequiredProtocols(thrownErrorGP);
+  if (requiredProtocols.size() != 1 ||
+      requiredProtocols[0]->getKnownProtocolKind() != KnownProtocolKind::Error)
+    return false;
+
+  // Any parameters that are of throwing function type must also throw 'E'.
+  for (auto param : *func->getParameters()) {
+    auto paramTy = param->getInterfaceType();
+    if (auto paramFuncTy = paramTy->getAs<AnyFunctionType>()) {
+      if (auto paramThrownErrorTy = paramFuncTy->getEffectiveThrownErrorType())
+        if (!(*paramThrownErrorTy)->isEqual(thrownError))
+          return false;
+    }
+  }
+
+  return true;
+}
+
 /// A type expressing the result of classifying whether a call or function
 /// throws or is async.
 class Classification {
@@ -1090,7 +1143,7 @@ public:
       }
 
       // Handle rethrowing and reasync functions.
-      switch (fnRef.getPolymorphicEffectKind(kind)) {
+      switch (auto polyKind = fnRef.getPolymorphicEffectKind(kind)) {
       case PolymorphicEffectKind::ByConformance: {
         auto substitutions = fnRef.getSubstitutions();
         for (auto conformanceRef : substitutions.getConformances())
@@ -1100,6 +1153,20 @@ public:
         // closure arguments too.
         LLVM_FALLTHROUGH;
       }
+
+      case PolymorphicEffectKind::Always:
+        if (polyKind == PolymorphicEffectKind::ByConformance) {
+          LLVM_FALLTHROUGH;
+        } else if (RethrowsDC &&
+            fnRef.getKind() == AbstractFunction::Function &&
+            isRethrowLikeTypedThrows(fnRef.getFunction())) {
+          // If we are in a rethrowing context and the function we're referring
+          // to is a rethrow-like function using typed throws, then look at all
+          // of the closure arguments.
+          LLVM_FALLTHROUGH;
+        } else {
+          break;
+        }
 
       case PolymorphicEffectKind::ByClosure: {
         // We need to walk the original parameter types in parallel
@@ -1123,8 +1190,9 @@ public:
           auto argClassification = classifyArgument(
               args->getExpr(i), params[i].getParameterType(), kind);
 
-          // Rethrows is untyped, so
-          if (kind == EffectKind::Throws) {
+          // Rethrows is untyped, so adjust the thrown error type.
+          if (kind == EffectKind::Throws &&
+              polyKind == PolymorphicEffectKind::ByClosure) {
             argClassification = argClassification.promoteToUntypedThrows();
           }
 
@@ -1135,7 +1203,6 @@ public:
       }
 
       case PolymorphicEffectKind::None:
-      case PolymorphicEffectKind::Always:
       case PolymorphicEffectKind::Invalid:
         break;
       }
@@ -1282,8 +1349,15 @@ private:
     // within the rethrows context.
     if (!isLocallyDefinedInPolymorphicEffectDeclContext(fn, kind) ||
         !fn->hasBody()) {
+      auto conditional = ConditionalEffectKind::Always;
+
+      // If we are within a rethrows context prior, treat some typed-throws
+      // functions as conditionally throwing.
+      if (RethrowsDC && isRethrowLikeTypedThrows(fn))
+        conditional = ConditionalEffectKind::Conditional;
+
       return Classification::forDeclRef(
-          ConcreteDeclRef(fn, subs), ConditionalEffectKind::Always, reason)
+          ConcreteDeclRef(fn, subs), conditional, reason)
             .onlyEffect(kind);
     }
 
