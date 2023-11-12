@@ -1648,6 +1648,14 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
 
 void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
+  // The SIL emitted for property init expressions is only needed by clients of
+  // resilient modules if the property belongs to a frozen type. When
+  // -experimental-skip-non-exportable-decls is specified, skip emitting
+  // property inits if possible.
+  if (M.getOptions().SkipNonExportableDecls &&
+      !pbd->getAnchoringVarDecl(i)->isInitExposedToClients())
+    return;
+
   auto *var = pbd->getAnchoringVarDecl(i);
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(constant);
