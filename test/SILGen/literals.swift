@@ -52,8 +52,7 @@ class TakesArrayLiteral<Element> : ExpressibleByArrayLiteral {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Int>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: store [[TMP:%.*]] to [trivial] [[POINTER]]
 // CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [[POINTER1:%.*]] = index_addr [[POINTER]] : $*Int, [[IDX1]] : $Builtin.Word
@@ -77,8 +76,7 @@ class Klass {}
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Klass>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[KLASS_METATYPE:%.*]] = metatype $@thick Klass.Type
 // CHECK: [[CTOR:%.*]] = function_ref @$s8literals5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
 // CHECK: [[TMP:%.*]] = apply [[CTOR]]([[KLASS_METATYPE]]) : $@convention(method) (@thick Klass.Type) -> @owned Klass
@@ -102,8 +100,7 @@ struct Foo<T> {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo<T>>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
@@ -120,8 +117,7 @@ func returnsAddressOnlyElementArray<T>(t: Foo<T>) -> TakesArrayLiteral<Foo<T>> {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo<T>>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: copy_addr %0 to [init] [[POINTER]] : $*Foo<T>
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF
 // CHECK: [[FIN_ARR:%.*]] = apply [[FIN_FN]]<Foo<T>>([[ARR]])
@@ -140,8 +136,7 @@ extension Foo {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo<T>>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Foo<T>
 // CHECK: copy_addr [[ACCESS]] to [init] [[POINTER]] : $*Foo<T>
 // CHECK: end_access [[ACCESS]] : $*Foo<T>
@@ -166,8 +161,7 @@ struct Foo2 {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<Foo2>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[METATYPE_FOO2:%.*]] = metatype $@thin Foo2.Type
 // CHECK: [[METATYPE_KLASS:%.*]] = metatype $@thick Klass.Type
 // CHECK: [[CTOR:%.*]] = function_ref @$s8literals5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass
@@ -191,8 +185,7 @@ func returnsNonTrivialStruct() -> TakesArrayLiteral<Foo2> {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<NestedLValuePath>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0 : $*NestedLValuePath
 // CHECK: [[OTHER_FN:%.*]] = function_ref @$s8literals16NestedLValuePathV21otherMutatingFunctionACyF : $@convention(method) (@inout NestedLValuePath) -> @owned NestedLValuePath
@@ -230,8 +223,7 @@ protocol WrapsSelfInArray {}
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<any WrapsSelfInArray>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %0 : $*Self
 // CHECK: [[EXISTENTIAL:%.*]] = init_existential_addr [[POINTER]] : $*any WrapsSelfInArray, $Self
 // CHECK: copy_addr [[ACCESS]] to [init] [[EXISTENTIAL]] : $*Self
@@ -260,8 +252,7 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<T>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[POINTER:%.*]] = pointer_to_address [[MDI]]
+// CHECK: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]]
 // CHECK: [[FN:%.*]] = function_ref @$s8literals9makeBasicxyAA11FooProtocolRzlF : $@convention(thin)
 // CHECK: [[TMP:%.*]] = apply [[FN]]<T>([[POINTER]])
 // CHECK: [[IDX:%.*]] = integer_literal $Builtin.Word, 1
@@ -294,8 +285,7 @@ class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
 // CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<(Int, Int)>([[ARRAY_LENGTH]])
 // CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
-// CHECK: [[MDI:%.*]] = mark_dependence [[ADDRESS]]
-// CHECK: [[TUPLE_ADDR:%.*]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*(Int, Int)
+// CHECK: [[TUPLE_ADDR:%.*]] = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*(Int, Int)
 // CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
 // CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 1
 // CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int

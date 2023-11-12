@@ -616,13 +616,6 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       AllUsers.insert(User);
       continue;
     }
-    if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
-      if (!recursivelyCollectInteriorUses(MDI, AddressNode,
-                                          IsInteriorAddress)) {
-        return false;
-      }
-      continue;
-    }
     if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
       // Only one pointer-to-address is allowed for safety.
       if (SeenPtrToAddr)
@@ -1170,15 +1163,9 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
-  auto *ARI = dyn_cast<AllocRefInst>(AI->getArgument(0));
-
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
-  }
-
-  if (ARI) {
-    deleter.forceDeleteWithUsers(ARI);
   }
 
   ++DeadAllocApplyEliminated;
