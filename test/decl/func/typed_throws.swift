@@ -154,3 +154,28 @@ func rethrowingFunc(body: () throws -> Void) rethrows { }
 func typedCallsRethrowingFunc<E>(body: () throws(E) -> Void) throws(E) {
   try rethrowingFunc(body: body) // expected-error{{thrown expression type 'any Error' cannot be converted to error type 'E'}}
 }
+
+// Compatibility feature: calls from a rethrows function to a rethrows-like
+// function using typed throws are permitted.
+func rethrowsLike<E>(_ body: () throws(E) -> Void) throws(E) { }
+
+protocol P { }
+
+func notRethrowsLike1<E: P>(_ body: () throws(E) -> Void) throws(E) { }
+// expected-note@-1{{required by global function 'notRethrowsLike1' where 'E' = 'any Error'}}
+
+func notRethrowsLike2<E>(_ body: () throws(E) -> Void) throws { }
+func notRethrowsLike3<E>(_ body: () throws(E) -> Void, defaulted: () throws -> Void = {}) throws(E) { }
+
+func fromRethrows(body: () throws -> Void) rethrows {
+  try rethrowsLike(body)
+
+  try rethrowsLike(hasThrownMyError) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  // expected-note@-1{{call is to 'rethrows' function, but argument function can throw}}
+
+  try notRethrowsLike1(body) // expected-error{{type 'any Error' cannot conform to 'P'}}
+  // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  try notRethrowsLike2(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  try notRethrowsLike3(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
