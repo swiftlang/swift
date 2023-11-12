@@ -50,8 +50,52 @@ func isTypeMigrated(_ node: TypeSyntax) -> Bool {
   }
 }
 
-
 extension ASTGenVisitor {
+  func generate(type node: TypeSyntax) -> BridgedTypeRepr {
+    guard isTypeMigrated(node) else {
+      return self.generateWithLegacy(node)
+    }
+    switch node.as(TypeSyntaxEnum.self) {
+    case .arrayType(let node):
+      return self.generate(node)
+    case .attributedType(let node):
+      return self.generate(node)
+    case .classRestrictionType:
+      break
+    case .compositionType(let node):
+      return self.generate(node)
+    case .dictionaryType(let node):
+      return self.generate(node)
+    case .functionType(let node):
+      return self.generate(node)
+    case .identifierType(let node):
+      return self.generate(node)
+    case .implicitlyUnwrappedOptionalType(let node):
+      return self.generate(node)
+    case .memberType(let node):
+      return self.generate(node)
+    case .metatypeType(let node):
+      return self.generate(node)
+    case .missingType:
+      break
+    case .namedOpaqueReturnType(let node):
+      return self.generate(node)
+    case .optionalType(let node):
+      return self.generate(node)
+    case .packElementType:
+      break
+    case .packExpansionType(let node):
+      return self.generate(node)
+    case .someOrAnyType(let node):
+      return self.generate(node)
+    case .suppressedType:
+      break
+    case .tupleType(let node):
+      return self.generate(node)
+    }
+    preconditionFailure("isTypeMigrated() mismatch")
+  }
+
   public func generate(_ node: IdentifierTypeSyntax) -> BridgedTypeRepr {
     let loc = node.bridgedSourceLoc(in: self)
 
@@ -67,7 +111,7 @@ extension ASTGenVisitor {
     }
 
     let genericArguments = generics.arguments.lazy.map {
-      self.generate($0.argument)
+      self.generate(type: $0.argument)
     }
 
     return BridgedGenericIdentTypeRepr.createParsed(
@@ -90,7 +134,7 @@ extension ASTGenVisitor {
 
       if let generics = memberType.genericArgumentClause {
         let genericArguments = generics.arguments.lazy.map {
-          self.generate($0.argument)
+          self.generate(type: $0.argument)
         }
 
         reverseMemberComponents.append(
@@ -112,7 +156,7 @@ extension ASTGenVisitor {
       baseType = memberType.baseType
     }
 
-    let baseComponent = generate(baseType)
+    let baseComponent = generate(type: baseType)
     let memberComponents = reverseMemberComponents.reversed().bridgedArray(in: self)
 
     return BridgedMemberTypeRepr.createParsed(
@@ -123,7 +167,7 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: ArrayTypeSyntax) -> BridgedTypeRepr {
-    let elementType = generate(node.element)
+    let elementType = generate(type: node.element)
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
     return BridgedArrayTypeRepr.createParsed(
@@ -135,8 +179,8 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: DictionaryTypeSyntax) -> BridgedTypeRepr {
-    let keyType = generate(node.key)
-    let valueType = generate(node.value)
+    let keyType = generate(type: node.key)
+    let valueType = generate(type: node.value)
     let colonLoc = node.colon.bridgedSourceLoc(in: self)
     let lSquareLoc = node.leftSquare.bridgedSourceLoc(in: self)
     let rSquareLoc = node.rightSquare.bridgedSourceLoc(in: self)
@@ -151,7 +195,7 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: MetatypeTypeSyntax) -> BridgedTypeRepr {
-    let baseType = generate(node.baseType)
+    let baseType = generate(type: node.baseType)
     let tyLoc = node.metatypeSpecifier.bridgedSourceLoc(in: self)
     if node.metatypeSpecifier.text == "Type" {
       return BridgedMetatypeTypeRepr.createParsed(
@@ -170,7 +214,7 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: ImplicitlyUnwrappedOptionalTypeSyntax) -> BridgedTypeRepr {
-    let base = generate(node.wrappedType)
+    let base = generate(type: node.wrappedType)
     let exclaimLoc = node.exclamationMark.bridgedSourceLoc(in: self)
     return BridgedImplicitlyUnwrappedOptionalTypeRepr.createParsed(
       self.ctx,
@@ -180,7 +224,7 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: OptionalTypeSyntax) -> BridgedTypeRepr {
-    let base = generate(node.wrappedType)
+    let base = generate(type: node.wrappedType)
     let questionLoc = node.questionMark.bridgedSourceLoc(in: self)
     return BridgedOptionalTypeRepr.createParsed(
       self.ctx,
@@ -190,7 +234,7 @@ extension ASTGenVisitor {
   }
 
   public func generate(_ node: PackExpansionTypeSyntax) -> BridgedTypeRepr {
-    let base = generate(node.repetitionPattern)
+    let base = generate(type: node.repetitionPattern)
     let repeatLoc = node.repeatKeyword.bridgedSourceLoc(in: self)
     return BridgedPackExpansionTypeRepr.createParsed(
       self.ctx,
@@ -212,7 +256,7 @@ extension ASTGenVisitor {
     assert(node.elements.count > 1)
 
     let types = node.elements.lazy.map {
-      generate($0.type)
+      generate(type: $0.type)
     }
 
     return BridgedCompositionTypeRepr.createParsed(
@@ -236,18 +280,18 @@ extension ASTGenVisitor {
       throwsLoc: (node.effectSpecifiers?.throwsSpecifier).bridgedSourceLoc(in: self),
       thrownType: self.generate(node.effectSpecifiers?.thrownError?.type).asNullable,
       arrowLoc: node.returnClause.arrow.bridgedSourceLoc(in: self),
-      resultType: generate(node.returnClause.type)
+      resultType: generate(type: node.returnClause.type)
     )
   }
 
   public func generate(_ node: NamedOpaqueReturnTypeSyntax) -> BridgedTypeRepr {
-    let baseTy = generate(node.type)
+    let baseTy = generate(type: node.type)
     return BridgedNamedOpaqueReturnTypeRepr.createParsed(self.ctx, base: baseTy)
   }
 
   public func generate(_ node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {
     let someOrAnyLoc = node.someOrAnySpecifier.bridgedSourceLoc(in: self)
-    let baseTy = generate(node.constraint)
+    let baseTy = generate(type: node.constraint)
     if node.someOrAnySpecifier.text == "some" {
       return BridgedOpaqueReturnTypeRepr.createParsed(
         self.ctx,
@@ -286,7 +330,7 @@ extension BridgedAttributedTypeSpecifier {
 
 extension ASTGenVisitor {
   public func generate(_ node: AttributedTypeSyntax) -> BridgedTypeRepr {
-    var type = generate(node.baseType)
+    var type = generate(type: node.baseType)
 
     // Handle specifiers.
     if let specifier = node.specifier {
@@ -366,7 +410,7 @@ extension ASTGenVisitor {
     node.lazy.map { element in
       let (firstName, firstNameLoc) = element.firstName.bridgedIdentifierAndSourceLoc(in: self)
       let (secondName, secondNameLoc) = element.secondName.bridgedIdentifierAndSourceLoc(in: self)
-      var type = generate(element.type)
+      var type = generate(type: element.type)
       if let ellipsis = element.ellipsis {
         type = BridgedVarargTypeRepr.createParsed(
           self.ctx,

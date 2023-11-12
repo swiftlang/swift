@@ -10,7 +10,8 @@
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
-// REQUIRES: rdar116686158
+// rdar://116686158
+// UNSUPPORTED: asan
 
 // NB: Ridiculous formatting to test that we do not include leading trivia in locations.
 

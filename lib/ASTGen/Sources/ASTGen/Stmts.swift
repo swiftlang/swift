@@ -11,10 +11,50 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func generate(_ node: CodeBlockSyntax) -> BridgedBraceStmt {
+  func generate(stmt node: StmtSyntax) -> BridgedStmt {
+    switch node.as(StmtSyntaxEnum.self) {
+    case .breakStmt:
+      break
+    case .continueStmt:
+      break
+    case .deferStmt:
+      break
+    case .discardStmt:
+      break
+    case .doStmt:
+      break
+    case .expressionStmt(let node):
+      return self.generate(node)
+    case .fallThroughStmt:
+      break
+    case .forStmt:
+      break
+    case .guardStmt:
+      break
+    case .labeledStmt:
+      break
+    case .missingStmt:
+      break
+    case .repeatStmt:
+      break
+    case .returnStmt(let node):
+      return self.generate(node).asStmt
+    case .thenStmt:
+      break
+    case .throwStmt:
+      break
+    case .whileStmt:
+      break
+    case .yieldStmt:
+      break
+    }
+    return self.generateWithLegacy(node)
+  }
+
+  public func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
     BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
@@ -31,7 +71,7 @@ extension ASTGenVisitor {
       self.ctx,
       ifKeywordLoc: node.ifKeyword.bridgedSourceLoc(in: self),
       condition: conditions.first!.castToExpr,
-      thenStmt: self.generate(node.body).asStmt,
+      thenStmt: self.generate(codeBlock: node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
       elseStmt: (self.generate(node.elseBody)?.castToStmt).asNullable
     )
