@@ -542,7 +542,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_hasTaskGroupStatusRecord();
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ExecutorRef swift_task_getPreferredTaskExecutor();
+TaskExecutorRef swift_task_getPreferredTaskExecutor();
 
 /// Push an executor preference onto the current task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
