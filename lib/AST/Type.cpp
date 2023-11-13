@@ -5065,6 +5065,28 @@ case TypeKind::Id:
         isUnchanged = false;
     }
 
+    llvm::Optional<ASTExtInfo> extInfo;
+    if (function->hasExtInfo()) {
+      extInfo = function->getExtInfo()
+                    .withGlobalActor(globalActorType)
+                    .withThrows(function->isThrowing(), thrownError);
+
+      // If there was a generic thrown error and it substituted with
+      // 'any Error' or 'Never', map to 'throws' or non-throwing rather than
+      // maintaining the sugar.
+      if (auto origThrownError = function->getThrownError()) {
+        if (origThrownError->isTypeParameter() ||
+            origThrownError->isTypeVariableOrMember()) {
+          // 'any Error'
+          if (thrownError->isEqual(
+                  thrownError->getASTContext().getErrorExistentialType()))
+            extInfo = extInfo->withThrows(true, Type());
+          else if (thrownError->isNever())
+            extInfo = extInfo->withThrows(false, Type());
+        }
+      }
+    }
+
     if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
 #ifndef NDEBUG
       // Check that generic parameters won't be transformed.
@@ -5080,24 +5102,13 @@ case TypeKind::Id:
       if (isUnchanged) return *this;
 
       auto genericSig = genericFnType->getGenericSignature();
-      if (!function->hasExtInfo())
-        return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(
-               genericSig, substParams, resultTy,
-               function->getExtInfo()
-                 .withGlobalActor(globalActorType)
-                 .withThrows(function->isThrowing(), thrownError));
+          genericSig, substParams, resultTy, extInfo);
     }
 
     if (isUnchanged) return *this;
 
-    if (!function->hasExtInfo())
-      return FunctionType::get(substParams, resultTy);
-    return FunctionType::get(
-             substParams, resultTy,
-             function->getExtInfo()
-               .withGlobalActor(globalActorType)
-               .withThrows(function->isThrowing(), thrownError));
+    return FunctionType::get(substParams, resultTy, extInfo);
   }
 
   case TypeKind::ArraySlice: {
