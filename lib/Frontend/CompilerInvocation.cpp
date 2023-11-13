@@ -417,7 +417,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
     if (contents == "spi") {
-      Opts.InterfaceContentMode = InterfaceMode::Private;
+      Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
   }
   for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
@@ -622,11 +622,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableAccessControl
       = A->getOption().matches(OPT_enable_access_control);
   }
-  if (auto A = Args.getLastArg(OPT_experimental_package_interface_load,
-                               OPT_experimental_package_interface_load)) {
-    Opts.EnablePackageInterfaceLoad
-      = A->getOption().matches(OPT_experimental_package_interface_load);
-  }
 
   Opts.ForceWorkaroundBrokenModules
     |= Args.hasArg(OPT_force_workaround_broken_modules);
@@ -636,6 +631,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_bare_slash_regex)) {
     Opts.EnableBareSlashRegexLiterals = true;
     Opts.EnableExperimentalStringProcessing = true;
+  }
+
+  if (Args.hasArg(OPT_experimental_package_interface_load)) {
+    Opts.EnablePackageInterfaceLoad = true;
   }
 
   // Experimental string processing.

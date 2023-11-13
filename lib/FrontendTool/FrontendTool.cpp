@@ -987,7 +987,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPrivateModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add SPI printing.
     ModuleInterfaceOptions privOpts = Invocation.getModuleInterfaceOptions();
-    privOpts.InterfaceContentMode = InterfaceMode::Private;
+    privOpts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     privOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(
@@ -1000,7 +1000,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasPackageModuleInterfaceOutputPath()) {
     // Copy the settings from the module interface to add package decl printing.
     ModuleInterfaceOptions pkgOpts = Invocation.getModuleInterfaceOptions();
-    pkgOpts.InterfaceContentMode = InterfaceMode::Package;
+    pkgOpts.setInterfaceMode(PrintOptions::InterfaceMode::Package);
     pkgOpts.ModulesToSkipInPublicInterface.clear();
 
     hadAnyError |= printModuleInterfaceIfNeeded(

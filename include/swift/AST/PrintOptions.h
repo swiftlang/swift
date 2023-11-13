@@ -118,12 +118,6 @@ struct ShouldPrintChecker {
   virtual ~ShouldPrintChecker() = default;
 };
 
-enum class InterfaceMode : uint8_t {
-  Public, // prints public/inlinable decls
-  Private, // prints SPI and public/inlinable decls
-  Package // prints package, SPI, and public/inlinable decls
-};
-
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -188,6 +182,25 @@ struct PrintOptions {
 
   /// Whether to print enum raw value expressions.
   EnumRawValueMode EnumRawValues = EnumRawValueMode::Skip;
+
+  enum class InterfaceMode : uint8_t {
+    Public, // prints public/inlinable decls
+    Private, // prints SPI and public/inlinable decls
+    Package // prints package, SPI, and public/inlinable decls
+  };
+
+  InterfaceMode InterfaceContentKind;
+
+  bool printPublicInterface() const {
+    return InterfaceContentKind == InterfaceMode::Public;
+  }
+  bool printPackageInterface() const {
+    return InterfaceContentKind == InterfaceMode::Package;
+  }
+
+  void setInterfaceMode(InterfaceMode mode) {
+    InterfaceContentKind = mode;
+  }
 
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -304,8 +317,6 @@ struct PrintOptions {
 
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
-
-  InterfaceMode InterfaceContentMode;
 
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
@@ -689,7 +700,7 @@ struct PrintOptions {
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
-                                              InterfaceMode interfaceContentMode,
+                                              InterfaceMode interfaceMode,
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
