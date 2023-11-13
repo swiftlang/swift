@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-experimental-feature TypedThrows  | %FileCheck %s --check-prefix=CHECK
 
 // XFAIL: CPU=arm64e
+// REQUIRES: PTRSIZE=64
 
 enum MyBigError: Error {
   case epicFail
