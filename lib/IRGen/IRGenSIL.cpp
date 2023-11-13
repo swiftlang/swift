@@ -3787,6 +3787,13 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     // If the error value is non-null, branch to the error destination.
     auto hasError = Builder.CreateICmpNE(errorValue, nullError);
+
+    // Create a dummy use of 'errorValue' in the catch BB to workaround an
+    // LLVM miscompile that ends up taking the wrong branch if there are no
+    // uses of 'errorValue' in the catch block.
+    // FIXME: Remove this when the following radar is fixed: rdar://116636601
+    Builder.CreatePtrToInt(errorValue, IGM.IntPtrTy);
+
     Builder.CreateCondBr(hasError,
                          typedErrorLoadBB ? typedErrorLoadBB : errorDest.bb,
                          normalDest.bb);
@@ -3805,12 +3812,6 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
         errorDest.phis[0]->addIncoming(errorValue, Builder.GetInsertBlock());
     } else {
       Builder.emitBlock(typedErrorLoadBB);
-
-      // Create a dummy use of 'errorValue' in the catch BB to workaround an
-      // LLVM miscompile that ends up taking the wrong branch if there are no
-      // uses of 'errorValue' in the catch block.
-      // FIXME: Remove this when the following radar is fixed: rdar://116636601
-      Builder.CreatePtrToInt(errorValue, IGM.IntPtrTy);
 
       auto &ti = cast<LoadableTypeInfo>(IGM.getTypeInfo(errorType));
       Explosion errorValue;
