@@ -5804,15 +5804,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         return ProtocolConformanceRef(Proto);
     }
 
-    // FIXME: Unify with shouldCreateMissingConformances
-    if (allowMissing &&
-        Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      return ProtocolConformanceRef(
-          M->getASTContext().getBuiltinConformance(
-            T, Proto, BuiltinConformanceKind::Missing));
-    }
-
-    return ProtocolConformanceRef::forInvalid();
+    return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
+                        : ProtocolConformanceRef::forInvalid();
   }
 
   // For non-existential types, this is equivalent to checking conformance.
