@@ -13,6 +13,8 @@
 #ifndef SWIFT_REFLECTION_DESCRIPTOR_FINDER_H
 #define SWIFT_REFLECTION_DESCRIPTOR_FINDER_H
 
+#include "swift/Demangling/Demangle.h"
+#include "swift/RemoteInspection/Records.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -39,6 +41,58 @@ struct BuiltinTypeDescriptorBase {
   virtual llvm::StringRef getMangledTypeName() = 0;
 };
 
+/// An abstract interface for a field record.
+struct FieldRecordBase {
+  const bool IsIndirectCase;
+  const bool IsVar;
+  const bool HasMangledTypeName;
+
+  FieldRecordBase(bool IsIndirectCase, bool IsVar,
+                       bool HasMangledTypeName)
+      : IsIndirectCase(IsIndirectCase), IsVar(IsVar),
+        HasMangledTypeName(HasMangledTypeName) {}
+
+  virtual ~FieldRecordBase(){};
+
+  virtual llvm::StringRef getFieldName() = 0;
+  virtual Demangle::Node *getDemangledTypeName() = 0;
+};
+
+/// An abstract interface for a field descriptor.
+struct FieldDescriptorBase {
+  const FieldDescriptorKind Kind;
+  const bool HasSuperClass;
+
+  FieldDescriptorBase(FieldDescriptorKind Kind, bool HasSuperClass)
+      : Kind(Kind), HasSuperClass(HasSuperClass) {}
+
+  bool isEnum() const {
+    return (Kind == FieldDescriptorKind::Enum ||
+            Kind == FieldDescriptorKind::MultiPayloadEnum);
+  }
+
+  bool isClass() const {
+    return (Kind == FieldDescriptorKind::Class ||
+            Kind == FieldDescriptorKind::ObjCClass);
+  }
+
+  bool isProtocol() const {
+    return (Kind == FieldDescriptorKind::Protocol ||
+            Kind == FieldDescriptorKind::ClassProtocol ||
+            Kind == FieldDescriptorKind::ObjCProtocol);
+  }
+
+  bool isStruct() const {
+    return Kind == FieldDescriptorKind::Struct;
+  }
+
+  virtual ~FieldDescriptorBase(){};
+
+  virtual Demangle::Node *demangleSuperclass() = 0;
+  virtual std::vector<std::unique_ptr<FieldRecordBase>>
+  getFieldRecords() = 0;
+};
+
 /// Interface for finding type descriptors. Implementors may provide descriptors
 /// that live inside or outside reflection metadata.
 struct DescriptorFinder {
@@ -46,6 +100,10 @@ struct DescriptorFinder {
 
   virtual std::unique_ptr<BuiltinTypeDescriptorBase>
   getBuiltinTypeDescriptor(const TypeRef *TR) = 0;
+
+
+  virtual std::unique_ptr<FieldDescriptorBase>
+  getFieldDescriptor(const TypeRef *TR) = 0;
 };
 
 } // namespace reflection

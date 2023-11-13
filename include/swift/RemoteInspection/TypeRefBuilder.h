@@ -476,8 +476,8 @@ public:
       return ReflectionInfos;
     }
 
-    /// Load unsubstituted field types for a nominal type.
-    RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
+    std::unique_ptr<FieldDescriptorBase>
+    getFieldDescriptor(const TypeRef *TR) override;
 
     std::unique_ptr<BuiltinTypeDescriptorBase>
     getBuiltinTypeDescriptor(const TypeRef *TR) override;
@@ -511,6 +511,9 @@ public:
   private:
     /// Get the primitive type lowering for a builtin type.
     RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
+
+    /// Load unsubstituted field types for a nominal type.
+    RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR);
 
     void populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index);
 
@@ -1532,12 +1535,11 @@ public:
   }
   const TypeRef *lookupSuperclass(const TypeRef *TR);
 
-  RemoteRef<FieldDescriptor> getFieldTypeInfo(const TypeRef *TR) {
-    return RDF.getFieldTypeInfo(TR);
-  }
+  std::unique_ptr<FieldDescriptorBase>
+  getFieldDescriptor(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
-  bool getFieldTypeRefs(const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+  bool getFieldTypeRefs(const TypeRef *TR, FieldDescriptorBase &FD,
                         remote::TypeInfoProvider *ExternalTypeInfo,
                         std::vector<FieldTypeInfo> &Fields);
 

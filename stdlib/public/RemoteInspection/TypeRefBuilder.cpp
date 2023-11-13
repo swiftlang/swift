@@ -195,15 +195,15 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::lookupTypeWitness(
 }
 
 const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
-  const auto &FD = getFieldTypeInfo(TR);
+  const auto &FD = getFieldDescriptor(TR);
   if (FD == nullptr)
     return nullptr;
 
-  if (!FD->hasSuperclass())
+  if (!FD->HasSuperClass)
     return nullptr;
 
   ScopedNodeFactoryCheckpoint checkpoint(this);
-  auto Demangled = demangleTypeRef(readTypeRef(FD, FD->Superclass));
+  auto Demangled = FD->demangleSuperclass();
   auto Unsubstituted = decodeMangledType(Demangled);
   if (!Unsubstituted)
     return nullptr;
@@ -375,34 +375,97 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldTypeInfo(
   return nullptr;
 }
 
+namespace {
+// A field record implementation that wraps a reflection field record.
+class FieldRecordImpl : public FieldRecordBase {
+  RemoteRef<const FieldRecord> Field;
+  TypeRefBuilder &Builder;
+
+public:
+  FieldRecordImpl(RemoteRef<const FieldRecord> FR, TypeRefBuilder &Builder)
+      : FieldRecordBase(FR->isIndirectCase(), FR->isVar(),
+                             FR->hasMangledTypeName()),
+        Field(FR), Builder(Builder) {}
+
+  ~FieldRecordImpl() override {}
+
+  StringRef getFieldName() override {
+    return Builder.getTypeRefString(
+        Builder.readTypeRef(Field, Field->FieldName));
+  }
+    
+  NodePointer getDemangledTypeName() override {
+    return Builder.demangleTypeRef(
+        Builder.readTypeRef(Field, Field->MangledTypeName));
+  }
+};
+
+/// A field descriptor implementation that wraps a reflection field
+/// descriptor.
+class FieldDescriptorImpl : public FieldDescriptorBase {
+  RemoteRef<FieldDescriptor> FD;
+  TypeRefBuilder &Builder;
+
+public:
+  FieldDescriptorImpl(RemoteRef<FieldDescriptor> FD, TypeRefBuilder &Builder)
+      : FieldDescriptorBase(FD->Kind, FD->hasSuperclass()), FD(FD),
+        Builder(Builder) {}
+
+  ~FieldDescriptorImpl() override {}
+
+  NodePointer demangleSuperclass() override {
+    return Builder.demangleTypeRef(Builder.readTypeRef(FD, FD->Superclass));
+  }
+
+  std::vector<std::unique_ptr<FieldRecordBase>> getFieldRecords() override {
+    std::vector<std::unique_ptr<FieldRecordBase>> FieldRecords;
+    for (auto &FieldRef : *FD.getLocalBuffer()) {
+      FieldRecords.emplace_back(
+          std::make_unique<FieldRecordImpl>(FD.getField(FieldRef), Builder));
+    }
+    return FieldRecords;
+  }
+};
+} // namespace
+
+std::unique_ptr<FieldDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldDescriptor(
+    const TypeRef *TR) {
+  if (auto FDI = getFieldTypeInfo(TR))
+    return std::make_unique<FieldDescriptorImpl>(FDI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<FieldDescriptorBase>
+TypeRefBuilder::getFieldDescriptor(const TypeRef *TR) {
+  for (auto DF : getDescriptorFinders())
+    if (auto descriptor = DF->getFieldDescriptor(TR))
+      return descriptor;
+  return nullptr;
+}
+
 bool TypeRefBuilder::getFieldTypeRefs(
-    const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+    const TypeRef *TR, FieldDescriptorBase &FD,
     remote::TypeInfoProvider *ExternalTypeInfo,
     std::vector<FieldTypeInfo> &Fields) {
-  if (FD == nullptr)
-    return false;
-
   auto Subs = TR->getSubstMap();
   if (!Subs)
     return false;
 
   int FieldValue = -1;
-  for (auto &FieldRef : *FD.getLocalBuffer()) {
-    auto Field = FD.getField(FieldRef);
-
-    auto FieldName = getTypeRefString(readTypeRef(Field, Field->FieldName));
+  for (auto &Field : FD.getFieldRecords()) {
+    auto FieldName = Field->getFieldName();
     FieldValue += 1;
 
     // Empty cases of enums do not have a type
-    if (FD->isEnum() && !Field->hasMangledTypeName()) {
+    if (FD.isEnum() && !Field->HasMangledTypeName) {
       Fields.push_back(
           FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
       continue;
     }
 
     ScopedNodeFactoryCheckpoint checkpoint(this);
-    auto Demangled =
-        demangleTypeRef(readTypeRef(Field, Field->MangledTypeName));
+    auto Demangled = Field->getDemangledTypeName();
     auto Unsubstituted = decodeMangledType(Demangled);
     if (!Unsubstituted)
       return false;
@@ -412,7 +475,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
     // `case a([T?])` is generic, but `case a([Int?])` is not.
     bool IsGeneric = false;
     auto Substituted = Unsubstituted->subst(*this, *Subs, IsGeneric);
-    bool IsIndirect = FD->isEnum() && Field->isIndirectCase();
+    bool IsIndirect = FD.isEnum() && Field->IsIndirectCase;
 
     auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted,
                                  IsIndirect, IsGeneric);
@@ -471,6 +534,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeInfo(
   return nullptr;
 }
 
+namespace {
 /// A builtin type descriptor implementation that wraps a reflection builtin
 /// type descriptor.
 class BuiltinTypeDescriptorImpl : public BuiltinTypeDescriptorBase {
@@ -491,6 +555,7 @@ public:
     return Builder.getTypeRefString(Builder.readTypeRef(BTD, BTD->TypeName));
   };
 };
+} // namespace
 
 std::unique_ptr<BuiltinTypeDescriptorBase>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeDescriptor(
