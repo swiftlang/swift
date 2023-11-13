@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Refactoring/Refactoring.h"
-#include "LocalRename.h"
 #include "RefactoringActions.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/SourceFile.h"

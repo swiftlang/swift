@@ -147,9 +147,9 @@ public:
   ArrayRef<Replacement> getReplacements() const { return Replacements; }
 };
 
-static std::vector<ResolvedLoc>
-resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs, SourceFile &SF,
-                       DiagnosticEngine &Diags) {
+std::vector<ResolvedLoc>
+swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
+                                   SourceFile &SF, DiagnosticEngine &Diags) {
   SourceManager &SM = SF.getASTContext().SourceMgr;
   unsigned BufferID = SF.getBufferID().value();
 
