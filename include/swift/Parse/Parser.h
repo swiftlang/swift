@@ -42,6 +42,7 @@ namespace llvm {
 
 namespace swift {
   class IdentTypeRepr;
+  class ErrorTypeRepr;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class IDEInspectionCallbacksFactory;
@@ -2034,11 +2035,6 @@ public:
 
   void performIDEInspectionSecondPassImpl(
       IDEInspectionDelayedDeclState &info);
-
-  /// Returns true if the caller should skip calling `parseType` afterwards.
-  bool parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
-                                ParserStatus &Status,
-                                SourceLoc &TildeCopyableLoc);
 
   //===--------------------------------------------------------------------===//
   // ASTGen support.

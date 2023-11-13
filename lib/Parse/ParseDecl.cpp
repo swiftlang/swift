@@ -6426,51 +6426,6 @@ static void addMoveOnlyAttrIf(SourceLoc const &parsedTildeCopyable,
   attrs.add(new(Context) MoveOnlyAttr(/*IsImplicit=*/true));
 }
 
-bool Parser::parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
-                                      ParserStatus &Status,
-                                      SourceLoc &TildeCopyableLoc) {
-  // Is suppression permitted?
-  if (parseTildeCopyable) {
-    // Try to find '~' 'Copyable'
-    //
-    // We do this knowing that Copyable is not a real type as of now, so we
-    // can't rely on parseType.
-    if (Tok.isTilde()) {
-      const auto &nextTok = peekToken(); // lookahead
-      if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
-        auto tildeLoc = consumeToken();
-        consumeToken(); // the 'Copyable' token
-
-        if (TildeCopyableLoc)
-          diagnose(tildeLoc, diag::already_suppressed, Context.Id_Copyable);
-        else
-          TildeCopyableLoc = tildeLoc;
-
-        return true;
-      } else if (nextTok.is(tok::code_complete)) {
-        consumeToken(); // consume '~'
-        Status.setHasCodeCompletionAndIsError();
-        if (CodeCompletionCallbacks) {
-          CodeCompletionCallbacks->completeWithoutConstraintType();
-        }
-        consumeToken(tok::code_complete);
-      }
-
-      // can't suppress whatever is between '~' and ',' or '{'.
-      diagnose(Tok, diag::only_suppress_copyable);
-      consumeToken();
-    }
-
-  } else if (Tok.isTilde()) {
-    // a suppression isn't allowed here, so emit an error eat the token to
-    // prevent further parsing errors.
-    diagnose(Tok, diag::cannot_suppress_here);
-    consumeToken();
-  }
-
-  return false;
-}
-
 /// Parse an inheritance clause.
 ///
 /// \verbatim
@@ -6546,11 +6501,47 @@ ParserStatus Parser::parseInheritance(
       continue;
     }
 
-    if (!EnabledNoncopyableGenerics) {
-      if (parseLegacyTildeCopyable(parseTildeCopyable,
-                                   Status,
-                                   TildeCopyableLoc))
-        continue;
+    if (!EnabledNoncopyableGenerics && Tok.isTilde()) {
+      ErrorTypeRepr *error = nullptr;
+      if (parseTildeCopyable) {
+        const auto &nextTok = peekToken(); // lookahead
+        if (isIdentifier(nextTok, Context.Id_Copyable.str())) {
+          auto tildeLoc = consumeToken();
+          consumeToken(); // the 'Copyable' token
+
+          if (TildeCopyableLoc)
+            Inherited.push_back(InheritedEntry(
+                ErrorTypeRepr::create(Context, tildeLoc,
+                                      diag::already_suppressed_copyable)));
+          else
+            TildeCopyableLoc = tildeLoc;
+
+          continue; // success
+        }
+
+        if (nextTok.is(tok::code_complete)) {
+          consumeToken(); // consume '~'
+          Status.setHasCodeCompletionAndIsError();
+          if (CodeCompletionCallbacks) {
+            CodeCompletionCallbacks->completeWithoutConstraintType();
+          }
+          consumeToken(tok::code_complete);
+        }
+
+        // can't suppress whatever is between '~' and ',' or '{'.
+        error = ErrorTypeRepr::create(Context, consumeToken(),
+                                      diag::only_suppress_copyable);
+      } else {
+        // Otherwise, a suppression isn't allowed here unless noncopyable
+        // generics is enabled, so record a delayed error diagnostic and
+        // eat the token to prevent further parsing errors.
+        error = ErrorTypeRepr::create(Context, consumeToken(),
+                                      diag::cannot_suppress_here);
+      }
+
+      // Record the error parsing ~Copyable, but continue on to parseType.
+      if (error)
+        Inherited.push_back(InheritedEntry(error));
     }
 
     auto ParsedTypeResult = parseType();

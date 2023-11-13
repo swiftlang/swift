@@ -172,9 +172,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   SourceLoc tildeLoc;
   if (Tok.isTilde() && !isInSILMode()) {
     tildeLoc = consumeToken();
-    if (!EnabledNoncopyableGenerics)
-      diagnose(tildeLoc, diag::cannot_suppress_here)
-          .fixItRemoveChars(tildeLoc, tildeLoc);
   }
 
   switch (Tok.getKind()) {
@@ -310,9 +307,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   }
 
   // Wrap in an InverseTypeRepr if needed.
-  if (EnabledNoncopyableGenerics && tildeLoc) {
-    ty = makeParserResult(ty,
-                          new(Context) InverseTypeRepr(tildeLoc, ty.get()));
+  if (tildeLoc) {
+    TypeRepr *repr;
+    if (EnabledNoncopyableGenerics)
+      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
+    else
+      repr =
+          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
+
+    ty = makeParserResult(ty, repr);
   }
 
   return ty;

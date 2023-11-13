@@ -961,8 +961,8 @@ ERROR(cannot_suppress_here,none,
 ERROR(only_suppress_copyable,none,
       "can only suppress 'Copyable'", ())
 
-ERROR(already_suppressed,none,
-      "duplicate suppression of %0", (Identifier))
+ERROR(already_suppressed_copyable,none,
+      "duplicate suppression of 'Copyable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Pattern parsing diagnostics
