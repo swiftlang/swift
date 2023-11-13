@@ -365,8 +365,16 @@ public struct EnumSeq<Base : Seq> : Seq {
 }
 
 extension Collection {
+  func myMap<T>(_ body: (Element) -> T) -> [T] {
+    var result = [T]()
+    for element in self {
+      result.append(body(element))
+    }
+    return result
+  }
+
   func transformEachElement<U>(_ cl: (Element) -> U) -> [U] {
-    return map(cl)
+    return myMap(cl)
   }
 }
 
