@@ -179,3 +179,14 @@ func fromRethrows(body: () throws -> Void) rethrows {
   try notRethrowsLike2(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
   try notRethrowsLike3(body) // expected-error{{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
 }
+
+// Substitution involving 'any Error' or 'Never' thrown error types should
+// use untyped throws or be non-throwing.
+enum G_E<T> {
+  case tuple((x: T, y: T))
+}
+
+func testArrMap(arr: [String]) {
+  _ = mapArray(arr, body: G_E<Int>.tuple)
+  // expected-error@-1{{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(String) -> G_E<Int>'}}
+}
