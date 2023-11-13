@@ -163,7 +163,9 @@ func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
       guard let currentTaskExecutor = task.unownedTaskExecutor else {
         fatalError("Expected to have task executor")
       }
+      // Test that we can compare UnownedExecutors:
       precondition(currentTaskExecutor == firstExecutor.asUnownedTaskExecutor())
+      print("OK: currentTaskExecutor == firstExecutor.asUnownedTaskExecutor()")
     }
   }
 }
@@ -188,6 +190,6 @@ func testGetCurrentTaskExecutor(_ firstExecutor: MyTaskExecutor,
 
     await testDisablingTaskExecutorPreference(firstExecutor, secondExecutor)
 
-//    await testGetCurrentTaskExecutor(firstExecutor, secondExecutor)
+    await testGetCurrentTaskExecutor(firstExecutor, secondExecutor)
   }
 }
