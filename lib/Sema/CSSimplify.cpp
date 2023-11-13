@@ -6893,17 +6893,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (typeVar1) {
-        if (auto *locator = typeVar1->getImpl().getLocator()) {
-          // TODO(diagnostics): Only binding here for function types, because
-          // doing so for KeyPath types leaves the constraint system in an
-          // unexpected state for key path diagnostics should we fail.
-          if (locator->isLastElement<LocatorPathElt::KeyPathType>() &&
-              type2->is<AnyFunctionType>())
-            return matchTypesBindTypeVar(typeVar1, type2, kind,
-                                         flags | TMF_BindingTypeVariable,
-                                         locator, formUnsolvedResult);
-        }
-
         // Performance optimization: Propagate fully or partially resolved
         // contextual type down into the body of result builder transformed
         // closure by eagerly binding intermediate body result type to the
