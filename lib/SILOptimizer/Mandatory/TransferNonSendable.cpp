@@ -140,9 +140,34 @@ struct UseDefChainVisitor
 
 } // namespace
 
+static SILValue getUnderlyingTrackedObjectValue(SILValue value) {
+  SILValue result = value;
+  while (true) {
+    SILValue temp = result;
+
+    temp = getUnderlyingObject(temp);
+
+    if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
+            temp->getDefiningInstruction())) {
+      temp = dsi->getOperand();
+    }
+    if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+            temp->getDefiningInstruction())) {
+      temp = dti->getOperand();
+    }
+
+    if (temp != result) {
+      result = temp;
+      continue;
+    }
+
+    return result;
+  }
+}
+
 static SILValue getUnderlyingTrackedValue(SILValue value) {
   if (!value->getType().isAddress()) {
-    return getUnderlyingObject(value);
+    return getUnderlyingTrackedObjectValue(value);
   }
 
   UseDefChainVisitor visitor;
@@ -837,6 +862,17 @@ public:
         builder.addAssignFresh(value->getRepresentative());
   }
 
+  template <typename DestValues>
+  void translateSILLookThrough(DestValues destValues, SILValue src) {
+    auto srcID = tryToTrackValue(src);
+
+    for (SILValue dest : destValues) {
+      auto destID = tryToTrackValue(dest);
+      assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
+             "srcID and dstID are different?!");
+    }
+  }
+
   /// Add a look through operation. This asserts that dest and src map to the
   /// same ID. Should only be used on instructions that are always guaranteed to
   /// have this property due to getUnderlyingTrackedValue looking through them.
@@ -846,7 +882,8 @@ public:
   /// explicit. Previously, we always called translateSILAssign and relied on
   /// the builder to recognize these cases and not create an assign
   /// PartitionOp. Doing such a thing obscures what is actually happening.
-  void translateSILLookThrough(SILValue dest, SILValue src) {
+  template <>
+  void translateSILLookThrough<SILValue>(SILValue dest, SILValue src) {
     auto srcID = tryToTrackValue(src);
     auto destID = tryToTrackValue(dest);
     assert(((!destID || !srcID) || destID->getID() == srcID->getID()) &&
@@ -1059,6 +1096,11 @@ public:
     case SILInstructionKind::UpcastInst:
       return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
 
+    // We identify tuple results with their operand's id.
+    case SILInstructionKind::DestructureTupleInst:
+    case SILInstructionKind::DestructureStructInst:
+      return translateSILLookThrough(inst->getResults(), inst->getOperand(0));
+
     case SILInstructionKind::UnconditionalCheckedCastInst:
       if (SILDynamicCastInst(inst).isRCIdentityPreserving())
         return translateSILLookThrough(inst->getResult(0), inst->getOperand(0));
@@ -1132,14 +1174,6 @@ public:
     case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::TryApplyInst:
       return translateSILApply(inst);
-
-    // These are used by SIL to disaggregate values together in a gep like
-    // way. We want to error on uses, not on the destructure itself, so we
-    // propagate.
-    case SILInstructionKind::DestructureTupleInst:
-    case SILInstructionKind::DestructureStructInst:
-      return translateSILMultiAssign(inst->getResults(),
-                                     inst->getOperandValues());
 
     // These are used by SIL to aggregate values together in a gep like way. We
     // want to look at uses of structs, not the struct uses itself. So just
