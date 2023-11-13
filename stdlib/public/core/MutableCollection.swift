@@ -368,6 +368,7 @@ extension MutableCollection where SubSequence == Slice<Self> {
 // moveSubranges(_:to:)
 //===----------------------------------------------------------------------===//
 
+#if !$Embedded
 extension MutableCollection {
   /// Moves the elements in the given subranges to just before the element at
   /// the specified index.
@@ -405,6 +406,7 @@ extension MutableCollection {
     return start..<end
   }
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // _rotate(in:shiftingToStart:)

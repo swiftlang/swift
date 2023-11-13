@@ -1176,6 +1176,7 @@ extension RangeReplaceableCollection {
   }
 }
 
+#if !$Embedded
 extension RangeReplaceableCollection {
   /// Removes the elements at the given indices.
   ///
@@ -1266,3 +1267,4 @@ extension MutableCollection where Self: RangeReplaceableCollection {
     removeSubrange(endOfElementsToKeep..<endIndex)
   }
 }
+#endif

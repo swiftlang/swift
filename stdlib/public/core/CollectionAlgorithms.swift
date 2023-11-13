@@ -213,6 +213,7 @@ extension BidirectionalCollection where Element: Equatable {
 // indices(where:) / indices(of:)
 //===----------------------------------------------------------------------===//
 
+#if !$Embedded
 extension Collection {
   /// Returns the indices of all the elements that match the given predicate.
   ///
@@ -284,6 +285,7 @@ extension Collection where Element: Equatable {
     indices(where: { $0 == element })
   }
 }
+#endif
 
 //===----------------------------------------------------------------------===//
 // partition(by:)
