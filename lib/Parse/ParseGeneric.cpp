@@ -339,7 +339,7 @@ ParserStatus Parser::parseGenericWhereClause(
         ParserResult<TypeRepr> Protocol = parseType();
         Status |= Protocol;
         if (Protocol.isNull())
-          Protocol = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+          Protocol = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
 
         // Add the requirement.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
@@ -358,7 +358,7 @@ ParserStatus Parser::parseGenericWhereClause(
       ParserResult<TypeRepr> SecondType = parseType();
       Status |= SecondType;
       if (SecondType.isNull())
-        SecondType = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+        SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
 
       // Add the requirement
       if (FirstType.hasCodeCompletion()) {
@@ -373,7 +373,7 @@ ParserStatus Parser::parseGenericWhereClause(
         // completion token in the TypeRepr.
         Requirements.push_back(RequirementRepr::getTypeConstraint(
             FirstType.get(), EqualLoc,
-            new (Context) ErrorTypeRepr(SecondType.get()->getLoc()),
+            ErrorTypeRepr::create(Context, SecondType.get()->getLoc()),
             isRequirementExpansion));
       } else {
         Requirements.push_back(RequirementRepr::getSameType(
@@ -383,7 +383,7 @@ ParserStatus Parser::parseGenericWhereClause(
     } else if (FirstType.hasCodeCompletion()) {
       // Recover by adding dummy constraint.
       Requirements.push_back(RequirementRepr::getTypeConstraint(
-          FirstType.get(), PreviousLoc, new (Context) ErrorTypeRepr(PreviousLoc),
+          FirstType.get(), PreviousLoc, ErrorTypeRepr::create(Context, PreviousLoc),
           isRequirementExpansion));
     } else {
       diagnose(Tok, diag::expected_requirement_delim);

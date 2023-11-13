@@ -42,6 +42,9 @@
 
 using namespace swift;
 
+static_assert(IsTriviallyDestructible<ZeroArgDiagnostic>::value,
+              "ZeroArgDiagnostic is meant to be trivially destructable");
+
 namespace {
 enum class DiagnosticOptions {
   /// No options.

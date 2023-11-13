@@ -2010,7 +2010,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       Ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
                          diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = new (Ctx) ErrorTypeRepr(ArgRange);
+      auto ErrRepr = ErrorTypeRepr::create(Ctx, ArgRange);
       ArgsTypeRepr =
           TupleTypeRepr::create(Ctx, {ErrRepr}, ArgRange);
     }
@@ -2025,8 +2025,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     if (!ResultTypeRepr) {
       Ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
                          diag::expected_type_after_arrow);
-      ResultTypeRepr = new (Ctx)
-          ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
+      ResultTypeRepr =
+          ErrorTypeRepr::create(Ctx, AE->getResultExpr()->getSourceRange());
     }
 
     auto NewTypeRepr = new (Ctx)
