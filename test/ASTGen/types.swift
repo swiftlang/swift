@@ -2,6 +2,7 @@
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
+// REQUIRES: rdar116686158
 
 protocol P { }
 protocol Q { }
