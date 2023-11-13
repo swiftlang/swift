@@ -1427,6 +1427,7 @@ ClangImporter::create(ASTContext &ctx,
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
   importedHeaderModule->setHasResolvedImports();
+  importedHeaderModule->setIsNonSwiftModule(true);
 
   importer->Impl.IsReadingBridgingPCH = false;
 
