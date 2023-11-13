@@ -160,6 +160,127 @@ static bool associatedTypesAreSameEquivalenceClass(AssociatedTypeDecl *a,
   return false;
 }
 
+namespace {
+
+/// Try to avoid situations where resolving the type of a witness calls back
+/// into associated type inference.
+struct TypeReprCycleCheckWalker : ASTWalker {
+  llvm::SmallDenseSet<Identifier, 2> circularNames;
+  ValueDecl *witness;
+  bool found;
+
+  TypeReprCycleCheckWalker(
+      const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved)
+    : witness(nullptr), found(false) {
+    for (auto *assocType : allUnresolved) {
+      circularNames.insert(assocType->getName());
+    }
+  }
+
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    // FIXME: We should still visit any generic arguments of this member type.
+    // However, we want to skip 'Foo.Element' because the 'Element' reference is
+    // not unqualified.
+    if (auto *memberTyR = dyn_cast<MemberTypeRepr>(T)) {
+      return Action::SkipChildren();
+    }
+
+    if (auto *identTyR = dyn_cast<SimpleIdentTypeRepr>(T)) {
+      if (circularNames.count(identTyR->getNameRef().getBaseIdentifier()) > 0) {
+        // If unqualified lookup can find a type with this name without looking
+        // into protocol members, don't skip the witness, since this type might
+        // be a candidate witness.
+        auto desc = UnqualifiedLookupDescriptor(
+            identTyR->getNameRef(), witness->getDeclContext(),
+            identTyR->getLoc(), UnqualifiedLookupOptions());
+
+        auto &ctx = witness->getASTContext();
+        auto results =
+            evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+
+        // Ok, resolving this name would trigger associated type inference
+        // recursively. We're going to skip this witness.
+        if (results.allResults().empty()) {
+          found = true;
+          return Action::Stop();
+        }
+      }
+    }
+
+    return Action::Continue();
+  }
+
+  bool checkForPotentialCycle(ValueDecl *witness) {
+    // Don't do this for protocol extension members, because we have a
+    // mini "solver" that avoids similar issues instead.
+    if (witness->getDeclContext()->getSelfProtocolDecl() != nullptr)
+      return false;
+
+    // If we already have an interface type, don't bother trying to
+    // avoid a cycle.
+    if (witness->hasInterfaceType())
+      return false;
+
+    // We call checkForPotentailCycle() multiple times with
+    // different witnesses.
+    found = false;
+    this->witness = witness;
+
+    auto walkInto = [&](TypeRepr *tyR) {
+      if (tyR)
+        tyR->walk(*this);
+      return found;
+    };
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(witness)) {
+      for (auto *param : *AFD->getParameters()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      if (auto *FD = dyn_cast<FuncDecl>(witness)) {
+        if (walkInto(FD->getResultTypeRepr()))
+          return true;
+      }
+
+      return false;
+    }
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(witness)) {
+      for (auto *param : *SD->getIndices()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      if (walkInto(SD->getElementTypeRepr()))
+        return true;
+
+      return false;
+    }
+
+    if (auto *VD = dyn_cast<VarDecl>(witness)) {
+      if (walkInto(VD->getTypeReprOrParentPatternTypeRepr()))
+        return true;
+
+      return false;
+    }
+
+    if (auto *EED = dyn_cast<EnumElementDecl>(witness)) {
+      for (auto *param : *EED->getParameterList()) {
+        if (walkInto(param->getTypeRepr()))
+          return true;
+      }
+
+      return false;
+    }
+
+    assert(false && "Should be exhaustive");
+    return false;
+  }
+};
+
+}
+
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     ConformanceChecker &checker,
@@ -175,11 +296,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     abort();
   }
 
+  TypeReprCycleCheckWalker cycleCheck(allUnresolved);
+
   InferredAssociatedTypesByWitnesses result;
 
   auto isExtensionUsableForInference = [&](const ExtensionDecl *extension) {
     // The context the conformance being checked is declared on.
-    const auto conformanceCtx = checker.Conformance->getDeclContext();
+    const auto conformanceCtx = conformance->getDeclContext();
     if (extension == conformanceCtx)
       return true;
 
@@ -249,11 +372,17 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
-    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext()))
+    if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
       if (!isExtensionUsableForInference(extension)) {
         LLVM_DEBUG(llvm::dbgs() << "Extension not usable for inference\n");
         continue;
       }
+    }
+
+    if (cycleCheck.checkForPotentialCycle(witness)) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping witness to avoid request cycle\n");
+      continue;
+    }
 
     // Try to resolve the type witness via this value witness.
     auto witnessResult = inferTypeWitnessesViaValueWitness(req, witness);
