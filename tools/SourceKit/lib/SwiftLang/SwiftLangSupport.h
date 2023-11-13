@@ -24,12 +24,13 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Indenting.h"
-#include "swift/Refactoring/Refactoring.h"
 #include "swift/IDETool/CompileInstance.h"
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/Index/IndexSymbol.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -276,8 +277,12 @@ public:
 
 class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
                                    public swift::DiagnosticConsumer {
-  class Implementation;
-  Implementation &Impl;
+  CategorizedRenameRangesReceiver Receiver;
+  std::string ErrBuffer;
+  llvm::raw_string_ostream OS;
+  std::vector<CategorizedRenameRanges> CategorizedRanges;
+
+  swift::PrintingDiagnosticConsumer DiagConsumer;
 
 public:
   RequestRenameRangeConsumer(CategorizedRenameRangesReceiver Receiver);

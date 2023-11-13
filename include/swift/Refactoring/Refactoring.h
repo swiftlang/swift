@@ -100,13 +100,11 @@ public:
 };
 
 class FindRenameRangesAnnotatingConsumer : public FindRenameRangesConsumer {
-  struct Implementation;
-  Implementation &Impl;
+  std::unique_ptr<SourceEditConsumer> pRewriter;
 
 public:
   FindRenameRangesAnnotatingConsumer(SourceManager &SM, unsigned BufferId,
                                      llvm::raw_ostream &OS);
-  ~FindRenameRangesAnnotatingConsumer();
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<RenameRangeDetail> Ranges) override;
 };
