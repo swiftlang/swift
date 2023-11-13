@@ -70,7 +70,7 @@ extension DiscontiguousSlice: CustomStringConvertible {
 extension DiscontiguousSlice {
   /// A position in a `DiscontiguousSlice`.
   @frozen
-  public struct Index: Comparable {
+  public struct Index {
     /// The index of the range that contains `base`.
     @usableFromInline
     internal let _rangeOffset: Int
