@@ -9,6 +9,7 @@ endif()
 add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
+  ParseBridging.cpp
   ParseDecl.cpp
   ParseExpr.cpp
   ParseGeneric.cpp

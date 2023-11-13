@@ -158,6 +158,11 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // This Parser is a fallback parser for ASTGen.
+  bool IsForASTGen = false;
+#endif
+
   // A cached answer to
   //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
   // to ensure there's no parsing performance regression.
@@ -957,7 +962,8 @@ public:
 
   ParserResult<Decl> parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                                bool IfConfigsAreDeclAttrs,
-                               llvm::function_ref<void(Decl *)> Handler);
+                               llvm::function_ref<void(Decl *)> Handler,
+                               bool fromASTGen = false);
 
   std::pair<std::vector<Decl *>, llvm::Optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
@@ -1349,50 +1355,6 @@ public:
   /// Get the location for a type error.
   SourceLoc getTypeErrorLoc() const;
 
-  /// Callback function used for creating a C++ AST from the syntax node at the given source location.
-  ///
-  /// The arguments to this callback are the source file to pass into ASTGen (the exported source file)
-  /// and the source location pointer to pass into ASTGen (to find the syntax node).
-  ///
-  /// The callback returns the new AST node and the ending location of the syntax node. If the AST node
-  /// is NULL, something went wrong.
-  template<typename T>
-  using ASTFromSyntaxTreeCallback = std::pair<T*, const void *>(
-      void *sourceFile, const void *sourceLoc
-  );
-
-  /// Parse by constructing a C++ AST node from the Swift syntax tree via ASTGen.
-  template<typename T>
-  ParserResult<T> parseASTFromSyntaxTree(
-      llvm::function_ref<ASTFromSyntaxTreeCallback<T>> body
-  ) {
-    if (!Context.LangOpts.hasFeature(Feature::ASTGenTypes))
-      return nullptr;
-
-    auto exportedSourceFile = SF.getExportedSourceFile();
-    if (!exportedSourceFile)
-      return nullptr;
-
-    // Perform the translation.
-    auto sourceLoc = Tok.getLoc().getOpaquePointerValue();
-    T* astNode;
-    const void *endLocPtr;
-    std::tie(astNode, endLocPtr) = body(exportedSourceFile, sourceLoc);
-
-    if (!astNode) {
-      assert(false && "Could not build AST node from syntax tree");
-      return nullptr;
-    }
-
-    // Reset the lexer to the ending location.
-    StringRef contents =
-        SourceMgr.extractText(SourceMgr.getRangeForBuffer(L->getBufferID()));
-    L->resetToOffset((const char *)endLocPtr - contents.data());
-    L->lex(Tok);
-
-    return makeParserResult(astNode);
-  }
-
   //===--------------------------------------------------------------------===//
   // Type Parsing
 
@@ -1409,9 +1371,10 @@ public:
       ParseTypeReason reason);
 
   ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(
-      Diag<> MessageID,
-      ParseTypeReason reason = ParseTypeReason::Unspecified);
+  ParserResult<TypeRepr>
+  parseType(Diag<> MessageID,
+            ParseTypeReason reason = ParseTypeReason::Unspecified,
+            bool fromASTGen = false);
 
   /// Parse a type optionally prefixed by a list of named opaque parameters. If
   /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
@@ -1735,7 +1698,8 @@ public:
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic,
+                                   bool fromASTGen = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();
@@ -1944,7 +1908,7 @@ public:
 
   bool isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                         ArrayRef<ASTNode> ParsedDecls);
-  ParserResult<Stmt> parseStmt();
+  ParserResult<Stmt> parseStmt(bool fromASTGen = false);
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
@@ -2075,6 +2039,18 @@ public:
   bool parseLegacyTildeCopyable(SourceLoc *parseTildeCopyable,
                                 ParserStatus &Status,
                                 SourceLoc &TildeCopyableLoc);
+
+  //===--------------------------------------------------------------------===//
+  // ASTGen support.
+
+  /// Parse a TypeRepr from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<TypeRepr> parseTypeReprFromSyntaxTree();
+  /// Parse a Stmt from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Stmt> parseStmtFromSyntaxTree();
+  /// Parse a Decl from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Decl> parseDeclFromSyntaxTree();
+  /// Parse an Expr from the syntax tree. i.e. SF->getExportedSourceFile()
+  ParserResult<Expr> parseExprFromSyntaxTree();
 };
 
 /// Describes a parsed declaration name.

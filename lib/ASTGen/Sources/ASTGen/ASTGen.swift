@@ -12,6 +12,7 @@
 
 import ASTBridging
 import BasicBridging
+import ParseBridging
 // Needed to use BumpPtrAllocator
 @_spi(BumpPtrAllocator) import SwiftSyntax
 
@@ -69,6 +70,19 @@ enum ASTNode {
       fatalError("Must be expr, stmt, or decl.")
     }
   }
+
+  var raw: UnsafeMutableRawPointer {
+    switch self {
+    case .expr(let e):
+      return e.raw
+    case .stmt(let s):
+      return s.raw
+    case .decl(let d):
+      return d.raw
+    case .type(let t):
+      return t.raw
+    }
+  }
 }
 
 /// Little utility wrapper that lets us have some mutable state within
@@ -95,16 +109,22 @@ struct ASTGenVisitor {
 
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(slabSize: 256)
 
+  /// Fallback legacy parser used when ASTGen doesn't have the generate(_:)
+  /// implementation for the AST node kind.
+  let legacyParse: BridgedLegacyParser
+
   init(
     diagnosticEngine: BridgedDiagnosticEngine,
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
-    astContext: BridgedASTContext
+    astContext: BridgedASTContext,
+    legacyParser: BridgedLegacyParser
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
+    self.legacyParse = legacyParser
   }
 
   public func generate(_ node: SourceFileSyntax) -> [UnsafeMutableRawPointer] {
@@ -173,6 +193,9 @@ extension ASTGenVisitor {
   }
 
   func generate(_ node: ExprSyntax) -> BridgedExpr {
+    if !isExprMigrated(node) {
+      return generateWithLegacy(node)
+    }
     return generate(Syntax(node)).castToExpr
   }
 
@@ -185,6 +208,9 @@ extension ASTGenVisitor {
   }
 
   func generate(_ node: TypeSyntax) -> BridgedTypeRepr {
+    if !isTypeMigrated(node) {
+      return generateWithLegacy(node)
+    }
     return generate(Syntax(node)).castToType
   }
 
@@ -256,8 +282,6 @@ extension ASTGenVisitor {
       return .decl(generate(node).asDecl)
     case .integerLiteralExpr(let node):
       return .expr(generate(node).asExpr)
-    case .labeledExprList:
-      fatalError("case does not correspond to an ASTNode")
     case .memberAccessExpr(let node):
       return .expr(generate(node).asExpr)
     case .memberBlockItem(let node):
@@ -296,8 +320,17 @@ extension ASTGenVisitor {
       return .decl(generate(node).asDecl)
     case .variableDecl(let node):
       return .decl(generate(node).asDecl)
+
+    // Un-migrated nodes.
+    case _ where node.is(ExprSyntax.self):
+      return .expr(self.generateWithLegacy(node.cast(ExprSyntax.self)))
+    case _ where node.is(StmtSyntax.self):
+      return .stmt(self.generateWithLegacy(node.cast(StmtSyntax.self)))
+    case _ where node.is(DeclSyntax.self):
+      return .decl(self.generateWithLegacy(node.cast(DeclSyntax.self)))
+
     default:
-      fatalError("not implemented")
+      fatalError("case does not correspond to an ASTNode")
     }
   }
 }
@@ -477,21 +510,155 @@ extension Optional where Wrapped: LazyCollectionProtocol {
 /// Generate AST nodes for all top-level entities in the given source file.
 @_cdecl("swift_ASTGen_buildTopLevelASTNodes")
 public func buildTopLevelASTNodes(
-  diagEnginePtr: UnsafeMutableRawPointer,
-  sourceFilePtr: UnsafePointer<UInt8>,
-  dc: UnsafeMutableRawPointer,
-  ctx: UnsafeMutableRawPointer,
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  dc: BridgedDeclContext,
+  ctx: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (UnsafeMutableRawPointer, UnsafeMutableRawPointer) -> Void
 ) {
-  sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
-    ASTGenVisitor(
-      diagnosticEngine: .init(raw: diagEnginePtr),
-      sourceBuffer: sourceFile.pointee.buffer,
-      declContext: BridgedDeclContext(raw: dc),
-      astContext: BridgedASTContext(raw: ctx)
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  ASTGenVisitor(
+    diagnosticEngine: diagEngine,
+    sourceBuffer: sourceFile.pointee.buffer,
+    declContext: dc,
+    astContext: ctx,
+    legacyParser: legacyParser
+  )
+  .generate(sourceFile.pointee.syntax)
+  .forEach { callback($0, outputContext) }
+}
+
+/// Generate an AST node at the given source location. Returns the generated
+/// ASTNode and mutate the pointee of `endLocPtr` to the end of the node.
+private func _build<Node: SyntaxProtocol>(
+  kind: Node.Type,
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+
+  // Find the type syntax node.
+  guard
+    let node = findSyntaxNodeInSourceFile(
+      sourceFilePtr: sourceFilePtr,
+      // FIXME: findSyntaxNodeInSourceFile should receive `BridgedSourceLoc`.
+      sourceLocationPtr: sourceLoc.getOpaquePointerValue()?.assumingMemoryBound(to: UInt8.self),
+      type: Node.self,
+      wantOutermost: true
     )
-    .generate(sourceFile.pointee.syntax)
-    .forEach { callback($0, outputContext) }
+  else {
+    // FIXME: Produce an error
+    return nil
   }
+
+  // Fill in the end location.
+  endLocPtr.pointee = sourceLoc.advanced(by: node.totalLength.utf8Length)
+
+  // Convert the syntax node.
+  return ASTGenVisitor(
+    diagnosticEngine: diagEngine,
+    sourceBuffer: sourceFile.pointee.buffer,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser
+  ).generate(Syntax(node)).raw
+}
+
+@_cdecl("swift_ASTGen_buildTypeRepr")
+@usableFromInline
+func buildTypeRepr(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    kind: TypeSyntax.self,
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )
+}
+
+@_cdecl("swift_ASTGen_buildDecl")
+@usableFromInline
+func buildDecl(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    kind: DeclSyntax.self,
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )
+}
+
+@_cdecl("swift_ASTGen_buildExpr")
+@usableFromInline
+func buildExpr(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    kind: ExprSyntax.self,
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )
+}
+
+@_cdecl("swift_ASTGen_buildStmt")
+@usableFromInline
+func buildStmt(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeRawPointer,
+  sourceLoc: BridgedSourceLoc,
+  declContext: BridgedDeclContext,
+  astContext: BridgedASTContext,
+  legacyParser: BridgedLegacyParser,
+  endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
+) -> UnsafeMutableRawPointer? {
+  return _build(
+    kind: StmtSyntax.self,
+    diagEngine: diagEngine,
+    sourceFilePtr: sourceFilePtr,
+    sourceLoc: sourceLoc,
+    declContext: declContext,
+    astContext: astContext,
+    legacyParser: legacyParser,
+    endLocPtr: endLocPtr
+  )
 }

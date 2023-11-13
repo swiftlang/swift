@@ -593,14 +593,6 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
                            constLoc));
 }
 
-/// Build a TypeRepr for AST node for the type at the given source location in the specified file.
-///
-/// \param sourceLoc The source location at which to start processing a type.
-/// \param endSourceLoc Will receive the source location immediately following the type.
-extern "C" TypeRepr *swift_ASTGen_buildTypeRepr(
-    void *diagEngine, void *sourceFile, const void *_Nullable sourceLoc,
-    void *declContext, void *astContext, const void *_Nullable *endSourceLoc);
-
 /// parseType
 ///   type:
 ///     type-scalar
@@ -609,33 +601,23 @@ extern "C" TypeRepr *swift_ASTGen_buildTypeRepr(
 ///   pack-expansion-type:
 ///     type-scalar '...'
 ///
-ParserResult<TypeRepr> Parser::parseType(
-    Diag<> MessageID, ParseTypeReason reason) {
-  #if SWIFT_BUILD_SWIFT_SYNTAX
-  auto astGenResult = parseASTFromSyntaxTree<TypeRepr>(
-      [&](void *exportedSourceFile, const void *sourceLoc) {
-        const void *endLocPtr = nullptr;
-        TypeRepr *typeRepr = swift_ASTGen_buildTypeRepr(
-            &Diags, exportedSourceFile, Tok.getLoc().getOpaquePointerValue(),
-            CurDeclContext, &Context, &endLocPtr);
-        return std::make_pair(typeRepr, endLocPtr);
-      });
-  if (astGenResult.isNonNull()) {
+/// \param fromASTGen If true , this function in called from ASTGen as the
+/// fallback, so do not attempt a callback to ASTGen.
+ParserResult<TypeRepr>
+Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
+  ParserResult<TypeRepr> ty;
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (IsForASTGen && !fromASTGen) {
+    ty = parseTypeReprFromSyntaxTree();
     // Note: there is a representational difference between the swift-syntax
     // tree and the C++ parser tree regarding variadic parameters. In the
     // swift-syntax tree, the ellipsis is part of the parameter declaration.
     // In the C++ parser tree, the ellipsis is part of the type. Account for
     // this difference by consuming the ellipsis here.
-    if (Tok.isEllipsis()) {
-      Tok.setKind(tok::ellipsis);
-      SourceLoc ellipsisLoc = consumeToken();
-      return makeParserResult(astGenResult,
-          new (Context) VarargTypeRepr(astGenResult.get(), ellipsisLoc));
-    }
-
-    return astGenResult;
+    goto AFTER_TY_PARSE;
   }
-  #endif
+#endif
 
   // Parse pack expansion 'repeat T'
   if (Tok.is(tok::kw_repeat)) {
@@ -649,7 +631,9 @@ ParserResult<TypeRepr> Parser::parseType(
         new (Context) PackExpansionTypeRepr(repeatLoc, ty.get()));
   }
 
-  auto ty = parseTypeScalar(MessageID, reason);
+  ty = parseTypeScalar(MessageID, reason);
+
+AFTER_TY_PARSE:
   if (ty.isNull())
     return ty;
 

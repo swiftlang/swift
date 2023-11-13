@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTBridging.h"
+#include "swift/Parse/ParseBridging.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +40,23 @@ void *_Nullable swift_ASTGen_parseSourceFile(const char *_Nonnull buffer,
                                              const char *_Nonnull filename,
                                              void *_Nullable ctx);
 void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
+
+/// Check whether the given source file round-trips correctly. Returns 0 if
+/// round-trip succeeded, non-zero otherwise.
+int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
+
+/// Emit parser diagnostics for given source file.. Returns non-zero if any
+/// diagnostics were emitted.
+int swift_ASTGen_emitParserDiagnostics(
+    void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
+    int downgradePlaceholderErrorsToWarnings);
+
+// Build AST nodes for the top-level entities in the syntax.
+void swift_ASTGen_buildTopLevelASTNodes(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedDeclContext declContext, BridgedASTContext astContext,
+    BridgedLegacyParser legacyParser, void *_Nonnull outputContext,
+    void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
 
 void *_Nullable swift_ASTGen_resolveMacroType(const void *_Nonnull macroType);
 void swift_ASTGen_destroyMacro(void *_Nonnull macro);
@@ -83,6 +101,38 @@ void swift_ASTGen_deinitializePlugin(void *_Nonnull handle);
 bool swift_ASTGen_pluginServerLoadLibraryPlugin(
     void *_Nonnull handle, const char *_Nonnull libraryPath,
     const char *_Nonnull moduleName, BridgedStringRef *_Nullable errorOut);
+
+/// Build a TypeRepr for AST node for the type at the given source location in
+/// the specified file.
+swift::TypeRepr *_Nullable swift_ASTGen_buildTypeRepr(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
+    BridgedSourceLoc *_Nonnull endSourceLoc);
+
+/// Build a Decl for AST node for the type at the given source location in the
+/// specified file.
+swift::Decl *_Nullable swift_ASTGen_buildDecl(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
+    BridgedSourceLoc *_Nonnull endSourceLoc);
+
+/// Build a Expr for AST node for the type at the given source location in the
+/// specified file.
+swift::Expr *_Nullable swift_ASTGen_buildExpr(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
+    BridgedSourceLoc *_Nonnull endSourceLoc);
+
+/// Build a Stmt for AST node for the type at the given source location in the
+/// specified file.
+swift::Stmt *_Nullable swift_ASTGen_buildStmt(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
+    BridgedSourceLoc *_Nonnull endSourceLoc);
 
 #ifdef __cplusplus
 }

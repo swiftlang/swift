@@ -5,7 +5,6 @@
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature SwiftParser -enable-experimental-feature ParserASTGen)
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ASTGenTypes)
 
 // REQUIRES: executable_test
 
