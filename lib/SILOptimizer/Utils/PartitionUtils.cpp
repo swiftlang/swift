@@ -13,6 +13,10 @@
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
 #include "llvm/Support/CommandLine.h"
 
+//===----------------------------------------------------------------------===//
+//                               MARK: Logging
+//===----------------------------------------------------------------------===//
+
 #ifndef NDEBUG
 
 bool swift::PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;

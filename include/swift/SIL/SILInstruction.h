@@ -2877,18 +2877,28 @@ public:
   void setSelfArgument(SILValue V) {
     assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
-                                      "arguments.");
+                                "arguments.");
     getArgumentOperands()[getNumArguments() - 1].set(V);
   }
 
   OperandValueArrayRef getArgumentsWithoutSelf() const {
-    assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
-           "at least a self parameter.");
+                                "at least a self parameter.");
     ArrayRef<Operand> ops = this->getArgumentOperands();
-    ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
-                                                         ops.size()-1);
+    if (!hasSelfArgument())
+      return ops;
+    auto opsWithoutSelf = ArrayRef<Operand>(&ops[0], ops.size() - 1);
     return OperandValueArrayRef(opsWithoutSelf);
+  }
+
+  ArrayRef<Operand> getOperandsWithoutSelf() const {
+    assert(getNumArguments() && "Should only be called when Callee has "
+                                "at least a self parameter.");
+    ArrayRef<Operand> ops = this->getArgumentOperands();
+    if (!hasSelfArgument())
+      return ops;
+    auto opsWithoutSelf = ArrayRef<Operand>(&ops[0], ops.size() - 1);
+    return opsWithoutSelf;
   }
 
   llvm::Optional<SILResultInfo> getSingleResult() const {

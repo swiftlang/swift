@@ -28,8 +28,8 @@ struct Partition::PartitionTester {
 
   PartitionTester(const Partition &p) : p(p) {}
 
-  signed getRegion(unsigned elt) const {
-    return signed(p.labels.at(Element(elt)));
+  unsigned getRegion(unsigned elt) const {
+    return unsigned(p.elementToRegionMap.at(Element(elt)));
   }
 };
 
@@ -40,6 +40,15 @@ using PartitionTester = Partition::PartitionTester;
 //===----------------------------------------------------------------------===//
 //                                   Tests
 //===----------------------------------------------------------------------===//
+
+// When we transfer we need a specific transfer instruction. We do not ever
+// actually dereference the instruction, so just use some invalid ptr values so
+// we can compare.
+SILInstruction *transferSingletons[5] = {
+    (SILInstruction *)0xDEADBEEF, (SILInstruction *)0xFEADBEED,
+    (SILInstruction *)0xFEDABEED, (SILInstruction *)0xFEDAEBED,
+    (SILInstruction *)0xFBDAEEED,
+};
 
 // This test tests that if a series of merges is split between two partitions
 // p1 and p2, but also applied in its entirety to p3, then joining p1 and p2
@@ -527,19 +536,20 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
                 // expected: p: ((0 1 2) (3 4 5) (6 7) (8 9) (Element(10))
                 // (Element(11)))
 
-                PartitionOp::Transfer(Element(2)),
-                PartitionOp::Transfer(Element(7)),
-                PartitionOp::Transfer(Element(10))});
+                PartitionOp::Transfer(Element(2), transferSingletons[0]),
+                PartitionOp::Transfer(Element(7), transferSingletons[1]),
+                PartitionOp::Transfer(Element(10), transferSingletons[2])});
   }
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned) { EXPECT_TRUE(false); };
+  auto never_called = [](const PartitionOp &, unsigned, SILInstruction *) {
+    EXPECT_TRUE(false);
+  };
 
   int times_called = 0;
-  auto increment_times_called = [&](const PartitionOp &, unsigned) {
-    times_called++;
-  };
+  auto increment_times_called = [&](const PartitionOp &, unsigned,
+                                    SILInstruction *) { times_called++; };
 
   {
     PartitionOpEvaluator eval(p);
@@ -601,22 +611,21 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   // Change p1 again.
   {
     PartitionOpEvaluator eval(p1);
-    eval.apply(PartitionOp::Transfer(Element(0)));
+    eval.apply(PartitionOp::Transfer(Element(0), transferSingletons[0]));
   }
 
   {
     bool failure = false;
     PartitionOpEvaluator eval(p1);
-    eval.failureCallback = [&](const PartitionOp &, unsigned) {
-      failure = true;
-    };
+    eval.failureCallback = [&](const PartitionOp &, unsigned,
+                               SILInstruction *) { failure = true; };
     eval.apply(PartitionOp::Require(Element(0)));
     EXPECT_TRUE(failure);
   }
 
   {
     PartitionOpEvaluator eval(p2);
-    eval.failureCallback = [](const PartitionOp &, unsigned) {
+    eval.failureCallback = [](const PartitionOp &, unsigned, SILInstruction *) {
       EXPECT_TRUE(false);
     };
     eval.apply(PartitionOp::Require(Element(0)));

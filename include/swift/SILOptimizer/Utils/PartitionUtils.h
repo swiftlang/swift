@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_UTILS_PARTITIONUTILS_H
 
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/SmallVector.h"
@@ -30,7 +31,7 @@ namespace PartitionPrimitives {
 extern bool REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING;
 #define REGIONBASEDISOLATION_VERBOSE_LOG(...)                                  \
   do {                                                                         \
-    if (REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {                         \
+    if (PartitionPrimitives::REGIONBASEDISOLATION_ENABLE_VERBOSE_LOGGING) {    \
       LLVM_DEBUG(__VA_ARGS__);                                                 \
     }                                                                          \
   } while (0);
@@ -50,25 +51,42 @@ struct Element {
 };
 
 struct Region {
-  signed num;
+  unsigned num;
 
-  explicit Region(int num) : num(num) {
-    assert(num >= -1 && "-1 is the only valid negative Region label");
-  }
+  explicit Region(unsigned num) : num(num) {}
 
   bool operator==(const Region &other) const { return num == other.num; }
   bool operator<(const Region &other) const { return num < other.num; }
 
-  operator signed() const { return num; }
-
-  bool isTransferred() const { return num < 0; }
-
-  static Region transferred() { return Region(-1); }
+  operator unsigned() const { return num; }
 };
 
 } // namespace PartitionPrimitives
 
-using namespace PartitionPrimitives;
+} // namespace swift
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<swift::PartitionPrimitives::Region> {
+  using Region = swift::PartitionPrimitives::Region;
+
+  static Region getEmptyKey() {
+    return Region(DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static Region getTombstoneKey() {
+    return Region(DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(Region region) {
+    return DenseMapInfo<unsigned>::getHashValue(region);
+  }
+  static bool isEqual(Region LHS, Region RHS) { return LHS == RHS; }
+};
+
+} // namespace llvm
+
+namespace swift {
 
 /// PartitionOpKind represents the different kinds of PartitionOps that
 /// SILInstructions can be translated to
@@ -96,6 +114,8 @@ enum class PartitionOpKind : uint8_t {
 /// first SILBasicBlocks are compiled to vectors of PartitionOps, then a fixed
 /// point partition is found over the CFG.
 class PartitionOp {
+  using Element = PartitionPrimitives::Element;
+
 private:
   PartitionOpKind OpKind;
   llvm::SmallVector<Element, 2> OpArgs;
@@ -111,16 +131,20 @@ private:
 
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind OpKind, Element arg1,
-              SILInstruction *sourceInst = nullptr,
-              Expr* sourceExpr = nullptr)
-      : OpKind(OpKind), OpArgs({arg1}),
-        sourceInst(sourceInst), sourceExpr(sourceExpr) {}
+              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
+      : OpKind(OpKind), OpArgs({arg1}), sourceInst(sourceInst),
+        sourceExpr(sourceExpr) {
+    assert((OpKind != PartitionOpKind::Transfer || sourceInst) &&
+           "Transfer needs a sourceInst");
+  }
 
   PartitionOp(PartitionOpKind OpKind, Element arg1, Element arg2,
-              SILInstruction *sourceInst = nullptr,
-              Expr* sourceExpr = nullptr)
-      : OpKind(OpKind), OpArgs({arg1, arg2}),
-        sourceInst(sourceInst), sourceExpr(sourceExpr) {}
+              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
+      : OpKind(OpKind), OpArgs({arg1, arg2}), sourceInst(sourceInst),
+        sourceExpr(sourceExpr) {
+    assert((OpKind != PartitionOpKind::Transfer || sourceInst) &&
+           "Transfer needs a sourceInst");
+  }
 
   friend class Partition;
 
@@ -135,9 +159,10 @@ public:
     return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
   }
 
-  static PartitionOp Transfer(Element tgt, SILInstruction *sourceInst = nullptr,
+  static PartitionOp Transfer(Element tgt, SILInstruction *transferringInst,
                               Expr *sourceExpr = nullptr) {
-    return PartitionOp(PartitionOpKind::Transfer, tgt, sourceInst, sourceExpr);
+    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringInst,
+                       sourceExpr);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -174,6 +199,8 @@ public:
                          " sources when used for the core analysis");
     return sourceInst;
   }
+
+  SILLocation getSourceLoc() const { return getSourceInst(true)->getLoc(); }
 
   Expr *getSourceExpr() const {
     return sourceExpr;
@@ -223,28 +250,6 @@ public:
   }
 };
 
-/// For the passed `map`, ensure that `key` maps to `val`. If `key` already
-/// mapped to a different value, ensure that all other keys mapped to that
-/// value also now map to `val`. This is a relatively expensive (linear time)
-/// operation that's unfortunately used pervasively throughout PartitionOp
-/// application. If this is a performance bottleneck, let's consider optimizing
-/// it to a true union-find or other tree-based data structure.
-static void horizontalUpdate(std::map<Element, Region> &map, Element key,
-                             Region val) {
-  if (!map.count(key)) {
-    map.insert({key, val});
-    return;
-  }
-
-  Region oldVal = map.at(key);
-  if (val == oldVal)
-    return;
-
-  for (auto [otherKey, otherVal] : map)
-    if (otherVal == oldVal)
-      map.insert_or_assign(otherKey, val);
-}
-
 struct PartitionOpEvaluator;
 
 /// A map from Element -> Region that represents the current partition set.
@@ -257,11 +262,13 @@ public:
   struct PartitionTester;
   friend PartitionOpEvaluator;
 
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+
 private:
   /// Label each index with a non-negative (unsigned) label if it is associated
-  /// with a valid region, and with -1 if it is associated with a transferred
-  /// region in-order traversal relied upon.
-  std::map<Element, Region> labels;
+  /// with a valid region.
+  std::map<Element, Region> elementToRegionMap;
 
   /// Track a label that is guaranteed to be strictly larger than all in use,
   /// and therefore safe for use as a fresh label.
@@ -273,12 +280,22 @@ private:
   /// must be reestablished by a call to canonicalize().
   bool canonical;
 
+  /// A map from a region number to a instruction that consumes it.
+  ///
+  /// All we care is that we ever track a single SILInstruction for a region
+  /// since we are fine with emitting a single error per value and letting the
+  /// user recompile. If this is an ask for in the future, we can use a true
+  /// multi map here. The implication of this is that when we are performing
+  /// dataflow we use a union operation to combine CFG elements and just take
+  /// the first instruction that we see.
+  llvm::SmallDenseMap<Region, SILInstruction *, 2> regionToTransferredInstMap;
+
 public:
-  Partition() : labels({}), canonical(true) {}
+  Partition() : elementToRegionMap({}), canonical(true) {}
 
   /// 1-arg constructor used when canonicality will be immediately invalidated,
   /// so set to false to begin with
-  Partition(bool canonical) : labels({}), canonical(canonical) {}
+  Partition(bool canonical) : elementToRegionMap({}), canonical(canonical) {}
 
   static Partition singleRegion(ArrayRef<Element> indices) {
     Partition p;
@@ -287,7 +304,7 @@ public:
           Region(*std::min_element(indices.begin(), indices.end()));
       p.fresh_label = Region(min_index + 1);
       for (Element index : indices) {
-        p.labels.insert_or_assign(index, min_index);
+        p.elementToRegionMap.insert_or_assign(index, min_index);
       }
     }
 
@@ -302,7 +319,7 @@ public:
 
     auto maxIndex = Element(0);
     for (Element index : indices) {
-      p.labels.insert_or_assign(index, Region(index));
+      p.elementToRegionMap.insert_or_assign(index, Region(index));
       maxIndex = Element(std::max(maxIndex, index));
     }
     p.fresh_label = Region(maxIndex + 1);
@@ -318,13 +335,30 @@ public:
     fst.canonicalize();
     snd.canonicalize();
 
-    return fst.labels == snd.labels;
+    return fst.elementToRegionMap == snd.elementToRegionMap;
   }
 
-  bool isTracked(Element val) const { return labels.count(val); }
+  bool isTracked(Element val) const { return elementToRegionMap.count(val); }
 
-  bool isTransferred(Element val) const {
-    return isTracked(val) && labels.at(val).isTransferred();
+  /// Mark val as transferred. Returns true if we inserted \p
+  /// transferOperand. We return false otherwise.
+  bool markTransferred(Element val, SILInstruction *transferOperand) {
+    // First see if our val is tracked. If it is not tracked, insert it and mark
+    // its new region as transferred.
+    if (!isTracked(val)) {
+      elementToRegionMap.insert_or_assign(val, fresh_label);
+      regionToTransferredInstMap.insert({fresh_label, transferOperand});
+      fresh_label = Region(fresh_label + 1);
+      canonical = false;
+      return true;
+    }
+
+    // Otherwise, we already have this value in the map. Try to insert it.
+    auto iter1 = elementToRegionMap.find(val);
+    assert(iter1 != elementToRegionMap.end());
+    auto iter2 =
+        regionToTransferredInstMap.try_emplace(iter1->second, transferOperand);
+    return iter2.second;
   }
 
   /// Construct the partition corresponding to the union of the two passed
@@ -333,35 +367,28 @@ public:
   /// Runs in quadratic time.
   static Partition join(const Partition &fst, const Partition &snd) {
     // First copy and canonicalize our inputs.
-    Partition fst_reduced = fst;
-    Partition snd_reduced = snd;
+    Partition fstReduced = fst;
+    Partition sndReduced = snd;
 
-    fst_reduced.canonicalize();
-    snd_reduced.canonicalize();
+    fstReduced.canonicalize();
+    sndReduced.canonicalize();
 
-    // For each element in snd_reduced...
-    for (const auto &[sndEltNumber, sndRegionNumber] : snd_reduced.labels) {
-      // For values that are both in fst_reduced and snd_reduced, we need to
-      // merge their regions.
-      if (fst_reduced.labels.count(sndEltNumber)) {
-        if (sndRegionNumber.isTransferred()) {
-          // If snd says that the region has been transferred, mark it
-          // transferred in fst.
-          horizontalUpdate(fst_reduced.labels, sndEltNumber,
-                           Region::transferred());
-          continue;
+    // For each (sndEltNumber, sndRegionNumber) in snd_reduced...
+    for (const auto &[sndEltNumber, sndRegionNumber] :
+         sndReduced.elementToRegionMap) {
+      // Check if fstReduced has sndEltNumber within it...
+      if (fstReduced.elementToRegionMap.count(sndEltNumber)) {
+        // If we do, we just merge sndEltNumber into fstRegion.
+        auto mergedRegion =
+            fstReduced.merge(sndEltNumber, Element(sndRegionNumber));
+
+        // Then if sndRegionNumber is transferred in sndReduced, make sure
+        // mergedRegion is transferred in fstReduced.
+        auto iter = sndReduced.regionToTransferredInstMap.find(sndRegionNumber);
+        if (iter != sndReduced.regionToTransferredInstMap.end()) {
+          fstReduced.regionToTransferredInstMap.try_emplace(mergedRegion,
+                                                            iter->second);
         }
-
-        // Otherwise merge. This maintains canonicality.
-        fst_reduced.merge(sndEltNumber, Element(sndRegionNumber));
-        continue;
-      }
-
-      // Otherwise, we have an element in snd that is not in fst. First see if
-      // our region is transferred. In such a case, just add this element as
-      // transferred.
-      if (sndRegionNumber.isTransferred()) {
-        fst_reduced.labels.insert({sndEltNumber, Region::transferred()});
         continue;
       }
 
@@ -372,12 +399,19 @@ public:
       // element as well since this number is guaranteed to be greater than our
       // representative and the number mapped to our representative in fst must
       // be <= our representative.
-      auto iter = fst_reduced.labels.find(Element(sndRegionNumber));
-      if (iter != fst_reduced.labels.end()) {
-        fst_reduced.labels.insert({sndEltNumber, iter->second});
-        if (fst_reduced.fresh_label < Region(sndEltNumber))
-          fst_reduced.fresh_label = Region(sndEltNumber + 1);
-        continue;
+      //
+      // In this case, we do not need to propagate transfer into fstRegion since
+      // we would have handled that already when we visited our earlier
+      // representative element number.
+      {
+        auto iter =
+            fstReduced.elementToRegionMap.find(Element(sndRegionNumber));
+        if (iter != fstReduced.elementToRegionMap.end()) {
+          fstReduced.elementToRegionMap.insert({sndEltNumber, iter->second});
+          if (fstReduced.fresh_label < Region(sndEltNumber))
+            fstReduced.fresh_label = Region(sndEltNumber + 1);
+          continue;
+        }
       }
 
       // Otherwise, we have an element that is not in fst and its representative
@@ -385,27 +419,32 @@ public:
       // since we should have visited our representative earlier if we were not
       // due to our traversal being in order. Thus just add this to fst_reduced.
       assert(sndEltNumber == Element(sndRegionNumber));
-      fst_reduced.labels.insert({sndEltNumber, sndRegionNumber});
-      if (fst_reduced.fresh_label < sndRegionNumber)
-        fst_reduced.fresh_label = Region(sndEltNumber + 1);
+      fstReduced.elementToRegionMap.insert({sndEltNumber, sndRegionNumber});
+      auto iter = sndReduced.regionToTransferredInstMap.find(sndRegionNumber);
+      if (iter != sndReduced.regionToTransferredInstMap.end()) {
+        fstReduced.regionToTransferredInstMap.insert(
+            {sndRegionNumber, iter->second});
+      }
+      if (fstReduced.fresh_label < sndRegionNumber)
+        fstReduced.fresh_label = Region(sndEltNumber + 1);
     }
 
     LLVM_DEBUG(llvm::dbgs() << "JOIN PEFORMED: \nFST: ";
                fst.print(llvm::dbgs()); llvm::dbgs() << "SND: ";
                snd.print(llvm::dbgs()); llvm::dbgs() << "RESULT: ";
-               fst_reduced.print(llvm::dbgs()););
+               fstReduced.print(llvm::dbgs()););
 
-    assert(fst_reduced.is_canonical_correct());
+    assert(fstReduced.is_canonical_correct());
 
     // fst_reduced is now the join
-    return fst_reduced;
+    return fstReduced;
   }
 
   /// Return a vector of the transferred values in this partition.
   std::vector<Element> getTransferredVals() const {
     // For effeciency, this could return an iterator not a vector.
     std::vector<Element> transferredVals;
-    for (auto [i, _] : labels)
+    for (auto [i, _] : elementToRegionMap)
       if (isTransferred(i))
         transferredVals.push_back(i);
     return transferredVals;
@@ -417,7 +456,7 @@ public:
     // For effeciency, this could return an iterator not a vector.
     std::map<Region, std::vector<Element>> buckets;
 
-    for (auto [i, label] : labels)
+    for (auto [i, label] : elementToRegionMap)
       buckets[label].push_back(i);
 
     std::vector<std::vector<Element>> doubleVec;
@@ -433,7 +472,7 @@ public:
     if (canonical)
       llvm::dbgs() << "(canonical)";
     llvm::dbgs() << "(fresh=" << fresh_label << "){";
-    for (const auto &[i, label] : labels)
+    for (const auto &[i, label] : elementToRegionMap)
       llvm::dbgs() << "[" << i << ": " << label << "] ";
     llvm::dbgs() << "}\n";
   }
@@ -441,21 +480,43 @@ public:
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os) const {
-    std::map<Region, std::vector<Element>> buckets;
+    SmallFrozenMultiMap<Region, Element, 8> multimap;
 
-    for (auto [i, label] : labels)
-      buckets[label].push_back(i);
+    for (auto [eltNo, regionNo] : elementToRegionMap)
+      multimap.insert(regionNo, eltNo);
+
+    multimap.setFrozen();
 
     os << "[";
-    for (auto [label, indices] : buckets) {
-      os << (label.isTransferred() ? "{" : "(");
+    for (auto [regionNo, elementNumbers] : multimap.getRange()) {
+      bool isTransferred = regionToTransferredInstMap.count(regionNo);
+      os << (isTransferred ? "{" : "(");
       int j = 0;
-      for (Element i : indices) {
+      for (Element i : elementNumbers) {
         os << (j++ ? " " : "") << i;
       }
-      os << (label.isTransferred() ? "}" : ")");
+      os << (isTransferred ? "}" : ")");
     }
     os << "]\n";
+  }
+
+  bool isTransferred(Element val) const {
+    auto iter = elementToRegionMap.find(val);
+    if (iter == elementToRegionMap.end())
+      return false;
+    return regionToTransferredInstMap.count(iter->second);
+  }
+
+  /// Return the instruction that transferred \p val's region or nullptr
+  /// otherwise.
+  SILInstruction *getTransferred(Element val) const {
+    auto iter = elementToRegionMap.find(val);
+    if (iter == elementToRegionMap.end())
+      return nullptr;
+    auto iter2 = regionToTransferredInstMap.find(iter->second);
+    if (iter2 == regionToTransferredInstMap.end())
+      return nullptr;
+    return iter2->second;
   }
 
 private:
@@ -466,31 +527,37 @@ private:
       return true; // vacuously correct
 
     auto fail = [&](Element i, int type) {
-      llvm::dbgs() << "FAIL(i=" << i << "; type=" << type << "): ";
-      print(llvm::dbgs());
+      llvm::errs() << "FAIL(i=" << i << "; type=" << type << "): ";
+      print(llvm::errs());
       return false;
     };
 
-    for (auto &[i, label] : labels) {
-      // Correctness vacuous at transferred indices.
-      if (label.isTransferred())
-        continue;
+    llvm::SmallDenseSet<Region, 8> seenRegion;
+    for (auto &[eltNo, regionNo] : elementToRegionMap) {
+      // See if all of our regionToTransferMap keys are regions in labels.
+      if (regionToTransferredInstMap.count(regionNo))
+        seenRegion.insert(regionNo);
 
       // Labels should not exceed fresh_label.
-      if (label >= fresh_label)
-        return fail(i, 0);
+      if (regionNo >= fresh_label)
+        return fail(eltNo, 0);
 
       // The label of a region should be at most as large as each index in it.
-      if ((unsigned)label > i)
-        return fail(i, 1);
+      if ((unsigned)regionNo > eltNo)
+        return fail(eltNo, 1);
 
       // Each region label should also be an element of the partition.
-      if (!labels.count(Element(label)))
-        return fail(i, 2);
+      if (!elementToRegionMap.count(Element(regionNo)))
+        return fail(eltNo, 2);
 
       // Each element that is also a region label should be mapped to itself.
-      if (labels.at(Element(label)) != label)
-        return fail(i, 3);
+      if (elementToRegionMap.at(Element(regionNo)) != regionNo)
+        return fail(eltNo, 3);
+    }
+
+    if (seenRegion.size() != regionToTransferredInstMap.size()) {
+      llvm::report_fatal_error(
+          "FAIL! regionToTransferMap has a region that isn't being tracked?!");
     }
 
     return true;
@@ -506,47 +573,103 @@ private:
       return;
     canonical = true;
 
-    std::map<Region, Region> relabel;
+    std::map<Region, Region> oldRegionToRelabeledMap;
 
-    // relies on in-order traversal of labels
-    for (auto &[i, label] : labels) {
-      // leave -1 (transferred region) as is
-      if (label.isTransferred())
-        continue;
-
-      if (!relabel.count(label)) {
+    // We rely on in-order traversal of labels to ensure that we always take the
+    // lowest eltNumber.
+    for (auto &[eltNo, regionNo] : elementToRegionMap) {
+      if (!oldRegionToRelabeledMap.count(regionNo)) {
         // if this is the first time encountering this region label,
         // then this region label should be relabelled to this index,
         // so enter that into the map
-        relabel.insert_or_assign(label, Region(i));
+        oldRegionToRelabeledMap.insert_or_assign(regionNo, Region(eltNo));
       }
 
-      // update this label with either its own index, or a prior index that
-      // shared a region with it
-      label = relabel.at(label);
+      // Update this label with either its own index, or a prior index that
+      // shared a region with it.
+      regionNo = oldRegionToRelabeledMap.at(regionNo);
 
-      // the maximum index iterated over will be used here to appropriately
-      // set fresh_label
-      fresh_label = Region(i + 1);
+      // The maximum index iterated over will be used here to appropriately
+      // set fresh_label.
+      fresh_label = Region(eltNo + 1);
+    }
+
+    // Then relabel our regionToTransferredInst map if we need to by swapping
+    // out the old map and updating.
+    llvm::SmallDenseMap<Region, SILInstruction *, 2> oldMap =
+        std::move(regionToTransferredInstMap);
+    for (auto &[oldReg, inst] : oldMap) {
+      auto iter = oldRegionToRelabeledMap.find(oldReg);
+      assert(iter != oldRegionToRelabeledMap.end());
+      regionToTransferredInstMap[iter->second] = inst;
     }
 
     assert(is_canonical_correct());
   }
 
-  // linear time - merge the regions of two indices, maintaining canonicality
-  void merge(Element fst, Element snd) {
-    assert(labels.count(fst) && labels.count(snd));
-    if (labels.at(fst) == labels.at(snd))
-      return;
+  /// Merge the regions of two indices while maintaining canonicality. Returns
+  /// the final region used.
+  ///
+  /// This runs in linear time.
+  Region merge(Element fst, Element snd) {
+    assert(elementToRegionMap.count(fst) && elementToRegionMap.count(snd));
 
-    // maintain canonicality by renaming the greater-numbered region
-    if (labels.at(fst) < labels.at(snd))
-      horizontalUpdate(labels, snd, labels.at(fst));
-    else
-      horizontalUpdate(labels, fst, labels.at(snd));
+    auto fstRegion = elementToRegionMap.at(fst);
+    auto sndRegion = elementToRegionMap.at(snd);
+
+    if (fstRegion == sndRegion)
+      return fstRegion;
+
+    // Maintain canonicality by renaming the greater-numbered region to the
+    // smaller region.
+    std::optional<Region> result;
+    if (fstRegion < sndRegion) {
+      result = fstRegion;
+
+      // Rename snd to use first region.
+      horizontalUpdate(elementToRegionMap, snd, fstRegion);
+      auto iter = regionToTransferredInstMap.find(sndRegion);
+      if (iter != regionToTransferredInstMap.end()) {
+        regionToTransferredInstMap.try_emplace(fstRegion, iter->second);
+        regionToTransferredInstMap.erase(iter);
+      }
+    } else {
+      result = sndRegion;
+
+      horizontalUpdate(elementToRegionMap, fst, sndRegion);
+      auto iter = regionToTransferredInstMap.find(fstRegion);
+      if (iter != regionToTransferredInstMap.end()) {
+        regionToTransferredInstMap.try_emplace(sndRegion, iter->second);
+        regionToTransferredInstMap.erase(iter);
+      }
+    }
 
     assert(is_canonical_correct());
-    assert(labels.at(fst) == labels.at(snd));
+    assert(elementToRegionMap.at(fst) == elementToRegionMap.at(snd));
+    return *result;
+  }
+
+private:
+  /// For the passed `map`, ensure that `key` maps to `val`. If `key` already
+  /// mapped to a different value, ensure that all other keys mapped to that
+  /// value also now map to `val`. This is a relatively expensive (linear time)
+  /// operation that's unfortunately used pervasively throughout PartitionOp
+  /// application. If this is a performance bottleneck, let's consider
+  /// optimizing it to a true union-find or other tree-based data structure.
+  static void horizontalUpdate(std::map<Element, Region> &map, Element key,
+                               Region val) {
+    if (!map.count(key)) {
+      map.insert({key, val});
+      return;
+    }
+
+    Region oldVal = map.at(key);
+    if (val == oldVal)
+      return;
+
+    for (auto [otherKey, otherVal] : map)
+      if (otherVal == oldVal)
+        map.insert_or_assign(otherKey, val);
   }
 };
 
@@ -562,6 +685,9 @@ private:
 /// event that a region containing one of the nontransferrable indices is
 /// transferred, the closure will be called with the offending transfer.
 struct PartitionOpEvaluator {
+  using Element = PartitionPrimitives::Element;
+  using Region = PartitionPrimitives::Region;
+
   Partition &p;
 
   /// If this PartitionOp evaluator should emit log statements.
@@ -569,7 +695,16 @@ struct PartitionOpEvaluator {
 
   /// If set to a non-null function, then this callback will be called if we
   /// discover a transferred value was used after it was transferred.
-  std::function<void(const PartitionOp &, Element)> failureCallback = nullptr;
+  ///
+  /// The arguments passed to the closure are:
+  ///
+  /// 1. The PartitionOp that required the element to be alive.
+  ///
+  /// 2. The element in the PartitionOp that was asked to be alive.
+  ///
+  /// 3. The instruction that originally transferred the region.
+  std::function<void(const PartitionOp &, Element, SILInstruction *)>
+      failureCallback = nullptr;
 
   /// A list of elements that cannot be transferred. Whenever we transfer, we
   /// check this list to see if we are transferring the element and then call
@@ -591,10 +726,11 @@ struct PartitionOpEvaluator {
   PartitionOpEvaluator(Partition &p) : p(p) {}
 
   /// A wrapper around the failure callback that checks if it is nullptr.
-  void handleFailure(const PartitionOp &op, Element elt) const {
+  void handleFailure(const PartitionOp &op, Element elt,
+                     SILInstruction *transferringInst) const {
     if (!failureCallback)
       return;
-    failureCallback(op, elt);
+    failureCallback(op, elt, transferringInst);
   }
 
   /// A wrapper around transferNonTransferrableCallback that only calls it if it
@@ -614,7 +750,7 @@ struct PartitionOpEvaluator {
   }
 
   /// Apply \p op to the partition op.
-  void apply(PartitionOp op) {
+  void apply(const PartitionOp &op) const {
     if (emitLog) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
@@ -632,14 +768,15 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Assign:
       assert(op.getOpArgs().size() == 2 &&
              "Assign PartitionOp should be passed 2 arguments");
-      assert(p.labels.count(op.getOpArgs()[1]) &&
+      assert(p.elementToRegionMap.count(op.getOpArgs()[1]) &&
              "Assign PartitionOp's source argument should be already tracked");
-      // if assigning to a missing region, handle the failure
-      if (p.isTransferred(op.getOpArgs()[1]))
-        handleFailure(op, op.getOpArgs()[1]);
+      // If we are using a region that was transferred as our assignment source
+      // value... emit an error.
+      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1], transferringInst);
 
-      p.labels.insert_or_assign(op.getOpArgs()[0],
-                                p.labels.at(op.getOpArgs()[1]));
+      p.elementToRegionMap.insert_or_assign(
+          op.getOpArgs()[0], p.elementToRegionMap.at(op.getOpArgs()[1]));
 
       // assignment could have invalidated canonicality of either the old region
       // of op.getOpArgs()[0] or the region of op.getOpArgs()[1], or both
@@ -650,7 +787,7 @@ struct PartitionOpEvaluator {
              "AssignFresh PartitionOp should be passed 1 argument");
 
       // map index op.getOpArgs()[0] to a fresh label
-      p.labels.insert_or_assign(op.getOpArgs()[0], p.fresh_label);
+      p.elementToRegionMap.insert_or_assign(op.getOpArgs()[0], p.fresh_label);
 
       // increment the fresh label so it remains fresh
       p.fresh_label = Region(p.fresh_label + 1);
@@ -659,19 +796,20 @@ struct PartitionOpEvaluator {
     case PartitionOpKind::Transfer: {
       assert(op.getOpArgs().size() == 1 &&
              "Transfer PartitionOp should be passed 1 argument");
-      assert(p.labels.count(op.getOpArgs()[0]) &&
+      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
              "Transfer PartitionOp's argument should already be tracked");
 
       // check if any nontransferrables are transferred here, and handle the
       // failure if so
       for (Element nonTransferrable : nonTransferrableElements) {
         assert(
-            p.labels.count(nonTransferrable) &&
+            p.elementToRegionMap.count(nonTransferrable) &&
             "nontransferrables should be function args and self, and therefore"
             "always present in the label map because of initialization at "
             "entry");
         if (!p.isTransferred(nonTransferrable) &&
-            p.labels.at(nonTransferrable) == p.labels.at(op.getOpArgs()[0])) {
+            p.elementToRegionMap.at(nonTransferrable) ==
+                p.elementToRegionMap.at(op.getOpArgs()[0])) {
           handleTransferNonTransferrable(op, nonTransferrable);
           break;
         }
@@ -681,8 +819,8 @@ struct PartitionOpEvaluator {
       // actor derived, we need to treat as nontransferrable.
       if (isActorDerived(op.getOpArgs()[0]))
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
-      Region elementRegion = p.labels.at(op.getOpArgs()[0]);
-      if (llvm::any_of(p.labels,
+      Region elementRegion = p.elementToRegionMap.at(op.getOpArgs()[0]);
+      if (llvm::any_of(p.elementToRegionMap,
                        [&](const std::pair<Element, Region> &pair) -> bool {
                          if (pair.second != elementRegion)
                            return false;
@@ -690,35 +828,32 @@ struct PartitionOpEvaluator {
                        }))
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
 
-      // Ensure if the region is transferred...
-      if (!p.isTransferred(op.getOpArgs()[0]))
-        // that all elements associated with the region are marked as
-        // transferred.
-        horizontalUpdate(p.labels, op.getOpArgs()[0], Region::transferred());
+      // Mark op.getOpArgs()[0] as transferred.
+      p.markTransferred(op.getOpArgs()[0], op.getSourceInst(true));
       break;
     }
     case PartitionOpKind::Merge:
       assert(op.getOpArgs().size() == 2 &&
              "Merge PartitionOp should be passed 2 arguments");
-      assert(p.labels.count(op.getOpArgs()[0]) &&
-             p.labels.count(op.getOpArgs()[1]) &&
+      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
+             p.elementToRegionMap.count(op.getOpArgs()[1]) &&
              "Merge PartitionOp's arguments should already be tracked");
 
       // if attempting to merge a transferred region, handle the failure
-      if (p.isTransferred(op.getOpArgs()[0]))
-        handleFailure(op, op.getOpArgs()[0]);
-      if (p.isTransferred(op.getOpArgs()[1]))
-        handleFailure(op, op.getOpArgs()[1]);
+      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0], transferringInst);
+      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[1]))
+        handleFailure(op, op.getOpArgs()[1], transferringInst);
 
       p.merge(op.getOpArgs()[0], op.getOpArgs()[1]);
       break;
     case PartitionOpKind::Require:
       assert(op.getOpArgs().size() == 1 &&
              "Require PartitionOp should be passed 1 argument");
-      assert(p.labels.count(op.getOpArgs()[0]) &&
+      assert(p.elementToRegionMap.count(op.getOpArgs()[0]) &&
              "Require PartitionOp's argument should already be tracked");
-      if (p.isTransferred(op.getOpArgs()[0]))
-        handleFailure(op, op.getOpArgs()[0]);
+      if (auto *transferringInst = p.getTransferred(op.getOpArgs()[0]))
+        handleFailure(op, op.getOpArgs()[0], transferringInst);
     }
 
     assert(p.is_canonical_correct());
