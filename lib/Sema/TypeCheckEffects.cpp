@@ -2922,7 +2922,12 @@ private:
       auto asyncKind = classification.getConditionalKind(EffectKind::Async);
       E->setNoAsync(asyncKind == ConditionalEffectKind::None);
     } else {
-      E->setThrows(ThrownErrorDestination());
+      // HACK: functions can get queued multiple times in
+      // definedFunctions, so be sure to be idempotent.
+      if (!E->isThrowsSet()) {
+        E->setThrows(ThrownErrorDestination());
+      }
+
       E->setNoAsync(true);
     }
 
