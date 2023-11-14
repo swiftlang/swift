@@ -645,15 +645,8 @@ enum class GenericEnvironmentKind : uint8_t {
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class MacroRole : uint8_t {
-  Expression,
-  Declaration,
-  Accessor,
-  MemberAttribute,
-  Member,
-  Peer,
-  Conformance,
-  CodeItem,
-  Extension,
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
 };
 using MacroRoleField = BCFixed<4>;
 

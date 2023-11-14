@@ -222,17 +222,17 @@ struct RawCharSourceRange {
   unsigned Length;
 };
 
-enum class MacroRole : uint32_t {
-  // This should align with 'swift::MacroRole'.
-  Expression = 0x01,
-  Declaration = 0x02,
-  Accessor = 0x04,
-  MemberAttribute = 0x08,
-  Member = 0x10,
-  Peer = 0x20,
-  Conformance = 0x40,
-  CodeItem = 0x80,
-  Extension = 0x100,
+enum class MacroRoleBits: uint8_t {
+#define MACRO_ROLE(Name, Description) Name,
+#include "swift/Basic/MacroRoles.def"
+};
+
+/// The context in which a macro can be used, which determines the syntax it
+/// uses.
+enum class MacroRole: uint32_t {
+#define MACRO_ROLE(Name, Description) \
+    Name = 1 << static_cast<uint8_t>(MacroRoleBits::Name),
+#include "swift/Basic/MacroRoles.def"
 };
 using MacroRoles = swift::OptionSet<MacroRole>;
 
