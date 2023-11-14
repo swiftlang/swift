@@ -41,7 +41,7 @@ enum SingletonTypeSynthesizer {
   _any,
   _bridgeObject,
   _error,
-  _executor, // the 'BuiltinExecutor' type
+  _executor,
   _job,
   _nativeObject,
   _never,
@@ -49,8 +49,7 @@ enum SingletonTypeSynthesizer {
   _rawUnsafeContinuation,
   _void,
   _word,
-  _executorProtocol, // the '_Concurrency.Executor' protocol
-  _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
+  _serialExecutor,
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -67,14 +66,8 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);
-  case _executorProtocol:
-    return SC.Context.getProtocol(KnownProtocolKind::Executor)
-      ->getDeclaredInterfaceType();
-    case _serialExecutor:
+  case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
-      ->getDeclaredInterfaceType();
-  case _taskExecutor:
-    return SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)
       ->getDeclaredInterfaceType();
   }
 }
