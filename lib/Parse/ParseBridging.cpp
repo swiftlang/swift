@@ -96,6 +96,7 @@ using ASTFromSyntaxTreeCallback = T *(void *sourceFile,
                                       BridgedSourceLoc sourceLoc,
                                       BridgedSourceLoc &endLoc);
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
 /// Parse by constructing a C++ AST node from the Swift syntax tree via ASTGen.
 template <typename T>
 static ParserResult<T>
@@ -123,6 +124,7 @@ parseASTFromSyntaxTree(swift::Parser &P,
 
   return makeParserResult(astNode);
 }
+#endif
 
 ParserResult<TypeRepr> Parser::parseTypeReprFromSyntaxTree() {
 #if SWIFT_BUILD_SWIFT_SYNTAX
@@ -133,7 +135,7 @@ ParserResult<TypeRepr> Parser::parseTypeReprFromSyntaxTree() {
                                       CurDeclContext, Context, *this, &endLoc);
   });
 #else
-  llvm_unreachable("ASTGen is not supported")
+  llvm_unreachable("ASTGen is not supported");
 #endif
 }
 
