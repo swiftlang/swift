@@ -209,6 +209,7 @@ case RefactoringKind::KIND: {                                                  \
       return true;                                                             \
   }
 #include "swift/Refactoring/RefactoringKinds.def"
+    case RefactoringKind::LocalRename:
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
     case RefactoringKind::FindLocalRenameRanges:

@@ -273,14 +273,6 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
   return RenameLoc{symbol.line, symbol.column, usage, oldName, isFunctionLike};
 }
 
-bool RefactoringActionLocalRename::isApplicable(
-    ResolvedCursorInfoPtr CursorInfo, DiagnosticEngine &Diag) {
-  llvm::Optional<RenameInfo> Info = getRenameInfo(CursorInfo);
-  return Info &&
-         Info->Availability.AvailableKind == RefactorAvailableKind::Available &&
-         Info->Availability.Kind == RefactoringKind::LocalRename;
-}
-
 /// Get the decl context that we need to walk when renaming \p VD.
 ///
 /// This \c DeclContext contains all possible references to \c VD within the
@@ -376,38 +368,6 @@ RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo) {
   indexDeclContext(RenameScope, rangeCollector);
 
   return rangeCollector.takeResults();
-}
-
-bool RefactoringActionLocalRename::performChange() {
-  if (StartLoc.isInvalid()) {
-    DiagEngine.diagnose(SourceLoc(), diag::invalid_location);
-    return true;
-  }
-  if (!DeclNameViewer(PreferredName).isValid()) {
-    DiagEngine.diagnose(SourceLoc(), diag::invalid_name, PreferredName);
-    return true;
-  }
-  if (!TheFile) {
-    DiagEngine.diagnose(StartLoc, diag::location_module_mismatch,
-                        MD->getNameStr());
-    return true;
-  }
-
-  llvm::Optional<RenameInfo> info =
-      getRenameInfoForLocalRename(TheFile, StartLoc, DiagEngine);
-  if (!info) {
-    // getRenameInfoForLocalRename has already produced an error in `DiagEngine`
-    return true;
-  }
-
-  RenameLocs renameRanges = localRenameLocs(TheFile, *info);
-  if (renameRanges.getLocations().empty())
-    return true;
-
-  auto consumers = DiagEngine.takeConsumers();
-  assert(consumers.size() == 1);
-  return syntacticRename(TheFile, renameRanges.getLocations(), PreferredName,
-                         EditConsumer, *consumers[0]);
 }
 
 int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
