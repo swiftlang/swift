@@ -5179,6 +5179,10 @@ public:
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
 
+  /// Determine whether this is an invertible protocol,
+  /// i.e., for a protocol P, the inverse constraint ~P exists.
+  bool isInvertibleProtocol() const;
+
 private:
   void computeKnownProtocolKind() const;
 

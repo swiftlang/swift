@@ -177,3 +177,30 @@ extension EnumExtendo: ~Copyable {} // expected-error {{cannot apply inverse '~C
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{cannot add inverse constraint 'Self: ~Copyable' on generic parameter 'Self' defined in outer scope}}
+
+protocol NoCopyP: ~Copyable {}
+
+func needsCopyable<T>(_ t: T) {} // expected-note 2{{generic parameter 'T' has an implicit Copyable requirement}}
+func noCopyable(_ t: borrowing some ~Copyable) {}
+func noCopyableAndP(_ t: borrowing some NoCopyP & ~Copyable) {}
+
+func openingExistentials(_ a: borrowing any NoCopyP & ~Copyable,
+                         _ b: any NoCopyP,
+                         _ nc: borrowing any ~Copyable) {
+  needsCopyable(a) // expected-error {{noncopyable type 'any NoCopyP & ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  noCopyable(a)
+  noCopyableAndP(a)
+
+  needsCopyable(b)
+  noCopyable(b)
+  noCopyableAndP(b)
+
+  needsCopyable(nc) // expected-error {{noncopyable type 'any ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  noCopyable(nc)
+  noCopyableAndP(nc) // expected-error {{global function 'noCopyableAndP' requires that 'some NoCopyP & ~Copyable' conform to 'NoCopyP'}}
+}
+
+func project<CurValue>(_ base: CurValue) { }
+func testSpecial(_ a: Any) {
+  _openExistential(a, do: project)
+}

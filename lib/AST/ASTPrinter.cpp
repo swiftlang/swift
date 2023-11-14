@@ -7192,17 +7192,29 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    if (T->getMembers().empty()) {
-      if (T->hasExplicitAnyObject())
-        Printer << "AnyObject";
-      else
-        Printer.printKeyword("Any", Options);
-    } else {
-      interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
-                 [&] { Printer << " & "; });
-      if (T->hasExplicitAnyObject())
-        Printer << " & AnyObject";
-    }
+    interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
+        [&] { Printer << " & "; });
+
+    bool printed = !T->getMembers().empty();
+    auto printSpecial = [&](llvm::StringRef str, bool tilde=false) {
+      if (printed)
+        Printer << " & ";
+
+      if (tilde)
+        Printer << "~";
+
+      Printer << str;
+      printed = true;
+    };
+
+    if (T->hasExplicitAnyObject())
+      printSpecial("AnyObject");
+
+    for (auto ip : T->getInverses())
+      printSpecial(getProtocolName(getKnownProtocolKind(ip)), true);
+
+    if (!printed)
+      Printer.printKeyword("Any", Options);
   }
 
   void visitParameterizedProtocolType(ParameterizedProtocolType *T) {

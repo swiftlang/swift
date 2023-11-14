@@ -658,6 +658,13 @@ AbstractGenericSignatureRequest::evaluate(
       requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
   }
 
+  /// Next, we need to expand default requirements for the added parameters.
+  SmallVector<Type, 2> localGPs;
+  for (auto *gtpt : addedParameters)
+    localGPs.push_back(gtpt);
+
+  expandDefaultRequirements(ctx, localGPs, requirements, errors);
+
   auto &rewriteCtx = ctx.getRewriteContext();
 
   if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
