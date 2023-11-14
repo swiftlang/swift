@@ -460,10 +460,10 @@ function Ensure-SwiftToolchain($Arch) {
   New-Item -ItemType Directory -ErrorAction Ignore "$BinaryCache\toolchains" | Out-Null
   Write-Output "Extracting Swift toolchain..."
   Invoke-Program "$BinaryCache\wix-4.0.1\tools\net6.0\any\wix.exe" -- burn extract "$BinaryCache\${PinnedToolchain}.exe" -out "$BinaryCache\toolchains\"
-  Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a0" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a1" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a2" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
-  Invoke-Program -OutNull msiexec.exe /qn /a "$BinaryCache\toolchains\a3" TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  Invoke-Program -OutNull msiexec.exe /lvx! a0.log /qn /a "$BinaryCache\toolchains\a0" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  Invoke-Program -OutNull msiexec.exe /lvx! a1.log /qn /a "$BinaryCache\toolchains\a1" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  Invoke-Program -OutNull msiexec.exe /lvx! a2.log /qn /a "$BinaryCache\toolchains\a2" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
+  Invoke-Program -OutNull msiexec.exe /lvx! a3.log /qn /a "$BinaryCache\toolchains\a3" ALLUSERS=1 TARGETDIR="$BinaryCache\toolchains\${PinnedToolchain}"
 }
 
 function TryAdd-KeyValue([hashtable]$Hashtable, [string]$Key, [string]$Value) {
