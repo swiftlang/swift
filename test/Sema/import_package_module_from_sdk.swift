@@ -29,7 +29,7 @@
 package func log(level: Int) {}
 
 //--- Client1.swift
-import LibInSDK // expected-warning {{module 'LibInSDK' is in package 'libPkg' but was loaded from SDK; modules of the same package should be built locally}}
+import LibInSDK // expected-warning {{module 'LibInSDK' is in package 'libPkg' but was loaded from SDK; modules of the same package should be built locally from source only}}
 
 func someFunc() {
   log(level: 1)

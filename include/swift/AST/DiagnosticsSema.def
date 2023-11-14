@@ -1110,7 +1110,7 @@ ERROR(in_package_module_not_compiled_from_source_or_package_interface,none,
 
 WARNING(in_package_module_not_compiled_locally,none,
         "module %0 is in package %1 but was loaded from SDK; "
-        "modules of the same package should be built locally: %2",
+        "modules of the same package should be built locally from source only: %2",
         (Identifier, Identifier, StringRef))
 
 ERROR(import_restriction_conflict,none,

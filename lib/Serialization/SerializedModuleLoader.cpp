@@ -641,7 +641,7 @@ SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs, ASTContex
   // Check if a package interface exists and if the package name applies to
   // the importer module.
   auto pkgPath = getPackageInterfacePathIfInSamePackage(fs, ctx).value_or("");
-  if (fs.exists(pkgPath))
+  if (!pkgPath.empty() && fs.exists(pkgPath))
     return pkgPath;
 
   // If above fails, use the existing logic as fallback.
