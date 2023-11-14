@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -disable-availability-checking
-// RUN: %FileCheck %s < %t/resolve_imports.tbd
+// RUN: %target-swift-frontend -resolve-imports -emit-tbd -emit-tbd-path %t/resolve_imports.tbd %s -disable-availability-checking -tbd-install_name resolve_imports
+// RUN: %llvm-nm %t/resolve_imports.tbd |  %FileCheck %s 
 
 // REQUIRES: OS=macosx 
 
@@ -27,17 +27,15 @@ extension PrivateProto {
 
 public struct S: PrivateProto {}
 
-// CHECK: symbols: [
-// CHECK: '_$s15resolve_imports1CCMa',
-// CHECK: '_$s15resolve_imports1CCMm',
-// CHECK: '_$s15resolve_imports1CCMn',
-// CHECK: '_$s15resolve_imports1CCN',
-// CHECK: '_$s15resolve_imports1CCfD',
-// CHECK: '_$s15resolve_imports1CCfd',
-// CHECK: '_$s15resolve_imports1SVMa',
-// CHECK: '_$s15resolve_imports1SVMn',
-// CHECK: '_$s15resolve_imports1SVN',
-// CHECK: '_$s15resolve_imports1SVSQAAMc',
-// CHECK: '_$s15resolve_imports1SVSQAASQ2eeoiySbx_xtFZTW',
-// CHECK: _main
-// CHECK: ]
+// CHECK: T _$s15resolve_imports1CCMa
+// CHECK-NEXT: D _$s15resolve_imports1CCMm
+// CHECK-NEXT: T _$s15resolve_imports1CCMn
+// CHECK-NEXT: D _$s15resolve_imports1CCN
+// CHECK-NEXT: T _$s15resolve_imports1CCfD
+// CHECK-NEXT: T _$s15resolve_imports1CCfd
+// CHECK-NEXT: T _$s15resolve_imports1SVMa
+// CHECK-NEXT: T _$s15resolve_imports1SVMn
+// CHECK-NEXT: D _$s15resolve_imports1SVN
+// CHECK-NEXT: T _$s15resolve_imports1SVSQAAMc
+// CHECK-NEXT: T _$s15resolve_imports1SVSQAASQ2eeoiySbx_xtFZTW
+// CHECK-NEXT: T _main
