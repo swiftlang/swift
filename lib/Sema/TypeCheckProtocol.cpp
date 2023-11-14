@@ -5777,12 +5777,16 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
 
     // First, if we have a superclass constraint, the class may conform
     // concretely.
+    //
+    // Note that `allowMissing` is not propagated here because it
+    // would result in a missing conformance if type is `& Sendable`
+    // protocol composition. It's handled for type as a whole below.
     if (auto superclass = layout.getSuperclass()) {
       auto result =
           (skipConditionalRequirements
-           ? M->lookupConformance(superclass, Proto, allowMissing)
-           : TypeChecker::conformsToProtocol(
-               superclass, Proto, M, allowMissing));
+               ? M->lookupConformance(superclass, Proto, /*allowMissing=*/false)
+               : TypeChecker::conformsToProtocol(superclass, Proto, M,
+                                                 /*allowMissing=*/false));
       if (result) {
         return result;
       }
@@ -5800,15 +5804,8 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, ModuleDecl *M,
         return ProtocolConformanceRef(Proto);
     }
 
-    // FIXME: Unify with shouldCreateMissingConformances
-    if (allowMissing &&
-        Proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
-      return ProtocolConformanceRef(
-          M->getASTContext().getBuiltinConformance(
-            T, Proto, BuiltinConformanceKind::Missing));
-    }
-
-    return ProtocolConformanceRef::forInvalid();
+    return allowMissing ? ProtocolConformanceRef::forMissingOrInvalid(T, Proto)
+                        : ProtocolConformanceRef::forInvalid();
   }
 
   // For non-existential types, this is equivalent to checking conformance.
