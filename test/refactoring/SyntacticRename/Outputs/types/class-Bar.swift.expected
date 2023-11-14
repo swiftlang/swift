@@ -2,24 +2,24 @@ class /*/*class-Foo:unknown*/Foo in comment*/ /*class-Foo:def*/Foo {}
 protocol /*protocol-Proto:def*/Proto {
 	associatedtype /*associated-Item:def*/Item
 }
-class /*class-Bar:def*/MoreBar : /*class-Foo*/Foo, /*protocol-Proto*/Proto {
+class /*class-Bar:def*/<base>Bar</base> : /*class-Foo*/Foo, /*protocol-Proto*/Proto {
 	typealias /*associated-Item:def*/Item = Int
 }
 
-let x: /*class-Bar*/MoreBar = /*class-Bar*/MoreBar()
+let x: /*class-Bar*/<base>Bar</base> = /*class-Bar*/<base>Bar</base>()
 
-func foo(a: /*class-Foo*/Foo, b: /*class-Bar*/MoreBar, c: inout /*class-Bar*/MoreBar) -> /*class-Foo*/Foo {
-	return /*class-Bar*/MoreBar()
+func foo(a: /*class-Foo*/Foo, b: /*class-Bar*/<base>Bar</base>, c: inout /*class-Bar*/<base>Bar</base>) -> /*class-Foo*/Foo {
+	return /*class-Bar*/<base>Bar</base>()
 }
 
-typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/Foo, /*class-Bar*/MoreBar) -> /*class-Bar*/MoreBar
+typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/Foo, /*class-Bar*/<base>Bar</base>) -> /*class-Bar*/<base>Bar</base>
 var example: /*alias-FuncType*/FuncType = {a, b in x}
 
 func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}
 
 class /*class-Animal:def*/Animal</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/Item == Int {}
 
-var anAnimal: /*class-Animal*/Animal<Int, /*class-Bar*/MoreBar> = /*class-Animal*/Animal()
+var anAnimal: /*class-Animal*/Animal<Int, /*class-Bar*/<base>Bar</base>> = /*class-Animal*/Animal()
 extension /*class-Animal:def*/Animal {
 	func boo(a: /*generic-T*/T, b: /*generic-U*/U) {}
 }

@@ -4,4 +4,4 @@ _ = /*test:ref*/`foo`(`x`:)
 
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="test" -is-function-like -old-name "foo(x:)" >> %t.ranges/backticks-separate-arglabel.swift.expected
-// RUN: diff -u %S/FindRangeOutputs/backticks-separate-arglabel.swift.expected %t.ranges/backticks-separate-arglabel.swift.expected
+// RUN: diff -u %S/Outputs/backticks-separate-arglabel.swift.expected %t.ranges/backticks-separate-arglabel.swift.expected
