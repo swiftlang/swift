@@ -28,8 +28,20 @@
 extern "C" {
 #endif
 
-typedef void __attribute__((swiftcall)) (*HeapObjectDestroyer)(
-    __attribute__((swift_context)) void *object);
+// FIXME: Replace with __has_feature(swiftcc) once that's added to Clang.
+#if __has_feature(swiftasynccc)
+#define SWIFT_CC_swift __attribute__((swiftcall))
+#define SWIFT_CONTEXT __attribute__((swift_context))
+#define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
+#define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
+#else
+#define SWIFT_CC_swift
+#define SWIFT_CONTEXT
+#define SWIFT_ERROR_RESULT
+#define SWIFT_INDIRECT_RESULT
+#endif
+
+typedef void SWIFT_CC_swift (*HeapObjectDestroyer)(SWIFT_CONTEXT void *object);
 
 static inline void _swift_embedded_invoke_heap_object_destroy(void *object) {
   void *metadata = *(void **)object;

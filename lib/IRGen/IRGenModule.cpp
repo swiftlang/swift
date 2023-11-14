@@ -572,7 +572,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   C_CC = getOptions().PlatformCCallingConvention;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
-  SwiftCC = llvm::CallingConv::Swift;
+
+  bool isSwiftCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_Swift)
+    == clang::TargetInfo::CCCR_OK;
+  if (isSwiftCCSupported) {
+    SwiftCC = llvm::CallingConv::Swift;
+  } else {
+    SwiftCC = DefaultCC;
+  }
 
   bool isAsyncCCSupported =
     clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
@@ -601,15 +609,22 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     AtomicBoolSize = Size(ClangASTContext->getTypeSize(atomicBoolTy));
     AtomicBoolAlign = Alignment(ClangASTContext->getTypeSize(atomicBoolTy));
   }
-  // On WebAssembly, tail optional arguments are not allowed because Wasm requires
-  // callee and caller signature to be the same. So LLVM adds dummy arguments for
-  // `swiftself` and `swifterror`. If there is `swiftself` but is no `swifterror` in
-  // a swiftcc function or invocation, then LLVM adds dummy `swifterror` parameter or
-  // argument. To count up how many dummy arguments should be added, we need to mark
-  // it as `swifterror` even though it's not in register.
-  ShouldUseSwiftError =
-    clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
-      ClangCodeGen->CGM()) || TargetInfo.OutputObjectFormat == llvm::Triple::Wasm;
+  if (TargetInfo.OutputObjectFormat == llvm::Triple::Wasm) {
+    // On WebAssembly, tail optional arguments are not allowed because Wasm
+    // requires callee and caller signature to be the same. So LLVM adds dummy
+    // arguments for `swiftself` and `swifterror`. If there is `swiftself` but
+    // is no `swifterror` in a swiftcc function or invocation, then LLVM adds
+    // dummy `swifterror` parameter or argument. To count up how many dummy
+    // arguments should be added, we need to mark it as `swifterror` even though
+    // it's not in register.
+    ShouldUseSwiftError = true;
+  } else if (!isSwiftCCSupported) {
+    ShouldUseSwiftError = false;
+  } else {
+    ShouldUseSwiftError =
+        clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
+            ClangCodeGen->CGM());
+  }
 
 #ifndef NDEBUG
   sanityCheckStdlib(*this);
