@@ -436,6 +436,7 @@ GlobalActorAttributeRequest::evaluate(
       if (!accessor->isGetter()) {
         decl->diagnose(diag::global_actor_disallowed,
                        decl->getDescriptiveKind())
+            .warnUntilSwiftVersion(6)
             .fixItRemove(globalActorAttr->getRangeWithAt());
 
         auto *storage = accessor->getStorage();
