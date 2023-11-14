@@ -156,7 +156,7 @@ public class PubKlass {
 // CHECK:     get
 // CHECK:   }
 // CHECK:   public init()
-// CHECK:   @objc deinit
+// CHECK:   deinit
 // CHECK: }
 
 class IntrnKlass {
@@ -183,7 +183,7 @@ package class PkgKlass {
 // CHECK-PKG:     get
 // CHECK-PKG:   }
 // CHECK-PKG:   package init()
-// CHECK-PKG:   @objc deinit
+// CHECK-PKG:   deinit
 // CHECK-PKG: }
 
 public protocol PubProto {
