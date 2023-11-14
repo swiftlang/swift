@@ -1529,6 +1529,190 @@ public:
 } // namespace
 
 //===----------------------------------------------------------------------===//
+//                           MARK: Require Liveness
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class BlockLivenessInfo {
+  // Generation counter so we do not need to reallocate.
+  unsigned generation = 0;
+  SILInstruction *firstRequireInst = nullptr;
+
+  void resetIfNew(unsigned newGeneration) {
+    if (generation == newGeneration)
+      return;
+    generation = newGeneration;
+    firstRequireInst = nullptr;
+  }
+
+public:
+  SILInstruction *getInst(unsigned callerGeneration) {
+    resetIfNew(callerGeneration);
+    return firstRequireInst;
+  }
+
+  void setInst(unsigned callerGeneration, SILInstruction *newValue) {
+    resetIfNew(callerGeneration);
+    firstRequireInst = newValue;
+  }
+};
+
+/// We only want to emit errors for the first requires along a path from a
+/// transfer instruction. We discover this by walking from user blocks to
+struct RequireLiveness {
+  unsigned generation;
+  SILInstruction *transferInst;
+  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo;
+  InstructionSet allRequires;
+  InstructionSetWithSize finalRequires;
+
+  /// If we have requires in the def block before our transfer, this is the
+  /// first require.
+  SILInstruction *firstRequireBeforeTransferInDefBlock = nullptr;
+
+  RequireLiveness(unsigned generation, Operand *transferOp,
+                  BasicBlockData<BlockLivenessInfo> &blockLivenessInfo)
+      : generation(generation), transferInst(transferOp->getUser()),
+        blockLivenessInfo(blockLivenessInfo),
+        allRequires(transferOp->getParentFunction()),
+        finalRequires(transferOp->getParentFunction()) {}
+
+  template <typename Collection>
+  void process(Collection collection);
+
+  /// Attempt to process requireInst for our def block. Returns false if
+  /// requireInst was before our def and we need to do interprocedural
+  /// processing. Returns true if requireInst was after our transferInst and we
+  /// were able to appropriately determine if we should emit it or not.
+  void processDefBlock();
+
+  /// Process all requires in block, updating blockLivenessInfo.
+  void processNonDefBlock(SILBasicBlock *block);
+};
+
+} // namespace
+
+void RequireLiveness::processDefBlock() {
+  LLVM_DEBUG(llvm::dbgs() << "    Processing def block!\n");
+  // First walk from the beginning of the block to the transfer instruction to
+  // see if we have any requires before our def. Once we find one, we can skip
+  // the traversal and jump straight to the transfer.
+  for (auto ii = transferInst->getParent()->begin(),
+            ie = transferInst->getIterator();
+       ii != ie; ++ii) {
+    if (allRequires.contains(&*ii) && !firstRequireBeforeTransferInDefBlock) {
+      firstRequireBeforeTransferInDefBlock = &*ii;
+      LLVM_DEBUG(llvm::dbgs() << "        Found transfer before def: "
+                              << *firstRequireBeforeTransferInDefBlock);
+      break;
+    }
+  }
+
+  // Then walk from our transferInst to the end of the block looking for the
+  // first require inst. Once we find it... return.
+  for (auto ii = std::next(transferInst->getIterator()),
+            ie = transferInst->getParent()->end();
+       ii != ie; ++ii) {
+    if (!allRequires.contains(&*ii))
+      continue;
+
+    finalRequires.insert(&*ii);
+    LLVM_DEBUG(llvm::dbgs() << "        Found transfer after def: " << *ii);
+    return;
+  }
+}
+
+void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
+  // Walk from the bottom to the top... assigning to our block state.
+  auto blockState = blockLivenessInfo.get(block);
+  for (auto &inst : llvm::make_range(block->rbegin(), block->rend())) {
+    if (!finalRequires.contains(&inst))
+      continue;
+    blockState.get()->setInst(generation, &inst);
+  }
+}
+
+template <typename Collection>
+void RequireLiveness::process(Collection requireInstList) {
+  LLVM_DEBUG(llvm::dbgs() << "==> Performing Require Liveness for: "
+                          << *transferInst);
+
+  // Then put all of our requires into our allRequires set.
+  BasicBlockWorklist initializingWorklist(transferInst->getFunction());
+  for (auto *require : requireInstList) {
+    LLVM_DEBUG(llvm::dbgs() << "        Require Inst: " << *require);
+    allRequires.insert(require);
+    initializingWorklist.pushIfNotVisited(require->getParent());
+  }
+
+  // Then process our def block to see if we have any requires before and after
+  // the transferInst...
+  processDefBlock();
+
+  // If we found /any/ requries after the transferInst, we can bail early since
+  // that is guaranteed to dominate all further requires.
+  if (!finalRequires.empty()) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "        Found transfer after def in def block! Exiting early!\n");
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "        Did not find transfer after def in def "
+                             "block! Walking blocks!\n");
+
+  // If we found a transfer in the def block before our def, add it to the block
+  // state for the def.
+  if (firstRequireBeforeTransferInDefBlock) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "        Found a require before transfer! Adding to block state!\n");
+    auto blockState = blockLivenessInfo.get(transferInst->getParent());
+    blockState.get()->setInst(generation, firstRequireBeforeTransferInDefBlock);
+  }
+
+  // Then for each require block that isn't a def block transfer, find the
+  // earliest transfer inst.
+  while (auto *requireBlock = initializingWorklist.pop()) {
+    auto blockState = blockLivenessInfo.get(requireBlock);
+    for (auto &inst : *requireBlock) {
+      if (!allRequires.contains(&inst))
+        continue;
+      LLVM_DEBUG(llvm::dbgs() << "        Mapping Block bb"
+                              << requireBlock->getDebugID() << " to: " << inst);
+      blockState.get()->setInst(generation, &inst);
+      break;
+    }
+  }
+
+  // Then walk from our def block looking for setInst blocks.
+  auto *transferBlock = transferInst->getParent();
+  BasicBlockWorklist worklist(transferInst->getFunction());
+  for (auto *succBlock : transferBlock->getSuccessorBlocks())
+    worklist.pushIfNotVisited(succBlock);
+
+  while (auto *next = worklist.pop()) {
+    // Check if we found an earliest requires... if so, add that to final
+    // requires and continue. We don't want to visit successors.
+    auto blockState = blockLivenessInfo.get(next);
+    if (auto *inst = blockState.get()->getInst(generation)) {
+      finalRequires.insert(inst);
+      continue;
+    }
+
+    // Do not look at successors of the transfer block.
+    if (next == transferBlock)
+      continue;
+
+    // Otherwise, we did not find a requires and need to search further
+    // successors.
+    for (auto *succBlock : next->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succBlock);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //       MARK: Inferring Transferred Instruction from violating Require
 //===----------------------------------------------------------------------===//
 
@@ -2035,14 +2219,9 @@ class PartitionAnalysis {
 
   BasicBlockData<BlockPartitionState> blockStates;
 
-  RaceTracer raceTracer;
-
   SILFunction *function;
 
   bool solved;
-
-  // TODO: make this configurable in a better way
-  const static int NUM_REQUIREMENTS_TO_DIAGNOSE = 50;
 
   /// The constructor initializes each block in the function by compiling it to
   /// PartitionOps, then seeds the solve method by setting `needsUpdate` to true
@@ -2053,7 +2232,7 @@ class PartitionAnalysis {
                     [this](SILBasicBlock *block) {
                       return BlockPartitionState(block, translator);
                     }),
-        raceTracer(fn, blockStates), function(fn), solved(false) {
+        function(fn), solved(false) {
     // Initialize the entry block as needing an update, and having a partition
     // that places all its non-sendable args in a single region
     blockStates[fn->getEntryBlock()].needsUpdate = true;
@@ -2151,17 +2330,6 @@ class PartitionAnalysis {
     translator.sortUniqueNeverTransferredValues();
   }
 
-  /// Track the transfer insts that have already had diagnostics emitted about.
-  llvm::DenseSet<SILInstruction *> emittedTransferInsts;
-
-  /// Returns true if a diagnostic has already been emitted for the transferred
-  /// instruction \p transferredInst.
-  ///
-  /// If we return false, we insert \p transferredInst into emittedTransferInst.
-  bool hasBeenEmitted(SILInstruction *transferredInst) {
-    return !emittedTransferInsts.insert(transferredInst).second;
-  }
-
   /// Once we have reached a fixpoint, this routine runs over all blocks again
   /// reporting any failures by applying our ops to the converged dataflow
   /// state.
@@ -2170,7 +2338,9 @@ class PartitionAnalysis {
 
     LLVM_DEBUG(llvm::dbgs() << "Emitting diagnostics for function "
                             << function->getName() << "\n");
-    RaceTracer tracer(function, blockStates);
+
+    SmallFrozenMultiMap<Operand *, SILInstruction *, 8>
+        transferOpToRequireInstMultiMap;
 
     // Then for each block...
     for (auto [block, blockState] : blockStates) {
@@ -2182,27 +2352,25 @@ class PartitionAnalysis {
       PartitionOpEvaluator eval(workingPartition);
       eval.failureCallback = /*handleFailure=*/
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
-              Operand *transferringInst) {
-            // Ensure that multiple transfers at the same AST node are only
-            // entered once into the race tracer
-            if (hasBeenEmitted(partitionOp.getSourceInst()))
-              return;
-
-            LLVM_DEBUG(llvm::dbgs()
-                       << "    Emitting Use After Transfer Error!\n"
-                       << "    ID:  %%" << transferredVal << "\n"
-                       << "    Rep: "
-                       << *translator.getValueForId(transferredVal)
-                               ->getRepresentative());
-
-            raceTracer.traceUseOfTransferredValue(partitionOp, transferredVal);
+              Operand *transferringOp) {
+            auto rep =
+                translator.getValueForId(transferredVal)->getRepresentative();
+            LLVM_DEBUG(
+                llvm::dbgs()
+                << "    Emitting Use After Transfer Error!\n"
+                << "        ID:  %%" << transferredVal << "\n"
+                << "        Rep: " << *rep
+                << "        Require Inst: " << *partitionOp.getSourceInst()
+                << "        Transferring Inst: " << *transferringOp->getUser());
+            transferOpToRequireInstMultiMap.insert(transferringOp,
+                                                   partitionOp.getSourceInst());
           };
       eval.transferredNonTransferrableCallback =
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal) {
             LLVM_DEBUG(llvm::dbgs()
-                       << "Emitting TransferNonTransferrable Error!\n"
-                       << "ID:  %%" << transferredVal << "\n"
-                       << "Rep: "
+                       << "    Emitting TransferNonTransferrable Error!\n"
+                       << "        ID:  %%" << transferredVal << "\n"
+                       << "        Rep: "
                        << *translator.getValueForId(transferredVal)
                                ->getRepresentative());
             function->getASTContext().Diags.diagnose(
@@ -2223,43 +2391,60 @@ class PartitionAnalysis {
       }
     }
 
-    // Once we have run over all backs, dump the accumulator and ask the
-    // raceTracer to report diagnostics at the transfer sites for all the racy
-    // requirement sites entered into it above.
-    LLVM_DEBUG(llvm::dbgs() << "Accumulator Complete:\n";
-               raceTracer.getAccumulator().print(llvm::dbgs()););
-    raceTracer.getAccumulator().emitErrorsForTransferRequire(
-        NUM_REQUIREMENTS_TO_DIAGNOSE);
-  }
+    // Now that we have found all of our transferInsts/Requires emit errors.
+    transferOpToRequireInstMultiMap.setFrozen();
 
-  bool tryDiagnoseAsCallSite(const PartitionOp &transferOp,
-                             unsigned numDisplayed, unsigned numHidden) {
-    SILInstruction *sourceInst = transferOp.getSourceInst();
-    ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
+    BasicBlockData<BlockLivenessInfo> blockLivenessInfo(function);
+    // We use a generation counter so we can lazily reset blockLivenessInfo
+    // since we cannot clear it without iterating over it.
+    unsigned blockLivenessInfoGeneration = 0;
 
-    // If the transfer does not correspond to an apply expression... return
-    // early.
-    if (!apply)
-      return false;
+    for (auto [transferOp, requireInsts] :
+         transferOpToRequireInstMultiMap.getRange()) {
 
-    auto isolationCrossing = apply->getIsolationCrossing();
-    if (!isolationCrossing) {
-      assert(false && "ApplyExprs should be transferring only if"
-                      " they are isolation crossing");
-      return false;
+      LLVM_DEBUG(llvm::dbgs() << "Transfer Inst: " << *transferOp->getUser());
+
+      RequireLiveness liveness(blockLivenessInfoGeneration, transferOp,
+                               blockLivenessInfo);
+      ++blockLivenessInfoGeneration;
+      liveness.process(requireInsts);
+
+      InferredCallerArgumentTypeInfo argTypeInfo(transferOp);
+      auto loc = transferOp->getUser()->getLoc();
+
+      function->getASTContext()
+          .Diags
+          .diagnose(loc.getSourceLoc(), diag::call_site_transfer_yields_race,
+                    argTypeInfo.inferredType,
+                    argTypeInfo.isolationCrossing.getCallerIsolation(),
+                    argTypeInfo.isolationCrossing.getCalleeIsolation())
+          .highlight(transferOp->get().getLoc().getSourceRange());
+
+      // Ok, we now have our requires... emit the errors.
+      bool didEmitRequire = false;
+
+      InstructionSet requireInstsUnique(function);
+      for (auto *require : requireInsts) {
+        // We can have multiple of the same require insts if we had a require
+        // and an assign from the same instruction. Our liveness checking above
+        // doesn't care about that, but we still need to make sure we do not
+        // emit twice.
+        if (!requireInstsUnique.insert(require))
+          continue;
+
+        // If this was not a last require, do not emit an error.
+        if (!liveness.finalRequires.contains(require))
+          continue;
+
+        auto loc = require->getLoc();
+        function->getASTContext()
+            .Diags.diagnose(loc.getSourceLoc(), diag::possible_racy_access_site)
+            .highlight(loc.getSourceRange());
+        didEmitRequire = true;
+      }
+
+      assert(didEmitRequire && "Should have a require for all errors?!");
     }
-    auto argExpr = transferOp.getSourceLoc();
-    if (!argExpr)
-      assert(false && "sourceExpr should be populated for ApplyExpr transfers");
-
-    function->getASTContext()
-        .Diags
-        .diagnose(argExpr.getSourceLoc(), diag::call_site_transfer_yields_race,
-                  transferOp.getSourceOp()->get()->getType().getASTType(),
-                  isolationCrossing.value().getCallerIsolation(),
-                  isolationCrossing.value().getCalleeIsolation())
-        .highlight(argExpr.getSourceRange());
-    return true;
   }
 
 public:
