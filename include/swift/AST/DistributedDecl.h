@@ -115,6 +115,6 @@ getDistributedSerializationRequirements(
     ProtocolDecl *protocol,
     llvm::SmallPtrSetImpl<ProtocolDecl *> &requirementProtos);
 
-// ==== ------------------------------------------------------------------------
+}
 
 #endif /* SWIFT_DECL_DISTRIBUTEDDECL_H */
