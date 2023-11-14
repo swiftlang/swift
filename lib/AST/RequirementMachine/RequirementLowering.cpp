@@ -952,6 +952,10 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
     desugarRequirements(result, errors);
     expandDefaultRequirements(ctx, needsDefaultRequirements, result, errors);
+
+    diagnoseRequirementErrors(ctx, errors,
+                              AllowConcreteTypePolicy::NestedAssocTypes);
+
     return ctx.AllocateCopy(result);
   }
 
