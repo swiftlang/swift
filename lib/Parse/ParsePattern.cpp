@@ -1053,7 +1053,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
         }
       }
     } else {
-      Ty = makeParserResult(new (Context) ErrorTypeRepr(PreviousLoc));
+      Ty = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
     }
     
     result = makeParserResult(result,
@@ -1278,7 +1278,7 @@ parseOptionalPatternTypeAnnotation(ParserResult<Pattern> result) {
 
   TypeRepr *repr = Ty.getPtrOrNull();
   if (!repr)
-    repr = new (Context) ErrorTypeRepr(PreviousLoc);
+    repr = ErrorTypeRepr::create(Context, PreviousLoc);
 
   return makeParserResult(status, new (Context) TypedPattern(P, repr));
 }

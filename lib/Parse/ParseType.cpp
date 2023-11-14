@@ -172,9 +172,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   SourceLoc tildeLoc;
   if (Tok.isTilde() && !isInSILMode()) {
     tildeLoc = consumeToken();
-    if (!EnabledNoncopyableGenerics)
-      diagnose(tildeLoc, diag::cannot_suppress_here)
-          .fixItRemoveChars(tildeLoc, tildeLoc);
   }
 
   switch (Tok.getKind()) {
@@ -232,7 +229,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
       CodeCompletionCallbacks->completeTypeSimpleBeginning();
     }
     return makeParserCodeCompletionResult<TypeRepr>(
-        new (Context) ErrorTypeRepr(consumeToken(tok::code_complete)));
+        ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
   case tok::l_square: {
     ty = parseTypeCollection();
     break;
@@ -255,7 +252,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
     }
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      ty = makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+      ty = makeParserErrorResult(ErrorTypeRepr::create(Context, Tok.getLoc()));
       consumeToken();
       return ty;
     }
@@ -310,9 +307,15 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
   }
 
   // Wrap in an InverseTypeRepr if needed.
-  if (EnabledNoncopyableGenerics && tildeLoc) {
-    ty = makeParserResult(ty,
-                          new(Context) InverseTypeRepr(tildeLoc, ty.get()));
+  if (tildeLoc) {
+    TypeRepr *repr;
+    if (EnabledNoncopyableGenerics)
+      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
+    else
+      repr =
+          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
+
+    ty = makeParserResult(ty, repr);
   }
 
   return ty;
@@ -685,8 +688,8 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
       auto diag = diagnose(Tok, diag::extra_rbracket);
       diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
       consumeToken();
-      return makeParserErrorResult(new (Context)
-                                       ErrorTypeRepr(getTypeErrorLoc()));
+      return makeParserErrorResult(ErrorTypeRepr::create(Context,
+                                                         getTypeErrorLoc()));
     }
 
     if (Tok.is(tok::colon)) {
@@ -702,8 +705,8 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
           diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
         }
       }
-      return makeParserErrorResult(new (Context)
-                                       ErrorTypeRepr(getTypeErrorLoc()));
+      return makeParserErrorResult(ErrorTypeRepr::create(Context,
+                                                         getTypeErrorLoc()));
     }
   }
   return result;

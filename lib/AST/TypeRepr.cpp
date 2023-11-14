@@ -653,6 +653,15 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.printKeyword("sil_box", Opts);
 }
 
+void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {
+  if (!DelayedDiag)
+    return;
+
+  // Consume and emit the diagnostic.
+  Context.Diags.diagnose(Range.Start, *DelayedDiag).highlight(Range);
+  DelayedDiag = llvm::None;
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // TypeReprs, is defined here to avoid too much layering violation / circular
 // linkage dependency.
