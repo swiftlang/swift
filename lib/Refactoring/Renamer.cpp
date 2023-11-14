@@ -270,13 +270,11 @@ bool Renamer::renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
 }
 
 RegionType Renamer::getSyntacticRenameRegionType(const ResolvedLoc &Resolved) {
-  if (Resolved.Node.isNull())
+  if (Resolved.IsInComment)
     return RegionType::Comment;
 
-  if (Expr *E = Resolved.Node.getAsExpr()) {
-    if (isa<StringLiteralExpr>(E))
-      return RegionType::String;
-  }
+  if (Resolved.IsInStringLiteral)
+    return RegionType::String;
   if (Resolved.IsInSelector)
     return RegionType::Selector;
   if (Resolved.IsActive)

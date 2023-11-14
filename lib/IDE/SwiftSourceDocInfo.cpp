@@ -104,13 +104,14 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<SourceLoc> Locs,
 
   // handle any unresolved locs past the end of the last AST node or comment
   std::vector<ResolvedLoc> Remaining(Locs.size() - ResolvedLocs.size(),
-                                     {ASTWalker::ParentTy(),
-                                      CharSourceRange(),
+                                     {CharSourceRange(),
                                       {},
                                       llvm::None,
                                       LabelRangeType::None,
                                       /*isActice*/ true,
-                                      /*isInSelector*/ false});
+                                      /*isInSelector*/ false,
+                                      /*IsInComment*/ true,
+                                      /*IsInStringLiteral*/ false});
   ResolvedLocs.insert(ResolvedLocs.end(), Remaining.begin(), Remaining.end());
 
   // return in the original order
@@ -542,13 +543,14 @@ void NameMatcher::skipLocsBefore(SourceLoc Start) {
   while (!isDone() && getSourceMgr().isBeforeInBuffer(nextLoc(), Start)) {
     if (!checkComments()) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({ASTWalker::ParentTy(),
-                              CharSourceRange(),
+      ResolvedLocs.push_back({CharSourceRange(),
                               {},
                               llvm::None,
                               LabelRangeType::None,
                               isActive(),
-                              isInSelector()});
+                              isInSelector(),
+                              /*IsInComment*/ true,
+                              /*IsInStringLiteral*/ false});
     }
   }
 }
@@ -650,6 +652,9 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   if (isDone())
     return false;
 
+  bool IsInComment = Node.isNull();
+  bool IsInStringLiteral = isa_and_nonnull<StringLiteralExpr>(Node.getAsExpr());
+
   CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
                                                                    NameLoc);
   SourceLoc &Next = LocsToResolve.back();
@@ -657,8 +662,9 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   if (Range.isValid()) {
     if (NameLoc == Next) {
       LocsToResolve.pop_back();
-      ResolvedLocs.push_back({Node, Range, LabelRanges, FirstTrailingLabel,
-        RangeType, isActive(), isInSelector()});
+      ResolvedLocs.push_back({Range, LabelRanges, FirstTrailingLabel, RangeType,
+                              isActive(), isInSelector(), IsInComment,
+                              IsInStringLiteral});
       if (isDone())
         return true;
       WasResolved = true;
@@ -672,13 +678,14 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
                                       Range.getByteLength() - 1);
       if (NewRange.getStart() == Next) {
         LocsToResolve.pop_back();
-        ResolvedLocs.push_back({Node,
-                                NewRange,
+        ResolvedLocs.push_back({NewRange,
                                 {},
                                 llvm::None,
                                 LabelRangeType::None,
                                 isActive(),
-                                isInSelector()});
+                                isInSelector(),
+                                IsInComment,
+                                IsInStringLiteral});
         WasResolved = true;
       }
     }

@@ -309,13 +309,14 @@ enum class LabelRangeType {
 };
 
 struct ResolvedLoc {
-  ASTWalker::ParentTy Node;
   CharSourceRange Range;
   std::vector<CharSourceRange> LabelRanges;
   llvm::Optional<unsigned> FirstTrailingLabel;
   LabelRangeType LabelType;
   bool IsActive;
   bool IsInSelector;
+  bool IsInComment;
+  bool IsInStringLiteral;
 };
 
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.
