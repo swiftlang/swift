@@ -906,7 +906,6 @@ struct RenameLocation {
 
 struct RenameLocations {
   StringRef OldName;
-  StringRef NewName;
   const bool IsFunctionLike;
   const bool IsNonProtocolType;
   std::vector<RenameLocation> LineColumnLocs;

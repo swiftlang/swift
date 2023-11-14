@@ -149,7 +149,8 @@ public:
 
 std::vector<ResolvedLoc>
 swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
-                                   SourceFile &SF, DiagnosticEngine &Diags) {
+                                   StringRef NewName, SourceFile &SF,
+                                   DiagnosticEngine &Diags) {
   SourceManager &SM = SF.getASTContext().SourceMgr;
   unsigned BufferID = SF.getBufferID().value();
 
@@ -164,32 +165,31 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
       return {};
     }
 
-    if (!RenameLoc.NewName.empty()) {
-      DeclNameViewer NewName(RenameLoc.NewName);
-      ArrayRef<StringRef> ParamNames = NewName.args();
-      bool newOperator = Lexer::isOperator(NewName.base());
+    if (!NewName.empty()) {
+      DeclNameViewer NewDeclName(NewName);
+      ArrayRef<StringRef> ParamNames = NewDeclName.args();
+      bool newOperator = Lexer::isOperator(NewDeclName.base());
       bool NewNameIsValid =
-          NewName.isValid() &&
-          (Lexer::isIdentifier(NewName.base()) || newOperator) &&
+          NewDeclName.isValid() &&
+          (Lexer::isIdentifier(NewDeclName.base()) || newOperator) &&
           std::all_of(ParamNames.begin(), ParamNames.end(),
                       [](StringRef Label) {
                         return Label.empty() || Lexer::isIdentifier(Label);
                       });
 
       if (!NewNameIsValid) {
-        Diags.diagnose(Location, diag::invalid_name, RenameLoc.NewName);
+        Diags.diagnose(Location, diag::invalid_name, NewName);
         return {};
       }
 
-      if (NewName.partsCount() != OldName.partsCount()) {
-        Diags.diagnose(Location, diag::arity_mismatch, RenameLoc.NewName,
+      if (NewDeclName.partsCount() != OldName.partsCount()) {
+        Diags.diagnose(Location, diag::arity_mismatch, NewName,
                        RenameLoc.OldName);
         return {};
       }
 
       if (RenameLoc.Usage == NameUsage::Call && !RenameLoc.IsFunctionLike) {
-        Diags.diagnose(Location, diag::name_not_functionlike,
-                       RenameLoc.NewName);
+        Diags.diagnose(Location, diag::name_not_functionlike, NewName);
         return {};
       }
     }
@@ -205,6 +205,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
 }
 
 int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
+                                StringRef NewName,
                                 SourceEditConsumer &EditConsumer,
                                 DiagnosticConsumer &DiagConsumer) {
 
@@ -214,20 +215,22 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
   DiagnosticEngine DiagEngine(SM);
   DiagEngine.addConsumer(DiagConsumer);
 
-  auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
+  auto ResolvedLocs =
+      resolveRenameLocations(RenameLocs, NewName, *SF, DiagEngine);
   if (ResolvedLocs.size() != RenameLocs.size())
     return true; // Already diagnosed.
 
   size_t index = 0;
   llvm::StringSet<> ReplaceTextContext;
+
   for (const RenameLoc &Rename : RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
-    TextReplacementsRenamer Renamer(SM, Rename.OldName, Rename.NewName,
+    TextReplacementsRenamer Renamer(SM, Rename.OldName, NewName,
                                     ReplaceTextContext);
     RegionType Type = Renamer.addSyntacticRenameRanges(Resolved, Rename);
     if (Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
-                          Rename.NewName);
+                          NewName);
       EditConsumer.accept(SM, Type, llvm::None);
     } else {
       EditConsumer.accept(SM, Type, Renamer.getReplacements());
@@ -238,7 +241,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
 }
 
 int swift::ide::findSyntacticRenameRanges(
-    SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
+    SourceFile *SF, ArrayRef<RenameLoc> RenameLocs, StringRef NewName,
     FindRenameRangesConsumer &RenameConsumer,
     DiagnosticConsumer &DiagConsumer) {
   assert(SF && "null source file");
@@ -247,7 +250,8 @@ int swift::ide::findSyntacticRenameRanges(
   DiagnosticEngine DiagEngine(SM);
   DiagEngine.addConsumer(DiagConsumer);
 
-  auto ResolvedLocs = resolveRenameLocations(RenameLocs, *SF, DiagEngine);
+  auto ResolvedLocs =
+      resolveRenameLocations(RenameLocs, NewName, *SF, DiagEngine);
   if (ResolvedLocs.size() != RenameLocs.size())
     return true; // Already diagnosed.
 
@@ -258,7 +262,7 @@ int swift::ide::findSyntacticRenameRanges(
     RegionType Type = Renamer.addSyntacticRenameRanges(Resolved, Rename);
     if (Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
-                          Rename.NewName);
+                          NewName);
       RenameConsumer.accept(SM, Type, llvm::None);
     } else {
       RenameConsumer.accept(SM, Type, Renamer.Ranges);

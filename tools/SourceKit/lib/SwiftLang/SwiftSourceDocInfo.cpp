@@ -2569,16 +2569,15 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
           return;
         }
 
-        RenameLocs Locs =
-            localRenameLocs(SrcFile, *Info, /*newName=*/StringRef());
+        RenameLocs Locs = localRenameLocs(SrcFile, *Info);
 
         // Ignore any errors produced by `resolveRenameLocations` since, if some
         // symbol failed to resolve, we still want to return all the other
         // symbols. This makes related idents more fault-tolerant.
         DiagnosticEngine Diags(SrcMgr);
 
-        std::vector<ResolvedLoc> ResolvedLocs =
-            resolveRenameLocations(Locs.getLocations(), *SrcFile, Diags);
+        std::vector<ResolvedLoc> ResolvedLocs = resolveRenameLocations(
+            Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
 
         for (auto ResolvedLoc : ResolvedLocs) {
           if (ResolvedLoc.Range.isInvalid()) {

@@ -173,16 +173,15 @@ swift::ide::getRenameInfo(ResolvedCursorInfoPtr cursorInfo) {
 
 class RenameRangeCollector : public IndexDataConsumer {
   StringRef usr;
-  StringRef newName;
   std::unique_ptr<StringScratchSpace> stringStorage;
   std::vector<RenameLoc> locations;
 
 public:
-  RenameRangeCollector(StringRef usr, StringRef newName)
-      : usr(usr), newName(newName), stringStorage(new StringScratchSpace()) {}
+  RenameRangeCollector(StringRef usr)
+      : usr(usr), stringStorage(new StringScratchSpace()) {}
 
-  RenameRangeCollector(const ValueDecl *D, StringRef newName)
-      : newName(newName), stringStorage(new StringScratchSpace()) {
+  RenameRangeCollector(const ValueDecl *D)
+      : stringStorage(new StringScratchSpace()) {
     SmallString<64> SS;
     llvm::raw_svector_ostream OS(SS);
     printValueDeclUSR(D, OS);
@@ -208,7 +207,7 @@ private:
 
   Action startSourceEntity(const IndexSymbol &symbol) override {
     if (symbol.USR == usr) {
-      if (auto loc = indexSymbolToRenameLoc(symbol, newName)) {
+      if (auto loc = indexSymbolToRenameLoc(symbol)) {
         // Inside capture lists like `{ [test] in }`, 'test' refers to both the
         // newly declared, captured variable and the referenced variable it is
         // initialized from. Make sure to only rename it once.
@@ -219,7 +218,6 @@ private:
           locations.push_back(std::move(*loc));
         } else {
           assert(existingLoc->OldName == loc->OldName &&
-                 existingLoc->NewName == loc->NewName &&
                  existingLoc->IsFunctionLike == loc->IsFunctionLike &&
                  existingLoc->IsNonProtocolType == loc->IsNonProtocolType &&
                  "Asked to do a different rename for the same location?");
@@ -234,12 +232,11 @@ private:
   }
 
   llvm::Optional<RenameLoc>
-  indexSymbolToRenameLoc(const index::IndexSymbol &symbol, StringRef NewName);
+  indexSymbolToRenameLoc(const index::IndexSymbol &symbol);
 };
 
 llvm::Optional<RenameLoc>
-RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
-                                             StringRef newName) {
+RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
   if (symbol.roles & (unsigned)index::SymbolRole::Implicit) {
     return llvm::None;
   }
@@ -277,8 +274,8 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol,
     break;
   }
   StringRef oldName = stringStorage->copyString(symbol.name);
-  return RenameLoc{symbol.line,    symbol.column,    usage, oldName, newName,
-                   isFunctionLike, isNonProtocolType};
+  return RenameLoc{symbol.line, symbol.column,  usage,
+                   oldName,     isFunctionLike, isNonProtocolType};
 }
 
 bool RefactoringActionLocalRename::isApplicable(
@@ -364,8 +361,7 @@ getRenameInfoForLocalRename(SourceFile *sourceFile, SourceLoc startLoc,
   return info;
 }
 
-RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo,
-                                       StringRef newName) {
+RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo) {
   DeclContext *RenameScope = SF;
   if (!RenameScope) {
     // If the value is declared in a DeclContext that's a child of the file in
@@ -381,7 +377,7 @@ RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo,
     }
   }
 
-  RenameRangeCollector rangeCollector(renameInfo.VD, newName);
+  RenameRangeCollector rangeCollector(renameInfo.VD);
   indexDeclContext(RenameScope, rangeCollector);
 
   return rangeCollector.takeResults();
@@ -409,14 +405,14 @@ bool RefactoringActionLocalRename::performChange() {
     return true;
   }
 
-  RenameLocs renameRanges = localRenameLocs(TheFile, *info, PreferredName);
+  RenameLocs renameRanges = localRenameLocs(TheFile, *info);
   if (renameRanges.getLocations().empty())
     return true;
 
   auto consumers = DiagEngine.takeConsumers();
   assert(consumers.size() == 1);
-  return syntacticRename(TheFile, renameRanges.getLocations(), EditConsumer,
-                         *consumers[0]);
+  return syntacticRename(TheFile, renameRanges.getLocations(), PreferredName,
+                         EditConsumer, *consumers[0]);
 }
 
 int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
@@ -436,10 +432,11 @@ int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
     return true;
   }
 
-  RenameLocs RenameRanges = localRenameLocs(SF, *info, StringRef());
+  RenameLocs RenameRanges = localRenameLocs(SF, *info);
   if (RenameRanges.getLocations().empty())
     return true;
 
   return findSyntacticRenameRanges(SF, RenameRanges.getLocations(),
-                                   RenameConsumer, DiagConsumer);
+                                   /*NewName=*/StringRef(), RenameConsumer,
+                                   DiagConsumer);
 }

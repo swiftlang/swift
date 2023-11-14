@@ -72,13 +72,6 @@ struct RenameLoc {
   unsigned Column;
   NameUsage Usage;
   StringRef OldName;
-  /// The new name that should be given to this symbol.
-  ///
-  /// This may not be known if the rename locations are specified by the client
-  /// using the a rename locations dicationary in syntactic rename.
-  ///
-  /// May be empty if no new name was specified in `localRenameLocs`.
-  StringRef NewName;
   const bool IsFunctionLike;
   const bool IsNonProtocolType;
 };
@@ -105,17 +98,18 @@ public:
 /// - Parameters:
 ///   - sourceFile: The source file in which to perform local rename
 ///   - renameInfo: Information about the symbol to rename. See `getRenameInfo`
-///   - newName: The new name that should be assigned to the identifer. Can
-///     be empty, in which case the new name of all `RenameLoc`s will also be
-///     empty.
-RenameLocs localRenameLocs(SourceFile *sourceFile, RenameInfo renameInfo,
-                           StringRef newName);
+RenameLocs localRenameLocs(SourceFile *sourceFile, RenameInfo renameInfo);
 
 /// Given a list of `RenameLoc`s, get the corresponding `ResolveLoc`s.
 ///
 /// These resolve locations contain more structured information, such as the
 /// range of the base name to rename and the ranges of the argument labels.
+///
+/// If a \p newName is passed, it is used to verify that all \p renameLocs can
+/// be renamed to this name. If any the names cannot be renamed, an empty vector
+/// is returned and the issue is diagnosed via \p diags.
 std::vector<ResolvedLoc> resolveRenameLocations(ArrayRef<RenameLoc> renameLocs,
+                                                StringRef newName,
                                                 SourceFile &sourceFile,
                                                 DiagnosticEngine &diags);
 
@@ -168,11 +162,18 @@ bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          DiagnosticConsumer &DiagConsumer);
 
 int syntacticRename(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
-                    SourceEditConsumer &EditConsumer,
+                    StringRef NewName, SourceEditConsumer &EditConsumer,
                     DiagnosticConsumer &DiagConsumer);
 
+/// Based on the given \p RenameLocs, finds the ranges (including argument
+/// labels) that need to be renamed and reports those to \p RenameConsumer.
+///
+/// If \p NewName is passed, it is validated that all locations can be renamed
+/// to that new name. If not, no ranges are reported and an error is emitted
+/// via \p DiagConsumer.
 int findSyntacticRenameRanges(SourceFile *SF,
                               llvm::ArrayRef<RenameLoc> RenameLocs,
+                              StringRef NewName,
                               FindRenameRangesConsumer &RenameConsumer,
                               DiagnosticConsumer &DiagConsumer);
 

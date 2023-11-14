@@ -310,7 +310,7 @@ static sourcekitd_response_t
 editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args);
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
+buildRenameLocationsFromDict(const RequestDict &Req,
                              std::vector<RenameLocations> &RenameLocations,
                              llvm::SmallString<64> &Error);
 
@@ -1071,7 +1071,7 @@ handleRequestFindRenameRanges(const RequestDict &Req,
 
     SmallString<64> ErrBuf;
     std::vector<RenameLocations> RenameLocations;
-    if (buildRenameLocationsFromDict(Req, false, RenameLocations, ErrBuf))
+    if (buildRenameLocationsFromDict(Req, RenameLocations, ErrBuf))
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     return Rec(findRenameRanges(InputBuf.get(), RenameLocations, Args));
   }
@@ -3994,7 +3994,7 @@ editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
 }
 
 static bool
-buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
+buildRenameLocationsFromDict(const RequestDict &Req,
                              std::vector<RenameLocations> &RenameLocations,
                              llvm::SmallString<64> &Error) {
   bool Failed = Req.dictionaryArrayApply(KeyRenameLocations,
@@ -4017,17 +4017,7 @@ buildRenameLocationsFromDict(const RequestDict &Req, bool UseNewName,
       return true;
     }
 
-    Optional<StringRef> NewName;
-    if (UseNewName) {
-      NewName = RenameLocation.getString(KeyNewName);
-      if (!NewName.has_value()) {
-        Error = "missing key.newname";
-        return true;
-      }
-    }
-
     RenameLocations.push_back({*OldName,
-                               UseNewName ? *NewName : "",
                                static_cast<bool>(IsFunctionLike),
                                static_cast<bool>(IsNonProtocolType),
                                {}});

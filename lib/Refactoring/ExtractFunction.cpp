@@ -110,8 +110,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
 
   RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,
                             NameUsage::Definition, /*OldName=*/Name,
-                            /*NewName=*/"",        IsFunctionLike,
-                            IsNonProtocolType};
+                            IsFunctionLike,        IsNonProtocolType};
   RenameRangeDetailCollector Renamer(SM, Name);
   Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
   auto Ranges = Renamer.Ranges;

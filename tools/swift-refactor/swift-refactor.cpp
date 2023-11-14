@@ -248,8 +248,8 @@ std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
   std::vector<RenameLoc> Renames;
   llvm::transform(Locs, std::back_inserter(Renames),
                   [&](const RefactorLoc &Loc) -> RenameLoc {
-                    return {Loc.Line, Loc.Column,     Loc.Usage,        OldName,
-                            NewName,  IsFunctionLike, IsNonProtocolType};
+                    return {Loc.Line, Loc.Column,     Loc.Usage,
+                            OldName,  IsFunctionLike, IsNonProtocolType};
                   });
   return Renames;
 }
@@ -400,11 +400,12 @@ int main(int argc, char *argv[]) {
     switch (options::Action) {
     case RefactoringKind::GlobalRename: {
       SourceEditOutputConsumer EditConsumer(SM, BufferID, llvm::outs());
-      return syntacticRename(SF, RenameLocs, EditConsumer, PrintDiags);
+      return syntacticRename(SF, RenameLocs, NewName, EditConsumer, PrintDiags);
     }
     case RefactoringKind::FindGlobalRenameRanges: {
       FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-      return findSyntacticRenameRanges(SF, RenameLocs, Consumer, PrintDiags);
+      return findSyntacticRenameRanges(SF, RenameLocs, NewName, Consumer,
+                                       PrintDiags);
     }
     default:
       llvm_unreachable("unexpected refactoring kind");

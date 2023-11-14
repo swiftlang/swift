@@ -1412,7 +1412,8 @@ void SwiftLangSupport::findRenameRanges(
 
   auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
   RequestRenameRangeConsumer Consumer(Receiver);
-  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer);
+  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, /*NewName=*/StringRef(),
+                                        Consumer, Consumer);
 }
 
 void SwiftLangSupport::findLocalRenameRanges(
@@ -1504,8 +1505,9 @@ getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
   for(const auto &Locations: RenameLocations) {
     for(const auto &Location: Locations.LineColumnLocs) {
       RenameLocs.push_back({Location.Line, Location.Column,
-        getNameUsage(Location.Type), Locations.OldName, Locations.NewName,
-        Locations.IsFunctionLike, Locations.IsNonProtocolType});
+                            getNameUsage(Location.Type), Locations.OldName,
+                            Locations.IsFunctionLike,
+                            Locations.IsNonProtocolType});
     }
   }
   return RenameLocs;
