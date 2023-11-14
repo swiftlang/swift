@@ -10,24 +10,31 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Renamer.h"
+#include "RenameRangeDetailCollector.h"
 
 using namespace swift;
 using namespace swift::refactoring;
 
-bool Renamer::renameBase(CharSourceRange Range,
-                         RefactoringRangeKind RangeKind) {
+void RenameRangeDetailCollector::addRenameRange(
+    CharSourceRange Label, RefactoringRangeKind RangeKind,
+    llvm::Optional<unsigned> NameIndex) {
+  Ranges.push_back({Label, RangeKind, NameIndex});
+}
+
+bool RenameRangeDetailCollector::renameBase(CharSourceRange Range,
+                                            RefactoringRangeKind RangeKind) {
   assert(Range.isValid());
 
   if (stripBackticks(Range).str() != Old.base())
     return true;
-  doRenameBase(Range, RangeKind);
+  addRenameRange(Range, RangeKind, llvm::None);
   return false;
 }
 
-bool Renamer::renameLabels(ArrayRef<CharSourceRange> LabelRanges,
-                           llvm::Optional<unsigned> FirstTrailingLabel,
-                           LabelRangeType RangeType, bool isCallSite) {
+bool RenameRangeDetailCollector::renameLabels(
+    ArrayRef<CharSourceRange> LabelRanges,
+    llvm::Optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType,
+    bool isCallSite) {
   if (isCallSite)
     return renameLabelsLenient(LabelRanges, FirstTrailingLabel, RangeType);
 
@@ -47,8 +54,9 @@ bool Renamer::renameLabels(ArrayRef<CharSourceRange> LabelRanges,
   return false;
 }
 
-CharSourceRange Renamer::getLeadingIdentifierRange(CharSourceRange Range,
-                                                   bool &IsEscaped) {
+CharSourceRange
+RenameRangeDetailCollector::getLeadingIdentifierRange(CharSourceRange Range,
+                                                      bool &IsEscaped) {
   assert(Range.isValid() && Range.getByteLength());
   IsEscaped = Range.str().front() == '`';
   SourceLoc Start = Range.getStart();
@@ -57,7 +65,8 @@ CharSourceRange Renamer::getLeadingIdentifierRange(CharSourceRange Range,
   return Lexer::getCharSourceRangeFromSourceRange(SM, Start);
 }
 
-CharSourceRange Renamer::stripBackticks(CharSourceRange Range) {
+CharSourceRange
+RenameRangeDetailCollector::stripBackticks(CharSourceRange Range) {
   StringRef Content = Range.str();
   if (Content.size() < 3 || Content.front() != '`' || Content.back() != '`') {
     return Range;
@@ -66,8 +75,9 @@ CharSourceRange Renamer::stripBackticks(CharSourceRange Range) {
                          Range.getByteLength() - 2);
 }
 
-void Renamer::splitAndRenameLabel(CharSourceRange Range,
-                                  LabelRangeType RangeType, size_t NameIndex) {
+void RenameRangeDetailCollector::splitAndRenameLabel(CharSourceRange Range,
+                                                     LabelRangeType RangeType,
+                                                     size_t NameIndex) {
   switch (RangeType) {
   case LabelRangeType::CallArg:
     return splitAndRenameCallArg(Range, NameIndex);
@@ -77,15 +87,16 @@ void Renamer::splitAndRenameLabel(CharSourceRange Range,
     return splitAndRenameParamLabel(Range, NameIndex,
                                     /*IsCollapsible=*/false);
   case LabelRangeType::Selector:
-    return doRenameLabel(Range, RefactoringRangeKind::SelectorArgumentLabel,
-                         NameIndex);
+    return addRenameRange(Range, RefactoringRangeKind::SelectorArgumentLabel,
+                          NameIndex);
   case LabelRangeType::None:
     llvm_unreachable("expected a label range");
   }
 }
 
-void Renamer::splitAndRenameParamLabel(CharSourceRange Range, size_t NameIndex,
-                                       bool IsCollapsible) {
+void RenameRangeDetailCollector::splitAndRenameParamLabel(CharSourceRange Range,
+                                                          size_t NameIndex,
+                                                          bool IsCollapsible) {
   // Split parameter range foo([a b]: Int) into decl argument label [a] and
   // parameter name [b] or noncollapsible parameter name [b] if IsCollapsible
   // is false (as for subscript decls). If we have only foo([a]: Int), then we
@@ -96,14 +107,14 @@ void Renamer::splitAndRenameParamLabel(CharSourceRange Range, size_t NameIndex,
 
   if (ExternalNameEnd == StringRef::npos) { // foo([a]: Int)
     if (IsCollapsible) {
-      doRenameLabel(Range, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
-      doRenameLabel(CharSourceRange{Range.getEnd(), 0},
-                    RefactoringRangeKind::ParameterName, NameIndex);
+      addRenameRange(Range, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+      addRenameRange(CharSourceRange{Range.getEnd(), 0},
+                     RefactoringRangeKind::ParameterName, NameIndex);
     } else {
-      doRenameLabel(CharSourceRange{Range.getStart(), 0},
-                    RefactoringRangeKind::DeclArgumentLabel, NameIndex);
-      doRenameLabel(Range, RefactoringRangeKind::NoncollapsibleParameterName,
-                    NameIndex);
+      addRenameRange(CharSourceRange{Range.getStart(), 0},
+                     RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+      addRenameRange(Range, RefactoringRangeKind::NoncollapsibleParameterName,
+                     NameIndex);
     }
   } else { // foo([a b]: Int)
     CharSourceRange Ext{Range.getStart(), unsigned(ExternalNameEnd)};
@@ -119,24 +130,26 @@ void Renamer::splitAndRenameParamLabel(CharSourceRange Range, size_t NameIndex,
     auto LocalLoc = Range.getStart().getAdvancedLocOrInvalid(LocalNameStart);
     CharSourceRange Local{LocalLoc, unsigned(Content.size() - LocalNameStart)};
 
-    doRenameLabel(Ext, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
+    addRenameRange(Ext, RefactoringRangeKind::DeclArgumentLabel, NameIndex);
     if (IsCollapsible) {
-      doRenameLabel(Local, RefactoringRangeKind::ParameterName, NameIndex);
+      addRenameRange(Local, RefactoringRangeKind::ParameterName, NameIndex);
     } else {
-      doRenameLabel(Local, RefactoringRangeKind::NoncollapsibleParameterName,
-                    NameIndex);
+      addRenameRange(Local, RefactoringRangeKind::NoncollapsibleParameterName,
+                     NameIndex);
     }
   }
 }
 
-void Renamer::splitAndRenameCallArg(CharSourceRange Range, size_t NameIndex) {
+void RenameRangeDetailCollector::splitAndRenameCallArg(CharSourceRange Range,
+                                                       size_t NameIndex) {
   // Split call argument foo([a: ]1) into argument name [a] and the remainder
   // [: ].
   StringRef Content = Range.str();
   size_t Colon = Content.find(':'); // FIXME: leading whitespace?
   if (Colon == StringRef::npos) {
     assert(Content.empty());
-    doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+    addRenameRange(Range, RefactoringRangeKind::CallArgumentCombined,
+                   NameIndex);
     return;
   }
 
@@ -145,16 +158,17 @@ void Renamer::splitAndRenameCallArg(CharSourceRange Range, size_t NameIndex) {
   Colon = Content.substr(0, Colon).rtrim().size();
 
   CharSourceRange Arg{Range.getStart(), unsigned(Colon)};
-  doRenameLabel(Arg, RefactoringRangeKind::CallArgumentLabel, NameIndex);
+  addRenameRange(Arg, RefactoringRangeKind::CallArgumentLabel, NameIndex);
 
   auto ColonLoc = Range.getStart().getAdvancedLocOrInvalid(Colon);
   assert(ColonLoc.isValid());
   CharSourceRange Rest{ColonLoc, unsigned(Content.size() - Colon)};
-  doRenameLabel(Rest, RefactoringRangeKind::CallArgumentColon, NameIndex);
+  addRenameRange(Rest, RefactoringRangeKind::CallArgumentColon, NameIndex);
 }
 
-bool Renamer::labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType,
-                                StringRef Expected) {
+bool RenameRangeDetailCollector::labelRangeMatches(CharSourceRange Range,
+                                                   LabelRangeType RangeType,
+                                                   StringRef Expected) {
   if (Range.getByteLength()) {
     bool IsEscaped = false;
     CharSourceRange ExistingLabelRange =
@@ -180,9 +194,9 @@ bool Renamer::labelRangeMatches(CharSourceRange Range, LabelRangeType RangeType,
   return Expected.empty();
 }
 
-bool Renamer::renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
-                                  llvm::Optional<unsigned> FirstTrailingLabel,
-                                  LabelRangeType RangeType) {
+bool RenameRangeDetailCollector::renameLabelsLenient(
+    ArrayRef<CharSourceRange> LabelRanges,
+    llvm::Optional<unsigned> FirstTrailingLabel, LabelRangeType RangeType) {
 
   ArrayRef<StringRef> OldNames = Old.args();
 
@@ -269,7 +283,8 @@ bool Renamer::renameLabelsLenient(ArrayRef<CharSourceRange> LabelRanges,
   return false;
 }
 
-RegionType Renamer::getSyntacticRenameRegionType(const ResolvedLoc &Resolved) {
+RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
+    const ResolvedLoc &Resolved) {
   if (Resolved.IsInComment)
     return RegionType::Comment;
 
@@ -282,8 +297,8 @@ RegionType Renamer::getSyntacticRenameRegionType(const ResolvedLoc &Resolved) {
   return RegionType::InactiveCode;
 }
 
-RegionType Renamer::addSyntacticRenameRanges(const ResolvedLoc &Resolved,
-                                             const RenameLoc &Config) {
+RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
+    const ResolvedLoc &Resolved, const RenameLoc &Config) {
 
   if (!Resolved.Range.isValid())
     return RegionType::Unmatched;

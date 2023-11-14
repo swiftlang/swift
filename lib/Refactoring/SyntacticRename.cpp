@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Renamer.h"
+#include "RenameRangeDetailCollector.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
@@ -100,7 +100,7 @@ int swift::ide::findSyntacticRenameRanges(
                           NewName);
       RenameConsumer.accept(SM, Type, llvm::None);
     } else {
-      RenameConsumer.accept(SM, Type, Renamer.Ranges);
+      RenameConsumer.accept(SM, Type, Renamer.getResult());
     }
   }
 

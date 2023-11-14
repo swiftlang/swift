@@ -34,7 +34,7 @@ add_swift_host_library(swiftRefactoring STATIC
   MoveMembersToExtension.cpp
   Refactoring.cpp
   RefactoringAction.cpp
-  Renamer.cpp
+  RenameRangeDetailCollector.cpp
   ReplaceBodiesWithFatalError.cpp
   SimplifyNumberLiteral.cpp
   SyntacticRename.cpp

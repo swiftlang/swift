@@ -23,25 +23,29 @@ namespace refactoring {
 
 using namespace swift::ide;
 
-class Renamer {
-protected:
+class RenameRangeDetailCollector {
   const SourceManager &SM;
-
-protected:
-  Renamer(const SourceManager &SM, StringRef OldName) : SM(SM), Old(OldName) {}
-
-  // Implementor's interface.
-  virtual void doRenameLabel(CharSourceRange Label,
-                             RefactoringRangeKind RangeKind,
-                             unsigned NameIndex) = 0;
-  virtual void doRenameBase(CharSourceRange Range,
-                            RefactoringRangeKind RangeKind) = 0;
-
-public:
   const DeclNameViewer Old;
+  /// The ranges that have been collect.
+  ///
+  /// This is the result of the `RenameRangeDetailCollector` and can be
+  /// retrieved with `getResult`.
+  std::vector<RenameRangeDetail> Ranges;
 
 public:
-  virtual ~Renamer() {}
+  RenameRangeDetailCollector(const SourceManager &SM, StringRef OldName)
+      : SM(SM), Old(OldName) {}
+
+  virtual ~RenameRangeDetailCollector() {}
+
+  RegionType addSyntacticRenameRanges(const ResolvedLoc &Resolved,
+                                      const RenameLoc &Config);
+
+  std::vector<RenameRangeDetail> getResult() const { return Ranges; }
+
+private:
+  void addRenameRange(CharSourceRange Label, RefactoringRangeKind RangeKind,
+                      llvm::Optional<unsigned> NameIndex);
 
   /// Adds a replacement to rename the given base name range
   /// \return true if the given range does not match the old name
@@ -79,26 +83,6 @@ private:
                            LabelRangeType RangeType);
 
   static RegionType getSyntacticRenameRegionType(const ResolvedLoc &Resolved);
-
-public:
-  RegionType addSyntacticRenameRanges(const ResolvedLoc &Resolved,
-                                      const RenameLoc &Config);
-};
-
-class RenameRangeDetailCollector : public Renamer {
-  void doRenameLabel(CharSourceRange Label, RefactoringRangeKind RangeKind,
-                     unsigned NameIndex) override {
-    Ranges.push_back({Label, RangeKind, NameIndex});
-  }
-  void doRenameBase(CharSourceRange Range,
-                    RefactoringRangeKind RangeKind) override {
-    Ranges.push_back({Range, RangeKind, llvm::None});
-  }
-
-public:
-  RenameRangeDetailCollector(const SourceManager &SM, StringRef OldName)
-      : Renamer(SM, OldName) {}
-  std::vector<RenameRangeDetail> Ranges;
 };
 
 } // namespace refactoring
