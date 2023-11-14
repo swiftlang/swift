@@ -245,11 +245,8 @@ else()
 #define COMPILED_WITH_SWIFT
 
 #include \"Basic/BasicBridging.h\"
-#include \"AST/ASTBridging.h\"
 #include \"SIL/SILBridging.h\"
 #include \"SILOptimizer/OptimizerBridging.h\"
-
-#include \"Parse/RegexParserBridging.h\"
 ")
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"

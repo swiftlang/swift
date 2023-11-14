@@ -81,6 +81,13 @@ extension BridgedSourceRange {
 }
 
 extension String {
+  init(bridged: BridgedStringRef) {
+    self.init(
+      decoding: UnsafeBufferPointer(start: bridged.data, count: bridged.count),
+      as: UTF8.self
+    )
+  }
+
   mutating func withBridgedString<R>(_ body: (BridgedStringRef) throws -> R) rethrows -> R {
     try withUTF8 { buffer in
       try body(BridgedStringRef(data: buffer.baseAddress, count: buffer.count))
