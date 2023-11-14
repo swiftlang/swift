@@ -544,7 +544,7 @@ public:
     return bits == other.bits &&
       (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
       globalActor.getPointer() == other.globalActor.getPointer() &&
-      thrownError.getPointer() == thrownError.getPointer();
+      thrownError.getPointer() == other.thrownError.getPointer();
   }
 
   constexpr std::tuple<unsigned, const void *, const void *, const void *>
