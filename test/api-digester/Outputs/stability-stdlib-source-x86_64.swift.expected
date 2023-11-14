@@ -1,10 +1,13 @@
-Accessor MutableCollection.subscript(_:).Get() has generic signature change from <Self where Self : Swift.MutableCollection> to <Self where Self : Swift.MutableCollection, Self.SubSequence == Swift.Slice<Self>>
-Accessor MutableCollection.subscript(_:).Set() has generic signature change from <Self where Self : Swift.MutableCollection> to <Self where Self : Swift.MutableCollection, Self.SubSequence == Swift.Slice<Self>>
+Accessor MutableCollection.subscript(_:).Get() has parameter 0 type change from Swift.Range<Self.Index> to Swift.RangeSet<Self.Index>
+Accessor MutableCollection.subscript(_:).Get() has return type change from Swift.Slice<Self> to Swift.DiscontiguousSlice<Self>
+Accessor MutableCollection.subscript(_:).Set() has parameter 0 type change from Swift.Slice<Self> to Swift.DiscontiguousSlice<Self>
+Accessor MutableCollection.subscript(_:).Set() has parameter 1 type change from Swift.Range<Self.Index> to Swift.RangeSet<Self.Index>
 Protocol CodingKey has added inherited protocol Sendable
 Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
 Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
-Subscript MutableCollection.subscript(_:) has generic signature change from <Self where Self : Swift.MutableCollection> to <Self where Self : Swift.MutableCollection, Self.SubSequence == Swift.Slice<Self>>
+Subscript MutableCollection.subscript(_:) has parameter 0 type change from Swift.Range<Self.Index> to Swift.RangeSet<Self.Index>
+Subscript MutableCollection.subscript(_:) has return type change from Swift.Slice<Self> to Swift.DiscontiguousSlice<Self>
 
 // Not actually a source break; the typechecker will find these operations on
 // FixedWidthInteger instead.
