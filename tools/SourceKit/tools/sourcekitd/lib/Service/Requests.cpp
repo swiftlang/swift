@@ -318,9 +318,8 @@ static sourcekitd_response_t
 createCategorizedEditsResponse(
     const RequestResult<ArrayRef<CategorizedEdits>> &Result);
 
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(
-    const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result);
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result);
 
 static sourcekitd_response_t
 findRenameRanges(llvm::MemoryBuffer *InputBuf,
@@ -1695,7 +1694,8 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
         *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
-        [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
+        [Rec](const CancellableResult<std::vector<CategorizedRenameRanges>>
+                  &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
         });
   });
@@ -4106,14 +4106,19 @@ createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &
   return RespBuilder.createResponse();
 }
 
-static sourcekitd_response_t
-createCategorizedRenameRangesResponse(const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
-  if (Result.isCancelled())
+static sourcekitd_response_t createCategorizedRenameRangesResponse(
+    const CancellableResult<std::vector<CategorizedRenameRanges>> &Result) {
+  using swift::ide::CancellableResultKind;
+  switch (Result.getKind()) {
+  case CancellableResultKind::Cancelled:
     return createErrorRequestCancelled();
-  if (Result.isError())
+  case CancellableResultKind::Failure:
     return createErrorRequestFailed(Result.getError());
+  case CancellableResultKind::Success:
+    break; // Handle below
+  }
 
-  const ArrayRef<CategorizedRenameRanges> &Ranges = Result.value();
+  const std::vector<CategorizedRenameRanges> &Ranges = Result.getResult();
 
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
@@ -4142,13 +4147,9 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
                  ArrayRef<RenameLocations> RenameLocations,
                  ArrayRef<const char *> Args) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  sourcekitd_response_t Result;
-  Lang.findRenameRanges(
-      InputBuf, RenameLocations, Args,
-      [&](const RequestResult<ArrayRef<CategorizedRenameRanges>> &ReqResult) {
-        Result = createCategorizedRenameRangesResponse(ReqResult);
-      });
-  return Result;
+  CancellableResult<std::vector<CategorizedRenameRanges>> ReqResult =
+      Lang.findRenameRanges(InputBuf, RenameLocations, Args);
+  return createCategorizedRenameRangesResponse(ReqResult);
 }
 
 static bool isSemanticEditorDisabled() {

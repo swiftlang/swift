@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/IDE/CancellableResult.h"
 #include "swift/IDE/Utils.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -135,23 +136,6 @@ struct RenameRangeDetail {
   llvm::Optional<unsigned> Index;
 };
 
-class FindRenameRangesConsumer {
-public:
-  virtual void accept(SourceManager &SM, RegionType RegionType,
-                      ArrayRef<RenameRangeDetail> Ranges) = 0;
-  virtual ~FindRenameRangesConsumer() = default;
-};
-
-class FindRenameRangesAnnotatingConsumer : public FindRenameRangesConsumer {
-  std::unique_ptr<SourceEditConsumer> pRewriter;
-
-public:
-  FindRenameRangesAnnotatingConsumer(SourceManager &SM, unsigned BufferId,
-                                     llvm::raw_ostream &OS);
-  void accept(SourceManager &SM, RegionType RegionType,
-              ArrayRef<RenameRangeDetail> Ranges) override;
-};
-
 StringRef getDescriptiveRefactoringKindName(RefactoringKind Kind);
 
 StringRef getDescriptiveRenameUnavailableReason(RefactorAvailableKind Kind);
@@ -175,20 +159,17 @@ getSyntacticRenameRangeDetails(const SourceManager &SM, StringRef OldName,
                                const RenameLoc &Config);
 
 /// Based on the given \p RenameLocs, finds the ranges (including argument
-/// labels) that need to be renamed and reports those to \p RenameConsumer.
+/// labels) that need to be renamed.
 ///
 /// If \p NewName is passed, it is validated that all locations can be renamed
 /// to that new name. If not, no ranges are reported and an error is emitted
 /// via \p DiagConsumer.
-int findSyntacticRenameRanges(SourceFile *SF,
-                              llvm::ArrayRef<RenameLoc> RenameLocs,
-                              StringRef NewName,
-                              FindRenameRangesConsumer &RenameConsumer,
-                              DiagnosticConsumer &DiagConsumer);
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+findSyntacticRenameRanges(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
+                          StringRef NewName);
 
-int findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
-                          FindRenameRangesConsumer &RenameConsumer,
-                          DiagnosticConsumer &DiagConsumer);
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+findLocalRenameRanges(SourceFile *SF, RangeConfig Range);
 
 SmallVector<RefactorAvailabilityInfo, 0>
 collectRefactorings(SourceFile *SF, RangeConfig Range,

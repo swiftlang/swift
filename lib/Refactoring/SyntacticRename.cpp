@@ -13,6 +13,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Refactoring/Refactoring.h"
 
@@ -73,21 +74,27 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
   return Resolver.resolve(UnresolvedLocs, SF.getAllTokens());
 }
 
-int swift::ide::findSyntacticRenameRanges(
-    SourceFile *SF, ArrayRef<RenameLoc> RenameLocs, StringRef NewName,
-    FindRenameRangesConsumer &RenameConsumer,
-    DiagnosticConsumer &DiagConsumer) {
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+swift::ide::findSyntacticRenameRanges(SourceFile *SF,
+                                      ArrayRef<RenameLoc> RenameLocs,
+                                      StringRef NewName) {
+  using ResultType =
+      CancellableResult<std::vector<SyntacticRenameRangeDetails>>;
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
   DiagnosticEngine DiagEngine(SM);
+  std::string ErrBuffer;
+  llvm::raw_string_ostream DiagOS(ErrBuffer);
+  swift::PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   DiagEngine.addConsumer(DiagConsumer);
 
   auto ResolvedLocs =
       resolveRenameLocations(RenameLocs, NewName, *SF, DiagEngine);
-  if (ResolvedLocs.size() != RenameLocs.size())
-    return true; // Already diagnosed.
+  if (ResolvedLocs.size() != RenameLocs.size() || DiagConsumer.didErrorOccur())
+    return ResultType::failure(ErrBuffer);
 
+  std::vector<SyntacticRenameRangeDetails> Result;
   size_t index = 0;
   for (const RenameLoc &Rename : RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
@@ -97,11 +104,14 @@ int swift::ide::findSyntacticRenameRanges(
     if (Details.Type == RegionType::Mismatch) {
       DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
                           NewName);
-      RenameConsumer.accept(SM, Details.Type, llvm::None);
+      Result.emplace_back(SyntacticRenameRangeDetails{Details.Type, {}});
     } else {
-      RenameConsumer.accept(SM, Details.Type, Details.Ranges);
+      Result.push_back(Details);
     }
   }
 
-  return false;
+  if (DiagConsumer.didErrorOccur())
+    return ResultType::failure(ErrBuffer);
+
+  return ResultType::success(Result);
 }

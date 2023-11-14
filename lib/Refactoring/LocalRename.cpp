@@ -15,6 +15,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Index/Index.h"
 
 using namespace swift::refactoring;
@@ -370,28 +371,28 @@ RenameLocs swift::ide::localRenameLocs(SourceFile *SF, RenameInfo renameInfo) {
   return rangeCollector.takeResults();
 }
 
-int swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range,
-                                      FindRenameRangesConsumer &RenameConsumer,
-                                      DiagnosticConsumer &DiagConsumer) {
+CancellableResult<std::vector<SyntacticRenameRangeDetails>>
+swift::ide::findLocalRenameRanges(SourceFile *SF, RangeConfig Range) {
+  using ResultType =
+      CancellableResult<std::vector<SyntacticRenameRangeDetails>>;
   assert(SF && "null source file");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
+  std::string ErrBuffer;
+  llvm::raw_string_ostream DiagOS(ErrBuffer);
+  swift::PrintingDiagnosticConsumer DiagConsumer(DiagOS);
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
   llvm::Optional<RenameInfo> info =
       getRenameInfoForLocalRename(SF, StartLoc, Diags);
-  if (!info) {
-    // getRenameInfoForLocalRename has already produced an error in `Diags`.
-    return true;
+  if (!info || DiagConsumer.didErrorOccur()) {
+    return ResultType::failure(ErrBuffer);
   }
 
   RenameLocs RenameRanges = localRenameLocs(SF, *info);
-  if (RenameRanges.getLocations().empty())
-    return true;
 
   return findSyntacticRenameRanges(SF, RenameRanges.getLocations(),
-                                   /*NewName=*/StringRef(), RenameConsumer,
-                                   DiagConsumer);
+                                   /*NewName=*/StringRef());
 }
