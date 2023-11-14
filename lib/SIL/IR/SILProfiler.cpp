@@ -1066,19 +1066,41 @@ public:
     if (SourceRegions.empty())
       return nullptr;
 
+    using MappedRegion = SILCoverageMap::MappedRegion;
+
     llvm::coverage::CounterExpressionBuilder Builder;
-    std::vector<SILCoverageMap::MappedRegion> Regions;
+    std::vector<MappedRegion> Regions;
+    SourceRange OuterRange;
     for (const auto &Region : SourceRegions) {
       assert(Region.hasStartLoc() && "invalid region");
       assert(Region.hasEndLoc() && "incomplete region");
+
+      // Build up the outer range from the union of all coverage regions.
+      SourceRange Range(Region.getStartLoc(), Region.getEndLoc());
+      if (!OuterRange) {
+        OuterRange = Range;
+      } else {
+        OuterRange.widen(Range);
+      }
 
       auto Start = SM.getLineAndColumnInBuffer(Region.getStartLoc());
       auto End = SM.getLineAndColumnInBuffer(Region.getEndLoc());
       assert(Start.first <= End.first && "region start and end out of order");
 
       auto Counter = Region.getCounter(CounterMap);
-      Regions.emplace_back(Start.first, Start.second, End.first, End.second,
-                           Counter.expand(Builder, CounterIndices));
+      Regions.push_back(
+          MappedRegion::code(Start.first, Start.second, End.first, End.second,
+                             Counter.expand(Builder, CounterIndices)));
+    }
+    // Add any skipped regions present in the outer range.
+    for (auto IfConfig : SF->getIfConfigsWithin(OuterRange)) {
+      for (auto SkipRange : IfConfig.getRangesWithoutActiveBody(SM)) {
+        auto Start = SM.getLineAndColumnInBuffer(SkipRange.getStart());
+        auto End = SM.getLineAndColumnInBuffer(SkipRange.getEnd());
+        assert(Start.first <= End.first && "region start and end out of order");
+        Regions.push_back(MappedRegion::skipped(Start.first, Start.second,
+                                                End.first, End.second));
+      }
     }
     return SILCoverageMap::create(M, SF, Filename, Name, PGOFuncName, Hash,
                                   Regions, Builder.getExpressions());
