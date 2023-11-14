@@ -78,9 +78,10 @@ static SourceLoc getNewFuncInsertLoc(DeclContext *DC,
   return SourceLoc();
 }
 
-static std::vector<NoteRegion>
-getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
-                  bool IsFunctionLike = false, bool IsNonProtocolType = false) {
+static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
+                                                 unsigned NameOffset,
+                                                 StringRef Name,
+                                                 bool IsFunctionLike = false) {
   auto InputBuffer =
       llvm::MemoryBuffer::getMemBufferCopy(SourceText, "<extract>");
 
@@ -108,9 +109,9 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
       Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
-  RenameLoc RenameConfig = {LineAndCol.first,      LineAndCol.second,
+  RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,
                             NameUsage::Definition, /*OldName=*/Name,
-                            IsFunctionLike,        IsNonProtocolType};
+                            IsFunctionLike};
   RenameRangeDetailCollector Renamer(SM, Name);
   Renamer.addSyntacticRenameRanges(Resolved.back(), RenameConfig);
   auto Ranges = Renamer.Ranges;

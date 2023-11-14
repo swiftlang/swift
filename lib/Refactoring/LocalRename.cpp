@@ -219,7 +219,6 @@ private:
         } else {
           assert(existingLoc->OldName == loc->OldName &&
                  existingLoc->IsFunctionLike == loc->IsFunctionLike &&
-                 existingLoc->IsNonProtocolType == loc->IsNonProtocolType &&
                  "Asked to do a different rename for the same location?");
         }
       }
@@ -253,7 +252,6 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
   }
 
   bool isFunctionLike = false;
-  bool isNonProtocolType = false;
 
   switch (symbol.symInfo.Kind) {
   case index::SymbolKind::EnumConstant:
@@ -268,14 +266,11 @@ RenameRangeCollector::indexSymbolToRenameLoc(const index::IndexSymbol &symbol) {
   case index::SymbolKind::Class:
   case index::SymbolKind::Enum:
   case index::SymbolKind::Struct:
-    isNonProtocolType = true;
-    break;
   default:
     break;
   }
   StringRef oldName = stringStorage->copyString(symbol.name);
-  return RenameLoc{symbol.line, symbol.column,  usage,
-                   oldName,     isFunctionLike, isNonProtocolType};
+  return RenameLoc{symbol.line, symbol.column, usage, oldName, isFunctionLike};
 }
 
 bool RefactoringActionLocalRename::isApplicable(

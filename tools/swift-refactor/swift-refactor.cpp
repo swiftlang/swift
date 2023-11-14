@@ -243,14 +243,13 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
 std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
                                      ArrayRef<RefactorLoc> Locs,
                                      StringRef OldName, StringRef NewName,
-                                     bool IsFunctionLike,
-                                     bool IsNonProtocolType) {
+                                     bool IsFunctionLike) {
   std::vector<RenameLoc> Renames;
-  llvm::transform(Locs, std::back_inserter(Renames),
-                  [&](const RefactorLoc &Loc) -> RenameLoc {
-                    return {Loc.Line, Loc.Column,     Loc.Usage,
-                            OldName,  IsFunctionLike, IsNonProtocolType};
-                  });
+  llvm::transform(
+      Locs, std::back_inserter(Renames),
+      [&](const RefactorLoc &Loc) -> RenameLoc {
+        return {Loc.Line, Loc.Column, Loc.Usage, OldName, IsFunctionLike};
+      });
   return Renames;
 }
 
@@ -392,10 +391,9 @@ int main(int argc, char *argv[]) {
       NewName = "";
     }
 
-    std::vector<RenameLoc>
-    RenameLocs = getRenameLocs(BufferID, SM, Start, options::OldName, NewName,
-                               options::IsFunctionLike.getNumOccurrences(),
-                               options::IsNonProtocolType.getNumOccurrences());
+    std::vector<RenameLoc> RenameLocs =
+        getRenameLocs(BufferID, SM, Start, options::OldName, NewName,
+                      options::IsFunctionLike.getNumOccurrences());
 
     switch (options::Action) {
     case RefactoringKind::GlobalRename: {

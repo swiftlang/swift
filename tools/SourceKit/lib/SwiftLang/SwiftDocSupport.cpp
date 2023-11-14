@@ -1506,8 +1506,7 @@ getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
     for(const auto &Location: Locations.LineColumnLocs) {
       RenameLocs.push_back({Location.Line, Location.Column,
                             getNameUsage(Location.Type), Locations.OldName,
-                            Locations.IsFunctionLike,
-                            Locations.IsNonProtocolType});
+                            Locations.IsFunctionLike});
     }
   }
   return RenameLocs;

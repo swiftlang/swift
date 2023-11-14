@@ -73,7 +73,6 @@ struct RenameLoc {
   NameUsage Usage;
   StringRef OldName;
   const bool IsFunctionLike;
-  const bool IsNonProtocolType;
 };
 
 /// An array of \c RenameLoc that also keeps the underlying string storage of

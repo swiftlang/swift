@@ -4005,22 +4005,14 @@ buildRenameLocationsFromDict(const RequestDict &Req,
       return true;
     }
 
-    int64_t IsNonProtocolType = false;
-    if (RenameLocation.getInt64(KeyIsNonProtocolType, IsNonProtocolType, false)) {
-      Error = "missing key.is_non_protocol_type";
-      return true;
-    }
-
     Optional<StringRef> OldName = RenameLocation.getString(KeyName);
     if (!OldName.has_value()) {
       Error = "missing key.name";
       return true;
     }
 
-    RenameLocations.push_back({*OldName,
-                               static_cast<bool>(IsFunctionLike),
-                               static_cast<bool>(IsNonProtocolType),
-                               {}});
+    RenameLocations.push_back(
+        {*OldName, static_cast<bool>(IsFunctionLike), {}});
     auto &LineCols = RenameLocations.back().LineColumnLocs;
     bool Failed = RenameLocation.dictionaryArrayApply(KeyLocations,
                                                       [&](RequestDict LineAndCol) {
