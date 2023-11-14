@@ -14,6 +14,7 @@
 #define SWIFT_SIL_LOCATION_H
 
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/AST/TypeAlignments.h"
@@ -412,6 +413,26 @@ public:
   /// specified type is incorrect, asserts.
   template <typename T> T *castToASTNode() const {
     return castNodeTo<T>(getPrimaryASTNode());
+  }
+
+  /// If this SILLocation contains an ASTNode, return that node.
+  ASTNode getASTNode() const {
+    if (!isASTNode())
+      return ASTNode();
+    // ASTNode is a superset of PrimaryASTNode so we can just cast it, once we
+    // remove the bit stolen by ASTNodeTy from the underlying ASTNode pointer.
+    auto primaryNode = getPrimaryASTNode().getPointer();
+
+    if (auto *stmt = primaryNode.dyn_cast<Stmt *>())
+      return {stmt};
+    if (auto *expr = primaryNode.dyn_cast<Expr *>())
+      return {expr};
+    if (auto *decl = primaryNode.dyn_cast<Decl *>())
+      return {decl};
+    if (auto *pattern = primaryNode.dyn_cast<Pattern *>())
+      return {pattern};
+
+    return ASTNode();
   }
 
   /// Return the location as a DeclContext or null.
