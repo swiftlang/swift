@@ -7074,6 +7074,11 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
 /// Checks if a record provides the required value type lifetime operations
 /// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
+  // Hack for a base type of std::optional from the Microsoft standard library.
+  if (decl->isInStdNamespace() && decl->getIdentifier() &&
+      decl->getName() == "_Optional_construct_base")
+    return true;
+
   // If we have no way of copying the type we can't import the class
   // at all because we cannot express the correct semantics as a swift
   // struct.

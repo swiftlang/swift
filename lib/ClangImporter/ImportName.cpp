@@ -1522,6 +1522,17 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     return ImportedName();
   result.effectiveContext = effectiveCtx;
 
+  // If this is a using declaration, import the name of the shadowed decl and
+  // adjust the context.
+  if (auto usingShadowDecl = dyn_cast<clang::UsingShadowDecl>(D)) {
+    auto targetDecl = usingShadowDecl->getTargetDecl();
+    if (isa<clang::CXXMethodDecl>(targetDecl)) {
+      ImportedName baseName = importName(targetDecl, version, givenName);
+      baseName.effectiveContext = effectiveCtx;
+      return baseName;
+    }
+  }
+
   // Gather information from the swift_async attribute, if there is one.
   llvm::Optional<unsigned> completionHandlerParamIndex;
   bool completionHandlerFlagIsZeroOnError = false;

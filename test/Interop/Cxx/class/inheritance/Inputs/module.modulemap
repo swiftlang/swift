@@ -28,6 +28,11 @@ module TypeAliases {
   header "type-aliases.h"
 }
 
+module UsingBaseMembers {
+  header "using-base-members.h"
+  requires cplusplus
+}
+
 module VirtualMethods {
   header "virtual-methods.h"
   requires cplusplus
