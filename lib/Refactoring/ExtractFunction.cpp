@@ -102,11 +102,8 @@ static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  UnresolvedLoc UnresoledName{NameLoc};
-
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
-  auto Resolved =
-      Matcher.resolve(llvm::makeArrayRef(UnresoledName), llvm::None);
+  auto Resolved = Matcher.resolve(llvm::makeArrayRef(NameLoc), llvm::None);
   assert(!Resolved.empty() && "Failed to resolve generated func name loc");
 
   RenameLoc RenameConfig = {LineAndCol.first, LineAndCol.second,

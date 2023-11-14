@@ -74,19 +74,20 @@ SourceManager &NameMatcher::getSourceMgr() const {
   return SrcFile.getASTContext().SourceMgr;
 }
 
-ResolvedLoc NameMatcher::resolve(UnresolvedLoc Loc) {
-  return resolve({Loc}, {}).front();
+ResolvedLoc NameMatcher::resolve(SourceLoc Loc) {
+  return resolve(Loc, {}).front();
 }
 
-std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens) {
+std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<SourceLoc> Locs,
+                                              ArrayRef<Token> Tokens) {
 
   // Note the original indices and sort them in reverse source order
   std::vector<size_t> MapToOriginalIndex(Locs.size());
   std::iota(MapToOriginalIndex.begin(), MapToOriginalIndex.end(), 0);
   std::sort(MapToOriginalIndex.begin(), MapToOriginalIndex.end(),
             [this, Locs](size_t first, size_t second) {
-              return first != second && !getSourceMgr()
-                .isBeforeInBuffer(Locs[first].Loc, Locs[second].Loc);
+              return first != second && !getSourceMgr().isBeforeInBuffer(
+                                            Locs[first], Locs[second]);
             });
 
   // Add the locs themselves
@@ -587,7 +588,7 @@ bool NameMatcher::shouldSkip(CharSourceRange Range) {
 
 SourceLoc NameMatcher::nextLoc() const {
   assert(!LocsToResolve.empty());
-  return LocsToResolve.back().Loc;
+  return LocsToResolve.back();
 }
 
 std::vector<CharSourceRange> getSelectorLabelRanges(SourceManager &SM,
@@ -651,10 +652,10 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
 
   CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
                                                                    NameLoc);
-  UnresolvedLoc &Next = LocsToResolve.back();
+  SourceLoc &Next = LocsToResolve.back();
   bool WasResolved = false;
   if (Range.isValid()) {
-    if (NameLoc == Next.Loc) {
+    if (NameLoc == Next) {
       LocsToResolve.pop_back();
       ResolvedLocs.push_back({Node, Range, LabelRanges, FirstTrailingLabel,
         RangeType, isActive(), isInSelector()});
@@ -669,7 +670,7 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
       // properties, e.g. 'foo' in '_foo' and '$foo' occurrences.
       auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1),
                                       Range.getByteLength() - 1);
-      if (NewRange.getStart() == Next.Loc) {
+      if (NewRange.getStart() == Next) {
         LocsToResolve.pop_back();
         ResolvedLocs.push_back({Node,
                                 NewRange,

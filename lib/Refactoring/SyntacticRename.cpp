@@ -154,7 +154,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
   SourceManager &SM = SF.getASTContext().SourceMgr;
   unsigned BufferID = SF.getBufferID().value();
 
-  std::vector<UnresolvedLoc> UnresolvedLocs;
+  std::vector<SourceLoc> UnresolvedLocs;
   for (const RenameLoc &RenameLoc : RenameLocs) {
     DeclNameViewer OldName(RenameLoc.OldName);
     SourceLoc Location =
@@ -194,7 +194,6 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
       }
     }
 
-    bool isOperator = Lexer::isOperator(OldName.base());
     UnresolvedLocs.push_back({Location});
   }
 

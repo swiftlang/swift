@@ -300,10 +300,6 @@ struct ResolvedStmtStartCursorInfo : public ResolvedCursorInfo {
 
 void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
-struct UnresolvedLoc {
-  SourceLoc Loc;
-};
-
 enum class LabelRangeType {
   None,
   CallArg,    // foo([a: ]2) or .foo([a: ]String)
@@ -336,7 +332,7 @@ struct CallingParent {
 /// whether it is within active/inactive code, or a selector or string literal).
 class NameMatcher: public ASTWalker {
   SourceFile &SrcFile;
-  std::vector<UnresolvedLoc> LocsToResolve;
+  std::vector<SourceLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
 
@@ -390,8 +386,9 @@ class NameMatcher: public ASTWalker {
 
 public:
   explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }
-  std::vector<ResolvedLoc> resolve(ArrayRef<UnresolvedLoc> Locs, ArrayRef<Token> Tokens);
-  ResolvedLoc resolve(UnresolvedLoc Loc);
+  std::vector<ResolvedLoc> resolve(ArrayRef<SourceLoc> Locs,
+                                   ArrayRef<Token> Tokens);
+  ResolvedLoc resolve(SourceLoc Loc);
 };
 
 enum class RangeKind : int8_t {
