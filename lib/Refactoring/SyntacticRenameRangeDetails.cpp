@@ -350,16 +350,20 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
 RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
     const ResolvedLoc &Resolved) {
-  if (Resolved.IsInComment)
-    return RegionType::Comment;
-
-  if (Resolved.IsInStringLiteral)
-    return RegionType::String;
-  if (Resolved.IsInSelector)
+  switch (Resolved.Context) {
+  case ResolvedLocContext::Default:
+    if (Resolved.IsActive) {
+      return RegionType::ActiveCode;
+    } else {
+      return RegionType::InactiveCode;
+    }
+  case ResolvedLocContext::Selector:
     return RegionType::Selector;
-  if (Resolved.IsActive)
-    return RegionType::ActiveCode;
-  return RegionType::InactiveCode;
+  case ResolvedLocContext::Comment:
+    return RegionType::Comment;
+  case ResolvedLocContext::StringLiteral:
+    return RegionType::String;
+  }
 }
 
 RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
