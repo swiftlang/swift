@@ -374,14 +374,9 @@ void SourceManager::setGeneratedSourceInfo(
   GeneratedSourceInfos[bufferID] = info;
 
   switch (info.kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion:
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
-  case GeneratedSourceInfo::ExtensionMacroExpansion:
+#define MACRO_ROLE(Name, Description) \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
     break;
 

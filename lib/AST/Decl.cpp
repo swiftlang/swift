@@ -10950,40 +10950,17 @@ BuiltinTupleDecl::BuiltinTupleDecl(Identifier Name, DeclContext *Parent)
 
 std::vector<MacroRole> swift::getAllMacroRoles() {
   return {
-      MacroRole::Expression,      MacroRole::Declaration, MacroRole::Accessor,
-      MacroRole::MemberAttribute, MacroRole::Member,      MacroRole::Peer,
-      MacroRole::Conformance,     MacroRole::CodeItem,    MacroRole::Extension,
+#define MACRO_ROLE(Name, Description) MacroRole::Name,
+#include "swift/Basic/MacroRoles.def"
   };
 }
 
 StringRef swift::getMacroRoleString(MacroRole role) {
   switch (role) {
-  case MacroRole::Expression:
-    return "expression";
-
-  case MacroRole::Declaration:
-    return "declaration";
-
-  case MacroRole::Accessor:
-    return "accessor";
-
-  case MacroRole::MemberAttribute:
-    return "memberAttribute";
-
-  case MacroRole::Member:
-    return "member";
-
-  case MacroRole::Peer:
-    return "peer";
-
-  case MacroRole::Conformance:
-    return "conformance";
-
-  case MacroRole::CodeItem:
-    return "codeItem";
-
-  case MacroRole::Extension:
-    return "extension";
+#define MACRO_ROLE(Name, Description) \
+  case MacroRole::Name:               \
+    return Description;
+#include "swift/Basic/MacroRoles.def"
   }
 }
 
@@ -11034,17 +11011,17 @@ StringRef swift::getMacroIntroducedDeclNameString(
 }
 
 static MacroRoles freestandingMacroRoles =
-  (MacroRoles() |
-   MacroRole::Expression |
-   MacroRole::Declaration |
-   MacroRole::CodeItem);
-static MacroRoles attachedMacroRoles = (MacroRoles() |
-                                        MacroRole::Accessor |
-                                        MacroRole::MemberAttribute |
-                                        MacroRole::Member |
-                                        MacroRole::Peer |
-                                        MacroRole::Conformance |
-                                        MacroRole::Extension);
+  (MacroRoles()
+#define FREESTANDING_MACRO_ROLE(Name, Description) | MacroRole::Name
+#define ATTACHED_MACRO_ROLE(Name, Description)
+#include "swift/Basic/MacroRoles.def"
+   );
+static MacroRoles attachedMacroRoles = 
+  (MacroRoles()
+#define ATTACHED_MACRO_ROLE(Name, Description) | MacroRole::Name
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#include "swift/Basic/MacroRoles.def"
+   );
 
 bool swift::isFreestandingMacro(MacroRoles contexts) {
   return bool(contexts & freestandingMacroRoles);
@@ -11064,17 +11041,22 @@ MacroRoles swift::getAttachedMacroRoles() {
 
 bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   switch (role) {
-  case MacroRole::Expression:
-  case MacroRole::Declaration:
-  case MacroRole::Accessor:
-  case MacroRole::MemberAttribute:
-  case MacroRole::Member:
-  case MacroRole::Peer:
-  case MacroRole::Conformance:
-  case MacroRole::Extension:
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName) \
+  case MacroRole::Name: \
+    return ctx.LangOpts.hasFeature(FeatureName::CodeItemMacros);
+
+#define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName) \
+  case MacroRole::Name: return ctx.LangOpts.hasFeature(Feature::FeatureName);
+
+#define MACRO_ROLE(Name, Description)
+
+#include "swift/Basic/MacroRoles.def"
+
+#define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName)
+#define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName)
+#define MACRO_ROLE(Name, Description) case MacroRole::Name:
+#include "swift/Basic/MacroRoles.def"
     return true;
-  case MacroRole::CodeItem:
-    return ctx.LangOpts.hasFeature(Feature::CodeItemMacros);
   }
 }
 
@@ -11515,32 +11497,31 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
     return origDC;
 
   switch (generatedSourceInfo->kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion: {
-    auto expansion =
-        cast<MacroExpansionExpr>(
-                             ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
-                             .get<Expr *>());
-    if (!origDC->isChildContextOf(expansion->getDeclContext()))
-      return MacroDiscriminatorContext(expansion);
+  // Attached macros
+#define FREESTANDING_MACRO_ROLE(Name, Description)  \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#define ATTACHED_MACRO_ROLE(Name, Description)
+#include "swift/Basic/MacroRoles.def"
+  {
+    auto node = ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode);
+    if (auto expansion = cast_or_null<MacroExpansionExpr>(
+                             node.dyn_cast<Expr *>())) {
+      if (!origDC->isChildContextOf(expansion->getDeclContext()))
+        return MacroDiscriminatorContext(expansion);
+    } else {
+      auto expansionDecl = cast<MacroExpansionDecl>(node.get<Decl *>());
+      if (!origDC->isChildContextOf(expansionDecl->getDeclContext()))
+        return MacroDiscriminatorContext(expansionDecl);
+    }
+
     return origDC;
   }
 
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
-    auto expansion =
-        cast<MacroExpansionDecl>(
-          ASTNode::getFromOpaqueValue(generatedSourceInfo->astNode)
-            .get<Decl *>());
-    if (!origDC->isChildContextOf(expansion->getDeclContext()))
-      return MacroDiscriminatorContext(expansion);
-    return origDC;
-  }
-
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
-  case GeneratedSourceInfo::ExtensionMacroExpansion:
+  // Attached macros
+#define FREESTANDING_MACRO_ROLE(Name, Description)
+#define ATTACHED_MACRO_ROLE(Name, Description)      \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::ReplacedFunctionBody:
     return origDC;

@@ -958,14 +958,9 @@ public:
       : SM(SM), BufferID(BufferID) {
     if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(BufferID)) {
       switch (GeneratedSourceInfo->kind) {
-      case GeneratedSourceInfo::ExpressionMacroExpansion:
-      case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-      case GeneratedSourceInfo::AccessorMacroExpansion:
-      case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-      case GeneratedSourceInfo::MemberMacroExpansion:
-      case GeneratedSourceInfo::PeerMacroExpansion:
-      case GeneratedSourceInfo::ConformanceMacroExpansion:
-      case GeneratedSourceInfo::ExtensionMacroExpansion:
+#define MACRO_ROLE(Name, Description)                 \
+      case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
         IsWalkingMacroExpansionBuffer = true;
         break;
       case GeneratedSourceInfo::ReplacedFunctionBody:

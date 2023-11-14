@@ -171,7 +171,8 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
       parser.CurDeclContext = generatedInfo->declContext;
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
+    case GeneratedSourceInfo::DeclarationMacroExpansion:
+    case GeneratedSourceInfo::CodeItemMacroExpansion:
       if (parser.CurDeclContext->isTypeContext()) {
         parser.parseExpandedMemberList(items);
       } else {
