@@ -483,10 +483,11 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   // targets must be taking a phi argument.
   SILBasicBlock *normalBB = forEachCall->getNormalBB();
   SILBasicBlock *errorBB = forEachCall->getErrorBB();
-  assert(errorBB->getSILPhiArguments().size() == 1 &&
-         normalBB->getSILPhiArguments().size() == 1);
+  assert(normalBB->getSILPhiArguments().size() == 1);
   SILPhiArgument *normalArgument = normalBB->getSILPhiArguments()[0];
-  SILPhiArgument *errorArgument = errorBB->getSILPhiArguments()[0];
+  SILPhiArgument *errorArgument = nullptr;
+  if (errorBB->getSILPhiArguments().size() == 1)
+    errorArgument = errorBB->getSILPhiArguments()[0];
 
   // A generator for creating a basic block for use as the target of the
   // "normal" branch of a try_apply.
@@ -503,8 +504,12 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   auto errorTargetGenerator = [&](SILBasicBlock *insertionBlock,
                                   SILValue borrowedElem, SILValue storeBorrow) {
     SILBasicBlock *newErrorBB = fun->createBasicBlockBefore(insertionBlock);
-    SILValue argument = newErrorBB->createPhiArgument(
+    SILValue argument;
+    if (errorArgument) {
+      argument = newErrorBB->createPhiArgument(
         errorArgument->getType(), errorArgument->getOwnershipKind());
+    }
+
     // Make the errorBB jump to the error target of the original forEach.
     SILBuilderWithScope builder(newErrorBB, forEachCall);
     if (storeBorrow) {
@@ -513,7 +518,11 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     if (borrowedElem) {
       builder.createEndBorrow(forEachLoc, borrowedElem);
     }
-    builder.createBranch(forEachLoc, errorBB, argument);
+
+    if (argument)
+      builder.createBranch(forEachLoc, errorBB, argument);
+    else
+      builder.createBranch(forEachLoc, errorBB);
     return newErrorBB;
   };
 

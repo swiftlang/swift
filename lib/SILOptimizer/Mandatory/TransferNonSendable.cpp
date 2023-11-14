@@ -640,7 +640,8 @@ public:
 
     if (auto tryApplyInst = dyn_cast<TryApplyInst>(inst)) {
       foundResults.emplace_back(tryApplyInst->getNormalBB()->getArgument(0));
-      foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
+      if (tryApplyInst->getErrorBB()->getNumArguments() > 0)
+        foundResults.emplace_back(tryApplyInst->getErrorBB()->getArgument(0));
       return;
     }
 

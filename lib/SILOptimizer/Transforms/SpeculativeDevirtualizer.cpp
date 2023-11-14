@@ -239,11 +239,19 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Split critical edges resulting from VirtAI.
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
-    ErrorBB->createPhiArgument(TAI->getErrorBB()->getArgument(0)->getType(),
-                               OwnershipKind::Owned);
+    SILArgument *ErrorArg = nullptr;
+    if (TAI->getErrorBB()->getNumArguments() == 1) {
+      ErrorArg = TAI->getErrorBB()->getArgument(0);
+      ErrorBB->createPhiArgument(ErrorArg->getType(), OwnershipKind::Owned);
+    }
     Builder.setInsertionPoint(ErrorBB);
-    Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
-                         {ErrorBB->getArgument(0)});
+
+    if (ErrorArg) {
+      Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
+                           {ErrorBB->getArgument(0)});
+    } else {
+      Builder.createBranch(TAI->getLoc(), TAI->getErrorBB());
+    }
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
     NormalBB->createPhiArgument(TAI->getNormalBB()->getArgument(0)->getType(),
