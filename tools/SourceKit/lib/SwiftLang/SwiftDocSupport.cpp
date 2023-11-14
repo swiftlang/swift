@@ -1397,26 +1397,6 @@ static NameUsage getNameUsage(RenameType Type) {
 static std::vector<RenameLoc>
 getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations);
 
-void SwiftLangSupport::
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args,
-                CategorizedEditsReceiver Receiver) {
-  std::string Error;
-  CompilerInstance ParseCI;
-  PrintingDiagnosticConsumer PrintDiags;
-  ParseCI.addDiagnosticConsumer(&PrintDiags);
-  SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
-  if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
-    return;
-  }
-
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
-  RequestRefactoringEditConsumer EditConsumer(Receiver);
-  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer);
-}
-
 void SwiftLangSupport::findRenameRanges(
     llvm::MemoryBuffer *InputBuf, ArrayRef<RenameLocations> RenameLocations,
     ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {

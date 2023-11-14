@@ -264,7 +264,6 @@ UID_REQUESTS = [
     REQUEST('NameTranslation', 'source.request.name.translation'),
     REQUEST('MarkupToXML', 'source.request.convert.markup.xml'),
     REQUEST('Statistics', 'source.request.statistics'),
-    REQUEST('SyntacticRename', 'source.request.syntacticrename'),
     REQUEST('FindRenameRanges', 'source.request.find-syntactic-rename-ranges'),
     REQUEST('FindLocalRenameRanges',
             'source.request.find-local-rename-ranges'),

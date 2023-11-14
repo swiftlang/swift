@@ -711,11 +711,6 @@ public:
       std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
       override;
 
-  void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                       ArrayRef<RenameLocations> RenameLocations,
-                       ArrayRef<const char*> Args,
-                       CategorizedEditsReceiver Receiver) override;
-
   void findRenameRanges(llvm::MemoryBuffer *InputBuf,
                         ArrayRef<RenameLocations> RenameLocations,
                         ArrayRef<const char *> Args,
