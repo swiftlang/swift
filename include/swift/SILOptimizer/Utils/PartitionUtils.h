@@ -124,32 +124,24 @@ private:
   /// generated during compilation from a SILBasicBlock
   PointerUnion<SILInstruction *, Operand *> source;
 
-  /// Record an AST expression corresponding to this PartitionOp, currently
-  /// populated only for Transfer expressions to indicate the value being
-  /// transferred
-  Expr *sourceExpr;
-
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind opKind, Element arg1,
-              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
-      : opKind(opKind), opArgs({arg1}), source(sourceInst),
-        sourceExpr(sourceExpr) {
+              SILInstruction *sourceInst = nullptr)
+      : opKind(opKind), opArgs({arg1}), source(sourceInst) {
     assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
-  PartitionOp(PartitionOpKind opKind, Element arg1,
-              Operand *sourceOperand, Expr *sourceExpr = nullptr)
-      : opKind(opKind), opArgs({arg1}), source(sourceOperand), sourceExpr(sourceExpr) {
-    assert((opKind != PartitionOpKind::Transfer || source) &&
+  PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
+      : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
+    assert((opKind != PartitionOpKind::Transfer || sourceOperand) &&
            "Transfer needs a sourceInst");
   }
 
-  PartitionOp(PartitionOpKind OpKind, Element arg1, Element arg2,
-              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
-      : opKind(OpKind), opArgs({arg1, arg2}), source(sourceInst),
-        sourceExpr(sourceExpr) {
-    assert((OpKind != PartitionOpKind::Transfer || sourceInst) &&
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
+              SILInstruction *sourceInst = nullptr)
+      : opKind(opKind), opArgs({arg1, arg2}), source(sourceInst) {
+    assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
@@ -166,10 +158,8 @@ public:
     return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
   }
 
-  static PartitionOp Transfer(Element tgt, Operand *transferringOp,
-                              Expr *sourceExpr = nullptr) {
-    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp,
-                       sourceExpr);
+  static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
+    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -207,11 +197,7 @@ public:
 
   Operand *getSourceOp() const { return source.get<Operand *>(); }
 
-  SILLocation getSourceLoc() const { return getSourceInst(true)->getLoc(); }
-
-  Expr *getSourceExpr() const {
-    return sourceExpr;
-  }
+  SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 

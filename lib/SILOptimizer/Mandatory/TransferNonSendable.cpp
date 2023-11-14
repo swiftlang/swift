@@ -224,6 +224,64 @@ static bool isProjectedFromAggregate(SILValue value) {
 }
 
 //===----------------------------------------------------------------------===//
+//                 MARK: Expr/Type Inference for Diagnostics
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct InferredCallerArgumentTypeInfo {
+  Type inferredType;
+  ApplyExpr *sourceApply;
+  ApplyIsolationCrossing isolationCrossing;
+  Expr *foundExpr;
+
+  InferredCallerArgumentTypeInfo(const Operand *op);
+};
+
+} // namespace
+
+InferredCallerArgumentTypeInfo::InferredCallerArgumentTypeInfo(
+    const Operand *op)
+    : inferredType(op->get()->getType().getASTType()), sourceApply(nullptr),
+      isolationCrossing(), foundExpr(nullptr) {
+  sourceApply = op->getUser()->getLoc().getAsASTNode<ApplyExpr>();
+  assert(sourceApply);
+  isolationCrossing = *sourceApply->getIsolationCrossing();
+
+  // Grab out full apply site and see if we can find a better expr.
+  SILInstruction *i = const_cast<SILInstruction *>(op->getUser());
+  auto fai = FullApplySite::isa(i);
+
+  // If we have self, then infer it.
+  if (fai.hasSelfArgument() && op == &fai.getSelfArgumentOperand()) {
+    if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
+      if (auto calledExpr =
+              dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
+        foundExpr = calledExpr->getBase();
+  } else {
+    // Otherwise, try to infer using the operand of the ApplyExpr.
+    unsigned argNum = [&]() -> unsigned {
+      if (fai.isCalleeOperand(*op))
+        return op->getOperandNumber();
+      return fai.getAppliedArgIndex(*op);
+    }();
+    if (argNum < sourceApply->getArgs()->size()) {
+      auto *expr = sourceApply->getArgs()->getExpr(argNum);
+
+      // If we have an erasure expression, lets use the original type. We do
+      // this since we are not saying the specific parameter that is the
+      // issue and we are using the type to explain it to the user.
+      if (auto *erasureExpr = dyn_cast<ErasureExpr>(expr))
+        expr = erasureExpr->getSubExpr();
+      foundExpr = expr;
+    }
+  }
+
+  if (foundExpr)
+    inferredType = foundExpr->findOriginalType();
+}
+
+//===----------------------------------------------------------------------===//
 //                       MARK: Instruction Level Model
 //===----------------------------------------------------------------------===//
 
@@ -391,12 +449,12 @@ struct PartitionOpBuilder {
         lookupValueID(tgt), lookupValueID(src), currentInst));
   }
 
-  void addTransfer(SILValue representative, Operand *op, Expr *expr) {
+  void addTransfer(SILValue representative, Operand *op) {
     assert(valueHasID(representative) &&
            "transferred value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
-        PartitionOp::Transfer(lookupValueID(representative), op, expr));
+        PartitionOp::Transfer(lookupValueID(representative), op));
   }
 
   void addMerge(SILValue fst, SILValue snd) {
@@ -832,39 +890,23 @@ public:
       if (auto value = tryToTrackValue(op))
         builder.addRequire(value->getRepresentative());
 
-    auto getSourceArg = [&](unsigned i) {
-      if (i < sourceApply->getArgs()->size())
-        return sourceApply->getArgs()->getExpr(i);
-      return (Expr *)nullptr;
-    };
-
-    auto getSourceSelf = [&]() {
-      if (auto callExpr = dyn_cast<CallExpr>(sourceApply))
-        if (auto calledExpr =
-                dyn_cast<DotSyntaxCallExpr>(callExpr->getDirectCallee()))
-          return calledExpr->getBase();
-      return (Expr *)nullptr;
-    };
-
     auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
-      int argNum = 0;
-      for (auto &operand : operands) {
-        if (auto value = tryToTrackValue(operand.get()))
-          builder.addTransfer(value->getRepresentative(), &operand, getSourceArg(argNum));
-        argNum++;
+      for (auto &op : operands) {
+        if (auto value = tryToTrackValue(op.get()))
+          builder.addTransfer(value->getRepresentative(), &op);
       }
     };
 
-    auto handleSILSelf = [&](Operand &self) {
-      if (auto value = tryToTrackValue(self.get()))
-        builder.addTransfer(value->getRepresentative(), &self, getSourceSelf());
+    auto handleSILSelf = [&](Operand *self) {
+      if (auto value = tryToTrackValue(self->get()))
+        builder.addTransfer(value->getRepresentative(), self);
     };
 
     if (applySite.hasSelfArgument()) {
       handleSILOperands(applySite.getOperandsWithoutSelf());
-      handleSILSelf(applySite.getSelfArgumentOperand());
+      handleSILSelf(&applySite.getSelfArgumentOperand());
     } else {
-      handleSILOperands(applySite.getArgumentOperands());
+      handleSILOperands(applySite->getAllOperands());
     }
 
     // non-sendable results can't be returned from cross-isolation calls without
@@ -1660,8 +1702,8 @@ public:
         auto diag = fn->getASTContext().Diags.diagnose(
             loc.getSourceLoc(), diag::transfer_yields_race, numDisplayed,
             numDisplayed != 1, numHidden > 0, numHidden);
-        if (auto sourceExpr = transferOp.getSourceExpr())
-          diag.highlight(sourceExpr->getSourceRange());
+        if (auto sourceExpr = transferOp.getSourceLoc())
+          diag.highlight(sourceExpr.getSourceRange());
         return;
       }
 
@@ -1671,7 +1713,7 @@ public:
         // transfer...
         if (numRequiresToProcess-- == 0)
           break;
-        auto loc = requireOp.getSourceLoc();
+        auto loc = requireOp.getSourceInst()->getLoc();
         fn->getASTContext()
             .Diags.diagnose(loc.getSourceLoc(), diag::possible_racy_access_site)
             .highlight(loc.getSourceRange());
@@ -1710,17 +1752,17 @@ private:
     assert(isolationCrossing && "ApplyExprs should be transferring only if "
                                 "they are isolation crossing");
 
-    auto argExpr = transferOp.getSourceExpr();
-    assert(argExpr && "sourceExpr should be populated for ApplyExpr transfers");
+    InferredCallerArgumentTypeInfo argTypeInfo(transferOp.getSourceOp());
 
+    auto loc = transferOp.getSourceLoc();
     sourceInst->getFunction()
         ->getASTContext()
         .Diags
-        .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
-                  argExpr->findOriginalType(),
-                  isolationCrossing.value().getCallerIsolation(),
-                  isolationCrossing.value().getCalleeIsolation())
-        .highlight(argExpr->getSourceRange());
+        .diagnose(loc.getSourceLoc(), diag::call_site_transfer_yields_race,
+                  argTypeInfo.inferredType,
+                  argTypeInfo.isolationCrossing.getCallerIsolation(),
+                  argTypeInfo.isolationCrossing.getCalleeIsolation())
+        .highlight(loc.getSourceRange());
     return true;
   }
 };
@@ -2206,17 +2248,17 @@ class PartitionAnalysis {
                       " they are isolation crossing");
       return false;
     }
-    auto argExpr = transferOp.getSourceExpr();
+    auto argExpr = transferOp.getSourceLoc();
     if (!argExpr)
       assert(false && "sourceExpr should be populated for ApplyExpr transfers");
 
     function->getASTContext()
         .Diags
-        .diagnose(argExpr->getLoc(), diag::call_site_transfer_yields_race,
-                  argExpr->findOriginalType(),
+        .diagnose(argExpr.getSourceLoc(), diag::call_site_transfer_yields_race,
+                  transferOp.getSourceOp()->get()->getType().getASTType(),
                   isolationCrossing.value().getCallerIsolation(),
                   isolationCrossing.value().getCalleeIsolation())
-        .highlight(argExpr->getSourceRange());
+        .highlight(argExpr.getSourceRange());
     return true;
   }
 
