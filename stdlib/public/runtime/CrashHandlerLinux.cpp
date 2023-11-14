@@ -240,7 +240,7 @@ handle_fatal_signal(int signum,
   pc = (void *)(ctx->uc_mcontext.gregs[REG_RIP]);
 #elif defined(__i386__)
   pc = (void *)(ctx->uc_mcontext.gregs[REG_EIP]);
-#elif defined(__arm64__)
+#elif defined(__arm64__) || defined(__aarch64__)
   pc = (void *)(ctx->uc_mcontext.pc);
 #elif defined(__arm__)
   pc = (void *)(ctx->uc_mcontext.gprs[15]);
