@@ -80,3 +80,16 @@ struct NoGlobalActorValueType {
 }
 
 /// -----------------------------------------------------------------
+
+@MainActor
+class MainActorIsolated {
+  init() {}
+
+  // expected-note@+1 {{static property declared here}}
+  static let shared = MainActorIsolated()
+}
+
+nonisolated func accessAcrossActors() {
+  // expected-error@+1 {{main actor-isolated static property 'shared' can not be referenced from a non-isolated context}}
+  let _ = MainActorIsolated.shared
+}
