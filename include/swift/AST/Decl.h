@@ -2276,6 +2276,10 @@ public:
     getMutablePatternList()[i].setOriginalInit(E);
   }
 
+  /// Returns a fully typechecked executable init expression for the pattern at
+  /// the given index.
+  Expr *getCheckedExecutableInit(unsigned i) const;
+
   Pattern *getPattern(unsigned i) const {
     return getPatternList()[i].getPattern();
   }

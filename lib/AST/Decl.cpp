@@ -2198,6 +2198,13 @@ PatternBindingDecl::getInitializerIsolation(unsigned i) const {
   return var->getInitializerIsolation();
 }
 
+Expr *PatternBindingDecl::getCheckedExecutableInit(unsigned i) const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           PatternBindingCheckedExecutableInitRequest{
+                               const_cast<PatternBindingDecl *>(this), i},
+                           nullptr);
+}
+
 bool PatternBindingDecl::hasStorage() const {
   // Walk the pattern, to check to see if any of the VarDecls included in it
   // have storage.

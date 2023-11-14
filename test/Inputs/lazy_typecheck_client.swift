@@ -43,6 +43,8 @@ func testPublicStructs() {
   let _: Int = s.publicDynamicProperty
   PublicStruct.publicStaticMethod()
   PublicStruct.activeMethod()
+  let _: Int = PublicStruct.publicStaticProperty
+  let _: Int = PublicStruct.publicStaticPropertyInferred
 
   let _ = FrozenPublicStruct(1)
 }
@@ -59,12 +61,16 @@ func testPublicClasses() {
   let _: String = c.publicPropertyInferredType
   c.publicFinalWrappedProperty = true
   PublicClass.publicClassMethod()
+  let _: Int = PublicClass.publicStaticProperty
+  let _: Int = PublicClass.publicStaticPropertyInferred
 
   let d = PublicDerivedClass(x: 3)
   let _: Int = d.publicMethod()
   let _: Int = d.publicProperty
   let _: String = d.publicPropertyInferredType
   PublicDerivedClass.publicClassMethod()
+  let _: Int = PublicDerivedClass.publicStaticProperty
+  let _: Int = PublicDerivedClass.publicStaticPropertyInferred
 
   class DerivedFromPublicClassSynthesizedDesignatedInit: PublicClassSynthesizedDesignatedInit {
     init() {}

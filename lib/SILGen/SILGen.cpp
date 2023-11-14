@@ -1656,6 +1656,10 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
       !pbd->getAnchoringVarDecl(i)->isInitExposedToClients())
     return;
 
+  // Force the executable init to be type checked before emission.
+  if (!pbd->getCheckedExecutableInit(i))
+    return;
+
   auto *var = pbd->getAnchoringVarDecl(i);
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(constant);
@@ -1666,6 +1670,9 @@ emitPropertyWrapperBackingInitializer(VarDecl *var) {
   auto initInfo = var->getPropertyWrapperInitializerInfo();
 
   if (initInfo.hasInitFromWrappedValue()) {
+    // FIXME: Fully typecheck the original property's init expression on-demand
+    // for lazy typechecking mode.
+
     SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
     emitOrDelayFunction(constant);
   }

@@ -219,6 +219,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
                 ->areAllParamsConcrete());
   }
 
+  // Force the executable init to be type checked before emission.
+  if (!pd->getCheckedExecutableInit(pbdEntry))
+    return;
+
   Mangle::ASTMangler TokenMangler;
   std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(pd, pbdEntry,
                                                               false);
