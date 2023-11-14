@@ -1147,8 +1147,9 @@ static bool performWithCompletionLikeOperationParams(
 }
 
 template <typename ResultType>
-static int printResult(CancellableResult<ResultType> Result,
-                       llvm::function_ref<int(ResultType &)> PrintSuccess) {
+static int
+printResult(CancellableResult<ResultType> Result,
+            llvm::function_ref<int(const ResultType &)> PrintSuccess) {
   switch (Result.getKind()) {
   case CancellableResultKind::Success: {
     return PrintSuccess(Result.getResult());
@@ -1166,7 +1167,7 @@ static int printResult(CancellableResult<ResultType> Result,
 static int printTypeContextInfo(
     CancellableResult<TypeContextInfoResult> CancellableResult) {
   return printResult<TypeContextInfoResult>(
-      CancellableResult, [](TypeContextInfoResult &Result) {
+      CancellableResult, [](const TypeContextInfoResult &Result) {
         llvm::outs() << "-----BEGIN TYPE CONTEXT INFO-----\n";
         for (auto resultItem : Result.Results) {
           llvm::outs() << "- TypeName: ";
@@ -1227,7 +1228,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 static int printConformingMethodList(
     CancellableResult<ConformingMethodListResults> CancellableResult) {
   return printResult<ConformingMethodListResults>(
-      CancellableResult, [](ConformingMethodListResults &Results) {
+      CancellableResult, [](const ConformingMethodListResults &Results) {
         auto Result = Results.Result;
         if (!Result) {
           return 0;
@@ -1396,7 +1397,7 @@ static int printCodeCompletionResults(
     bool PrintAnnotatedDescription) {
   llvm::raw_fd_ostream &OS = llvm::outs();
   return printResult<CodeCompleteResult>(
-      CancellableResult, [&](CodeCompleteResult &Result) {
+      CancellableResult, [&](const CodeCompleteResult &Result) {
         printCodeCompletionResultsImpl(
             Result.ResultSink.Results, OS, IncludeKeywords, IncludeComments,
             IncludeSourceText, PrintAnnotatedDescription,
