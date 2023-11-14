@@ -95,8 +95,9 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getConcreteReplacementForMemberSerializationRequirement(
-    ValueDecl *member) {
+Type swift::getSerializationRequirementTypesForMember(
+    ValueDecl *member,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements) {
   auto &C = member->getASTContext();
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
@@ -115,6 +116,18 @@ Type swift::getConcreteReplacementForMemberSerializationRequirement(
       signature = genericContext->getGenericSignature();
     } else {
       signature = DC->getGenericSignatureOfContext();
+    }
+
+    // Also store all `SerializationRequirement : SomeProtocol` requirements
+    for (auto requirement: signature.getRequirements()) {
+      if (requirement.getFirstType()->isEqual(SerReqAssocType) &&
+          requirement.getKind() == RequirementKind::Conformance) {
+        if (auto nominal = requirement.getSecondType()->getAnyNominal()) {
+          if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+            serializationRequirements.insert(protocol);
+          }
+        }
+      }
     }
 
     // Note that this may be null, e.g. if we're a distributed func inside
@@ -1220,46 +1233,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     }
 
     return true;
-}
-
-void
-swift::extractDistributedSerializationRequirements(
-    ASTContext &C,
-    ArrayRef<Requirement> allRequirements,
-    llvm::SmallPtrSet<ProtocolDecl *, 2> &into) {
-  auto DA = C.getDistributedActorDecl();
-  auto daSerializationReqAssocType =
-      DA->getAssociatedType(C.Id_SerializationRequirement);
-
-  for (auto req : allRequirements) {
-    // FIXME: Seems unprincipled
-    if (req.getKind() != RequirementKind::SameType &&
-        req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    if (auto dependentMemberType =
-            req.getFirstType()->getAs<DependentMemberType>()) {
-      if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
-        // auto requirementProto = req.getSecondType();
-        // if (auto proto = dyn_cast_or_null<ProtocolDecl>(
-        //         requirementProto->getAnyNominal())) {
-        //   into.insert(proto);
-        // } else {
-        //   auto serialReqType = requirementProto->castTo<ExistentialType>()
-        //                            ->getConstraintType();
-        //   auto flattenedRequirements =
-        //       flattenDistributedSerializationTypeToRequiredProtocols(
-        //           serialReqType.getPointer());
-        //   for (auto p : flattenedRequirements) {
-        //     into.insert(p);
-        //   }
-        auto layout = req.getSecondType()->getExistentialLayout();
-        for (auto p : layout.getProtocols()) {
-          into.insert(p);
-        }
-      }
-    }
-  }
 }
 
 /******************************************************************************/
