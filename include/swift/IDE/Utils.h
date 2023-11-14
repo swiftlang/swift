@@ -311,12 +311,12 @@ enum class LabelRangeType {
 enum class ResolvedLocContext { Default, Selector, Comment, StringLiteral };
 
 struct ResolvedLoc {
-  CharSourceRange Range;
-  std::vector<CharSourceRange> LabelRanges;
-  llvm::Optional<unsigned> FirstTrailingLabel;
-  LabelRangeType LabelType;
-  bool IsActive;
-  ResolvedLocContext Context;
+  CharSourceRange range;
+  std::vector<CharSourceRange> labelRanges;
+  llvm::Optional<unsigned> firstTrailingLabel;
+  LabelRangeType labelType;
+  bool isActive;
+  ResolvedLocContext context;
 };
 
 /// Used by NameMatcher to track parent CallExprs when walking a checked AST.

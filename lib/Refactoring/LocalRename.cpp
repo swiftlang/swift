@@ -91,7 +91,7 @@ renameAvailabilityInfo(const ValueDecl *VD,
       if (RefInfo && !RefInfo->IsArgLabel) {
         NameMatcher Matcher(*(RefInfo->SF));
         auto Resolved = Matcher.resolve({RefInfo->Loc});
-        if (Resolved.LabelRanges.empty())
+        if (Resolved.labelRanges.empty())
           return llvm::None;
       }
     }
@@ -107,7 +107,7 @@ renameAvailabilityInfo(const ValueDecl *VD,
         if (RefInfo && !RefInfo->IsArgLabel) {
           NameMatcher Matcher(*(RefInfo->SF));
           auto Resolved = Matcher.resolve({RefInfo->Loc});
-          if (Resolved.LabelRanges.empty())
+          if (Resolved.labelRanges.empty())
             return llvm::None;
         }
       }

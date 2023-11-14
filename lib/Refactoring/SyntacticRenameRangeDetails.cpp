@@ -350,9 +350,9 @@ bool RenameRangeDetailCollector::renameLabelsLenient(
 
 RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
     const ResolvedLoc &Resolved) {
-  switch (Resolved.Context) {
+  switch (Resolved.context) {
   case ResolvedLocContext::Default:
-    if (Resolved.IsActive) {
+    if (Resolved.isActive) {
       return RegionType::ActiveCode;
     } else {
       return RegionType::InactiveCode;
@@ -369,7 +369,7 @@ RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
 RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
     const ResolvedLoc &Resolved, const RenameLoc &Config) {
 
-  if (!Resolved.Range.isValid())
+  if (!Resolved.range.isValid())
     return RegionType::Unmatched;
 
   auto RegionKind = getSyntacticRenameRegionType(Resolved);
@@ -397,15 +397,15 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
   // any appearance of just 'init', 'subscript', or 'callAsFunction' in
   // strings, comments, and inactive code.
   if (IsSpecialBase && (Config.Usage == NameUsage::Unknown &&
-                        Resolved.LabelType == LabelRangeType::None))
+                        Resolved.labelType == LabelRangeType::None))
     return RegionType::Unmatched;
 
   if (!Config.IsFunctionLike || !IsSpecialBase) {
-    if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
+    if (renameBase(Resolved.range, RefactoringRangeKind::BaseName))
       return RegionType::Mismatch;
 
   } else if (IsInit || IsCallAsFunction) {
-    if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName)) {
+    if (renameBase(Resolved.range, RefactoringRangeKind::KeywordBaseName)) {
       // The base name doesn't need to match (but may) for calls, but
       // it should for definitions and references.
       if (Config.Usage == NameUsage::Definition ||
@@ -414,7 +414,7 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
       }
     }
   } else if (IsSubscript && Config.Usage == NameUsage::Definition) {
-    if (renameBase(Resolved.Range, RefactoringRangeKind::KeywordBaseName))
+    if (renameBase(Resolved.range, RefactoringRangeKind::KeywordBaseName))
       return RegionType::Mismatch;
   }
 
@@ -429,10 +429,10 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
       break;
     case NameUsage::Reference:
       HandleLabels =
-          Resolved.LabelType == LabelRangeType::Selector || IsSubscript;
+          Resolved.labelType == LabelRangeType::Selector || IsSubscript;
       break;
     case NameUsage::Unknown:
-      HandleLabels = Resolved.LabelType != LabelRangeType::None;
+      HandleLabels = Resolved.labelType != LabelRangeType::None;
       break;
     }
   }
@@ -440,10 +440,10 @@ RegionType RenameRangeDetailCollector::addSyntacticRenameRanges(
   if (HandleLabels) {
     bool isCallSite = Config.Usage != NameUsage::Definition &&
                       (Config.Usage != NameUsage::Reference || IsSubscript) &&
-                      Resolved.LabelType == LabelRangeType::CallArg;
+                      Resolved.labelType == LabelRangeType::CallArg;
 
-    if (renameLabels(Resolved.LabelRanges, Resolved.FirstTrailingLabel,
-                     Resolved.LabelType, isCallSite))
+    if (renameLabels(Resolved.labelRanges, Resolved.firstTrailingLabel,
+                     Resolved.labelType, isCallSite))
       return Config.Usage == NameUsage::Unknown ? RegionType::Unmatched
                                                 : RegionType::Mismatch;
   }

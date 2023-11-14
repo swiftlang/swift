@@ -102,7 +102,7 @@ swift::ide::findSyntacticRenameRanges(SourceFile *SF,
     SyntacticRenameRangeDetails Details =
         getSyntacticRenameRangeDetails(SM, Rename.OldName, Resolved, Rename);
     if (Details.Type == RegionType::Mismatch) {
-      DiagEngine.diagnose(Resolved.Range.getStart(), diag::mismatched_rename,
+      DiagEngine.diagnose(Resolved.range.getStart(), diag::mismatched_rename,
                           NewName);
       Result.emplace_back(SyntacticRenameRangeDetails{Details.Type, {}});
     } else {

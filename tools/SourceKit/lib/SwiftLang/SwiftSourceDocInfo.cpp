@@ -2580,12 +2580,12 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
             Locs.getLocations(), /*NewName=*/StringRef(), *SrcFile, Diags);
 
         for (auto ResolvedLoc : ResolvedLocs) {
-          if (ResolvedLoc.Range.isInvalid()) {
+          if (ResolvedLoc.range.isInvalid()) {
             continue;
           }
           unsigned Offset = SrcMgr.getLocOffsetInBuffer(
-              ResolvedLoc.Range.getStart(), BufferID);
-          Ranges.emplace_back(Offset, ResolvedLoc.Range.getByteLength());
+              ResolvedLoc.range.getStart(), BufferID);
+          Ranges.emplace_back(Offset, ResolvedLoc.range.getByteLength());
         }
       };
       Action();
