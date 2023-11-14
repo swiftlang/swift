@@ -395,19 +395,12 @@ int main(int argc, char *argv[]) {
         getRenameLocs(BufferID, SM, Start, options::OldName, NewName,
                       options::IsFunctionLike.getNumOccurrences());
 
-    switch (options::Action) {
-    case RefactoringKind::GlobalRename: {
-      SourceEditOutputConsumer EditConsumer(SM, BufferID, llvm::outs());
-      return syntacticRename(SF, RenameLocs, NewName, EditConsumer, PrintDiags);
-    }
-    case RefactoringKind::FindGlobalRenameRanges: {
-      FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-      return findSyntacticRenameRanges(SF, RenameLocs, NewName, Consumer,
-                                       PrintDiags);
-    }
-    default:
+    if (options::Action != RefactoringKind::FindGlobalRenameRanges) {
       llvm_unreachable("unexpected refactoring kind");
     }
+    FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
+    return findSyntacticRenameRanges(SF, RenameLocs, NewName, Consumer,
+                                     PrintDiags);
   }
 
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);

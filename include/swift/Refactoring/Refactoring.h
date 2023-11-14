@@ -160,10 +160,6 @@ bool refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
                          SourceEditConsumer &EditConsumer,
                          DiagnosticConsumer &DiagConsumer);
 
-int syntacticRename(SourceFile *SF, llvm::ArrayRef<RenameLoc> RenameLocs,
-                    StringRef NewName, SourceEditConsumer &EditConsumer,
-                    DiagnosticConsumer &DiagConsumer);
-
 /// Based on the given \p RenameLocs, finds the ranges (including argument
 /// labels) that need to be renamed and reports those to \p RenameConsumer.
 ///
