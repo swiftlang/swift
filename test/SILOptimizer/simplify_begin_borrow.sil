@@ -159,6 +159,20 @@ bb0(%0 : @owned $C):
   return %6 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_replace_pointer_escape :
+// CHECK:         begin_borrow
+// CHECK:       } // end sil function 'dont_replace_pointer_escape'
+sil [ossa] @dont_replace_pointer_escape : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow [pointer_escape] %0 : $C
+  %2 = function_ref @takeC : $@convention(thin) (@guaranteed C) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0: $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_replace_with_multiple_uses :
 // CHECK:         begin_borrow
 // CHECK:       } // end sil function 'dont_replace_with_multiple_uses'

@@ -784,6 +784,10 @@ bool BridgedInstruction::BeginBorrow_isLexical() const {
   return getAs<swift::BeginBorrowInst>()->isLexical();
 }
 
+bool BridgedInstruction::BeginBorrow_hasPointerEscape() const {
+  return getAs<swift::BeginBorrowInst>()->hasPointerEscape();
+}
+
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {
   return getAs<swift::ProjectBoxInst>()->getFieldIndex();
 }
