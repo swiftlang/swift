@@ -134,13 +134,6 @@ struct SwiftParserExecutor {
   }
 };
 
-static void appendToVector(void *declPtr, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
-  auto decl = static_cast<Decl *>(declPtr);
-
-  vec->push_back(decl);
-}
-
 struct ASTGenExecutor {
   constexpr static StringRef name = "ASTGen with SwiftParser";
 
