@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/Lexer.h"
-#include "swift/AST/BridgingUtils.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
@@ -33,11 +32,10 @@
 
 #include <limits>
 
-// Regex lexing delivered via libSwift.
-static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
-  regexLiteralLexingFn = fn;
-}
+extern "C" bool
+swift_ASTGen_lexRegexLiteral(const char *_Nonnull *_Nonnull curPtrPtr,
+                             const char *_Nonnull bufferEndPtr,
+                             bool mustBeRegex, void *_Nullable diagEngine);
 
 using namespace swift;
 
@@ -2040,9 +2038,10 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
 const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
                                        DiagnosticEngine *Diags,
                                        bool &CompletelyErroneous) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+  if (!LangOpts.EnableExperimentalStringProcessing)
     return nullptr;
 
   bool IsForwardSlash = (*TokStart == '/');
@@ -2088,9 +2087,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   // - Ptr will not be advanced if this is not for a regex literal.
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
-  auto *Ptr = TokStart;
-  CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, getBridgedOptionalDiagnosticEngine(Diags));
+  const char *Ptr = TokStart;
+  CompletelyErroneous =
+      swift_ASTGen_lexRegexLiteral(&Ptr, BufferEnd, MustBeRegex, Diags);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -2178,6 +2177,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   }
   assert(Ptr > TokStart && Ptr <= BufferEnd);
   return Ptr;
+#else
+  return nullptr;
+#endif
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
