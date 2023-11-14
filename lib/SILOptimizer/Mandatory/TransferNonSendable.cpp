@@ -391,12 +391,12 @@ struct PartitionOpBuilder {
         lookupValueID(tgt), lookupValueID(src), currentInst));
   }
 
-  void addTransfer(SILValue value, Expr *sourceExpr) {
-    assert(valueHasID(value) &&
+  void addTransfer(SILValue representative, Operand *op, Expr *expr) {
+    assert(valueHasID(representative) &&
            "transferred value should already have been encountered");
 
     currentInstPartitionOps.emplace_back(
-        PartitionOp::Transfer(lookupValueID(value), currentInst, sourceExpr));
+        PartitionOp::Transfer(lookupValueID(representative), op, expr));
   }
 
   void addMerge(SILValue fst, SILValue snd) {
@@ -846,25 +846,25 @@ public:
       return (Expr *)nullptr;
     };
 
-    auto handleSILOperands = [&](OperandValueArrayRef ops) {
+    auto handleSILOperands = [&](MutableArrayRef<Operand> operands) {
       int argNum = 0;
-      for (auto arg : ops) {
-        if (auto value = tryToTrackValue(arg))
-          builder.addTransfer(value->getRepresentative(), getSourceArg(argNum));
+      for (auto &operand : operands) {
+        if (auto value = tryToTrackValue(operand.get()))
+          builder.addTransfer(value->getRepresentative(), &operand, getSourceArg(argNum));
         argNum++;
       }
     };
 
-    auto handleSILSelf = [&](SILValue self) {
-      if (auto value = tryToTrackValue(self))
-        builder.addTransfer(value->getRepresentative(), getSourceSelf());
+    auto handleSILSelf = [&](Operand &self) {
+      if (auto value = tryToTrackValue(self.get()))
+        builder.addTransfer(value->getRepresentative(), &self, getSourceSelf());
     };
 
     if (applySite.hasSelfArgument()) {
-      handleSILOperands(applySite.getArgumentsWithoutSelf());
-      handleSILSelf(applySite.getSelfArgument());
+      handleSILOperands(applySite.getOperandsWithoutSelf());
+      handleSILSelf(applySite.getSelfArgumentOperand());
     } else {
-      handleSILOperands(applySite.getArguments());
+      handleSILOperands(applySite.getArgumentOperands());
     }
 
     // non-sendable results can't be returned from cross-isolation calls without
@@ -1699,8 +1699,7 @@ private:
   /// returns true iff one was succesfully formed and emitted.
   bool tryDiagnoseAsCallSite(const PartitionOp &transferOp,
                              unsigned numDisplayed, unsigned numHidden) const {
-    SILInstruction *sourceInst =
-        transferOp.getSourceInst(/*assertNonNull=*/true);
+    SILInstruction *sourceInst = transferOp.getSourceInst();
     ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
 
     // If the transfer does not correspond to an apply expression... bail.
@@ -1747,7 +1746,7 @@ class RaceTracer {
   TransferredReason findTransferredAtOpReason(TrackableValueID transferredVal,
                                               PartitionOp op) {
     TransferredReason transferredReason;
-    findAndAddTransferredReasons(op.getSourceInst(true)->getParent(),
+    findAndAddTransferredReasons(op.getSourceInst()->getParent(),
                                  transferredVal, transferredReason, 0, op);
     return transferredReason;
   }
@@ -2141,10 +2140,10 @@ class PartitionAnalysis {
       PartitionOpEvaluator eval(workingPartition);
       eval.failureCallback = /*handleFailure=*/
           [&](const PartitionOp &partitionOp, TrackableValueID transferredVal,
-              SILInstruction *transferringInst) {
+              Operand *transferringInst) {
             // Ensure that multiple transfers at the same AST node are only
             // entered once into the race tracer
-            if (hasBeenEmitted(partitionOp.getSourceInst(true)))
+            if (hasBeenEmitted(partitionOp.getSourceInst()))
               return;
 
             LLVM_DEBUG(llvm::dbgs()
@@ -2193,8 +2192,7 @@ class PartitionAnalysis {
 
   bool tryDiagnoseAsCallSite(const PartitionOp &transferOp,
                              unsigned numDisplayed, unsigned numHidden) {
-    SILInstruction *sourceInst =
-        transferOp.getSourceInst(/*assertNonNull=*/true);
+    SILInstruction *sourceInst = transferOp.getSourceInst();
     ApplyExpr *apply = sourceInst->getLoc().getAsASTNode<ApplyExpr>();
 
     // If the transfer does not correspond to an apply expression... return
