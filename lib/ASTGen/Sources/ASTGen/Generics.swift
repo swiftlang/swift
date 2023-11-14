@@ -14,17 +14,17 @@ import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  func generate(_ node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
+  func generate(genericParameterClause node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
     .createParsed(
       self.ctx,
       leftAngleLoc: node.leftAngle.bridgedSourceLoc(in: self),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
-      genericWhereClause: self.generate(node.genericWhereClause).asNullable,
+      genericWhereClause: self.generate(optional: node.genericWhereClause).asNullable,
       rightAngleLoc: node.rightAngle.bridgedSourceLoc(in: self)
     )
   }
 
-  func generate(_ node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
+  func generate(genericParameter node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
     var genericParameterIndex: Int?
@@ -44,12 +44,12 @@ extension ASTGenVisitor {
       eachKeywordLoc: node.eachKeyword.bridgedSourceLoc(in: self),
       name: name,
       nameLoc: nameLoc,
-      inheritedType: self.generate(node.inheritedType).asNullable,
+      inheritedType: self.generate(optional: node.inheritedType).asNullable,
       index: genericParameterIndex
     )
   }
 
-  func generate(_ node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
+  func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
     let requirements = node.requirements.lazy.map {
       switch $0.requirement {
       case .conformanceRequirement(let conformance):

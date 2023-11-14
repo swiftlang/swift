@@ -14,7 +14,7 @@ import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
-  public func generate(_ node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
+  public func generate(stringLiteralExpr node: StringLiteralExprSyntax) -> BridgedStringLiteralExpr {
     let openDelimiterOrQuoteLoc = (node.openingPounds ?? node.openingQuote).bridgedSourceLoc(in: self)
 
     // FIXME: Handle interpolated strings.
@@ -24,19 +24,19 @@ extension ASTGenVisitor {
     }
   }
 
-  public func generate(_ node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
+  public func generate(integerLiteralExpr node: IntegerLiteralExprSyntax) -> BridgedIntegerLiteralExpr {
     var segment = node.literal.text
     return segment.withBridgedString { bridgedSegment in
       return .createParsed(ctx, value: bridgedSegment, loc: node.literal.bridgedSourceLoc(in: self))
     }
   }
 
-  public func generate(_ node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
+  public func generate(booleanLiteralExpr node: BooleanLiteralExprSyntax) -> BridgedBooleanLiteralExpr {
     let value = node.literal.tokenKind == .keyword(.true)
     return .createParsed(ctx, value: value, loc: node.literal.bridgedSourceLoc(in: self))
   }
 
-  public func generate(_ node: ArrayExprSyntax) -> BridgedArrayExpr {
+  public func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
     let expressions = node.elements.lazy.map(self.generate)
 
     let commaLocations = node.elements.compactMap(in: self) {
@@ -52,7 +52,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(_ node: NilLiteralExprSyntax) -> BridgedNilLiteralExpr {
+  func generate(nilLiteralExpr node: NilLiteralExprSyntax) -> BridgedNilLiteralExpr {
     .createParsed(self.ctx, nilKeywordLoc: node.nilKeyword.bridgedSourceLoc(in: self))
   }
 }
