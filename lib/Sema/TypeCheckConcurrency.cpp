@@ -495,7 +495,8 @@ Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
 /// nonisolated or it is accessed from within the same module.
 static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
                                   VarDecl *var,
-                                  const ActorIsolation &varIsolation) {
+                                  const ActorIsolation &varIsolation,
+                                  ActorReferenceResult::Options &options) {
   // must be immutable
   if (!var->isLet())
     return false;
@@ -516,8 +517,12 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 
     // Static 'let's are initialized upon first access, so they cannot be
     // synchronously accessed across actors.
-    if (var->isGlobalStorage() && var->isLazilyInitializedGlobal())
+    if (var->isGlobalStorage() && var->isLazilyInitializedGlobal()) {
+      // Compiler versions <= 5.9 accepted this code, so downgrade to a
+      // warning prior to Swift 6.
+      options = ActorReferenceResult::Flags::Preconcurrency;
       return false;
+    }
 
     // If it's distributed, generally variable access is not okay...
     if (auto nominalParent = var->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -533,7 +538,8 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule,
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
                                     VarDecl *let) {
   auto isolation = getActorIsolation(let);
-  return varIsSafeAcrossActors(fromModule, let, isolation);
+  ActorReferenceResult::Options options = llvm::None;
+  return varIsSafeAcrossActors(fromModule, let, isolation, options);
 }
 
 namespace {
@@ -5829,7 +5835,8 @@ static bool isNonValueReference(const ValueDecl *value) {
 
 bool swift::isAccessibleAcrossActors(
     ValueDecl *value, const ActorIsolation &isolation,
-    const DeclContext *fromDC, llvm::Optional<ReferencedActor> actorInstance) {
+    const DeclContext *fromDC, ActorReferenceResult::Options &options,
+    llvm::Optional<ReferencedActor> actorInstance) {
   // Initializers and enum elements are accessible across actors unless they
   // are global-actor qualified.
   if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value)) {
@@ -5849,10 +5856,20 @@ bool swift::isAccessibleAcrossActors(
   // 'let' declarations are immutable, so some of them can be accessed across
   // actors.
   if (auto var = dyn_cast<VarDecl>(value)) {
-    return varIsSafeAcrossActors(fromDC->getParentModule(), var, isolation);
+    return varIsSafeAcrossActors(
+        fromDC->getParentModule(), var, isolation, options);
   }
 
   return false;
+}
+
+bool swift::isAccessibleAcrossActors(
+    ValueDecl *value, const ActorIsolation &isolation,
+    const DeclContext *fromDC,
+    llvm::Optional<ReferencedActor> actorInstance) {
+  ActorReferenceResult::Options options = llvm::None;
+  return isAccessibleAcrossActors(
+      value, isolation, fromDC, options, actorInstance);
 }
 
 ActorReferenceResult ActorReferenceResult::forSameConcurrencyDomain(
@@ -5993,16 +6010,18 @@ ActorReferenceResult ActorReferenceResult::forReference(
       (isa<ConstructorDecl>(fromDC) || isa<DestructorDecl>(fromDC)))
     return forSameConcurrencyDomain(declIsolation);
 
+  // Determine what adjustments we need to perform for cross-actor
+  // references.
+  Options options = llvm::None;
+
   // At this point, we are accessing the target from outside the actor.
   // First, check whether it is something that can be accessed directly,
   // without any kind of promotion.
   if (isAccessibleAcrossActors(
-          declRef.getDecl(), declIsolation, fromDC, actorInstance))
+          declRef.getDecl(), declIsolation, fromDC, options, actorInstance))
     return forEntersActor(declIsolation, llvm::None);
 
-  // This is a cross-actor reference, so determine what adjustments we need
-  // to perform.
-  Options options = llvm::None;
+  // This is a cross-actor reference.
 
   // Note if the reference originates from a @preconcurrency-isolated context.
   if (contextIsolation.preconcurrency() || declIsolation.preconcurrency())
