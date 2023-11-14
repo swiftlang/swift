@@ -3366,6 +3366,9 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_with_more_effects,none,
       "cannot override non-%1 %0 with %1 %0",
       (DescriptiveDeclKind, StringRef))
+ERROR(override_typed_throws,none,
+      "%0 that throws %1 cannot override one that throws %2",
+      (DescriptiveDeclKind, Type, Type))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
