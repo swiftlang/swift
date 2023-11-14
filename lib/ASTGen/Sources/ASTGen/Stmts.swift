@@ -64,8 +64,10 @@ extension ASTGenVisitor {
   }
 
   func makeIfStmt(_ node: IfExprSyntax) -> BridgedIfStmt {
+    // FIXME: handle multiple coniditons.
+    // FIXME: handle non-expression conditions.
     let conditions = node.conditions.map(self.generate)
-    assert(conditions.count == 1)  // TODO: handle multiple conditions.
+    assert(conditions.count == 1)
 
     return .createParsed(
       self.ctx,

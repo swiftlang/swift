@@ -188,7 +188,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  /// Generate AST from a Syntax node. The node must be a decl, stmt, expr, or
+  /// Generate ASTNode from a Syntax node. The node must be a decl, stmt, expr, or
   /// type.
   func generate(_ node: Syntax) -> ASTNode {
     if let decl = node.as(DeclSyntax.self) {
@@ -222,6 +222,8 @@ extension ASTGenVisitor {
 // Misc visits.
 // TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
 extension ASTGenVisitor {
+
+  /// Do NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
   func generate(choices node: some SyntaxChildChoices) -> ASTNode {
     return self.generate(Syntax(node))
   }
@@ -273,6 +275,7 @@ extension ASTGenVisitor {
     return self.generate(expr: node)
   }
 
+  /// DO NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
   @inline(__always)
   func generate(optional node: (some SyntaxChildChoices)?) -> ASTNode? {
     guard let node else {
