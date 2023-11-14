@@ -133,7 +133,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // If we are not run as 'swift', don't do anything special. This doesn't work
   // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
   // if we try and resolve using the actual executable path.
-  if (ExecName != "swift")
+  if (ExecName != "swift" && ExecName != "swift-legacy-driver")
     return false;
 
   // If there are no program arguments, always invoke as normal.
@@ -167,14 +167,30 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
                                     StringRef ExecName,
                                     const ArrayRef<const char *> argv) {
-  // We are not invoking the driver, so don't forward.
-  if (ExecName != "swift" && ExecName != "swiftc") {
-    return true;
+  // We are expected to use the legacy driver to `exec` an overload
+  // for testing purposes.
+  if (llvm::sys::Process::GetEnv("SWIFT_OVERLOAD_DRIVER").has_value()) {
+    return false;
   }
   StringRef disableArg = "-disallow-use-new-driver";
   StringRef disableEnv = "SWIFT_USE_OLD_DRIVER";
   auto shouldWarn = !llvm::sys::Process::
     GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").has_value();
+
+  // We explicitly are on the fallback to the legacy driver from the new driver.
+  // Do not forward.
+  if (ExecName == "swift-legacy-driver" ||
+      ExecName == "swiftc-legacy-driver") {
+    if (shouldWarn)
+      diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableArg);
+    return true;
+  }
+
+  // We are not invoking the driver, so don't forward.
+  if (ExecName != "swift" && ExecName != "swiftc") {
+    return true;
+  }
+
   // If user specified using the old driver, don't forward.
   if (llvm::find_if(argv, [&](const char* arg) {
     return StringRef(arg) == disableArg;
@@ -193,7 +209,7 @@ static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
 
 static bool appendSwiftDriverName(SmallString<256> &buffer) {
   assert(llvm::sys::fs::exists(buffer));
-  if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
+  if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_OVERLOAD_DRIVER")) {
     llvm::sys::path::append(buffer, *driverNameOp);
     return true;
   }
@@ -312,8 +328,7 @@ static int run_driver(StringRef ExecName,
         subCommandArgs.push_back(DriverModeArg.data());
       } else if (ExecName == "swiftc") {
         subCommandArgs.push_back("--driver-mode=swiftc");
-      } else {
-        assert(ExecName == "swift");
+      } else if (ExecName == "swift") {
         subCommandArgs.push_back("--driver-mode=swift");
       }
       // Push these non-op frontend arguments so the build log can indicate
@@ -344,7 +359,16 @@ static int run_driver(StringRef ExecName,
       return 2;
     }
   }
-
+  
+  // We are in the fallback to legacy driver mode.
+  // Now that we have determined above that we are not going to
+  // forward the invocation to the new driver, ensure the rest of the
+  // downstream driver execution refers to itself by the appropriate name.
+  if (ExecName == "swift-legacy-driver")
+    ExecName = "swift";
+  else if (ExecName == "swiftc-legacy-driver")
+    ExecName = "swiftc";
+  
   Driver TheDriver(Path, ExecName, argv, Diags);
   switch (TheDriver.getDriverKind()) {
   case Driver::DriverKind::SILOpt:

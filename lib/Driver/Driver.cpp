@@ -99,6 +99,8 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
       llvm::StringSwitch<llvm::Optional<DriverKind>>(DriverName)
           .Case("swift", DriverKind::Interactive)
           .Case("swiftc", DriverKind::Batch)
+          .Case("swift-legacy-driver", DriverKind::Interactive)
+          .Case("swiftc-legacy-driver", DriverKind::Batch)
           .Case("sil-opt", DriverKind::SILOpt)
           .Case("sil-func-extractor", DriverKind::SILFuncExtractor)
           .Case("sil-nm", DriverKind::SILNM)
