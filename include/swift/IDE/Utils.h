@@ -302,7 +302,6 @@ void simple_display(llvm::raw_ostream &out, ResolvedCursorInfoPtr info);
 
 struct UnresolvedLoc {
   SourceLoc Loc;
-  bool ResolveArgLocs;
 };
 
 enum class LabelRangeType {

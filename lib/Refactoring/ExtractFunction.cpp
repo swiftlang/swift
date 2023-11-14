@@ -102,7 +102,7 @@ static std::vector<NoteRegion> getNotableRegions(StringRef SourceText,
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
   auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
-  UnresolvedLoc UnresoledName{NameLoc, true};
+  UnresolvedLoc UnresoledName{NameLoc};
 
   NameMatcher Matcher(*Instance->getPrimarySourceFile());
   auto Resolved =

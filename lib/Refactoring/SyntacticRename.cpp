@@ -195,9 +195,7 @@ swift::ide::resolveRenameLocations(ArrayRef<RenameLoc> RenameLocs,
     }
 
     bool isOperator = Lexer::isOperator(OldName.base());
-    UnresolvedLocs.push_back(
-        {Location, (RenameLoc.Usage == NameUsage::Unknown ||
-                    (RenameLoc.Usage == NameUsage::Call && !isOperator))});
+    UnresolvedLocs.push_back({Location});
   }
 
   NameMatcher Resolver(SF);

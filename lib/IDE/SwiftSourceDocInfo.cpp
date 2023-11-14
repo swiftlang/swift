@@ -625,13 +625,11 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, DeclNameLoc NameLoc,
     return Resolved;
   }
 
-  if (LocsToResolve.back().ResolveArgLocs) {
-    if (Args) {
-      auto Labels = getCallArgLabelRanges(getSourceMgr(), Args,
-                                          LabelRangeEndAt::BeforeElemStart);
-      return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
-                        Labels.first, Labels.second);
-    }
+  if (Args) {
+    auto Labels = getCallArgLabelRanges(getSourceMgr(), Args,
+                                        LabelRangeEndAt::BeforeElemStart);
+    return tryResolve(Node, NameLoc.getBaseNameLoc(), LabelRangeType::CallArg,
+                      Labels.first, Labels.second);
   }
 
   return tryResolve(Node, NameLoc.getBaseNameLoc());
