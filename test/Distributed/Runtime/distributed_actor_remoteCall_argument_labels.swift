@@ -6,6 +6,10 @@
 
 // UNSUPPORTED: OS=windows-msvc
 
+// The returned "effective" label changed in 5.9, to fix an incorrect behavior,
+// so we skip the test in previous releases:
+// UNSUPPORTED: back_deployment_runtime
+
 import Distributed
 
 @available(SwiftStdlib 5.5, *)
