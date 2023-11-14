@@ -2464,15 +2464,9 @@ getMacroIntroducedDeclNameKind(Identifier name) {
 llvm::Optional<MacroRole> getMacroRole(StringRef roleName) {
   // Match the role string to the known set of roles.
   return llvm::StringSwitch<llvm::Optional<MacroRole>>(roleName)
-      .Case("declaration", MacroRole::Declaration)
-      .Case("expression", MacroRole::Expression)
-      .Case("codeItem", MacroRole::CodeItem)
-      .Case("accessor", MacroRole::Accessor)
-      .Case("memberAttribute", MacroRole::MemberAttribute)
-      .Case("member", MacroRole::Member)
-      .Case("peer", MacroRole::Peer)
-      .Case("conformance", MacroRole::Conformance)
-      .Case("extension", MacroRole::Extension)
+#define MACRO_ROLE(Name, Description)  \
+      .Case(Description, MacroRole::Name)
+#include "swift/Basic/MacroRoles.def"
       .Default(llvm::None);
 }
 

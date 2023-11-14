@@ -1963,24 +1963,10 @@ static void handleRequestSyntacticMacroExpansion(
     }
     MacroRoles macroRoles;
     for (auto uid : macroRoleUIDs) {
-      if (uid == KindMacroRoleExpression)
-        macroRoles |= MacroRole::Expression;
-      if (uid == KindMacroRoleDeclaration)
-        macroRoles |= MacroRole::Declaration;
-      if (uid == KindMacroRoleCodeItem)
-        macroRoles |= MacroRole::CodeItem;
-      if (uid == KindMacroRoleAccessor)
-        macroRoles |= MacroRole::Accessor;
-      if (uid == KindMacroRoleMemberAttribute)
-        macroRoles |= MacroRole::MemberAttribute;
-      if (uid == KindMacroRoleMember)
-        macroRoles |= MacroRole::Member;
-      if (uid == KindMacroRolePeer)
-        macroRoles |= MacroRole::Peer;
-      if (uid == KindMacroRoleConformance)
-        macroRoles |= MacroRole::Conformance;
-      if (uid == KindMacroRoleExtension)
-        macroRoles |= MacroRole::Extension;
+#define MACRO_ROLE(Name, Description)        \
+      if (uid == KindMacroRole##Name)        \
+        macroRoles |= MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
     }
 
     // definition.

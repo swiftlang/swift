@@ -1356,14 +1356,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
     auto bufferID = SourceMgr.findBufferContainingLoc(loc);
     if (auto generatedInfo = SourceMgr.getGeneratedSourceInfo(bufferID)) {
       switch (generatedInfo->kind) {
-      case GeneratedSourceInfo::ExpressionMacroExpansion:
-      case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-      case GeneratedSourceInfo::AccessorMacroExpansion:
-      case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-      case GeneratedSourceInfo::MemberMacroExpansion:
-      case GeneratedSourceInfo::PeerMacroExpansion:
-      case GeneratedSourceInfo::ConformanceMacroExpansion:
-      case GeneratedSourceInfo::ExtensionMacroExpansion:
+#define MACRO_ROLE(Name, Description)  \
+      case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
       case GeneratedSourceInfo::PrettyPrinted:
         fixIts = {};
         break;
@@ -1405,14 +1400,10 @@ DiagnosticEngine::getGeneratedSourceBufferNotes(SourceLoc loc) {
         ASTNode::getFromOpaqueValue(generatedInfo->astNode);
 
     switch (generatedInfo->kind) {
-    case GeneratedSourceInfo::ExpressionMacroExpansion:
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    case GeneratedSourceInfo::AccessorMacroExpansion:
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::MemberMacroExpansion:
-    case GeneratedSourceInfo::PeerMacroExpansion:
-    case GeneratedSourceInfo::ConformanceMacroExpansion:
-    case GeneratedSourceInfo::ExtensionMacroExpansion: {
+#define MACRO_ROLE(Name, Description)  \
+    case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+    {
       DeclName macroName = getGeneratedSourceInfoMacroName(*generatedInfo);
 
       // If it was an expansion of an attached macro, increase the range to
@@ -1602,14 +1593,10 @@ DeclName
 swift::getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   ASTNode expansionNode = ASTNode::getFromOpaqueValue(info.astNode);
   switch (info.kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion:
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-  case GeneratedSourceInfo::MemberMacroExpansion:
-  case GeneratedSourceInfo::PeerMacroExpansion:
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
-  case GeneratedSourceInfo::ExtensionMacroExpansion: {
+#define MACRO_ROLE(Name, Description)  \
+    case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+  {
     DeclName macroName;
     if (auto customAttr = info.attachedMacroCustomAttr) {
       // FIXME: How will we handle deserialized custom attributes like this?

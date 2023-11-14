@@ -34,29 +34,8 @@ class GeneratedSourceInfo {
 public:
   /// The kind of generated source code.
   enum Kind {
-    /// The expansion of a freestanding expression macro.
-    ExpressionMacroExpansion,
-
-    /// The expansion of a freestanding declaration macro.
-    FreestandingDeclMacroExpansion,
-
-    /// The expansion of an accessor attached macro.
-    AccessorMacroExpansion,
-
-    /// The expansion of a member attribute attached macro.
-    MemberAttributeMacroExpansion,
-
-    /// The expansion of an attached member macro.
-    MemberMacroExpansion,
-
-    /// The expansion of an attached peer macro.
-    PeerMacroExpansion,
-
-    /// The expansion of an attached conformance macro.
-    ConformanceMacroExpansion,
-
-    /// The expansion of an attached extension macro.
-    ExtensionMacroExpansion,
+#define MACRO_ROLE(Name, Description) Name##MacroExpansion,
+#include "swift/Basic/MacroRoles.def"
 
     /// A new function body that is replacing an existing function body.
     ReplacedFunctionBody,

@@ -313,7 +313,8 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
       Result.Freestanding = true;
     break;
   }
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion: {
+  case GeneratedSourceInfo::DeclarationMacroExpansion: 
+  case GeneratedSourceInfo::CodeItemMacroExpansion: {
     auto expansion = cast<MacroExpansionDecl>(
         ASTNode::getFromOpaqueValue(Info.astNode).get<Decl *>());
     Result.ExpansionLoc = RegularLocation(expansion);
@@ -321,6 +322,9 @@ static MacroInfo getMacroInfo(GeneratedSourceInfo &Info,
     Result.Freestanding = true;
     break;
   }
+
+#define FREESTANDING_MACRO_EXPANSION(Name, Description)
+#define ATTACHED
   case GeneratedSourceInfo::AccessorMacroExpansion:
   case GeneratedSourceInfo::MemberAttributeMacroExpansion:
   case GeneratedSourceInfo::MemberMacroExpansion:

@@ -569,9 +569,9 @@ static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
 bool swift::isInvalidAttachedMacro(MacroRole role,
                                    Decl *attachedTo) {
   switch (role) {
-  case MacroRole::Expression:
-  case MacroRole::Declaration:
-  case MacroRole::CodeItem:
+#define FREESTANDING_MACRO_ROLE(Name, Description) case MacroRole::Name:
+#define ATTACHED_MACRO_ROLE(Name, Description)
+#include "swift/Basic/MacroRoles.def"
     llvm_unreachable("Invalid macro role for attached macro");
 
   case MacroRole::Accessor:
@@ -796,25 +796,11 @@ static std::string expandMacroDefinition(
 
 static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
   switch (role) {
-  case MacroRole::Expression:
-    return GeneratedSourceInfo::ExpressionMacroExpansion;
-  case MacroRole::Declaration:
-  case MacroRole::CodeItem:
-    return GeneratedSourceInfo::FreestandingDeclMacroExpansion;
-  case MacroRole::Accessor:
-    return GeneratedSourceInfo::AccessorMacroExpansion;
-  case MacroRole::MemberAttribute:
-    return GeneratedSourceInfo::MemberAttributeMacroExpansion;
-  case MacroRole::Member:
-    return GeneratedSourceInfo::MemberMacroExpansion;
-  case MacroRole::Peer:
-    return GeneratedSourceInfo::PeerMacroExpansion;
-  case MacroRole::Conformance:
-    return GeneratedSourceInfo::ConformanceMacroExpansion;
-  case MacroRole::Extension:
-    return GeneratedSourceInfo::ExtensionMacroExpansion;
+#define MACRO_ROLE(Name, Description)                 \
+  case MacroRole::Name:                               \
+    return GeneratedSourceInfo::Name##MacroExpansion;
+#include "swift/Basic/MacroRoles.def"
   }
-  llvm_unreachable("unhandled MacroRole");
 }
 
 // If this storage declaration is a variable with an explicit initializer,

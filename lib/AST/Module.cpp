@@ -906,14 +906,10 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
   while (llvm::Optional<GeneratedSourceInfo> info =
              SM.getGeneratedSourceInfo(bufferID)) {
     switch (info->kind) {
-    case GeneratedSourceInfo::ExpressionMacroExpansion:
-    case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    case GeneratedSourceInfo::AccessorMacroExpansion:
-    case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    case GeneratedSourceInfo::MemberMacroExpansion:
-    case GeneratedSourceInfo::PeerMacroExpansion:
-    case GeneratedSourceInfo::ConformanceMacroExpansion:
-    case GeneratedSourceInfo::ExtensionMacroExpansion: {
+#define MACRO_ROLE(Name, Description)  \
+    case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+    {
       // Location was within a macro expansion, return the expansion site, not
       // the insertion location.
       if (info->attachedMacroCustomAttr) {
@@ -1202,29 +1198,10 @@ llvm::Optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   auto genInfo =
       *getASTContext().SourceMgr.getGeneratedSourceInfo(*getBufferID());
   switch (genInfo.kind) {
-  case GeneratedSourceInfo::ExpressionMacroExpansion:
-    return MacroRole::Expression;
-
-  case GeneratedSourceInfo::FreestandingDeclMacroExpansion:
-    return MacroRole::Declaration;
-
-  case GeneratedSourceInfo::AccessorMacroExpansion:
-    return MacroRole::Accessor;
-
-  case GeneratedSourceInfo::MemberAttributeMacroExpansion:
-    return MacroRole::MemberAttribute;
-
-  case GeneratedSourceInfo::MemberMacroExpansion:
-    return MacroRole::Member;
-
-  case GeneratedSourceInfo::PeerMacroExpansion:
-    return MacroRole::Peer;
-
-  case GeneratedSourceInfo::ConformanceMacroExpansion:
-    return MacroRole::Conformance;
-
-  case GeneratedSourceInfo::ExtensionMacroExpansion:
-    return MacroRole::Extension;
+#define MACRO_ROLE(Name, Description)               \
+  case GeneratedSourceInfo::Name##MacroExpansion: \
+    return MacroRole::Name;
+#include "swift/Basic/MacroRoles.def"
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
