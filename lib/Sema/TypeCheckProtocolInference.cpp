@@ -282,6 +282,71 @@ struct TypeReprCycleCheckWalker : ASTWalker {
 
 }
 
+static bool isExtensionUsableForInference(const ExtensionDecl *extension,
+                                          NormalProtocolConformance *conformance) {
+  // The context the conformance being checked is declared on.
+  const auto conformanceDC = conformance->getDeclContext();
+  if (extension == conformanceDC)
+    return true;
+
+  // Invalid case.
+  const auto extendedNominal = extension->getExtendedNominal();
+  if (extendedNominal == nullptr)
+    return true;
+
+  auto *proto = dyn_cast<ProtocolDecl>(extendedNominal);
+
+  // If the extension is bound to the nominal the conformance is
+  // declared on, it is viable for inference when its conditional
+  // requirements are satisfied by those of the conformance context.
+  if (!proto) {
+    // Retrieve the generic signature of the extension.
+    const auto extensionSig = extension->getGenericSignature();
+    return extensionSig
+        .requirementsNotSatisfiedBy(
+            conformanceDC->getGenericSignatureOfContext())
+        .empty();
+  }
+
+  // The condition here is a bit more fickle than
+  // `isExtensionApplied`. That check would prematurely reject
+  // extensions like `P where AssocType == T` if we're relying on a
+  // default implementation inside the extension to infer `AssocType == T`
+  // in the first place. Only check conformances on the `Self` type,
+  // because those have to be explicitly declared on the type somewhere
+  // so won't be affected by whatever answer inference comes up with.
+  auto *module = conformanceDC->getParentModule();
+  auto checkConformance = [&](ProtocolDecl *proto) {
+    auto typeInContext = conformanceDC->mapTypeIntoContext(conformance->getType());
+    auto otherConf = TypeChecker::conformsToProtocol(
+        typeInContext, proto, module);
+    return !otherConf.isInvalid();
+  };
+
+  // First check the extended protocol itself.
+  if (!checkConformance(proto))
+    return false;
+
+  // Source file and module file have different ways to get self bounds.
+  // Source file extension will have trailing where clause which can avoid
+  // computing a generic signature. Module file will not have
+  // trailing where clause, so it will compute generic signature to get
+  // self bounds which might result in slow performance.
+  SelfBounds bounds;
+  if (extension->getParentSourceFile() != nullptr)
+    bounds = getSelfBoundsFromWhereClause(extension);
+  else
+    bounds = getSelfBoundsFromGenericSignature(extension);
+  for (auto *decl : bounds.decls) {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+      if (!checkConformance(proto))
+        return false;
+    }
+  }
+
+  return true;
+}
+
 InferredAssociatedTypesByWitnesses
 AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                     ConformanceChecker &checker,
@@ -301,70 +366,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
   InferredAssociatedTypesByWitnesses result;
 
-  auto isExtensionUsableForInference = [&](const ExtensionDecl *extension) {
-    // The context the conformance being checked is declared on.
-    const auto conformanceCtx = conformance->getDeclContext();
-    if (extension == conformanceCtx)
-      return true;
-
-    // Invalid case.
-    const auto extendedNominal = extension->getExtendedNominal();
-    if (extendedNominal == nullptr)
-      return true;
-
-    auto *proto = dyn_cast<ProtocolDecl>(extendedNominal);
-
-    // If the extension is bound to the nominal the conformance is
-    // declared on, it is viable for inference when its conditional
-    // requirements are satisfied by those of the conformance context.
-    if (!proto) {
-      // Retrieve the generic signature of the extension.
-      const auto extensionSig = extension->getGenericSignature();
-      return extensionSig
-          .requirementsNotSatisfiedBy(
-              conformanceCtx->getGenericSignatureOfContext())
-          .empty();
-    }
-
-    // The condition here is a bit more fickle than
-    // `isExtensionApplied`. That check would prematurely reject
-    // extensions like `P where AssocType == T` if we're relying on a
-    // default implementation inside the extension to infer `AssocType == T`
-    // in the first place. Only check conformances on the `Self` type,
-    // because those have to be explicitly declared on the type somewhere
-    // so won't be affected by whatever answer inference comes up with.
-    auto *module = dc->getParentModule();
-    auto checkConformance = [&](ProtocolDecl *proto) {
-      auto typeInContext = dc->mapTypeIntoContext(conformance->getType());
-      auto otherConf = TypeChecker::conformsToProtocol(
-          typeInContext, proto, module);
-      return !otherConf.isInvalid();
-    };
-
-    // First check the extended protocol itself.
-    if (!checkConformance(proto))
-      return false;
-
-    // Source file and module file have different ways to get self bounds.
-    // Source file extension will have trailing where clause which can avoid
-    // computing a generic signature. Module file will not have
-    // trailing where clause, so it will compute generic signature to get
-    // self bounds which might result in slow performance.
-    SelfBounds bounds;
-    if (extension->getParentSourceFile() != nullptr)
-      bounds = getSelfBoundsFromWhereClause(extension);
-    else
-      bounds = getSelfBoundsFromGenericSignature(extension);
-    for (auto *decl : bounds.decls) {
-      if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-        if (!checkConformance(proto))
-          return false;
-      }
-    }
-
-    return true;
-  };
-
   for (auto witness :
        checker.lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
@@ -374,7 +375,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // type can't use it regardless of what associated types we end up
     // inferring, skip the witness.
     if (auto extension = dyn_cast<ExtensionDecl>(witness->getDeclContext())) {
-      if (!isExtensionUsableForInference(extension)) {
+      if (!isExtensionUsableForInference(extension, conformance)) {
         LLVM_DEBUG(llvm::dbgs() << "Extension not usable for inference\n");
         continue;
       }
