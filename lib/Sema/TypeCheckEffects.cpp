@@ -1173,14 +1173,21 @@ public:
         // because it only counts for rethrows/reasync purposes if it
         // lines up with a throws/async function parameter in the
         // original type.
-        auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
-        if (!origType) {
+        Type fnInterfaceType = fnRef.getType();
+        if (!fnInterfaceType) {
           result.merge(Classification::forInvalidCode());
           return;
         }
 
         // Use the most significant result from the arguments.
-        auto params = origType->getParams();
+        auto *fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())
+            ->getAs<AnyFunctionType>();
+        if (!fnSubstType)  {
+          result.merge(Classification::forInvalidCode());
+          return;
+        }
+
+        auto params = fnSubstType->getParams();
         if (params.size() != args->size()) {
           result.merge(Classification::forInvalidCode());
           return;
@@ -2914,6 +2921,9 @@ private:
 
       auto asyncKind = classification.getConditionalKind(EffectKind::Async);
       E->setNoAsync(asyncKind == ConditionalEffectKind::None);
+    } else {
+      E->setThrows(ThrownErrorDestination());
+      E->setNoAsync(true);
     }
 
     // If current apply expression did not type-check, don't attempt
