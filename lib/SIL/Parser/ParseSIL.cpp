@@ -8621,13 +8621,22 @@ bool SILParserState::parseSILCoverageMap(Parser &P) {
         break;
       }
 
-      auto Counter = State.parseSILCoverageExpr(Builder);
-      if (!Counter) {
-        BodyHasError = true;
-        break;
+      using MappedRegion = SILCoverageMap::MappedRegion;
+
+      if (P.Tok.isContextualKeyword("skipped")) {
+        P.consumeToken();
+        Regions.push_back(
+            MappedRegion::skipped(StartLine, StartCol, EndLine, EndCol));
+      } else {
+        auto Counter = State.parseSILCoverageExpr(Builder);
+        if (!Counter) {
+          BodyHasError = true;
+          break;
+        }
+        Regions.push_back(
+            MappedRegion::code(StartLine, StartCol, EndLine, EndCol, *Counter));
       }
 
-      Regions.emplace_back(StartLine, StartCol, EndLine, EndCol, *Counter);
     } while (P.Tok.isNot(tok::r_brace) && P.Tok.isNot(tok::eof));
   }
   if (BodyHasError)
