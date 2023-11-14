@@ -79,7 +79,7 @@ swift_create_early_driver_copies(swift-frontend)
 
 # If a `swift-driver` executable adjacent to the `swift-frontend` executable exists
 # then the `swift` and `swiftc` symlinks should point to it by-default
-if(EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver" AND EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help")
+if(EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}" AND EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}")
   message(STATUS "Pointing 'swift' and 'swiftc' symlinks at 'swift-driver'.")
   swift_create_post_build_symlink(swift-frontend
     SOURCE "swift-driver${CMAKE_EXECUTABLE_SUFFIX}"
@@ -200,4 +200,11 @@ add_dependencies(editor-integration swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT editor-integration)
-
+if(EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}" AND EXISTS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}")
+  swift_install_in_component(PROGRAMS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}"
+                             DESTINATION "bin"
+                             COMPONENT compiler)
+  swift_install_in_component(PROGRAMS "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}"
+                             DESTINATION "bin"
+                             COMPONENT compiler)
+endif()
