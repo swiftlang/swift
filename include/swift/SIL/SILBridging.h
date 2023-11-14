@@ -215,6 +215,7 @@ struct BridgedOperand {
 
   BRIDGED_INLINE bool isTypeDependent() const;
   BRIDGED_INLINE bool isLifetimeEnding() const;
+  BRIDGED_INLINE bool canAcceptOwnership(BridgedValue::Ownership ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand getNextUse() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getUser() const;
@@ -537,6 +538,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand ForwardingInst_singleForwardedOperand() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedOperandArray ForwardingInst_forwardedOperands() const;
   BRIDGED_INLINE BridgedValue::Ownership ForwardingInst_forwardingOwnership() const;
+  BRIDGED_INLINE void ForwardingInst_setForwardingOwnership(BridgedValue::Ownership ownership) const;
   BRIDGED_INLINE bool ForwardingInst_preservesOwnership() const;
 
   // =========================================================================//
@@ -591,6 +593,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt StructExtractInst_fieldIndex() const;
   BRIDGED_INLINE OptionalBridgedValue StructInst_getUniqueNonTrivialFieldValue() const;
   BRIDGED_INLINE SwiftInt StructElementAddrInst_fieldIndex() const;
+  BRIDGED_INLINE bool BeginBorrow_isLexical() const;
   BRIDGED_INLINE SwiftInt ProjectBoxInst_fieldIndex() const;
   BRIDGED_INLINE bool EndCOWMutationInst_doKeepUnique() const;
   BRIDGED_INLINE SwiftInt EnumInst_caseIndex() const;

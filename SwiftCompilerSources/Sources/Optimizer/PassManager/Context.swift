@@ -79,14 +79,21 @@ extension MutatingContext {
     _bridged.eraseInstruction(instruction.bridged)
   }
 
-  func erase(instructionIncludingDebugUses inst: Instruction) {
+  func erase(instructionIncludingAllUsers inst: Instruction) {
+    if inst.isDeleted {
+      return
+    }
     for result in inst.results {
       for use in result.uses {
-        assert(use.instruction is DebugValueInst, "instruction to delete may only have debug_value uses")
-        erase(instruction: use.instruction)
+        erase(instructionIncludingAllUsers: use.instruction)
       }
     }
     erase(instruction: inst)
+  }
+
+  func erase(instructionIncludingDebugUses inst: Instruction) {
+    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
+    erase(instructionIncludingAllUsers: inst)
   }
 
   func erase(block: BasicBlock) {
@@ -448,7 +455,7 @@ extension AllocRefInstBase {
   }
 }
 
-extension UseList {
+extension Sequence where Element == Operand {
   func replaceAll(with replacement: Value, _ context: some MutatingContext) {
     for use in self {
       use.set(to: replacement, context)
@@ -523,6 +530,13 @@ extension TermInst {
   func replaceBranchTarget(from fromBlock: BasicBlock, to toBlock: BasicBlock, _ context: some MutatingContext) {
     context.notifyBranchesChanged()
     bridged.TermInst_replaceBranchTarget(fromBlock.bridged, toBlock.bridged)
+  }
+}
+
+extension ForwardingInstruction {
+  func setForwardingOwnership(to ownership: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.ForwardingInst_setForwardingOwnership(ownership._bridged)
   }
 }
 

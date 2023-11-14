@@ -269,6 +269,10 @@ bool BridgedOperand::isTypeDependent() const { return op->isTypeDependent(); }
 
 bool BridgedOperand::isLifetimeEnding() const { return op->isLifetimeEnding(); }
 
+bool BridgedOperand::canAcceptOwnership(BridgedValue::Ownership ownership) const {
+  return op->canAcceptKind(BridgedValue::castToOwnership(ownership));
+}
+
 OptionalBridgedOperand BridgedOperand::getNextUse() const {
   return {op->getNextUse()};
 }
@@ -683,6 +687,11 @@ BridgedValue::Ownership BridgedInstruction::ForwardingInst_forwardingOwnership()
   return castOwnership(forwardingInst->getForwardingOwnershipKind());
 }
 
+void BridgedInstruction::ForwardingInst_setForwardingOwnership(BridgedValue::Ownership ownership) const {
+  auto *forwardingInst = swift::ForwardingInstruction::get(unbridged());
+  return forwardingInst->setForwardingOwnershipKind(BridgedValue::castToOwnership(ownership));
+}
+
 bool BridgedInstruction::ForwardingInst_preservesOwnership() const {
   return swift::ForwardingInstruction::get(unbridged())->preservesOwnership();
 }
@@ -769,6 +778,10 @@ OptionalBridgedValue BridgedInstruction::StructInst_getUniqueNonTrivialFieldValu
 
 SwiftInt BridgedInstruction::StructElementAddrInst_fieldIndex() const {
   return getAs<swift::StructElementAddrInst>()->getFieldIndex();
+}
+
+bool BridgedInstruction::BeginBorrow_isLexical() const {
+  return getAs<swift::BeginBorrowInst>()->isLexical();
 }
 
 SwiftInt BridgedInstruction::ProjectBoxInst_fieldIndex() const {

@@ -61,7 +61,7 @@ let namedReturnValueOptimization = FunctionPass(name: "named-return-value-optimi
 /// Returns a copy_addr which copies from an alloc_stack to the `outArg` at the end of the function.
 ///
 private func findCopyForNRVO(for outArg: FunctionArgument) -> CopyAddrInst? {
-  guard let singleArgUse = outArg.uses.singleNonDebugUse,
+  guard let singleArgUse = outArg.uses.ignoreDebugUses.singleUse,
         let copyToArg = singleArgUse.instruction as? CopyAddrInst else {
     return nil
   }
@@ -106,7 +106,7 @@ private func findCopyForNRVO(for outArg: FunctionArgument) -> CopyAddrInst? {
 }
 
 private func performNRVO(with copy: CopyAddrInst, _ context: FunctionPassContext) {
-  copy.source.uses.replaceAllExceptDealloc(with: copy.destination, context)
+  copy.source.replaceAllUsesExceptDealloc(with: copy.destination, context)
   assert(copy.source == copy.destination)
   context.erase(instruction: copy)
 }
@@ -122,10 +122,8 @@ private func isAnyInstructionWritingToMemory(after: Instruction) -> Bool {
   return false
 }
 
-private extension UseList {
-  func replaceAllExceptDealloc(with replacement: Value, _ context: some MutatingContext) {
-    for use in self where !(use.instruction is Deallocation)  {
-      use.set(to: replacement, context)
-    }
+private extension Value {
+  func replaceAllUsesExceptDealloc(with replacement: Value, _ context: some MutatingContext) {
+    uses.lazy.filter{!($0.instruction is Deallocation)}.replaceAll(with: replacement, context)
   }
 }

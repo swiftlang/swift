@@ -42,7 +42,9 @@ public struct Operand : CustomStringConvertible, NoReflectionChildren {
   public var isTypeDependent: Bool { bridged.isTypeDependent() }
 
   public var endsLifetime: Bool { bridged.isLifetimeEnding() }
-  
+
+  public func canAccept(ownership: Ownership) -> Bool { bridged.canAcceptOwnership(ownership._bridged) }
+
   public var description: String { "operand #\(index) of \(instruction)" }
 }
 
@@ -113,33 +115,43 @@ public struct UseList : CollectionLikeSequence {
     self.firstOpPtr = firstOpPtr
   }
 
+  public func makeIterator() -> Iterator {
+    return Iterator(currentOpPtr: firstOpPtr)
+  }
+}
+
+extension Sequence where Element == Operand {
   public var singleUse: Operand? {
-    if let op = firstOpPtr.operand {
-      if op.getNextUse().operand != nil {
+    var result: Operand? = nil
+    for op in self {
+      if result != nil {
         return nil
       }
-      return Operand(bridged: op)
-    }
-    return nil
-  }
-
-  public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
-    var result: I? = nil
-    for use in self {
-      if let user = use.instruction as? I {
-        if result != nil {
-          return nil
-        }
-        result = user
-      }
+      result = op
     }
     return result
   }
 
   public var isSingleUse: Bool { singleUse != nil }
 
-  public func makeIterator() -> Iterator {
-    return Iterator(currentOpPtr: firstOpPtr)
+  public var ignoreDebugUses: LazyFilterSequence<Self> {
+    self.lazy.filter { !($0.instruction is DebugValueInst) }
+  }
+
+  public func filterUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+    self.lazy.filter { $0.instruction is I }
+  }
+
+  public func ignoreUsers<I: Instruction>(ofType: I.Type) -> LazyFilterSequence<Self> {
+    self.lazy.filter { !($0.instruction is I) }
+  }
+
+  public func getSingleUser<I: Instruction>(ofType: I.Type) -> I? {
+    filterUsers(ofType: I.self).singleUse?.instruction as? I
+  }
+
+  public func getSingleUser<I: Instruction>(notOfType: I.Type) -> Instruction? {
+    ignoreUsers(ofType: I.self).singleUse?.instruction
   }
 }
 

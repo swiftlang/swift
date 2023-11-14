@@ -8,6 +8,7 @@
 
 swift_compiler_sources(Optimizer
   SimplifyApply.swift
+  SimplifyBeginBorrow.swift
   SimplifyBeginCOWMutation.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift

@@ -879,6 +879,8 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
   public var endBorrows: EndBorrowSequence {
     uses.lazy.compactMap({ $0.instruction as? EndBorrowInst })
   }
+
+  public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {

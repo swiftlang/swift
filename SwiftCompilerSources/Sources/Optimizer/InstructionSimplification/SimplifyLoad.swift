@@ -197,7 +197,7 @@ extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
     if context.preserveDebugInfo {
       return !uses.contains { !($0.instruction is DestroyValueInst) }
     } else {
-      return !nonDebugUses.contains { !($0.instruction is DestroyValueInst) }
+      return !uses.ignoreDebugUses.contains { !($0.instruction is DestroyValueInst) }
     }
   }
 }

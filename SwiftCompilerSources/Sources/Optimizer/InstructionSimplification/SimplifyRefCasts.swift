@@ -65,7 +65,7 @@ private extension UnaryInstruction {
   }
 
   func tryReplaceSource(withOperandOf inst: SingleValueInstruction, _ context: SimplifyContext) -> Bool {
-    let singleUse = context.preserveDebugInfo ? inst.uses.singleUse : inst.uses.singleNonDebugUse
+    let singleUse = context.preserveDebugInfo ? inst.uses.singleUse : inst.uses.ignoreDebugUses.singleUse
     let canEraseInst = singleUse?.instruction == self
     let replacement = inst.operands[0].value
 
