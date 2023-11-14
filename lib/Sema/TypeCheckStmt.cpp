@@ -2775,6 +2775,14 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &eval,
   // So, build out the body now.
   ASTScope::expandFunctionBody(AFD);
 
+  if (AFD->isDistributedThunk()) {
+    if (auto func = dyn_cast<FuncDecl>(AFD)) {
+      if (TypeChecker::checkDistributedFunc(func)) {
+        return errorBody();
+      }
+    }
+  }
+
   // Type check the function body if needed.
   bool hadError = false;
   if (!alreadyTypeChecked) {

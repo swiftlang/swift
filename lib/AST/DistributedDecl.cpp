@@ -95,8 +95,9 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(ValueDecl *member) 
   llvm_unreachable("Unable to fetch ActorSystem type!");
 }
 
-Type swift::getConcreteReplacementForMemberSerializationRequirement(
-    ValueDecl *member) {
+Type swift::getSerializationRequirementTypesForMember(
+    ValueDecl *member,
+    llvm::SmallPtrSet<ProtocolDecl *, 2> &serializationRequirements) {
   auto &C = member->getASTContext();
   auto *DC = member->getDeclContext();
   auto DA = C.getDistributedActorDecl();
@@ -106,8 +107,10 @@ Type swift::getConcreteReplacementForMemberSerializationRequirement(
     return getDistributedSerializationRequirementType(classDecl, C.getDistributedActorDecl());
   }
 
-  /// === Maybe the value is declared in a protocol?
-  if (auto protocol = DC->getSelfProtocolDecl()) {
+  auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
+      ->getDeclaredInterfaceType();
+
+  if (DC->getSelfProtocolDecl() || isa<ExtensionDecl>(DC)) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -115,8 +118,17 @@ Type swift::getConcreteReplacementForMemberSerializationRequirement(
       signature = DC->getGenericSignatureOfContext();
     }
 
-    auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
-                               ->getDeclaredInterfaceType();
+    // Also store all `SerializationRequirement : SomeProtocol` requirements
+    for (auto requirement: signature.getRequirements()) {
+      if (requirement.getFirstType()->isEqual(SerReqAssocType) &&
+          requirement.getKind() == RequirementKind::Conformance) {
+        if (auto nominal = requirement.getSecondType()->getAnyNominal()) {
+          if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+            serializationRequirements.insert(protocol);
+          }
+        }
+      }
+    }
 
     // Note that this may be null, e.g. if we're a distributed func inside
     // a protocol that did not declare a specific actor system requirement.
@@ -355,15 +367,24 @@ swift::getDistributedSerializationRequirements(
 
 bool swift::checkDistributedSerializationRequirementIsExactlyCodable(
     ASTContext &C,
-    const llvm::SmallPtrSetImpl<ProtocolDecl *> &allRequirements) {
+    Type type) {
+  if (!type)
+    return false;
+
+  if (type->hasError())
+    return false;
+
   auto encodable = C.getProtocol(KnownProtocolKind::Encodable);
   auto decodable = C.getProtocol(KnownProtocolKind::Decodable);
 
-  if (allRequirements.size() != 2)
+  auto layout = type->getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  if (protocols.size() != 2)
     return false;
 
-  return allRequirements.count(encodable) &&
-         allRequirements.count(decodable);
+  return std::count(protocols.begin(), protocols.end(), encodable) == 1 &&
+      std::count(protocols.begin(), protocols.end(), decodable) == 1;
 }
 
 /******************************************************************************/
@@ -1212,34 +1233,6 @@ AbstractFunctionDecl::isDistributedTargetInvocationResultHandlerOnReturn() const
     }
 
     return true;
-}
-
-llvm::SmallPtrSet<ProtocolDecl *, 2>
-swift::extractDistributedSerializationRequirements(
-    ASTContext &C, ArrayRef<Requirement> allRequirements) {
-  llvm::SmallPtrSet<ProtocolDecl *, 2> serializationReqs;
-  auto DA = C.getDistributedActorDecl();
-  auto daSerializationReqAssocType =
-      DA->getAssociatedType(C.Id_SerializationRequirement);
-
-  for (auto req : allRequirements) {
-    // FIXME: Seems unprincipled
-    if (req.getKind() != RequirementKind::SameType &&
-        req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    if (auto dependentMemberType =
-            req.getFirstType()->getAs<DependentMemberType>()) {
-      if (dependentMemberType->getAssocType() == daSerializationReqAssocType) {
-        auto layout = req.getSecondType()->getExistentialLayout();
-        for (auto p : layout.getProtocols()) {
-          serializationReqs.insert(p);
-        }
-      }
-    }
-  }
-
-  return serializationReqs;
 }
 
 /******************************************************************************/
