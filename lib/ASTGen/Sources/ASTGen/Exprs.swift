@@ -255,12 +255,6 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, base: name, loc: nameLoc)
   }
 
-  public func generate(_ node: IdentifierPatternSyntax) -> BridgedUnresolvedDeclRefExpr {
-    let (name, nameLoc) = node.identifier.bridgedIdentifierAndSourceLoc(in: self)
-
-    return .createParsed(self.ctx, base: name, loc: nameLoc)
-  }
-
   public func generate(_ node: MemberAccessExprSyntax) -> BridgedUnresolvedDotExpr {
     let loc = node.bridgedSourceLoc(in: self)
     let base = generate(expr: node.base!)

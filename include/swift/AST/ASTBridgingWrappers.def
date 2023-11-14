@@ -55,6 +55,11 @@
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
 
+#ifndef PATTERN
+#define PATTERN(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##Pattern)
+#endif
+#include "swift/AST/PatternNodes.def"
+
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NONNULL(Decl)

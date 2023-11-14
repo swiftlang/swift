@@ -14,7 +14,7 @@ import ASTBridging
 import BasicBridging
 import ParseBridging
 // Needed to use BumpPtrAllocator
-@_spi(BumpPtrAllocator) @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
+@_spi(BumpPtrAllocator) import SwiftSyntax
 
 import struct SwiftDiagnostics.Diagnostic
 

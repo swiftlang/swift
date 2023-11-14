@@ -117,6 +117,14 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
 
+// Define `.asPattern` on each BridgedXXXPattern type.
+#define PATTERN(Id, Parent)                                                    \
+  BridgedPattern Bridged##Id##Pattern_asPattern(                               \
+      Bridged##Id##Pattern pattern) {                                          \
+    return static_cast<Pattern *>(pattern.unbridged());                        \
+  }
+#include "swift/AST/PatternNodes.def"
+
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostics
 //===----------------------------------------------------------------------===//
@@ -274,18 +282,25 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag) {
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedExpr nameExpr,
+    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern cPattern,
     BridgedExpr initExpr, bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
-  auto *name = cast<UnresolvedDeclRefExpr>(nameExpr.unbridged());
-  auto *varDecl = new (context) VarDecl(
-      isStatic, isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
-      name->getLoc(), name->getName().getBaseIdentifier(), declContext);
-  auto *pattern = new (context) NamedPattern(varDecl);
+  Pattern *pattern = cPattern.unbridged();
+
+  VarDecl::Introducer introducer =
+      isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+
+  // Configure all vars.
+  pattern->forEachVariable([&](VarDecl *VD) {
+    VD->setStatic(isStatic);
+    VD->setIntroducer(introducer);
+  });
+
   return PatternBindingDecl::create(context,
-                                    /*StaticLoc=*/SourceLoc(), // FIXME
+                                    /*StaticLoc=*/SourceLoc(),
+                                    // FIXME: 'class' spelling kind.
                                     isStatic ? StaticSpellingKind::KeywordStatic
                                              : StaticSpellingKind::None,
                                     cBindingKeywordLoc.unbridged(), pattern,
@@ -1253,6 +1268,26 @@ BridgedExistentialTypeRepr_createParsed(BridgedASTContext cContext,
   ASTContext &context = cContext.unbridged();
   return new (context)
       ExistentialTypeRepr(cAnyLoc.unbridged(), baseTy.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Patterns
+//===----------------------------------------------------------------------===//
+
+BridgedNamedPattern
+BridgedNamedPattern_createParsed(BridgedASTContext cContext,
+                                 BridgedDeclContext cDeclContext,
+                                 BridgedIdentifier name, BridgedSourceLoc loc) {
+  auto &context = cContext.unbridged();
+  auto *dc = cDeclContext.unbridged();
+
+  // Note 'isStatic' and the introducer value are temporary.
+  // The outer context should set the correct values.
+  auto *varDecl = new (context) VarDecl(
+      /*isStatic=*/false, VarDecl::Introducer::Let, loc.unbridged(),
+      name.unbridged(), dc);
+  auto *pattern = new (context) NamedPattern(varDecl);
+  return pattern;
 }
 
 //===----------------------------------------------------------------------===//

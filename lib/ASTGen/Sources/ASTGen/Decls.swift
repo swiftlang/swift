@@ -305,7 +305,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: node.bindingSpecifier.bridgedSourceLoc(in: self),
-      nameExpr: pattern.castToExpr,
+      pattern: pattern,
       initializer: initializer,
       isStatic: isStatic,
       isLet: isLet
