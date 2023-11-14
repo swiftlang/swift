@@ -156,10 +156,10 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-error {{setter cannot have a global actor}} {{158:7-11=}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{158:7-11=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
 
-      @GA1 _modify { fatalError() } // expected-error {{_modify accessor cannot have a global actor}} {{7-12=}}
+      @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{156:5-5=@GA1}}
     }
 
@@ -168,13 +168,13 @@ do {
         get { false }
 
         @GA1
-        set { } // expected-error {{setter cannot have a global actor}}
+        set { } // expected-warning {{setter cannot have a global actor}}
       }
     }
 
     @GA1 var testAlreadyWithGlobal: String {
       get { "" }
-      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
     }
   }
 
@@ -182,27 +182,27 @@ do {
     var test1: Int {
       get { 42 }
       @GA1
-      set { } // expected-error {{setter cannot have a global actor}} {{184:7-11=}}
+      set { } // expected-warning {{setter cannot have a global actor}} {{184:7-11=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
-      @GA1 _modify { fatalError() } // expected-error {{_modify accessor cannot have a global actor}} {{7-12=}}
+      @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
       // expected-note@-1 {{move global actor attribute to property 'test1'}} {{182:5-5=@GA1}}
     }
 
     var test2: Int {
-      @GA1 willSet { // expected-error {{willSet observer cannot have a global actor}} {{7-12=}}
+      @GA1 willSet { // expected-warning {{willSet observer cannot have a global actor}} {{7-12=}}
         // expected-note@-1 {{move global actor attribute to property 'test2'}} {{191:5-5=@GA1}}
       }
     }
 
     subscript(x: Int) -> Bool {
       get { true }
-      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
       // expected-note@-1 {{move global actor attribute to subscript 'subscript(_:)'}} {{197:5-5=@GA1}}
     }
 
     @GA1 subscript(y: Bool) -> String {
       get { "" }
-      @GA1 set { } // expected-error {{setter cannot have a global actor}} {{7-12=}}
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
     }
   }
 }
