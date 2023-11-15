@@ -209,79 +209,31 @@ extension ASTGenVisitor {
   }
 }
 
-// Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
-// 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
+// Optional node handling.
 extension ASTGenVisitor {
-  @inline(__always)
-  func generate(optional node: TypeSyntax?) -> BridgedTypeRepr? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(type: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: ExprSyntax?) -> BridgedExpr? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(expr: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: GenericParameterClauseSyntax?) -> BridgedGenericParamList? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(genericParameterClause: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(genericWhereClause: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(enumCaseParameterClause: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    guard let node else {
-      return .init()
-    }
-
-    return self.generate(inheritedTypeList: node)
-  }
-
-  @inline(__always)
-  func generate(optional node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
-    guard let node else {
-      return .init()
-    }
-
-    return self.generate(precedenceGroupNameList: node)
-  }
-
-  /// Generate AST from an optional node.
-  /// This is `node.map(body)` but with `self.generate(...)` syntax.
+  /// Generate an AST node from an optional node using the generator function.
+  ///
   /// Usage:
-  ///   self.generate(optional: node.initializer, generate(expr:))
+  ///   self.map(node.initializer, generate(expr:))
   @inline(__always)
-  func generate<T: SyntaxProtocol, U>(optional node: T?, _ body: (T) -> U) -> U? {
-    return node.map(body)
+  func map<Node: SyntaxProtocol, Result: HasNullable>(
+    _ node: Node?,
+    _ body: (Node) -> Result
+  ) -> Result.Nullable {
+    return Result.asNullable(node.map(body))
+  }
+
+  /// Generate an AST node array from an optional collection node using the
+  /// generator function. If `nil`, returns an empty array.
+  ///
+  /// Usage:
+  ///   self.map(node.genericWhereClasuse, generate(genericWhereClause:))
+  @inline(__always)
+  func map<Node: SyntaxCollection>(
+    _ node: Node?,
+    _ body: (Node) -> BridgedArrayRef
+  ) -> BridgedArrayRef {
+    return node.map(body) ?? .init()
   }
 }
 
