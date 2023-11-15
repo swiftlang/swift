@@ -241,7 +241,14 @@ extension ASTGenVisitor {
   }
 
   public func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
-    generate(choices: node.item)
+    switch node.item {
+    case .decl(let node):
+      return .decl(self.generate(decl: node))
+    case .stmt(let node):
+      return .stmt(self.generate(stmt: node))
+    case .expr(let node):
+      return .expr(self.generate(expr: node))
+    }
   }
 
   public func generate(arrayElement node: ArrayElementSyntax) -> BridgedExpr {
@@ -273,16 +280,6 @@ extension ASTGenVisitor {
     }
 
     return self.generate(expr: node)
-  }
-
-  /// DO NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
-  @inline(__always)
-  func generate(optional node: (some SyntaxChildChoices)?) -> ASTNode? {
-    guard let node else {
-      return nil
-    }
-
-    return self.generate(choices: node)
   }
 
   @inline(__always)
@@ -328,6 +325,15 @@ extension ASTGenVisitor {
     }
 
     return self.generate(precedenceGroupNameList: node)
+  }
+
+  /// Generate AST from an optional node.
+  /// This is `node.map(body)` but with `self.generate(...)` syntax.
+  /// Usage:
+  ///   self.generate(optional: node.initializer, generate(expr:))
+  @inline(__always)
+  func generate<T: SyntaxProtocol, U>(optional node: T?, _ body: (T) -> U) -> U? {
+    return node.map(body)
   }
 }
 

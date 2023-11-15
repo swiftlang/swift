@@ -75,7 +75,14 @@ extension ASTGenVisitor {
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(codeBlock: node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
-      elseStmt: (self.generate(optional: node.elseBody)?.castToStmt).asNullable
+      elseStmt: self.generate(optional: node.elseBody) {
+        switch $0 {
+        case .codeBlock(let node):
+          return self.generate(codeBlock: node).asStmt
+        case .ifExpr(let node):
+          return self.makeIfStmt(node).asStmt
+        }
+      }.asNullable
     )
   }
 

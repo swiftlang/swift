@@ -76,8 +76,8 @@ func test5(_ b: Swift.Bool) -> Int {
   return if b { 0 } else { 1 }
 }
 
-func test6(_ b: Bool) -> Int {
-  let x = if b { 0 } else { 1 }
+func test6(_ b1: Bool, b2: Bool) -> Int {
+  let x = if b1 { 0 } else if b2 { 1 } else { 2 }
   return x
 }
 
