@@ -80,8 +80,14 @@ FunctionTest::FunctionTest(StringRef name, Invocation invocation)
 }
 FunctionTest::FunctionTest(StringRef name, NativeSwiftInvocation invocation)
     : invocation(invocation), pass(nullptr), function(nullptr),
-      dependencies(nullptr) {
-  Registry::get().registerFunctionTest(this, name);
+      dependencies(nullptr) {}
+
+void FunctionTest::createNativeSwiftFunctionTest(
+    StringRef name, NativeSwiftInvocation invocation) {
+  /// Statically allocate the tests to avoid triggering LSAN's "leak" detection.
+  static SmallVector<FunctionTest, 4> tests;
+  auto &test = tests.emplace_back(name, invocation);
+  Registry::get().registerFunctionTest(&test, name);
 }
 
 FunctionTest *FunctionTest::get(StringRef name) {
