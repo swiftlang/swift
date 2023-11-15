@@ -55,9 +55,24 @@ extension MutatingContext {
   ///
   /// `inst` and all subsequent instructions are moved to the new block, while all
   /// instructions _before_ `inst` remain in the original block.
-  func splitBlock(at inst: Instruction) -> BasicBlock {
+  func splitBlock(before inst: Instruction) -> BasicBlock {
     notifyBranchesChanged()
-    return _bridged.splitBlock(inst.bridged).block
+    return _bridged.splitBlockBefore(inst.bridged).block
+  }
+
+  /// Splits the basic block, which contains `inst`, after `inst` and returns the
+  /// new block.
+  ///
+  /// All subsequent instructions after `inst` are moved to the new block, while `inst` and all
+  /// instructions _before_ `inst` remain in the original block.
+  func splitBlock(after inst: Instruction) -> BasicBlock {
+    notifyBranchesChanged()
+    return _bridged.splitBlockAfter(inst.bridged).block
+  }
+
+  func createBlock(after block: BasicBlock) -> BasicBlock {
+    notifyBranchesChanged()
+    return _bridged.createBlockAfter(block.bridged).block
   }
 
   func erase(instruction: Instruction) {
