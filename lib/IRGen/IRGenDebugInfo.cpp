@@ -401,6 +401,13 @@ private:
     return false;
   }
 
+  /// Round up the size in bits to the minimum amount of bits the that will
+  /// effectively be used given the byte size.
+  uint64_t GetPaddedSizeInBits(uint64_t SizeInBits) {
+    unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
+    return ((SizeInBits + SizeOfByte - 1) / SizeOfByte) * SizeOfByte;
+  }
+
 public:
   llvm::MDNode *createInlinedAt(const SILDebugScope *DS) {
     auto *CS = DS->InlinedCallSite;
@@ -1373,8 +1380,8 @@ private:
         StringRef Name = "<internal>";
         InternalType = DBuilder.createForwardDecl(
             llvm::dwarf::DW_TAG_structure_type, Name, Scope, File,
-            /*Line*/ 0, llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits,
-            MangledName);
+            /*Line*/ 0, llvm::dwarf::DW_LANG_Swift,
+            GetPaddedSizeInBits(SizeInBits), AlignInBits, MangledName);
       }
       return InternalType;
     }
@@ -1476,8 +1483,9 @@ private:
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createStructType(DbgTy, Decl, StructTy, Scope, File, L.line,
-                                SizeInBits, AlignInBits, Flags, nullptr,
-                                llvm::dwarf::DW_LANG_Swift, MangledName);
+                                GetPaddedSizeInBits(SizeInBits), AlignInBits,
+                                Flags, nullptr, llvm::dwarf::DW_LANG_Swift,
+                                MangledName);
       StringRef Name = Decl->getName().str();
       if (!DbgTy.getTypeSizeInBits())
         return DBuilder.createForwardDecl(
@@ -1487,8 +1495,9 @@ private:
         return DBuilder.createForwardDecl(
             llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File,
             FwdDeclLine, llvm::dwarf::DW_LANG_Swift, 0, AlignInBits);
-      return createOpaqueStruct(Scope, Name, File, FwdDeclLine, SizeInBits,
-                                AlignInBits, Flags, MangledName);
+      return createOpaqueStruct(Scope, Name, File, FwdDeclLine,
+                                GetPaddedSizeInBits(SizeInBits), AlignInBits,
+                                Flags, MangledName);
     }
 
     case TypeKind::Class: {
@@ -1512,9 +1521,9 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+      return createOpaqueStruct(
+          Scope, Decl ? Decl->getNameStr() : MangledName, File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::Existential:
@@ -1524,9 +1533,9 @@ private:
       auto L = getFilenameAndLocation(*this, Decl);
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
-                                File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+      return createOpaqueStruct(
+          Scope, Decl ? Decl->getNameStr() : MangledName, File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::UnboundGeneric: {
@@ -1548,8 +1557,9 @@ private:
       auto *File = getOrCreateFile(L.filename);
       unsigned FwdDeclLine = 0;
       return createOpaqueStructWithSizedContainer(
-          Scope, Decl ? Decl->getNameStr() : "", File, FwdDeclLine, SizeInBits,
-          AlignInBits, Flags, MangledName, collectGenericParams(StructTy));
+          Scope, Decl ? Decl->getNameStr() : "", File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, MangledName,
+          collectGenericParams(StructTy));
     }
 
     case TypeKind::BoundGenericClass: {
@@ -1585,11 +1595,12 @@ private:
       // Tuples are also represented as structs.  Since tuples are ephemeral
       // (not nominal) they don't have a source location.
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
-                           MangledName);
+        return createTuple(DbgTy, Scope, GetPaddedSizeInBits(SizeInBits),
+                           AlignInBits, Flags, MangledName);
       else
-        return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+        return createOpaqueStruct(Scope, MangledName, MainFile, 0,
+                                  GetPaddedSizeInBits(SizeInBits), AlignInBits,
+                                  Flags, MangledName);
     }
 
     case TypeKind::InOut:
@@ -1614,8 +1625,8 @@ private:
                              : getOrCreateDesugaredType(Superclass, DbgTy);
       auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File,
-          FwdDeclLine, llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits,
-          Flags));
+          FwdDeclLine, llvm::dwarf::DW_LANG_Swift,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags));
 
       // Emit the protocols the archetypes conform to.
       SmallVector<llvm::Metadata *, 4> Protocols;
@@ -1630,9 +1641,10 @@ private:
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
       }
       auto DITy = DBuilder.createStructType(
-          Scope, MangledName, File, FwdDeclLine, SizeInBits, AlignInBits, Flags,
-          DerivedFrom, DBuilder.getOrCreateArray(Protocols),
-          llvm::dwarf::DW_LANG_Swift, nullptr);
+          Scope, MangledName, File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, DerivedFrom,
+          DBuilder.getOrCreateArray(Protocols), llvm::dwarf::DW_LANG_Swift,
+          nullptr);
 
       DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
       return DITy;
@@ -1648,19 +1660,22 @@ private:
       unsigned FwdDeclLine = 0;
 
       return DBuilder.createStructType(
-          Scope, MangledName, File, FwdDeclLine, SizeInBits, AlignInBits, Flags,
-          nullptr, nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+          Scope, MangledName, File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, nullptr, nullptr,
+          llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
     case TypeKind::SILFunction:
     case TypeKind::Function:
     case TypeKind::GenericFunction: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits,
-                                     Flags, MangledName);
+        return createFunctionPointer(DbgTy, Scope,
+                                     GetPaddedSizeInBits(SizeInBits),
+                                     AlignInBits, Flags, MangledName);
       else
-        return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+        return createOpaqueStruct(Scope, MangledName, MainFile, 0,
+                                  GetPaddedSizeInBits(SizeInBits), AlignInBits,
+                                  Flags, MangledName);
     }
 
     case TypeKind::Enum: {
@@ -1674,7 +1689,8 @@ private:
           return createEnumType(*CompletedDbgTy, Decl, MangledName, Scope, File,
                                 L.line, Flags);
       return createOpaqueStruct(Scope, Decl->getName().str(), File, FwdDeclLine,
-                                SizeInBits, AlignInBits, Flags, MangledName);
+                                GetPaddedSizeInBits(SizeInBits), AlignInBits,
+                                Flags, MangledName);
     }
 
     case TypeKind::BoundGenericEnum: {
@@ -1685,8 +1701,9 @@ private:
       unsigned FwdDeclLine = 0;
 
       return createOpaqueStructWithSizedContainer(
-          Scope, Decl->getName().str(), File, FwdDeclLine, SizeInBits,
-          AlignInBits, Flags, MangledName, collectGenericParams(EnumTy));
+          Scope, Decl->getName().str(), File, FwdDeclLine,
+          GetPaddedSizeInBits(SizeInBits), AlignInBits, Flags, MangledName,
+          collectGenericParams(EnumTy));
     }
 
     case TypeKind::BuiltinVector: {
@@ -1698,8 +1715,8 @@ private:
           ElemTy, IGM.getTypeInfoForUnlowered(ElemTy), IGM, false);
       unsigned Count = BuiltinVectorTy->getNumElements();
       auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
-      return DBuilder.createVectorType(SizeInBits, AlignInBits,
-                                       getOrCreateType(ElemDbgTy),
+      return DBuilder.createVectorType(GetPaddedSizeInBits(SizeInBits),
+                                       AlignInBits, getOrCreateType(ElemDbgTy),
                                        DBuilder.getOrCreateArray(Subscript));
     }
 
@@ -1730,7 +1747,10 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          AliasedTy, DbgTy.getFragmentStorageType(), DbgTy.getRawSizeInBits(),
+          AliasedTy, DbgTy.getFragmentStorageType(),
+          DbgTy.getRawSizeInBits()
+              ? GetPaddedSizeInBits(*DbgTy.getRawSizeInBits())
+              : DbgTy.getRawSizeInBits(),
           DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(), false,
           DbgTy.isSizeFragmentSize(), DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
@@ -1759,8 +1779,9 @@ private:
     case TypeKind::GenericTypeParam: {
       // FIXME: Provide a more meaningful debug type.
       return DBuilder.createStructType(
-          Scope, MangledName, File, 0, SizeInBits, AlignInBits, Flags, nullptr,
-          nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+          Scope, MangledName, File, 0, GetPaddedSizeInBits(SizeInBits),
+          AlignInBits, Flags, nullptr, nullptr, llvm::dwarf::DW_LANG_Swift,
+          nullptr, MangledName);
     }
 
     // The following types exist primarily for internal use by the type
@@ -1782,9 +1803,9 @@ private:
                  DbgTy.getType()->dump(llvm::dbgs()); llvm::dbgs() << "\n");
       MangledName = "<unknown>";
     }
-    return DBuilder.createBasicType(MangledName, SizeInBits, Encoding,
-                                    llvm::DINode::FlagZero,
-                                    NumExtraInhabitants);
+    return DBuilder.createBasicType(
+        MangledName, GetPaddedSizeInBits(SizeInBits), Encoding,
+        llvm::DINode::FlagZero, NumExtraInhabitants);
   }
 
   /// Determine if there exists a name mangling for the given type.
@@ -1826,6 +1847,8 @@ private:
     if (DbgTy.isForwardDecl())
       return true;
     auto SizeInBits = DbgTy.getTypeSizeInBits();
+    if (SizeInBits)
+      SizeInBits = GetPaddedSizeInBits(*SizeInBits);
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
         (!SizeInBits && CachedSizeInBits)) {
