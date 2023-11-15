@@ -858,7 +858,7 @@ void swift::rewriting::expandDefaultRequirements(ASTContext &ctx,
 }
 
 /// Collect structural requirements written in the inheritance clause of an
-/// AssociatedTypeDecl or GenericTypeParamDecl.
+/// AssociatedTypeDecl, GenericTypeParamDecl, or ProtocolDecl.
 void swift::rewriting::realizeInheritedRequirements(
     TypeDecl *decl, Type type, bool shouldInferRequirements,
     SmallVectorImpl<StructuralRequirement> &result,
@@ -888,6 +888,17 @@ void swift::rewriting::realizeInheritedRequirements(
       inferRequirements(inheritedType, loc, moduleForInference,
                         decl->getInnermostDeclContext(), result);
     }
+
+    realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
+  }
+
+  // Also check for `SynthesizedProtocolAttr`s with additional constraints added
+  // by ClangImporter. This is how imported protocols are marked `Sendable`
+  // without changing their inheritance lists.
+  auto attrs = decl->getAttrs().getAttributes<SynthesizedProtocolAttr>();
+  for (auto attr : attrs) {
+    auto inheritedType = attr->getProtocol()->getDeclaredType();
+    auto loc = attr->getLocation();
 
     realizeTypeRequirement(dc, type, inheritedType, loc, result, errors);
   }
