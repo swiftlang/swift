@@ -84,8 +84,6 @@ class Boxed<Value> {
 }
 
 struct ASTGenVisitor {
-  typealias ResultType = ASTNode
-
   fileprivate let diagnosticEngine: BridgedDiagnosticEngine
 
   let base: UnsafeBufferPointer<UInt8>
@@ -174,47 +172,9 @@ extension ASTGenVisitor {
   }
 }
 
-extension ASTGenVisitor {
-  /// Generate ASTNode from a Syntax node. The node must be a decl, stmt, expr, or
-  /// type.
-  func generate(_ node: Syntax) -> ASTNode {
-    if let decl = node.as(DeclSyntax.self) {
-      return .decl(self.generate(decl: decl))
-    }
-    if let stmt = node.as(StmtSyntax.self) {
-      return .stmt(self.generate(stmt: stmt))
-    }
-    if let expr = node.as(ExprSyntax.self) {
-      return .expr(self.generate(expr: expr))
-    }
-    if let type = node.as(TypeSyntax.self) {
-      return .type(self.generate(type: type))
-    }
-
-    // --- Special cases where `node` doesn't belong to one of the base kinds.
-
-    // CodeBlockSyntax -> BraceStmt.
-    if let node = node.as(CodeBlockSyntax.self) {
-      return .stmt(self.generate(codeBlock: node).asStmt)
-    }
-    // CodeBlockItemSyntax -> ASTNode.
-    if let node = node.as(CodeBlockItemSyntax.self) {
-      return self.generate(codeBlockItem: node)
-    }
-
-    fatalError("node does not correspond to an ASTNode \(node.kind)")
-  }
-}
-
 // Misc visits.
 // TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
 extension ASTGenVisitor {
-
-  /// Do NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
-  func generate(choices node: some SyntaxChildChoices) -> ASTNode {
-    return self.generate(Syntax(node))
-  }
-
   public func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
     generate(decl: node.decl)
   }
@@ -224,7 +184,18 @@ extension ASTGenVisitor {
   }
 
   public func generate(conditionElement node: ConditionElementSyntax) -> ASTNode {
-    generate(choices: node.condition)
+    // FIXME: returning ASTNode is wrong, non-expression conditions are not ASTNode.
+    switch node.condition {
+    case .availability(_):
+      break
+    case .expression(let node):
+      return .expr(self.generate(expr: node))
+    case .matchingPattern(_):
+      break
+    case .optionalBinding(_):
+      break
+    }
+    fatalError("unimplemented")
   }
 
   public func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
