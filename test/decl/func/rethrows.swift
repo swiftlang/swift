@@ -659,3 +659,32 @@ protocol P1 {
 func open(p: any P1, s: any Sequence) throws {
   _ = p.test(s).map(\.id)
 }
+
+// Rethrows checking and parameter packs, oh my.
+func rethrowsWithParameterPacks<each Arg>(_ arguments: repeat each Arg, body: () throws -> Void) rethrows { }
+
+enum MyError: Error {
+case fail
+}
+
+func testRethrowsWithParameterPacks() throws {
+  try rethrowsWithParameterPacks { throw MyError.fail }
+  rethrowsWithParameterPacks { }
+
+  try rethrowsWithParameterPacks(1) { throw MyError.fail }
+  rethrowsWithParameterPacks(1) { }
+
+  try rethrowsWithParameterPacks(1, "hello") { throw MyError.fail }
+  rethrowsWithParameterPacks(1, "hello") { }
+
+  rethrowsWithParameterPacks { throw MyError.fail }
+  // expected-error@-1{{call can throw but is not marked with 'try'}}
+  // expected-note@-2{{call is to 'rethrows' function, but argument function can throw}}
+}
+
+// Rethrows checking with the original parameter type providing the cues.
+func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows { }
+
+func testArbitraryAndRethrows() {
+  takesArbitraryAndRethrows(throwingFunc) { }
+}
