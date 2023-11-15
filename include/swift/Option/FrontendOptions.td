@@ -848,6 +848,10 @@ def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
+def playground_option : Separate<["-"], "playground-option">,
+  Flags<[FrontendOption]>,
+  HelpText<"Provide an option to the playground transform (if enabled)">;
+
 def playground_high_performance : Flag<["-"], "playground-high-performance">,
   HelpText<"Omit instrumentation that has a high runtime performance impact">;
 

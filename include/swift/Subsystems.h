@@ -131,13 +131,26 @@ namespace swift {
   /// be compared against the results from the debugger.
   void performDebuggerTestingTransform(SourceFile &SF);
 
-  /// Once type checking is complete, this optionally transforms the ASTs to add
-  /// calls to external logging functions.
+  /// Once type checking is complete, this optionally transforms the ASTs to
+  /// insert calls to external logging functions.
+  ///
+  /// \param Opts The specific set of transforms that should be applied.
+  void performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts);
+
+  /// Once type checking is complete, this optionally transforms the ASTs to
+  /// insert calls to external logging functions. This function is provided
+  /// for backward compatibility with existing code; for new code, the variant
+  /// that takes an `PlaygroundOptionSet` parameter should be used.
   ///
   /// \param HighPerformance True if the playground transform should omit
   /// instrumentation that has a high runtime performance impact.
+  ///
+  /// This function is provided for backward compatibility with older code, and
+  /// is a convenience for calling `performPlaygroundTransform()` with the set
+  /// of options that are enabled in high-performance mode. New uses should call
+  /// the newer form of this function that takes a `PlaygroundOptionSet`.
   void performPlaygroundTransform(SourceFile &SF, bool HighPerformance);
-  
+
   /// Once type checking is complete this optionally walks the ASTs to add calls
   /// to externally provided functions that simulate "program counter"-like
   /// debugging events. See the comment at the top of lib/Sema/PCMacro.cpp for a

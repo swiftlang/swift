@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/PlaygroundOption.h"
 
 #include <random>
 #include <forward_list>
@@ -36,11 +37,20 @@ using namespace swift::instrumenter_support;
 
 namespace {
 
+struct TransformOptions {
+  bool LogScopeEvents;
+  bool LogFunctionParameters;
+
+  TransformOptions(const PlaygroundOptionSet &opts) :
+    LogScopeEvents(opts.contains(PlaygroundOption::ScopeEvents)),
+    LogFunctionParameters(opts.contains(PlaygroundOption::FunctionParameters)) {}
+};
+
 class Instrumenter : InstrumenterBase {
 private:
   std::mt19937_64 &RNG;
   unsigned &TmpNameIndex;
-  bool HighPerformance;
+  TransformOptions Options;
   bool ExtendedCallbacks;
 
   DeclNameRef DebugPrintName;
@@ -113,7 +123,7 @@ private:
   // all the braces up to its target.
   size_t escapeToTarget(BracePair::TargetKinds TargetKind,
                         ElementVector &Elements, size_t EI) {
-    if (HighPerformance)
+    if (!Options.LogScopeEvents)
       return EI;
 
     for (const BracePair &BP : BracePairs) {
@@ -127,10 +137,9 @@ private:
   }
 
 public:
-  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
-               unsigned &TmpNameIndex)
-      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
-        HighPerformance(HP),
+  Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG,
+               TransformOptions OPT, unsigned &TmpNameIndex)
+      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex), Options(OPT),
         ExtendedCallbacks(C.LangOpts.hasFeature(Feature::PlaygroundExtendedCallbacks)),
         DebugPrintName(C.getIdentifier("__builtin_debugPrint")),
         PrintName(C.getIdentifier("__builtin_print")),
@@ -609,7 +618,7 @@ public:
     // If we were given any parameters that apply to this brace block, we insert
     // log calls for them now (before any of the other statements). We only log
     // named parameters (not `{ _ in ... }`, for example).
-    if (PL && !HighPerformance) {
+    if (PL && Options.LogFunctionParameters) {
       size_t EI = 0;
       for (const auto &PD : *PL) {
         if (PD->hasName()) {
@@ -627,7 +636,7 @@ public:
       }
     }
 
-    if (!TopLevel && !HighPerformance && !BS->isImplicit()) {
+    if (!TopLevel && Options.LogScopeEvents && !BS->isImplicit()) {
       Elements.insert(Elements.begin(), *buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), *buildScopeExit(BS->getSourceRange()));
     }
@@ -895,16 +904,17 @@ public:
 
 } // end anonymous namespace
 
-void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
+void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts) {
   class ExpressionFinder : public ASTWalker {
   private:
     ASTContext &ctx;
+    TransformOptions Options;
     std::mt19937_64 RNG;
-    bool HighPerformance;
     unsigned TmpNameIndex = 0;
 
   public:
-    ExpressionFinder(ASTContext &ctx, bool HP) : ctx(ctx), HighPerformance(HP) {}
+    ExpressionFinder(ASTContext &ctx, PlaygroundOptionSet Opts) :
+      ctx(ctx), Options(Opts) {}
 
     // FIXME: Remove this
     bool shouldWalkAccessorsTheOldWay() override { return true; }
@@ -918,7 +928,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
-            Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
+            Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, PL);
             if (NewBody != Body) {
               FD->setBody(NewBody, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -930,7 +940,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            Instrumenter I(ctx, TLCD, RNG, HighPerformance, TmpNameIndex);
+            Instrumenter I(ctx, TLCD, RNG, Options, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
@@ -944,6 +954,20 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     }
   };
 
-  ExpressionFinder EF(SF.getASTContext(), HighPerformance);
+  ExpressionFinder EF(SF.getASTContext(), Opts);
   SF.walk(EF);
+}
+
+/// This function is provided for backward compatibility with the old API, since
+/// LLDB and others call it directly, passing it a boolean to control whether to
+/// only apply "high performance" options. We emulate that here.
+void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
+  PlaygroundOptionSet HighPerfTransformOpts;
+  // Enable any playground options that are marked as being applicable to high
+  // performance mode.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (HighPerfOn) \
+    HighPerfTransformOpts.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
+  swift::performPlaygroundTransform(SF, HighPerfTransformOpts);
 }

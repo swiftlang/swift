@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
@@ -36,6 +37,11 @@ LangOptions::LangOptions() {
   Features.insert(Feature::ParserRoundTrip);
   Features.insert(Feature::ParserValidation);
 #endif
+  // Enable any playground options that are enabled by default.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (DefaultOn) \
+    PlaygroundOptions.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
 }
 
 struct SupportedConditionalValue {
@@ -636,6 +642,23 @@ bool swift::includeInModuleInterface(Feature feature) {
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
+}
+
+llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
+  switch (option) {
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  case PlaygroundOption::OptionName: return #OptionName;
+#include "swift/Basic/PlaygroundOptions.def"
+  }
+  llvm_unreachable("covered switch");
+}
+
+llvm::Optional<PlaygroundOption> swift::getPlaygroundOption(llvm::StringRef name) {
+  return llvm::StringSwitch<llvm::Optional<PlaygroundOption>>(name)
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  .Case(#OptionName, PlaygroundOption::OptionName)
+#include "swift/Basic/PlaygroundOptions.def"
+  .Default(llvm::None);
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
