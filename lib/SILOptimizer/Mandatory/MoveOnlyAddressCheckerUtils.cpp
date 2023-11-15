@@ -2984,8 +2984,14 @@ void MoveOnlyAddressCheckerPImpl::insertDestroysOnBoundary(
                                  InitableButNotConsumable)
         continue;
 
-      auto *insertPt = inst->getNextInstruction();
-      assert(insertPt && "def instruction was a terminator");
+      SILInstruction *insertPt;
+      if (auto tryApply = dyn_cast<TryApplyInst>(inst)) {
+        // The dead def is only valid on the success return path.
+        insertPt = &tryApply->getNormalBB()->front();
+      } else {
+        insertPt = inst->getNextInstruction();
+        assert(insertPt && "instruction is a terminator that wasn't handled?");
+      }
       insertDestroyBeforeInstruction(addressUseState, insertPt,
                                      liveness.getRootValue(), defPair.second,
                                      consumes);
