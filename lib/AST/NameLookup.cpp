@@ -3186,18 +3186,24 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
-  llvm::SmallVector<ProtocolDecl *, 2> result;
-  SmallPtrSet<const ProtocolDecl *, 2> known;
-  known.insert(PD);
+  llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
+  auto addInherited = [&inherited, &PD](ProtocolDecl *P) {
+    if (PD != P)
+      inherited.insert(P);
+  };
+
+  for (auto attr : PD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    addInherited(attr->getProtocol());
+  }
+
   bool anyObject = false;
   for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
+      addInherited(proto);
     }
   }
 
-  return PD->getASTContext().AllocateCopy(result);
+  return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
 }
 
 ArrayRef<ValueDecl *>
