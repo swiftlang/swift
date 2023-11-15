@@ -27,7 +27,7 @@ extension ASTGenVisitor {
     case .doStmt:
       break
     case .expressionStmt(let node):
-      return self.generate(node)
+      return self.generate(expressionStmt: node)
     case .fallThroughStmt:
       break
     case .forStmt:
@@ -41,7 +41,7 @@ extension ASTGenVisitor {
     case .repeatStmt:
       break
     case .returnStmt(let node):
-      return self.generate(node).asStmt
+      return self.generate(returnStmt: node).asStmt
     case .thenStmt:
       break
     case .throwStmt:
@@ -58,14 +58,16 @@ extension ASTGenVisitor {
     BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
-      elements: self.generate(node.statements),
+      elements: self.generate(codeBlockItemList: node.statements),
       rBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
     )
   }
 
   func makeIfStmt(_ node: IfExprSyntax) -> BridgedIfStmt {
+    // FIXME: handle multiple coniditons.
+    // FIXME: handle non-expression conditions.
     let conditions = node.conditions.map(self.generate)
-    assert(conditions.count == 1)  // TODO: handle multiple conditions.
+    assert(conditions.count == 1)
 
     return .createParsed(
       self.ctx,
@@ -73,11 +75,11 @@ extension ASTGenVisitor {
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(codeBlock: node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
-      elseStmt: (self.generate(node.elseBody)?.castToStmt).asNullable
+      elseStmt: (self.generate(optional: node.elseBody)?.castToStmt).asNullable
     )
   }
 
-  public func generate(_ node: ExpressionStmtSyntax) -> BridgedStmt {
+  public func generate(expressionStmt node: ExpressionStmtSyntax) -> BridgedStmt {
     switch Syntax(node.expression).as(SyntaxEnum.self) {
     case .ifExpr(let e):
       return makeIfStmt(e).asStmt
@@ -86,11 +88,11 @@ extension ASTGenVisitor {
     }
   }
 
-  public func generate(_ node: ReturnStmtSyntax) -> BridgedReturnStmt {
+  public func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
     .createParsed(
       self.ctx,
       returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
-      expr: self.generate(node.expression).asNullable
+      expr: self.generate(optional: node.expression).asNullable
     )
   }
 }

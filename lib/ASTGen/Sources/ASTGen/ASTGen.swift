@@ -127,15 +127,15 @@ struct ASTGenVisitor {
     self.legacyParse = legacyParser
   }
 
-  public func generate(_ node: SourceFileSyntax) -> [UnsafeMutableRawPointer] {
-    var out = [UnsafeMutableRawPointer]()
+  public func generate(sourceFile node: SourceFileSyntax) -> [BridgedDecl] {
+    var out = [BridgedDecl]()
 
     for element in node.statements {
       let loc = element.bridgedSourceLoc(in: self)
       let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
       case .decl(let d):
-        out.append(d.raw)
+        out.append(d)
       case .stmt(let s):
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
           self.ctx,
@@ -144,7 +144,7 @@ struct ASTGenVisitor {
           stmt: s,
           endLoc: loc
         )
-        out.append(topLevelDecl.raw)
+        out.append(topLevelDecl.asDecl)
       case .expr(let e):
         let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
           self.ctx,
@@ -153,7 +153,7 @@ struct ASTGenVisitor {
           expr: e,
           endLoc: loc
         )
-        out.append(topLevelDecl.raw)
+        out.append(topLevelDecl.asDecl)
       default:
         fatalError("Top level nodes must be decls, stmts, or exprs.")
       }
@@ -188,7 +188,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  /// Generate AST from a Syntax node. The node must be a decl, stmt, expr, or
+  /// Generate ASTNode from a Syntax node. The node must be a decl, stmt, expr, or
   /// type.
   func generate(_ node: Syntax) -> ASTNode {
     if let decl = node.as(DeclSyntax.self) {
@@ -222,32 +222,34 @@ extension ASTGenVisitor {
 // Misc visits.
 // TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
 extension ASTGenVisitor {
-  func generate(_ node: some SyntaxChildChoices) -> ASTNode {
+
+  /// Do NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
+  func generate(choices node: some SyntaxChildChoices) -> ASTNode {
     return self.generate(Syntax(node))
   }
 
-  public func generate(_ node: MemberBlockItemSyntax) -> BridgedDecl {
+  public func generate(memberBlockItem node: MemberBlockItemSyntax) -> BridgedDecl {
     generate(decl: node.decl)
   }
 
-  public func generate(_ node: InitializerClauseSyntax) -> BridgedExpr {
+  public func generate(initializerClause node: InitializerClauseSyntax) -> BridgedExpr {
     generate(expr: node.value)
   }
 
-  public func generate(_ node: ConditionElementSyntax) -> ASTNode {
-    generate(node.condition)
+  public func generate(conditionElement node: ConditionElementSyntax) -> ASTNode {
+    generate(choices: node.condition)
   }
 
   public func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
-    generate(node.item)
+    generate(choices: node.item)
   }
 
-  public func generate(_ node: ArrayElementSyntax) -> BridgedExpr {
+  public func generate(arrayElement node: ArrayElementSyntax) -> BridgedExpr {
     generate(expr: node.expression)
   }
 
   @inline(__always)
-  func generate(_ node: CodeBlockItemListSyntax) -> BridgedArrayRef {
+  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
     node.lazy.map { self.generate(codeBlockItem: $0).bridged }.bridgedArray(in: self)
   }
 }
@@ -256,7 +258,7 @@ extension ASTGenVisitor {
 // 'self.visit(<expr>)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(_ node: TypeSyntax?) -> BridgedTypeRepr? {
+  func generate(optional node: TypeSyntax?) -> BridgedTypeRepr? {
     guard let node else {
       return nil
     }
@@ -265,7 +267,7 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(_ node: ExprSyntax?) -> BridgedExpr? {
+  func generate(optional node: ExprSyntax?) -> BridgedExpr? {
     guard let node else {
       return nil
     }
@@ -273,59 +275,59 @@ extension ASTGenVisitor {
     return self.generate(expr: node)
   }
 
+  /// DO NOT introduce another usage of this. Not all choices can produce 'ASTNode'.
   @inline(__always)
-  func generate(_ node: (some SyntaxChildChoices)?) -> ASTNode? {
+  func generate(optional node: (some SyntaxChildChoices)?) -> ASTNode? {
     guard let node else {
       return nil
     }
 
-    // This call recurses without disambiguation.
-    return self.generate(node) as ASTNode
+    return self.generate(choices: node)
   }
 
   @inline(__always)
-  func generate(_ node: GenericParameterClauseSyntax?) -> BridgedGenericParamList? {
+  func generate(optional node: GenericParameterClauseSyntax?) -> BridgedGenericParamList? {
     guard let node else {
       return nil
     }
 
-    return self.generate(node)
+    return self.generate(genericParameterClause: node)
   }
 
   @inline(__always)
-  func generate(_ node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause? {
+  func generate(optional node: GenericWhereClauseSyntax?) -> BridgedTrailingWhereClause? {
     guard let node else {
       return nil
     }
 
-    return self.generate(node)
+    return self.generate(genericWhereClause: node)
   }
 
   @inline(__always)
-  func generate(_ node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList? {
+  func generate(optional node: EnumCaseParameterClauseSyntax?) -> BridgedParameterList? {
     guard let node else {
       return nil
     }
 
-    return self.generate(node)
+    return self.generate(enumCaseParameterClause: node)
   }
 
   @inline(__always)
-  func generate(_ node: InheritedTypeListSyntax?) -> BridgedArrayRef {
+  func generate(optional node: InheritedTypeListSyntax?) -> BridgedArrayRef {
     guard let node else {
       return .init()
     }
 
-    return self.generate(node)
+    return self.generate(inheritedTypeList: node)
   }
 
   @inline(__always)
-  func generate(_ node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
+  func generate(optional node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
     guard let node else {
       return .init()
     }
 
-    return self.generate(node)
+    return self.generate(precedenceGroupNameList: node)
   }
 }
 
@@ -414,8 +416,8 @@ public func buildTopLevelASTNodes(
     astContext: ctx,
     legacyParser: legacyParser
   )
-  .generate(sourceFile.pointee.syntax)
-  .forEach { callback($0, outputContext) }
+  .generate(sourceFile: sourceFile.pointee.syntax)
+  .forEach { callback($0.raw, outputContext) }
 }
 
 /// Generate an AST node at the given source location. Returns the generated

@@ -38,7 +38,7 @@ func isExprMigrated(_ node: ExprSyntax) -> Bool {
         .tupleExpr, .ifExpr, .booleanLiteralExpr, .integerLiteralExpr,
         .arrayExpr, .nilLiteralExpr, .stringLiteralExpr:
 
-      // `generate(_: StringLiteralExprSyntax)` doesn't support interpolations.
+      // `generate(stringLiteralExpr:)` doesn't support interpolations.
       if let str = current.as(StringLiteralExprSyntax.self) {
         if str.segments.count != 1 {
           return false
@@ -89,7 +89,7 @@ extension ASTGenVisitor {
     }
     switch node.as(ExprSyntaxEnum.self) {
     case .arrayExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(arrayExpr: node).asExpr
     case .arrowExpr:
       break
     case .asExpr:
@@ -101,7 +101,7 @@ extension ASTGenVisitor {
     case .binaryOperatorExpr:
       break
     case .booleanLiteralExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(booleanLiteralExpr: node).asExpr
     case .borrowExpr:
       break
     case .canImportExpr:
@@ -109,13 +109,13 @@ extension ASTGenVisitor {
     case .canImportVersionInfo:
       break
     case .closureExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(closureExpr: node).asExpr
     case .consumeExpr:
       break
     case .copyExpr:
       break
     case .declReferenceExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(declReferenceExpr: node).asExpr
     case .dictionaryExpr:
       break
     case .discardAssignmentExpr:
@@ -129,17 +129,17 @@ extension ASTGenVisitor {
     case .forceUnwrapExpr:
       break
     case .functionCallExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(functionCallExpr: node).asExpr
     case .genericSpecializationExpr:
       break
     case .ifExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(ifExpr: node).asExpr
     case .inOutExpr:
       break
     case .infixOperatorExpr:
       break
     case .integerLiteralExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(integerLiteralExpr: node).asExpr
     case .isExpr:
       break
     case .keyPathExpr:
@@ -147,11 +147,11 @@ extension ASTGenVisitor {
     case .macroExpansionExpr:
       break
     case .memberAccessExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(memberAccessExpr: node).asExpr
     case .missingExpr:
       break
     case .nilLiteralExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(nilLiteralExpr: node).asExpr
     case .optionalChainingExpr:
       break
     case .packElementExpr:
@@ -173,7 +173,7 @@ extension ASTGenVisitor {
     case .simpleStringLiteralExpr:
       break
     case .stringLiteralExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(stringLiteralExpr: node).asExpr
     case .subscriptCallExpr:
       break
     case .superExpr:
@@ -185,7 +185,7 @@ extension ASTGenVisitor {
     case .tryExpr:
       break
     case .tupleExpr(let node):
-      return self.generate(node).asExpr
+      return self.generate(tupleExpr: node).asExpr
     case .typeExpr:
       break
     case .unresolvedAsExpr:
@@ -198,11 +198,11 @@ extension ASTGenVisitor {
     preconditionFailure("isExprMigrated() mismatch")
   }
 
-  public func generate(_ node: ClosureExprSyntax) -> BridgedClosureExpr {
+  public func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
       lBraceLoc: node.leftBrace.bridgedSourceLoc(in: self),
-      elements: self.generate(node.statements),
+      elements: self.generate(codeBlockItemList: node.statements),
       rBraceLoc: node.rightBrace.bridgedSourceLoc(in: self)
     )
 
@@ -210,7 +210,7 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, declContext: self.declContext, body: body)
   }
 
-  public func generate(_ node: FunctionCallExprSyntax) -> BridgedCallExpr {
+  public func generate(functionCallExpr node: FunctionCallExprSyntax) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
         self.diagnose(
@@ -240,7 +240,7 @@ extension ASTGenVisitor {
     }
 
     let argumentTuple = self.generate(
-      node.arguments,
+      labeledExprList: node.arguments,
       leftParen: node.leftParen,
       rightParen: node.rightParen
     )
@@ -249,13 +249,13 @@ extension ASTGenVisitor {
     return .createParsed(self.ctx, fn: callee, args: argumentTuple)
   }
 
-  public func generate(_ node: DeclReferenceExprSyntax) -> BridgedUnresolvedDeclRefExpr {
+  public func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedUnresolvedDeclRefExpr {
     let (name, nameLoc) = node.baseName.bridgedIdentifierAndSourceLoc(in: self)
 
     return .createParsed(self.ctx, base: name, loc: nameLoc)
   }
 
-  public func generate(_ node: MemberAccessExprSyntax) -> BridgedUnresolvedDotExpr {
+  public func generate(memberAccessExpr node: MemberAccessExprSyntax) -> BridgedUnresolvedDotExpr {
     let loc = node.bridgedSourceLoc(in: self)
     let base = generate(expr: node.base!)
     let name = node.declName.baseName.bridgedIdentifier(in: self)
@@ -263,7 +263,7 @@ extension ASTGenVisitor {
     return .createParsed(ctx, base: base, dotLoc: loc, name: name, nameLoc: loc)
   }
 
-  public func generate(_ node: IfExprSyntax) -> BridgedSingleValueStmtExpr {
+  public func generate(ifExpr node: IfExprSyntax) -> BridgedSingleValueStmtExpr {
     let stmt = makeIfStmt(node).asStmt
 
     // Wrap in a SingleValueStmtExpr to embed as an expression.
@@ -275,16 +275,16 @@ extension ASTGenVisitor {
     )
   }
 
-  public func generate(_ node: TupleExprSyntax) -> BridgedTupleExpr {
-    return self.generate(node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
+  public func generate(tupleExpr node: TupleExprSyntax) -> BridgedTupleExpr {
+    return self.generate(labeledExprList: node.elements, leftParen: node.leftParen, rightParen: node.rightParen)
   }
 
-  // NOTE: When implementing new `generate(_:)`, please update `isExprMigrated(_:)`.
+  // NOTE: When implementing new `generate(expr:)`, please update `isExprMigrated(_:)`.
 }
 
 extension ASTGenVisitor {
   /// Generate a tuple expression from a ``LabeledExprListSyntax`` and parentheses.
-  func generate(_ node: LabeledExprListSyntax, leftParen: TokenSyntax?, rightParen: TokenSyntax?) -> BridgedTupleExpr {
+  func generate(labeledExprList node: LabeledExprListSyntax, leftParen: TokenSyntax?, rightParen: TokenSyntax?) -> BridgedTupleExpr {
     let expressions = node.lazy.map {
       self.generate(expr: $0.expression)
     }
