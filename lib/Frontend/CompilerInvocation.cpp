@@ -633,9 +633,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
-  if (Args.hasArg(OPT_experimental_package_interface_load)) {
-    Opts.EnablePackageInterfaceLoad = true;
-  }
+  // Either the env var and the flag has to be set to enable package interface load
+  Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
+                                    ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
   // Experimental string processing.
   if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,

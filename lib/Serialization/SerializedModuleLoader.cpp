@@ -596,8 +596,9 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
   return std::string(result.str());
 }
 
-llvm::Optional<std::string> SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
-
+llvm::Optional<std::string>
+SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
+                                                                 ASTContext &ctx) const {
   if (!ctx.LangOpts.EnablePackageInterfaceLoad)
     return {};
 

@@ -21,17 +21,25 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name barpkg \
 // RUN:   -experimental-package-interface-load \
-// RUN:   -Rmodule-loading 2> %t/load-pkg-enabled.output
-// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-ENABLED %s < %t/load-pkg-enabled.output
-// CHECK-LOAD-PKG-ENABLED: loaded module 'Bar'; source: '{{.*}}/Bar.package.swiftinterface', loaded: '{{.*}}/Bar-{{.*}}.swiftmodule'
+// RUN:   -Rmodule-loading 2> %t/load-pkg-flag.output
+// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-ENABLED %s < %t/load-pkg-flag.output
 
-/// Client should not load a package interface module without -experimental-package-interface-load
+/// Client should load a package interface module if enabled with env var `SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD`
+// RUN: env SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD=true \
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -package-name barpkg \
+// RUN:   -Rmodule-loading 2> %t/load-pkg-env-var.output
+// RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-ENABLED %s < %t/load-pkg-env-var.output
+
+// CHECK-LOAD-PKG-ENABLED: loaded module 'Bar'; source: '{{.*}}Bar.package.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+
+/// Client should not load a package interface module without the flag or the env var
 // RUN: not %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -package-name barpkg \
 // RUN:   -Rmodule-loading 2> %t/load-pkg-off.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PKG-OFF %s < %t/load-pkg-off.output
-// CHECK-LOAD-PKG-OFF: loaded module 'Bar'; source: '{{.*}}/Bar.private.swiftinterface', loaded: '{{.*}}/Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PKG-OFF: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}/Bar.private.swiftinterface
+// CHECK-LOAD-PKG-OFF: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PKG-OFF: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.private.swiftinterface
 
 /// Client loads a private interface since the package-name is different from the loaded module's.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
@@ -39,7 +47,7 @@
 // RUN:   -experimental-package-interface-load \
 // RUN:   -Rmodule-loading 2> %t/load-diff-pkg.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-DIFF-PKG %s < %t/load-diff-pkg.output
-// CHECK-LOAD-DIFF-PKG: loaded module 'Bar'; source: '{{.*}}/Bar.private.swiftinterface', loaded: '{{.*}}/Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-DIFF-PKG: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
 
 // RUN: rm -rf %t/*.swiftmodule
 // RUN: rm -rf %t/Bar.package.swiftinterface
@@ -50,8 +58,8 @@
 // RUN:   -experimental-package-interface-load \
 // RUN:   -Rmodule-loading 2> %t/load-priv.output
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PRIV %s < %t/load-priv.output
-// CHECK-LOAD-PRIV: loaded module 'Bar'; source: '{{.*}}/Bar.private.swiftinterface', loaded: '{{.*}}/Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PRIV: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}/Bar.private.swiftinterface
+// CHECK-LOAD-PRIV: loaded module 'Bar'; source: '{{.*}}Bar.private.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PRIV: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.private.swiftinterface
 
 // RUN: rm -rf %t/*.swiftmodule
 // RUN: rm -rf %t/Bar.private.swiftinterface
@@ -64,8 +72,8 @@
 // RUN:   -Rmodule-loading 2> %t/load-pub.output
 
 // RUN: %FileCheck -check-prefix=CHECK-LOAD-PUB %s < %t/load-pub.output
-// CHECK-LOAD-PUB: loaded module 'Bar'; source: '{{.*}}/Bar.swiftinterface', loaded: '{{.*}}/Bar-{{.*}}.swiftmodule'
-// CHECK-LOAD-PUB: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}/Bar.swiftinterface
+// CHECK-LOAD-PUB: loaded module 'Bar'; source: '{{.*}}Bar.swiftinterface', loaded: '{{.*}}Bar-{{.*}}.swiftmodule'
+// CHECK-LOAD-PUB: error: module 'Bar' is in package 'barpkg' but was built from a non-package interface; modules of the same package can only be loaded if built from source or package interface: {{.*}}Bar.swiftinterface
 
 
 //--- Bar.swift
