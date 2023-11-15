@@ -102,7 +102,7 @@ extension UnownedJob: CustomStringConvertible {
   @available(SwiftStdlib 5.9, *)
   public var description: String {
     let id = _getJobTaskId(self)
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
@@ -151,7 +151,7 @@ public struct Job: Sendable {
   @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
@@ -220,7 +220,7 @@ public struct ExecutorJob: Sendable {
   @_unavailableInEmbedded
   public var description: String {
     let id = _getJobTaskId(UnownedJob(context: self.context))
-    /// Tasks are always assigned an unique ID, however some jobs may not have it set,
+    /// Tasks are always assigned a unique ID, however some jobs may not have it set,
     /// and it appearing as 0 for _different_ jobs may lead to misunderstanding it as
     /// being "the same 0 id job", we specifically print 0 (id not set) as nil.
     if (id > 0) {
