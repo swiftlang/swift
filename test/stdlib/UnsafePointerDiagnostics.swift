@@ -2,6 +2,9 @@
 
 // Test availability attributes on UnsafePointer initializers.
 // Assume the original source contains no UnsafeRawPointer types.
+@available(*, unavailable, renamed: "UnsafeMutableRawBufferPointer")
+typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
+
 func unsafePointerConversionAvailability(
   mrp: UnsafeMutableRawPointer,
   rp: UnsafeRawPointer,
@@ -99,7 +102,7 @@ func unsafePointerConversionAvailability(
 func unsafeRawBufferPointerConversions(
   mrp: UnsafeMutableRawPointer,
   rp: UnsafeRawPointer,
-  mrbp: UnsafeMutableRawBufferPointer,
+  mrbp: UnsafeRawMutableBufferPointer,
   rbp: UnsafeRawBufferPointer,
   mbpi: UnsafeMutableBufferPointer<Int>,
   bpi: UnsafeBufferPointer<Int>) {
@@ -107,21 +110,21 @@ func unsafeRawBufferPointerConversions(
   let omrp: UnsafeMutableRawPointer? = mrp
   let orp: UnsafeRawPointer? = rp
 
-  _ = UnsafeMutableRawBufferPointer(start: mrp, count: 1)
+  _ = UnsafeRawMutableBufferPointer(start: mrp, count: 1)
   _ = UnsafeRawBufferPointer(start: mrp, count: 1)
-  _ = UnsafeMutableRawBufferPointer(start: rp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutableRawPointer?'}}
+  _ = UnsafeRawMutableBufferPointer(start: rp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutableRawPointer?'}}
   _ = UnsafeRawBufferPointer(start: rp, count: 1)
-  _ = UnsafeMutableRawBufferPointer(mrbp)
+  _ = UnsafeRawMutableBufferPointer(mrbp)
   _ = UnsafeRawBufferPointer(mrbp)
-  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{missing argument label 'mutating:' in call}}
+  _ = UnsafeRawMutableBufferPointer(rbp) // expected-error {{missing argument label 'mutating:' in call}}
   _ = UnsafeRawBufferPointer(rbp)
-  _ = UnsafeMutableRawBufferPointer(mbpi)
+  _ = UnsafeRawMutableBufferPointer(mbpi)
   _ = UnsafeRawBufferPointer(mbpi)
-  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot convert value of type 'UnsafeBufferPointer<Int>' to expected argument type 'UnsafeMutableRawBufferPointer'}}
+  _ = UnsafeRawMutableBufferPointer(bpi) // expected-error {{cannot convert value of type 'UnsafeBufferPointer<Int>' to expected argument type 'UnsafeRawMutableBufferPointer'}}
   _ = UnsafeRawBufferPointer(bpi)
-  _ = UnsafeMutableRawBufferPointer(start: omrp, count: 1)
+  _ = UnsafeRawMutableBufferPointer(start: omrp, count: 1)
   _ = UnsafeRawBufferPointer(start: omrp, count: 1)
-  _ = UnsafeMutableRawBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
+  _ = UnsafeRawMutableBufferPointer(start: orp, count: 1) // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'UnsafeMutableRawPointer?'}}
   _ = UnsafeRawBufferPointer(start: orp, count: 1)
 }
 
@@ -327,11 +330,11 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
 
 
-  _ = UnsafeMutableRawBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
+  _ = UnsafeRawMutableBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeRawMutableBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = UnsafeMutableRawBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
+  _ = UnsafeRawMutableBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeRawMutableBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
   // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
@@ -363,7 +366,7 @@ func unsafePointerInitNonEphemeralConversions() {
   _ = UnsafeBufferPointer(start: &global, count: 0)
   _ = UnsafeMutableBufferPointer(start: &global, count: 0)
   _ = UnsafeRawBufferPointer(start: &global, count: 0)
-  _ = UnsafeMutableRawBufferPointer(start: &global, count: 0)
+  _ = UnsafeRawMutableBufferPointer(start: &global, count: 0)
 
   // FIXME: This is currently ambiguous.
   _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)'}}
