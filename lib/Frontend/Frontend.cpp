@@ -165,6 +165,15 @@ CompilerInvocation::getPrivateModuleInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.PrivateModuleInterfaceOutputPath;
 }
 
+std::string
+CompilerInvocation::getPackageModuleInterfaceOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "PackageModuleInterfaceOutputPath only makes sense when the whole "
+         "module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.PackageModuleInterfaceOutputPath;
+}
+
 std::string CompilerInvocation::getAPIDescriptorPathForWholeModule() const {
   assert(
       getFrontendOptions().InputsAndOutputs.isWholeModule() &&

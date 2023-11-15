@@ -1262,7 +1262,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     if (importedModule) {
       auto path = importedModule->getModuleFilename();
       if (llvm::sys::path::extension(path) == ".swiftinterface" &&
-          !path.endswith(".private.swiftinterface")) {
+          !(path.endswith(".private.swiftinterface") || path.endswith(".package.swiftinterface"))) {
         // If the module was built from the public swiftinterface, it can't
         // have any SPI.
         diagnose(attr->getLocation(),

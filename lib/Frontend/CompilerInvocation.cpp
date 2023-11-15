@@ -418,7 +418,7 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   if (const Arg *A = Args.getLastArg(OPT_library_level)) {
     StringRef contents = A->getValue();
     if (contents == "spi") {
-      Opts.PrintPrivateInterfaceContent = true;
+      Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
   }
   for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
@@ -623,6 +623,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableAccessControl
       = A->getOption().matches(OPT_enable_access_control);
   }
+
   Opts.ForceWorkaroundBrokenModules
     |= Args.hasArg(OPT_force_workaround_broken_modules);
 
@@ -632,6 +633,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableBareSlashRegexLiterals = true;
     Opts.EnableExperimentalStringProcessing = true;
   }
+
+  // Either the env var and the flag has to be set to enable package interface load
+  Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
+                                    ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
 
   // Experimental string processing.
   if (auto A = Args.getLastArg(OPT_enable_experimental_string_processing,

@@ -55,9 +55,6 @@ struct ModuleInterfaceOptions {
   /// e.g. -package-name PACKAGE_ID
   std::string IgnorablePrivateFlags;
 
-  /// Print for a private swiftinterface file, SPI decls and attributes.
-  bool PrintPrivateInterfaceContent = false;
-
   /// Print imports with both @_implementationOnly and @_spi, only applies
   /// when PrintSPIs is true.
   bool ExperimentalSPIImports = false;
@@ -70,6 +67,18 @@ struct ModuleInterfaceOptions {
 
   /// A list of modules we shouldn't import in the public interfaces.
   std::vector<std::string> ModulesToSkipInPublicInterface;
+
+  /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
+  PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;
+  bool printPublicInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Public;
+  }
+  bool printPackageInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Package;
+  }
+  void setInterfaceMode(PrintOptions::InterfaceMode mode) {
+    InterfaceContentMode = mode;
+  }
 };
 
 extern version::Version InterfaceFormatVersion;

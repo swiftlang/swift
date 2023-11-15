@@ -56,8 +56,9 @@ def ModuleInterfaceOption : OptionFlag;
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorable : OptionFlag;
 
-// The option should be written into a .private.swiftinterface module interface file,
-// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option should be written into a .private.swiftinterface or
+// .package.swiftinterface module interface file, and read/parsed from
+// there when reconstituting a .swiftmodule from it.
 // The option can be safely ignored by the older compiler.
 def ModuleInterfaceOptionIgnorablePrivate : OptionFlag;
 
@@ -593,6 +594,12 @@ def emit_private_module_interface_path :
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
+def emit_package_module_interface_path :
+  Separate<["-"], "emit-package-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
+         ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
+  MetaVarName<"<path>">, HelpText<"Output package module interface file to <path>">;
+
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -750,6 +757,11 @@ def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Library code can assume that all clients are visible at linktime, and aggressively strip unused code">;
+
+def experimental_package_interface_load:
+  Flag<["-"], "experimental-package-interface-load">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Enables loading a package interface if in the same package specified with package-name">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,

@@ -1107,9 +1107,9 @@ ERROR(module_not_testable,Fatal,
 ERROR(module_not_compiled_for_private_import,none,
       "module %0 was not compiled for private import", (Identifier))
 
-ERROR(in_package_module_not_compiled_from_source,none,
-      "module %0 is in package '%1' but was built from interface; "
-      "modules of the same package can only be loaded if built from source: %2",
+ERROR(in_package_module_not_compiled_from_source_or_package_interface,none,
+      "module %0 is in package '%1' but was built from a non-package interface; "
+      "modules of the same package can only be loaded if built from source or package interface: %2",
       (Identifier, StringRef, StringRef))
 
 WARNING(in_package_module_not_compiled_locally,none,

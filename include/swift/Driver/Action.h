@@ -408,7 +408,8 @@ public:
     : JobAction(Action::Kind::VerifyModuleInterfaceJob, { ModuleEmitter },
                 file_types::TY_Nothing), inputType(inputType) {
     assert(inputType == file_types::TY_SwiftModuleInterfaceFile ||
-           inputType == file_types::TY_PrivateSwiftModuleInterfaceFile);
+           inputType == file_types::TY_PrivateSwiftModuleInterfaceFile ||
+           inputType == file_types::TY_PackageSwiftModuleInterfaceFile);
   }
 
   file_types::ID getInputType() const { return inputType; }

@@ -266,6 +266,7 @@ public:
   bool hasModuleSourceInfoOutputPath() const;
   bool hasModuleInterfaceOutputPath() const;
   bool hasPrivateModuleInterfaceOutputPath() const;
+  bool hasPackageModuleInterfaceOutputPath() const;
   bool hasABIDescriptorOutputPath() const;
   bool hasAPIDescriptorOutputPath() const;
   bool hasConstValuesOutputPath() const;
