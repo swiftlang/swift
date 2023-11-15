@@ -70,19 +70,6 @@ enum ASTNode {
       fatalError("Must be expr, stmt, or decl.")
     }
   }
-
-  var raw: UnsafeMutableRawPointer {
-    switch self {
-    case .expr(let e):
-      return e.raw
-    case .stmt(let s):
-      return s.raw
-    case .decl(let d):
-      return d.raw
-    case .type(let t):
-      return t.raw
-    }
-  }
 }
 
 /// Little utility wrapper that lets us have some mutable state within
@@ -428,8 +415,8 @@ public func buildTopLevelASTNodes(
 
 /// Generate an AST node at the given source location. Returns the generated
 /// ASTNode and mutate the pointee of `endLocPtr` to the end of the node.
-private func _build<Node: SyntaxProtocol>(
-  kind: Node.Type,
+private func _build<Node: SyntaxProtocol, Result>(
+  generator: (ASTGenVisitor) -> (Node) -> Result,
   diagEngine: BridgedDiagnosticEngine,
   sourceFilePtr: UnsafeRawPointer,
   sourceLoc: BridgedSourceLoc,
@@ -437,7 +424,7 @@ private func _build<Node: SyntaxProtocol>(
   astContext: BridgedASTContext,
   legacyParser: BridgedLegacyParser,
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
-) -> UnsafeMutableRawPointer? {
+) -> Result? {
   let sourceFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
 
   // Find the type syntax node.
@@ -458,13 +445,13 @@ private func _build<Node: SyntaxProtocol>(
   endLocPtr.pointee = sourceLoc.advanced(by: node.totalLength.utf8Length)
 
   // Convert the syntax node.
-  return ASTGenVisitor(
+  return generator(ASTGenVisitor(
     diagnosticEngine: diagEngine,
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: declContext,
     astContext: astContext,
     legacyParser: legacyParser
-  ).generate(Syntax(node)).raw
+  ))(node)
 }
 
 @_cdecl("swift_ASTGen_buildTypeRepr")
@@ -479,7 +466,7 @@ func buildTypeRepr(
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> UnsafeMutableRawPointer? {
   return _build(
-    kind: TypeSyntax.self,
+    generator: ASTGenVisitor.generate(type:),
     diagEngine: diagEngine,
     sourceFilePtr: sourceFilePtr,
     sourceLoc: sourceLoc,
@@ -487,7 +474,7 @@ func buildTypeRepr(
     astContext: astContext,
     legacyParser: legacyParser,
     endLocPtr: endLocPtr
-  )
+  )?.raw
 }
 
 @_cdecl("swift_ASTGen_buildDecl")
@@ -502,7 +489,7 @@ func buildDecl(
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> UnsafeMutableRawPointer? {
   return _build(
-    kind: DeclSyntax.self,
+    generator: ASTGenVisitor.generate(decl:),
     diagEngine: diagEngine,
     sourceFilePtr: sourceFilePtr,
     sourceLoc: sourceLoc,
@@ -510,7 +497,7 @@ func buildDecl(
     astContext: astContext,
     legacyParser: legacyParser,
     endLocPtr: endLocPtr
-  )
+  )?.raw
 }
 
 @_cdecl("swift_ASTGen_buildExpr")
@@ -525,7 +512,7 @@ func buildExpr(
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> UnsafeMutableRawPointer? {
   return _build(
-    kind: ExprSyntax.self,
+    generator: ASTGenVisitor.generate(expr:),
     diagEngine: diagEngine,
     sourceFilePtr: sourceFilePtr,
     sourceLoc: sourceLoc,
@@ -533,7 +520,7 @@ func buildExpr(
     astContext: astContext,
     legacyParser: legacyParser,
     endLocPtr: endLocPtr
-  )
+  )?.raw
 }
 
 @_cdecl("swift_ASTGen_buildStmt")
@@ -548,7 +535,7 @@ func buildStmt(
   endLocPtr: UnsafeMutablePointer<BridgedSourceLoc>
 ) -> UnsafeMutableRawPointer? {
   return _build(
-    kind: StmtSyntax.self,
+    generator: ASTGenVisitor.generate(stmt:),
     diagEngine: diagEngine,
     sourceFilePtr: sourceFilePtr,
     sourceLoc: sourceLoc,
@@ -556,5 +543,5 @@ func buildStmt(
     astContext: astContext,
     legacyParser: legacyParser,
     endLocPtr: endLocPtr
-  )
+  )?.raw
 }
