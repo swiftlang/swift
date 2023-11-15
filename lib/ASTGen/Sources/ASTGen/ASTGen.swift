@@ -132,7 +132,7 @@ struct ASTGenVisitor {
 
     for element in node.statements {
       let loc = element.bridgedSourceLoc(in: self)
-      let swiftASTNodes = generate(element)
+      let swiftASTNodes = generate(codeBlockItem: element)
       switch swiftASTNodes {
       case .decl(let d):
         out.append(d.raw)
@@ -188,179 +188,67 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: DeclSyntax) -> BridgedDecl {
-    return generate(Syntax(node)).castToDecl
-  }
-
-  func generate(_ node: ExprSyntax) -> BridgedExpr {
-    if !isExprMigrated(node) {
-      return generateWithLegacy(node)
-    }
-    return generate(Syntax(node)).castToExpr
-  }
-
-  func generate(_ node: PatternSyntax) -> ASTNode {
-    return generate(Syntax(node))
-  }
-
-  func generate(_ node: StmtSyntax) -> BridgedStmt {
-    return generate(Syntax(node)).castToStmt
-  }
-
-  func generate(_ node: TypeSyntax) -> BridgedTypeRepr {
-    if !isTypeMigrated(node) {
-      return generateWithLegacy(node)
-    }
-    return generate(Syntax(node)).castToType
-  }
-
-  func generate(_ node: some SyntaxChildChoices) -> ASTNode {
-    return self.generate(Syntax(node))
-  }
-
+  /// Generate AST from a Syntax node. The node must be a decl, stmt, expr, or
+  /// type.
   func generate(_ node: Syntax) -> ASTNode {
-    switch node.as(SyntaxEnum.self) {
-    case .actorDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .arrayElement(let node):
-      return .expr(generate(node))
-    case .arrayExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .arrayType(let node):
-      return .type(generate(node))
-    case .associatedTypeDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .attributedType(let node):
-      return .type(generate(node))
-    case .booleanLiteralExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .classDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .closureExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .codeBlock(let node):
-      return .stmt(generate(node).asStmt)
-    case .codeBlockItem(let node):
-      return generate(node)
-    case .compositionType(let node):
-      return .type(generate(node))
-    case .conditionElement(let node):
-      return generate(node)
-    case .declReferenceExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .deinitializerDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .dictionaryType(let node):
-      return .type(generate(node))
-    case .enumCaseDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .enumDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .expressionStmt(let node):
-      return .stmt(generate(node))
-    case .extensionDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .functionCallExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .functionDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .functionType(let node):
-      return .type(generate(node))
-    case .identifierPattern(let node):
-      return .expr(generate(node).asExpr)
-    case .identifierType(let node):
-      return .type(generate(node))
-    case .ifExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .implicitlyUnwrappedOptionalType(let node):
-      return .type(generate(node))
-    case .importDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .initializerClause(let node):
-      return .expr(generate(node))
-    case .initializerDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .integerLiteralExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .memberAccessExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .memberBlockItem(let node):
-      return .decl(generate(node))
-    case .memberType(let node):
-      return .type(generate(node))
-    case .metatypeType(let node):
-      return .type(generate(node))
-    case .namedOpaqueReturnType(let node):
-      return .type(generate(node))
-    case .nilLiteralExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .operatorDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .optionalType(let node):
-      return .type(generate(node))
-    case .packExpansionType(let node):
-      return .type(generate(node))
-    case .precedenceGroupDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .protocolDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .returnStmt(let node):
-      return .stmt(generate(node).asStmt)
-    case .someOrAnyType(let node):
-      return .type(generate(node))
-    case .stringLiteralExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .structDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .tupleExpr(let node):
-      return .expr(generate(node).asExpr)
-    case .tupleType(let node):
-      return .type(generate(node))
-    case .typeAliasDecl(let node):
-      return .decl(generate(node).asDecl)
-    case .variableDecl(let node):
-      return .decl(generate(node).asDecl)
-
-    // Un-migrated nodes.
-    case _ where node.is(ExprSyntax.self):
-      return .expr(self.generateWithLegacy(node.cast(ExprSyntax.self)))
-    case _ where node.is(StmtSyntax.self):
-      return .stmt(self.generateWithLegacy(node.cast(StmtSyntax.self)))
-    case _ where node.is(DeclSyntax.self):
-      return .decl(self.generateWithLegacy(node.cast(DeclSyntax.self)))
-
-    default:
-      fatalError("case does not correspond to an ASTNode")
+    if let decl = node.as(DeclSyntax.self) {
+      return .decl(self.generate(decl: decl))
     }
+    if let stmt = node.as(StmtSyntax.self) {
+      return .stmt(self.generate(stmt: stmt))
+    }
+    if let expr = node.as(ExprSyntax.self) {
+      return .expr(self.generate(expr: expr))
+    }
+    if let type = node.as(TypeSyntax.self) {
+      return .type(self.generate(type: type))
+    }
+
+    // --- Special cases where `node` doesn't belong to one of the base kinds.
+
+    // CodeBlockSyntax -> BraceStmt.
+    if let node = node.as(CodeBlockSyntax.self) {
+      return .stmt(self.generate(codeBlock: node).asStmt)
+    }
+    // CodeBlockItemSyntax -> ASTNode.
+    if let node = node.as(CodeBlockItemSyntax.self) {
+      return self.generate(codeBlockItem: node)
+    }
+
+    fatalError("node does not correspond to an ASTNode \(node.kind)")
   }
 }
 
 // Misc visits.
 // TODO: Some of these are called within a single file/method; we may want to move them to the respective files.
 extension ASTGenVisitor {
+  func generate(_ node: some SyntaxChildChoices) -> ASTNode {
+    return self.generate(Syntax(node))
+  }
+
   public func generate(_ node: MemberBlockItemSyntax) -> BridgedDecl {
-    generate(node.decl)
+    generate(decl: node.decl)
   }
 
   public func generate(_ node: InitializerClauseSyntax) -> BridgedExpr {
-    generate(node.value)
+    generate(expr: node.value)
   }
 
   public func generate(_ node: ConditionElementSyntax) -> ASTNode {
     generate(node.condition)
   }
 
-  public func generate(_ node: CodeBlockItemSyntax) -> ASTNode {
+  public func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
     generate(node.item)
   }
 
   public func generate(_ node: ArrayElementSyntax) -> BridgedExpr {
-    generate(node.expression)
+    generate(expr: node.expression)
   }
 
   @inline(__always)
   func generate(_ node: CodeBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate($0).bridged }.bridgedArray(in: self)
+    node.lazy.map { self.generate(codeBlockItem: $0).bridged }.bridgedArray(in: self)
   }
 }
 
@@ -373,7 +261,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return self.generate(node)
+    return self.generate(type: node)
   }
 
   @inline(__always)
@@ -382,7 +270,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return self.generate(node)
+    return self.generate(expr: node)
   }
 
   @inline(__always)

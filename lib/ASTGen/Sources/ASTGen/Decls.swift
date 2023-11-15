@@ -18,6 +18,60 @@ import SwiftDiagnostics
 // MARK: - TypeDecl
 
 extension ASTGenVisitor {
+  func generate(decl node: DeclSyntax) -> BridgedDecl {
+    switch node.as(DeclSyntaxEnum.self) {
+    case .accessorDecl:
+      break
+    case .actorDecl(let node):
+      return self.generate(node).asDecl
+    case .associatedTypeDecl(let node):
+      return self.generate(node).asDecl
+    case .classDecl(let node):
+      return self.generate(node).asDecl
+    case .deinitializerDecl(let node):
+      return self.generate(node).asDecl
+    case .editorPlaceholderDecl:
+      break
+    case .enumCaseDecl(let node):
+      return self.generate(node).asDecl
+    case .enumDecl(let node):
+      return self.generate(node).asDecl
+    case .extensionDecl(let node):
+      return self.generate(node).asDecl
+    case .functionDecl(let node):
+      return self.generate(node).asDecl
+    case .ifConfigDecl:
+      break
+    case .importDecl(let node):
+      return self.generate(node).asDecl
+    case .initializerDecl(let node):
+      return self.generate(node).asDecl
+    case .macroDecl:
+      break
+    case .macroExpansionDecl:
+      break
+    case .missingDecl:
+      break
+    case .operatorDecl(let node):
+      return self.generate(node).asDecl
+    case .poundSourceLocation:
+      break
+    case .precedenceGroupDecl(let node):
+      return self.generate(node).asDecl
+    case .protocolDecl(let node):
+      return self.generate(node).asDecl
+    case .structDecl(let node):
+      return self.generate(node).asDecl
+    case .subscriptDecl:
+      break
+    case .typeAliasDecl(let node):
+      return self.generate(node).asDecl
+    case .variableDecl(let node):
+      return self.generate(node).asDecl
+    }
+    return self.generateWithLegacy(node)
+  }
+
   public func generate(_ node: TypeAliasDeclSyntax) -> BridgedTypeAliasDecl {
     let (name, nameLoc) = node.name.bridgedIdentifierAndSourceLoc(in: self)
 
@@ -29,7 +83,7 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       genericParamList: self.generate(node.genericParameterClause).asNullable,
       equalLoc: node.initializer.equal.bridgedSourceLoc(in: self),
-      underlyingType: self.generate(node.initializer.value),
+      underlyingType: self.generate(type: node.initializer.value),
       genericWhereClause: self.generate(node.genericWhereClause).asNullable
     )
   }
@@ -193,7 +247,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       extensionKeywordLoc: node.extensionKeyword.bridgedSourceLoc(in: self),
-      extendedType: self.generate(node.extendedType),
+      extendedType: self.generate(type: node.extendedType),
       inheritedTypes: self.generate(node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(node.genericWhereClause).asNullable,
       braceRange: BridgedSourceRange(
@@ -241,7 +295,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   public func generate(_ node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
-    let pattern = generate(node.bindings.first!.pattern)
+    let pattern = generate(pattern: node.bindings.first!.pattern)
     let initializer = generate(node.bindings.first!.initializer!)
 
     let isStatic = false  // TODO: compute this
@@ -251,7 +305,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       bindingKeywordLoc: node.bindingSpecifier.bridgedSourceLoc(in: self),
-      nameExpr: pattern.castToExpr,
+      pattern: pattern,
       initializer: initializer,
       isStatic: isStatic,
       isLet: isLet
@@ -286,7 +340,7 @@ extension ASTGenVisitor {
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(body))
+        decl.setParsedBody(self.generate(codeBlock: body))
       }
     }
 
@@ -310,7 +364,7 @@ extension ASTGenVisitor {
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(body))
+        decl.setParsedBody(self.generate(codeBlock: body))
       }
     }
 
@@ -326,7 +380,7 @@ extension ASTGenVisitor {
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(body))
+        decl.setParsedBody(self.generate(codeBlock: body))
       }
     }
 
@@ -539,7 +593,7 @@ extension ASTGenVisitor {
 
   @inline(__always)
   func generate(_ node: InheritedTypeListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate($0.type) }.bridgedArray(in: self)
+    node.lazy.map { self.generate(type: $0.type) }.bridgedArray(in: self)
   }
 
   @inline(__always)

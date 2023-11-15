@@ -177,6 +177,13 @@ namespace swift {
 #define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
 #include "swift/AST/TypeReprNodes.def"
 
+// Declare `.asPattern` on each BridgedXXXPattern type, which upcasts a wrapper
+// for a Pattern subclass to a BridgedPattern.
+#define PATTERN(Id, Parent)                                                    \
+  SWIFT_NAME("getter:Bridged" #Id "Pattern.asPattern(self:)")                  \
+  BridgedPattern Bridged##Id##Pattern_asPattern(Bridged##Id##Pattern pattern);
+#include "swift/AST/PatternNodes.def"
+
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostic Engine
 //===----------------------------------------------------------------------===//
@@ -289,10 +296,10 @@ void BridgedDiagnostic_finish(BridgedDiagnostic cDiag);
 
 SWIFT_NAME(
     "BridgedPatternBindingDecl.createParsed(_:declContext:bindingKeywordLoc:"
-    "nameExpr:initializer:isStatic:isLet:)")
+    "pattern:initializer:isStatic:isLet:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedExpr opaqueNameExpr,
+    BridgedSourceLoc cBindingKeywordLoc, BridgedPattern pattern,
     BridgedExpr opaqueInitExpr, bool isStatic, bool isLet);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:firstName:"
@@ -859,6 +866,16 @@ BridgedVarargTypeRepr_createParsed(BridgedASTContext cContext,
 
 SWIFT_NAME("BridgedTypeRepr.dump(self:)")
 void BridgedTypeRepr_dump(BridgedTypeRepr type);
+
+//===----------------------------------------------------------------------===//
+// MARK: Patterns
+//===----------------------------------------------------------------------===//
+
+SWIFT_NAME("BridgedNamedPattern.createParsed(_:declContext:name:loc:)")
+BridgedNamedPattern
+BridgedNamedPattern_createParsed(BridgedASTContext astContext,
+                                 BridgedDeclContext declContext,
+                                 BridgedIdentifier name, BridgedSourceLoc cLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: Misc

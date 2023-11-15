@@ -2,7 +2,8 @@
 
 // -enable-experimental-feature requires an asserts build
 // REQUIRES: asserts
-// REQUIRES: rdar116686158
+// rdar://116686158
+// UNSUPPORTED: asan
 
 protocol P { }
 protocol Q { }

@@ -5838,13 +5838,6 @@ protected:
           SourceLoc nameLoc, Identifier name, DeclContext *dc,
           StorageIsMutable_t supportsMutation);
 
-protected:
-  // Only \c ParamDecl::setSpecifier is allowed to flip this - and it's also
-  // on the way out of that business.
-  void setIntroducer(Introducer value) {
-    Bits.VarDecl.Introducer = uint8_t(value);
-  }
-
 public:
   VarDecl(bool isStatic, Introducer introducer,
           SourceLoc nameLoc, Identifier name, DeclContext *dc)
@@ -6063,6 +6056,12 @@ public:
   /// Is this a stored property that will _not_ trigger any user-defined code
   /// upon any kind of access?
   bool isOrdinaryStoredProperty() const;
+
+  /// Set the introducer kind.
+  /// Note: do not call this after type checking begun.
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
+  }
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);

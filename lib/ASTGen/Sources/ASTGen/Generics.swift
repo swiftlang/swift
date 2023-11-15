@@ -56,15 +56,15 @@ extension ASTGenVisitor {
         return BridgedRequirementRepr(
           SeparatorLoc: conformance.colon.bridgedSourceLoc(in: self),
           Kind: .typeConstraint,
-          FirstType: self.generate(conformance.leftType),
-          SecondType: self.generate(conformance.rightType)
+          FirstType: self.generate(type: conformance.leftType),
+          SecondType: self.generate(type: conformance.rightType)
         )
       case .sameTypeRequirement(let sameType):
         return BridgedRequirementRepr(
           SeparatorLoc: sameType.equal.bridgedSourceLoc(in: self),
           Kind: .sameType,
-          FirstType: self.generate(sameType.leftType),
-          SecondType: self.generate(sameType.rightType)
+          FirstType: self.generate(type: sameType.leftType),
+          SecondType: self.generate(type: sameType.rightType)
         )
       case .layoutRequirement(_):
         // FIXME: Implement layout requirement translation.
