@@ -842,8 +842,8 @@ and deallocated with special instructions.
 
 Pack types are only allowed in two positions:
 - at the top level of a type, e.g. ``%0 : $Pack{Int, Float}``
-- as a parameter or result type of a function type, e.g.
-  ``%fn : $@convention(thin) (@pack_in Pack{Int, Float}) -> ()``
+- as a parameter or result type of a function type, e.g. ``%fn : $@convention(thin) (@pack_in Pack{Int, Float}) -> ()``
+
 Note in particular that they are not allowed in tuple types.  Pack
 expansions in tuple types are still flattened into the surrounding
 tuple structure like they are in Swift (unless the tuple is exploded,
@@ -2577,24 +2577,35 @@ ends of these lifetimes across a deinit barrier.
 
 Source level variables (lets, vars, ...) and function arguments will result in
 SIL-level lexical lifetimes if either of the two sets of circumstances apply:
+
 (1) Inferred lexicality.
-- the type is non-trivial
-- the type is not eager-move
-- the variable or argument is not annotated to be eager-move
+
+    - the type is non-trivial
+
+    - the type is not eager-move
+
+    - the variable or argument is not annotated to be eager-move
+
 OR
+
 (2) Explicit lexicality.
-- the type, variable, or argument is annotated `@_lexical`
+
+    - the type, variable, or argument is annotated `@_lexical`
 
 A type is eager-move by satisfying one of two conditions:
+
 (1) Inferred: An aggregate is inferred to be eager-move if all of its fields are
-    eager-move.
+eager-move.
+
 (2) Annotated: Any type can be eager-move if it is annotated with an attribute
-    that explicitly specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
+that explicitly specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
 
 A variable or argument is eager-move by satisfying one of two conditions:
+
 (1) Inferred: Its type is eager-move.
+
 (2) Annotated: The variable or argument is annotated with an attribute that
-    specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
+specifies it to be: `@_eagerMove`, `@_noImplicitCopy`.
 
 These source-level rules result in a few sorts of SIL value whose destroys must
 not be moved across deinit barriers:
@@ -6532,7 +6543,7 @@ Given the address of a tuple in memory, derives the
 address of an element within that value.
 
 tuple_pack_element_addr
-``````````````````
+```````````````````````
 ::
 
   sil-instruction ::= 'tuple_pack_element_addr' sil-value 'of' sil-operand 'as' sil-type
@@ -8608,7 +8619,7 @@ Optimizer Dataflow Marker Instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 mark_unresolved_non_copyable_value
-```````````````
+``````````````````````````````````
 ::
 
   sil-instruction ::= 'mark_unresolved_non_copyable_value'
