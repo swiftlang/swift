@@ -29,6 +29,7 @@ import Foundation
 // expected-member {{ObjectiveC.NSObject.Bool}}
 // expected-conformance {{Swift.Hashable}}
 // expected-conformance {{Swift.Equatable}}
+// expected-conformance {{Swift.Sequence}}
 // expected-member {{Swift._ExpressibleByBuiltinIntegerLiteral.init}}
 @objc private class LookupFactory: NSObject {
   // expected-provides {{AssignmentPrecedence}}
