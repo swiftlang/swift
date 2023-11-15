@@ -16,7 +16,9 @@ extension BeginBorrowInst : OnoneSimplifyable {
   func simplify(_ context: SimplifyContext) {
     if borrowedValue.ownership == .owned,
        // We need to keep lexical lifetimes in place.
-       !isLexical
+       !isLexical,
+       // The same for borrow-scopes which encapsulated pointer escapes.
+       !hasPointerEscape
     {
       tryReplaceBorrowWithOwnedOperand(beginBorrow: self, context)
     }
