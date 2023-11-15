@@ -60,6 +60,9 @@ function(add_swift_macro_library name)
   set(destination_dir "lib${LLVM_LIBDIR_SUFFIX}/swift/host/plugins")
 
   swift_install_in_component(TARGETS ${name}
+    RUNTIME
+      DESTINATION bin
+      COMPONENT compiler
     LIBRARY
       DESTINATION "${destination_dir}"
       COMPONENT compiler
