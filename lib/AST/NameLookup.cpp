@@ -3187,20 +3187,12 @@ ArrayRef<ProtocolDecl *>
 InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
                                     ProtocolDecl *PD) const {
   llvm::SmallSetVector<ProtocolDecl *, 2> inherited;
-  auto addInherited = [&inherited, &PD](ProtocolDecl *P) {
-    if (PD != P)
-      inherited.insert(P);
-  };
-
-  for (auto attr : PD->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
-    addInherited(attr->getProtocol());
-  }
-
   bool anyObject = false;
-  for (const auto &found : getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      addInherited(proto);
-    }
+  for (const auto &found :
+       getDirectlyInheritedNominalTypeDecls(PD, anyObject)) {
+    auto proto = dyn_cast<ProtocolDecl>(found.Item);
+    if (proto && proto != PD)
+      inherited.insert(proto);
   }
 
   return PD->getASTContext().AllocateCopy(inherited.getArrayRef());
@@ -3716,6 +3708,16 @@ swift::getDirectlyInheritedNominalTypeDecls(
       result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
     }
     return result;
+  }
+
+  // Check for SynthesizedProtocolAttrs on the protocol. ClangImporter uses
+  // these to add `Sendable` conformances to protocols without modifying the
+  // inherited type list.
+  for (auto attr :
+       protoDecl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    auto loc = attr->getLocation();
+    result.push_back(
+        {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc()});
   }
 
   // Else we have access to this information on the where clause.
