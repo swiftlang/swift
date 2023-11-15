@@ -3303,6 +3303,70 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   return restrictiveImport;
 }
 
+SmallVector<CharSourceRange, 2>
+IfConfigRangeInfo::getRangesWithoutActiveBody(const SourceManager &SM) const {
+  SmallVector<CharSourceRange, 2> result;
+  if (ActiveBodyRange.isValid()) {
+    // Split the whole range by the active range.
+    result.emplace_back(SM, WholeRange.getStart(), ActiveBodyRange.getStart());
+    result.emplace_back(SM, ActiveBodyRange.getEnd(), WholeRange.getEnd());
+  } else {
+    // No active body, we just return the whole range.
+    result.push_back(WholeRange);
+  }
+  return result;
+}
+
+void SourceFile::recordIfConfigRangeInfo(IfConfigRangeInfo ranges) {
+  IfConfigRanges.Ranges.push_back(ranges);
+  IfConfigRanges.IsSorted = false;
+}
+
+ArrayRef<IfConfigRangeInfo>
+SourceFile::getIfConfigsWithin(SourceRange outer) const {
+  auto &SM = getASTContext().SourceMgr;
+  assert(SM.getRangeForBuffer(BufferID).contains(outer.Start) &&
+         "Range not within this file?");
+
+  if (!IfConfigRanges.IsSorted) {
+    // Sort the ranges if we need to.
+    llvm::sort(IfConfigRanges.Ranges, [&](IfConfigRangeInfo lhs,
+                                          IfConfigRangeInfo rhs) {
+      return SM.isBeforeInBuffer(lhs.getStartLoc(), rhs.getStartLoc());
+    });
+
+    // Be defensive and eliminate duplicates in case we've parsed twice.
+    auto newEnd = std::unique(
+        IfConfigRanges.Ranges.begin(), IfConfigRanges.Ranges.end(),
+        [&](const IfConfigRangeInfo &lhs, const IfConfigRangeInfo &rhs) {
+          if (lhs.getWholeRange() != rhs.getWholeRange())
+            return false;
+
+          assert(lhs == rhs && "Active ranges changed on a re-parse?");
+          return true;
+        });
+    IfConfigRanges.Ranges.erase(newEnd, IfConfigRanges.Ranges.end());
+    IfConfigRanges.IsSorted = true;
+  }
+
+  // First let's find the first #if that is after the outer start loc.
+  auto ranges = llvm::makeArrayRef(IfConfigRanges.Ranges);
+  auto lower = llvm::lower_bound(
+      ranges, outer.Start, [&](IfConfigRangeInfo range, SourceLoc loc) {
+        return SM.isBeforeInBuffer(range.getStartLoc(), loc);
+      });
+  if (lower == ranges.end() ||
+      SM.isBeforeInBuffer(outer.End, lower->getStartLoc())) {
+    return {};
+  }
+  // Next let's find the first #if that's after the outer end loc.
+  auto upper = llvm::upper_bound(
+      ranges, outer.End, [&](SourceLoc loc, IfConfigRangeInfo range) {
+        return SM.isBeforeInBuffer(loc, range.getStartLoc());
+      });
+  return llvm::makeArrayRef(lower, upper - lower);
+}
+
 void ModuleDecl::setPackageName(Identifier name) {
   Package = PackageUnit::create(name, *this, getASTContext());
 }

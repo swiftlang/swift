@@ -4168,7 +4168,14 @@ void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   for (auto &MR : getMappedRegions()) {
     OS << "  " << MR.StartLine << ":" << MR.StartCol << " -> " << MR.EndLine
        << ":" << MR.EndCol << " : ";
-    printCounter(OS, MR.Counter);
+    switch (MR.RegionKind) {
+    case MappedRegion::Kind::Code:
+      printCounter(OS, MR.Counter);
+      break;
+    case MappedRegion::Kind::Skipped:
+      OS << "skipped";
+      break;
+    }
     OS << "\n";
   }
   OS << "}\n\n";

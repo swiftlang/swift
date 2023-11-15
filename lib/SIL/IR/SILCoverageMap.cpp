@@ -22,6 +22,7 @@
 using namespace swift;
 
 using llvm::coverage::CounterExpression;
+using llvm::coverage::CounterMappingRegion;
 
 SILCoverageMap *
 SILCoverageMap::create(SILModule &M, SourceFile *ParentSourceFile,
@@ -55,6 +56,19 @@ SILCoverageMap::SILCoverageMap(SourceFile *ParentSourceFile, uint64_t Hash)
   : ParentSourceFile(ParentSourceFile), Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
+
+CounterMappingRegion
+SILCoverageMap::MappedRegion::getLLVMRegion(unsigned int FileID) const {
+  switch (RegionKind) {
+  case MappedRegion::Kind::Code:
+    return CounterMappingRegion::makeRegion(Counter, FileID, StartLine,
+                                            StartCol, EndLine, EndCol);
+  case MappedRegion::Kind::Skipped:
+    return CounterMappingRegion::makeSkipped(FileID, StartLine, StartCol,
+                                             EndLine, EndCol);
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
 
 namespace {
 struct Printer {
