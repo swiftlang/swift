@@ -6101,11 +6101,11 @@ public:
     ParsedPath = path;
   }
 
-  TypeRepr *getRootType() const {
+  TypeRepr *getExplicitRootType() const {
     assert(!isObjC() && "cannot get root type of ObjC keypath");
     return RootType;
   }
-  void setRootType(TypeRepr *rootType) {
+  void setExplicitRootType(TypeRepr *rootType) {
     assert(!isObjC() && "cannot set root type of ObjC keypath");
     RootType = rootType;
   }

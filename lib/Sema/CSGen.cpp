@@ -3732,7 +3732,7 @@ namespace {
                                                           TVO_CanBindToHole);
 
       // If a root type was explicitly given, then resolve it now.
-      if (auto rootRepr = E->getRootType()) {
+      if (auto rootRepr = E->getExplicitRootType()) {
         const auto rootObjectTy = resolveTypeReferenceInExpression(
             rootRepr, TypeResolverContext::InExpression, locator);
         if (!rootObjectTy || rootObjectTy->hasError())
