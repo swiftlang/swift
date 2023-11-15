@@ -2043,13 +2043,36 @@ public struct ClosureCallerMacro: ExpressionMacro {
     }
 }
 
-public struct FirstArgumentConcatStringMacro: ExpressionMacro {
+public struct PrependHelloMacro: ExpressionMacro {
     public static func expansion(
       of node: some FreestandingMacroExpansionSyntax,
       in context: some MacroExpansionContext
     ) -> ExprSyntax {
         """
-        \(node.arguments.first!.expression) + " world"
+        "hello " + \(node.arguments.first!.expression)
+        """
+    }
+}
+
+public struct AsIsMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        node.arguments.first!.expression
+    }
+}
+
+public struct IntroduceShadowedMacro: ExpressionMacro {
+    public static func expansion(
+      of node: some FreestandingMacroExpansionSyntax,
+      in context: some MacroExpansionContext
+    ) -> ExprSyntax {
+        """
+        {
+            let shadowed = "from shadow"
+            return \(node.arguments.first!.expression)
+        }()
         """
     }
 }

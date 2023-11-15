@@ -112,6 +112,17 @@ let printWithFileLine = buildPrinter { }
             testParameterUseVariableFromOriginalDeclContext()
         }
         
+        do {
+            let shadowed: String = "not this either"
+            // CHECK: hello world
+            testNestedStillInOriginalDeclContext()
+        }
+        
+        // CHECK: hello from shadow
+        testUseShadowedFromOuterExpansion()
+        // CHECK: hello MacroUser/macro_default_argument_enabled.swift
+        testMacroUseMacro()
+        
         // CHECK: [[# @LINE + 1]]
         asDefaultArgument()
         // CHECK: [[# @LINE + 1]]
