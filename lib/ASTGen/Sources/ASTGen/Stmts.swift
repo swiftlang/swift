@@ -75,14 +75,14 @@ extension ASTGenVisitor {
       condition: conditions.first!.castToExpr,
       thenStmt: self.generate(codeBlock: node.body).asStmt,
       elseLoc: node.elseKeyword.bridgedSourceLoc(in: self),
-      elseStmt: self.map(node.elseBody) {
+      elseStmt: node.elseBody.map {
         switch $0 {
         case .codeBlock(let node):
           return self.generate(codeBlock: node).asStmt
         case .ifExpr(let node):
           return self.makeIfStmt(node).asStmt
         }
-      }
+      }.asNullable
     )
   }
 
@@ -99,7 +99,7 @@ extension ASTGenVisitor {
     .createParsed(
       self.ctx,
       returnKeywordLoc: node.returnKeyword.bridgedSourceLoc(in: self),
-      expr: self.map(node.expression, generate(expr:))
+      expr: self.generate(expr: node.expression)
     )
   }
 }

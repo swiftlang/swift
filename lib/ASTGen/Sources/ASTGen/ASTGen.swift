@@ -209,27 +209,56 @@ extension ASTGenVisitor {
   }
 }
 
-// Optional node handling.
+// Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
+// 'self.generate(foo: FooSyntax)' recursion pattern between optional and non-optional inputs.
 extension ASTGenVisitor {
-  /// Generate an AST node from an optional node using the generator function.
-  ///
-  /// Usage:
-  ///   self.map(node.initializer, generate(expr:))
   @inline(__always)
-  func map<Node: SyntaxProtocol, Result: HasNullable>(
+  func generate(type node: TypeSyntax?) -> BridgedNullableTypeRepr {
+    self.map(node, generate(type:))
+  }
+
+  @inline(__always)
+  func generate(expr node: ExprSyntax?) -> BridgedNullableExpr {
+    self.map(node, generate(expr:))
+  }
+
+  @inline(__always)
+  func generate(genericParameterClause node: GenericParameterClauseSyntax?) -> BridgedNullableGenericParamList {
+    self.map(node, generate(genericParameterClause:))
+  }
+
+  @inline(__always)
+  func generate(genericWhereClause node: GenericWhereClauseSyntax?) -> BridgedNullableTrailingWhereClause {
+    self.map(node, generate(genericWhereClause:))
+  }
+
+  @inline(__always)
+  func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax?) -> BridgedNullableParameterList {
+    self.map(node, generate(enumCaseParameterClause:))
+  }
+
+  @inline(__always)
+  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
+    self.map(node, generate(inheritedTypeList:))
+  }
+
+  @inline(__always)
+  func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax?) -> BridgedArrayRef {
+    self.map(node, generate(precedenceGroupNameList:))
+  }
+
+  // Helper function for `generate(foo: FooSyntax?)` methods.
+  @inline(__always)
+  private func map<Node: SyntaxProtocol, Result: HasNullable>(
     _ node: Node?,
     _ body: (Node) -> Result
   ) -> Result.Nullable {
     return Result.asNullable(node.map(body))
   }
 
-  /// Generate an AST node array from an optional collection node using the
-  /// generator function. If `nil`, returns an empty array.
-  ///
-  /// Usage:
-  ///   self.map(node.genericWhereClasuse, generate(genericWhereClause:))
+  // Helper function for `generate(barList: BarListSyntax?)` methods for collection nodes.
   @inline(__always)
-  func map<Node: SyntaxCollection>(
+  private func map<Node: SyntaxCollection>(
     _ node: Node?,
     _ body: (Node) -> BridgedArrayRef
   ) -> BridgedArrayRef {

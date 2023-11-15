@@ -101,7 +101,7 @@ extension ASTGenVisitor {
       secondName: secondName,
       secondNameLoc: secondNameLoc,
       type: type.asNullable,
-      defaultValue: self.map(node.defaultValue?.value, generate(expr:))
+      defaultValue: self.generate(expr: node.defaultValue?.value)
     )
   }
 }
