@@ -533,7 +533,7 @@ function Build-CMakeProject {
 
     $GenerateDebugInfo = $Defines["CMAKE_BUILD_TYPE"] -ne "Release"
 
-    $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+    $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/utf-8", "/Zc:inline")
     if ($GenerateDebugInfo) { $CFlags += "/Zi" }
     $CXXFlags = $CFlags.Clone() + "/Zc:__cplusplus"
 
