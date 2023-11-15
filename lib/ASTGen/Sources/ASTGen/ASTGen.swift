@@ -28,7 +28,6 @@ enum ASTNode {
   case decl(BridgedDecl)
   case stmt(BridgedStmt)
   case expr(BridgedExpr)
-  case type(BridgedTypeRepr)
 
   var castToExpr: BridgedExpr {
     guard case .expr(let bridged) = self else {
@@ -51,13 +50,6 @@ enum ASTNode {
     return bridged
   }
 
-  var castToType: BridgedTypeRepr {
-    guard case .type(let bridged) = self else {
-      fatalError("Expected a type")
-    }
-    return bridged
-  }
-
   var bridged: BridgedASTNode {
     switch self {
     case .expr(let e):
@@ -66,8 +58,6 @@ enum ASTNode {
       return BridgedASTNode(raw: s.raw, kind: .stmt)
     case .decl(let d):
       return BridgedASTNode(raw: d.raw, kind: .decl)
-    default:
-      fatalError("Must be expr, stmt, or decl.")
     }
   }
 }
