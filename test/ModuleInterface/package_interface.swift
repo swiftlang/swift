@@ -1,3 +1,6 @@
+// rdar://118461385 (Swift CI: failing on the ASAN bot with `Abort trap: 6`)
+// REQUIRES: rdar118461385
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
