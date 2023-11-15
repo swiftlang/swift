@@ -159,10 +159,9 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  // This Parser is a fallback parser for ASTGen.
+  /// This Parser is a fallback parser for ASTGen.
+  // Note: This doesn't affect anything in non-SWIFT_BUILD_SWIFT_SYNTAX envs.
   bool IsForASTGen = false;
-#endif
 
   // A cached answer to
   //     Context.LangOpts.hasFeature(Feature::NoncopyableGenerics)
