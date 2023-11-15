@@ -1023,6 +1023,26 @@ void PatternBindingEntryRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
+// PatternCheckedExecutableInitRequest computation.
+//----------------------------------------------------------------------------//
+
+llvm::Optional<Expr *>
+PatternBindingCheckedExecutableInitRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPattern(idx)->executableInitChecked())
+    return llvm::None;
+  return PBD->getExecutableInit(idx);
+}
+
+void PatternBindingCheckedExecutableInitRequest::cacheResult(Expr *expr) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  assert(expr == PBD->getExecutableInit(idx));
+  PBD->getPattern(idx)->setExecutableInitChecked();
+}
+
+//----------------------------------------------------------------------------//
 // NamingPatternRequest computation.
 //----------------------------------------------------------------------------//
 

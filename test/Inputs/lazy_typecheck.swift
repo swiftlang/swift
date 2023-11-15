@@ -87,7 +87,7 @@ struct InternalWrapper {
 
 // MARK: - Global vars
 
-public var publicGlobalVar: Int = 0
+public var publicGlobalVar: Int = NoTypecheck.int
 public var publicGlobalVarInferredType = ""
 public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
 
@@ -131,16 +131,17 @@ protocol InternalProtoConformingToPublicProto: PublicProto {
 }
 
 public struct PublicStruct {
-  public var publicProperty: Int
+  public var publicProperty: Int = NoTypecheck.int
   public var publicPropertyInferredType = ""
   @PublicWrapper public var publicWrappedProperty = 3.14
   @_transparent public var publicTransparentProperty: Int {
     get { return 1 }
   }
   public dynamic var publicDynamicProperty: Int = 5
+  public static let publicStaticProperty: Int = NoTypecheck.int
+  public static let publicStaticPropertyInferred = 2
 
   public init(x: Int) {
-    self.publicProperty = 1
     _ = NoTypecheck()
   }
 
@@ -189,9 +190,11 @@ struct InternalStruct: NoTypecheckProto {
 }
 
 public class PublicClass {
-  public var publicProperty: Int
+  public var publicProperty: Int = NoTypecheck.int
   public var publicPropertyInferredType = ""
   @PublicWrapper public final var publicFinalWrappedProperty: Bool = false
+  public static let publicStaticProperty: Int = NoTypecheck.int
+  public static let publicStaticPropertyInferred = 2
 
   public init(x: Int) {
     self.publicProperty = x

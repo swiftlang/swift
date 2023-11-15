@@ -2347,6 +2347,27 @@ public:
   void cacheResult(const PatternBindingEntry *value) const;
 };
 
+class PatternBindingCheckedExecutableInitRequest
+    : public SimpleRequest<PatternBindingCheckedExecutableInitRequest,
+                           Expr *(PatternBindingDecl *, unsigned),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Expr *evaluate(Evaluator &evaluator, PatternBindingDecl *PBD,
+                 unsigned i) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  llvm::Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
 class NamingPatternRequest
     : public SimpleRequest<NamingPatternRequest, NamedPattern *(VarDecl *),
                            RequestFlags::SeparatelyCached> {

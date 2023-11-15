@@ -2662,22 +2662,9 @@ public:
         // as a replacement.
         diagnoseWrittenPlaceholderTypes(Ctx, PBD->getPattern(i), init);
 
-        // If we entered an initializer context, contextualize any
-        // auto-closures we might have created.
-        // Note that we don't contextualize the initializer for a property
-        // with a wrapper, because the initializer will have been subsumed
-        // by the backing storage property.
-        if (!DC->isLocalContext() &&
-            !(PBD->getSingleVar() &&
-              PBD->getSingleVar()->hasAttachedPropertyWrapper())) {
-          auto *initContext = cast_or_null<PatternBindingInitializer>(
-              PBD->getInitContext(i));
-          if (initContext) {
-            TypeChecker::contextualizeInitializer(initContext, init);
-            (void)PBD->getInitializerIsolation(i);
-            TypeChecker::checkInitializerEffects(initContext, init);
-          }
-        }
+        // Trigger a request that will complete typechecking for the
+        // initializer.
+        (void)PBD->getCheckedExecutableInit(i);
       }
     }
 
@@ -2686,6 +2673,7 @@ public:
       // If this is an init accessor property with a default initializer,
       // make sure that it subsumes initializers of all of its "initializes"
       // stored properties.
+      // FIXME: This should be requestified.
       auto *initAccessor = var->getAccessor(AccessorKind::Init);
       if (initAccessor && PBD->isInitialized(0)) {
         for (auto *property : initAccessor->getInitializedProperties()) {
