@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -279,9 +280,10 @@ public:
     TheClosure = closure;
   }
 
-  explicit AbstractFunction(ParamDecl *parameter)
-    : TheKind(Kind::Parameter) {
+  explicit AbstractFunction(ParamDecl *parameter, SubstitutionMap subs)
+    : TheKind(Kind::Parameter), Substitutions(subs) {
     TheParameter = parameter;
+
   }
 
   Kind getKind() const { return TheKind; }
@@ -307,6 +309,24 @@ public:
     case Kind::Parameter: return getParameter()->getInterfaceType();
     }
     llvm_unreachable("bad kind");
+  }
+
+  /// Retrieve the interface type for a parameter based on an index into the
+  /// substituted parameter type. This
+  Type getOrigParamInterfaceType(unsigned substIndex) const {
+    switch (getKind()) {
+    case Kind::Opaque:
+    case Kind::Closure:
+    case Kind::Parameter:
+      return getType()->castTo<AnyFunctionType>()->getParams()[substIndex]
+                 .getParameterType();
+
+    case Kind::Function: {
+      auto params = getParameterList(static_cast<ValueDecl *>(getFunction()));
+      auto origIndex = params->getOrigParamIndex(getSubstitutions(), substIndex);
+      return params->get(origIndex)->getInterfaceType();
+    }
+    }
   }
 
   bool isAutoClosure() const {
@@ -386,7 +406,10 @@ public:
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
         return AbstractFunction(fn, DRE->getDeclRef().getSubstitutions());
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
-        return AbstractFunction(param);
+        SubstitutionMap subs;
+        if (auto genericEnv = param->getDeclContext()->getGenericEnvironmentOfContext())
+          subs = genericEnv->getForwardingSubstitutionMap();
+        return AbstractFunction(param, subs);
       }
 
     // Closures.
@@ -813,6 +836,8 @@ public:
     if (!thrownError || isNeverThrownError(thrownError))
       return result;
 
+    assert(!thrownError->hasError());
+
     result.ThrowKind = conditionalKind;
     result.ThrowReason = reason;
     result.ThrownError = thrownError;
@@ -1187,15 +1212,15 @@ public:
           return;
         }
 
-        auto params = fnSubstType->getParams();
-        if (params.size() != args->size()) {
+        if (fnSubstType->getParams().size() != args->size()) {
           result.merge(Classification::forInvalidCode());
           return;
         }
 
-        for (unsigned i = 0, e = params.size(); i < e; ++i) {
+        for (unsigned i = 0, e = args->size(); i < e; ++i) {
+          Type origParamType = fnRef.getOrigParamInterfaceType(i);
           auto argClassification = classifyArgument(
-              args->getExpr(i), params[i].getParameterType(), kind);
+              args->getExpr(i), origParamType, fnRef.getSubstitutions(), kind);
 
           // Rethrows is untyped, so adjust the thrown error type.
           if (kind == EffectKind::Throws &&
@@ -1291,7 +1316,7 @@ private:
                        EffectKind kind) {
     switch (fn.getKind()) {
     case AbstractFunction::Opaque: {
-      return classifyArgumentByType(fn.getType(),
+      return classifyArgumentByType(fn.getType(), fn.getSubstitutions(),
                                     ConditionalEffectKind::Always, reason,
                                     kind);
     }
@@ -1330,8 +1355,8 @@ private:
     else // otherwise, it throws unconditionally.
       conditional = ConditionalEffectKind::Always;
 
-    return classifyArgumentByType(param->getTypeInContext(),
-                                  conditional, reason, kind);
+    return classifyArgumentByType(
+        param->getInterfaceType(), subs, conditional, reason, kind);
   }
 
   bool isLocallyDefinedInPolymorphicEffectDeclContext(DeclContext *DC,
@@ -1660,7 +1685,8 @@ private:
   }
 
   /// Classify an argument being passed to a rethrows/reasync function.
-  Classification classifyArgument(Expr *arg, Type paramType, EffectKind kind) {
+  Classification classifyArgument(
+      Expr *arg, Type paramType, SubstitutionMap subs, EffectKind kind) {
     arg = arg->getValueProvidingExpr();
 
     if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
@@ -1673,7 +1699,7 @@ private:
         }
       }
 
-      return classifyArgumentByType(arg->getType(),
+      return classifyArgumentByType(arg->getType(), subs,
                                     ConditionalEffectKind::Always,
                                     PotentialEffectReason::forDefaultClosure(),
                                     kind);
@@ -1698,7 +1724,7 @@ private:
     // various tuple operations.
     if (auto paramTupleType = dyn_cast<TupleType>(paramType.getPointer())) {
       if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        return classifyTupleArgument(tuple, paramTupleType, kind);
+        return classifyTupleArgument(tuple, paramTupleType, subs, kind);
       }
 
       if (paramTupleType->getNumElements() != 1) {
@@ -1707,6 +1733,7 @@ private:
         // parameter type included a throwing function type.
         return classifyArgumentByType(
                                     paramType,
+                                    subs,
                                     ConditionalEffectKind::Always,
                                     PotentialEffectReason::forClosure(arg),
                                     kind);
@@ -1751,6 +1778,7 @@ private:
   /// Classify an argument to a rethrows/reasync function that's a tuple literal.
   Classification classifyTupleArgument(TupleExpr *tuple,
                                        TupleType *paramTupleType,
+                                       SubstitutionMap subs,
                                        EffectKind kind) {
     if (paramTupleType->getNumElements() != tuple->getNumElements())
       return Classification::forInvalidCode();
@@ -1759,7 +1787,7 @@ private:
     for (unsigned i : indices(tuple->getElements())) {
       result.merge(classifyArgument(tuple->getElement(i),
                                     paramTupleType->getElementType(i),
-                                    kind));
+                                    subs, kind));
     }
     return result;
   }
@@ -1768,7 +1796,8 @@ private:
   /// a throws/async function in a way that is permitted to cause a
   /// rethrows/reasync function to throw/async.
   static Classification 
-  classifyArgumentByType(Type paramType, ConditionalEffectKind conditional,
+  classifyArgumentByType(Type paramType, SubstitutionMap subs,
+                         ConditionalEffectKind conditional,
                          PotentialEffectReason reason, EffectKind kind) {
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
@@ -1786,8 +1815,10 @@ private:
         return Classification();
 
       case EffectKind::Throws:
-        if (auto thrownError = fnType->getEffectiveThrownErrorType())
-          return Classification::forThrows(*thrownError, conditional, reason);
+        if (auto thrownError = fnType->getEffectiveThrownErrorType()) {
+          return Classification::forThrows(
+              thrownError->subst(subs), conditional, reason);
+        }
 
         return Classification();
       }
@@ -1799,7 +1830,7 @@ private:
 
       for (auto eltType : tuple->getElementTypes()) {
         result.merge(
-            classifyArgumentByType(eltType, conditional, reason, kind));
+            classifyArgumentByType(eltType, subs, conditional, reason, kind));
       }
 
       return result;

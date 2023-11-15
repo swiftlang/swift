@@ -681,3 +681,10 @@ func testRethrowsWithParameterPacks() throws {
   // expected-error@-1{{call can throw but is not marked with 'try'}}
   // expected-note@-2{{call is to 'rethrows' function, but argument function can throw}}
 }
+
+// Rethrows checking with the original parameter type providing the cues.
+func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows { }
+
+func testArbitraryAndRethrows() {
+  takesArbitraryAndRethrows(throwingFunc) { }
+}
