@@ -7456,6 +7456,9 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
     return std::make_pair(true, capability);
   };
 
+  if (keyPath->hasSingleInvalidComponent())
+    return fail();
+
   auto capability = KeyPathCapability::Writable;
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];

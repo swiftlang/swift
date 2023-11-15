@@ -376,6 +376,10 @@ ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
 
+ERROR(cannot_convert_unresolved_key_path_argument_value,none,
+      "cannot convert value of key path type to expected argument type %0",
+      (Type))
+
 ERROR(cannot_convert_argument_value_for_swift_func,none,
       "cannot convert value of type %0 to expected argument type %1 "
       "because %kind2 was not imported from C header",

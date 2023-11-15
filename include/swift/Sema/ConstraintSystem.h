@@ -491,6 +491,10 @@ public:
   /// a type of a key path expression.
   bool isKeyPathType() const;
 
+  /// Determine whether this type variable represents a root type of a key path
+  /// expression.
+  bool isKeyPathRoot() const;
+
   /// Determine whether this type variable represents a value type of a key path
   /// expression.
   bool isKeyPathValue() const;
@@ -4006,20 +4010,6 @@ public:
   /// \returns `true` if it was possible to generate constraints for
   /// the body and assign fixed type to the closure, `false` otherwise.
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
-                      ConstraintLocatorBuilder locator);
-
-  /// Given the fact a contextual type is now available for the type
-  /// variable representing one of the key path expressions, let's set a
-  /// pre-determined key path expression type.
-  ///
-  /// \param typeVar The type variable representing a key path expression.
-  /// \param contextualType The contextual type this key path would be
-  /// converted to.
-  /// \param locator The locator associated with contextual type.
-  ///
-  /// \returns `true` if it was possible to generate constraints for
-  /// the keyPath expression, `false` otherwise.
-  bool resolveKeyPath(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
   /// Given the fact that contextual type is now available for the type

@@ -96,7 +96,7 @@ bool BindingSet::isDelayed() const {
 
   // Delay key path literal type binding until there is at least
   // one contextual binding (or default is promoted into a binding).
-  if (TypeVar->getImpl().isKeyPathType() && Bindings.empty())
+  if (TypeVar->getImpl().isKeyPathType() && !Defaults.empty())
     return true;
 
   if (isHole()) {
@@ -178,7 +178,7 @@ bool BindingSet::isPotentiallyIncomplete() const {
   // contextual type or key path is resolved enough to infer
   // capability and promote default into a binding.
   if (TypeVar->getImpl().isKeyPathType())
-    return Bindings.empty();
+    return !Defaults.empty();
 
   // If current type variable is associated with a code completion token
   // it's possible that it doesn't have enough contextual information
@@ -430,6 +430,41 @@ void BindingSet::inferTransitiveBindings(
         &inferredBindings) {
   using BindingKind = AllowedBindingKind;
 
+  // If the current type variable represents a key path root type
+  // let's try to transitively infer its type through bindings of
+  // a key path type.
+  if (TypeVar->getImpl().isKeyPathRoot()) {
+    auto *locator = TypeVar->getImpl().getLocator();
+    if (auto *keyPathTy =
+            CS.getType(locator->getAnchor())->getAs<TypeVariableType>()) {
+      auto keyPathBindings = inferredBindings.find(keyPathTy);
+      if (keyPathBindings != inferredBindings.end()) {
+        auto &bindings = keyPathBindings->getSecond();
+
+        for (auto &binding : bindings.Bindings) {
+          auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+
+          Type inferredRootTy;
+          if (isKnownKeyPathType(bindingTy)) {
+            // AnyKeyPath doesn't have a root type.
+            if (bindingTy->isAnyKeyPath())
+              continue;
+
+            auto *BGT = bindingTy->castTo<BoundGenericType>();
+            inferredRootTy = BGT->getGenericArgs()[0];
+          } else if (auto *fnType = bindingTy->getAs<FunctionType>()) {
+            if (fnType->getNumParams() == 1)
+              inferredRootTy = fnType->getParams()[0].getParameterType();
+          }
+
+          if (inferredRootTy && !inferredRootTy->isTypeVariableOrMember())
+            addBinding(
+                binding.withSameSource(inferredRootTy, BindingKind::Exact));
+        }
+      }
+    }
+  }
+
   for (const auto &entry : Info.SupertypeOf) {
     auto relatedBindings = inferredBindings.find(entry.first);
     if (relatedBindings == inferredBindings.end())
@@ -496,6 +531,24 @@ void BindingSet::inferTransitiveBindings(
   }
 }
 
+static BoundGenericType *getKeyPathType(ASTContext &ctx,
+                                        KeyPathCapability capability,
+                                        Type rootType, Type valueType) {
+  switch (capability) {
+  case KeyPathCapability::ReadOnly:
+    return BoundGenericType::get(ctx.getKeyPathDecl(), /*parent=*/Type(),
+                                 {rootType, valueType});
+
+  case KeyPathCapability::Writable:
+    return BoundGenericType::get(ctx.getWritableKeyPathDecl(),
+                                 /*parent=*/Type(), {rootType, valueType});
+
+  case KeyPathCapability::ReferenceWritable:
+    return BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
+                                 /*parent=*/Type(), {rootType, valueType});
+  }
+}
+
 void BindingSet::finalize(
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings) {
   inferTransitiveBindings(inferredBindings);
@@ -536,6 +589,84 @@ void BindingSet::finalize(
           }
         }
       }
+    }
+
+    if (TypeVar->getImpl().isKeyPathType()) {
+      auto &ctx = CS.getASTContext();
+
+      auto *keyPathLoc = TypeVar->getImpl().getLocator();
+      auto *keyPath = castToExpr<KeyPathExpr>(keyPathLoc->getAnchor());
+
+      bool isValid;
+      llvm::Optional<KeyPathCapability> capability;
+
+      std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
+
+      // Key path literal is not yet sufficiently resolved.
+      if (isValid && !capability)
+        return;
+
+      // If the key path is sufficiently resolved we can add inferred binding
+      // to the set.
+      SmallSetVector<PotentialBinding, 4> updatedBindings;
+      for (const auto &binding : Bindings) {
+        auto bindingTy = binding.BindingType->lookThroughAllOptionalTypes();
+
+        assert(isKnownKeyPathType(bindingTy) || bindingTy->is<FunctionType>());
+
+        // Functions don't have capability so we can simply add them.
+        if (bindingTy->is<FunctionType>())
+          updatedBindings.insert(binding);
+      }
+
+      // Note that even though key path literal maybe be invalid it's
+      // still the best course of action to use contextual function type
+      // bindings because they allow to propagate type information from
+      // the key path into the context, so key path bindings are addded
+      // only if there is absolutely no other choice.
+      if (updatedBindings.empty()) {
+        auto rootTy = CS.getKeyPathRootType(keyPath);
+
+        // A valid key path literal.
+        if (capability) {
+          // Note that the binding is formed using root & value
+          // type variables produced during constraint generation
+          // because at this point root is already known (otherwise
+          // inference wouldn't been able to determine key path's
+          // capability) and we always want to infer value from
+          // the key path and match it to a contextual type to produce
+          // better diagnostics.
+          auto keyPathTy = getKeyPathType(ctx, *capability, rootTy,
+                                          CS.getKeyPathValueType(keyPath));
+          updatedBindings.insert(
+              {keyPathTy, AllowedBindingKind::Exact, keyPathLoc});
+        } else if (CS.shouldAttemptFixes()) {
+          // If key path is structurally correct and has a resolved root
+          // type, let's promote the fallback type into a binding because
+          // root would have been inferred from explicit type already and
+          // it's benefitial for diagnostics to assign a non-placeholder
+          // type to key path literal to propagate root/value to the context.
+          if (!keyPath->hasSingleInvalidComponent() &&
+              (keyPath->getParsedRoot() ||
+               !CS.getFixedType(rootTy)->isTypeVariableOrMember())) {
+            auto fallback = llvm::find_if(Defaults, [](const auto &entry) {
+              return entry.second->getKind() == ConstraintKind::FallbackType;
+            });
+            assert(fallback != Defaults.end());
+            updatedBindings.insert(
+                {fallback->first, AllowedBindingKind::Exact, fallback->second});
+          } else {
+            updatedBindings.insert(PotentialBinding::forHole(
+                TypeVar, CS.getConstraintLocator(
+                             keyPath, ConstraintLocator::FallbackType)));
+          }
+        }
+      }
+
+      Bindings = std::move(updatedBindings);
+      Defaults.clear();
+
+      return;
     }
 
     if (CS.shouldAttemptFixes() &&
@@ -795,6 +926,12 @@ llvm::Optional<BindingSet> ConstraintSystem::determineBestBindings(
   auto isViableForRanking = [this](const BindingSet &bindings) -> bool {
     auto *typeVar = bindings.getTypeVariable();
 
+    // Key path root type variable is always viable because it can be
+    // transitively inferred from key path type during binding set
+    // finalization.
+    if (typeVar->getImpl().isKeyPathRoot())
+      return true;
+
     // Type variable representing a base of unresolved member chain should
     // always be considered viable for ranking since it's allow to infer
     // types from transitive protocol requirements.
@@ -886,60 +1023,6 @@ void PotentialBindings::addDefault(Constraint *constraint) {
 
 void BindingSet::addDefault(Constraint *constraint) {
   auto defaultTy = constraint->getSecondType();
-
-  if (TypeVar->getImpl().isKeyPathType() && Bindings.empty()) {
-    if (constraint->getKind() == ConstraintKind::FallbackType) {
-      auto &ctx = CS.getASTContext();
-
-      bool isValid;
-      llvm::Optional<KeyPathCapability> capability;
-
-      std::tie(isValid, capability) = CS.inferKeyPathLiteralCapability(TypeVar);
-
-      if (!isValid) {
-        // If one of the references in a key path is invalid let's add
-        // a placeholder binding in diagnostic mode to indicate that
-        // the key path cannot be properly resolved.
-        if (CS.shouldAttemptFixes()) {
-          addBinding({PlaceholderType::get(ctx, TypeVar),
-                      AllowedBindingKind::Exact, constraint});
-        }
-
-        // During normal solving the set has to stay empty.
-        return;
-      }
-
-      if (capability) {
-        auto *keyPathType = defaultTy->castTo<BoundGenericType>();
-
-        auto root = keyPathType->getGenericArgs()[0];
-        auto value = keyPathType->getGenericArgs()[1];
-
-        switch (*capability) {
-        case KeyPathCapability::ReadOnly:
-          break;
-
-        case KeyPathCapability::Writable:
-          keyPathType = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                              /*parent=*/Type(), {root, value});
-          break;
-
-        case KeyPathCapability::ReferenceWritable:
-          keyPathType =
-              BoundGenericType::get(ctx.getReferenceWritableKeyPathDecl(),
-                                    /*parent=*/Type(), {root, value});
-          break;
-        }
-
-        addBinding({keyPathType, AllowedBindingKind::Exact, constraint});
-      }
-
-      // If key path is not yet sufficiently resolved, don't add any
-      // bindings.
-      return;
-    }
-  }
-
   Defaults.insert({defaultTy->getCanonicalType(), constraint});
 }
 

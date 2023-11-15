@@ -3853,7 +3853,10 @@ namespace {
         // constraint system so we can find it later.
         CS.setType(E, i, base);
       }
-      
+
+      auto valueLocator =
+        CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
+
       // If there was an optional chaining component, the end result must be
       // optional.
       if (didOptionalChain) {
@@ -3862,8 +3865,7 @@ namespace {
         componentTypeVars.push_back(objTy);
 
         auto optTy = OptionalType::get(objTy);
-        CS.addConstraint(ConstraintKind::Conversion, base, optTy,
-                         locator);
+        CS.addConstraint(ConstraintKind::Conversion, base, optTy, valueLocator);
         base = optTy;
       }
 
@@ -3873,8 +3875,7 @@ namespace {
         (void)CS.recordFix(AllowKeyPathWithoutComponents::create(CS, locator));
       }
 
-      auto valueLocator =
-          CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
+
       auto *value = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape |
                                                             TVO_CanBindToHole);
       CS.addConstraint(ConstraintKind::Equal, base, value, valueLocator);
