@@ -37,6 +37,8 @@ func testPublicStructs() {
   let _: Int = s.publicMethod()
   let _: Int = s.publicProperty
   let _: String = s.publicPropertyInferredType
+  let _: Int = s.publicLazyProperty
+  let _: Int = s.publicLazyPropertyInferred
   let _: Double = s.publicWrappedProperty
   let _: Double = s.$publicWrappedProperty.wrappedValue
   let _: Int = s.publicTransparentProperty
@@ -59,6 +61,8 @@ func testPublicClasses() {
   let _: Int = c.publicMethod()
   let _: Int = c.publicProperty
   let _: String = c.publicPropertyInferredType
+  let _: Int = c.publicLazyProperty
+  let _: Int = c.publicLazyPropertyInferred
   c.publicFinalWrappedProperty = true
   PublicClass.publicClassMethod()
   let _: Int = PublicClass.publicStaticProperty

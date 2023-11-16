@@ -17,14 +17,14 @@ public struct S {
 
   public lazy var lazyVar: Int = generateNumber()
 
-  // CHECK: sil [lazy_getter]{{.*}} @$s4main1SV7lazyVarSivg : $@convention(method) (@inout S) -> Int
-  // CHECK: end sil function '$s4main1SV7lazyVarSivg'
-
-  // CHECK: sil{{.*}} @$s4main1SV7lazyVarSivs : $@convention(method) (Int, @inout S) -> ()
-  // CHECK: end sil function '$s4main1SV7lazyVarSivs'
-
   // CHECK: sil [transparent] [serialized]{{.*}} @$s4main1SV7lazyVarSivM : $@yield_once @convention(method) (@inout S) -> @yields @inout Int
   // CHECK: end sil function '$s4main1SV7lazyVarSivM'
+
+  // CHECK: sil [lazy_getter]{{.*}} @$s4main1SV7lazyVarSivg : $@convention(method) (@inout S) -> Int
+  // CHECK-NOT: end sil function '$s4main1SV7lazyVarSivg'
+
+  // CHECK: sil{{.*}} @$s4main1SV7lazyVarSivs : $@convention(method) (Int, @inout S) -> ()
+  // CHECK-NOT: end sil function '$s4main1SV7lazyVarSivs'
 
   // CHECK: sil [transparent]{{.*}} @$s4main1SV018$__lazy_storage_$_B3Var33_39316373847D37F82BD23977A13DEF23LLSiSgvpfi : $@convention(thin) () -> Optional<Int>
   // CHECK: end sil function '$s4main1SV018$__lazy_storage_$_B3Var33_39316373847D37F82BD23977A13DEF23LLSiSgvpfi'

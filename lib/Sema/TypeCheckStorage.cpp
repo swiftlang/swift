@@ -1670,12 +1670,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   Expr *InitValue;
   if (PBD->getInit(entryIndex)) {
-    PBD->setInitializerSubsumed(entryIndex);
-
-    if (!PBD->isInitializerChecked(entryIndex))
-      TypeChecker::typeCheckPatternBinding(PBD, entryIndex);
-
-    InitValue = PBD->getInit(entryIndex);
+    assert(PBD->isInitializerSubsumed(entryIndex));
+    InitValue = PBD->getCheckedAndContextualizedInit(entryIndex);
   } else {
     InitValue = new (Ctx) ErrorExpr(SourceRange(), Tmp2VD->getTypeInContext());
   }
@@ -2785,6 +2781,11 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   PBD->setInitializerChecked(0);
 
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
+
+  // Make sure the original init is marked as subsumed.
+  auto *originalPBD = VD->getParentPatternBinding();
+  auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
+  originalPBD->setInitializerSubsumed(originalIndex);
 
   return Storage;
 }
