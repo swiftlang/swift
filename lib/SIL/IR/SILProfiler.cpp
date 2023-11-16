@@ -131,16 +131,6 @@ static bool shouldProfile(SILDeclRef Constant) {
   return true;
 }
 
-static Stmt *getProfilerStmtForCase(CaseStmt *caseStmt) {
-  switch (caseStmt->getParentKind()) {
-  case CaseParentKind::Switch:
-    return caseStmt;
-  case CaseParentKind::DoCatch:
-    return caseStmt->getBody();
-  }
-  llvm_unreachable("invalid parent kind");
-}
-
 SILProfiler *SILProfiler::create(SILModule &M, SILDeclRef Ref) {
   // If profiling isn't enabled, don't profile anything.
   const auto &Opts = M.getOptions();
@@ -347,7 +337,7 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       mapRegion(FES->getBody());
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      mapRegion(getProfilerStmtForCase(CS));
+      mapRegion(CS);
     }
     return Action::Continue(S);
   }
@@ -807,7 +797,7 @@ struct PGOMapping : public ASTWalker {
       setKnownExecutionCount(FES->getBody());
       setExecutionCount(FES, parentCount);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      setKnownExecutionCount(getProfilerStmtForCase(CS));
+      setKnownExecutionCount(CS);
     }
     return Action::Continue(S);
   }
@@ -897,9 +887,6 @@ private:
 
   /// A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
-
-  /// A stack of active do-catch statements.
-  std::vector<DoCatchStmt *> DoCatchStack;
 
   llvm::Optional<CounterExpr> ExitCounter;
 
@@ -1003,13 +990,16 @@ private:
       return;
 
     llvm::Optional<CounterExpr> JumpsToLabel;
-    Stmt *ParentStmt = Parent.getAsStmt();
-    if (ParentStmt) {
-      if (isa<DoCatchStmt>(ParentStmt))
+    if (auto *ParentStmt = Parent.getAsStmt()) {
+      if (auto *DCS = dyn_cast<DoCatchStmt>(ParentStmt)) {
+        // We need to handle the brace of a DoCatchStmt here specially,
+        // applying the same logic we apply to the catch clauses (handled by
+        // the CaseStmt logic), we add on the exit count of the branch to the
+        // statement's exit count.
+        addToCounter(DCS, getExitCounter());
         return;
-      auto caseStmt = dyn_cast_or_null<CaseStmt>(ParentStmt);
-      if (caseStmt && caseStmt->getParentKind() == CaseParentKind::DoCatch)
-        return;
+      }
+
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = getCounter(LS);
     }
@@ -1029,11 +1019,14 @@ private:
   }
 
   /// Push a region covering \c Node onto the stack.
-  void pushRegion(ASTNode Node) {
+  void pushRegion(ASTNode Node, SourceRange Range = SourceRange()) {
+    if (Range.isInvalid())
+      Range = Node.getSourceRange();
+
     // Note we don't store counters for nodes, as we need to be able to fix
     // them up later.
-    RegionStack.emplace_back(Node, /*Counter*/ llvm::None, Node.getStartLoc(),
-                             getEndLoc(Node));
+    RegionStack.emplace_back(Node, /*Counter*/ llvm::None, Range.Start,
+                             Lexer::getLocForEndOfToken(SM, Range.End));
     LLVM_DEBUG({
       llvm::dbgs() << "Pushed region: ";
       RegionStack.back().print(llvm::dbgs(), SM);
@@ -1288,27 +1281,43 @@ public:
       for (CaseStmt *Case : SS->getCases())
         assignKnownCounter(Case);
 
-    } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-      if (caseStmt->getParentKind() == CaseParentKind::Switch)
-        pushRegion(S);
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      // The counter for the do-catch statement itself tracks the number of
+      // jumps to it by break statements, including the implicit breaks at the
+      // end of body + catches.
+      assignCounter(DCS, CounterExpr::Zero());
+
+      // The do-catch body is visited the same number of times as its parent.
+      assignCounter(DCS->getBody(), getCurrentCounter());
+
+      // The catch clauses are CaseStmts that have their own mapped counters.
+      for (CaseStmt *Catch : DCS->getCatches())
+        assignKnownCounter(Catch);
+
     } else if (auto *DS = dyn_cast<DoStmt>(S)) {
       // The counter for the do statement itself tracks the number of jumps
       // to it by break statements.
       assignCounter(DS, CounterExpr::Zero());
 
+      // The do body is visited the same number of times as its parent.
       assignCounter(DS->getBody(), getCurrentCounter());
 
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      // The do-catch body is visited the same number of times as its parent.
-      assignCounter(DCS->getBody(), getCurrentCounter());
-
-      for (CaseStmt *Catch : DCS->getCatches())
-        assignKnownCounter(Catch->getBody());
-
-      // Initialize the exit count of the do-catch to the entry count, then
-      // subtract off non-local exits as they are visited.
-      assignCounter(DCS, getCurrentCounter());
-      DoCatchStack.push_back(DCS);
+    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      SourceRange Range;
+      switch (CS->getParentKind()) {
+      case CaseParentKind::DoCatch:
+        // For a catch clause, we only want the range to cover the brace.
+        Range = CS->getBody()->getSourceRange();
+        break;
+      case CaseParentKind::Switch:
+        // FIXME: We may want to reconsider using the full range here, as it
+        // implies the case pattern is evaluated the same number of times as
+        // the body, which is not true. We don't currently have a way of
+        // tracking the pattern evaluation count though.
+        Range = CS->getSourceRange();
+        break;
+      }
+      pushRegion(CS, Range);
     }
     return Action::Continue(S);
   }
@@ -1354,30 +1363,21 @@ public:
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
 
-      // The break also affects the exit counts of active do-catch statements.
-      for (auto *DCS : DoCatchStack)
-        subtractFromCounter(DCS, getCurrentCounter());
-
       terminateRegion(S);
 
     } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
       addToCounter(FS->getFallthroughDest(), getCurrentCounter());
       terminateRegion(S);
 
-    } else if (isa<SwitchStmt>(S)) {
+    } else if (isa<SwitchStmt>(S) || isa<DoCatchStmt>(S)) {
+      // Replace the parent counter with the exit count of the statement.
       replaceCount(getCounter(S), getEndLoc(S));
 
-    } else if (auto caseStmt = dyn_cast<CaseStmt>(S)) {
-      if (caseStmt->getParentKind() == CaseParentKind::Switch) {
-        // The end of a case block is an implicit break, update the exit
-        // counter to reflect this.
-        addToCounter(caseStmt->getParentStmt(), getCurrentCounter());
-        popRegions(S);
-      }
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
-      DoCatchStack.pop_back();
-      replaceCount(getCounter(S), getEndLoc(S));
+    } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      // The end of a case/catch block is an implicit break, update the exit
+      // counter to reflect this.
+      addToCounter(CS->getParentStmt(), getCurrentCounter());
+      popRegions(S);
 
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
       // When we return, adjust loop condition counts and do-catch exit counts
@@ -1385,8 +1385,6 @@ public:
       if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
         for (auto *RWS : RepeatWhileStack)
           subtractFromCounter(RWS->getCond(), getCurrentCounter());
-        for (auto *DCS : DoCatchStack)
-          subtractFromCounter(DCS, getCurrentCounter());
       }
 
       terminateRegion(S);

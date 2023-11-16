@@ -156,8 +156,8 @@ func test1() -> Int {        // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+7]]:2  : 0
     let x = try throwingFn() // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+1]]:13 : (0 - 1)
     return x
   } catch {                  // CHECK-NEXT: [[@LINE]]:11 -> [[@LINE+2]]:4 : 2
-    return 0                 // FIXME: The below region shouldn't exist
-  }                          // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:2 : (1 - 2)
+    return 0
+  }
 }                            // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test2SiyKF"
@@ -192,9 +192,9 @@ func test6(
     try fn()             // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+1]]:4 : (0 - 1)
   } catch SomeErr.Err1 { // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+2]]:4 : 2
     return
-  }                      // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+3]]:2 : (0 - 2)
+  }                      // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+3]]:2 : (0 - 1)
 
-  try fn()               // CHECK-NEXT: [[@LINE]]:11 -> [[@LINE+1]]:2 : ((0 - 2) - 3)
+  try fn()               // CHECK-NEXT: [[@LINE]]:11 -> [[@LINE+1]]:2 : ((0 - 1) - 3)
 }                        // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test7s5Int32VyF"
@@ -206,27 +206,27 @@ func test7() -> Int32 {  // CHECK-NEXT: [[@LINE]]:23 -> [[@LINE+31]]:2 : 0
     x += 2               // CHECK-NEXT: [[@LINE]]:5  -> [[@LINE+1]]:4 : zero
   } catch SomeErr.Err1 { // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+1]]:4 : 1
   } catch _ {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+1]]:4 : 2
-  }                      // CHECK-NEXT: [[@LINE]]:4  -> {{[0-9:]+}}   : 0
+  }                      // CHECK-NEXT: [[@LINE]]:4  -> {{[0-9:]+}}   : (1 + 2)
 
-  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+2]]:4 : 0
-    try test6(test5)     // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+1]]:4 : (0 - 3)
+  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+2]]:4 : (1 + 2)
+    try test6(test5)     // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+1]]:4 : ((1 + 2) - 3)
   } catch _ {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+1]]:4 : 4
-  }                      // CHECK-NEXT: [[@LINE]]:4  -> {{[0-9:]+}}   : 0
+  }                      // CHECK-NEXT: [[@LINE]]:4  -> {{[0-9:]+}}   : (((1 + 2) + 4) - 3)
 
-  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+5]]:4 : 0
+  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+5]]:4 : (((1 + 2) + 4) - 3)
     try test6 {          // (closures are mapped separately)
       () throws -> () in
       throw SomeErr.Err1
-    }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : (0 - 5)
+    }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : ((((1 + 2) + 4) - 3) - 5)
   } catch _ {}           // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE]]:15  : 6
-                         // CHECK-NEXT: [[@LINE-1]]:15 -> {{[0-9:]+}} : 0
+                         // CHECK-NEXT: [[@LINE-1]]:15 -> {{[0-9:]+}} : (((((1 + 2) + 4) + 6) - 3) - 5)
 
   // TODO: We ought to realize that everything after try! is unreachable
   // This is similar issue to rdar://100896177
   try! test6 {
     () throws -> () in
     return
-  }                      // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+2]]:11 : (0 - 7)
+  }                      // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+2]]:11 : ((((((1 + 2) + 4) + 6) - 3) - 5) - 7
 
   return x
 }                        // CHECK-NEXT: }
@@ -241,24 +241,23 @@ func test8(_ b: Bool) -> Int { // CHECK-NEXT: [[@LINE]]:30 {{.*}} : 0
     if b {                     // CHECK-NEXT: [[@LINE]]:10 {{.*}} : 2
       return 1
     }                          // CHECK-NEXT: [[@LINE]]:6 {{.*}} : (1 - 2)
-  }                            // CHECK: [[@LINE]]:4 {{.*}} : (0 - 2)
+  }                            // CHECK: [[@LINE]]:4 {{.*}} : (1 - 2)
   return 0
 }
 
 // Test coverage with nested do-catches
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors5test9SiyF"
-func test9() -> Int {    // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+12]]:2 : 0
-  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+8]]:4 : 0
-    try test5()          // CHECK-NEXT: [[@LINE]]:16 -> [[@LINE+7]]:4 : (0 - 1)
+func test9() -> Int {    // CHECK-NEXT: [[@LINE]]:21 -> [[@LINE+11]]:2 : 0
+  do {                   // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+7]]:4 : 0
+    try test5()          // CHECK-NEXT: [[@LINE]]:16 -> [[@LINE+6]]:4 : (0 - 1)
     do {                 // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+2]]:6 : (0 - 1)
       throw SomeErr.Err1
-    } catch {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+3]]:6 : 2
+    } catch {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+2]]:6 : 2
       return 0
-                         // FIXME: There shouldn't be region here, it's unreachable (rdar://100470244)
-    }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : ((0 - 1) - 2)
+    }
   } catch {              // CHECK-NEXT: [[@LINE]]:11 -> [[@LINE+2]]:4 : 3
     return 1
-  }                      // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:2 : ((0 - 2) - 3)
+  }
 }                        // CHECK-NEXT: }
 
 // Test coverage with a do-catch inside of a repeat-while
@@ -269,7 +268,7 @@ func test10() -> Int {
       throw SomeErr.Err1
     } catch {            // CHECK: [[@LINE]]:13 {{.*}} : 2
       return 0
-    }                    // CHECK: [[@LINE]]:6 {{.*}} : (1 - 2)
+    }                    // CHECK-NOT: [[@LINE]]:6 ->
 
   } while false          // CHECK: [[@LINE]]:11 {{.*}} : (1 - 2)
   return 1
@@ -282,10 +281,10 @@ func test11() -> Int { // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+11]]:2 : 0
     do {               // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+2]]:6 : 1
       try test5()      // CHECK-NEXT: [[@LINE]]:18 -> [[@LINE+1]]:6 : (1 - 2)
     } catch {          // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+2]]:6 : 3
-      break            // FIXME: This counter should account for the counter 2 (rdar://100470244)
-    }                  // CHECK-NEXT: [[@LINE]]:6   -> [[@LINE+3]]:4  : (1 - 3)
+      break
+    }                  // CHECK-NEXT: [[@LINE]]:6   -> [[@LINE+3]]:4  : (1 - 2)
                        // FIXME: This exit counter is wrong (rdar://118472537)
-                       // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+2]]:11 : (0 - 3)
+                       // CHECK-NEXT: [[@LINE+1]]:4 -> [[@LINE+2]]:11 : (0 - 2)
   } while false        // CHECK-NEXT: [[@LINE]]:11  -> [[@LINE]]:16   : (1 - 3)
   return 1
 }                      // CHECK-NEXT: }
@@ -297,8 +296,8 @@ func test12() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+7]]:2  : 0
     try test5()               // CHECK-NEXT: [[@LINE]]:16 -> [[@LINE+1]]:13 : (0 - 1)
     return 1
   } catch is SomeErr {        // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+2]]:4 : 2
-    throw SomeErr.Err1        // FIXME: The below region shouldn't exist
-  }                           // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:2 : 1
+    throw SomeErr.Err1
+  }
 }                             // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test13SiyF"
@@ -306,8 +305,8 @@ func test13() -> Int {      // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+6]]:2 : 0
   do {                      // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+2]]:4 : 0
     return try throwingFn() // Note we don't emit a region here because it would be empty.
   } catch {                 // CHECK-NEXT: [[@LINE]]:11 -> [[@LINE+2]]:4 : 2
-    return 0                // FIXME: The below region shouldn't exist
-  }                         // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:2 : (1 - 2)
+    return 0
+  }
 }                           // CHECK-NEXT: }
 
 func takesInts(_ x: Int, _ y: Int) {}
@@ -317,6 +316,29 @@ func takesInts(_ x: Int, _ y: Int) {}
 func test14() throws {           // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+2]]:2 : 0
   takesInts(try throwingFn(), 0) // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+1]]:2 : (0 - 1)
 }                                // CHECK-NEXT: }
+
+// The return can be reached via the catch if SomeErr.Err1 was thrown, OR the
+// 'do' block if an error wasn't thrown.
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test15SiyKF"
+func test15() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+6]]:2  : 0
+  do {                        // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+2]]:4  : 0
+    try test5()               // CHECK-NEXT: [[@LINE]]:16 -> [[@LINE+1]]:4  : (0 - 1)
+  } catch SomeErr.Err1 {      // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+1]]:4  : 2
+  }                           // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:11 : ((0 + 2) - 1)
+  return 2
+}                             // CHECK-NEXT: }
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test16SiyKF"
+func test16() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+9]]:2  : 0
+  do {                        // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+5]]:4  : 0
+    do {                      // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+2]]:6  : 0
+      try test5()             // CHECK-NEXT: [[@LINE]]:18 -> [[@LINE+1]]:6  : (0 - 1)
+    } catch SomeErr.Err1 {    // CHECK-NEXT: [[@LINE]]:26 -> [[@LINE+1]]:6  : 2
+    }                         // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4  : ((0 + 2) - 1)
+  } catch SomeErr.Err2 {      // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+1]]:4  : 3
+  }                           // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:11 : (((0 + 2) + 3) - 1)
+  return 2
+}                             // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test17ySiAA1SVKF"
 func test17(
@@ -354,12 +376,36 @@ func test21() throws -> Int {  // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+3]]:2 : 0
   return 1
 }                              // CHECK-NEXT: }
 
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test22SiyKF"
+func test22() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+7]]:2 : 0
+  x: do {                     // CHECK-NEXT: [[@LINE]]:9  -> [[@LINE+2]]:4 : 0
+    try test5()               // CHECK-NEXT: [[@LINE]]:16 -> [[@LINE+1]]:4 : (0 - 1)
+  } catch SomeErr.Err1 {      // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+2]]:4 : 2
+    break x
+  }                           // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:11 : ((0 + 2) - 1)
+  return 1                    // CHECK-NEXT: }
+}
+
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s15coverage_errors6test23SiyKF"
+func test23() throws -> Int { // CHECK-NEXT: [[@LINE]]:29 -> [[@LINE+11]]:2 : 0
+  x: do {                     // CHECK-NEXT: [[@LINE]]:9  -> [[@LINE+7]]:4  : 0
+    do {                      // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+3]]:6  : 0
+      try test5()             // CHECK-NEXT: [[@LINE]]:18 -> [[@LINE+1]]:14 : (0 - 1)
+      break x
+    } catch SomeErr.Err1 {    // CHECK-NEXT: [[@LINE]]:26 -> [[@LINE+1]]:6  : 2
+    }                         // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:13 : 2
+    return 1
+  } catch SomeErr.Err2 {      // CHECK-NEXT: [[@LINE]]:24 -> [[@LINE+1]]:4  : 3
+  }                           // CHECK-NEXT: [[@LINE]]:4  -> [[@LINE+1]]:11 : ((0 + 3) - 1)
+  return 2
+}                             // CHECK-NEXT: }
+
 struct TestInit {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_errors.TestInit.init() -> coverage_errors.TestInit
   init() {               // CHECK-NEXT: [[@LINE]]:10 -> [[@LINE+5]]:4 : 0
     do {                 // CHECK-NEXT: [[@LINE]]:8  -> [[@LINE+2]]:6 : 0
       throw SomeErr.Err1
     } catch {            // CHECK-NEXT: [[@LINE]]:13 -> [[@LINE+1]]:6 : 1
-    }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : 0
+    }                    // CHECK-NEXT: [[@LINE]]:6  -> [[@LINE+1]]:4 : 1
   }                      // CHECK-NEXT: }
 }

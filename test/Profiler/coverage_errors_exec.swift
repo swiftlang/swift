@@ -23,6 +23,8 @@ struct S {
 }
 
 func noThrowingFn() throws -> Int { 0 }
+
+@discardableResult
 func throwingFn() throws -> Int { throw Err() }
 
 var throwingProp: Int {
@@ -44,7 +46,7 @@ func test1() -> Int {        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   } catch {                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
     return 0                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   }                          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = test1()                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 
 func test2() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
@@ -72,7 +74,7 @@ func test5() -> Int {        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   } catch {                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
     return 0                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   }                          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
-}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = test5()                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 
 func takesInts(_ x: Int, _ y: Int) {} // CHECK: {{ *}}[[@LINE]]|{{ *}}0
@@ -126,3 +128,53 @@ func test21() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
   return 1                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
 }                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
 _ = try? test21()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+// rdar://100470244 - Make sure we don't underflow the counter here.
+func test12() -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  do {                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1           // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } catch {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 2           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = test12()           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test13() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  x: do {                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    try throwingFn()          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  } catch is Err {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    break x                   // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return 1                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test13()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test14() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  x: do {                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    do {                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try throwingFn()        // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      break x                 // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    } catch is Err {          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    }                         // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    return 1                  // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  } catch is Err {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  }                           // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  return 2                    // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test14()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+
+func test15() throws -> Int { // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  x: do {                     // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    do {                      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      try noThrowingFn()      // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+      break x                 // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    } catch is Err {          // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+    }                         // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+    return 1                  // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  } catch is Err {            // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+                              // CHECK: {{ *}}[[@LINE]]|{{ *}}0
+  }                           // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+  return 2                    // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+}                             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
+_ = try? test15()             // CHECK: {{ *}}[[@LINE]]|{{ *}}1
