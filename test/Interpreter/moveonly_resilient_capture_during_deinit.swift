@@ -4,6 +4,8 @@
 // RUN: %target-build-swift -o %t/a.out -I %t %s %t/moveonly_resilient_type.o
 // RUN: %target-run %t/a.out | %FileCheck %s
 
+// REQUIRES: executable_test
+
 import moveonly_resilient_type
 
 // CHECK: start
