@@ -629,8 +629,7 @@ ASTContext *ASTContext::get(
     ClangImporterOptions &ClangImporterOpts,
     symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend
-    ) {
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend) {
   // If more than two data structures are concatentated, then the aggregate
   // size math needs to become more complicated due to per-struct alignment
   // constraints.
@@ -714,7 +713,8 @@ ASTContext::~ASTContext() {
   getImpl().~Implementation();
 }
 
-void ASTContext::SetPreModuleImportCallback(std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
+void ASTContext::SetPreModuleImportCallback(
+    std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback) {
   PreModuleImportCallback = callback;
 }
 

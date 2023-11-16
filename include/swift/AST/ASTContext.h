@@ -294,8 +294,10 @@ public:
   /// OutputBackend for writing outputs.
   llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> OutputBackend;
 
-  /// Set the callback function that is invoked before Swift module importing is performed
-  void SetPreModuleImportCallback(std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback);
+  /// Set the callback function that is invoked before Swift module importing is
+  /// performed
+  void SetPreModuleImportCallback(
+      std::function<void(llvm::StringRef ModuleName, bool IsOverlay)> callback);
 
   /// If the shared pointer is not a \c nullptr and the pointee is \c true,
   /// all operations working on this ASTContext should be aborted at the next
