@@ -173,7 +173,15 @@ SILLocation ProfileCounterRef::getLocation() const {
 
 void ProfileCounterRef::dumpSimple(raw_ostream &OS) const {
   switch (RefKind) {
-  case Kind::Node: {
+  case Kind::Node:
+    break;
+  case Kind::ErrorBranch:
+    OS << "error branch of: ";
+    break;
+  }
+  switch (RefKind) {
+  case Kind::Node:
+  case Kind::ErrorBranch: {
     OS << Node.getOpaqueValue() << " ";
     if (auto *D = Node.dyn_cast<Decl *>()) {
       OS << Decl::getKindName(D->getKind());
@@ -190,6 +198,11 @@ void ProfileCounterRef::dump(raw_ostream &OS) const {
   switch (RefKind) {
   case Kind::Node:
     Node.dump(OS);
+    break;
+  case Kind::ErrorBranch:
+    OS << "error branch of:\n";
+    Node.dump(OS.indent(2));
+    break;
   }
 }
 

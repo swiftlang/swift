@@ -36,9 +36,10 @@ class ProfileCounterRef final {
 public:
   enum class Kind : uint8_t {
     /// References an ASTNode.
-    // TODO: This is the currently the only kind, but it will be expanded in
-    // the future for e.g top-level entry and error branches.
-    Node
+    Node,
+
+    /// References the error branch for an apply or access.
+    ErrorBranch
   };
 
 private:
@@ -54,6 +55,12 @@ public:
   static ProfileCounterRef node(ASTNode node) {
     assert(node && "Must have non-null ASTNode");
     return ProfileCounterRef(node, Kind::Node);
+  }
+
+  /// A profile counter that is associated with the error branch of a particular
+  /// error-throwing AST node.
+  static ProfileCounterRef errorBranchOf(ASTNode node) {
+    return ProfileCounterRef(node, Kind::ErrorBranch);
   }
 
   /// Retrieve the corresponding location of the counter.
