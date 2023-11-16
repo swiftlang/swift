@@ -5110,11 +5110,14 @@ bool swift::checkSendableConformance(
       // we allow `NSObject` for Objective-C interoperability.
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
-          classDecl->diagnose(
-              diag::concurrent_value_inherit,
-              nominal->getASTContext().LangOpts.EnableObjCInterop,
-              classDecl->getName());
-          return true;
+          classDecl
+              ->diagnose(diag::concurrent_value_inherit,
+                         nominal->getASTContext().LangOpts.EnableObjCInterop,
+                         classDecl->getName())
+              .limitBehavior(behavior);
+
+          if (behavior == DiagnosticBehavior::Unspecified)
+            return true;
         }
       }
     }
