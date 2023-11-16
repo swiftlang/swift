@@ -2182,6 +2182,15 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             }
           }
 
+          if (auto lvalue = dyn_cast<LValueType>(t)) {
+            auto objTy = lvalue->getObjectType();
+            auto erased = transformFn(objTy, currPos);
+            if (erased.getPointer() == objTy.getPointer())
+              return Type(lvalue);
+
+            return erased;
+          }
+
           if (!t->isTypeParameter()) {
             // Recurse.
             return llvm::None;
