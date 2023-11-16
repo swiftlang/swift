@@ -45,6 +45,9 @@ internal struct BacktraceOptions: ParsableArguments {
 internal struct GenericMetadataOptions: ParsableArguments {
   @Flag(help: "Show allocations in mangled form")
   var mangled: Bool = false
+
+  @Option(help: "Path to output JSON file")
+  var outputJson: String? = nil
 }
 
 internal func inspect(options: UniversalOptions,
