@@ -254,18 +254,15 @@ final class NonSendable {
     // expected-tns-warning@-2 {{call site passes `self` or a non-sendable argument of this function to another thread, potentially yielding a race with the caller}}
     // expected-tns-warning@-3 {{passing argument of non-sendable type 'NonSendable' from nonisolated context to main actor-isolated context at this call site could yield a race with accesses later in this function}}
 
-
     await self.update()
     // expected-targeted-and-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into main actor-isolated context may introduce data races}}
-    // expected-tns-note@-2 {{access here could race}}
+    // expected-tns-note @-2 {{access here could race}}
 
     _ = await x
     // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-    // expected-tns-note@-2 {{access here could race}}
 
     _ = await self.x
-    // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
-    // expected-tns-note@-2 {{access here could race}}
+      // expected-warning@-1 {{non-sendable type 'NonSendable' passed in implicitly asynchronous call to main actor-isolated property 'x' cannot cross actor boundary}}
   }
 
   @MainActor

@@ -109,10 +109,15 @@ func closureInOut(_ a: Actor) async {
   await a.useKlass(ns0)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
   // expected-tns-warning @-2 {{passing argument of non-sendable type 'NonSendableKlass' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
-  await a.useKlass(ns1) // expected-tns-note {{access here could race}}
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
-  closure() // expected-tns-note {{access here could race}}
+  // We only emit a warning on the first use we see, so make sure we do both
+  // klass and the closure.
+  if await booleanFlag {
+    await a.useKlass(ns1) // expected-tns-note {{access here could race}}
+    // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
+  } else {
+    closure() // expected-tns-note {{access here could race}}
+  }
 }
 
 func closureInOut2(_ a: Actor) async {
@@ -130,7 +135,7 @@ func closureInOut2(_ a: Actor) async {
 
   closure = { useInOut(&contents) } // expected-tns-note {{access here could race}}
 
-  await a.useKlass(ns1) // expected-tns-note {{access here could race}}
+  await a.useKlass(ns1)
   // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendableKlass'}}
 
   closure()
@@ -547,7 +552,7 @@ func multipleFieldVarMergeTest1() async {
 
   // So even if we reassign over k1, since we did a merge, this should error.
   box.k1 = NonSendableKlass() // expected-tns-note {{access here could race}}
-  useValue(box) // expected-tns-note {{access here could race}}
+  useValue(box)
 }
 
 func multipleFieldVarMergeTest2() async {
@@ -586,7 +591,7 @@ func multipleFieldTupleMergeTest1() async {
 
   // So even if we reassign over k1, since we did a merge, this should error.
   box.0 = NonSendableKlass() // expected-tns-note {{access here could race}}
-  useValue(box) // expected-tns-note {{access here could race}}
+  useValue(box)
 }
 
 // TODO: Tuples today do not work since I need to change how we assign into

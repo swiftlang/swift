@@ -48,6 +48,8 @@ func foo_noniso_multi(_ : Any, _ : Any, _ : Any) {}
 
 func foo_noniso_vararg(_ : Any ...) {}
 
+var bool : Bool { false }
+
 func test_isolation_crossing_sensitivity(a : A) async {
     let ns0 = NonSendable();
     let ns1 = NonSendable();
@@ -113,9 +115,10 @@ func test_closure_capture(a : A) async {
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-    print(ns0) // expected-tns-note {{access here could race}}
+    // This only touches ns1/ns2 so we get an error on ns1 since it is first.
+    print(ns0)
     print(ns1) // expected-tns-note {{access here could race}}
-    print(ns2) // expected-tns-note {{access here could race}}
+    print(ns2)
     print(ns3)
 
     // this should consume ns3
@@ -123,9 +126,10 @@ func test_closure_capture(a : A) async {
     // expected-complete-warning @-1 {{passing argument of non-sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-    print(ns0) // expected-tns-note {{access here could race}}
-    print(ns1) // expected-tns-note {{access here could race}}
-    print(ns2) // expected-tns-note {{access here could race}}
+    // This only uses ns3 so we should only emit an error on ns3.
+    print(ns0)
+    print(ns1)
+    print(ns2)
     print(ns3) // expected-tns-note {{access here could race}}
 }
 
@@ -152,42 +156,60 @@ func test_regions(a : A, b : Bool) async {
         await a.foo(ns0_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns0_0) // expected-tns-note {{access here could race}}
-        print(ns0_1) // expected-tns-note {{access here could race}}
+        if (b) {
+          print(ns0_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns0_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns0_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns0_0) // expected-tns-note {{access here could race}}
-        print(ns0_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns0_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns0_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns1_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns1_0) // expected-tns-note {{access here could race}}
-        print(ns1_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns1_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns1_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns1_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
       // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns1_0) // expected-tns-note {{access here could race}}
-        print(ns1_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns1_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns1_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns2_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns2_0) // expected-tns-note {{access here could race}}
-        print(ns2_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns2_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns2_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns2_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns2_0) // expected-tns-note {{access here could race}}
-        print(ns2_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns2_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns2_1) // expected-tns-note {{access here could race}}
+        }
     }
 }
 
@@ -233,84 +255,120 @@ func test_indirect_regions(a : A, b : Bool) async {
         await a.foo(ns0_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns0_0) // expected-tns-note {{access here could race}}
-        print(ns0_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns0_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns0_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns0_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns0_0) // expected-tns-note {{access here could race}}
-        print(ns0_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns0_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns0_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns1_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns1_0) // expected-tns-note {{access here could race}}
-        print(ns1_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns1_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns1_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns1_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns1_0) // expected-tns-note {{access here could race}}
-        print(ns1_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns1_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns1_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns2_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns2_0) // expected-tns-note {{access here could race}}
-        print(ns2_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns2_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns2_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns2_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns2_0) // expected-tns-note {{access here could race}}
-        print(ns2_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns2_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns2_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns3_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns3_0) // expected-tns-note {{access here could race}}
-        print(ns3_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns3_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns3_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns3_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns3_0) // expected-tns-note {{access here could race}}
-        print(ns3_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns3_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns3_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns4_0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns4_0) // expected-tns-note {{access here could race}}
-        print(ns4_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns4_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns4_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns4_1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        print(ns4_0) // expected-tns-note {{access here could race}}
-        print(ns4_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns4_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns4_1) // expected-tns-note {{access here could race}}
+        }
     }
 
     if (b) {
         await a.foo(ns5_0) // expected-tns-warning {{passing argument of non-sendable type 'Any' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
-        print(ns5_0) // expected-tns-note {{access here could race}}
-        print(ns5_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns5_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns5_1) // expected-tns-note {{access here could race}}
+        }
     } else {
         await a.foo(ns5_1) // expected-tns-warning {{passing argument of non-sendable type 'Any' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'Any' into actor-isolated context may introduce data races}}
 
-        print(ns5_0) // expected-tns-note {{access here could race}}
-        print(ns5_1) // expected-tns-note {{access here could race}}
+        if b {
+          print(ns5_0) // expected-tns-note {{access here could race}}
+        } else {
+          print(ns5_1) // expected-tns-note {{access here could race}}
+        }
     }
 }
 
@@ -510,35 +568,59 @@ func test_tuple_formation(a : A, i : Int) async {
         await a.foo(ns0) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        foo_noniso(ns0); // expected-tns-note {{access here could race}}
-        foo_noniso(ns1); // expected-tns-note {{access here could race}}
-        foo_noniso(ns2); // expected-tns-note {{access here could race}}
-        foo_noniso(ns3); // expected-tns-note {{access here could race}}
-        foo_noniso(ns4);
-        foo_noniso(ns012); // expected-tns-note {{access here could race}}
-        foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        if bool {
+          foo_noniso(ns0); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns1); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns2); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns3); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns4);
+        } else if bool {
+          foo_noniso(ns012); // expected-tns-note {{access here could race}}
+        } else {
+          foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        }
     case 1:
         await a.foo(ns1) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        foo_noniso(ns0); // expected-tns-note {{access here could race}}
-        foo_noniso(ns1); // expected-tns-note {{access here could race}}
-        foo_noniso(ns2); // expected-tns-note {{access here could race}}
-        foo_noniso(ns3); // expected-tns-note {{access here could race}}
-        foo_noniso(ns4);
-        foo_noniso(ns012); // expected-tns-note {{access here could race}}
-        foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        if bool {
+          foo_noniso(ns0); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns1); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns2); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns3); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns4);
+        } else if bool {
+          foo_noniso(ns012); // expected-tns-note {{access here could race}}
+        } else {
+          foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        }
     case 2:
         await a.foo(ns2) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
-        foo_noniso(ns0); // expected-tns-note {{access here could race}}
-        foo_noniso(ns1); // expected-tns-note {{access here could race}}
-        foo_noniso(ns2); // expected-tns-note {{access here could race}}
-        foo_noniso(ns3); // expected-tns-note {{access here could race}}
-        foo_noniso(ns4);
-        foo_noniso(ns012); // expected-tns-note {{access here could race}}
-        foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        if bool {
+          foo_noniso(ns0); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns1); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns2); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns3); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns4);
+        } else if bool {
+          foo_noniso(ns012); // expected-tns-note {{access here could race}}
+        } else {
+          foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        }
     case 3:
         await a.foo(ns4) // expected-tns-warning {{passing argument of non-sendable type 'NonSendable' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 {{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
@@ -554,24 +636,40 @@ func test_tuple_formation(a : A, i : Int) async {
         // TODO: Interestingly with complete, we emit this error 3 times?!
         // expected-complete-warning @-2 3{{passing argument of non-sendable type '(NonSendable, NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
-        foo_noniso(ns0); // expected-tns-note {{access here could race}}
-        foo_noniso(ns1); // expected-tns-note {{access here could race}}
-        foo_noniso(ns2); // expected-tns-note {{access here could race}}
-        foo_noniso(ns3); // expected-tns-note {{access here could race}}
-        foo_noniso(ns4);
-        foo_noniso(ns012); // expected-tns-note {{access here could race}}
-        foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        if bool {
+          foo_noniso(ns0); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns1); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns2); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns3); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns4);
+        } else if bool {
+          foo_noniso(ns012); // expected-tns-note {{access here could race}}
+        } else {
+          foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        }
     default:
         await a.foo(ns13) // expected-tns-warning {{passing argument of non-sendable type '(NonSendable, NonSendable)' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
         // expected-complete-warning @-1 2{{passing argument of non-sendable type '(NonSendable, NonSendable)' into actor-isolated context may introduce data races}}
 
-        foo_noniso(ns0); // expected-tns-note {{access here could race}}
-        foo_noniso(ns1); // expected-tns-note {{access here could race}}
-        foo_noniso(ns2); // expected-tns-note {{access here could race}}
-        foo_noniso(ns3); // expected-tns-note {{access here could race}}
-        foo_noniso(ns4);
-        foo_noniso(ns012); // expected-tns-note {{access here could race}}
-        foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        if bool {
+          foo_noniso(ns0); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns1); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns2); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns3); // expected-tns-note {{access here could race}}
+        } else if bool {
+          foo_noniso(ns4);
+        } else if bool {
+          foo_noniso(ns012); // expected-tns-note {{access here could race}}
+        } else  {
+          foo_noniso(ns13); // expected-tns-note {{access here could race}}
+        }
     }
 }
 
@@ -685,9 +783,13 @@ func one_consume_many_require_varag(a : A) async {
     // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
-    foo_noniso_vararg(ns0, ns3, ns4); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns3, ns1, ns4); // xpected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns4, ns3, ns2); // xpected-tns-note {{access here could race}}
+    if bool {
+      foo_noniso_vararg(ns0, ns3, ns4); // expected-tns-note {{access here could race}}
+    } else if bool {
+      foo_noniso_vararg(ns3, ns1, ns4); // expected-tns-note {{access here could race}}
+    } else {
+      foo_noniso_vararg(ns4, ns3, ns2); // expected-tns-note {{access here could race}}
+    }
 }
 
 func one_consume_one_require_vararg(a : A) async {
@@ -714,13 +816,13 @@ func many_consume_one_require_vararg(a : A) async {
     // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns4, ns1, ns4)
-    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns5, ns5, ns2)
-    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
-    foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note {{access here could race}}
+    foo_noniso_vararg(ns0, ns1, ns2); // expected-tns-note 3{{access here could race}}
 }
 
 func many_consume_many_require_vararg(a : A) async {
@@ -737,15 +839,19 @@ func many_consume_many_require_vararg(a : A) async {
     // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns4, ns1, ns4)
-    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
     await a.foo_vararg(ns5, ns5, ns2)
-    // xpected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
+    // expected-tns-warning @-1 {{passing argument of non-sendable type 'Any...' from nonisolated context to actor-isolated context at this call site could yield a race with accesses later in this function}}
     // expected-complete-warning @-2 {{passing argument of non-sendable type 'Any...' into actor-isolated context may introduce data races}}
 
-    foo_noniso_vararg(ns0, ns6, ns7); // expected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns6, ns1, ns7); // xpected-tns-note {{access here could race}}
-    foo_noniso_vararg(ns7, ns6, ns2); // xpected-tns-note {{access here could race}}
+    if bool {
+      foo_noniso_vararg(ns0, ns6, ns7); // expected-tns-note {{access here could race}}
+    } else if bool {
+      foo_noniso_vararg(ns6, ns1, ns7);  // expected-tns-note {{access here could race}}
+    } else {
+      foo_noniso_vararg(ns7, ns6, ns2);  // expected-tns-note {{access here could race}}
+    }
 }
 
 enum E { // expected-complete-note {{consider making enum 'E' conform to the 'Sendable' protocol}}

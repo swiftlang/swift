@@ -2901,6 +2901,16 @@ public:
     return opsWithoutSelf;
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutSelf() {
+    assert(getNumArguments() && "Should only be called when Callee has "
+                                "at least a self parameter.");
+    MutableArrayRef<Operand> ops = this->getArgumentOperands();
+    if (!hasSelfArgument())
+      return ops;
+    auto opsWithoutSelf = ops.drop_back();
+    return opsWithoutSelf;
+  }
+
   llvm::Optional<SILResultInfo> getSingleResult() const {
     auto SubstCallee = getSubstCalleeType();
     if (SubstCallee->getNumResults() != 1)
