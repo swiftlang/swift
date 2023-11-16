@@ -1057,9 +1057,18 @@ private:
 
   /// Mark \c S as a terminator, starting a zero region.
   void terminateRegion(ASTNode S) {
-    SourceMappingRegion &Region = getRegion();
-    if (!Region.hasEndLoc())
-      Region.setEndLoc(getEndLoc(S));
+    assert(!RegionStack.empty() && "Cannot terminate non-existant region");
+
+    // Walk up the region stack and cut short regions until we reach a region
+    // for an AST node. This ensures we correctly handle new regions that have
+    // been introduced as a result of replacing the count, e.g if errors have
+    // been thrown.
+    for (auto &Region : llvm::reverse(RegionStack)) {
+      if (!Region.hasEndLoc())
+        Region.setEndLoc(getEndLoc(S));
+      if (Region.getNode())
+        break;
+    }
     replaceCount(CounterExpr::Zero(), /*Start*/ llvm::None);
   }
 
