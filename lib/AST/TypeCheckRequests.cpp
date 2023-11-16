@@ -1023,23 +1023,24 @@ void PatternBindingEntryRequest::cacheResult(
 }
 
 //----------------------------------------------------------------------------//
-// PatternCheckedExecutableInitRequest computation.
+// PatternBindingCheckedAndContextualizedInitRequest computation.
 //----------------------------------------------------------------------------//
 
 llvm::Optional<Expr *>
-PatternBindingCheckedExecutableInitRequest::getCachedResult() const {
+PatternBindingCheckedAndContextualizedInitRequest::getCachedResult() const {
   auto *PBD = std::get<0>(getStorage());
   auto idx = std::get<1>(getStorage());
-  if (!PBD->getPattern(idx)->executableInitChecked())
+  if (!PBD->getPatternList()[idx].isInitializerCheckedAndContextualized())
     return llvm::None;
-  return PBD->getExecutableInit(idx);
+  return PBD->getInit(idx);
 }
 
-void PatternBindingCheckedExecutableInitRequest::cacheResult(Expr *expr) const {
+void PatternBindingCheckedAndContextualizedInitRequest::cacheResult(
+    Expr *expr) const {
   auto *PBD = std::get<0>(getStorage());
   auto idx = std::get<1>(getStorage());
-  assert(expr == PBD->getExecutableInit(idx));
-  PBD->getPattern(idx)->setExecutableInitChecked();
+  assert(expr == PBD->getInit(idx));
+  PBD->getMutablePatternList()[idx].setInitializerCheckedAndContextualized();
 }
 
 //----------------------------------------------------------------------------//

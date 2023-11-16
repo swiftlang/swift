@@ -2347,8 +2347,8 @@ public:
   void cacheResult(const PatternBindingEntry *value) const;
 };
 
-class PatternBindingCheckedExecutableInitRequest
-    : public SimpleRequest<PatternBindingCheckedExecutableInitRequest,
+class PatternBindingCheckedAndContextualizedInitRequest
+    : public SimpleRequest<PatternBindingCheckedAndContextualizedInitRequest,
                            Expr *(PatternBindingDecl *, unsigned),
                            RequestFlags::SeparatelyCached> {
 public:

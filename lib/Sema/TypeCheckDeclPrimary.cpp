@@ -2664,7 +2664,7 @@ public:
 
         // Trigger a request that will complete typechecking for the
         // initializer.
-        (void)PBD->getCheckedExecutableInit(i);
+        (void)PBD->getCheckedAndContextualizedInit(i);
       }
     }
 

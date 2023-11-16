@@ -2072,7 +2072,7 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
-  InitExpr.initAfterSynthesis = E;
+  InitExpr.initAfterSynthesis.setPointer(E);
   InitContextAndFlags.setInt(InitContextAndFlags.getInt() -
                              PatternFlags::IsText);
 }
@@ -2198,11 +2198,17 @@ PatternBindingDecl::getInitializerIsolation(unsigned i) const {
   return var->getInitializerIsolation();
 }
 
-Expr *PatternBindingDecl::getCheckedExecutableInit(unsigned i) const {
+Expr *PatternBindingDecl::getCheckedAndContextualizedInit(unsigned i) const {
   return evaluateOrDefault(getASTContext().evaluator,
-                           PatternBindingCheckedExecutableInitRequest{
+                           PatternBindingCheckedAndContextualizedInitRequest{
                                const_cast<PatternBindingDecl *>(this), i},
                            nullptr);
+}
+
+Expr *PatternBindingDecl::getCheckedAndContextualizedExecutableInit(
+    unsigned i) const {
+  (void)getCheckedAndContextualizedInit(i);
+  return getExecutableInit(i);
 }
 
 bool PatternBindingDecl::hasStorage() const {
