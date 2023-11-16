@@ -3146,6 +3146,10 @@ static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinCreateAsyncTaskInGroupWithExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinCreateAsyncTaskWithExecutor(Decl *decl) {
   return false;
 }

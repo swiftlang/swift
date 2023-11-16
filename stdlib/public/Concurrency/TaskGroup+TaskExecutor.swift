@@ -13,7 +13,8 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-// ==== TaskGroup ------------------------------------------------------------------------------------------------------
+// None of TaskExecutor APIs are available in task-to-thread concurrency model.
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 @available(SwiftStdlib 9999, *)
 extension TaskGroup {
@@ -35,20 +36,68 @@ extension TaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskInGroup
-    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false)
+
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
+        taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        _getUndefinedTaskExecutor()
+      }
+
+//    if let taskExecutor {
+//      let executorBuiltin: Builtin.Executor =
+//        taskExecutor.asUnownedTaskExecutor().executor
+//
+      // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+//    } else {
+//      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
+//      // Create the task in this group without executor preference.
+//      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+//    }
     #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
+
+  /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   will be ignored. In order to inherit the parent task's executor preference
+  ///                   invoke `addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
+  ///                   and it will be inherited automatically.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    on taskExecutor: (any TaskExecutor)?,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
-    #endif
 
     if let taskExecutor {
       let executorBuiltin: Builtin.Executor =
@@ -61,19 +110,18 @@ extension TaskGroup {
       // Create the task in this group without executor preference.
       fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
     }
+
+    return true
     #else
     fatalError("Unsupported Swift compiler")
     #endif
   }
-
-  // FIXME: addTaskUnlessCancelled
 }
 
 // ==== ThrowingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @available(SwiftStdlib 9999, *)
 extension ThrowingTaskGroup {
-  // FIXME: SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
@@ -92,20 +140,12 @@ extension ThrowingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskInGroup
-    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false)
-    #else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-    #endif
 
     if let taskExecutor {
       let executorBuiltin: Builtin.Executor =
@@ -123,14 +163,62 @@ extension ThrowingTaskGroup {
     #endif
   }
 
-  // FIXME: addTaskUnlessCancelled
+  /// Adds a child task to the group and enqueue it on the specified executor, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   will be ignored. In order to inherit the parent task's executor preference
+  ///                   invoke `addTaskUnlessCancelled()` without passing a value to the `taskExecutor` parameter,
+  ///                   and it will be inherited automatically.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    on taskExecutor: (any TaskExecutor)?,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
+
+    if let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      // Create the task in this group with an executor preference.
+      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    } else {
+      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
+      // Create the task in this group without executor preference.
+      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    }
+
+    return true
+    #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
 }
 
 // ==== DiscardingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @available(SwiftStdlib 9999, *)
 extension DiscardingTaskGroup {
-  // FIXME: SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
@@ -149,20 +237,12 @@ extension DiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskInGroup
-    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: true)
-    #else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true)
-    #endif
 
     if let taskExecutor {
       let executorBuiltin: Builtin.Executor =
@@ -180,15 +260,64 @@ extension DiscardingTaskGroup {
     #endif
   }
 
-  // FIXME: addTaskUnlessCancelled
+  /// Adds a child task to the group and set it up with the passed in task executor preference,
+  /// unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   will be ignored. In order to inherit the parent task's executor preference
+  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   and it will be inherited automatically.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    on taskExecutor: (any TaskExecutor)?,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> Void
+  ) -> Bool {
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+    )
+
+    if let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      // Create the task in this group with an executor preference.
+      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    } else {
+      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
+      // Create the task in this group without executor preference.
+      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    }
+
+    return true
+    #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
 }
 
 // ==== ThrowingDiscardingTaskGroup ------------------------------------------------------------------------------------------------------
 
 @available(SwiftStdlib 9999, *)
 extension ThrowingDiscardingTaskGroup {
-  // FIXME: SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  /// Adds a child task to the group and enqueue it on the specified executor.
+  /// Adds a child task to the group and set it up with the passed in task executor preference.
   ///
   /// - Parameters:
   ///   - taskExecutor: The task executor that the child task should be started on and keep using.
@@ -206,20 +335,12 @@ extension ThrowingDiscardingTaskGroup {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Void
   ) {
-    #if compiler(>=5.9) && $BuiltinCreateAsyncTaskInGroup
-    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
       inheritContext: false, enqueueJob: false,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: true)
-    #else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: true)
-    #endif
 
     if let taskExecutor {
       let executorBuiltin: Builtin.Executor =
@@ -237,5 +358,58 @@ extension ThrowingDiscardingTaskGroup {
     #endif
   }
 
-  // FIXME: addTaskUnlessCancelled
+
+  /// Adds a child task to the group and set it up with the passed in task executor preference,
+  /// unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///                   If `nil` is passed explicitly, tht parent task's executor preference (if any),
+  ///                   will be ignored. In order to inherit the parent task's executor preference
+  ///                   invoke `addTask()` without passing a value to the `taskExecutor` parameter,
+  ///                   and it will be inherited automatically.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    on taskExecutor: (any TaskExecutor)?,
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> Void
+  ) -> Bool {
+    #if $BuiltinCreateAsyncTaskInGroupWithExecutor
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
+    )
+
+    if let taskExecutor {
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      // Create the task in this group with an executor preference.
+      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+    } else {
+      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
+      // Create the task in this group without executor preference.
+      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+    }
+
+    return true
+    #else
+    fatalError("Unsupported Swift compiler")
+    #endif
+  }
 }
+
+#endif
