@@ -2363,14 +2363,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
       baseObjTy->isExistentialType() && outerDC->getSelfProtocolDecl() &&
       // If there are no type variables, there were no references to 'Self'.
       type->hasTypeVariable()) {
-    auto getResultType = [](Type type) {
-      if (auto *funcTy = type->getAs<FunctionType>())
-        return funcTy->getResult();
-      return type;
-    };
-
-    auto nonErasedResultTy = getResultType(type);
-
     const auto selfGP = cast<GenericTypeParamType>(
         outerDC->getSelfInterfaceType()->getCanonicalType());
     auto openedTypeVar = replacements.lookup(selfGP);
@@ -2383,19 +2375,6 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     if (auto *anchor = getAsExpr(simplifyLocatorToAnchor(locator))) {
       contextualTy =
           getContextualType(getParentExpr(anchor), /*forConstraint=*/false);
-    }
-
-    if (!hasFixFor(locator) &&
-        AddExplicitExistentialCoercion::isRequired(
-            *this, nonErasedResultTy,
-            [&](TypeVariableType *typeVar) {
-              return openedTypeVar == typeVar ? baseObjTy
-                                              : llvm::Optional<Type>();
-            },
-            locator) &&
-        !contextualTy) {
-      recordFix(AddExplicitExistentialCoercion::create(
-          *this, getResultType(type), locator));
     }
   }
 

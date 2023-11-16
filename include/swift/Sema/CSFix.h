@@ -3410,40 +3410,6 @@ public:
   }
 };
 
-class AddExplicitExistentialCoercion final : public ConstraintFix {
-  Type ErasedResultType;
-
-  AddExplicitExistentialCoercion(ConstraintSystem &cs, Type erasedResultTy,
-                                 ConstraintLocator *locator,
-                                 FixBehavior fixBehavior)
-      : ConstraintFix(cs, FixKind::AddExplicitExistentialCoercion, locator,
-                      fixBehavior),
-        ErasedResultType(erasedResultTy) {}
-
-public:
-  std::string getName() const override {
-    return "add explicit existential type coercion";
-  }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  static bool
-  isRequired(ConstraintSystem &cs, Type resultTy,
-             ArrayRef<std::pair<TypeVariableType *, OpenedArchetypeType *>>
-                 openedExistentials,
-             ConstraintLocatorBuilder locator);
-
-  static bool
-  isRequired(ConstraintSystem &cs, Type resultTy,
-             llvm::function_ref<llvm::Optional<Type>(TypeVariableType *)>
-                 findExistentialType,
-             ConstraintLocatorBuilder locator);
-
-  static AddExplicitExistentialCoercion *create(ConstraintSystem &cs,
-                                                Type resultTy,
-                                                ConstraintLocator *locator);
-};
-
 class RenameConflictingPatternVariables final
     : public ConstraintFix,
       private llvm::TrailingObjects<RenameConflictingPatternVariables,
