@@ -1,0 +1,192 @@
+/* Generic Signature Changes */
+
+/* RawRepresentable Changes */
+
+/* Removed Decls */
+
+// FIXME: Cause unknown; possibly a change in headers in the clang resource dir.
+Var __GNUC_VA_LIST has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+
+/* Type Changes */
+
+/* Decl Attribute changes */
+
+/* Fixed-layout Type Changes */
+
+/* Protocol Conformance Change */
+
+// SE-0331: These imported structs have pointer fields, so they became
+// non-Sendable once the Unsafe*Pointer types were no longer Sendable.
+Struct DIR has removed conformance to Sendable
+Struct FTS has removed conformance to Sendable
+Struct FTS.__Unnamed_union___Anonymous_field8 has removed conformance to Sendable
+Struct _RuneEntry has removed conformance to Sendable
+Struct _RuneLocale has removed conformance to Sendable
+Struct _RuneRange has removed conformance to Sendable
+Struct __Reply__host_lockgroup_info_t has removed conformance to Sendable
+Struct __Reply__host_processor_info_t has removed conformance to Sendable
+Struct __Reply__host_processor_sets_t has removed conformance to Sendable
+Struct __Reply__host_processors_t has removed conformance to Sendable
+Struct __Reply__host_virtual_physical_table_info_t has removed conformance to Sendable
+Struct __Reply__kext_request_t has removed conformance to Sendable
+Struct __Reply__kmod_control_t has removed conformance to Sendable
+Struct __Reply__kmod_get_info_t has removed conformance to Sendable
+Struct __Reply__mach_memory_info_t has removed conformance to Sendable
+Struct __Reply__mach_port_get_set_status_t has removed conformance to Sendable
+Struct __Reply__mach_port_names_t has removed conformance to Sendable
+Struct __Reply__mach_port_space_info_t has removed conformance to Sendable
+Struct __Reply__mach_ports_lookup_t has removed conformance to Sendable
+Struct __Reply__mach_vm_read_t has removed conformance to Sendable
+Struct __Reply__mach_vm_region_info_64_t has removed conformance to Sendable
+Struct __Reply__mach_vm_region_info_t has removed conformance to Sendable
+Struct __Reply__mach_zone_info_t has removed conformance to Sendable
+Struct __Reply__processor_set_tasks_t has removed conformance to Sendable
+Struct __Reply__processor_set_tasks_with_flavor_t has removed conformance to Sendable
+Struct __Reply__processor_set_threads_t has removed conformance to Sendable
+Struct __Reply__task_get_dyld_image_infos_t has removed conformance to Sendable
+Struct __Reply__task_get_emulation_vector_t has removed conformance to Sendable
+Struct __Reply__task_threads_t has removed conformance to Sendable
+Struct __Reply__task_zone_info_t has removed conformance to Sendable
+Struct __Reply__vm_mapped_pages_info_t has removed conformance to Sendable
+Struct __Reply__vm_read_t has removed conformance to Sendable
+Struct __Request__host_security_create_task_token_t has removed conformance to Sendable
+Struct __Request__kext_request_t has removed conformance to Sendable
+Struct __Request__kmod_control_t has removed conformance to Sendable
+Struct __Request__mach_port_construct_t has removed conformance to Sendable
+Struct __Request__mach_ports_register_t has removed conformance to Sendable
+Struct __Request__mach_vm_write_t has removed conformance to Sendable
+Struct __Request__task_create_t has removed conformance to Sendable
+Struct __Request__task_register_dyld_image_infos_t has removed conformance to Sendable
+Struct __Request__task_set_emulation_vector_t has removed conformance to Sendable
+Struct __Request__task_unregister_dyld_image_infos_t has removed conformance to Sendable
+Struct __Request__vm_write_t has removed conformance to Sendable
+Struct __darwin_pthread_handler_rec has removed conformance to Sendable
+Struct __darwin_sigaltstack has removed conformance to Sendable
+Struct __darwin_ucontext has removed conformance to Sendable
+Struct __darwin_ucontext64 has removed conformance to Sendable
+Struct __msfilterreq has removed conformance to Sendable
+Struct __nl_cat_d has removed conformance to Sendable
+Struct __sFILE has removed conformance to Sendable
+Struct __sbuf has removed conformance to Sendable
+Struct __shmid_ds_new has removed conformance to Sendable
+Struct __siginfo has removed conformance to Sendable
+Struct _ftsent has removed conformance to Sendable
+Struct _malloc_zone_t has removed conformance to Sendable
+Struct _opaque_pthread_t has removed conformance to Sendable
+Struct _pcred has removed conformance to Sendable
+Struct addrinfo has removed conformance to Sendable
+Struct aiocb has removed conformance to Sendable
+Struct au_arb_t has removed conformance to Sendable
+Struct au_arg32_t has removed conformance to Sendable
+Struct au_arg64_t has removed conformance to Sendable
+Struct au_cert_hash_t has removed conformance to Sendable
+Struct au_class_ent has removed conformance to Sendable
+Struct au_event_ent has removed conformance to Sendable
+Struct au_execarg_t has removed conformance to Sendable
+Struct au_execenv_t has removed conformance to Sendable
+Struct au_file_t has removed conformance to Sendable
+Struct au_identity_t has removed conformance to Sendable
+Struct au_invalid_t has removed conformance to Sendable
+Struct au_krb5_principal_t has removed conformance to Sendable
+Struct au_opaque_t has removed conformance to Sendable
+Struct au_path_t has removed conformance to Sendable
+Struct au_sdev_handle has removed conformance to Sendable
+Struct au_session has removed conformance to Sendable
+Struct au_text_t has removed conformance to Sendable
+Struct au_user_ent has removed conformance to Sendable
+Struct au_zonename_t has removed conformance to Sendable
+Struct bpf_program has removed conformance to Sendable
+Struct ctlname has removed conformance to Sendable
+Struct datum has removed conformance to Sendable
+Struct dk_error_description_t has removed conformance to Sendable
+Struct dk_format_capacities_t has removed conformance to Sendable
+Struct dk_provision_status_t has removed conformance to Sendable
+Struct dk_unmap_t has removed conformance to Sendable
+Struct dl_info has removed conformance to Sendable
+Struct entry has removed conformance to Sendable
+Struct eproc has removed conformance to Sendable
+Struct eventreq has removed conformance to Sendable
+Struct exception has removed conformance to Sendable
+Struct extern_proc has removed conformance to Sendable
+Struct fchecklv has removed conformance to Sendable
+Struct fsignatures has removed conformance to Sendable
+Struct fssearchblock has removed conformance to Sendable
+Struct fstab has removed conformance to Sendable
+Struct glob_t has removed conformance to Sendable
+Struct glob_t.__Unnamed_union___Anonymous_field5 has removed conformance to Sendable
+Struct gmonparam has removed conformance to Sendable
+Struct group has removed conformance to Sendable
+Struct hfs_mount_args has removed conformance to Sendable
+Struct hostent has removed conformance to Sendable
+Struct iconv_allocation_t has removed conformance to Sendable
+Struct iconv_fallbacks has removed conformance to Sendable
+Struct iconv_hooks has removed conformance to Sendable
+Struct if_clonereq has removed conformance to Sendable
+Struct if_nameindex has removed conformance to Sendable
+Struct ifaddrs has removed conformance to Sendable
+Struct ifdrv has removed conformance to Sendable
+Struct ifmaddrs has removed conformance to Sendable
+Struct ifmedia_description has removed conformance to Sendable
+Struct ifmediareq has removed conformance to Sendable
+Struct ifqueue has removed conformance to Sendable
+Struct iovec has removed conformance to Sendable
+Struct kevent has removed conformance to Sendable
+Struct kinfo_proc has removed conformance to Sendable
+Struct klist has removed conformance to Sendable
+Struct kmod_info has removed conformance to Sendable
+Struct kmod_reference has removed conformance to Sendable
+Struct lconv has removed conformance to Sendable
+Struct mach_msg_ool_descriptor_t has removed conformance to Sendable
+Struct mach_msg_ool_ports_descriptor_t has removed conformance to Sendable
+Struct mig_subsystem has removed conformance to Sendable
+Struct mig_symtab has removed conformance to Sendable
+Struct msg has removed conformance to Sendable
+Struct msgbuf has removed conformance to Sendable
+Struct msghdr has removed conformance to Sendable
+Struct ndrv_protocol_desc has removed conformance to Sendable
+Struct netent has removed conformance to Sendable
+Struct option has removed conformance to Sendable
+Struct passwd has removed conformance to Sendable
+Struct pipebuf has removed conformance to Sendable
+Struct port_obj_tentry has removed conformance to Sendable
+Struct protoent has removed conformance to Sendable
+Struct pseminfo has removed conformance to Sendable
+Struct pshminfo has removed conformance to Sendable
+Struct pstats has removed conformance to Sendable
+Struct qelem has removed conformance to Sendable
+Struct rb_node has removed conformance to Sendable
+Struct rb_tree has removed conformance to Sendable
+Struct rb_tree_ops_t has removed conformance to Sendable
+Struct regex_t has removed conformance to Sendable
+Struct routine_descriptor has removed conformance to Sendable
+Struct rpc_routine_descriptor has removed conformance to Sendable
+Struct rpc_signature has removed conformance to Sendable
+Struct rpc_subsystem has removed conformance to Sendable
+Struct rpcent has removed conformance to Sendable
+Struct rslvmulti_req has removed conformance to Sendable
+Struct rt_addrinfo has removed conformance to Sendable
+Struct sa_endpoints has removed conformance to Sendable
+Struct sbuf has removed conformance to Sendable
+Struct servent has removed conformance to Sendable
+Struct sf_hdtr has removed conformance to Sendable
+Struct sigevent has removed conformance to Sendable
+Struct sigstack has removed conformance to Sendable
+Struct tm has removed conformance to Sendable
+Struct tokenstr has removed conformance to Sendable
+Struct tokenstr.__Unnamed_union_tt has removed conformance to Sendable
+Struct uprof has removed conformance to Sendable
+Struct vfsidctl has removed conformance to Sendable
+Struct vfsstatfs has removed conformance to Sendable
+Struct vmspace has removed conformance to Sendable
+Struct wordexp_t has removed conformance to Sendable
+
+/* Protocol Requirement Change */
+
+/* Class Inheritance Change */
+
+/* Others */
+
