@@ -110,7 +110,7 @@ Type swift::getSerializationRequirementTypesForMember(
   auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
       ->getDeclaredInterfaceType();
 
-  if (DC->getSelfProtocolDecl() || isa<ExtensionDecl>(DC)) {
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
