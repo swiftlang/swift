@@ -1233,11 +1233,6 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
-  // If this a GenericType, ModuleType, or GenericTypeParamType, return the
-  // type declaration.
-  // NOTE: Will not attempt to find an AssociatedTypeDecl.
-  TypeDecl *getAnyTypeDecl();
-
   /// removeArgumentLabels -  Retrieve a version of this type with all
   /// argument labels removed.
   Type removeArgumentLabels(unsigned numArgumentLabels);
@@ -7424,10 +7419,6 @@ inline Type TypeBase::getNominalParent() {
 
 inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
-}
-
-inline TypeDecl *TypeBase::getAnyTypeDecl() {
-  return getCanonicalType().getAnyTypeDecl();
 }
 
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {

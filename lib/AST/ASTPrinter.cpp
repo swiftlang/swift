@@ -3336,6 +3336,14 @@ static bool hasInverseCopyable(
     Decl *decl,
     std::function<bool(InverseMarking const&)> isRelevantInverse) {
 
+  auto getTypeDecl = [](Type type) -> TypeDecl* {
+    if (auto genericTy = type->getAnyGeneric())
+      return genericTy;
+    if (auto gtpt = dyn_cast<GenericTypeParamType>(type))
+      return gtpt->getDecl();
+    return nullptr;
+  };
+
   if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
     if (auto *nominal = extension->getSelfNominalTypeDecl())
       if (isRelevantInverse(nominal->getNoncopyableMarking()))
@@ -3361,7 +3369,7 @@ static bool hasInverseCopyable(
     // Check for noncopyable types in the types of this declaration.
     if (Type type = value->getInterfaceType()) {
       bool hasNoncopyable = type.findIf([&](Type type) {
-        if (auto typeDecl = type->getAnyTypeDecl())
+        if (auto *typeDecl = getTypeDecl(type))
           if (isRelevantInverse(typeDecl->getNoncopyableMarking()))
             return true;
 

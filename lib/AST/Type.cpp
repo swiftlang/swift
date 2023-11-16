@@ -91,17 +91,6 @@ GenericTypeDecl *CanType::getAnyGeneric() const {
   return nullptr;
 }
 
-TypeDecl *CanType::getAnyTypeDecl() const {
-  // NOTE: there is no simple way to determine if it's an AssociatedTypeDecl.
-  if (auto genericTy = getAnyGeneric())
-    return genericTy;
-  if (auto gtpt = dyn_cast<GenericTypeParamType>(*this))
-    return gtpt->getDecl();
-  if (auto module = dyn_cast<ModuleType>(*this))
-    return module->getModule();
-  return nullptr;
-}
-
 //===----------------------------------------------------------------------===//
 // Various Type Methods.
 //===----------------------------------------------------------------------===//
