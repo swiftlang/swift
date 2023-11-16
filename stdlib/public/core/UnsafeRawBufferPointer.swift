@@ -1,3 +1,4 @@
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1)
 //===--- UnsafeRawBufferPointer.swift.gyb ---------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -10,28 +11,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-%import gyb
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 14)
 @available(*, unavailable, renamed: "UnsafeMutableRawBufferPointer")
 typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
-% for mutable in (True, False):
-%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
-%  Mutable = 'Mutable' if mutable else ''
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 19)
 
-/// A ${Mutable.lower()} nonowning collection interface to the bytes in a
+/// A mutable nonowning collection interface to the bytes in a
 /// region of memory.
 ///
-/// You can use an `${Self}` instance in low-level operations to eliminate
+/// You can use an `UnsafeMutableRawBufferPointer` instance in low-level operations to eliminate
 /// uniqueness checks and release mode bounds checks. Bounds checks are always
 /// performed in debug mode.
 ///
-%  if mutable:
-/// An `${Self}` instance is a view of the raw bytes in a region of memory.
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 28)
+/// An `UnsafeMutableRawBufferPointer` instance is a view of the raw bytes in a region of memory.
 /// Each byte in memory is viewed as a `UInt8` value independent of the type
 /// of values held in that memory. Reading from and writing to memory through
 /// a raw buffer are untyped operations. Accessing this collection's bytes
 /// does not bind the underlying memory to `UInt8`.
 ///
-/// In addition to its collection interface, an `${Self}`
+/// In addition to its collection interface, an `UnsafeMutableRawBufferPointer`
 /// instance also supports the following methods provided by
 /// `UnsafeMutableRawPointer`, including bounds checks in debug mode:
 ///
@@ -39,17 +38,7 @@ typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
 /// - `loadUnaligned(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
 /// - `copyMemory(from:)`
-%  else:
-/// An `${Self}` instance is a view of the raw bytes in a region of memory.
-/// Each byte in memory is viewed as a `UInt8` value independent of the type
-/// of values held in that memory. Reading from memory through a raw buffer is
-/// an untyped operation.
-///
-/// In addition to its collection interface, an `${Self}`
-/// instance also supports the `load(fromByteOffset:as:)`
-/// and `loadUnaligned(fromByteOffset:as:)` methods provided by
-/// `UnsafeRawPointer`, including bounds checks in debug mode.
-%  end
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 53)
 ///
 /// To access the underlying memory through typed operations, the memory must
 /// be bound to a trivial type.
@@ -63,16 +52,16 @@ typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
 ///   not produce valid copies and can only be done by calling a C API, such as
 ///   `memmove()`.
 ///
-/// ${Self} Semantics
+/// UnsafeMutableRawBufferPointer Semantics
 /// =================
 ///
-/// An `${Self}` instance is a view into memory and does not own the memory
-/// that it references. Copying a variable or constant of type `${Self}` does
+/// An `UnsafeMutableRawBufferPointer` instance is a view into memory and does not own the memory
+/// that it references. Copying a variable or constant of type `UnsafeMutableRawBufferPointer` does
 /// not copy the underlying memory. However, initializing another collection
-/// with an `${Self}` instance copies bytes out of the referenced memory and
+/// with an `UnsafeMutableRawBufferPointer` instance copies bytes out of the referenced memory and
 /// into the new collection.
 ///
-/// The following example uses `someBytes`, an `${Self}` instance, to
+/// The following example uses `someBytes`, an `UnsafeMutableRawBufferPointer` instance, to
 /// demonstrate the difference between assigning a buffer pointer and using a
 /// buffer pointer as the source for another collection's elements. Here, the
 /// assignment to `destBytes` creates a new, nonowning buffer pointer
@@ -87,18 +76,18 @@ typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
 ///
 ///     var byteArray: [UInt8] = Array(destBytes)
 ///     byteArray += someBytes[n..<someBytes.count]
-% if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 91)
 ///
-/// Assigning into a ranged subscript of an `${Self}` instance copies bytes
+/// Assigning into a ranged subscript of an `UnsafeMutableRawBufferPointer` instance copies bytes
 /// into the memory. The next `n` bytes of the memory that `someBytes`
 /// references are copied in this code:
 ///
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
-% end
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 98)
 @frozen
-public struct Unsafe${Mutable}RawBufferPointer {
+public struct UnsafeMutableRawBufferPointer {
   @usableFromInline
-  internal let _position, _end: Unsafe${Mutable}RawPointer?
+  internal let _position, _end: UnsafeMutableRawPointer?
 
   /// Creates a buffer over the specified number of contiguous bytes starting
   /// at the given pointer.
@@ -111,70 +100,24 @@ public struct Unsafe${Mutable}RawBufferPointer {
   ///     be negative.
   @inlinable
   public init(
-    @_nonEphemeral start: Unsafe${Mutable}RawPointer?, count: Int
+    @_nonEphemeral start: UnsafeMutableRawPointer?, count: Int
   ) {
-    _debugPrecondition(count >= 0, "${Self} with negative count")
+    _debugPrecondition(count >= 0, "UnsafeMutableRawBufferPointer with negative count")
     _debugPrecondition(count == 0 || start != nil,
-      "${Self} has a nil start and nonzero count")
+      "UnsafeMutableRawBufferPointer has a nil start and nonzero count")
     _position = start
     _end = start.map { $0 + _assumeNonNegative(count) }
   }
 }
 
-%if not mutable:
-extension UnsafeRawBufferPointer {
-  /// An iterator over the bytes viewed by a raw buffer pointer.
-  @frozen
-  public struct Iterator {
-    @usableFromInline
-    internal var _position, _end: UnsafeRawPointer?
-
-    @inlinable
-    internal init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
-      self._position = _position
-      self._end = _end
-    }
-  }
-}
-
-extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
-  /// Advances to the next byte and returns it, or `nil` if no next byte
-  /// exists.
-  ///
-  /// Once `nil` has been returned, all subsequent calls return `nil`.
-  ///
-  /// - Returns: The next sequential byte in the raw buffer if another byte
-  ///   exists; otherwise, `nil`.
-  @inlinable
-  public mutating func next() -> UInt8? {
-    if _position == _end { return nil }
-
-    // We can do an unchecked unwrap here by borrowing invariants from the pointer.
-    // For a validly constructed buffer pointer, the only way _position can be nil is
-    // if _end is also nil. We checked that case above. Thus, we can safely do an
-    // unchecked unwrap here.
-    //
-    // Additionally, validly constructed buffer pointers also have an _end that is
-    // strictly greater than or equal to _position, and so we do not need to do checked
-    // arithmetic here as we cannot possibly overflow.
-    //
-    // We check these invariants in debug builds to defend against invalidly constructed
-    // pointers.
-    _debugPrecondition(_position! < _end!)
-    let position = _position._unsafelyUnwrappedUnchecked
-    let result = position.load(as: UInt8.self)
-    _position = position + 1
-    return result
-  }
-}
-%else:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 171)
 extension UnsafeMutableRawBufferPointer {
   public typealias Iterator = UnsafeRawBufferPointer.Iterator
 }
-%end
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 175)
 
-extension Unsafe${Mutable}RawBufferPointer: Sequence {
-  public typealias SubSequence = Slice<${Self}>
+extension UnsafeMutableRawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<UnsafeMutableRawBufferPointer>
 
   /// Returns an iterator over the bytes of this sequence.
   @inlinable
@@ -203,7 +146,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
+extension UnsafeMutableRawBufferPointer: MutableCollection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8
@@ -219,7 +162,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   /// The "past the end" position---that is, the position one greater than the
   /// last valid subscript argument.
   ///
-  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
+  /// The `endIndex` property of an `UnsafeMutableRawBufferPointer`
   /// instance is always identical to `count`.
   @inlinable
   public var endIndex: Index {
@@ -244,13 +187,13 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
       _debugPrecondition(i < endIndex)
       return _position._unsafelyUnwrappedUnchecked.load(fromByteOffset: i, as: UInt8.self)
     }
-%  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 248)
     nonmutating set {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
       _position._unsafelyUnwrappedUnchecked.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
     }
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 254)
   }
 
   /// Accesses the bytes in the specified memory region.
@@ -264,7 +207,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
       _debugPrecondition(bounds.upperBound <= endIndex)
       return Slice(base: self, bounds: bounds)
     }
-%  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 268)
     nonmutating set {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
@@ -276,10 +219,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
           byteCount: newValue.count)
       }
     }
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 280)
   }
 
-% if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 283)
   /// Exchanges the byte values at the specified indices
   /// in this buffer's memory.
   ///
@@ -302,7 +245,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
     pj.storeBytes(of: tmp, toByteOffset: 0, as: UInt8.self)
   }
 
-% end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 306)
   /// The number of bytes in the buffer.
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
@@ -319,10 +262,10 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
+extension UnsafeMutableRawBufferPointer: RandomAccessCollection { }
 
-extension Unsafe${Mutable}RawBufferPointer {
-%  if mutable:
+extension UnsafeMutableRawBufferPointer {
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 326)
   /// Allocates uninitialized memory with the specified size and alignment.
   ///
   /// You are in charge of managing the allocated memory. Be sure to deallocate
@@ -348,7 +291,7 @@ extension Unsafe${Mutable}RawBufferPointer {
       byteCount: byteCount, alignment: alignment)
     return UnsafeMutableRawBufferPointer(start: base, count: byteCount)
   }
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 352)
 
   /// Deallocates the memory block previously allocated at this buffer pointer’s 
   /// base address. 
@@ -395,9 +338,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   memory.
   @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
-    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.load out of bounds")
+      "UnsafeMutableRawBufferPointer.load out of bounds")
     return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
@@ -436,13 +379,13 @@ extension Unsafe${Mutable}RawBufferPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.load out of bounds")
+      "UnsafeMutableRawBufferPointer.load out of bounds")
     return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
-%  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 446)
   /// Stores a value's bytes into the buffer pointer's raw memory at the
   /// specified byte offset.
   ///
@@ -484,9 +427,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.storeBytes out of bounds")
+      "UnsafeMutableRawBufferPointer.storeBytes out of bounds")
 
     let pointer = baseAddress._unsafelyUnwrappedUnchecked
     pointer.storeBytes(of: value, toByteOffset: offset, as: T.self)
@@ -500,9 +443,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   @usableFromInline func _legacy_se0349_storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(offset >= 0, "${Self}.storeBytes with negative offset")
+    _debugPrecondition(offset >= 0, "UnsafeMutableRawBufferPointer.storeBytes with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
-      "${Self}.storeBytes out of bounds")
+      "UnsafeMutableRawBufferPointer.storeBytes out of bounds")
 
     baseAddress!._legacy_se0349_storeBytes_internal(
       of: value, toByteOffset: offset, as: T.self
@@ -528,7 +471,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @inlinable
   public func copyMemory(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
-      "${Self}.copyMemory source has too many elements")
+      "UnsafeMutableRawBufferPointer.copyMemory source has too many elements")
     if let baseAddress = baseAddress, let sourceAddress = source.baseAddress {
       baseAddress.copyMemory(from: sourceAddress, byteCount: source.count)
     }
@@ -558,7 +501,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     if source.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<UInt8>) -> Void in
       _debugPrecondition(source.count <= self.count,
-        "${Self}.copyBytes source has too many elements")
+        "UnsafeMutableRawBufferPointer.copyBytes source has too many elements")
       if let base = buffer.baseAddress {
         position.copyMemory(from: base, byteCount: buffer.count)
       }
@@ -568,12 +511,12 @@ extension Unsafe${Mutable}RawBufferPointer {
 
     for (index, byteValue) in source.enumerated() {
       _debugPrecondition(index < self.count,
-        "${Self}.copyBytes source has too many elements")
+        "UnsafeMutableRawBufferPointer.copyBytes source has too many elements")
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
     }
   }
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 577)
 
   /// Creates a new buffer over the same memory as the given buffer.
   ///
@@ -583,7 +526,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     self.init(start: bytes.baseAddress, count: bytes.count)
   }
 
-%  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 587)
   /// Creates a new mutable buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
@@ -592,15 +535,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     self.init(start: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
       count: bytes.count)
   }
-%  else:
-  /// Creates a new buffer over the same memory as the given buffer.
-  ///
-  /// - Parameter bytes: The buffer to convert.
-  @inlinable
-  public init(_ bytes: UnsafeRawBufferPointer) {
-    self.init(start: bytes.baseAddress, count: bytes.count)
-  }
-%  end # !mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 604)
 
   /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
   ///
@@ -612,57 +547,9 @@ extension Unsafe${Mutable}RawBufferPointer {
       count: buffer.count * MemoryLayout<T>.stride)
   }
 
-%  if not mutable:
-  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
-  ///
-  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
-  ///   buffer's type `T` must be a trivial type.
-  @inlinable
-  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
-    self.init(start: buffer.baseAddress,
-      count: buffer.count * MemoryLayout<T>.stride)
-  }
-%  end # !mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 626)
 
-%  if not mutable:
-  /// Creates a raw buffer over the same memory as the given raw buffer slice,
-  /// with the indices rebased to zero.
-  ///
-  /// The new buffer represents the same region of memory as the slice, but its
-  /// indices start at zero instead of at the beginning of the slice in the
-  /// original buffer. The following code creates `slice`, a slice covering
-  /// part of an existing buffer instance, then rebases it into a new `rebased`
-  /// buffer.
-  ///
-  ///     let slice = buffer[n...]
-  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
-  ///
-  /// After this code has executed, the following are true:
-  ///
-  /// - `rebased.startIndex == 0`
-  /// - `rebased[0] == slice[n]`
-  /// - `rebased[0] == buffer[n]`
-  /// - `rebased.count == slice.count`
-  ///
-  /// - Parameter slice: The raw buffer slice to rebase.
-  @inlinable
-  public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
-    // NOTE: `Slice` does not guarantee that its start/end indices are valid
-    // in `base` -- it merely ensures that `startIndex <= endIndex`.
-    // We need manually check that we aren't given an invalid slice,
-    // or the resulting collection would allow access that was
-    // out-of-bounds with respect to the original base buffer.
-    // We only do this in debug builds to prevent a measurable performance
-    // degradation wrt passing around pointers not wrapped in a BufferPointer
-    // construct.
-    _debugPrecondition(
-      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
-      "Invalid slice")
-    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
-    let count = slice.endIndex &- slice.startIndex
-    self.init(start: base, count: count)
-  }
-%  end # !mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 666)
 
   /// Creates a raw buffer over the same memory as the given raw buffer slice,
   /// with the indices rebased to zero.
@@ -696,11 +583,11 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @inlinable
-  public var baseAddress: Unsafe${Mutable}RawPointer? {
+  public var baseAddress: UnsafeMutableRawPointer? {
     return _position
   }
 
-  %  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 704)
   
   /// Initializes the memory referenced by this buffer with the given value,
   /// binds the memory to the value's type, and returns a typed buffer of the
@@ -982,7 +869,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return moveInitializeMemory(as: T.self, fromContentsOf: rebased)
   }
 
-  %  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 986)
 
   /// Binds this buffer’s memory to the specified type and returns a typed buffer
   /// of the bound memory.
@@ -1006,15 +893,15 @@ extension Unsafe${Mutable}RawBufferPointer {
   @discardableResult
   public func bindMemory<T>(
     to type: T.Type
-  ) -> Unsafe${Mutable}BufferPointer<T> {
+  ) -> UnsafeMutableBufferPointer<T> {
     guard let base = _position else {
-      return Unsafe${Mutable}BufferPointer<T>(start: nil, count: 0)
+      return UnsafeMutableBufferPointer<T>(start: nil, count: 0)
     }
 
     let capacity = count / MemoryLayout<T>.stride
     Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
-    return Unsafe${Mutable}BufferPointer<T>(
-      start: Unsafe${Mutable}Pointer<T>(base._rawValue), count: capacity)
+    return UnsafeMutableBufferPointer<T>(
+      start: UnsafeMutablePointer<T>(base._rawValue), count: capacity)
   }
 
   /// Executes the given closure while temporarily binding the buffer to
@@ -1065,7 +952,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @_alwaysEmitIntoClient
   public func withMemoryRebound<T, Result>(
     to type: T.Type,
-    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws -> Result
+    _ body: (_ buffer: UnsafeMutableBufferPointer<T>) throws -> Result
   ) rethrows -> Result {
     guard let s = _position else {
       return try body(.init(start: nil, count: 0))
@@ -1103,7 +990,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @_alwaysEmitIntoClient
   public func assumingMemoryBound<T>(
     to: T.Type
-  ) -> Unsafe${Mutable}BufferPointer<T> {
+  ) -> UnsafeMutableBufferPointer<T> {
     guard let s = _position else {
       return .init(start: nil, count: 0)
     }
@@ -1114,7 +1001,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     return .init(start: .init(s._rawValue), count: n)
   }
 
-%  if Mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1118)
   @inlinable
   @_alwaysEmitIntoClient
   public func withContiguousMutableStorageIfAvailable<R>(
@@ -1132,48 +1019,664 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 
-%  end
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1136)
   @inlinable
   @_alwaysEmitIntoClient
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     try withMemoryRebound(to: Element.self) {
-      try body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
+      try body(UnsafeBufferPointer<Element>($0))
     }
   }
 }
 
 @_unavailableInEmbedded
-extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
+extension UnsafeMutableRawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
-    return "${Self}"
+    return "UnsafeMutableRawBufferPointer"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 
-extension ${Self} {
+extension UnsafeMutableRawBufferPointer {
   @available(*, unavailable,
-    message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
-  public subscript(bounds: Range<Int>) -> ${Self} {
-    get { return ${Self}(start: nil, count: 0) }
-%  if mutable:
+    message: "use 'UnsafeMutableRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> UnsafeMutableRawBufferPointer {
+    get { return UnsafeMutableRawBufferPointer(start: nil, count: 0) }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1162)
     nonmutating set {}
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1164)
   }
 
-%  if mutable:
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1167)
   @available(*, unavailable,
     message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
     get { return UnsafeRawBufferPointer(start: nil, count: 0) }
     nonmutating set {}
   }
-%  end # mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1174)
 }
 
-% end # for mutable
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 19)
+
+/// A  nonowning collection interface to the bytes in a
+/// region of memory.
+///
+/// You can use an `UnsafeRawBufferPointer` instance in low-level operations to eliminate
+/// uniqueness checks and release mode bounds checks. Bounds checks are always
+/// performed in debug mode.
+///
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 43)
+/// An `UnsafeRawBufferPointer` instance is a view of the raw bytes in a region of memory.
+/// Each byte in memory is viewed as a `UInt8` value independent of the type
+/// of values held in that memory. Reading from memory through a raw buffer is
+/// an untyped operation.
+///
+/// In addition to its collection interface, an `UnsafeRawBufferPointer`
+/// instance also supports the `load(fromByteOffset:as:)`
+/// and `loadUnaligned(fromByteOffset:as:)` methods provided by
+/// `UnsafeRawPointer`, including bounds checks in debug mode.
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 53)
+///
+/// To access the underlying memory through typed operations, the memory must
+/// be bound to a trivial type.
+///
+/// - Note: A *trivial type* can be copied bit for bit with no indirection
+///   or reference-counting operations. Generally, native Swift types that do
+///   not contain strong or weak references or other forms of indirection are
+///   trivial, as are imported C structs and enums. Copying memory that
+///   contains values of nontrivial types can only be done safely with a typed
+///   pointer. Copying bytes directly from nontrivial, in-memory values does
+///   not produce valid copies and can only be done by calling a C API, such as
+///   `memmove()`.
+///
+/// UnsafeRawBufferPointer Semantics
+/// =================
+///
+/// An `UnsafeRawBufferPointer` instance is a view into memory and does not own the memory
+/// that it references. Copying a variable or constant of type `UnsafeRawBufferPointer` does
+/// not copy the underlying memory. However, initializing another collection
+/// with an `UnsafeRawBufferPointer` instance copies bytes out of the referenced memory and
+/// into the new collection.
+///
+/// The following example uses `someBytes`, an `UnsafeRawBufferPointer` instance, to
+/// demonstrate the difference between assigning a buffer pointer and using a
+/// buffer pointer as the source for another collection's elements. Here, the
+/// assignment to `destBytes` creates a new, nonowning buffer pointer
+/// covering the first `n` bytes of the memory that `someBytes`
+/// references---nothing is copied:
+///
+///     var destBytes = someBytes[0..<n]
+///
+/// Next, the bytes referenced by `destBytes` are copied into `byteArray`, a
+/// new `[UInt8]` array, and then the remainder of `someBytes` is appended to
+/// `byteArray`:
+///
+///     var byteArray: [UInt8] = Array(destBytes)
+///     byteArray += someBytes[n..<someBytes.count]
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 98)
+@frozen
+public struct UnsafeRawBufferPointer {
+  @usableFromInline
+  internal let _position, _end: UnsafeRawPointer?
+
+  /// Creates a buffer over the specified number of contiguous bytes starting
+  /// at the given pointer.
+  ///
+  /// - Parameters:
+  ///   - start: The address of the memory that starts the buffer. If `starts`
+  ///     is `nil`, `count` must be zero. However, `count` may be zero even
+  ///     for a non-`nil` `start`.
+  ///   - count: The number of bytes to include in the buffer. `count` must not
+  ///     be negative.
+  @inlinable
+  public init(
+    @_nonEphemeral start: UnsafeRawPointer?, count: Int
+  ) {
+    _debugPrecondition(count >= 0, "UnsafeRawBufferPointer with negative count")
+    _debugPrecondition(count == 0 || start != nil,
+      "UnsafeRawBufferPointer has a nil start and nonzero count")
+    _position = start
+    _end = start.map { $0 + _assumeNonNegative(count) }
+  }
+}
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 125)
+extension UnsafeRawBufferPointer {
+  /// An iterator over the bytes viewed by a raw buffer pointer.
+  @frozen
+  public struct Iterator {
+    @usableFromInline
+    internal var _position, _end: UnsafeRawPointer?
+
+    @inlinable
+    internal init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
+      self._position = _position
+      self._end = _end
+    }
+  }
+}
+
+extension UnsafeRawBufferPointer.Iterator: IteratorProtocol, Sequence {
+  /// Advances to the next byte and returns it, or `nil` if no next byte
+  /// exists.
+  ///
+  /// Once `nil` has been returned, all subsequent calls return `nil`.
+  ///
+  /// - Returns: The next sequential byte in the raw buffer if another byte
+  ///   exists; otherwise, `nil`.
+  @inlinable
+  public mutating func next() -> UInt8? {
+    if _position == _end { return nil }
+
+    // We can do an unchecked unwrap here by borrowing invariants from the pointer.
+    // For a validly constructed buffer pointer, the only way _position can be nil is
+    // if _end is also nil. We checked that case above. Thus, we can safely do an
+    // unchecked unwrap here.
+    //
+    // Additionally, validly constructed buffer pointers also have an _end that is
+    // strictly greater than or equal to _position, and so we do not need to do checked
+    // arithmetic here as we cannot possibly overflow.
+    //
+    // We check these invariants in debug builds to defend against invalidly constructed
+    // pointers.
+    _debugPrecondition(_position! < _end!)
+    let position = _position._unsafelyUnwrappedUnchecked
+    let result = position.load(as: UInt8.self)
+    _position = position + 1
+    return result
+  }
+}
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 175)
+
+extension UnsafeRawBufferPointer: Sequence {
+  public typealias SubSequence = Slice<UnsafeRawBufferPointer>
+
+  /// Returns an iterator over the bytes of this sequence.
+  @inlinable
+  public func makeIterator() -> Iterator {
+    return Iterator(_position: _position, _end: _end)
+  }
+
+  /// Copies the elements of `self` to the memory at `destination.baseAddress`,
+  /// stopping when either `self` or `destination` is exhausted.
+  ///
+  /// - Returns: an iterator over any remaining elements of `self` and the
+  ///   number of elements copied.
+  @inlinable // unsafe-performance
+  @_alwaysEmitIntoClient
+  public func _copyContents(
+    initializing destination: UnsafeMutableBufferPointer<UInt8>
+  ) -> (Iterator, UnsafeMutableBufferPointer<UInt8>.Index) {
+    guard let s = _position, let e = _end, e > s, !destination.isEmpty else {
+      return (makeIterator(), 0)
+    }
+    let destinationAddress = destination.baseAddress._unsafelyUnwrappedUnchecked
+    let d = UnsafeMutableRawPointer(destinationAddress)
+    let n = Swift.min(destination.count, s.distance(to: e))
+    d.copyMemory(from: s, byteCount: n)
+    return (Iterator(_position: s.advanced(by: n), _end: e), n)
+  }
+}
+
+extension UnsafeRawBufferPointer: Collection {
+  // TODO: Specialize `index` and `formIndex` and
+  // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
+  public typealias Element = UInt8
+  public typealias Index = Int
+  public typealias Indices = Range<Int>
+
+  /// Always zero, which is the index of the first byte in a nonempty buffer.
+  @inlinable
+  public var startIndex: Index {
+    return 0
+  }
+
+  /// The "past the end" position---that is, the position one greater than the
+  /// last valid subscript argument.
+  ///
+  /// The `endIndex` property of an `UnsafeRawBufferPointer`
+  /// instance is always identical to `count`.
+  @inlinable
+  public var endIndex: Index {
+    return count
+  }
+
+  @inlinable
+  public var indices: Indices {
+    // Not checked because init forbids negative count.
+    return Indices(uncheckedBounds: (startIndex, endIndex))
+  }
+
+  /// Accesses the byte at the given offset in the memory region as a `UInt8`
+  /// value.
+  ///
+  /// - Parameter i: The offset of the byte to access. `i` must be in the range
+  ///   `0..<count`.
+  @inlinable
+  public subscript(i: Int) -> Element {
+    get {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position._unsafelyUnwrappedUnchecked.load(fromByteOffset: i, as: UInt8.self)
+    }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 254)
+  }
+
+  /// Accesses the bytes in the specified memory region.
+  ///
+  /// - Parameter bounds: The range of byte offsets to access. The upper and
+  ///   lower bounds of the range must be in the range `0...count`.
+  @inlinable
+  public subscript(bounds: Range<Int>) -> SubSequence {
+    get {
+      _debugPrecondition(bounds.lowerBound >= startIndex)
+      _debugPrecondition(bounds.upperBound <= endIndex)
+      return Slice(base: self, bounds: bounds)
+    }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 280)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 306)
+  /// The number of bytes in the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @inlinable
+  public var count: Int {
+    if let pos = _position {
+      // Unsafely unwrapped because init forbids end being nil if _position
+      // isn't.
+      _internalInvariant(_end != nil)
+      return _assumeNonNegative(_end._unsafelyUnwrappedUnchecked - pos)
+    }
+    return 0
+  }
+}
+
+extension UnsafeRawBufferPointer: RandomAccessCollection { }
+
+extension UnsafeRawBufferPointer {
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 352)
+
+  /// Deallocates the memory block previously allocated at this buffer pointer’s 
+  /// base address. 
+  ///
+  /// This buffer pointer's `baseAddress` must be `nil` or a pointer to a memory 
+  /// block previously returned by a Swift allocation method. If `baseAddress` is 
+  /// `nil`, this function does nothing. Otherwise, the memory must not be initialized 
+  /// or `Pointee` must be a trivial type. This buffer pointer's byte `count` must 
+  /// be equal to the originally allocated size of the memory block.
+  @inlinable
+  public func deallocate() {
+    _position?.deallocate()
+  }
+
+  /// Returns a new instance of the given type, read from the buffer pointer's
+  /// raw memory at the specified byte offset.
+  ///
+  /// The memory at `offset` bytes from this buffer pointer's `baseAddress`
+  /// must be properly aligned for accessing `T` and initialized to `T` or
+  /// another type that is layout compatible with `T`.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the next four bytes.
+  ///
+  ///     let a = someBytes.load(as: Int32.self)
+  ///     let b = someBytes.load(fromByteOffset: 4, as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the buffer
+  /// pointer's memory region---that is, `offset + MemoryLayout<T>.size` must
+  /// be less than or equal to the buffer pointer's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset, in bytes, into the buffer pointer's memory at
+  ///     which to begin reading data for the new instance. The buffer pointer
+  ///     plus `offset` must be properly aligned for accessing an instance of
+  ///     type `T`. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @inlinable
+  public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
+    _debugPrecondition(offset >= 0, "UnsafeRawBufferPointer.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "UnsafeRawBufferPointer.load out of bounds")
+    return baseAddress!.load(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Returns a new instance of the given type, constructed from the raw memory
+  /// at the specified offset.
+  ///
+  /// This function only supports loading trivial types.
+  /// A trivial type does not contain any reference-counted property
+  /// within its in-memory stored representation.
+  /// The memory at `offset` bytes into the buffer must be laid out
+  /// identically to the in-memory representation of `T`.
+  ///
+  /// You can use this method to create new values from the buffer pointer's
+  /// underlying bytes. The following example creates two new `Int32`
+  /// instances from the memory referenced by the buffer pointer `someBytes`.
+  /// The bytes for `a` are copied from the first four bytes of `someBytes`,
+  /// and the bytes for `b` are copied from the fourth through seventh bytes.
+  ///
+  ///     let a = someBytes.loadUnaligned(as: Int32.self)
+  ///     let b = someBytes.loadUnaligned(fromByteOffset: 3, as: Int32.self)
+  ///
+  /// The memory to read for the new instance must not extend beyond the buffer
+  /// pointer's memory region---that is, `offset + MemoryLayout<T>.size` must
+  /// be less than or equal to the buffer pointer's `count`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset, in bytes, into the buffer pointer's memory at
+  ///     which to begin reading data for the new instance. The default is zero.
+  ///   - type: The type to use for the newly constructed instance. The memory
+  ///     must be initialized to a value of a type that is layout compatible
+  ///     with `type`.
+  /// - Returns: A new instance of type `T`, copied from the buffer pointer's
+  ///   memory.
+  @_alwaysEmitIntoClient
+  public func loadUnaligned<T>(
+    fromByteOffset offset: Int = 0,
+    as type: T.Type
+  ) -> T {
+    _debugPrecondition(offset >= 0, "UnsafeRawBufferPointer.load with negative offset")
+    _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
+      "UnsafeRawBufferPointer.load out of bounds")
+    return baseAddress!.loadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 577)
+
+  /// Creates a new buffer over the same memory as the given buffer.
+  ///
+  /// - Parameter bytes: The buffer to convert.
+  @inlinable
+  public init(_ bytes: UnsafeMutableRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 596)
+  /// Creates a new buffer over the same memory as the given buffer.
+  ///
+  /// - Parameter bytes: The buffer to convert.
+  @inlinable
+  public init(_ bytes: UnsafeRawBufferPointer) {
+    self.init(start: bytes.baseAddress, count: bytes.count)
+  }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 604)
+
+  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
+  ///
+  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
+  ///   buffer's type `T` must be a trivial type.
+  @inlinable
+  public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
+    self.init(start: buffer.baseAddress,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 616)
+  /// Creates a raw buffer over the contiguous bytes in the given typed buffer.
+  ///
+  /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
+  ///   buffer's type `T` must be a trivial type.
+  @inlinable
+  public init<T>(_ buffer: UnsafeBufferPointer<T>) {
+    self.init(start: buffer.baseAddress,
+      count: buffer.count * MemoryLayout<T>.stride)
+  }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 626)
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 628)
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
+  ///
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
+  ///
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// After this code has executed, the following are true:
+  ///
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
+  @inlinable
+  public init(rebasing slice: Slice<UnsafeRawBufferPointer>) {
+    // NOTE: `Slice` does not guarantee that its start/end indices are valid
+    // in `base` -- it merely ensures that `startIndex <= endIndex`.
+    // We need manually check that we aren't given an invalid slice,
+    // or the resulting collection would allow access that was
+    // out-of-bounds with respect to the original base buffer.
+    // We only do this in debug builds to prevent a measurable performance
+    // degradation wrt passing around pointers not wrapped in a BufferPointer
+    // construct.
+    _debugPrecondition(
+      slice.startIndex >= 0 && slice.endIndex <= slice.base.count,
+      "Invalid slice")
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    let count = slice.endIndex &- slice.startIndex
+    self.init(start: base, count: count)
+  }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 666)
+
+  /// Creates a raw buffer over the same memory as the given raw buffer slice,
+  /// with the indices rebased to zero.
+  ///
+  /// The new buffer represents the same region of memory as the slice, but its
+  /// indices start at zero instead of at the beginning of the slice in the
+  /// original buffer. The following code creates `slice`, a slice covering
+  /// part of an existing buffer instance, then rebases it into a new `rebased`
+  /// buffer.
+  ///
+  ///     let slice = buffer[n...]
+  ///     let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// After this code has executed, the following are true:
+  ///
+  /// - `rebased.startIndex == 0`
+  /// - `rebased[0] == slice[n]`
+  /// - `rebased[0] == buffer[n]`
+  /// - `rebased.count == slice.count`
+  ///
+  /// - Parameter slice: The raw buffer slice to rebase.
+  @inlinable
+  public init(rebasing slice: Slice<UnsafeMutableRawBufferPointer>) {
+    let base = slice.base.baseAddress?.advanced(by: slice.startIndex)
+    let count = slice.endIndex &- slice.startIndex
+    self.init(start: base, count: count)
+  }
+
+  /// A pointer to the first byte of the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @inlinable
+  public var baseAddress: UnsafeRawPointer? {
+    return _position
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 986)
+
+  /// Binds this buffer’s memory to the specified type and returns a typed buffer
+  /// of the bound memory.
+  ///
+  /// Use the `bindMemory(to:)` method to bind the memory referenced
+  /// by this buffer to the type `T`. The memory must be uninitialized or
+  /// initialized to a type that is layout compatible with `T`. If the memory
+  /// is uninitialized, it is still uninitialized after being bound to `T`.
+  ///
+  /// - Warning: A memory location may only be bound to one type at a time. The
+  ///   behavior of accessing memory as a type unrelated to its bound type is
+  ///   undefined.
+  ///
+  /// - Parameters:
+  ///   - type: The type `T` to bind the memory to.
+  /// - Returns: A typed buffer of the newly bound memory. The memory in this
+  ///   region is bound to `T`, but has not been modified in any other way.
+  ///   The typed buffer references `self.count / MemoryLayout<T>.stride`
+  ///   instances of `T`.
+  @_transparent
+  @discardableResult
+  public func bindMemory<T>(
+    to type: T.Type
+  ) -> UnsafeBufferPointer<T> {
+    guard let base = _position else {
+      return UnsafeBufferPointer<T>(start: nil, count: 0)
+    }
+
+    let capacity = count / MemoryLayout<T>.stride
+    Builtin.bindMemory(base._rawValue, capacity._builtinWordValue, type)
+    return UnsafeBufferPointer<T>(
+      start: UnsafePointer<T>(base._rawValue), count: capacity)
+  }
+
+  /// Executes the given closure while temporarily binding the buffer to
+  /// instances of type `T`.
+  ///
+  /// Use this method when you have a buffer to raw memory and you need
+  /// to access that memory as instances of a given type `T`. Accessing
+  /// memory as a type `T` requires that the memory be bound to that type.
+  /// A memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// Any instance of `T` within the re-bound region may be initialized or
+  /// uninitialized. The memory underlying any individual instance of `T`
+  /// must have the same initialization state (i.e.  initialized or
+  /// uninitialized.) Accessing a `T` whose underlying memory
+  /// is in a mixed initialization state shall be undefined behaviour.
+  ///
+  /// If the byte count of the original buffer is not a multiple of
+  /// the stride of `T`, then the re-bound buffer is shorter
+  /// than the original buffer.
+  ///
+  /// After executing `body`, this method rebinds memory back to its original
+  /// binding state. This can be unbound memory, or bound to a different type.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Note: A raw buffer may represent memory that has been bound to a type.
+  ///   If that is the case, then `T` must be layout compatible with the
+  ///   type to which the memory has been bound. This requirement does not
+  ///   apply if the raw buffer represents memory that has not been bound
+  ///   to any type.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     buffer.
+  ///   - body: A closure that takes a typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  ///   - buffer: The buffer temporarily bound to instances of `T`.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withMemoryRebound<T, Result>(
+    to type: T.Type,
+    _ body: (_ buffer: UnsafeBufferPointer<T>) throws -> Result
+  ) rethrows -> Result {
+    guard let s = _position else {
+      return try body(.init(start: nil, count: 0))
+    }
+    _debugPrecondition(
+      Int(bitPattern: s) & (MemoryLayout<T>.alignment-1) == 0,
+      "baseAddress must be a properly aligned pointer for type T"
+    )
+    // initializer ensures _end is nil only when _position is nil.
+    _internalInvariant(_end != nil)
+    let c = _assumeNonNegative(s.distance(to: _end._unsafelyUnwrappedUnchecked))
+    let n = c / MemoryLayout<T>.stride
+    let binding = Builtin.bindMemory(s._rawValue, n._builtinWordValue, T.self)
+    defer { Builtin.rebindMemory(s._rawValue, binding) }
+    return try body(.init(start: .init(s._rawValue), count: n))
+  }
+
+  /// Returns a typed buffer to the memory referenced by this buffer,
+  /// assuming that the memory is already bound to the specified type.
+  ///
+  /// Use this method when you have a raw buffer to memory that has already
+  /// been bound to the specified type. The memory starting at this pointer
+  /// must be bound to the type `T`. Accessing memory through the returned
+  /// pointer is undefined if the memory has not been bound to `T`. To bind
+  /// memory to `T`, use `bindMemory(to:capacity:)` instead of this method.
+  ///
+  /// - Note: The buffer's base address must match the
+  ///   alignment of `T` (as reported by `MemoryLayout<T>.alignment`).
+  ///   That is, `Int(bitPattern: self.baseAddress) % MemoryLayout<T>.alignment`
+  ///   must equal zero.
+  ///
+  /// - Parameter to: The type `T` that the memory has already been bound to.
+  /// - Returns: A typed pointer to the same memory as this raw pointer.
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func assumingMemoryBound<T>(
+    to: T.Type
+  ) -> UnsafeBufferPointer<T> {
+    guard let s = _position else {
+      return .init(start: nil, count: 0)
+    }
+    // initializer ensures _end is nil only when _position is nil.
+    _internalInvariant(_end != nil)
+    let c = _assumeNonNegative(s.distance(to: _end._unsafelyUnwrappedUnchecked))
+    let n = c / MemoryLayout<T>.stride
+    return .init(start: .init(s._rawValue), count: n)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1136)
+  @inlinable
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try withMemoryRebound(to: Element.self) {
+      try body($0)
+    }
+  }
+}
+
+@_unavailableInEmbedded
+extension UnsafeRawBufferPointer: CustomDebugStringConvertible {
+  /// A textual representation of the buffer, suitable for debugging.
+  public var debugDescription: String {
+    return "UnsafeRawBufferPointer"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
+  }
+}
+
+extension UnsafeRawBufferPointer {
+  @available(*, unavailable,
+    message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
+    get { return UnsafeRawBufferPointer(start: nil, count: 0) }
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1164)
+  }
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1174)
+}
+
+// ###sourceLocation(file: "/Users/kobe/Desktop/swift-project/swift/stdlib/public/core/UnsafeRawBufferPointer.swift.gyb", line: 1177)
 
 /// Invokes the given closure with a mutable buffer pointer covering the raw
 /// bytes of the given argument.
@@ -1313,6 +1816,6 @@ extension UnsafeRawBufferPointer.Iterator: Sendable { }
 extension UnsafeMutableRawBufferPointer: Sendable { }
 
 
-// ${'Local Variables'}:
+// Local Variables:
 // eval: (read-only-mode 1)
 // End:
