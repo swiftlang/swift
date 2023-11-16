@@ -54,6 +54,21 @@ static bool isIsolationBoundaryCrossingApply(const SILInstruction *inst) {
   return false;
 }
 
+/// Check if the passed in type is NonSendable.
+///
+/// NOTE: We special case RawPointer and NativeObject to ensure they are
+/// treated as non-Sendable and strict checking is applied to it.
+static bool isNonSendableType(SILType type, SILFunction *fn) {
+  // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
+  if (type.getASTType()->is<BuiltinNativeObjectType>() ||
+      type.getASTType()->is<BuiltinRawPointerType>()) {
+    return true;
+  }
+
+  // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
+  return !type.isSendable(fn);
+}
+
 namespace {
 
 struct UseDefChainVisitor
@@ -93,10 +108,17 @@ struct UseDefChainVisitor
     return visitAll(access->getSource());
   }
 
-  SILValue visitStorageCast(SingleValueInstruction *, Operand *sourceAddr,
+  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceAddr,
                             AccessStorageCast castType) {
+    // If this is a type case, see if the result of the cast is sendable. In
+    // such a case, we do not want to look through this cast.
+    if (castType == AccessStorageCast::Type &&
+        !isNonSendableType(cast->getType(), cast->getFunction()))
+      return SILValue();
+
     // If we do not have an identity cast, mark this as a merge.
     isMerge |= castType != AccessStorageCast::Identity;
+
     return sourceAddr->get();
   }
 
@@ -623,14 +645,7 @@ private:
   /// NOTE: We special case RawPointer and NativeObject to ensure they are
   /// treated as non-Sendable and strict checking is applied to it.
   bool isNonSendableType(SILType type) const {
-    // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
-    if (type.getASTType()->is<BuiltinNativeObjectType>() ||
-        type.getASTType()->is<BuiltinRawPointerType>()) {
-      return true;
-    }
-
-    // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
-    return !type.isSendable(function);
+    return ::isNonSendableType(type, function);
   }
 
   // ===========================================================================
