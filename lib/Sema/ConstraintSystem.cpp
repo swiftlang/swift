@@ -2232,7 +2232,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
           if (t->is<GenericTypeParamType>()) {
             erasedTy = baseTy;
           } else {
-            erasedTy = existentialSig->getNonDependentUpperBounds(t);
+            erasedTy = existentialSig->getUpperBound(t);
           }
 
           if (metatypeDepth) {

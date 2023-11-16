@@ -673,8 +673,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
       if (root->isEqual(archetype)) {
         erasedTy = root->getExistentialType();
       } else {
-        erasedTy =
-            sig->getNonDependentUpperBounds(archetype->getInterfaceType());
+        erasedTy = sig->getUpperBound(archetype->getInterfaceType());
       }
 
       if (metatypeDepth) {
@@ -3687,7 +3686,7 @@ Type ArchetypeType::getExistentialType() const {
   auto interfaceType = getInterfaceType();
   auto genericSig = genericEnv->getGenericSignature();
 
-  auto upperBound = genericSig->getDependentUpperBounds(interfaceType);
+  auto upperBound = genericSig->getUpperBound(interfaceType);
 
   return genericEnv->mapTypeIntoContext(upperBound);
 }
