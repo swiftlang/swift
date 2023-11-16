@@ -556,7 +556,7 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
 
   void *allocation = _swift_task_alloc_specific(task, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
-  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p", allocation, task);
+  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor preference record %p for task:%p", allocation, task);
 
   addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
@@ -565,10 +565,17 @@ swift::swift_task_pushTaskExecutorPreference(TaskExecutorRef taskExecutor) {
   return record;
 }
 
-void AsyncTask::pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
+SWIFT_CC(swift)
+void swift::swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record) {
+  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor preference record %p from task:%p", allocation, swift_task_getCurrent());
+  removeStatusRecordFromSelf(record);
+  swift_task_dealloc(record);
+}
+
+void AsyncTask::pushInitialTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record = ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
-  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create a task preference record %p for task:%p",
+  SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task preference record %p for task:%p",
                        record, this);
 
   addStatusRecord(this, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
@@ -576,16 +583,10 @@ void AsyncTask::pushTaskExecutorPreference(TaskExecutorRef preferredExecutor) {
   });
 }
 
-SWIFT_CC(swift)
-void swift::swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record) {
-  SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task preference record %p from task:%p", allocation, swift_task_getCurrent());
-  removeStatusRecordFromSelf(record);
-  swift_task_dealloc(record);
-}
-
 // ONLY use this method while destroying task and removing the "initial" preference.
 // In all other situations prefer a balanced "push / pop" pair of calls.
-void AsyncTask::dropTaskExecutorPreferenceRecord() {
+void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
+  SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Drop initial task preference record from task:%p", this);
   assert(this->hasInitialTaskExecutorPreferenceRecord());
 
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
@@ -597,8 +598,10 @@ void AsyncTask::dropTaskExecutorPreferenceRecord() {
         return;
       }
     }
-    // This drop mirrors the push during task creation; so it must always reliably be the last drop we do.
-    assert(false && "dropTaskExecutorPreferenceRecord must be guaranteed to drop the last preference");
+
+    // This drop mirrors the push "initial" preference during task creation;
+    // so it must always reliably always have a preference to drop.
+    assert(false && "dropInitialTaskExecutorPreferenceRecord must be guaranteed to drop the last preference");
   });
 }
 

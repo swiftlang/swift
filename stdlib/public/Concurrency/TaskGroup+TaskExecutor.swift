@@ -17,7 +17,6 @@ import Swift
 
 @available(SwiftStdlib 9999, *)
 extension TaskGroup {
-  // FIXME: SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Adds a child task to the group and enqueue it on the specified executor.
   ///
   /// - Parameters:
