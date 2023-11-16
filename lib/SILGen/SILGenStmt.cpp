@@ -26,6 +26,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILProfiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1514,6 +1515,15 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
     B.createUnconditionalFail(loc, "throw turned into a trap");
     B.createUnreachable(loc);
     return;
+  }
+
+  if (auto *E = loc.getAsASTNode<Expr>()) {
+    // Check to see whether we have a counter associated with the error branch
+    // of this node, and if so emit a counter increment.
+    auto *P = F.getProfiler();
+    auto ref = ProfileCounterRef::errorBranchOf(E);
+    if (P && P->hasCounterFor(ref))
+      emitProfilerIncrement(ref);
   }
 
   SmallVector<SILValue, 1> args;
