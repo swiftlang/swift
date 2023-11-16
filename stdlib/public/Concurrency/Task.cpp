@@ -1032,7 +1032,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
     assert(jobFlags.task_hasInitialTaskExecutorPreferenceRecord());
-    task->pushTaskExecutorPreference(taskExecutor);
+    task->pushInitialTaskExecutorPreference(taskExecutor);
   }
 
   // If we're supposed to enqueue the task, do so now.

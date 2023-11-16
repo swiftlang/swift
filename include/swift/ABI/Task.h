@@ -400,9 +400,12 @@ private:
 
 public:
   /// Flag that the task is to be enqueued on the provided executor and actually
-  /// enqueue it
-  void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
+  /// enqueue it.
   void flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecutor, TaskExecutorRef taskExecutor);
+  /// Same as `flagAsAndEnqueueOnTaskExecutor` with an `undefined` task executor.
+  inline void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
+    return flagAsAndEnqueueOnTaskExecutor(newExecutor, TaskExecutorRef::undefined());
+  }
 
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
@@ -417,11 +420,13 @@ public:
   /// Get the preferred task executor reference if there is one set for this task.
   TaskExecutorRef getPreferredTaskExecutor();
 
-  /// Only to be used during task creation.
-  /// Otherwise use `swift_task_pushTaskExecutorPreference` and `swift_task_popTaskExecutorPreference`.
-  void pushTaskExecutorPreference(TaskExecutorRef preferred);
+  /// WARNING: Only to be used during task creation, in other situations prefer to use
+  /// `swift_task_pushTaskExecutorPreference` and `swift_task_popTaskExecutorPreference`.
+  void pushInitialTaskExecutorPreference(TaskExecutorRef preferred);
 
-  void dropTaskExecutorPreferenceRecord();
+  /// WARNING: Only to be used during task completion (destroy).
+  /// This is because this API assumes that we have an executor prefer
+  void dropInitialTaskExecutorPreferenceRecord();
 
   // ==== Task Local Values ----------------------------------------------------
 
@@ -528,8 +533,10 @@ public:
 
   // ==== Task Executor Preference --------------------------------------------
 
-  /// Returns true if the task has a, specifically, *inherited*
-  /// a task executor preference from its parent task.
+  /// Returns true if the task has a task executor preference set,
+  /// specifically at creation time of the task. This may be from
+  /// inheriting the preference from a parent task, or by explicitly
+  /// setting it during creation (`Task(on:...)`).
   ///
   /// This means that during task tear down the record should be deallocated
   /// because it was not set with a

@@ -13,9 +13,28 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Code block with specified executor ----------------------------------------
+// None of TaskExecutor APIs are available in task-to-thread concurrency model.
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+/// Configure the current task hierarchy's task executor preference to the passed ``TaskExecutor``,
+/// and execute the passed in closure by immediately hopping to that executor.
+///
+/// ### Task executor preference semantics
+/// Task executors influence _where_ nonisolated asynchronous functions, and default actor methods execute.
+/// The preferred executor will be used whenever possible, rather than hopping to the global concurrent pool.
+///
+/// For an in depth discussion of this topic, see ``TaskExecutor``.
+///
+/// ### Disabling task executor preference
+/// Passing `nil` as executor means disabling any preference preference (if it was set) and the task hierarchy
+/// will execute without any executor preference until a different preference is set.
+///
+/// - Parameters:
+///   - executor: the task executor to use as preferred task executor; if `nil` it is interpreted as "no preference"
+///   - operation: the operation to execute on the passed executor; if the executor was `nil`, this will execute on the default global concurrent executor.
+/// - Returns: the value returned from the `operation` closure
+/// - Throws: if the operation closure throws
+/// - SeeAlso: `TaskExecutor`
 @available(SwiftStdlib 9999, *)
 @_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
 public func withTaskExecutor<T: Sendable>(
@@ -41,25 +60,54 @@ public func withTaskExecutor<T: Sendable>(
       _popTaskExecutorPreference(record: record)
     }
 
-//    #if compiler(>=9999) && $BuiltinHopToExecutor
+  #if $BuiltinHopToExecutor
   if executor == nil {
     let defaultGenericExecutor = _getGenericExecutor()
     await Builtin.hopToExecutor(defaultGenericExecutor)
   } else {
     await Builtin.hopToExecutor(taskExecutorBuiltin)
   }
-//    #else
-//    fatalError("Swift compiler is incompatible with this SDK version")
-//    #endif
+  #else
+  fatalError("Unsupported Swift compiler")
+  #endif
 
-    return try await operation()
+  return try await operation()
 }
 
 /// Task with specified executor ----------------------------------------------
 
 @available(SwiftStdlib 9999, *)
 extension Task where Failure == Never {
-  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
+  /// Runs the given nonthrowing operation asynchronously
+  /// as part of a new top-level task on behalf of the current actor.
+  ///
+  /// This overload allows specifying a preferred ``TaskExecutor`` on which
+  /// the `operation`, as well as all child tasks created from this task will be
+  /// executing whenever possible. Refer to ``TaskExecutor`` for a detailed discussion
+  // of the effect of task executors on execution semantics of asynchronous code.
+  ///
+  /// Use this function when creating asynchronous work
+  /// that operates on behalf of the synchronous function that calls it.
+  /// Like `Task.detached(priority:operation:)`,
+  /// this function creates a separate, top-level task.
+  /// Unlike `Task.detached(priority:operation:)`,
+  /// the task created by `Task.init(priority:operation:)`
+  /// inherits the priority and actor context of the caller,
+  /// so the operation is treated more like an asynchronous extension
+  /// to the synchronous operation.
+  ///
+  /// You need to keep a reference to the task
+  /// if you want to cancel it by calling the `Task.cancel()` method.
+  /// Discarding your reference to a detached task
+  /// doesn't implicitly cancel that task,
+  /// it only makes it impossible for you to explicitly cancel the task.
+  ///
+  /// - Parameters:
+  ///   - executor: the preferred task executor for this task, and any child tasks created by it
+  ///   - priority: The priority of the task.
+  ///     Pass `nil` to use the priority from `Task.currentPriority`.
+  ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
@@ -67,7 +115,7 @@ extension Task where Failure == Never {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) {
-    // #if compiler(>=9999) && $BuiltinCreateAsyncTaskWithExecutor // FIXME
+    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -80,15 +128,14 @@ extension Task where Failure == Never {
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
       flags, taskExecutorRef.executor, operation)
     self._task = task
-//    #else
-//    fatalError("Unsupported Swift compiler")
-//    #endif
+    #else
+    fatalError("Unsupported Swift compiler, missing support for $BuiltinHopToExecutor")
+    #endif
   }
 }
 
 @available(SwiftStdlib 9999, *)
 extension Task where Failure == Error {
-  // FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
@@ -96,7 +143,7 @@ extension Task where Failure == Error {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) {
-    #if compiler(>=9999) && $BuiltinCreateAsyncTaskWithExecutor
+    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -107,10 +154,10 @@ extension Task where Failure == Error {
     // Create the asynchronous task.
     let taskExecutorRef = executor.asUnownedTaskExecutor()
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
-      flags, taskExecutorRef, operation)
+      flags, taskExecutorRef.executor, operation)
     self._task = task
     #else
-    fatalError("Unsupported Swift compiler")
+    fatalError("Unsupported Swift compiler, missing support for $BuiltinHopToExecutor")
     #endif
   }
 }
@@ -118,6 +165,13 @@ extension Task where Failure == Error {
 @available(SwiftStdlib 9999, *)
 extension UnsafeCurrentTask {
 
+  /// The current ``TaskExecutor`` preference, if this task has one configured.
+  ///
+  /// The executor may be used to compare for equality with an expected executor preference.
+  ///
+  /// The lifetime of an executor is not guaranteed by an ``UnownedTaskExecutor``,
+  /// so accessing it must be handled with great case -- and the program must use other
+  /// means to guarantee the executor remains alive while it is in use.
   public var unownedTaskExecutor: UnownedTaskExecutor? {
     let ref = _getPreferredTaskExecutor()
     return UnownedTaskExecutor(ref)
@@ -126,25 +180,26 @@ extension UnsafeCurrentTask {
 
 // ==== Runtime ---------------------------------------------------------------
 
-// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_getPreferredTaskExecutor")
-public func _getPreferredTaskExecutor() -> Builtin.Executor
+internal func _getPreferredTaskExecutor() -> Builtin.Executor
 
-// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+typealias TaskExecutorPreferenceStatusRecord = UnsafeRawPointer
+
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_pushTaskExecutorPreference")
 internal func _pushTaskExecutorPreference(_ executor: Builtin.Executor)
-  -> UnsafeRawPointer /*TaskExecutorPreferenceStatusRecord*/
+  -> TaskExecutorPreferenceStatusRecord
 
-// FIXME: do the SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 9999, *)
 @_silgen_name("swift_task_popTaskExecutorPreference")
 internal func _popTaskExecutorPreference(
-  record: UnsafeRawPointer /*TaskExecutorPreferenceStatusRecord*/
+  record: TaskExecutorPreferenceStatusRecord
 )
 
 @available(SwiftStdlib 9999, *)
 @usableFromInline
 @_silgen_name("swift_task_getUndefinedTaskExecutor")
 internal func _getUndefinedTaskExecutor() -> Builtin.Executor
+
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

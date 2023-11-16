@@ -742,7 +742,7 @@ struct AsyncTask::PrivateStorage {
     // elements are destroyed; in order to respect stack-discipline of
     // the task-local allocator.
     if (task->hasInitialTaskExecutorPreferenceRecord()) {
-      task->dropTaskExecutorPreferenceRecord();
+      task->dropInitialTaskExecutorPreferenceRecord();
     }
 
     // Drain unlock the task and remove any overrides on thread as a
@@ -1034,11 +1034,6 @@ inline void AsyncTask::flagAsAndEnqueueOnTaskExecutor(SerialExecutorRef newExecu
 //  }
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
-
-inline void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
-  return flagAsAndEnqueueOnTaskExecutor(newExecutor, TaskExecutorRef::undefined());
-}
-
 
 // Always and only called by the task on itself
 inline

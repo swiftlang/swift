@@ -100,9 +100,14 @@ public protocol SerialExecutor: Executor {
 
 /// An executor that may be used as preferred executor by a task.
 ///
-/// A task with executor preference will execute nonisolated functions on this executor,
-/// rather than using the default global executor. Default actors also are able to run
-/// on a task's preferred executor.
+/// ### Impact of setting a task executor preference
+/// By default, without setting a task executor preference, nonisolated asynchronous functions,
+/// as well as methods declared on default actors -- that is actors which do not require a specific executor --
+/// execute on Swift's default global concurrent executor. This is an executor shared by the entire runtime
+/// to execute any work which does not have strict executor requirements.
+///
+/// By setting a task executor preference, either with a ``withTaskExecutor(_:operation:)``, creating
+/// a task with a preference (`Task(on:)`), or
 @available(SwiftStdlib 9999, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
