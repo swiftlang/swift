@@ -3421,7 +3421,8 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
   if (matchMode.contains(TypeMatchFlags::AllowOverride)) {
     // Removing 'throwing' is ABI-compatible for synchronous functions, but
     // not for async ones.
-    if (ext2.isThrowing() &&
+    if (ext2.isThrowing() && !ext1.isThrowing() &&
+        ext2.getThrownError().isNull() &&
         !(ext2.isAsync() &&
           matchMode.contains(TypeMatchFlags::AllowABICompatible))) {
       ext1 = ext1.withThrows(true, ext2.getThrownError());
