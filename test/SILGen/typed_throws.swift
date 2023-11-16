@@ -126,4 +126,24 @@ open class MyClass {
   // CHECK-NEXT: throw_addr
   public init<E>(body: () throws(E) -> Void) throws(E) {
   }
+
+  func f() throws { }
+}
+
+// CHECK-LABEL:      sil_vtable MySubclass {
+// CHECK-NEXT:   #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws10MySubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
+// CHECK-NEXT:  #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKFAA0C5ClassCADyyKFTV [override]
+// CHECK-NEXT:  #MySubclass.f: (MySubclass) -> () throws(MyError) -> () : @$s12typed_throws10MySubclassC1fyyAA0C5ErrorOYKF
+
+class MySubclass: MyClass {
+  override func f() throws(MyError) { }
+}
+
+// CHECK-LABEL: sil_vtable MySubsubclass
+// CHECK-NEXT:     #MyClass.init!allocator: <E where E : Error> (MyClass.Type) -> (() throws(E) -> ()) throws(E) -> MyClass : @$s12typed_throws13MySubsubclassC4bodyACyyxYKXE_txYKcs5ErrorRzlufC [override]
+// CHECK-NEXT:    #MyClass.f: (MyClass) -> () throws -> () : @$s12typed_throws13MySubsubclassC1fyyF [override]
+// CHECK-NEXT:    #MySubclass.f: (MySubclass) -> () throws(MyError) -> () : @$s12typed_throws13MySubsubclassC1fyyF [override]
+// CHECK-NEXT:    #MySubsubclass.f: (MySubsubclass) -> () -> () : @$s12typed_throws13MySubsubclassC1fyyF
+class MySubsubclass: MySubclass {
+  override func f() { }
 }

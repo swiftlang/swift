@@ -1143,11 +1143,11 @@ struct R_76250381<Result, Failure: Error> {
 
 // https://github.com/apple/swift/issues/55926
 (0..<10).map { x, y in } 
-// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 2 were used in closure body}}
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 2 were used in closure body}}
 (0..<10).map { x, y, z in } 
-// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 3 were used in closure body}}
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 3 were used in closure body}}
 (0..<10).map { x, y, z, w in } 
-// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 4 were used in closure body}}
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 4 were used in closure body}}
 
 // rdar://77022842 - crash due to a missing argument to a ternary operator
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
@@ -1171,6 +1171,7 @@ func rdar76058892() {
     test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
       if let arr = arr {
         arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}} // expected-error {{generic parameter 'T' could not be inferred}}
+        // expected-error@-1 {{generic parameter 'E' could not be inferred}}
       }
     }
   }

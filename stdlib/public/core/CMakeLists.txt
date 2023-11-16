@@ -298,7 +298,7 @@ endif()
 # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concise-pound-file")
 
-list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "TypedThrows")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
 
