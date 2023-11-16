@@ -2177,6 +2177,12 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   if (!result.has_value())
     return false;
 
+  // Bail if the load_borrow has reborrows. In this case it's not so easy to
+  // find the insertion points for the destroys.
+  if (!lbi->getUsersOfType<BranchInst>().empty()) {
+    return false;
+  }
+
   ++NumLoadPromoted;
 
   SILType loadTy = result->first;
