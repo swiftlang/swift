@@ -658,7 +658,9 @@ bool DCE::removeDead() {
 
         endLifetimeOfLiveValue(phiArg->getIncomingPhiValue(pred), insertPt);
       }
-      erasePhiArgument(&BB, i);
+      erasePhiArgument(&BB, i, /*cleanupDeadPhiOps=*/true,
+                       InstModCallbacks().onCreateNewInst(
+                           [&](auto *inst) { markInstructionLive(inst); }));
       Changed = true;
       BranchesChanged = true;
     }
