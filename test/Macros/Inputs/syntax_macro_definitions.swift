@@ -925,10 +925,10 @@ public struct AddCompletionHandler: PeerMacro {
          let nodeType = node.attributeName.as(IdentifierTypeSyntax.self) {
         return attributeType.name.text != nodeType.name.text
       }
-      if let attributeMemberType = attribute.attributeName.as(MemberTypeIdentifierSyntax.self),
-         let attributeModuleName = attributeMemberType.baseType.as(SimpleTypeIdentifierSyntax.self),
-         let nodeMemberType = node.attributeName.as(MemberTypeIdentifierSyntax.self),
-         let moduleName = nodeMemberType.baseType.as(SimpleTypeIdentifierSyntax.self) {
+      if let attributeMemberType = attribute.attributeName.as(MemberTypeSyntax.self),
+         let attributeModuleName = attributeMemberType.baseType.as(IdentifierTypeSyntax.self),
+         let nodeMemberType = node.attributeName.as(MemberTypeSyntax.self),
+         let moduleName = nodeMemberType.baseType.as(IdentifierTypeSyntax.self) {
         return attributeModuleName.name.text != moduleName.name.text ||
                nodeMemberType.name.text != attributeMemberType.name.text
       }
