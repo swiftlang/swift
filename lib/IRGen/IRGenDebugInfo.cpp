@@ -1037,20 +1037,79 @@ private:
     return DITy;
   }
 
-  llvm::DICompositeType *createEnumType(CompletedDebugTypeInfo DbgTy,
-                                        EnumDecl *Decl, StringRef MangledName,
-                                        llvm::DIScope *Scope,
-                                        llvm::DIFile *File, unsigned Line,
-                                        llvm::DINode::DIFlags Flags) {
+  /// Create debug information for an enum with a raw type (enum E : Int {}).
+  llvm::DICompositeType *createRawEnumType(CompletedDebugTypeInfo DbgTy,
+                                           EnumDecl *Decl,
+                                           StringRef MangledName,
+                                           llvm::DIScope *Scope,
+                                           llvm::DIFile *File, unsigned Line,
+                                           llvm::DINode::DIFlags Flags) {
+    assert(
+        Decl->hasRawType() &&
+        "Trying to create a raw enum debug info from enum with no raw type!");
+
     StringRef Name = Decl->getName().str();
     unsigned SizeInBits = DbgTy.getSizeInBits();
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
-    // FIXME: Is DW_TAG_union_type the right thing here?
-    // Consider using a DW_TAG_variant_type instead.
     auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
+        llvm::dwarf::DW_TAG_enumeration_type, MangledName, Scope, File, Line,
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+        MangledName));
+
+    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
+    DITypeCache[DbgTy.getType()] = TH;
+
+    auto RawType = Decl->getRawType();
+    auto &TI = IGM.getTypeInfoForUnlowered(RawType);
+    llvm::Optional<CompletedDebugTypeInfo> ElemDbgTy =
+        CompletedDebugTypeInfo::getFromTypeInfo(RawType, TI, IGM);
+    if (!ElemDbgTy)
+      // Without complete type info we can only create a forward decl.
+      return DBuilder.createForwardDecl(
+          llvm::dwarf::DW_TAG_enumeration_type, Name, Scope, File, Line,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
+
+    SmallVector<llvm::Metadata *, 16> Elements;
+    for (auto *ElemDecl : Decl->getAllElements()) {
+      // TODO: add the option to emit an enumerator with no value, and use that
+      // instead of emitting a 0.
+      auto MTy =
+          DBuilder.createEnumerator(ElemDecl->getBaseIdentifier().str(), 0);
+      Elements.push_back(MTy);
+    }
+
+    auto EnumType = getOrCreateType(*ElemDbgTy);
+    auto DITy = DBuilder.createEnumerationType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits,
+        DBuilder.getOrCreateArray(Elements), EnumType,
+        llvm::dwarf::DW_LANG_Swift, MangledName, false);
+
+    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return DITy;
+  }
+
+  // Create debug information for an enum with no raw type.
+  llvm::DICompositeType *createVariantType(CompletedDebugTypeInfo DbgTy,
+                                           EnumDecl *Decl,
+                                           StringRef MangledName,
+                                           llvm::DIScope *Scope,
+                                           llvm::DIFile *File, unsigned Line,
+                                           llvm::DINode::DIFlags Flags) {
+    assert(!Decl->getRawType() &&
+           "Attempting to create variant debug info from raw enum!");
+
+    StringRef Name = Decl->getName().str();
+    unsigned SizeInBits = DbgTy.getSizeInBits();
+    // Default, since Swift doesn't allow specifying a custom alignment.
+    unsigned AlignInBits = 0;
+    auto NumExtraInhabitants = DbgTy.getNumExtraInhabitants();
+
+    // A variant part should actually be a child to a DW_TAG_structure_type
+    // according to the DWARF spec.
+    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName));
 
@@ -1058,56 +1117,53 @@ private:
     DITypeCache[DbgTy.getType()] = TH;
 
     SmallVector<llvm::Metadata *, 16> Elements;
-
     for (auto *ElemDecl : Decl->getAllElements()) {
-      // FIXME <rdar://problem/14845818> Support enums.
-      // Swift Enums can be both like DWARF enums and discriminated unions.
-      // LLVM now supports variant types in debug metadata, which may be a
-      // better fit.
       llvm::Optional<CompletedDebugTypeInfo> ElemDbgTy;
-      if (Decl->hasRawType()) {
-        // An enum with a raw type (enum E : Int {}), similar to a
-        // DWARF enum.
-        //
-        // The storage occupied by the enum may be smaller than the
-        // one of the raw type as long as it is large enough to hold
-        // all enum values. Use the raw type for the debug type, but
-        // the storage size from the enum.
-        auto RawType = Decl->getRawType();
-        auto &TI = IGM.getTypeInfoForUnlowered(RawType);
-        ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(RawType, TI, IGM);
-      } else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
-        // A discriminated union. This should really be described as a
-        // DW_TAG_variant_type. For now only describing the data.
+      if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
+        // A variant case which carries a payload.
         ArgTy = ElemDecl->getParentEnum()->mapTypeIntoContext(ArgTy);
         auto &TI = IGM.getTypeInfoForUnlowered(ArgTy);
         ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(ArgTy, TI, IGM);
+        if (!ElemDbgTy) {
+          // Without complete type info we can only create a forward decl.
+          return DBuilder.createForwardDecl(
+              llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
+              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
+        }
+        unsigned Offset = 0;
+        auto MTy =
+            createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
+                             Offset, Scope, File, Flags);
+        Elements.push_back(MTy);
       } else {
-        // Discriminated union case without argument. Fallback to Int
-        // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntType();
-        auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
-        ElemDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
+        // A variant with no payload.
+        auto MTy = DBuilder.createMemberType(
+            Scope, ElemDecl->getBaseIdentifier().str(), File, 0, 0, 0, 0, Flags,
+            nullptr);
+        Elements.push_back(MTy);
       }
-      if (!ElemDbgTy) {
-        // Without complete type info we can only create a forward decl.
-        return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_union_type, Name, Scope, File, Line,
-            llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
-      }
-      unsigned Offset = 0;
-      auto MTy =
-          createMemberType(*ElemDbgTy, ElemDecl->getBaseIdentifier().str(),
-                           Offset, Scope, File, Flags);
-      Elements.push_back(MTy);
     }
-    auto DITy = DBuilder.createUnionType(
-        Scope, Name, File, Line, SizeInBits, AlignInBits,
-        Flags, DBuilder.getOrCreateArray(Elements),
-        llvm::dwarf::DW_LANG_Swift, MangledName);
-
+    auto VPTy = DBuilder.createVariantPart(Scope, {}, File, Line, SizeInBits,
+                                           AlignInBits, Flags, nullptr,
+                                           DBuilder.getOrCreateArray(Elements));
+    auto DITy = DBuilder.createStructType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
+        DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
+        MangledName, NumExtraInhabitants ? *NumExtraInhabitants : 0);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
+  }
+
+  llvm::DICompositeType *createEnumType(CompletedDebugTypeInfo DbgTy,
+                                        EnumDecl *Decl, StringRef MangledName,
+                                        llvm::DIScope *Scope,
+                                        llvm::DIFile *File, unsigned Line,
+                                        llvm::DINode::DIFlags Flags) {
+    if (Decl->hasRawType())
+      return createRawEnumType(DbgTy, Decl, MangledName, Scope, File, Line,
+                               Flags);
+    return createVariantType(DbgTy, Decl, MangledName, Scope, File, Line,
+                             Flags);
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
