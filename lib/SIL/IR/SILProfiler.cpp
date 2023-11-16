@@ -1491,3 +1491,9 @@ llvm::Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
   }
   return it->getSecond();
 }
+
+unsigned SILProfiler::getCounterIndexFor(ProfileCounterRef ref) {
+  auto result = RegionCounterMap.find(ref);
+  assert(result != RegionCounterMap.end());
+  return result->second;
+}

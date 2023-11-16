@@ -142,11 +142,13 @@ public:
   /// Get the number of region counters.
   unsigned getNumRegionCounters() const { return NumRegionCounters; }
 
-  /// Get the mapping from a \c ProfileCounterRef to its corresponding
-  /// profile counter.
-  const llvm::DenseMap<ProfileCounterRef, unsigned> &
-  getRegionCounterMap() const {
-    return RegionCounterMap;
+  /// Retrieve the counter index for a given counter reference, asserting that
+  /// it is present.
+  unsigned getCounterIndexFor(ProfileCounterRef ref);
+
+  /// Whether a counter has been recorded for the given counter reference.
+  bool hasCounterFor(ProfileCounterRef ref) {
+    return RegionCounterMap.contains(ref);
   }
 
 private:
