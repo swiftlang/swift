@@ -220,7 +220,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   }
 
   // Force the executable init to be type checked before emission.
-  if (!pd->getCheckedExecutableInit(pbdEntry))
+  if (!pd->getCheckedAndContextualizedExecutableInit(pbdEntry))
     return;
 
   Mangle::ASTMangler TokenMangler;
