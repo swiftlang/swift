@@ -231,16 +231,24 @@ handle_fatal_signal(int signum,
   void *pc = 0;
   ucontext_t *ctx = (ucontext_t *)uctx;
 
-#ifdef __DARWIN_UNIX03
+#if defined(__arm64__) && __DARWIN_OPAQUE_ARM_THREAD_STATE64
+#define THREAD_STATE_MEMBER(x) __opaque_##x
+#elif __DARWIN_UNIX03
+#define THREAD_STATE_MEMBER(x) __##x
+#else
+#define THREAD_STATE_MEMBER(x) x
+#endif
+
+#if __DARWIN_UNIX03
 #define CTX_MEMBER(x) __##x
 #else
 #define CTX_MEMBER(x) x
 #endif
 
 #if defined(__x86_64__)
-  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).CTX_MEMBER(rip));
+  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).THREAD_STATE_MEMBER(rip));
 #elif defined(__arm64__)
-  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).CTX_MEMBER(pc));
+  pc = (void *)(ctx->uc_mcontext->CTX_MEMBER(ss).THREAD_STATE_MEMBER(pc));
 #endif
 
   _swift_displayCrashMessage(signum, pc);

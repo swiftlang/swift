@@ -41,12 +41,12 @@ internal struct DumpGenericMetadata: ParsableCommand {
       let allocations: [swift_metadata_allocation_t] =
           try process.context.allocations.sorted()
 
-      let generics: [Metadata] = allocations.compactMap { allocation in
+      let generics: [Metadata] = allocations.compactMap { allocation -> Metadata? in
         let pointer = swift_reflection_allocationMetadataPointer(process.context, allocation)
         if pointer == 0 { return nil }
 
         return Metadata(ptr: pointer,
-                        allocation: allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + UInt64($0.size) }),
+                        allocation: allocations.last(where: { pointer >= $0.ptr && pointer < $0.ptr + swift_reflection_ptr_t($0.size) }),
                         name: (process.context.name(type: pointer, mangled: genericMetadataOptions.mangled) ?? "<unknown>"),
                         isArrayOfClass: process.context.isArrayOfClass(pointer))
       }

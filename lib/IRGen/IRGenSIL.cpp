@@ -125,16 +125,7 @@ struct CoroutineState {
 class LoweredValue {
 public:
   enum class Kind {
-    /// The first two LoweredValue kinds correspond to a SIL address value.
-    ///
-    /// The LoweredValue of an existential alloc_stack keeps an owning container
-    /// in addition to the address of the allocated buffer.
-    /// Depending on the allocated type, the container may be equal to the
-    /// buffer itself (for types with known sizes) or it may be the address
-    /// of a fixed-size container which points to the heap-allocated buffer.
-    /// In this case the address-part may be null, which means that the buffer
-    /// is not allocated yet.
-    ContainedAddress,
+    /// The first three LoweredValue kinds correspond to a SIL address value.
 
     /// The LoweredValue of a resilient, generic, or loadable typed alloc_stack
     /// keeps an optional stackrestore point in addition to the address of the
@@ -171,15 +162,14 @@ public:
     /// A coroutine state.
     CoroutineState,
   };
-  
+
   Kind kind;
   
 private:
   using ExplosionVector = SmallVector<llvm::Value *, 4>;
   using SingletonExplosion = llvm::Value*;
 
-  using Members = ExternalUnionMembers<ContainedAddress,
-                                       StackAddress,
+  using Members = ExternalUnionMembers<StackAddress,
                                        OwnedAddress,
                                        DynamicallyEnforcedAddress,
                                        ExplosionVector,
@@ -191,7 +181,6 @@ private:
   
   static Members::Index getMemberIndexForKind(Kind kind) {
     switch (kind) {
-    case Kind::ContainedAddress: return Members::indexOf<ContainedAddress>();
     case Kind::StackAddress: return Members::indexOf<StackAddress>();
     case Kind::OwnedAddress: return Members::indexOf<OwnedAddress>();
     case Kind::DynamicallyEnforcedAddress: return Members::indexOf<DynamicallyEnforcedAddress>();
@@ -230,23 +219,7 @@ public:
       : kind(Kind::DynamicallyEnforcedAddress) {
     Storage.emplace<DynamicallyEnforcedAddress>(kind, address);
   }
-  
-  enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
 
-  /// Create an address value for an alloc_stack, consisting of a container and
-  /// a not yet allocated buffer.
-  LoweredValue(const Address &container, ContainerForUnallocatedAddress_t)
-      : kind(Kind::ContainedAddress) {
-    Storage.emplace<ContainedAddress>(kind, container, Address());
-  }
-  
-  /// Create an address value for an alloc_stack, consisting of a container and
-  /// the address of the allocated buffer.
-  LoweredValue(const ContainedAddress &address)
-      : kind(Kind::ContainedAddress) {
-    Storage.emplace<ContainedAddress>(kind, address);
-  }
-  
   LoweredValue(const FunctionPointer &fn)
       : kind(Kind::FunctionPointer) {
     Storage.emplace<FunctionPointer>(kind, fn);
@@ -304,29 +277,12 @@ public:
     return (kind == Kind::StackAddress ||
             kind == Kind::DynamicallyEnforcedAddress);
   }
-  bool isUnallocatedAddressInBuffer() const {
-    return kind == Kind::ContainedAddress &&
-           !Storage.get<ContainedAddress>(kind).getAddress().isValid();
-  }
   bool isBoxWithAddress() const {
     return kind == Kind::OwnedAddress;
   }
   
   const StackAddress &getStackAddress() const {
     return Storage.get<StackAddress>(kind);
-  }
-  
-  Address getContainerOfAddress() const {
-    const auto &containedAddress = Storage.get<ContainedAddress>(kind);
-    assert(containedAddress.getContainer().isValid() && "address has no container");
-    return containedAddress.getContainer();
-  }
-
-  Address getAddressInContainer() const {
-    const auto &containedAddress = Storage.get<ContainedAddress>(kind);
-    assert(containedAddress.getContainer().isValid() &&
-           "address has no container");
-    return containedAddress.getAddress();
   }
 
   const DynamicallyEnforcedAddress &getDynamicallyEnforcedAddress() const {
@@ -336,8 +292,6 @@ public:
   Address getAnyAddress() const {
     if (kind == LoweredValue::Kind::StackAddress) {
       return Storage.get<StackAddress>(kind).getAddress();
-    } else if (kind == LoweredValue::Kind::ContainedAddress) {
-      return getAddressInContainer();
     } else {
       return getDynamicallyEnforcedAddress().Addr;
     }
@@ -500,24 +454,6 @@ public:
     assert(isAddress(v) && "address for non-address value?!");
     setLoweredValue(v, DynamicallyEnforcedAddress{address, scratch});
   }
-  
-  void setContainerOfUnallocatedAddress(SILValue v,
-                                        const Address &buffer) {
-    assert(isAddress(v) && "address for non-address value?!");
-    setLoweredValue(v,
-      LoweredValue(buffer, LoweredValue::ContainerForUnallocatedAddress));
-  }
-  
-  void overwriteAllocatedAddress(SILValue v, const Address &address) {
-    assert(isAddress(v) && "address for non-address value?!");
-    auto it = LoweredValues.find(v);
-    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
-    assert(it->second.isUnallocatedAddressInBuffer() &&
-           "not an unallocated address");
-    it->second = ContainedAddress(it->second.getContainerOfAddress(), address);
-  }
-
-  void setAllocatedAddressForBuffer(SILValue v, const Address &allocedAddress);
 
   /// Create a new Explosion corresponding to the given SIL value.
   void setLoweredExplosion(SILValue v, Explosion &e) {
@@ -1817,7 +1753,6 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, SILType type,
     ex.add(Storage.get<StackAddress>(kind).getAddressPointer());
     return;
 
-  case Kind::ContainedAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
     llvm_unreachable("not a value");
@@ -1853,7 +1788,6 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF,
                                                  SILType type) const {
   switch (kind) {
   case Kind::StackAddress:
-  case Kind::ContainedAddress:
   case Kind::DynamicallyEnforcedAddress:
   case Kind::CoroutineState:
     llvm_unreachable("not a value");
@@ -3422,7 +3356,6 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
 
   case LoweredValue::Kind::EmptyExplosion:
   case LoweredValue::Kind::OwnedAddress:
-  case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
   case LoweredValue::Kind::CoroutineState:
@@ -3847,7 +3780,6 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   auto fnType = v->getType().castTo<SILFunctionType>();
 
   switch (lv.kind) {
-  case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::StackAddress:
   case LoweredValue::Kind::DynamicallyEnforcedAddress:
   case LoweredValue::Kind::OwnedAddress:
@@ -7581,24 +7513,12 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   setLoweredFunctionPointer(i, fn);
 }
 
-void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
-                                                const Address &allocedAddress) {
-  overwriteAllocatedAddress(v, allocedAddress);
-
-  // Emit the debug info for the variable if any.
-  if (auto allocStack = dyn_cast<AllocStackInst>(v)) {
-    emitDebugInfoForAllocStack(allocStack, getTypeInfo(v->getType()),
-                               allocedAddress.getAddress());
-  }
-}
-
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc()->getType();
   const TypeInfo &addrTI = getTypeInfo(addrTy);
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
-  assert(!loweredDest.isUnallocatedAddressInBuffer());
   Address dest = loweredDest.getAnyAddress();
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
@@ -7622,7 +7542,6 @@ void IRGenSILFunction::visitExplicitCopyAddrInst(
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
-  assert(!loweredDest.isUnallocatedAddressInBuffer());
   Address dest = loweredDest.getAnyAddress();
   if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {

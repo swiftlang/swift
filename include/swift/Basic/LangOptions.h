@@ -22,6 +22,7 @@
 #include "swift/Basic/FixedBitSet.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
 #include "clang/CAS/CASOptions.h"
@@ -216,6 +217,10 @@ namespace swift {
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
+    /// Enable loading a package interface if both client and depdency module are in the
+    /// same package determined by `package-name` flag.
+    bool EnablePackageInterfaceLoad = false;
+
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
@@ -298,9 +303,8 @@ namespace swift {
     /// Indicates whether the playground transformation should be applied.
     bool PlaygroundTransform = false;
 
-    /// Indicates whether the playground transformation should omit
-    /// instrumentation that has a high runtime performance impact.
-    bool PlaygroundHighPerformance = false;
+    /// Indicates the specific playground transformations to apply.
+    PlaygroundOptionSet PlaygroundOptions;
 
     /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;

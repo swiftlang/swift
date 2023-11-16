@@ -881,6 +881,7 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction {
   }
 
   public var isLexical: Bool { bridged.BeginBorrow_isLexical() }
+  public var hasPointerEscape: Bool { bridged.BeginBorrow_hasPointerEscape() }
 }
 
 final public class ProjectBoxInst : SingleValueInstruction, UnaryInstruction {

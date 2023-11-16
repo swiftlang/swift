@@ -48,6 +48,39 @@ enum class RestrictedImportKind {
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = llvm::Optional<AttributedImport<ImportedModule>>;
 
+/// Stores range information for a \c #if block in a SourceFile.
+class IfConfigRangeInfo final {
+  /// The range of the entire \c #if block, including \c #else and \c #endif.
+  CharSourceRange WholeRange;
+
+  /// The range of the active selected body, if there is one. This does not
+  /// include the outer syntax of the \c #if. This may be invalid, which
+  /// indicates there is no active body.
+  CharSourceRange ActiveBodyRange;
+
+public:
+  IfConfigRangeInfo(CharSourceRange wholeRange, CharSourceRange activeBodyRange)
+      : WholeRange(wholeRange), ActiveBodyRange(activeBodyRange) {
+    assert(wholeRange.getByteLength() > 0 && "Range must be non-empty");
+    assert(activeBodyRange.isInvalid() || wholeRange.contains(activeBodyRange));
+  }
+
+  CharSourceRange getWholeRange() const { return WholeRange; }
+  SourceLoc getStartLoc() const { return WholeRange.getStart(); }
+
+  friend bool operator==(const IfConfigRangeInfo &lhs,
+                         const IfConfigRangeInfo &rhs) {
+    return lhs.WholeRange == rhs.WholeRange &&
+           lhs.ActiveBodyRange == rhs.ActiveBodyRange;
+  }
+
+  /// Retrieve the ranges produced by subtracting the active body range from
+  /// the whole range. This includes both inactive branches as well as the
+  /// other syntax of the \c #if.
+  SmallVector<CharSourceRange, 2>
+  getRangesWithoutActiveBody(const SourceManager &SM) const;
+};
+
 /// A file containing Swift source code.
 ///
 /// This is a .swift or .sil file (or a virtual file, such as the contents of
@@ -208,6 +241,19 @@ private:
   /// resume parsing at the code completion token in the file.
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
+
+  struct IfConfigRangesData {
+    /// All the \c #if source ranges in this file.
+    std::vector<IfConfigRangeInfo> Ranges;
+
+    /// Whether the elemnts in \c Ranges are sorted in source order within
+    /// this file. We flip this to \c false any time a new range gets recorded,
+    /// and lazily do the sorting when doing a query.
+    bool IsSorted = false;
+  };
+
+  /// Stores all the \c #if source range info in this file.
+  mutable IfConfigRangesData IfConfigRanges;
 
   friend class HasImportsMatchingFlagRequest;
 
@@ -447,6 +493,13 @@ public:
   void addMissingImportedModule(ImportedModule module) const {
      const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
   }
+
+  /// Record the source range info for a parsed \c #if block.
+  void recordIfConfigRangeInfo(IfConfigRangeInfo ranges);
+
+  /// Retrieve the source range infos for any \c #if blocks contained within a
+  /// given source range of this file.
+  ArrayRef<IfConfigRangeInfo> getIfConfigsWithin(SourceRange outer) const;
 
   void getMissingImportedModules(
          SmallVectorImpl<ImportedModule> &imports) const override;

@@ -1048,7 +1048,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     return true;
 
   case DAK_SPIAccessControl: {
-    if (!Options.PrintSPIs) return false;
+    if (Options.printPublicInterface()) return false;
 
     auto spiAttr = static_cast<const SPIAccessControlAttr*>(this);
     interleave(spiAttr->getSPIGroups(),
@@ -1100,7 +1100,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto Attr = cast<AvailableAttr>(this);
     if (Options.SuppressNoAsyncAvailabilityAttr && Attr->isNoAsync())
       return false;
-    if (!Options.PrintSPIs && Attr->IsSPI) {
+    if (Options.printPublicInterface() && Attr->IsSPI) {
       assert(Attr->hasPlatform());
       assert(Attr->Introduced.has_value());
       Printer.printAttrName("@available");
@@ -1196,7 +1196,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<SpecializeAttr>(this);
     // Don't print the _specialize attribute if it is marked spi and we are
     // asked to skip SPI.
-    if (!Options.PrintSPIs && !attr->getSPIGroups().empty())
+    if (Options.printPublicInterface() && !attr->getSPIGroups().empty())
       return false;
 
     // Don't print the _specialize attribute if we are asked to skip the ones

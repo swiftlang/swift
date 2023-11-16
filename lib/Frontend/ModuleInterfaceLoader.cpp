@@ -647,7 +647,8 @@ class ModuleInterfaceLoaderImpl {
     if (!sdkPath.empty() &&
         hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                   path::begin(sdkPath), path::end(sdkPath))) {
-      return !StringRef(interfacePath).endswith(".private.swiftinterface");
+      return !(StringRef(interfacePath).endswith(".private.swiftinterface") ||
+               StringRef(interfacePath).endswith(".package.swiftinterface"));
     }
     return false;
   }
@@ -695,7 +696,8 @@ class ModuleInterfaceLoaderImpl {
     if (sdkPath.empty() ||
         !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
                    path::begin(sdkPath), path::end(sdkPath)) ||
-        StringRef(interfacePath).endswith(".private.swiftinterface"))
+        StringRef(interfacePath).endswith(".private.swiftinterface") ||
+         StringRef(interfacePath).endswith(".package.swiftinterface"))
       return llvm::None;
 
     // If the module isn't target-specific, there's no fallback path.
@@ -1217,7 +1219,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
   auto &fs = *Ctx.SourceMgr.getFileSystem();
-  std::string InPath = BaseName.findInterfacePath(fs).value_or("");
+  std::string InPath = BaseName.findInterfacePath(fs, Ctx).value_or("");
   if (InPath.empty()) {
     if (fs.exists(ModPath)) {
       LLVM_DEBUG(llvm::dbgs()
@@ -1285,8 +1287,10 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(StringRef mo
   auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
   llvm::SmallString<32> modulePath;
 
-  // When looking up the module for a private interface, strip the '.private.' section of the base name
-  if (interfacePath.endswith(".private." + interfaceExt.str())) {
+  // When looking up the module for a private or package interface, strip
+  // the '.private.' or '.package.'section of the base name
+  if (interfacePath.endswith(".private." + interfaceExt.str()) ||
+      interfacePath.endswith(".package." + interfaceExt.str())) {
     auto newBaseName = llvm::sys::path::stem(llvm::sys::path::stem(interfacePath));
     modulePath = llvm::sys::path::parent_path(interfacePath);
     llvm::sys::path::append(modulePath, newBaseName + "." + newExt.str());

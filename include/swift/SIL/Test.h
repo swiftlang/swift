@@ -151,7 +151,10 @@ public:
   ///     } // end namespace swift::test
   FunctionTest(StringRef name, Invocation invocation);
 
-  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
+  /// Creates a test that will run \p invocation and stores it in the global
+  /// registry.
+  static void createNativeSwiftFunctionTest(StringRef name,
+                                            NativeSwiftInvocation invocation);
 
   /// Computes and returns the function's dominance tree.
   DominanceInfo *getDominanceInfo();
@@ -254,6 +257,11 @@ private:
   /// The vendor for dependencies provided to the test by TestRunner.  Only
   /// non-null when FunctionTest::run is executing.
   Dependencies *dependencies;
+
+public:
+  /// Creates a test that will run \p invocation.  For use by
+  /// createNativeSwiftFunctionTest.
+  FunctionTest(StringRef name, NativeSwiftInvocation invocation);
 };
 
 /// Thunks for delaying template instantiation.

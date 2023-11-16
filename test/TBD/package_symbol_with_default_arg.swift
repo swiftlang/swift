@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 

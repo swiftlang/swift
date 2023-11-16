@@ -175,7 +175,7 @@
                 "swift-integration-tests": "release/5.10",
                 "swift-xcode-playground-support": "release/5.10",
                 "ninja": "release",
-                "icu": "release-65-1",
+                "icu": "maint/maint-69",
                 "yams": "5.0.1",
                 "cmake": "v3.24.2",
                 "indexstore-db": "release/5.10",

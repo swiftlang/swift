@@ -524,7 +524,7 @@ std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
 
   if (ModuleInterfaceSourcePath) {
     if (auto InterfacePath =
-        BaseName.findInterfacePath(*Ctx.SourceMgr.getFileSystem()))
+        BaseName.findInterfacePath(*Ctx.SourceMgr.getFileSystem(), Ctx))
       ModuleInterfaceSourcePath->assign(InterfacePath->begin(),
                                         InterfacePath->end());
   }
@@ -597,16 +597,62 @@ std::string SerializedModuleBaseName::getName(file_types::ID fileTy) const {
 }
 
 llvm::Optional<std::string>
-SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs) const {
+SerializedModuleBaseName::getPackageInterfacePathIfInSamePackage(llvm::vfs::FileSystem &fs,
+                                                                 ASTContext &ctx) const {
+  if (!ctx.LangOpts.EnablePackageInterfaceLoad)
+    return {};
+
+  std::string packagePath{
+    getName(file_types::TY_PackageSwiftModuleInterfaceFile)};
+
+  if (fs.exists(packagePath)) {
+    // Read the interface file and extract its package-name argument value
+    StringRef result;
+    if (auto packageFile = llvm::MemoryBuffer::getFile(packagePath)) {
+      llvm::BumpPtrAllocator alloc;
+      llvm::StringSaver argSaver(alloc);
+      SmallVector<const char*, 8> args;
+      (void)extractCompilerFlagsFromInterface(packagePath,
+                                              (*packageFile)->getBuffer(), argSaver, args);
+      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+        StringRef current(args[I]), next(args[I + 1]);
+        if (current == "-package-name") {
+          // Instead of `break` here, continue to get the last value in case of dupes,
+          // to be consistent with the default parsing logic.
+          result = next;
+        }
+      }
+    }
+    // Return the .package.swiftinterface path if the package name applies to
+    // the importer module.
+    if (!result.empty() && result == ctx.LangOpts.PackageName)
+      return packagePath;
+  }
+  return {};
+}
+
+llvm::Optional<std::string>
+SerializedModuleBaseName::findInterfacePath(llvm::vfs::FileSystem &fs, ASTContext &ctx) const {
   std::string interfacePath{getName(file_types::TY_SwiftModuleInterfaceFile)};
+  // Ensure the public swiftinterface already exists, otherwise bail early
+  // as it's considered the module doesn't exist.
   if (!fs.exists(interfacePath))
     return {};
 
+  // Check if a package interface exists and if the package name applies to
+  // the importer module.
+  auto pkgPath = getPackageInterfacePathIfInSamePackage(fs, ctx).value_or("");
+  if (!pkgPath.empty() && fs.exists(pkgPath))
+    return pkgPath;
+
+  // If above fails, use the existing logic as fallback.
   // If present, use the private interface instead of the public one.
   std::string privatePath{
       getName(file_types::TY_PrivateSwiftModuleInterfaceFile)};
   if (fs.exists(privatePath))
     return privatePath;
+
+  // Otherwise return the public .swiftinterface path
   return interfacePath;
 }
 
@@ -688,6 +734,7 @@ bool SerializedModuleLoaderBase::findModule(
       (moduleName + ".framework").str(),
       genericBaseName.getName(file_types::TY_SwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile),
+      genericBaseName.getName(file_types::TY_PackageSwiftModuleInterfaceFile),
       genericBaseName.getName(file_types::TY_SwiftModuleFile)};
 
   auto searchPaths = Ctx.SearchPathOpts.moduleSearchPathsContainingFile(

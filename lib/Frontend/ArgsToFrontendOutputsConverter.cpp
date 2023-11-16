@@ -325,6 +325,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_interface_path);
   auto privateModuleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_private_module_interface_path);
+  auto packageModuleInterfaceOutput = getSupplementaryFilenamesFromArguments(options::OPT_emit_package_module_interface_path);
   auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_source_info_path);
   auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
@@ -342,7 +343,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
+      !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
       !moduleSemanticInfoOutput || !optRecordOutput) {
     return llvm::None;
@@ -364,6 +365,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
     sop.PrivateModuleInterfaceOutputPath = (*privateModuleInterfaceOutput)[i];
+    sop.PackageModuleInterfaceOutputPath = (*packageModuleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
     sop.ABIDescriptorOutputPath = (*abiDescriptorOutput)[i];
@@ -475,6 +477,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       pathsFromArguments.ModuleInterfaceOutputPath;
   auto PrivateModuleInterfaceOutputPath =
       pathsFromArguments.PrivateModuleInterfaceOutputPath;
+  auto PackageModuleInterfaceOutputPath =
+      pathsFromArguments.PackageModuleInterfaceOutputPath;
 
   // There is no non-path form of -emit-abi-descriptor-path
   auto ABIDescriptorOutputPath = pathsFromArguments.ABIDescriptorOutputPath;
@@ -518,6 +522,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.PrivateModuleInterfaceOutputPath = PrivateModuleInterfaceOutputPath;
+  sop.PackageModuleInterfaceOutputPath = PackageModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
   sop.ABIDescriptorOutputPath = ABIDescriptorOutputPath;
@@ -617,6 +622,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
                                options::OPT_emit_loaded_module_trace_path,
                                options::OPT_emit_module_interface_path,
                                options::OPT_emit_private_module_interface_path,
+                               options::OPT_emit_package_module_interface_path,
                                options::OPT_emit_module_source_info_path,
                                options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),

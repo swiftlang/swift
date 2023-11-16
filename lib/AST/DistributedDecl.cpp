@@ -110,7 +110,7 @@ Type swift::getSerializationRequirementTypesForMember(
   auto SerReqAssocType = DA->getAssociatedType(C.Id_SerializationRequirement)
       ->getDeclaredInterfaceType();
 
-  if (DC->getSelfProtocolDecl() || isa<ExtensionDecl>(DC)) {
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = member->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();
@@ -119,15 +119,8 @@ Type swift::getSerializationRequirementTypesForMember(
     }
 
     // Also store all `SerializationRequirement : SomeProtocol` requirements
-    for (auto requirement: signature.getRequirements()) {
-      if (requirement.getFirstType()->isEqual(SerReqAssocType) &&
-          requirement.getKind() == RequirementKind::Conformance) {
-        if (auto nominal = requirement.getSecondType()->getAnyNominal()) {
-          if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-            serializationRequirements.insert(protocol);
-          }
-        }
-      }
+    for (auto proto: signature->getRequiredProtocols(SerReqAssocType)) {
+      serializationRequirements.insert(proto);
     }
 
     // Note that this may be null, e.g. if we're a distributed func inside

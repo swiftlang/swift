@@ -61,11 +61,11 @@ extension EnumCaseParameterSyntax: ValueParameterSyntax {
 }
 
 extension ASTGenVisitor {
-  func generate(_ node: FunctionParameterSyntax) -> BridgedParamDecl {
+  func generate(functionParameter node: FunctionParameterSyntax) -> BridgedParamDecl {
     self.makeParamDecl(node)
   }
 
-  func generate(_ node: EnumCaseParameterSyntax) -> BridgedParamDecl {
+  func generate(enumCaseParameter node: EnumCaseParameterSyntax) -> BridgedParamDecl {
     self.makeParamDecl(node)
   }
 
@@ -83,7 +83,7 @@ extension ASTGenVisitor {
 
     let (secondName, secondNameLoc) = node.secondName.bridgedIdentifierAndSourceLoc(in: self)
 
-    var type = self.generate(node.optionalType)
+    var type = self.generate(optional: node.optionalType)
     if let ellipsis = node.ellipsis, let base = type {
       type = BridgedVarargTypeRepr.createParsed(
         self.ctx,
@@ -101,7 +101,7 @@ extension ASTGenVisitor {
       secondName: secondName,
       secondNameLoc: secondNameLoc,
       type: type.asNullable,
-      defaultValue: self.generate(node.defaultValue?.value).asNullable
+      defaultValue: self.generate(optional: node.defaultValue?.value).asNullable
     )
   }
 }
@@ -109,16 +109,16 @@ extension ASTGenVisitor {
 // MARK: - ParameterList
 
 extension ASTGenVisitor {
-  func generate(_ node: FunctionParameterClauseSyntax) -> BridgedParameterList {
+  func generate(functionParameterClause node: FunctionParameterClauseSyntax) -> BridgedParameterList {
     BridgedParameterList.createParsed(
       self.ctx,
       leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
-      parameters: self.generate(node.parameters),
+      parameters: self.generate(functionParameterList: node.parameters),
       rightParenLoc: node.rightParen.bridgedSourceLoc(in: self)
     )
   }
 
-  func generate(_ node: EnumCaseParameterClauseSyntax) -> BridgedParameterList {
+  func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax) -> BridgedParameterList {
     BridgedParameterList.createParsed(
       self.ctx,
       leftParenLoc: node.leftParen.bridgedSourceLoc(in: self),
@@ -130,7 +130,7 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   @inline(__always)
-  func generate(_ node: FunctionParameterListSyntax) -> BridgedArrayRef {
+  func generate(functionParameterList node: FunctionParameterListSyntax) -> BridgedArrayRef {
     node.lazy.map(self.generate).bridgedArray(in: self)
   }
 }

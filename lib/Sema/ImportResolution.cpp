@@ -751,9 +751,10 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   ASTContext &ctx = topLevelModule->getASTContext();
   if (!topLevelModule->getPackageName().empty() &&
       topLevelModule->getPackageName().str() == ctx.LangOpts.PackageName &&
-      topLevelModule->isBuiltFromInterface()) {
+      topLevelModule->isBuiltFromInterface() &&
+      !topLevelModule->getModuleSourceFilename().endswith(".package.swiftinterface")) {
       ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
-                         diag::in_package_module_not_compiled_from_source,
+                         diag::in_package_module_not_compiled_from_source_or_package_interface,
                          topLevelModule->getBaseIdentifier(),
                          ctx.LangOpts.PackageName,
                          topLevelModule->getModuleSourceFilename()
