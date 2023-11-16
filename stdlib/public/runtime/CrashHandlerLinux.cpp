@@ -243,7 +243,11 @@ handle_fatal_signal(int signum,
 #elif defined(__arm64__) || defined(__aarch64__)
   pc = (void *)(ctx->uc_mcontext.pc);
 #elif defined(__arm__)
+#if defined(__ANDROID__)
+  pc = (void *)(ctx->uc_mcontext.arm_pc);
+#else
   pc = (void *)(ctx->uc_mcontext.gprs[15]);
+#endif
 #endif
 
   _swift_displayCrashMessage(signum, pc);
