@@ -168,3 +168,5 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 
 
 @_marker public protocol Copyable {}
+
+@_marker public protocol _ConstExtractable {}
