@@ -467,6 +467,98 @@ bool swiftscan_cached_output_load(swiftscan_cached_output_t output,
   return success();
 }
 
+namespace {
+/// Asynchronously visits the graph of the object node to ensure it's fully
+/// materialized.
+class AsyncObjectLoader
+    : public std::enable_shared_from_this<AsyncObjectLoader> {
+  void *Ctx;
+  void (*Callback)(void *Ctx, bool, swiftscan_string_ref_t);
+  llvm::cas::ObjectStore &CAS;
+
+  // The output handle to update after load if set.
+  SwiftCachedOutputHandle *OutputHandle;
+
+  llvm::SmallDenseSet<llvm::cas::ObjectRef> ObjectsSeen;
+  unsigned NumPending = 0;
+  std::optional<llvm::cas::ObjectProxy> RootObj;
+  std::atomic<bool> MissingNode{false};
+  /// The first error that occurred.
+  std::optional<llvm::Error> ErrOccurred;
+  std::mutex Mutex;
+
+public:
+  AsyncObjectLoader(void *Ctx,
+                    void (*Callback)(void *Ctx, bool, swiftscan_string_ref_t),
+                    llvm::cas::ObjectStore &CAS,
+                    SwiftCachedOutputHandle *Handle = nullptr)
+      : Ctx(Ctx), Callback(Callback), CAS(CAS), OutputHandle(Handle) {}
+
+  void visit(llvm::cas::ObjectRef Ref, bool IsRootNode) {
+    {
+      std::lock_guard<std::mutex> Guard(Mutex);
+      if (!ObjectsSeen.insert(Ref).second)
+        return;
+      ++NumPending;
+    }
+    auto This = shared_from_this();
+    CAS.getProxyAsync(
+        Ref, [This, IsRootNode](
+                 llvm::Expected<std::optional<llvm::cas::ObjectProxy>> Obj) {
+          SWIFT_DEFER { This->finishedNode(); };
+          if (!Obj) {
+            This->encounteredError(Obj.takeError());
+            return;
+          }
+          if (!*Obj) {
+            This->MissingNode = true;
+            return;
+          }
+          if (IsRootNode)
+            This->RootObj = *Obj;
+          if (auto Err = (*Obj)->forEachReference(
+                  [&This](llvm::cas::ObjectRef Sub) -> llvm::Error {
+                    This->visit(Sub, /*IsRootNode*/ false);
+                    return llvm::Error::success();
+                  })) {
+            This->encounteredError(std::move(Err));
+            return;
+          }
+        });
+  }
+
+  void finishedNode() {
+    {
+      std::lock_guard<std::mutex> Guard(Mutex);
+      assert(NumPending);
+      --NumPending;
+      if (NumPending != 0)
+        return;
+    }
+    if (ErrOccurred) {
+      std::string ErrMsg = toString(std::move(*ErrOccurred));
+      return Callback(Ctx, false, createNonOwningString(ErrMsg));
+    }
+    if (MissingNode)
+      return Callback(Ctx, false, swift::c_string_utils::create_null());
+
+    if (OutputHandle)
+      OutputHandle->LoadedProxy = RootObj;
+    return Callback(Ctx, true, swift::c_string_utils::create_null());
+  }
+
+  /// Only keeps the first error that occurred.
+  void encounteredError(llvm::Error &&E) {
+    std::lock_guard<std::mutex> Guard(Mutex);
+    if (ErrOccurred) {
+      llvm::consumeError(std::move(E));
+      return;
+    }
+    ErrOccurred = std::move(E);
+  }
+};
+} // namespace
+
 void swiftscan_cached_output_load_async(
     swiftscan_cached_output_t output, void *ctx,
     void (*callback)(void *ctx, bool success, swiftscan_string_ref_t error),
@@ -478,93 +570,35 @@ void swiftscan_cached_output_load_async(
   if (Out->LoadedProxy)
     return callback(ctx, true, swift::c_string_utils::create_null());
 
-  /// Asynchronously visits the graph of the object node to ensure it's fully
-  /// materialized.
-  class AsyncObjectLoader
-      : public std::enable_shared_from_this<AsyncObjectLoader> {
-    void *Ctx;
-    void (*Callback)(void *Ctx, bool, swiftscan_string_ref_t);
-    SwiftCachedOutputHandle &Handle;
+  auto Loader =
+      std::make_shared<AsyncObjectLoader>(ctx, callback, Out->CAS, Out);
+  Loader->visit(Out->Ref, /*IsRootNode*/ true);
+}
 
-    llvm::SmallDenseSet<llvm::cas::ObjectRef> ObjectsSeen;
-    unsigned NumPending = 0;
-    std::optional<llvm::cas::ObjectProxy> RootObj;
-    std::atomic<bool> MissingNode{false};
-    /// The first error that occurred.
-    std::optional<llvm::Error> ErrOccurred;
-    std::mutex Mutex;
+void swiftscan_cache_download_cas_object_async(
+    swiftscan_cas_t cas, const char *id, void *ctx,
+    void (*callback)(void *ctx, bool success, swiftscan_string_ref_t error),
+    swiftscan_cache_cancellation_token_t *token) {
+  if (token)
+    *token = nullptr;
 
-  public:
-    AsyncObjectLoader(void *Ctx,
-                      void (*Callback)(void *Ctx, bool, swiftscan_string_ref_t),
-                      SwiftCachedOutputHandle &Handle)
-        : Ctx(Ctx), Callback(Callback), Handle(Handle) {}
-
-    void visit(llvm::cas::ObjectRef Ref, bool IsRootNode) {
-      {
-        std::lock_guard<std::mutex> Guard(Mutex);
-        if (!ObjectsSeen.insert(Ref).second)
-          return;
-        ++NumPending;
-      }
-      auto This = shared_from_this();
-      Handle.CAS.getProxyAsync(
-          Ref, [This, IsRootNode](
-                   llvm::Expected<std::optional<llvm::cas::ObjectProxy>> Obj) {
-            SWIFT_DEFER { This->finishedNode(); };
-            if (!Obj) {
-              This->encounteredError(Obj.takeError());
-              return;
-            }
-            if (!*Obj) {
-              This->MissingNode = true;
-              return;
-            }
-            if (IsRootNode)
-              This->RootObj = *Obj;
-            if (auto Err = (*Obj)->forEachReference(
-                    [&This](llvm::cas::ObjectRef Sub) -> llvm::Error {
-                      This->visit(Sub, /*IsRootNode*/ false);
-                      return llvm::Error::success();
-                    })) {
-              This->encounteredError(std::move(Err));
-              return;
-            }
-          });
-    }
-
-    void finishedNode() {
-      {
-        std::lock_guard<std::mutex> Guard(Mutex);
-        assert(NumPending);
-        --NumPending;
-        if (NumPending != 0)
-          return;
-      }
-      if (ErrOccurred) {
-        std::string ErrMsg = toString(std::move(*ErrOccurred));
-        return Callback(Ctx, false, createNonOwningString(ErrMsg));
-      }
-      if (MissingNode)
-        return Callback(Ctx, false, swift::c_string_utils::create_null());
-
-      Handle.LoadedProxy = RootObj;
-      return Callback(Ctx, true, swift::c_string_utils::create_null());
-    }
-
-    /// Only keeps the first error that occurred.
-    void encounteredError(llvm::Error &&E) {
-      std::lock_guard<std::mutex> Guard(Mutex);
-      if (ErrOccurred) {
-        llvm::consumeError(std::move(E));
-        return;
-      }
-      ErrOccurred = std::move(E);
-    }
+  auto failure = [ctx, callback](llvm::Error E) {
+    std::string ErrMsg = toString(std::move(E));
+    return callback(ctx, false, createNonOwningString(ErrMsg));
   };
 
-  auto Loader = std::make_shared<AsyncObjectLoader>(ctx, callback, *Out);
-  Loader->visit(Out->Ref, /*IsRootNode*/ true);
+  auto &CAS = unwrap(cas)->getCAS();
+  auto ID = CAS.parseID(id);
+  if (!ID)
+    return failure(ID.takeError());
+
+  auto Ref = CAS.getReference(*ID);
+  if (!Ref)
+    return callback(ctx, false, swift::c_string_utils::create_null());
+
+  auto Loader =
+      std::make_shared<AsyncObjectLoader>(ctx, callback, CAS);
+  Loader->visit(*Ref, /*IsRootNode*/ true);
 }
 
 bool swiftscan_cached_output_is_materialized(swiftscan_cached_output_t output) {
