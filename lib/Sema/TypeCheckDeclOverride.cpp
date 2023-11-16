@@ -17,6 +17,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
+#include "TypeCheckEffects.h"
 #include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2036,16 +2037,54 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(base, diag::overridden_here);
     }
   }
-  // If the overriding declaration is 'throws' but the base is not,
-  // complain. Do the same for 'async'
+
+  // Check effects.
   if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
-    if (overrideFn->hasThrows() &&
-        !cast<AbstractFunctionDecl>(base)->hasThrows()) {
+    // Determine the thrown errors in the base and override declarations.
+    auto baseFn = cast<AbstractFunctionDecl>(base);
+    Type overrideThrownError =
+        overrideFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+    Type baseThrownError =
+        baseFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
+
+    if (baseThrownError && baseThrownError->hasTypeParameter()) {
+      auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+      baseThrownError = baseThrownError.subst(subs);
+      baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
+    }
+
+    if (overrideThrownError)
+      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+
+    // Check for a subtyping relationship.
+    switch (compareThrownErrorsForSubtyping(
+                overrideThrownError, baseThrownError, overrideFn)) {
+    case ThrownErrorSubtyping::DropsThrows:
       diags.diagnose(override, diag::override_with_more_effects,
                      override->getDescriptiveKind(), "throwing");
       diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::Mismatch:
+      diags.diagnose(override, diag::override_typed_throws,
+                     override->getDescriptiveKind(), overrideThrownError,
+                     baseThrownError);
+      diags.diagnose(base, diag::overridden_here);
+      break;
+
+    case ThrownErrorSubtyping::ExactMatch:
+    case ThrownErrorSubtyping::Subtype:
+      // Proper subtyping.
+      break;
+
+    case ThrownErrorSubtyping::Dependent:
+      // Only in already ill-formed code.
+      assert(ctx.Diags.hadAnyError());
+      break;
     }
 
+    // If the override is 'async' but the base declaration is not, we have a
+    // problem.
     if (overrideFn->hasAsync() &&
         !cast<AbstractFunctionDecl>(base)->hasAsync()) {
       diags.diagnose(override, diag::override_with_more_effects,

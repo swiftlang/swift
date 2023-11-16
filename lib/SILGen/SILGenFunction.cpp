@@ -771,7 +771,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           val = B.createMarkUnresolvedNonCopyableValueInst(
               loc, val,
               MarkUnresolvedNonCopyableValueInst::CheckKind::
-                  AssignableButNotConsumable);
+                  NoConsumeOrAssign);
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }
@@ -1726,11 +1726,7 @@ void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
   if (!SP->hasRegionCounters() || !getModule().getOptions().UseProfile.empty())
     return;
 
-  const auto &RegionCounterMap = SP->getRegionCounterMap();
-  auto CounterIt = RegionCounterMap.find(Ref);
-
-  assert(CounterIt != RegionCounterMap.end() &&
-         "cannot increment non-existent counter");
+  auto CounterIdx = SP->getCounterIndexFor(Ref);
 
   // If we're at an unreachable point, the increment can be elided as the
   // counter cannot be incremented.
@@ -1738,7 +1734,7 @@ void SILGenFunction::emitProfilerIncrement(ProfileCounterRef Ref) {
     return;
 
   B.createIncrementProfilerCounter(
-      Ref.getLocation(), CounterIt->second, SP->getPGOFuncName(),
+      Ref.getLocation(), CounterIdx, SP->getPGOFuncName(),
       SP->getNumRegionCounters(), SP->getPGOFuncHash());
 }
 

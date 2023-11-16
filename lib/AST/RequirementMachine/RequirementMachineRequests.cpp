@@ -632,14 +632,13 @@ AbstractGenericSignatureRequest::evaluate(
 
   // Convert the input Requirements into StructuralRequirements by adding
   // empty source locations.
-  SmallVector<StructuralRequirement, 4> requirements;
+  SmallVector<StructuralRequirement, 2> requirements;
   for (auto req : baseSignature.getRequirements())
     requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
-  // We need to create this errors vector to pass to
-  // desugarRequirement, but this request should never
-  // diagnose errors.
-  SmallVector<RequirementError, 4> errors;
+  // Add the new requirements.
+  for (auto req : addedRequirements)
+    requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
 
   // The requirements passed to this request may have been substituted,
   // meaning the subject type might be a concrete type and not a type
@@ -651,12 +650,8 @@ AbstractGenericSignatureRequest::evaluate(
   // Desugaring converts these kinds of requirements into "proper"
   // requirements where the subject type is always a type parameter,
   // which is what the RuleBuilder expects.
-  for (auto req : addedRequirements) {
-    SmallVector<Requirement, 2> reqs;
-    desugarRequirement(req, SourceLoc(), reqs, errors);
-    for (auto req : reqs)
-      requirements.push_back({req, SourceLoc(), /*wasInferred=*/false});
-  }
+  SmallVector<RequirementError, 2> errors;
+  desugarRequirements(requirements, errors);
 
   auto &rewriteCtx = ctx.getRewriteContext();
 
@@ -747,8 +742,8 @@ InferredGenericSignatureRequest::evaluate(
       parentSig.getGenericParams().begin(),
       parentSig.getGenericParams().end());
 
-  SmallVector<StructuralRequirement, 4> requirements;
-  SmallVector<RequirementError, 4> errors;
+  SmallVector<StructuralRequirement, 2> requirements;
+  SmallVector<RequirementError, 2> errors;
 
   SourceLoc loc = [&]() {
     if (genericParamList) {
@@ -844,9 +839,6 @@ InferredGenericSignatureRequest::evaluate(
     for (auto *gtpd : genericParamList->getParams())
       localGPs.push_back(gtpd->getDeclaredInterfaceType());
 
-  // Expand defaults and eliminate all inverse-conformance requirements.
-  expandDefaultRequirements(ctx, localGPs, requirements, errors);
-
   // Perform requirement inference from function parameter and result
   // types and such.
   for (auto sourcePair : inferenceSources) {
@@ -860,11 +852,13 @@ InferredGenericSignatureRequest::evaluate(
   // Finish by adding any remaining requirements. This is used to introduce
   // inferred same-type requirements when building the generic signature of
   // an extension whose extended type is a generic typealias.
-  SmallVector<Requirement, 4> rawAddedRequirements;
   for (const auto &req : addedRequirements)
-    desugarRequirement(req, SourceLoc(), rawAddedRequirements, errors);
-  for (const auto &req : rawAddedRequirements)
     requirements.push_back({req, SourceLoc(), /*inferred=*/true});
+
+  desugarRequirements(requirements, errors);
+
+  // Expand defaults and eliminate all inverse-conformance requirements.
+  expandDefaultRequirements(ctx, localGPs, requirements, errors);
 
   // Re-order requirements so that inferred requirements appear last. This
   // ensures that if an inferred requirement is redundant with some other

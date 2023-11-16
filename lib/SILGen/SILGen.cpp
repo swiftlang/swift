@@ -1657,7 +1657,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
     return;
 
   // Force the executable init to be type checked before emission.
-  if (!pbd->getCheckedExecutableInit(i))
+  if (!pbd->getCheckedAndContextualizedExecutableInit(i))
     return;
 
   auto *var = pbd->getAnchoringVarDecl(i);

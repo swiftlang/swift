@@ -68,11 +68,10 @@ protected:
   // clang-format off
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Pattern, bitmax(NumPatternKindBits,8)+1+1,
     Kind : bitmax(NumPatternKindBits,8),
     isImplicit : 1,
-    hasInterfaceType : 1,
-    executableInitChecked : 1
+    hasInterfaceType : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TuplePattern, Pattern, 32,
@@ -105,7 +104,6 @@ protected:
     Bits.Pattern.Kind = unsigned(kind);
     Bits.Pattern.isImplicit = false;
     Bits.Pattern.hasInterfaceType = false;
-    Bits.Pattern.executableInitChecked = false;
   }
 
 private:
@@ -137,11 +135,6 @@ public:
   /// exists no source code for it.
   bool isImplicit() const { return Bits.Pattern.isImplicit; }
   void setImplicit() { Bits.Pattern.isImplicit = true; }
-
-  bool executableInitChecked() const {
-    return Bits.Pattern.executableInitChecked;
-  }
-  void setExecutableInitChecked() { Bits.Pattern.executableInitChecked = true; }
 
   /// Find the smallest subpattern which obeys the property that matching it is
   /// equivalent to matching this pattern.

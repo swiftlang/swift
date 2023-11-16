@@ -3718,35 +3718,31 @@ public:
       return;
     }
 
-    printFieldQuotedRaw([&](raw_ostream &out) { genericSig->print(out); },
-                        "generic_signature");
-
-    auto printSubstitution = [&](GenericTypeParamType * genericParam,
-                                 Type replacementType) {
-      printFieldQuotedRaw([&](raw_ostream &out) {
-        genericParam->print(out);
-        out << " -> ";
-        if (replacementType) {
-          PrintOptions opts;
-          opts.PrintForSIL = true;
-          opts.PrintTypesForDebugging = true;
-          replacementType->print(out, opts);
-        }
-        else
-          out << "<unresolved concrete type>";
-      }, "");
-    };
+    printFieldRaw([&](raw_ostream &out) { genericSig->print(out); },
+                  "generic_signature");
 
     auto genericParams = genericSig.getGenericParams();
     auto replacementTypes =
     static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
     for (unsigned i : indices(genericParams)) {
       if (style == SubstitutionMap::DumpStyle::Minimal) {
-        printSubstitution(genericParams[i], replacementTypes[i]);
+        printFieldRaw([&](raw_ostream &out) {
+          genericParams[i]->print(out);
+          out << " -> ";
+          if (replacementTypes[i])
+            out << replacementTypes[i];
+          else
+            out << "<unresolved concrete type>";
+        }, "");
       } else {
         printRecArbitrary([&](StringRef label) {
           printHead("substitution", ASTNodeColor, label);
-          printSubstitution(genericParams[i], replacementTypes[i]);
+          printFieldRaw([&](raw_ostream &out) {
+            genericParams[i]->print(out);
+            out << " -> ";
+          }, "");
+          if (replacementTypes[i])
+            printRec(replacementTypes[i]);
           printFoot();
         });
       }

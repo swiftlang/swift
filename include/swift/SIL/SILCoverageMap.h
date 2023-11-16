@@ -162,7 +162,16 @@ public:
     return Expressions;
   }
 
-  void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
+  /// Print a given profiling counter expression, given the reference to the
+  /// counter, and the list of counters it may reference.
+  static void
+  printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C,
+               ArrayRef<llvm::coverage::CounterExpression> Expressions);
+
+  /// Print a given profiling counter expression.
+  void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const {
+    printCounter(OS, C, getExpressions());
+  }
 
   /// Print the coverage map.
   void print(llvm::raw_ostream &OS, bool Verbose = false,

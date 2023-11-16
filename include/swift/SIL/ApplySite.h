@@ -500,6 +500,20 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  MutableArrayRef<Operand> getOperandsWithoutSelf() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getOperandsWithoutSelf();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;

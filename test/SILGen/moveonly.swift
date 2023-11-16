@@ -913,7 +913,7 @@ func testGlobalAssign() {
 // CHECK:   store [[ARG]] to [init] [[PROJECT]]
 //
 // CHECK:   [[FN:%.*]] = function_ref @$s8moveonly49checkMarkUnresolvedNonCopyableValueInstOnCaptured1xyAA2FDVn_tFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> (@guaranteed FD) -> @out τ_0_0 for <()>
-// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[PROJECT]]
+// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PROJECT]]
 // CHECK:   [[VALUE:%.*]] = load [copy] [[MARK]]
 // CHECK:   [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[FN]]([[VALUE]])
 // CHECK: } // end sil function '$s8moveonly49checkMarkUnresolvedNonCopyableValueInstOnCaptured1xyAA2FDVn_tF'

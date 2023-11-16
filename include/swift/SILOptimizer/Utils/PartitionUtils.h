@@ -117,32 +117,31 @@ class PartitionOp {
   using Element = PartitionPrimitives::Element;
 
 private:
-  PartitionOpKind OpKind;
-  llvm::SmallVector<Element, 2> OpArgs;
+  PartitionOpKind opKind;
+  llvm::SmallVector<Element, 2> opArgs;
 
   /// Record the SILInstruction that this PartitionOp was generated from, if
   /// generated during compilation from a SILBasicBlock
-  SILInstruction *sourceInst;
-
-  /// Record an AST expression corresponding to this PartitionOp, currently
-  /// populated only for Transfer expressions to indicate the value being
-  /// transferred
-  Expr *sourceExpr;
+  PointerUnion<SILInstruction *, Operand *> source;
 
   // TODO: can the following declarations be merged?
-  PartitionOp(PartitionOpKind OpKind, Element arg1,
-              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
-      : OpKind(OpKind), OpArgs({arg1}), sourceInst(sourceInst),
-        sourceExpr(sourceExpr) {
-    assert((OpKind != PartitionOpKind::Transfer || sourceInst) &&
+  PartitionOp(PartitionOpKind opKind, Element arg1,
+              SILInstruction *sourceInst = nullptr)
+      : opKind(opKind), opArgs({arg1}), source(sourceInst) {
+    assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
-  PartitionOp(PartitionOpKind OpKind, Element arg1, Element arg2,
-              SILInstruction *sourceInst = nullptr, Expr *sourceExpr = nullptr)
-      : OpKind(OpKind), OpArgs({arg1, arg2}), sourceInst(sourceInst),
-        sourceExpr(sourceExpr) {
-    assert((OpKind != PartitionOpKind::Transfer || sourceInst) &&
+  PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand)
+      : opKind(opKind), opArgs({arg1}), source(sourceOperand) {
+    assert((opKind != PartitionOpKind::Transfer || sourceOperand) &&
+           "Transfer needs a sourceInst");
+  }
+
+  PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
+              SILInstruction *sourceInst = nullptr)
+      : opKind(opKind), opArgs({arg1, arg2}), source(sourceInst) {
+    assert((opKind != PartitionOpKind::Transfer || sourceInst) &&
            "Transfer needs a sourceInst");
   }
 
@@ -159,10 +158,8 @@ public:
     return PartitionOp(PartitionOpKind::AssignFresh, tgt, sourceInst);
   }
 
-  static PartitionOp Transfer(Element tgt, SILInstruction *transferringInst,
-                              Expr *sourceExpr = nullptr) {
-    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringInst,
-                       sourceExpr);
+  static PartitionOp Transfer(Element tgt, Operand *transferringOp) {
+    return PartitionOp(PartitionOpKind::Transfer, tgt, transferringOp);
   }
 
   static PartitionOp Merge(Element tgt1, Element tgt2,
@@ -176,57 +173,53 @@ public:
   }
 
   bool operator==(const PartitionOp &other) const {
-      return OpKind == other.OpKind
-             && OpArgs == other.OpArgs
-                && sourceInst == other.sourceInst;
+    return opKind == other.opKind && opArgs == other.opArgs &&
+           source == other.source;
   };
 
   bool operator<(const PartitionOp &other) const {
-    if (OpKind != other.OpKind)
-      return OpKind < other.OpKind;
-    if (OpArgs != other.OpArgs)
-      return OpArgs < other.OpArgs;
-    return sourceInst < other.sourceInst;
+    if (opKind != other.opKind)
+      return opKind < other.opKind;
+    if (opArgs != other.opArgs)
+      return opArgs < other.opArgs;
+    return source < other.source;
   }
 
-  PartitionOpKind getKind() const { return OpKind; }
+  PartitionOpKind getKind() const { return opKind; }
 
-  ArrayRef<Element> getOpArgs() const { return OpArgs; }
+  ArrayRef<Element> getOpArgs() const { return opArgs; }
 
-  SILInstruction *getSourceInst(bool assertNonNull = false) const {
-    assert(!assertNonNull ||
-           sourceInst && "PartitionOps should be assigned SILInstruction"
-                         " sources when used for the core analysis");
-    return sourceInst;
+  SILInstruction *getSourceInst() const {
+    if (source.is<Operand *>())
+      return source.get<Operand *>()->getUser();
+    return source.get<SILInstruction *>();
   }
 
-  SILLocation getSourceLoc() const { return getSourceInst(true)->getLoc(); }
+  Operand *getSourceOp() const { return source.get<Operand *>(); }
 
-  Expr *getSourceExpr() const {
-    return sourceExpr;
-  }
+  SILLocation getSourceLoc() const { return getSourceInst()->getLoc(); }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   void print(llvm::raw_ostream &os, bool extraSpace = false) const {
-    switch (OpKind) {
+    switch (opKind) {
     case PartitionOpKind::Assign: {
       constexpr static char extraSpaceLiteral[10] = "      ";
       os << "assign ";
       if (extraSpace)
         os << extraSpaceLiteral;
-      os << "%%" << OpArgs[0] << " = %%" << OpArgs[1];
+      os << "%%" << opArgs[0] << " = %%" << opArgs[1];
       break;
     }
     case PartitionOpKind::AssignFresh:
-      os << "assign_fresh %%" << OpArgs[0];
+      os << "assign_fresh %%" << opArgs[0];
       break;
     case PartitionOpKind::Transfer: {
       constexpr static char extraSpaceLiteral[10] = "    ";
       os << "transfer ";
       if (extraSpace)
         os << extraSpaceLiteral;
-      os << "%%" << OpArgs[0];
+      os << "%%" << opArgs[0];
       break;
     }
     case PartitionOpKind::Merge: {
@@ -234,7 +227,7 @@ public:
       os << "merge ";
       if (extraSpace)
         os << extraSpaceLiteral;
-      os << "%%" << OpArgs[0] << " with %%" << OpArgs[1];
+      os << "%%" << opArgs[0] << " with %%" << opArgs[1];
       break;
     }
     case PartitionOpKind::Require: {
@@ -242,11 +235,11 @@ public:
       os << "require ";
       if (extraSpace)
         os << extraSpaceLiteral;
-      os << "%%" << OpArgs[0];
+      os << "%%" << opArgs[0];
       break;
     }
     }
-    os << ": " << *getSourceInst(true);
+    os << ": " << *getSourceInst();
   }
 };
 
@@ -288,7 +281,7 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  llvm::SmallDenseMap<Region, SILInstruction *, 2> regionToTransferredInstMap;
+  llvm::SmallDenseMap<Region, Operand *, 2> regionToTransferredOpMap;
 
 public:
   Partition() : elementToRegionMap({}), canonical(true) {}
@@ -342,12 +335,12 @@ public:
 
   /// Mark val as transferred. Returns true if we inserted \p
   /// transferOperand. We return false otherwise.
-  bool markTransferred(Element val, SILInstruction *transferOperand) {
+  bool markTransferred(Element val, Operand *transferOperand) {
     // First see if our val is tracked. If it is not tracked, insert it and mark
     // its new region as transferred.
     if (!isTracked(val)) {
       elementToRegionMap.insert_or_assign(val, fresh_label);
-      regionToTransferredInstMap.insert({fresh_label, transferOperand});
+      regionToTransferredOpMap.insert({fresh_label, transferOperand});
       fresh_label = Region(fresh_label + 1);
       canonical = false;
       return true;
@@ -357,7 +350,7 @@ public:
     auto iter1 = elementToRegionMap.find(val);
     assert(iter1 != elementToRegionMap.end());
     auto iter2 =
-        regionToTransferredInstMap.try_emplace(iter1->second, transferOperand);
+        regionToTransferredOpMap.try_emplace(iter1->second, transferOperand);
     return iter2.second;
   }
 
@@ -384,10 +377,10 @@ public:
 
         // Then if sndRegionNumber is transferred in sndReduced, make sure
         // mergedRegion is transferred in fstReduced.
-        auto iter = sndReduced.regionToTransferredInstMap.find(sndRegionNumber);
-        if (iter != sndReduced.regionToTransferredInstMap.end()) {
-          fstReduced.regionToTransferredInstMap.try_emplace(mergedRegion,
-                                                            iter->second);
+        auto iter = sndReduced.regionToTransferredOpMap.find(sndRegionNumber);
+        if (iter != sndReduced.regionToTransferredOpMap.end()) {
+          fstReduced.regionToTransferredOpMap.try_emplace(mergedRegion,
+                                                          iter->second);
         }
         continue;
       }
@@ -420,9 +413,9 @@ public:
       // due to our traversal being in order. Thus just add this to fst_reduced.
       assert(sndEltNumber == Element(sndRegionNumber));
       fstReduced.elementToRegionMap.insert({sndEltNumber, sndRegionNumber});
-      auto iter = sndReduced.regionToTransferredInstMap.find(sndRegionNumber);
-      if (iter != sndReduced.regionToTransferredInstMap.end()) {
-        fstReduced.regionToTransferredInstMap.insert(
+      auto iter = sndReduced.regionToTransferredOpMap.find(sndRegionNumber);
+      if (iter != sndReduced.regionToTransferredOpMap.end()) {
+        fstReduced.regionToTransferredOpMap.insert(
             {sndRegionNumber, iter->second});
       }
       if (fstReduced.fresh_label < sndRegionNumber)
@@ -489,7 +482,7 @@ public:
 
     os << "[";
     for (auto [regionNo, elementNumbers] : multimap.getRange()) {
-      bool isTransferred = regionToTransferredInstMap.count(regionNo);
+      bool isTransferred = regionToTransferredOpMap.count(regionNo);
       os << (isTransferred ? "{" : "(");
       int j = 0;
       for (Element i : elementNumbers) {
@@ -504,17 +497,17 @@ public:
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return false;
-    return regionToTransferredInstMap.count(iter->second);
+    return regionToTransferredOpMap.count(iter->second);
   }
 
   /// Return the instruction that transferred \p val's region or nullptr
   /// otherwise.
-  SILInstruction *getTransferred(Element val) const {
+  Operand *getTransferred(Element val) const {
     auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
       return nullptr;
-    auto iter2 = regionToTransferredInstMap.find(iter->second);
-    if (iter2 == regionToTransferredInstMap.end())
+    auto iter2 = regionToTransferredOpMap.find(iter->second);
+    if (iter2 == regionToTransferredOpMap.end())
       return nullptr;
     return iter2->second;
   }
@@ -535,7 +528,7 @@ private:
     llvm::SmallDenseSet<Region, 8> seenRegion;
     for (auto &[eltNo, regionNo] : elementToRegionMap) {
       // See if all of our regionToTransferMap keys are regions in labels.
-      if (regionToTransferredInstMap.count(regionNo))
+      if (regionToTransferredOpMap.count(regionNo))
         seenRegion.insert(regionNo);
 
       // Labels should not exceed fresh_label.
@@ -555,7 +548,7 @@ private:
         return fail(eltNo, 3);
     }
 
-    if (seenRegion.size() != regionToTransferredInstMap.size()) {
+    if (seenRegion.size() != regionToTransferredOpMap.size()) {
       llvm::report_fatal_error(
           "FAIL! regionToTransferMap has a region that isn't being tracked?!");
     }
@@ -596,12 +589,15 @@ private:
 
     // Then relabel our regionToTransferredInst map if we need to by swapping
     // out the old map and updating.
-    llvm::SmallDenseMap<Region, SILInstruction *, 2> oldMap =
-        std::move(regionToTransferredInstMap);
-    for (auto &[oldReg, inst] : oldMap) {
+    //
+    // TODO: If we just used an array for this, we could just rewrite and
+    // re-sort and not have to deal with potential allocations.
+    llvm::SmallDenseMap<Region, Operand *, 2> oldMap =
+        std::move(regionToTransferredOpMap);
+    for (auto &[oldReg, op] : oldMap) {
       auto iter = oldRegionToRelabeledMap.find(oldReg);
       assert(iter != oldRegionToRelabeledMap.end());
-      regionToTransferredInstMap[iter->second] = inst;
+      regionToTransferredOpMap[iter->second] = op;
     }
 
     assert(is_canonical_correct());
@@ -628,19 +624,19 @@ private:
 
       // Rename snd to use first region.
       horizontalUpdate(elementToRegionMap, snd, fstRegion);
-      auto iter = regionToTransferredInstMap.find(sndRegion);
-      if (iter != regionToTransferredInstMap.end()) {
-        regionToTransferredInstMap.try_emplace(fstRegion, iter->second);
-        regionToTransferredInstMap.erase(iter);
+      auto iter = regionToTransferredOpMap.find(sndRegion);
+      if (iter != regionToTransferredOpMap.end()) {
+        regionToTransferredOpMap.try_emplace(fstRegion, iter->second);
+        regionToTransferredOpMap.erase(iter);
       }
     } else {
       result = sndRegion;
 
       horizontalUpdate(elementToRegionMap, fst, sndRegion);
-      auto iter = regionToTransferredInstMap.find(fstRegion);
-      if (iter != regionToTransferredInstMap.end()) {
-        regionToTransferredInstMap.try_emplace(sndRegion, iter->second);
-        regionToTransferredInstMap.erase(iter);
+      auto iter = regionToTransferredOpMap.find(fstRegion);
+      if (iter != regionToTransferredOpMap.end()) {
+        regionToTransferredOpMap.try_emplace(sndRegion, iter->second);
+        regionToTransferredOpMap.erase(iter);
       }
     }
 
@@ -702,9 +698,11 @@ struct PartitionOpEvaluator {
   ///
   /// 2. The element in the PartitionOp that was asked to be alive.
   ///
-  /// 3. The instruction that originally transferred the region.
-  std::function<void(const PartitionOp &, Element, SILInstruction *)>
-      failureCallback = nullptr;
+  /// 3. The operand of the instruction that originally transferred the
+  /// region. Can be used to get the immediate value transferred or the
+  /// transferring instruction.
+  std::function<void(const PartitionOp &, Element, Operand *)> failureCallback =
+      nullptr;
 
   /// A list of elements that cannot be transferred. Whenever we transfer, we
   /// check this list to see if we are transferring the element and then call
@@ -727,10 +725,10 @@ struct PartitionOpEvaluator {
 
   /// A wrapper around the failure callback that checks if it is nullptr.
   void handleFailure(const PartitionOp &op, Element elt,
-                     SILInstruction *transferringInst) const {
+                     Operand *transferringOp) const {
     if (!failureCallback)
       return;
-    failureCallback(op, elt, transferringInst);
+    failureCallback(op, elt, transferringOp);
   }
 
   /// A wrapper around transferNonTransferrableCallback that only calls it if it
@@ -829,7 +827,7 @@ struct PartitionOpEvaluator {
         return handleTransferNonTransferrable(op, op.getOpArgs()[0]);
 
       // Mark op.getOpArgs()[0] as transferred.
-      p.markTransferred(op.getOpArgs()[0], op.getSourceInst(true));
+      p.markTransferred(op.getOpArgs()[0], op.getSourceOp());
       break;
     }
     case PartitionOpKind::Merge:

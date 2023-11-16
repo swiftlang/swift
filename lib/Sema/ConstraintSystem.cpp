@@ -1665,8 +1665,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC) {
-  auto &ctx = getASTContext();
-
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -1715,7 +1713,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (!funcDecl->getDeclContext()->isTypeContext() && !funcDecl->getDeclContext()->isLocalContext() ) {
+      if (!funcDecl->getDeclContext()->isTypeContext() &&
+          !funcDecl->getDeclContext()->isLocalContext()) {
         funcType =
             funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
@@ -1724,7 +1723,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
-    openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(), locator);
+    openedType = unwrapPropertyWrapperParameterTypes(
+        *this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(),
+        locator);
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
@@ -2426,6 +2427,27 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
   return type;
 }
 
+static unsigned getApplicationLevel(ConstraintSystem &CS, Type baseTy,
+                                    UnresolvedDotExpr *UDE) {
+  unsigned level = 0;
+
+  // If base is a metatype it would be ignored (unless this is an initializer
+  // call), but if it is some other type it means that we have a single
+  // application level already.
+  if (!baseTy->is<MetatypeType>())
+    ++level;
+
+  if (auto *call = dyn_cast_or_null<CallExpr>(CS.getParentExpr(UDE))) {
+    // Reference is applied only if it appears in a function position
+    // in the parent call expression - i.e. `x(...)` vs. `y(x)`,
+    // the latter doesn't have `x` applied.
+    if (UDE == call->getFn()->getSemanticsProvidingExpr())
+      level += 1;
+  }
+
+  return level;
+}
+
 bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
   // If this is a compiler synthesized implicit conversion, let's skip
   // the check because the base of `UDE` is not the base of the injected
@@ -2440,20 +2462,7 @@ bool ConstraintSystem::isPartialApplication(ConstraintLocator *locator) {
 
   auto baseTy =
       simplifyType(getType(UDE->getBase()))->getWithoutSpecifierType();
-
-  // If base is a metatype it would be ignored (unless this is an initializer
-  // call), but if it is some other type it means that we have a single
-  // application level already.
-  unsigned level = 0;
-  if (!baseTy->is<MetatypeType>())
-    ++level;
-
-  if (auto *call = dyn_cast_or_null<CallExpr>(getParentExpr(UDE))) {
-    if (UDE == call->getFn()->getSemanticsProvidingExpr())
-      level += 1;
-  }
-
-  return level < 2;
+  return getApplicationLevel(*this, baseTy, UDE) < 2;
 }
 
 DeclReferenceType
@@ -2671,7 +2680,10 @@ ConstraintSystem::getTypeOfMemberReference(
       if (isPartialApplication(locator) &&
           isSendableType(DC->getParentModule(), baseOpenedTy)) {
         // Add @Sendable to functions without conditional conformances
-        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+        functionType =
+            functionType
+                ->withExtInfo(functionType->getExtInfo().withConcurrent())
+                ->getAs<FunctionType>();
       }
       // Unapplied values should always be Sendable
       info = info.withConcurrent();
@@ -3088,18 +3100,7 @@ isInvalidPartialApplication(ConstraintSystem &cs,
   if (!isInvalidIfPartiallyApplied())
     return {false,0};
 
-  // If base is a metatype it would be ignored (unless this is an initializer
-  // call), but if it is some other type it means that we have a single
-  // application level already.
-  unsigned level = 0;
-  if (!baseTy->is<MetatypeType>())
-    ++level;
-
-  if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(UDE))) {
-    level += 1;
-  }
-
-  return {true, level};
+  return {true, getApplicationLevel(cs, baseTy, UDE)};
 }
 
 FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {

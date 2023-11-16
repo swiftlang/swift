@@ -44,10 +44,9 @@ using PartitionTester = Partition::PartitionTester;
 // When we transfer we need a specific transfer instruction. We do not ever
 // actually dereference the instruction, so just use some invalid ptr values so
 // we can compare.
-SILInstruction *transferSingletons[5] = {
-    (SILInstruction *)0xDEADBEEF, (SILInstruction *)0xFEADBEED,
-    (SILInstruction *)0xFEDABEED, (SILInstruction *)0xFEDAEBED,
-    (SILInstruction *)0xFBDAEEED,
+Operand *transferSingletons[5] = {
+    (Operand *)0xDEAD0000, (Operand *)0xFEAD0000, (Operand *)0xAEDF0000,
+    (Operand *)0xFEDA0000, (Operand *)0xFBDA0000,
 };
 
 // This test tests that if a series of merges is split between two partitions
@@ -543,13 +542,14 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 
   // expected: p: ({0 1 2 6 7 10} (3 4 5) (8 9) (Element(11)))
 
-  auto never_called = [](const PartitionOp &, unsigned, SILInstruction *) {
+  auto never_called = [](const PartitionOp &, unsigned, Operand *) {
     EXPECT_TRUE(false);
   };
 
   int times_called = 0;
-  auto increment_times_called = [&](const PartitionOp &, unsigned,
-                                    SILInstruction *) { times_called++; };
+  auto increment_times_called = [&](const PartitionOp &, unsigned, Operand *) {
+    times_called++;
+  };
 
   {
     PartitionOpEvaluator eval(p);
@@ -617,15 +617,16 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
   {
     bool failure = false;
     PartitionOpEvaluator eval(p1);
-    eval.failureCallback = [&](const PartitionOp &, unsigned,
-                               SILInstruction *) { failure = true; };
+    eval.failureCallback = [&](const PartitionOp &, unsigned, Operand *) {
+      failure = true;
+    };
     eval.apply(PartitionOp::Require(Element(0)));
     EXPECT_TRUE(failure);
   }
 
   {
     PartitionOpEvaluator eval(p2);
-    eval.failureCallback = [](const PartitionOp &, unsigned, SILInstruction *) {
+    eval.failureCallback = [](const PartitionOp &, unsigned, Operand *) {
       EXPECT_TRUE(false);
     };
     eval.apply(PartitionOp::Require(Element(0)));
