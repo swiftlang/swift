@@ -582,6 +582,11 @@ public:
     return *EndLoc;
   }
 
+  /// Whether the region has a non-empty range.
+  bool hasNonEmptyRange() const {
+    return StartLoc && EndLoc && *StartLoc != *EndLoc;
+  }
+
   void print(llvm::raw_ostream &OS, const SourceManager &SM) const {
     OS << "[";
     if (hasStartLoc())
@@ -1006,6 +1011,7 @@ private:
     assert(I != E && "parent not in stack");
     auto ParentIt = I;
     SourceLoc EndLoc = ParentIt->getEndLoc();
+    assert(ParentIt->hasNonEmptyRange() && "Pushed node with empty range?");
 
     unsigned FirstPoppedIndex = SourceRegions.size();
     (void)FirstPoppedIndex;
@@ -1015,6 +1021,12 @@ private:
         continue;
       if (!I->hasEndLoc())
         I->setEndLoc(EndLoc);
+
+      // If the range ended up being empty, ignore it (this can happen when we
+      // replace the counter, and don't extend the region any further).
+      if (!I->hasNonEmptyRange())
+        continue;
+
       SourceRegions.push_back(std::move(*I));
     }
 

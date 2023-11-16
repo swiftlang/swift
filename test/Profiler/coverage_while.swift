@@ -123,6 +123,10 @@ func goo() {
   } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : ([[RWS8]] - [[RET1]])
 }
 
-eoo()
-foo()
-goo()
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.hoo
+func hoo() {       // CHECK-NEXT: [[@LINE]]:12 -> [[@LINE+5]]:2 : 0
+  var i: Int = 0
+  while (i < 10) { // CHECK-NEXT: [[@LINE]]:9 -> [[@LINE]]:17 : (0 + 1)
+    i += 1         // CHECK-NEXT: [[@LINE-1]]:18 -> [[@LINE+1]]:4 : 1
+  }                // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:2 : 0
+}
