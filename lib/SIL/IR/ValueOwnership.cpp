@@ -275,7 +275,6 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(UncheckedValueCast)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
-FORWARDING_OWNERSHIP_INST(Enum)
 FORWARDING_OWNERSHIP_INST(MarkDependence)
 // NOTE: init_existential_ref from a reference counting perspective is not
 // considered to be "owned" since it doesn't affect reference counts. That being
@@ -295,6 +294,25 @@ FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableValue)
 FORWARDING_OWNERSHIP_INST(CopyableToMoveOnlyWrapperValue)
 FORWARDING_OWNERSHIP_INST(MoveOnlyWrapperToCopyableBox)
 #undef FORWARDING_OWNERSHIP_INST
+
+ValueOwnershipKind
+ValueOwnershipKindClassifier::visitEnumInst(EnumInst *I) {
+  if (!I->getModule().useLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
+    // During address lowering, an address-only enum instruction will eventually
+    // be lowered to inject_enum_addr/init_enum_data_addr, initializing a
+    // non-trivial storage location.  So prior to AddressLowering (in opaque
+    // values mode) such an enum instruction produces a non-trivial value,
+    // without regard to whether it is in a trivial case.  Otherwise, non-trivial
+    // storage would fail to be destroy_addr'd.
+    assert(!I->getType().isTrivial(*I->getFunction()));
+    // An enum instruction is representation changing, so its address-only
+    // operand must be owned.
+    return OwnershipKind::Owned;
+  }
+  return I->getType().isTrivial(*I->getFunction())
+             ? ValueOwnershipKind(OwnershipKind::None)
+             : I->getForwardingOwnershipKind();
+}
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitUncheckedOwnershipConversionInst(
