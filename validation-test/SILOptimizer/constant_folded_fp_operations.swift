@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-sil -O -suppress-warnings -verify %t/constant_folded_fp_operation_validation.swift 2>&1 | %FileCheck --check-prefix=CHECK-SIL %t/constant_folded_fp_operation_validation.swift
 // RUN: %target-build-swift -O -suppress-warnings %t/constant_folded_fp_operation_validation.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck --check-prefix=COMPARE-RESULT %t/constant_folded_fp_operation_validation.swift
+// RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: swift_in_compiler
@@ -13,11 +13,19 @@
 createTestFile()
 
 func createTestFile() {
-    let validator = FPConstantFoldedComparisonOpsValidator()
-    validator.generateOptimizedFuncDecls()
-    validator.generateUnoptimizedFuncDecls()
-    validator.generateComparisonFuncDecls()
-    validator.generateComparisonFuncCalls()
+    generateOperandAccessors()
+
+    let cmpOpValidator = FPConstantFoldedComparisonOpsValidator()
+    cmpOpValidator.generateOptimizedFuncDecls()
+    cmpOpValidator.generateUnoptimizedFuncDecls()
+    cmpOpValidator.generateComparisonFuncDecls()
+    cmpOpValidator.generateComparisonFuncCalls()
+
+    let arithOpValidator = FPConstantFoldedArithmeticOpsValidator()
+    arithOpValidator.generateOptimizedFuncDecls()
+    arithOpValidator.generateUnoptimizedFuncDecls()
+    arithOpValidator.generateComparisonFuncDecls()
+    arithOpValidator.generateComparisonFuncCalls()
 }
 
 /////////////////// Protocols ///////////////////
@@ -48,7 +56,7 @@ protocol FPOptimizedOpsValidator {
 
     func optimizedFunDeclCheck(fpType: FPType, op: FPOperation, op1: FPOperand, op2: FPOperand) -> String
     func unoptimizedFunDeclCheck(fpType: FPType, op: FPOperation, op1: FPOperand, op2: FPOperand) -> String
-    func resultComaparisonCheck(fpType: FPType, op: FPOperation, op1: FPOperand, op2: FPOperand) -> String
+    func resultComparisonCheck(fpType: FPType, op: FPOperation, op1: FPOperand, op2: FPOperand) -> String
 }
 
 ////////////////// Common ///////////////////
@@ -244,16 +252,16 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         """
     }
 
-    func resultComaparisonCheck(
+    func resultComparisonCheck(
         fpType: FPType, 
         op: FPOperation, 
         op1: FPOperand, 
         op2: FPOperand
     ) -> String {
-        let resultVarName = ["var", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+        let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
 
         return """
-        // COMPARE-RESULT: [\(resultVarName)] result equal? true
+        precondition(\(comparisonFuncName)(), "\(comparisonFuncName) returned false!")
         """
     }
 
@@ -287,15 +295,13 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        let resultVarName = ["var", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         
                         print("""
                         @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
-                        func \(comparisonFuncName)() {
-                            let \(resultVarName) = \(optFuncName)() == \(unoptFuncName)()
-                            print("[\(resultVarName)] result equal? \\(\(resultVarName))")
+                        func \(comparisonFuncName)() -> Bool {
+                            return \(optFuncName)() == \(unoptFuncName)()
                         }
                                 
                         """)
@@ -310,15 +316,12 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             for op in FPOperation.allCases {
                 for op1 in FPOperand.allCases {
                     for op2 in FPOperand.allCases {
-                        let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        let checkDirective = resultComaparisonCheck(fpType: fpType, op: op, op1: op1, op2: op2)
+                        let comparison = resultComparisonCheck(fpType: fpType, op: op, op1: op1, op2: op2)
 
                         print("""
-                        \(checkDirective)
-                        \(comparisonFuncName)()
+                        \(comparison)
 
                         """)
-                        
                     }
                 }
             }
@@ -363,6 +366,253 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
         print("""
         @inline(never) @_silgen_name("\(funcName)") \(optAttr)
         func \(funcName)() -> Bool {
+            return \(operand1) \(op.math_name()) \(operand2)
+        }
+        \(checkDirectives)
+                
+        """)
+    }
+}
+
+////////////////// Arithmetic Operations Validator ///////////////////
+
+struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
+    /// Type of floating points this validator deals with.
+    enum _FpType : CaseIterable, Representable, Equatable {
+        case Float
+        case Double
+
+        func math_name() -> String {
+            switch self {
+            case .Float:
+                return "Float"
+            case .Double:
+                return "Double"
+            }
+        }
+
+        func printable_name() -> String {
+            switch self {
+            case .Float:
+                return "float"
+            case .Double:
+                return "double"
+            }
+        }
+    }
+
+    /// Type of floating point operations this validator deals with.
+    enum _FPOperation : CaseIterable, Representable, Equatable {
+        case Add
+        case Subtract
+        case Multiply
+        case Divide
+
+        func math_name() -> String {
+            switch self {
+                case .Add:
+                    return "+"
+                case .Subtract:
+                    return "-"
+                case .Multiply:
+                    return "*"
+                case .Divide:
+                    return "/"
+            }
+        }
+
+        func printable_name() -> String {
+            switch self {
+                case .Add:
+                    return "add"
+                case .Subtract:
+                    return "sub"
+                case .Multiply:
+                    return "mul"
+                case .Divide:
+                    return "div"
+            }
+        }
+    }
+
+    /// Type of floating point operands this validator deals with.
+    enum _FPOperand : CaseIterable, Representable, Equatable {
+        case Zero
+        case One
+
+        func math_name() -> String {
+            switch self {
+                case .Zero:
+                    return "0.0"
+                case .One:
+                    return "1.0"
+            }
+        }
+
+        func printable_name() -> String {
+            switch self {
+                case .Zero:
+                    return "zero"
+                case .One:
+                    return "one"
+            }
+        }
+    }
+
+    private let optPrefix = "opt"
+    private let unoptPrefix = "unopt"
+
+    /////////////////////// FPOptimizedOpsValidator Conformances ///////////////////////
+    typealias FPType = _FpType
+    typealias FPOperation = _FPOperation
+    typealias FPOperand = _FPOperand
+
+        func optimizedFunDeclCheck(
+        fpType: FPType, 
+        op: FPOperation, 
+        op1: FPOperand, 
+        op2: FPOperand
+    ) -> String {
+        let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+
+        return """
+        // CHECK-SIL-LABEL: sil hidden [noinline] @\(funcName)
+        // CHECK-SIL-NEXT: [global: ]
+        // CHECK-SIL-NEXT: bb0:
+        // CHECK-SIL-NOT: {{.*}}f\(op.printable_name()){{.*}}
+        // CHECK-SIL: } // end sil function '\(funcName)' 
+        """
+    }
+
+    func unoptimizedFunDeclCheck(
+        fpType: FPType, 
+        op: FPOperation, 
+        op1: FPOperand, 
+        op2: FPOperand
+    ) -> String {
+        let funcName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+
+        return """
+        // CHECK-SIL-LABEL: sil hidden [noinline] [Onone] @\(funcName)
+        // CHECK-SIL-NEXT: bb0:
+        // CHECK-SIL:  {{.*}}f\(op.printable_name()){{.*}}
+        // CHECK-SIL: } // end sil function '\(funcName)' 
+        """
+    }
+
+    func resultComparisonCheck(
+        fpType: FPType, 
+        op: FPOperation, 
+        op1: FPOperand, 
+        op2: FPOperand
+    ) -> String {
+        let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+
+        // 0.0 / 0.0 is NaN and Nan != Nan
+        if op == .Divide && op1 == .Zero && op2 == .Zero {
+            return """
+            precondition(!\(comparisonFuncName)(), "\(comparisonFuncName) returned true. Expected false.")
+            """
+        }
+
+        return """
+        precondition(\(comparisonFuncName)(), "\(comparisonFuncName) returned false. Expected true.")
+        """
+    }
+
+    func generateOptimizedFuncDecls() {
+        for fpType in FPType.allCases {
+            for op in FPOperation.allCases {
+                for op1 in FPOperand.allCases {
+                    for op2 in FPOperand.allCases {
+                        generateFuncDeclWithCheckDirectives(fpType: fpType, op: op, op1: op1, op2: op2, isopt: true)
+                    }
+                }
+            }
+        }
+    }
+
+    func generateUnoptimizedFuncDecls() {
+        for fpType in FPType.allCases {
+            for op in FPOperation.allCases {
+                for op1 in FPOperand.allCases {
+                    for op2 in FPOperand.allCases {
+                        generateFuncDeclWithCheckDirectives(fpType: fpType, op: op, op1: op1, op2: op2, isopt: false)
+                    }
+                }
+            }
+        }
+    }
+
+    func generateComparisonFuncDecls() {
+        for fpType in FPType.allCases {
+            for op in FPOperation.allCases {
+                for op1 in FPOperand.allCases {
+                    for op2 in FPOperand.allCases {
+                        let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+                        let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+                        let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+                        
+                        print("""
+                        @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
+                        func \(comparisonFuncName)() -> Bool {
+                            return \(optFuncName)() == \(unoptFuncName)()
+                        }
+                                
+                        """)
+                    }
+                }
+            }
+        }
+    }
+
+    func generateComparisonFuncCalls() {
+        for fpType in FPType.allCases {
+            for op in FPOperation.allCases {
+                for op1 in FPOperand.allCases {
+                    for op2 in FPOperand.allCases {
+                        let comparison = resultComparisonCheck(fpType: fpType, op: op, op1: op1, op2: op2)
+                        print("""
+                        \(comparison)
+
+                        """)   
+                    }
+                }
+            }
+        }
+    }
+
+    /////////////////////// Utilities ///////////////////////
+    private func generateFuncDeclWithCheckDirectives(
+        fpType: FPType, 
+        op: FPOperation, 
+        op1: FPOperand, 
+        op2: FPOperand, 
+        isopt: Bool = false
+    ) {
+        var operand1 = op1.math_name()
+        var operand2 = op2.math_name()
+
+        if !isopt {
+            if fpType == .Double {
+                operand1 = op1 == .Zero ? "zero_double()": "one_double()"
+                operand2 = op2 == .Zero ? "zero_double()": "one_double()"
+            } else {
+                operand1 = op1 == .Zero ? "zero_float()": "one_float()"
+                operand2 = op2 == .Zero ? "zero_float()": "one_float()"
+            }
+        }
+
+        let optPrefix = isopt ? optPrefix : unoptPrefix
+        let optAttr = isopt ? "" : "@_optimize(none)"
+        let funcName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
+        let checkDirectives = isopt ? 
+        optimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2) : 
+        unoptimizedFunDeclCheck(fpType: fpType, op: op, op1: op1, op2: op2)
+
+        print("""
+        @inline(never) @_silgen_name("\(funcName)") \(optAttr)
+        func \(funcName)() -> \(fpType.math_name()) {
             return \(operand1) \(op.math_name()) \(operand2)
         }
         \(checkDirectives)
