@@ -11,14 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 %import gyb
-
-% for mutable in (True, False):
-%  Mutable = 'Mutable' if mutable else ''
-%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
-% if mutable:
 @available(*, unavailable, renamed: "UnsafeMutableRawBufferPointer")
 typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
-%end
+% for mutable in (True, False):
+%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
+%  Mutable = 'Mutable' if mutable else ''
 
 /// A ${Mutable.lower()} nonowning collection interface to the bytes in a
 /// region of memory.
@@ -99,7 +96,7 @@ typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
 @frozen
-public struct UnsafeRaw${Mutable}BufferPointer {
+public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 
@@ -176,7 +173,7 @@ extension UnsafeMutableRawBufferPointer {
 }
 %end
 
-extension UnsafeRaw${Mutable}BufferPointer: Sequence {
+extension Unsafe${Mutable}RawBufferPointer: Sequence {
   public typealias SubSequence = Slice<${Self}>
 
   /// Returns an iterator over the bytes of this sequence.
@@ -206,7 +203,7 @@ extension UnsafeRaw${Mutable}BufferPointer: Sequence {
   }
 }
 
-extension UnsafeRaw${Mutable}BufferPointer: ${Mutable}Collection {
+extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8
@@ -222,7 +219,7 @@ extension UnsafeRaw${Mutable}BufferPointer: ${Mutable}Collection {
   /// The "past the end" position---that is, the position one greater than the
   /// last valid subscript argument.
   ///
-  /// The `endIndex` property of an `UnsafeRaw${Mutable}BufferPointer`
+  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
   /// instance is always identical to `count`.
   @inlinable
   public var endIndex: Index {
@@ -322,9 +319,9 @@ extension UnsafeRaw${Mutable}BufferPointer: ${Mutable}Collection {
   }
 }
 
-extension UnsafeRaw${Mutable}BufferPointer: RandomAccessCollection { }
+extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
-extension UnsafeRaw${Mutable}BufferPointer {
+extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
   /// Allocates uninitialized memory with the specified size and alignment.
   ///
@@ -519,7 +516,7 @@ extension UnsafeRaw${Mutable}BufferPointer {
   /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// The memory referenced by `source` may overlap with the memory referenced 
+  /// The memory referenced by `source` may overlap with the memory referenced
   /// by this buffer.
   ///
   /// After calling `copyMemory(from:)`, the first `source.count` bytes of
@@ -713,7 +710,7 @@ extension UnsafeRaw${Mutable}BufferPointer {
   /// initialized to a trivial type, and must be properly aligned for
   /// accessing `T`.
   ///
-  /// After calling this method on a raw buffer with non-nil `baseAddress` `b`, 
+  /// After calling this method on a raw buffer with non-nil `baseAddress` `b`,
   /// the region starting at `b` and continuing up to
   /// `b + self.count - self.count % MemoryLayout<T>.stride` is bound
   /// to type `T` and is initialized. If `T` is a nontrivial type, you must
@@ -724,8 +721,8 @@ extension UnsafeRaw${Mutable}BufferPointer {
   /// - Parameters:
   ///   - type: The type to bind this buffer’s memory to.
   ///   - repeatedValue: The instance to copy into memory.
-  /// - Returns: A typed buffer of the memory referenced by this raw buffer. 
-  ///     The typed buffer contains `self.count / MemoryLayout<T>.stride` 
+  /// - Returns: A typed buffer of the memory referenced by this raw buffer.
+  ///     The typed buffer contains `self.count / MemoryLayout<T>.stride`
   ///     instances of `T`.
   @inlinable
   @discardableResult
@@ -779,10 +776,10 @@ extension UnsafeRaw${Mutable}BufferPointer {
       "insufficient space to accommodate source.underestimatedCount elements")
     guard let base = baseAddress else {
       // this can be a precondition since only an invalid argument should be costly
-      _precondition(source.underestimatedCount == 0, 
+      _precondition(source.underestimatedCount == 0,
         "no memory available to initialize from source")
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
-    }  
+    }
 
     _debugPrecondition(
       Int(bitPattern: base) % MemoryLayout<S.Element>.stride == 0,
@@ -790,9 +787,9 @@ extension UnsafeRaw${Mutable}BufferPointer {
     )
 
     _internalInvariant(_end != nil)
-    for p in stride(from: base, 
+    for p in stride(from: base,
       // only advance to as far as the last element that will fit
-      to: _end._unsafelyUnwrappedUnchecked - elementStride + 1, 
+      to: _end._unsafelyUnwrappedUnchecked - elementStride + 1,
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
@@ -803,7 +800,7 @@ extension UnsafeRaw${Mutable}BufferPointer {
     }
 
     return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Element.self), 
+                  start: base.assumingMemoryBound(to: S.Element.self),
                   count: idx / elementStride))
   }
 
@@ -987,7 +984,7 @@ extension UnsafeRaw${Mutable}BufferPointer {
 
   %  end # mutable
 
-  /// Binds this buffer’s memory to the specified type and returns a typed buffer 
+  /// Binds this buffer’s memory to the specified type and returns a typed buffer
   /// of the bound memory.
   ///
   /// Use the `bindMemory(to:)` method to bind the memory referenced
@@ -1148,7 +1145,7 @@ extension UnsafeRaw${Mutable}BufferPointer {
 }
 
 @_unavailableInEmbedded
-extension UnsafeRaw${Mutable}BufferPointer: CustomDebugStringConvertible {
+extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "${Self}"
@@ -1158,7 +1155,7 @@ extension UnsafeRaw${Mutable}BufferPointer: CustomDebugStringConvertible {
 
 extension ${Self} {
   @available(*, unavailable,
-    message: "use 'UnsafeRaw${Mutable}BufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+    message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> ${Self} {
     get { return ${Self}(start: nil, count: 0) }
 %  if mutable:
@@ -1167,7 +1164,7 @@ extension ${Self} {
   }
 
 %  if mutable:
-  @available(*, unavailable, 
+  @available(*, unavailable,
     message: "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
     get { return UnsafeRawBufferPointer(start: nil, count: 0) }
