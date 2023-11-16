@@ -45,7 +45,7 @@ using namespace swift::PartitionPrimitives;
 /// see if the ActorIsolationChecker determined it crossed isolation.  It's
 /// possible this is brittle and a more nuanced check is needed, but this
 /// suffices for all cases tested so far.
-static bool SILApplyCrossesIsolation(const SILInstruction *inst) {
+static bool isIsolationBoundaryCrossingApply(const SILInstruction *inst) {
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>())
     return apply->getIsolationCrossing().has_value();
 
@@ -762,7 +762,7 @@ public:
   void translateSILApply(SILInstruction *applyInst) {
     // If this apply does not cross isolation domains, it has normal
     // non-transferring multi-assignment semantics
-    if (!SILApplyCrossesIsolation(applyInst)) {
+    if (!isIsolationBoundaryCrossingApply(applyInst)) {
       SILMultiAssignOptions options;
       if (auto fas = FullApplySite::isa(applyInst)) {
         if (fas.hasSelfArgument()) {
