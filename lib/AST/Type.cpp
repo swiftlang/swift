@@ -645,10 +645,7 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
         for (auto replacementType :
                  opaque->getSubstitutions().getReplacementTypes()) {
           if (replacementType->hasOpenedExistentialWithRoot(root)) {
-            Type interfaceType = opaque->getInterfaceType();
-            auto genericSig =
-                opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-            return genericSig->getNonDependentUpperBounds(interfaceType);
+            return opaque->getExistentialType();
           }
         }
       }

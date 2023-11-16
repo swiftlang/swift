@@ -2174,10 +2174,7 @@ static Type typeEraseExistentialSelfReferences(Type refTy, Type baseTy,
             for (auto replacementType :
                  opaque->getSubstitutions().getReplacementTypes()) {
               if (hasErasedGenericParameter(replacementType)) {
-                Type interfaceType = opaque->getInterfaceType();
-                auto genericSig =
-                    opaque->getDecl()->getOpaqueInterfaceGenericSignature();
-                return genericSig->getNonDependentUpperBounds(interfaceType);
+                return opaque->getExistentialType();
               }
             }
           }
