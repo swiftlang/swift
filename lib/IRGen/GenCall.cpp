@@ -4560,8 +4560,6 @@ llvm::Value *irgen::emitTaskCreate(
     llvm::Value *taskOptions = llvm::ConstantInt::get(
       IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
 
-  // If there is a task group, emit a task group option structure to contain
-  // it.
   // If there is a task group, emit a task group option structure to contain it.
   if (taskGroup) {
     TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
@@ -4586,14 +4584,6 @@ llvm::Value *irgen::emitTaskCreate(
     // TaskGroup
     IGF.Builder.CreateStore(
         taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
-
-//    if (executorIdentity) {
-//      auto executorRecord = IGF.Builder.CreateStructGEP(optionsRecord, 1, Size());
-//      IGF.Builder.CreateStore(
-//          executorIdentity, IGF.Builder.CreateStructGEP(executorRecord, 0, Size()));
-//      IGF.Builder.CreateStore(
-//          executorImpl, IGF.Builder.CreateStructGEP(executorRecord, 1, Size()));
-//    }
 
     taskOptions = IGF.Builder.CreateBitOrPointerCast(
         optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
