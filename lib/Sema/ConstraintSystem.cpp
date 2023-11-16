@@ -7469,8 +7469,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       break;
 
     case KeyPathExpr::Component::Kind::CodeCompletion: {
-      capability = KeyPathCapability::ReadOnly;
-      break;
+      return fail();
     }
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
