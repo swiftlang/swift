@@ -11049,7 +11049,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
   switch (role) {
 #define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, FeatureName) \
   case MacroRole::Name: \
-    return ctx.LangOpts.hasFeature(FeatureName::CodeItemMacros);
+    return ctx.LangOpts.hasFeature(Feature::FeatureName);
 
 #define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, FeatureName) \
   case MacroRole::Name: return ctx.LangOpts.hasFeature(Feature::FeatureName);
