@@ -18,7 +18,6 @@ extern "C" {
 #endif
 
 void initializeSwiftModules();
-void initializeSwiftParseModules();
 
 #ifdef __cplusplus
 }
