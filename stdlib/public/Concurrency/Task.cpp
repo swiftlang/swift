@@ -886,21 +886,16 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
   }
 
-  // If we're going to inherit (copy) a task executor preference record,
-  // we want to store this information in a job flag, such that we can
-  // efficiently detect if there is an executor preference we need to look for
-  // in task status records.
-  //
-  // The record itself we'll add to the task once it has been created,
-  // further down this function.
-  bool shouldPushTaskExecutorPreferenceRecord = false;
-  // if (parent && targetExecutor.isGeneric()) { // TODO: or like this?
-  if (taskExecutor.isUndefined() && parent) {
-    auto parentTaskExecutor = parent->getPreferredTaskExecutor();
-    if (parentTaskExecutor.isDefined()) {
-      shouldPushTaskExecutorPreferenceRecord = true;
-      jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
-      taskExecutor = parentTaskExecutor;
+  // Only attempt to inherit parent's executor preference if we didn't set one explicitly,
+  // which we've recorded in the flag by noticing a task create option higher up in this func.
+  if (!jobFlags.task_hasInitialTaskExecutorPreferenceRecord()) {
+    // do we have a parent we can inherit the task executor from?
+    if (parent) {
+      auto parentTaskExecutor = parent->getPreferredTaskExecutor();
+      if (parentTaskExecutor.isDefined()) {
+        jobFlags.task_setHasInitialTaskExecutorPreferenceRecord(true);
+        taskExecutor = parentTaskExecutor;
+      }
     }
   }
 
@@ -1028,7 +1023,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If the task does not have a specific executor set already via create options,
   // and there is a task executor preference set in the parent,
   // we inherit it by deep-copying the preference record.
-  if (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+  // if (shouldPushTaskExecutorPreferenceRecord || taskExecutor.isDefined()) {
+  if (jobFlags.task_hasInitialTaskExecutorPreferenceRecord()) {
     // Implementation note: we must do this AFTER `swift_taskGroup_attachChild`
     // because the group takes a fast-path when attaching the child record.
     assert(jobFlags.task_hasInitialTaskExecutorPreferenceRecord());

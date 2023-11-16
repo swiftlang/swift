@@ -39,7 +39,7 @@ extension TaskGroup {
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false)
 
@@ -50,17 +50,8 @@ extension TaskGroup {
         _getUndefinedTaskExecutor()
       }
 
-//    if let taskExecutor {
-//      let executorBuiltin: Builtin.Executor =
-//        taskExecutor.asUnownedTaskExecutor().executor
-//
-      // Create the task in this group with an executor preference.
+    // Create the task in this group with an executor preference.
     _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-//    } else {
-//      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-//      // Create the task in this group without executor preference.
-//      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-//    }
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -95,22 +86,19 @@ extension TaskGroup {
     }
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
         taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        _getUndefinedTaskExecutor()
+      }
 
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    }
-
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
@@ -143,21 +131,19 @@ extension ThrowingTaskGroup {
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false)
 
-    if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
         taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        _getUndefinedTaskExecutor()
+      }
 
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    }
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -192,22 +178,19 @@ extension ThrowingTaskGroup {
     }
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
         taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        _getUndefinedTaskExecutor()
+      }
 
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    }
-
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
@@ -240,21 +223,19 @@ extension DiscardingTaskGroup {
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: true)
 
-    if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
+    let executorBuiltin: Builtin.Executor =
+      if let taskExecutor {
         taskExecutor.asUnownedTaskExecutor().executor
+      } else {
+        _getUndefinedTaskExecutor()
+      }
 
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
-    } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
-    }
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -290,22 +271,19 @@ extension DiscardingTaskGroup {
     }
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
     )
 
+    let executorBuiltin: Builtin.Executor =
     if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+      taskExecutor.asUnownedTaskExecutor().executor
     } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+      _getUndefinedTaskExecutor()
     }
 
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
@@ -338,21 +316,19 @@ extension ThrowingDiscardingTaskGroup {
     #if $BuiltinCreateAsyncTaskInGroupWithExecutor
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: true)
 
+    let executorBuiltin: Builtin.Executor =
     if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+      taskExecutor.asUnownedTaskExecutor().executor
     } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+      _getUndefinedTaskExecutor()
     }
+
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     #else
     fatalError("Unsupported Swift compiler")
     #endif
@@ -389,22 +365,19 @@ extension ThrowingDiscardingTaskGroup {
     }
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: true,
       addPendingGroupTaskUnconditionally: false, isDiscardingTask: true
     )
 
+    let executorBuiltin: Builtin.Executor =
     if let taskExecutor {
-      let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
-
-      // Create the task in this group with an executor preference.
-      _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
+      taskExecutor.asUnownedTaskExecutor().executor
     } else {
-      // FIXME: DISABLE THE TASK PREFERENCE (PASS NIL?)
-      // Create the task in this group without executor preference.
-      fatalError("NOT YET") // _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
+      _getUndefinedTaskExecutor()
     }
 
+    // Create the task in this group with an executor preference.
+    _ = Builtin.createAsyncTaskInGroupWithExecutor(flags, _group, executorBuiltin, operation)
     return true
     #else
     fatalError("Unsupported Swift compiler")
