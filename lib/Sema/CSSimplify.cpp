@@ -9536,9 +9536,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // where the base type has a conditional Sendable conformance
   if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
     if (isPartialApplication(memberLocator)) {
-      auto sendableProtocol =
-          Context.getProtocol(
-              KnownProtocolKind::Sendable);
+      auto sendableProtocol = Context.getProtocol(KnownProtocolKind::Sendable);
       auto baseConformance = DC->getParentModule()->lookupConformance(
           instanceTy, sendableProtocol);
 
@@ -9548,9 +9546,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                 if (req.getKind() != RequirementKind::Conformance)
                   return false;
 
-                if (auto protocolTy = req.getSecondType()->template getAs<ProtocolType>()) {
+                if (auto protocolTy =
+                        req.getSecondType()->template getAs<ProtocolType>()) {
                   return req.getFirstType()->hasTypeVariable() &&
-                         protocolTy->getDecl()->isSpecificProtocol(KnownProtocolKind::Sendable);
+                         protocolTy->getDecl()->isSpecificProtocol(
+                             KnownProtocolKind::Sendable);
                 }
                 return false;
               })) {

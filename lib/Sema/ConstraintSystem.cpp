@@ -1713,7 +1713,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     if (Context.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
       // All global functions should be @Sendable
-      if (!funcDecl->getDeclContext()->isTypeContext() && !funcDecl->getDeclContext()->isLocalContext() ) {
+      if (!funcDecl->getDeclContext()->isTypeContext() &&
+          !funcDecl->getDeclContext()->isLocalContext()) {
         funcType =
             funcType->withExtInfo(funcType->getExtInfo().withConcurrent());
       }
@@ -1722,7 +1723,9 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
-    openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(), locator);
+    openedType = unwrapPropertyWrapperParameterTypes(
+        *this, funcDecl, functionRefKind, openedType->castTo<FunctionType>(),
+        locator);
 
     auto origOpenedType = openedType;
     if (!isRequirementOrWitness(locator)) {
@@ -2677,7 +2680,10 @@ ConstraintSystem::getTypeOfMemberReference(
       if (isPartialApplication(locator) &&
           isSendableType(DC->getParentModule(), baseOpenedTy)) {
         // Add @Sendable to functions without conditional conformances
-        functionType = functionType->withExtInfo(functionType->getExtInfo().withConcurrent())->getAs<FunctionType>();
+        functionType =
+            functionType
+                ->withExtInfo(functionType->getExtInfo().withConcurrent())
+                ->getAs<FunctionType>();
       }
       // Unapplied values should always be Sendable
       info = info.withConcurrent();
