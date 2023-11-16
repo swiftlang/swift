@@ -716,7 +716,6 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
   }
   if (!WrittenRequirements.empty()) {
     out << "Written requirements: {\n";
-
     for (unsigned reqID : indices(WrittenRequirements)) {
       out << " - ID: " << reqID << " - ";
       const auto &requirement = WrittenRequirements[reqID];
@@ -725,6 +724,6 @@ void RewriteSystem::dump(llvm::raw_ostream &out) const {
       requirement.loc.print(out, Context.getASTContext().SourceMgr);
       out << "\n";
     }
+    out << "}\n";
   }
-  out << "}\n";
 }
