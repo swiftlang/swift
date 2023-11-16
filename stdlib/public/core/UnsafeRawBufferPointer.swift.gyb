@@ -13,8 +13,12 @@
 %import gyb
 
 % for mutable in (True, False):
-%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
+%  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
+% if mutable:
+@available(*, unavailable, renamed: "UnsafeMutableRawBufferPointer")
+typealias UnsafeRawMutableBufferPointer = UnsafeMutableRawBufferPointer
+%end
 
 /// A ${Mutable.lower()} nonowning collection interface to the bytes in a
 /// region of memory.
@@ -95,7 +99,7 @@
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
 @frozen
-public struct Unsafe${Mutable}RawBufferPointer {
+public struct UnsafeRaw${Mutable}BufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
 
@@ -172,7 +176,7 @@ extension UnsafeMutableRawBufferPointer {
 }
 %end
 
-extension Unsafe${Mutable}RawBufferPointer: Sequence {
+extension UnsafeRaw${Mutable}BufferPointer: Sequence {
   public typealias SubSequence = Slice<${Self}>
 
   /// Returns an iterator over the bytes of this sequence.
@@ -202,7 +206,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
+extension UnsafeRaw${Mutable}BufferPointer: ${Mutable}Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8
@@ -218,7 +222,7 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   /// The "past the end" position---that is, the position one greater than the
   /// last valid subscript argument.
   ///
-  /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
+  /// The `endIndex` property of an `UnsafeRaw${Mutable}BufferPointer`
   /// instance is always identical to `count`.
   @inlinable
   public var endIndex: Index {
@@ -318,9 +322,9 @@ extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
+extension UnsafeRaw${Mutable}BufferPointer: RandomAccessCollection { }
 
-extension Unsafe${Mutable}RawBufferPointer {
+extension UnsafeRaw${Mutable}BufferPointer {
 %  if mutable:
   /// Allocates uninitialized memory with the specified size and alignment.
   ///
@@ -1144,7 +1148,7 @@ extension Unsafe${Mutable}RawBufferPointer {
 }
 
 @_unavailableInEmbedded
-extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
+extension UnsafeRaw${Mutable}BufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "${Self}"
@@ -1153,8 +1157,8 @@ extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
 }
 
 extension ${Self} {
-  @available(*, unavailable, 
-    message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  @available(*, unavailable,
+    message: "use 'UnsafeRaw${Mutable}BufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> ${Self} {
     get { return ${Self}(start: nil, count: 0) }
 %  if mutable:
