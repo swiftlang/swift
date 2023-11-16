@@ -245,6 +245,8 @@ enum class UnqualifiedLookupFlags {
   ExcludeMacroExpansions = 1 << 6,
   /// This lookup should only return macros.
   MacroLookup            = 1 << 7,
+  /// This lookup should only return modules
+  ModuleLookup           = 1 << 8,
 };
 
 using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;

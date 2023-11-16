@@ -7,14 +7,29 @@
 
 // Build library that declares macros
 // RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
-
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_library.swiftmodule %S/Inputs/macro_library.swift -module-name macro_library -load-plugin-library %t/%target-library-name(MacroDefinition) -enable-experimental-feature ExtensionMacros 
 // 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -I %t
 
 import freestanding_macro_library
+import macro_library
 
 struct stringify<T> { }
 
 func testStringify(a: Int, b: Int) {
   _ = #stringify(a + b)
 }
+
+enum macro_library {
+  @propertyWrapper
+  struct declareVarValuePeerShadowed {
+    var wrappedValue: Int
+  }
+}
+
+struct TestShadowedQualified {
+  @macro_library.declareVarValuePeerShadowed
+  var shouldFindMacro: Int = 3
+}
+
+_ = TestShadowedQualified().value

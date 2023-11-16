@@ -113,6 +113,7 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
+      {UnqualifiedLookupFlags::ModuleLookup, "ModuleLookup"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -1649,7 +1650,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
   if (moduleName) {
     UnqualifiedLookupDescriptor moduleLookupDesc(
         moduleName, moduleScopeDC, SourceLoc(),
-        UnqualifiedLookupFlags::TypeLookup);
+        UnqualifiedLookupFlags::ModuleLookup);
     auto moduleLookup = evaluateOrDefault(
         ctx.evaluator, UnqualifiedLookupRequest{moduleLookupDesc}, {});
     auto foundTypeDecl = moduleLookup.getSingleTypeResult();
@@ -1657,8 +1658,12 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
     if (!moduleDecl)
       return {};
 
+    auto options = NL_ExcludeMacroExpansions;
+    if (onlyMacros)
+      options |= NL_OnlyMacros;
+
     ModuleQualifiedLookupRequest req{moduleScopeDC, moduleDecl, macroName,
-                                     SourceLoc(), NL_ExcludeMacroExpansions};
+                                     SourceLoc(), options};
     auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
     for (auto *found : lookup)
       addChoiceIfApplicable(found);
