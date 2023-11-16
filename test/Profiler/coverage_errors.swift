@@ -3,8 +3,8 @@
 
 struct S {
   // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init() -> coverage_catch.S
-  init() {     // CHECK: [[@LINE]]:10 -> [[@LINE+6]]:4 : 0
-    do {       // CHECK: [[@LINE]]:8 -> [[@LINE+2]]:6 : 0
+  init() { // CHECK: [[@LINE]]:10 -> [[@LINE+6]]:4 : 0
+    do {   // CHECK: [[@LINE]]:8 -> [[@LINE+2]]:6 : 0
       throw SomeErr.Err1
     } catch {
       // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 1
@@ -17,14 +17,14 @@ enum SomeErr : Error {
   case Err2
 }
 
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.bar
-func bar() throws {
-  // CHECK-NEXT: [[@LINE-1]]:19 -> [[@LINE+2]]:2 : 0
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test1
+func test1() throws {
+  // CHECK-NEXT: [[@LINE-1]]:21 -> [[@LINE+2]]:2 : 0
   throw SomeErr.Err2
 } // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.baz
-func baz(_ fn: () throws -> ()) rethrows {
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test2
+func test2(_ fn: () throws -> ()) rethrows {
   do {
     try fn()
   } catch SomeErr.Err1 { // CHECK: [[@LINE]]:24 -> {{[0-9]+}}:4 : 1
@@ -34,8 +34,8 @@ func baz(_ fn: () throws -> ()) rethrows {
   try fn()
 } // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.foo
-func foo() -> Int32 {
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test3
+func test3() -> Int32 {
   var x : Int32 = 0
 
   do {
@@ -48,41 +48,41 @@ func foo() -> Int32 {
   } // CHECK: [[@LINE]]:4 -> {{[0-9:]+}} : 0
 
   do {
-    try baz(bar)
+    try test2(test1)
   } catch _ {
     // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:4 : 3
   } // CHECK: [[@LINE]]:4 -> {{[0-9:]+}} : 0
 
   do {
-    try baz { () throws -> () in throw SomeErr.Err1 }
+    try test2 { () throws -> () in throw SomeErr.Err1 }
   } catch _ {}
 
-  try! baz { () throws -> () in return }
+  try! test2 { () throws -> () in return }
 
   return x
 }
 
-let _ = foo()
+let _ = test3()
 
 // rdar://34244637 - Coverage after a do-catch is incorrect
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.goo
-func goo(_ b: Bool) -> Int { // CHECK-NEXT: [[@LINE]]:28 {{.*}} : 0
-  do {                       // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+2]]:4 : 0
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test4
+func test4(_ b: Bool) -> Int { // CHECK-NEXT: [[@LINE]]:30 {{.*}} : 0
+  do {                         // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+2]]:4 : 0
     throw SomeErr.Err1
-  } catch {                  // CHECK-NEXT: [[@LINE]]:11 {{.*}} : 1
-                             // CHECK-NEXT: [[@LINE+1]]:8 {{.*}} : 1
-    if b {                   // CHECK-NEXT: [[@LINE]]:10 {{.*}} : 2
+  } catch {                    // CHECK-NEXT: [[@LINE]]:11 {{.*}} : 1
+                               // CHECK-NEXT: [[@LINE+1]]:8 {{.*}} : 1
+    if b {                     // CHECK-NEXT: [[@LINE]]:10 {{.*}} : 2
       return 1
-    }                        // CHECK-NEXT: [[@LINE]]:6 {{.*}} : (1 - 2)
-  } // CHECK: [[@LINE]]:4 {{.*}} : (0 - 2)
+    }                          // CHECK-NEXT: [[@LINE]]:6 {{.*}} : (1 - 2)
+  }                            // CHECK: [[@LINE]]:4 {{.*}} : (0 - 2)
   return 0
 }
 
 // Test coverage with nested do-catches
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.hoo
-func hoo() -> Int {
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test5
+func test5() -> Int {
   do {
-    try bar()
+    try test1()
     do {
       throw SomeErr.Err1
     } catch {
@@ -96,8 +96,8 @@ func hoo() -> Int {
 }
 
 // Test coverage with a do-catch inside of a repeat-while
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.ioo
-func ioo() -> Int {
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test6
+func test6() -> Int {
   repeat { // CHECK: [[@LINE]]:10 {{.*}} : 1
     do {
       throw SomeErr.Err1
@@ -110,11 +110,11 @@ func ioo() -> Int {
 }
 
 // Test coverage with a break inside a do-catch inside of a repeat-while
-// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.joo
-func joo() -> Int {
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.test7
+func test7() -> Int {
   repeat { // CHECK: [[@LINE]]:10 {{.*}} : 1
     do {
-      try bar()
+      try test1()
     } catch { // CHECK: [[@LINE]]:13 {{.*}} : 2
       break
     } // CHECK: [[@LINE]]:6 {{.*}} : (1 - 2)
@@ -124,12 +124,12 @@ func joo() -> Int {
 }
 
 // rdar://41010883 – Make sure we don't introduce an empty unreachable region.
-// CHECK-LABEL: sil_coverage_map {{.*}} "$s14coverage_catch3kooSiyKF" {{.*}} // coverage_catch.koo
-func koo() throws -> Int { // CHECK-NEXT: [[@LINE]]:26 -> [[@LINE+7]]:2 : 0
-  do {                     // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+3]]:4 : 0
-    try bar()
+// CHECK-LABEL: sil_coverage_map {{.*}} "$s14coverage_catch5test8SiyKF"
+func test8() throws -> Int { // CHECK-NEXT: [[@LINE]]:28 -> [[@LINE+7]]:2 : 0
+  do {                       // CHECK-NEXT: [[@LINE]]:6 -> [[@LINE+3]]:4 : 0
+    try test1()
     return 1
-  } catch is SomeErr {     // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+2]]:4 : 1
+  } catch is SomeErr {       // CHECK-NEXT: [[@LINE]]:22 -> [[@LINE+2]]:4 : 1
     throw SomeErr.Err1
   }
-}                          // CHECK-NEXT: }
+}                            // CHECK-NEXT: }
