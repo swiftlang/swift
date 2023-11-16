@@ -2047,13 +2047,14 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     Type baseThrownError =
         baseFn->getEffectiveThrownErrorType().value_or(ctx.getNeverType());
 
-    if (baseThrownError->hasTypeParameter()) {
+    if (baseThrownError && baseThrownError->hasTypeParameter()) {
       auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
       baseThrownError = baseThrownError.subst(subs);
       baseThrownError = overrideFn->mapTypeIntoContext(baseThrownError);
     }
 
-    overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
+    if (overrideThrownError)
+      overrideThrownError = overrideFn->mapTypeIntoContext(overrideThrownError);
 
     // Check for a subtyping relationship.
     switch (compareThrownErrorsForSubtyping(
