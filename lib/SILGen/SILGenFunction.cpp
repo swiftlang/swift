@@ -767,7 +767,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
           val = B.createMarkUnresolvedNonCopyableValueInst(
               loc, val,
               MarkUnresolvedNonCopyableValueInst::CheckKind::
-                  AssignableButNotConsumable);
+                  NoConsumeOrAssign);
         }
         val = emitLoad(loc, val, tl, SGFContext(), IsNotTake).forward(*this);
       }
