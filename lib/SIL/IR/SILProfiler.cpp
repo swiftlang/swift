@@ -262,6 +262,28 @@ static bool shouldWalkIntoUnhandledDecl(const Decl *D) {
   return isa<PatternBindingDecl>(D);
 }
 
+/// Whether the expression \c E could potentially throw an error.
+static bool mayExpressionThrow(const Expr *E) {
+  if (auto *AE = dyn_cast<ApplyExpr>(E)) {
+    // Throws if the function throws.
+    return bool(AE->throws());
+  }
+  if (auto *S = dyn_cast<SubscriptExpr>(E)) {
+    // Throws if subscript has a throwing getter.
+    auto *SD = cast<SubscriptDecl>(S->getDecl().getDecl());
+    if (auto *accessor = SD->getEffectfulGetAccessor())
+      return accessor->hasThrows();
+  }
+  if (auto *DE = dyn_cast<DeclRefExpr>(E)) {
+    if (auto *VD = dyn_cast<VarDecl>(DE->getDecl())) {
+      // Throws if the getter throws.
+      if (auto *accessor = VD->getEffectfulGetAccessor())
+        return accessor->hasThrows();
+    }
+  }
+  return false;
+}
+
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
   /// The SIL function being profiled.
@@ -355,7 +377,26 @@ struct MapRegionCounters : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       mapRegion(E);
 
-    return shouldWalkIntoExpr(E, Parent, Constant);
+    auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
+    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+      // We need to manually do the post-visit here since the ASTWalker will
+      // skip it.
+      // FIXME: The ASTWalker should do a post-visit.
+      walkToExprPost(E);
+    }
+    return WalkResult;
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (shouldSkipExpr(E))
+      return Action::Continue(E);
+
+    // If we have an expr that may throw an error, give it a counter for the
+    // error branch.
+    if (mayExpressionThrow(E))
+      mapRegion(ProfileCounterRef::errorBranchOf(E));
+
+    return Action::Continue(E);
   }
 };
 
@@ -809,7 +850,26 @@ struct PGOMapping : public ASTWalker {
     if (isa<LazyInitializerExpr>(E))
       setKnownExecutionCount(E);
 
-    return shouldWalkIntoExpr(E, Parent, Constant);
+    auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
+    if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
+      // We need to manually do the post-visit here since the ASTWalker will
+      // skip it.
+      // FIXME: The ASTWalker should do a post-visit.
+      walkToExprPost(E);
+    }
+    return WalkResult;
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (shouldSkipExpr(E))
+      return Action::Continue(E);
+
+    // If we have an expr that may throw an error, give it a counter for the
+    // error branch.
+    if (mayExpressionThrow(E))
+      setKnownExecutionCount(ProfileCounterRef::errorBranchOf(E));
+
+    return Action::Continue(E);
   }
 };
 
@@ -1379,11 +1439,10 @@ public:
     }
     auto WalkResult = shouldWalkIntoExpr(E, Parent, Constant);
     if (WalkResult.Action.Action == PreWalkAction::SkipChildren) {
-      // We need to manually pop the region here as the ASTWalker won't call
-      // the post-visitation.
+      // We need to manually do the post-visit here since the ASTWalker will
+      // skip it.
       // FIXME: The ASTWalker should do a post-visit.
-      if (hasCounter(E))
-        popRegions(E);
+      walkToExprPost(E);
     }
     return WalkResult;
   }
@@ -1394,6 +1453,15 @@ public:
 
     if (hasCounter(E))
       popRegions(E);
+
+    // The region following the expression gets current counter minus the
+    // error branch counter, i.e the number of times we didn't throw an error.
+    if (!RegionStack.empty() && mayExpressionThrow(E)) {
+      auto ThrowCount = assignKnownCounter(ProfileCounterRef::errorBranchOf(E));
+      replaceCount(
+          CounterExpr::Sub(getCurrentCounter(), ThrowCount, CounterAlloc),
+          Lexer::getLocForEndOfToken(SM, E->getEndLoc()));
+    }
 
     return Action::Continue(E);
   }
