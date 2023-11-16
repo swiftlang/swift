@@ -128,7 +128,7 @@ import Swift
 ///
 /// Note that there is nothing, other than the Task's use of `self` retaining the actor,
 /// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
-/// So once the task completes and its the closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+/// So once the task is completed and its closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
