@@ -188,6 +188,11 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createEndLifetime(of value: Value) -> EndLifetimeInst {
+    return notifyNew(bridged.createEndLifetime(value.bridged).getAs(EndLifetimeInst.self))
+  }
+
+  @discardableResult
   public func createDebugStep() -> DebugStepInst {
     return notifyNew(bridged.createDebugStep().getAs(DebugStepInst.self))
   }

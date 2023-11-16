@@ -1342,6 +1342,10 @@ BridgedInstruction BridgedBuilder::createDestroyAddr(BridgedValue op) const {
   return {unbridged().createDestroyAddr(regularLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
+  return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createDebugStep() const {
   return {unbridged().createDebugStep(regularLoc())};
 }
