@@ -88,6 +88,13 @@ extension NoSerializationRequirementYet
   }
 }
 
+extension ProtocolWithChecksSeqReqDA {
+  // expected-error@+1{{result type 'NotCodable' of distributed instance method 'test4' does not conform to serialization requirement 'Codable'}}
+  distributed func test4() -> NotCodable {
+    .init()
+  }
+}
+
 // FIXME(distributed): remove the -verify-ignore-unknown
 // <unknown>:0: error: unexpected error produced: instance method 'recordReturnType' requires that 'NotCodable' conform to 'Decodable'
 // <unknown>:0: error: unexpected error produced: instance method 'recordReturnType' requires that 'NotCodable' conform to 'Encodable'
