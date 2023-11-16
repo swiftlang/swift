@@ -245,6 +245,7 @@ else()
 ")
   add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
+    DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp.tmp"
       "${CMAKE_CURRENT_BINARY_DIR}/HeaderDependencies.cpp"
