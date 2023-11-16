@@ -1,4 +1,5 @@
 // REQUIRES: shell
+// REQUIRES: rdar118528453
 // Also uses awk:
 // XFAIL OS=windows
 
