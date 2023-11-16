@@ -1788,32 +1788,11 @@ void swift::simple_display(
 // ResolveMacroRequest computation.
 //----------------------------------------------------------------------------//
 
-/// Destructure a type repr for a macro reference.
-///
-/// For a 1-level member type repr whose base and member are both identifier
-/// types, e.g. `Foo.Bar`, return a pair of the base and the member.
-///
-/// For an identifier type repr, return a pair of `nullptr` and the identifier.
-static std::pair<IdentTypeRepr *, IdentTypeRepr *>
-destructureMacroRefTypeRepr(TypeRepr *typeRepr) {
-  if (!typeRepr)
-    return {nullptr, nullptr};
-  if (auto *identType = dyn_cast<IdentTypeRepr>(typeRepr))
-    return {nullptr, identType};
-  if (auto *memType = dyn_cast<MemberTypeRepr>(typeRepr))
-    if (auto *base = dyn_cast<IdentTypeRepr>(memType->getBaseComponent()))
-      if (memType->getMemberComponents().size() == 1)
-        if (auto first =
-                dyn_cast<IdentTypeRepr>(memType->getMemberComponents().front()))
-          return {base, first};
-  return {nullptr, nullptr};
-}
-
 DeclNameRef UnresolvedMacroReference::getMacroName() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getMacroName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [_, member] = attr->destructureMacroRef();
     if (!member)
       return DeclNameRef();
     return member->getNameRef();
@@ -1833,7 +1812,7 @@ DeclNameRef UnresolvedMacroReference::getModuleName() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getModuleName();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [base, _] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [base, _] = attr->destructureMacroRef();
     if (!base)
       return DeclNameRef();
     return base->getNameRef();
@@ -1845,7 +1824,7 @@ DeclNameLoc UnresolvedMacroReference::getModuleNameLoc() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getModuleNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [base, _] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [base, _] = attr->destructureMacroRef();
     if (!base)
       return DeclNameLoc();
     return base->getNameLoc();
@@ -1857,7 +1836,7 @@ DeclNameLoc UnresolvedMacroReference::getMacroNameLoc() const {
   if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
     return expansion->getMacroNameLoc();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [_, member] = attr->destructureMacroRef();
     if (!member)
       return DeclNameLoc();
     return member->getNameLoc();
@@ -1870,7 +1849,7 @@ SourceRange UnresolvedMacroReference::getGenericArgsRange() const {
     return expansion->getGenericArgsRange();
 
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [_, member] = attr->destructureMacroRef();
     if (!member)
       return SourceRange();
     auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(member);
@@ -1888,7 +1867,7 @@ ArrayRef<TypeRepr *> UnresolvedMacroReference::getGenericArgs() const {
     return expansion->getGenericArgs();
 
   if (auto *attr = pointer.dyn_cast<CustomAttr *>()) {
-    auto [_, member] = destructureMacroRefTypeRepr(attr->getTypeRepr());
+    auto [_, member] = attr->destructureMacroRef();
     if (!member)
       return {};
     auto *genericTypeRepr = dyn_cast_or_null<GenericIdentTypeRepr>(member);

@@ -3585,32 +3585,13 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   // Look for names at module scope, so we don't trigger name lookup for
   // nested scopes. At this point, we're looking to see whether there are
   // any suitable macros.
-
-  // Handle a module-qualified name.
-  if (auto *memTypeRepr =
-          dyn_cast_or_null<MemberTypeRepr>(attr->getTypeRepr())) {
-    auto baseTypeRepr = memTypeRepr->getBaseComponent();
-    auto memberReprs = memTypeRepr->getMemberComponents();
-    auto *moduleNameRepr = dyn_cast<IdentTypeRepr>(baseTypeRepr);
-
-    if (moduleNameRepr && (memberReprs.size() == 1)) {
-      if (auto *macroNameRepr = dyn_cast<IdentTypeRepr>(memberReprs.front())) {
-        auto moduleName = moduleNameRepr->getNameRef();
-        auto macroName = macroNameRepr->getNameRef();
-        auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
-                                               getAttachedMacroRoles());
-        if (!macros.empty())
-          return nullptr;
-      }
-    }
-  } else if (auto *identTypeRepr =
-                 dyn_cast_or_null<IdentTypeRepr>(attr->getTypeRepr())) {
-    auto macros =
-        namelookup::lookupMacros(dc, DeclNameRef(), identTypeRepr->getNameRef(),
-                                 getAttachedMacroRoles());
-    if (!macros.empty())
-      return nullptr;
-  }
+  auto [base, member] = attr->destructureMacroRef();
+  auto moduleName = (base) ? base->getNameRef() : DeclNameRef();
+  auto macroName = (member) ? member->getNameRef() : DeclNameRef();
+  auto macros = namelookup::lookupMacros(dc, moduleName, macroName,
+                                         getAttachedMacroRoles());
+  if (!macros.empty())
+    return nullptr;
 
   // Find the types referenced by the custom attribute.
   auto &ctx = dc->getASTContext();
