@@ -53,13 +53,23 @@ public:
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    if (auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D))
-      if (!isa<ProtocolDecl>(NTD))
+    auto *NTD = llvm::dyn_cast<NominalTypeDecl>(D);
+    if (!NTD)
+      if (auto *ETD = dyn_cast<ExtensionDecl>(D))
+        NTD = ETD->getExtendedNominal();
+    if (NTD)
+      if (!isa<ProtocolDecl>(NTD) &&
+          CheckedDecls.find(NTD) == CheckedDecls.end()) {
+        CheckedDecls.insert(NTD);
         for (auto &Protocol : NTD->getAllProtocols())
           if (Protocols.count(Protocol->getName().str().str()) != 0)
             ConformanceTypeDecls.push_back(NTD);
+      }
     return Action::Continue();
   }
+
+private:
+  std::unordered_set<NominalTypeDecl *> CheckedDecls;
 };
 
 std::string toFullyQualifiedTypeNameString(const swift::Type &Type) {
