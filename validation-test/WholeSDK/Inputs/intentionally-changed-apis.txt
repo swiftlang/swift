@@ -7,11 +7,32 @@
 // FIXME: Cause unknown; possibly a change in headers in the clang resource dir.
 Var __GNUC_VA_LIST has been removed
 
+// FIXME: Cause unknown; this is a block in a union, maybe that's broken now?
+Constructor glob_t.__Unnamed_union___Anonymous_field5.init(gl_errblk:) has been removed
+
+// https://reviews.llvm.org/D109239: Changed in 2022 to be based on a compiler
+// builtin that ClangImporter does not know how to expand.
+Var FLT_EVAL_METHOD has been removed
+
 /* Moved Decls */
 
 /* Renamed Decls */
 
 /* Type Changes */
+
+// FIXME: Cause unknown; possibly a regression. Header says `_Null_unspecified`.
+Var NSApp has declared type change from AppKit.NSApplication! to AppKit.NSApplication?
+
+// FIXME: Cause unknown; possibly a regression. Header has not been audited for nullability.
+Var _CurrentRuneLocale has declared type change from Swift.UnsafeMutablePointer<Darwin._RuneLocale>! to Swift.UnsafeMutablePointer<Darwin._RuneLocale>?
+Var __stderrp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var __stdinp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var __stdoutp has declared type change from Swift.UnsafeMutablePointer<Darwin.FILE>! to Swift.UnsafeMutablePointer<Darwin.FILE>?
+Var _c_locale has declared type change from Darwin.locale_t! to Darwin.locale_t?
+Var optarg has declared type change from Swift.UnsafeMutablePointer<Swift.CChar>! to Swift.UnsafeMutablePointer<Swift.CChar>?
+Var suboptarg has declared type change from Swift.UnsafeMutablePointer<Swift.CChar>! to Swift.UnsafeMutablePointer<Swift.CChar>?
+Var port_obj_table has declared type change from Swift.UnsafeMutablePointer<Darwin.port_obj_tentry>! to Swift.UnsafeMutablePointer<Darwin.port_obj_tentry>?
+Var vprintf_stderr_func has declared type change from ((Swift.UnsafePointer<Swift.CChar>?, Swift.CVaListPointer?) -> Swift.Int32)! to ((Swift.UnsafePointer<Swift.CChar>?, Swift.CVaListPointer?) -> Swift.Int32)?
 
 /* Decl Attribute changes */
 
@@ -183,6 +204,11 @@ Struct vfsidctl has removed conformance to Sendable
 Struct vfsstatfs has removed conformance to Sendable
 Struct vmspace has removed conformance to Sendable
 Struct wordexp_t has removed conformance to Sendable
+Struct NSAccessibility has removed conformance to Sendable
+
+// FIXME: NS_SWIFT_SENDABLE doesn't work on protocols.
+// !!! But it did in Swift 5.7??? !!!
+Protocol URLSessionDelegate has removed inherited protocol Sendable
 
 /* Protocol Requirement Change */
 
