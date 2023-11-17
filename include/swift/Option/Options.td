@@ -1948,4 +1948,9 @@ def load_plugin_executable:
            "of module names where the macro types are declared">,
   MetaVarName<"<path>#<module-names>">;
 
+def disable_sandbox:
+  Flag<["-"], "disable-sandbox">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable using the sandbox when executing subprocesses">;
+
 include "FrontendOptions.td"
