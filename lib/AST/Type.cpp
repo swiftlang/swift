@@ -607,15 +607,15 @@ void TypeBase::getRootOpenedExistentials(
 }
 
 Type TypeBase::typeEraseOpenedArchetypesWithRoot(
-    const OpenedArchetypeType *root, const DeclContext *useDC) const {
+    const OpenedArchetypeType *root) const {
   assert(root->isRoot() && "Expected a root archetype");
 
   Type type = Type(const_cast<TypeBase *>(this));
   if (!hasOpenedExistential())
     return type;
 
-  const auto sig = root->getASTContext().getOpenedExistentialSignature(
-      root->getExistentialType(), useDC->getGenericSignatureOfContext());
+  auto *env = root->getGenericEnvironment();
+  auto sig = env->getGenericSignature();
 
   unsigned metatypeDepth = 0;
 
@@ -665,9 +665,8 @@ Type TypeBase::typeEraseOpenedArchetypesWithRoot(
         return llvm::None;
       }
 
-      if (!root->isEqual(archetype->getRoot())) {
+      if (archetype->getGenericEnvironment() != env)
         return Type(ty);
-      }
 
       Type erasedTy;
       if (root->isEqual(archetype)) {
