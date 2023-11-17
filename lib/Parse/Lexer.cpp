@@ -32,9 +32,8 @@
 #include <limits>
 
 extern "C" bool
-swift_ASTGen_lexRegexLiteral(const char *_Nonnull *_Nonnull curPtrPtr,
-                             const char *_Nonnull bufferEndPtr,
-                             bool mustBeRegex, void *_Nullable diagEngine);
+swift_ASTGen_lexRegexLiteral(const char ** curPtrPtr, const char * bufferEndPtr,
+                             bool mustBeRegex, void * diagEngine);
 
 using namespace swift;
 

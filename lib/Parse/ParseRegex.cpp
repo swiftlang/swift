@@ -19,9 +19,9 @@
 #include "swift/Parse/Parser.h"
 
 extern "C" bool swift_ASTGen_parseRegexLiteral(
-    BridgedString input, size_t *_Nonnull versionOut,
-    void *_Nonnull UnsafeMutableRawPointer, size_t captureStructureSize,
-    BridgedSourceLoc diagLoc, void *_Nonnull diagEngine);
+    BridgedString input, size_t * versionOut,
+    void * UnsafeMutableRawPointer, size_t captureStructureSize,
+    BridgedSourceLoc diagLoc, void * diagEngine);
 
 using namespace swift;
 
