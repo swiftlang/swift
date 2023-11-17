@@ -12,7 +12,7 @@ let blah = /*test:ref*/add3.callAsFunction(x:y:)
 
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="test" -old-name "add3" >> %t.ranges/call-as-function-base.swift.expected
-// RUN: diff -u %S/FindRangeOutputs/call-as-function-base.swift.expected %t.ranges/call-as-function-base.swift.expected
+// RUN: diff -u %S/Outputs/call-as-function-base.swift.expected %t.ranges/call-as-function-base.swift.expected
 
 
 

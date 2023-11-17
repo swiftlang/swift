@@ -8,7 +8,7 @@ func /*param-label:def*/aFunc(a: Int) {}
 
 func /*arg-label:def*/aFunc(b a:Int) {}
 
-func /*no-label:def*/aFunc2(aLabel b:Int) -> Int {
+func /*no-label:def*/<base>aFunc</base>(<arglabel index=0>_</arglabel><param index=0> b</param>:Int) -> Int {
     return /*no-args:call*/aFunc()
 }
 
@@ -41,12 +41,12 @@ let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruc
 /*no-args:call*/aFunc()
 /*param-label:call*/aFunc(a: 2)
 /*arg-label:call*/aFunc(b: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())
-let _ = /*no-label:call*/aFunc2(aLabel: 3)
+let _ = /*no-label:call*/<base>aFunc</base>(<callcombo index=0></callcombo>3)
 /*whitespace-labels:call*/aFunc( a  :  2 ,2,  c:  4 )
 
 let _ = aStruct . /*method:call*/foo(a: 2, b: 3, 1)
 let _ = AStruct . /*method*/foo(aStruct)(a: 1, b: 8, 10)
-let _ = aStruct . /*bar:call*/bar(/*no-args:call*/aFunc())(/*no-label:call*/aFunc2(aLabel: 2))
+let _ = aStruct . /*bar:call*/bar(/*no-args:call*/aFunc())(/*no-label:call*/<base>aFunc</base>(<callcombo index=0></callcombo>2))
 
 var a = /*referenced*/bar
 var b = /*referenced*/bar(a:)
