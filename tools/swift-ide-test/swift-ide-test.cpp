@@ -414,12 +414,6 @@ static llvm::cl::opt<bool> CodeCompleteCallPatternHeuristics(
     llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-ObjCForwardDeclarations("enable-objc-forward-declarations",
-    llvm::cl::desc("Import Objective-C forward declarations when possible"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
@@ -4486,8 +4480,13 @@ int main(int argc, char *argv[]) {
     options::EnableDeserializationSafety;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
+  // The manner in which swift-ide-test constructs its CompilerInvocation does
+  // not hit the codepath in arg parsing that would normally construct
+  // ClangImporter options based on enabled language features etc. Explicitly
+  // enable them here.
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
-    options::ObjCForwardDeclarations;
+      InitInvok.getLangOptions().hasFeature(
+          Feature::ImportObjcForwardDeclarations);
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
